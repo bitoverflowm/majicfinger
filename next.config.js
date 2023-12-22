@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ["@nivo"],
   experimental: {
-    appDir: true,
     serverActions: true,
+    esmExternals: 'loose'
   },
   images: {
-    domains: ['bitoai-blog.ghost.io'],
+    domains: [''],
   },
 }
 
