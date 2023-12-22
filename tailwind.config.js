@@ -24,9 +24,9 @@ module.exports = {
         '9/16': '56.25%',
       },
       colors: {
-        'onyx': "#363946",
-        'ghost': "#FBFBFF",
-        'uranian': '#A5D8FF',
+        'majic-grey': "#7D8491",
+        'majic-white': "#FBFBFF",
+        'majic-blue': '#A5D8FF',
       },
       keyframes: {
         shiver: {

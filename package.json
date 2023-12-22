@@ -17,6 +17,7 @@
     "@nivo/bump": "^0.84.0",
     "@nivo/calendar": "^0.84.0",
     "@nivo/core": "^0.84.0",
+    "@nivo/line": "^0.84.0",
     "@stripe/react-stripe-js": "^1.16.5",
     "@stripe/stripe-js": "^1.47.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
