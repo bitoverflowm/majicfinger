@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect } from 'react'
 
 import { ResponsiveAreaBump } from '@nivo/bump'
 import { ResponsiveBar } from '@nivo/bar'
@@ -16,9 +16,14 @@ import { ResponsiveCalendar } from '@nivo/calendar'
 
 export default function Home() {
 
-  const [chart, setChart] = useState('bar')
+  const [chart, setChart] = useState('line')
+  const [dataVisible, setDataVisible] = useState(0)
+  const [activeData, setActiveData] = useState()
 
-  const barData = [
+  const [isEditing, setIsEditing] = useState()
+  const [liveData, setLiveData] = useState()
+
+  const defaultBarData = [
     {
       "country": "AD",
       "hot dog": 175,
@@ -126,7 +131,34 @@ export default function Home() {
     }
   ]
 
-  const lineData = [
+  const defaultBTCLine = [
+    {
+      "id": "BTC Price",
+      "data": [
+        {
+          "x": "Aug 22",
+          "y": 1100
+        },
+        {
+          "x": "Sept 22",
+          "y": 33578
+        },
+        {
+          "x": "Oct 22",
+          "y": 33578
+        },
+        {
+          "x": "Nov 22",
+          "y": 33578
+        },
+        {
+        "x": "Dec 22",
+        "y": 43578
+      }]
+    },
+  ]
+
+  const defaultLineData = [
     {
       "id": "japan",
       "color": "hsl(197, 70%, 50%)",
@@ -399,7 +431,7 @@ export default function Home() {
     }
   ]
 
-  const ghData = [
+  const defaultGhData = [
     {
       "value": 9,
       "day": "2016-12-26"
@@ -2573,12 +2605,63 @@ export default function Home() {
   /*
   styling  
   */
-  const button = 'text-xxs px-2 py-1 rounded-md border flex place-items-center place-content-center gap-1 cursor-pointer hover:bg-black hover:text-white'
+ //base button class
+ const button = 'text-xxs px-2 py-1 rounded-md border flex place-items-center place-content-center gap-1 cursor-pointer hover:bg-black hover:text-white'
+ // blue call to acton button
+  const actionButton = 'text-xxs px-2 py-1 rounded-md border flex place-items-center place-content-center gap-1 cursor-pointer hover:bg-black hover:text-white bg-majic-blue'
+  // When call to action is selected
+  const actionButtonActive = 'text-xxs px-2 py-1 rounded-md border flex place-items-center place-content-center gap-1 cursor-pointer hover:bg-black hover:text-white bg-black text-white'
+  //toggle button selected
   const selBtn = 'bg-black text-white'
+  //toggle button unselected
   const undBtn = 'bg-white text-black border-black'
 
+  const toggleDataView = () => {
+    setDataVisible(!dataVisible)
+  }
+
+  const toggleIsEditing = () => {
+    setIsEditing(!isEditing)
+  }
+
+  const handleDataChange = (event) => {
+    setLiveData(JSON.parse(event.target.value))
+  }
+
+  const handleSaveData = () => {
+    if(checkJSONValidity(liveData)){
+      setActiveData(liveData)
+    }else{
+      alert("error in json object")
+    }
+  }
+
+  const checkJSONValidity = (jsonData) => {
+    try{
+      JSON.parse(jsonData);
+      return { isValid: true, error: null };
+    } catch(error) {
+      const errorMessage = error.message
+      
+      let position
+      const match = errorMessage.match(/position (\d+)/);
+      
+      if (match) {
+        position = parseInt(match[1], 10);
+      }
+
+      return { isValid: false, error: errorMessage, position: position };
+    }
+  }
+
+  useEffect(()=> {
+    setActiveData(defaultBTCLine)
+    setLiveData(defaultBTCLine)
+  }, [])
+
+
   return (
-    <div className='w-full h-screen bg-white flex place-content-center place-items-center'>
+    <div className='w-full h-screen bg-white flex flex-col place-content-center place-items-center'>
       <div className='absolute top-10 left-10 flex flex-col'>
         <div className='text-xxs font-bold'>Switch Chart Type:</div>
         <div className='flex py-2 gap-2 text-sm'>
@@ -2587,16 +2670,35 @@ export default function Home() {
           <div onClick={()=>setChart('ghTrack')} className={`${button} ${chart === 'ghTrack' ? selBtn : undBtn}`}><IoBarChartOutline /> Calendar Chart</div>
         </div>
         <div className='py-2'>
-          <div className={`${button} text-xxs font-bold bg-majic-blue`}> <BsClipboardData /> Edit Data</div>
+          <div className={`${dataVisible ? actionButtonActive : actionButton }`} onClick={()=>toggleDataView()}> <BsClipboardData /> Data</div>
         </div>
       </div>
-      <div className='w-full h-content flex flex-col place-items-center place-content-center'>
-        <div className='w-full h-96 p-20 p-10'>
+      <div className={`${dataVisible ? 'text-xxs absolute right-0 h-screen flex-col border-l-4 w-2/4 bg-white bg-opacity-75 backdrop-blur-sm z-10' : 'hidden'}`}>
+        {
+          isEditing 
+            ? <div >
+                <div className='flex px-2 py-2 gap-1 w-full'>
+                  <div className={`${actionButton} p-1 w-1/6`} onClick={()=>handleSaveData()}>Save</div>
+                  <div className='flex w-5/6 place-content-end pr-5 gap-2'>
+                    <div className={`${button}  ${undBtn} p-1`} onClick={()=>toggleDataView()}>Close</div>
+                    <div className={`${button}  ${undBtn} p-1`} onClick={()=>setLiveData(activeData)}>Reset Data</div>
+                  </div>
+                </div>
+                <textarea value={JSON.stringify(liveData, null, 2)} onChange={handleDataChange}  className='h-dvh w-full'/>
+              </div>
+            : <div >
+                <pre onClick={()=>toggleIsEditing()}>{JSON.stringify(liveData, null, 2)}</pre>
+              </div>
+        }
+      </div>
+      <div className='px-20 w-full h-screen flex flex-col place-items-center place-content-center '>
+        <div className='w-full h-4/6 p-20 p-10 bg-majic-white shadow-xl rounded-lg text-center'>
+            <div className='text-xs font-bold'>Chart Heading</div>
             {
               chart && chart === "bar" 
                 &&             
                   <ResponsiveBar
-                    data={barData}
+                    data={defaultBarData}
                     keys={[
                         'hot dog',
                         'burger',
@@ -2714,12 +2816,90 @@ export default function Home() {
                     barAriaLabel={e=>e.id+": "+e.formattedValue+" in country: "+e.indexValue}
               />
             }
-
             {
               chart && chart === "line"
                 && <ResponsiveLine
-                      data={lineData}
-                      margin={{ top: 50, right: 110, bottom: 50, left: 60 }}
+                      data={defaultBTCLine}
+                      margin={{ top: 50, right: 110, bottom: 40, left: 60 }}
+                      xScale={{ type: 'point' }}
+                      yScale={{
+                          type: 'linear',
+                          min: 'auto',
+                          max: 'auto',
+                          stacked: true,
+                          reverse: false
+                      }}
+                      yFormat=" >-.2f"
+                      axisTop={null}
+                      axisRight={null}
+                      axisBottom={{
+                          tickSize: 5,
+                          tickPadding: 5,
+                          tickRotation: 0,
+                          legend: 'date',
+                          legendOffset: 36,
+                          legendPosition: 'middle'
+                      }}
+                      axisLeft={{
+                          tickSize: 5,
+                          tickPadding: 5,
+                          tickRotation: 0,
+                          legend: 'price',
+                          legendOffset: -40,
+                          legendPosition: 'middle'
+                      }}
+                      /*Curvature */
+                      curve="cardinal"
+                      /*Color Scheme */
+                      colors={{scheme: "pastel1"}}
+                      /*Line thickness */
+                      lineWidth={'6px'}
+                      /*Grid */
+                      enableGridX={false}
+                      enableGridY={false}
+                      /* points */
+                      enablePoints={false}
+                      pointSize={0}
+                      pointColor={{ theme: 'background' }}
+                      pointBorderWidth={2}
+                      pointBorderColor={{ from: 'serieColor' }}
+                      pointLabelYOffset={-12}
+                      useMesh={true}
+                      /*legend formatting */
+                      legends={[
+                          {
+                              anchor: 'bottom-right',
+                              direction: 'column',
+                              justify: false,
+                              translateX: 100,
+                              translateY: 0,
+                              itemsSpacing: 0,
+                              itemDirection: 'left-to-right',
+                              itemWidth: 80,
+                              itemHeight: 20,
+                              itemOpacity: 0.75,
+                              symbolSize: 12,
+                              symbolShape: 'circle',
+                              symbolBorderColor: 'rgba(0, 0, 0, .5)',
+                              effects: [
+                                  {
+                                      on: 'hover',
+                                      style: {
+                                          itemBackground: 'rgba(0, 0, 0, .03)',
+                                          itemOpacity: 1
+                                      }
+                                  }
+                              ]
+                          }
+                      ]}
+                    />
+            }
+
+            {
+              chart && chart === "line2"
+                && <ResponsiveLine
+                      data={defaultBTCLine}
+                      margin={{ top: 50, right: 110, bottom: 40, left: 60 }}
                       xScale={{ type: 'point' }}
                       yScale={{
                           type: 'linear',
@@ -2747,12 +2927,24 @@ export default function Home() {
                           legendOffset: -40,
                           legendPosition: 'middle'
                       }}
-                      pointSize={10}
+                      /*Curvature */
+                      curve="cardinal"
+                      /*Color Scheme */
+                      colors={{scheme: "pastel1"}}
+                      /*Line thickness */
+                      lineWidth={'6px'}
+                      /*Grid */
+                      enableGridX={false}
+                      enableGridY={false}
+                      /* points */
+                      enablePoints={false}
+                      pointSize={0}
                       pointColor={{ theme: 'background' }}
                       pointBorderWidth={2}
                       pointBorderColor={{ from: 'serieColor' }}
                       pointLabelYOffset={-12}
                       useMesh={true}
+                      /*legend formatting */
                       legends={[
                           {
                               anchor: 'bottom-right',
@@ -2784,7 +2976,7 @@ export default function Home() {
             {
               chart && chart === "ghTrack"
                 && <ResponsiveCalendar
-                data={ghData}
+                data={defaultGhData}
                 from="2015-03-01"
                 to="2016-07-12"
                 emptyColor="#eeeeee"
@@ -2808,12 +3000,11 @@ export default function Home() {
                 ]}
             />
 
-            }
-            
+            }            
         </div>
-        <div className='bg-majic-blue hover:bg-black hover-text-white my-10 p-2 rounded-md'>
-          Create New Chart
-        </div>
+      </div>
+      <div className={`${actionButton} mb-20`}>
+        Start New Chart
       </div>
     </div>
   )
