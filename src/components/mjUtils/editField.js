@@ -16,12 +16,19 @@ const EditField = ({val, keyval, saveVal, type, dataIndex}) => {
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (textareaRef.current && !textareaRef.current.contains(event.target)) {
-                setEditing(false);
-                // You can also call any other function here
-                setTempVal(currentTempVal => { 
-                    saveVal(keyval, currentTempVal, type, dataIndex); // Call saveVal if provided
-                    return currentTempVal;
-                });
+                if(textareaRef.current.value){
+                    setEditing(false);
+                    saveVal(keyval, textareaRef.current.value, type, dataIndex); // Call saveVal if provided
+                    return
+                    // You can also call any other function here
+                }else{
+                    if(val){
+                        setTempVal(val)
+                        setEditing(false)
+                    }else{
+                        setEditing(true)
+                    }
+                }
             }
         }
 
@@ -35,6 +42,10 @@ const EditField = ({val, keyval, saveVal, type, dataIndex}) => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [editing]);
+
+    useEffect(()=>{
+        setTempVal()
+    }, [val])
 
     
 

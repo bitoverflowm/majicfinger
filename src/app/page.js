@@ -2799,6 +2799,17 @@ export default function Home() {
     setLiveData(updatedData)
   }
 
+  const triggerAddSeries = () => {
+    if (liveData.length > 0) {
+      // Get the last series in the array
+      const lastSeries = liveData[liveData.length - 1];
+      console.log(liveData[liveData.length - 1])
+      // Duplicate the last series
+      const newSeries = { ...lastSeries, id: lastSeries.id +"#" };
+      setLiveData([...liveData, newSeries])
+    }
+  };
+
 
 
   useEffect(()=> {
@@ -3226,7 +3237,7 @@ export default function Home() {
                                   ))}
                                 </div>
                                 { (key+1) === liveData.length && 
-                                  <div className='flex place-content-center py-1 text-lg text-black'><IoAddCircle /></div>}
+                                  <div className='flex place-content-center py-1 text-lg text-black hover:text-majic-blue cursor-pointer' onClick={()=>triggerAddSeries()}><IoAddCircle /></div>}
                               </div>                              
                              </React.Fragment>
                           ))}
