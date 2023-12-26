@@ -31,6 +31,7 @@ export default function Home() {
 
   //States for views
   const [sideViewActive, setSideViewActive] = useState(false)
+  const [editViewActive, setEditViewActive] = useState()
   const [dataEditView, setDataEditView] = useState()
 
   //humanFriendly edit view
@@ -41,8 +42,10 @@ export default function Home() {
   const [previewOldData, setPreviewOldData] = useState()
 
   //States for data editing
+  //isEditing is speficically for editing JSON data
   const [isEditing, setIsEditing] = useState()
   const [liveData, setLiveData] = useState()
+  const [editingCell, setEditingCell] = useState()
 
   //chart variable holder
   const [xAxis, setXAxis] = useState()
@@ -164,6 +167,7 @@ export default function Home() {
   const defaultBTCLine = [
     {
       "id": "BTC Price",
+      "color": "hsl(243, 70%, 50%)",
       "data": [
         {
           "x": "Aug 22",
@@ -186,9 +190,9 @@ export default function Home() {
         "y": 43578
       }]
     },
-    /*
     {
       "id": "ETH Price",
+      "color": "hsl(243, 70%, 50%)",
       "data": [
         {
           "x": "Aug 22",
@@ -210,7 +214,7 @@ export default function Home() {
         "x": "Dec 22",
         "y": 43578
       }]
-    },*/
+    }
   ]
 
   const defaultLineData = [
@@ -2672,7 +2676,7 @@ export default function Home() {
   const undBtn = 'bg-white text-black border-black'
 
   //Table formatting
-  const tbl_Label = "px-2 py-2 bg-majic-white flex place-items-center place-content-center font-bold border border-majic-grey"
+  const tbl_Label = "px-2 py-2 bg-majic-white flex place-items-center place-content-center font-bold border border-majic-grey w-12"
   const tbl_axis = "px-2 py-2 border text-center border-majic-grey"
   const tbl_cell = "px-2 py-2 border text-center border-majic-grey"
 
@@ -2687,6 +2691,12 @@ export default function Home() {
 
   const toggleSideView = () => {
     setSideViewActive(!sideViewActive)
+    setEditViewActive(false)
+  }
+
+  const toggleEditView = () => {
+    setEditViewActive(!editViewActive)
+    setSideViewActive(false)
   }
 
   const toggleIsEditing = () => {
@@ -2811,7 +2821,6 @@ export default function Home() {
   };
 
 
-
   useEffect(()=> {
     setActiveData(defaultBTCLine)
     setLiveData(defaultBTCLine)
@@ -2822,6 +2831,7 @@ export default function Home() {
 
   return (
     <div className='w-full max-h-screen bg-white flex flex-col place-content-center place-items-center'>
+      {editingCell && <div className='absolute top-0 bg-majic-accent px-6 py-3 rounded-b-lg text-xs font-bold shadow-xl text-white z-20'>Click anywhere to save changes</div>}
       {/* Control panel */}
       <div className='absolute top-10 left-10 flex flex-col z-20'>
         <div className='text-xxs font-bold'>Switch Chart Type:</div>
@@ -2851,10 +2861,10 @@ export default function Home() {
 
       </div>
       {/*Parent dashboard panel */}
-      <div className={sideViewActive ? 'flex w-full h-screen place-items-center place-content-center': "w-screen h-screen"}>
+      <div className={`${sideViewActive && 'flex w-full h-screen place-items-center place-content-center'} ${editViewActive && 'flex w-full h-screen place-items-center place-content-center'} ${!(sideViewActive) && !(editViewActive) && 'w-screen h-screen'}`}>
         {/* Chart panel */}
         <div className={dataVisible ? 'w-screen z-0' : 'w-full h-screen flex flex-col place-items-center place-content-center'}>
-          <div className={sideViewActive ? `w-3/4 h-full`:`px-20 `}>
+          <div className={`${sideViewActive && 'w-3/4 h-full'} ${editViewActive && 'w-1/2 h-full'} ${!(sideViewActive) && !(editViewActive) && 'px-20'}`}>
             <div className='min-w-[800px] min-h-[600px] h-4/6 p-20 p-10 bg-majic-white shadow-xl rounded-lg text-center'>
                 <div className='text-xs font-bold'>Chart Heading</div>
                 {
@@ -3174,6 +3184,9 @@ export default function Home() {
               <div className={`${sideViewActive ? actionButtonActive: actionButton }`} onClick={toggleSideView}>
                   {sideViewActive ? 'Exit side-by-side view' : 'View chart side-by-side'}
               </div>
+              <div className={`${editViewActive ? actionButtonActive: actionButton }`} onClick={toggleEditView}>
+                  {editViewActive ? 'Exit Edit View' : 'View Edit View'}
+              </div>
             </div>
             <div className='flex gap-1'>
               <div className={`${button} ${dataEditView === "humanView" ? selBtn : undBtn }`} onClick={()=>change_data_editing_view("humanView")}><PiFinnTheHumanFill /> Human Friendly View </div>
@@ -3203,17 +3216,17 @@ export default function Home() {
                             <React.Fragment>
                               <div key={key} className='w-fit'>
                                 <div className='grid grid-flow-col grid-rows-2 auto-cols-auto'>
-                                  <div className={tbl_Label + " row-span-2"}><EditField val={item.id} keyval={key} saveVal={saveValues} type={'id'}/></div>
+                                  <div className={tbl_Label + " row-span-2"}><EditField val={item.id} keyval={key} saveVal={saveValues} type={'id'} setEditingCell={setEditingCell}/></div>
                                   <div className={tbl_axis}>{xAxis}</div>
                                   <div className={tbl_axis}>{yAxis}</div>
                                   {item.data.map((dataPoint, index) => (
                                     (index+1) === item.data.length ?
                                       <React.Fragment key={index}>
                                         <div className={tbl_cell}>
-                                          <EditField val={dataPoint.x} keyval={key} saveVal={saveValues} type={'x'} dataIndex={index}/>
+                                          <EditField val={dataPoint.x} keyval={key} saveVal={saveValues} type={'x'} dataIndex={index} setEditingCell={setEditingCell}/>
                                           </div>
                                         <div className={tbl_cell}>
-                                          <EditField val={dataPoint.y} keyval={key} saveVal={saveValues} type={'y'} dataIndex={index}/></div>
+                                          <EditField val={dataPoint.y} keyval={key} saveVal={saveValues} type={'y'} dataIndex={index} setEditingCell={setEditingCell}/></div>
                                         {
                                           addingXY 
                                             ? <>
@@ -3231,8 +3244,8 @@ export default function Home() {
                                         
                                       </React.Fragment>
                                       : <React.Fragment key={index}>
-                                        <div className={tbl_cell}><EditField val={dataPoint.x} keyval={key} saveVal={saveValues} type={'x'} dataIndex={index}/></div>
-                                        <div className={tbl_cell}><EditField val={dataPoint.y} keyval={key} saveVal={saveValues} type={'y'} dataIndex={index}/></div>
+                                        <div className={tbl_cell}><EditField val={dataPoint.x} keyval={key} saveVal={saveValues} type={'x'} dataIndex={index} setEditingCell={setEditingCell}/></div>
+                                        <div className={tbl_cell}><EditField val={dataPoint.y} keyval={key} saveVal={saveValues} type={'y'} dataIndex={index} setEditingCell={setEditingCell}/></div>
                                       </React.Fragment>
                                   ))}
                                 </div>
