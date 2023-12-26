@@ -1,27 +1,57 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 
 import { ResponsiveAreaBump } from '@nivo/bump'
 import { ResponsiveBar } from '@nivo/bar'
 import { ResponsiveLine } from '@nivo/line'
-
-import { useState } from 'react'
-
-import { IoBarChartOutline } from "react-icons/io5";
-import { BsClipboardData } from "react-icons/bs";
 import { ResponsiveCalendar } from '@nivo/calendar'
 
+import { IoBarChartOutline, IoAddCircle, IoAdd } from "react-icons/io5";
+import { BsClipboardData } from "react-icons/bs";
+import { VscJson } from "react-icons/vsc";
+import { PiFinnTheHumanFill } from "react-icons/pi";
+import { CiViewTable } from "react-icons/ci";
+import { SlMagicWand } from "react-icons/sl";
+import { FaLongArrowAltRight } from "react-icons/fa";
+import { FaRegEye } from "react-icons/fa";
+import { LuTimerReset } from "react-icons/lu";
+import { MdOutlineCreateNewFolder } from "react-icons/md";
+import { GoEyeClosed } from "react-icons/go";
+
+
+
+import EditField from '@/components/mjUtils/editField'
 
 
 export default function Home() {
 
   const [chart, setChart] = useState('line')
   const [dataVisible, setDataVisible] = useState(0)
-  const [activeData, setActiveData] = useState()
 
+  //States for views
+  const [sideViewActive, setSideViewActive] = useState(false)
+  const [dataEditView, setDataEditView] = useState()
+
+  //humanFriendly edit view
+  const [horizontalTable, setHorizontalTable] = useState(true)
+
+  //the parent data; this is correct, and is master
+  const [activeData, setActiveData] = useState()
+  const [previewOldData, setPreviewOldData] = useState()
+
+  //States for data editing
   const [isEditing, setIsEditing] = useState()
   const [liveData, setLiveData] = useState()
+
+  //chart variable holder
+  const [xAxis, setXAxis] = useState()
+  const [yAxis, setYAxis] = useState()
+
+  //edit data field states
+  const [addingXY, setAddingXY] = useState()
+  const [tempX, setTempX] = useState('')
+  const [tempY, setTempY] = useState('')
 
   const defaultBarData = [
     {
@@ -156,6 +186,31 @@ export default function Home() {
         "y": 43578
       }]
     },
+    /*
+    {
+      "id": "ETH Price",
+      "data": [
+        {
+          "x": "Aug 22",
+          "y": 1100
+        },
+        {
+          "x": "Sept 22",
+          "y": 33578
+        },
+        {
+          "x": "Oct 22",
+          "y": 33578
+        },
+        {
+          "x": "Nov 22",
+          "y": 33578
+        },
+        {
+        "x": "Dec 22",
+        "y": 43578
+      }]
+    },*/
   ]
 
   const defaultLineData = [
@@ -2605,9 +2660,9 @@ export default function Home() {
   /*
   styling  
   */
- //base button class
- const button = 'text-xxs px-2 py-1 rounded-md border flex place-items-center place-content-center gap-1 cursor-pointer hover:bg-black hover:text-white'
- // blue call to acton button
+  //base button class
+  const button = 'text-xxs px-2 py-1 rounded-md border flex place-items-center place-content-center gap-1 cursor-pointer hover:bg-black hover:text-white'
+  // blue call to acton button
   const actionButton = 'text-xxs px-2 py-1 rounded-md border flex place-items-center place-content-center gap-1 cursor-pointer hover:bg-black hover:text-white bg-majic-blue'
   // When call to action is selected
   const actionButtonActive = 'text-xxs px-2 py-1 rounded-md border flex place-items-center place-content-center gap-1 cursor-pointer hover:bg-black hover:text-white bg-black text-white'
@@ -2616,17 +2671,49 @@ export default function Home() {
   //toggle button unselected
   const undBtn = 'bg-white text-black border-black'
 
+  //Table formatting
+  const tbl_Label = "px-2 py-2 bg-majic-white flex place-items-center place-content-center font-bold border border-majic-grey"
+  const tbl_axis = "px-2 py-2 border text-center border-majic-grey"
+  const tbl_cell = "px-2 py-2 border text-center border-majic-grey"
+
+  /*
+  * Handle Views
+  */
+
   const toggleDataView = () => {
     setDataVisible(!dataVisible)
+    setSideViewActive(false)
+  }
+
+  const toggleSideView = () => {
+    setSideViewActive(!sideViewActive)
   }
 
   const toggleIsEditing = () => {
     setIsEditing(!isEditing)
   }
 
+
+
+  const change_data_editing_view = ( arg ) => {
+    if(arg === "humanView"){
+      setDataEditView("humanView")
+    }else if(arg === "jsonView"){
+      setDataEditView("jsonView")
+    }else if(arg === "sheetView"){
+      setDataEditView("sheetView")
+    }else if(arg === "majicView"){
+      setDataEditView("majicView")
+    }
+  }
+  
+  /*
+    * data management
+   */
+
   const handleDataChange = (event) => {
     setLiveData(JSON.parse(event.target.value))
-  }
+  }  
 
   const handleSaveData = () => {
     if(checkJSONValidity(liveData)){
@@ -2654,15 +2741,78 @@ export default function Home() {
     }
   }
 
+  const triggerAddXY = () =>{
+    //add state to show new cells for x and y
+    setAddingXY(true)
+    //these will be editFields
+  }
+
+  const handleXDataAdd = (e) => {
+    setTempX(e.target.value)
+  }
+
+  const handleYDataAdd = (e) => {
+    setTempY(e.target.value)
+  }
+
+  const saveAddXY = (key) => {
+    //id is the id of the data series being added to
+    if(tempX && tempY){
+      
+      setLiveData(currentLiveData => {
+        return currentLiveData.map((item, index)=> {
+          if(index === key){
+            return {
+              ...item,
+              data: [...item.data, {x: tempX, y: parseInt(tempY, 10)}]
+            };
+          }
+          return item;
+        })
+      })
+      setTempX('');
+      setTempY('');
+      setAddingXY()
+    }
+  }
+
+  /* Manipulating Data */
+  const saveValues = (key, newVal, type, dataIndex=null) => {
+    const updatedData = liveData.map((item, index) => {
+      if (index === key) {
+        if (type === 'id') {
+          return { ...item, id: newVal };
+        } else if (type === 'x' || type === 'y') {
+          return { 
+            ...item, 
+            data: item.data.map((dataPoint, idx) => {
+              if (idx === dataIndex) {
+                return { ...dataPoint, [type]: newVal };
+              }
+              return dataPoint;
+            })
+          };
+        }
+      }
+      return item;
+    });
+    setLiveData(updatedData)
+  }
+
+
+
   useEffect(()=> {
     setActiveData(defaultBTCLine)
     setLiveData(defaultBTCLine)
+    setXAxis('date')
+    setYAxis('price')
   }, [])
 
 
   return (
-    <div className='w-full h-screen bg-white flex flex-col place-content-center place-items-center'>
-      <div className='absolute top-10 left-10 flex flex-col'>
+    <div className='w-full max-h-screen bg-white flex flex-col place-content-center place-items-center'>
+      {/* Control panel */}
+      <div className='absolute top-10 left-10 flex flex-col z-20'>
         <div className='text-xxs font-bold'>Switch Chart Type:</div>
         <div className='flex py-2 gap-2 text-sm'>
           <div onClick={()=>setChart('bar')} className={`${button} ${chart === 'bar' ? selBtn : undBtn}`}><IoBarChartOutline /> Bar</div>
@@ -2672,337 +2822,477 @@ export default function Home() {
         <div className='py-2'>
           <div className={`${dataVisible ? actionButtonActive : actionButton }`} onClick={()=>toggleDataView()}> <BsClipboardData /> Data</div>
         </div>
-      </div>
-      <div className={`${dataVisible ? 'text-xxs absolute right-0 h-screen flex-col border-l-4 w-2/4 bg-white bg-opacity-75 backdrop-blur-sm z-10' : 'hidden'}`}>
-        {
-          isEditing 
-            ? <div >
-                <div className='flex px-2 py-2 gap-1 w-full'>
-                  <div className={`${actionButton} p-1 w-1/6`} onClick={()=>handleSaveData()}>Save</div>
-                  <div className='flex w-5/6 place-content-end pr-5 gap-2'>
-                    <div className={`${button}  ${undBtn} p-1`} onClick={()=>toggleDataView()}>Close</div>
-                    <div className={`${button}  ${undBtn} p-1`} onClick={()=>setLiveData(activeData)}>Reset Data</div>
-                  </div>
-                </div>
-                <textarea value={JSON.stringify(liveData, null, 2)} onChange={handleDataChange}  className='h-dvh w-full'/>
-              </div>
-            : <div >
-                <pre onClick={()=>toggleIsEditing()}>{JSON.stringify(liveData, null, 2)}</pre>
-              </div>
+        <div className='flex py-1 gap-2 text-sm'>
+          <div  className={`${button} ${previewOldData? selBtn : undBtn}`} onClick={()=>setPreviewOldData(!previewOldData)}><FaRegEye /> Preview Old Data State</div>
+        </div>
+        <div className='flex py-1 gap-2 text-sm'>
+          <div onClick={()=>setLiveData(activeData)} className={`${button} ${undBtn}`}><LuTimerReset  /> Reset to Old Data State</div>
+        </div>
+        <div className='flex py-1 gap-2 text-sm'>
+          <div onClick={()=>setActiveData(liveData)} className={`${button} ${undBtn}`}><MdOutlineCreateNewFolder /> Replace Old Data With Live Data</div>
+        </div>
+        { previewOldData &&
+          <div className='rounded-md mt-2 px-4 max-w-96 pt-6 bg-majic-blue bg-opacity-20 backdrop-blur-sm'>
+            <div className='flex place-content-end' onClick={()=>setPreviewOldData(false)}><GoEyeClosed /></div>
+            <pre onClick={()=>toggleIsEditing()}>{JSON.stringify(activeData, null, 2)}</pre>
+          </div>
         }
+
       </div>
-      <div className='px-20 w-full h-screen flex flex-col place-items-center place-content-center '>
-        <div className='w-full h-4/6 p-20 p-10 bg-majic-white shadow-xl rounded-lg text-center'>
-            <div className='text-xs font-bold'>Chart Heading</div>
-            {
-              chart && chart === "bar" 
-                &&             
-                  <ResponsiveBar
-                    data={defaultBarData}
-                    keys={[
-                        'hot dog',
-                        'burger',
-                        'sandwich',
-                        'kebab',
-                        'fries',
-                        'donut'
-                    ]}
-                    indexBy="country"
-                    margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
-                    padding={0.3}
-                    valueScale={{ type: 'linear' }}
-                    indexScale={{ type: 'band', round: true }}
-                    colors={{ scheme: 'nivo' }}
-                    defs={[
-                        {
-                            id: 'dots',
-                            type: 'patternDots',
-                            background: 'inherit',
-                            color: '#38bcb2',
-                            size: 4,
-                            padding: 1,
-                            stagger: true
-                        },
-                        {
-                            id: 'lines',
-                            type: 'patternLines',
-                            background: 'inherit',
-                            color: '#eed312',
-                            rotation: -45,
-                            lineWidth: 6,
-                            spacing: 10
-                        }
-                    ]}
-                    fill={[
-                        {
-                            match: {
-                                id: 'fries'
+      {/*Parent dashboard panel */}
+      <div className={sideViewActive ? 'flex w-full h-screen place-items-center place-content-center': "w-screen h-screen"}>
+        {/* Chart panel */}
+        <div className={dataVisible ? 'w-screen z-0' : 'w-full h-screen flex flex-col place-items-center place-content-center'}>
+          <div className={sideViewActive ? `w-3/4 h-full`:`px-20 `}>
+            <div className='min-w-[800px] min-h-[600px] h-4/6 p-20 p-10 bg-majic-white shadow-xl rounded-lg text-center'>
+                <div className='text-xs font-bold'>Chart Heading</div>
+                {
+                  chart && chart === "bar" 
+                    &&             
+                      <ResponsiveBar
+                        data={defaultBarData}
+                        keys={[
+                            'hot dog',
+                            'burger',
+                            'sandwich',
+                            'kebab',
+                            'fries',
+                            'donut'
+                        ]}
+                        indexBy="country"
+                        margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
+                        padding={0.3}
+                        valueScale={{ type: 'linear' }}
+                        indexScale={{ type: 'band', round: true }}
+                        colors={{ scheme: 'nivo' }}
+                        defs={[
+                            {
+                                id: 'dots',
+                                type: 'patternDots',
+                                background: 'inherit',
+                                color: '#38bcb2',
+                                size: 4,
+                                padding: 1,
+                                stagger: true
                             },
-                            id: 'dots'
-                        },
-                        {
-                            match: {
-                                id: 'sandwich'
+                            {
+                                id: 'lines',
+                                type: 'patternLines',
+                                background: 'inherit',
+                                color: '#eed312',
+                                rotation: -45,
+                                lineWidth: 6,
+                                spacing: 10
+                            }
+                        ]}
+                        fill={[
+                            {
+                                match: {
+                                    id: 'fries'
+                                },
+                                id: 'dots'
                             },
-                            id: 'lines'
-                        }
-                    ]}
-                    borderColor={{
-                        from: 'color',
-                        modifiers: [
-                            [
-                                'darker',
-                                1.6
+                            {
+                                match: {
+                                    id: 'sandwich'
+                                },
+                                id: 'lines'
+                            }
+                        ]}
+                        borderColor={{
+                            from: 'color',
+                            modifiers: [
+                                [
+                                    'darker',
+                                    1.6
+                                ]
                             ]
-                        ]
-                    }}
-                    axisTop={null}
-                    axisRight={null}
-                    axisBottom={{
-                        tickSize: 5,
-                        tickPadding: 5,
-                        tickRotation: 0,
-                        legend: 'country',
-                        legendPosition: 'middle',
-                        legendOffset: 32,
-                        truncateTickAt: 0
-                    }}
-                    axisLeft={{
-                        tickSize: 5,
-                        tickPadding: 5,
-                        tickRotation: 0,
-                        legend: 'food',
-                        legendPosition: 'middle',
-                        legendOffset: -40,
-                        truncateTickAt: 0
-                    }}
-                    labelSkipWidth={12}
-                    labelSkipHeight={12}
-                    labelTextColor={{
-                        from: 'color',
-                        modifiers: [
-                            [
-                                'darker',
-                                1.6
+                        }}
+                        axisTop={null}
+                        axisRight={null}
+                        axisBottom={{
+                            tickSize: 5,
+                            tickPadding: 5,
+                            tickRotation: 0,
+                            legend: 'country',
+                            legendPosition: 'middle',
+                            legendOffset: 32,
+                            truncateTickAt: 0
+                        }}
+                        axisLeft={{
+                            tickSize: 5,
+                            tickPadding: 5,
+                            tickRotation: 0,
+                            legend: 'food',
+                            legendPosition: 'middle',
+                            legendOffset: -40,
+                            truncateTickAt: 0
+                        }}
+                        labelSkipWidth={12}
+                        labelSkipHeight={12}
+                        labelTextColor={{
+                            from: 'color',
+                            modifiers: [
+                                [
+                                    'darker',
+                                    1.6
+                                ]
                             ]
-                        ]
-                    }}
+                        }}
+                        legends={[
+                            {
+                                dataFrom: 'keys',
+                                anchor: 'bottom-right',
+                                direction: 'column',
+                                justify: false,
+                                translateX: 120,
+                                translateY: 0,
+                                itemsSpacing: 2,
+                                itemWidth: 100,
+                                itemHeight: 20,
+                                itemDirection: 'left-to-right',
+                                itemOpacity: 0.85,
+                                symbolSize: 20,
+                                effects: [
+                                    {
+                                        on: 'hover',
+                                        style: {
+                                            itemOpacity: 1
+                                        }
+                                    }
+                                ]
+                            }
+                        ]}
+                        role="application"
+                        ariaLabel="Nivo bar chart demo"
+                        barAriaLabel={e=>e.id+": "+e.formattedValue+" in country: "+e.indexValue}
+                  />
+                }
+                {
+                  chart && chart === "line"
+                    && <ResponsiveLine
+                          data={liveData}
+                          margin={{ top: 50, right: 110, bottom: 40, left: 60 }}
+                          xScale={{ type: 'point' }}
+                          yScale={{
+                              type: 'linear',
+                              min: 'auto',
+                              max: 'auto',
+                              stacked: true,
+                              reverse: false
+                          }}
+                          yFormat=" >-.2f"
+                          axisTop={null}
+                          axisRight={null}
+                          axisBottom={{
+                              tickSize: 5,
+                              tickPadding: 5,
+                              tickRotation: 0,
+                              legend: xAxis,
+                              legendOffset: 36,
+                              legendPosition: 'middle'
+                          }}
+                          axisLeft={{
+                              tickSize: 5,
+                              tickPadding: 5,
+                              tickRotation: 0,
+                              legend: yAxis,
+                              legendOffset: -40,
+                              legendPosition: 'middle'
+                          }}
+                          /*Curvature */
+                          curve="cardinal"
+                          /*Color Scheme */
+                          colors={{scheme: "pastel1"}}
+                          /*Line thickness */
+                          lineWidth={'4px'}
+                          /*Grid */
+                          enableGridX={false}
+                          enableGridY={false}
+                          /* points */
+                          enablePoints={false}
+                          pointSize={0}
+                          pointColor={{ theme: 'background' }}
+                          pointBorderWidth={2}
+                          pointBorderColor={{ from: 'serieColor' }}
+                          pointLabelYOffset={-12}
+                          useMesh={true}
+                          /*legend formatting */
+                          legends={[
+                              {
+                                  anchor: 'bottom-right',
+                                  direction: 'column',
+                                  justify: false,
+                                  translateX: 100,
+                                  translateY: 0,
+                                  itemsSpacing: 0,
+                                  itemDirection: 'left-to-right',
+                                  itemWidth: 80,
+                                  itemHeight: 20,
+                                  itemOpacity: 0.75,
+                                  symbolSize: 12,
+                                  symbolShape: 'circle',
+                                  symbolBorderColor: 'rgba(0, 0, 0, .5)',
+                                  effects: [
+                                      {
+                                          on: 'hover',
+                                          style: {
+                                              itemBackground: 'rgba(0, 0, 0, .03)',
+                                              itemOpacity: 1
+                                          }
+                                      }
+                                  ]
+                              }
+                          ]}
+                        />
+                }
+
+                {
+                  chart && chart === "line2"
+                    && <ResponsiveLine
+                          data={defaultBTCLine}
+                          margin={{ top: 50, right: 110, bottom: 40, left: 60 }}
+                          xScale={{ type: 'point' }}
+                          yScale={{
+                              type: 'linear',
+                              min: 'auto',
+                              max: 'auto',
+                              stacked: true,
+                              reverse: false
+                          }}
+                          yFormat=" >-.2f"
+                          axisTop={null}
+                          axisRight={null}
+                          axisBottom={{
+                              tickSize: 5,
+                              tickPadding: 5,
+                              tickRotation: 0,
+                              legend: 'transportation',
+                              legendOffset: 36,
+                              legendPosition: 'middle'
+                          }}
+                          axisLeft={{
+                              tickSize: 5,
+                              tickPadding: 5,
+                              tickRotation: 0,
+                              legend: 'count',
+                              legendOffset: -40,
+                              legendPosition: 'middle'
+                          }}
+                          /*Curvature */
+                          curve="cardinal"
+                          /*Color Scheme */
+                          colors={{scheme: "pastel1"}}
+                          /*Line thickness */
+                          lineWidth={'6px'}
+                          /*Grid */
+                          enableGridX={false}
+                          enableGridY={false}
+                          /* points */
+                          enablePoints={false}
+                          pointSize={0}
+                          pointColor={{ theme: 'background' }}
+                          pointBorderWidth={2}
+                          pointBorderColor={{ from: 'serieColor' }}
+                          pointLabelYOffset={-12}
+                          useMesh={true}
+                          /*legend formatting */
+                          legends={[
+                              {
+                                  anchor: 'bottom-right',
+                                  direction: 'column',
+                                  justify: false,
+                                  translateX: 100,
+                                  translateY: 0,
+                                  itemsSpacing: 0,
+                                  itemDirection: 'left-to-right',
+                                  itemWidth: 80,
+                                  itemHeight: 20,
+                                  itemOpacity: 0.75,
+                                  symbolSize: 12,
+                                  symbolShape: 'circle',
+                                  symbolBorderColor: 'rgba(0, 0, 0, .5)',
+                                  effects: [
+                                      {
+                                          on: 'hover',
+                                          style: {
+                                              itemBackground: 'rgba(0, 0, 0, .03)',
+                                              itemOpacity: 1
+                                          }
+                                      }
+                                  ]
+                              }
+                          ]}
+                        />
+                }
+                {
+                  chart && chart === "ghTrack"
+                    && <ResponsiveCalendar
+                    data={defaultGhData}
+                    from="2015-03-01"
+                    to="2016-07-12"
+                    emptyColor="#eeeeee"
+                    colors={[ '#61cdbb', '#97e3d5', '#e8c1a0', '#f47560' ]}
+                    margin={{ top: 40, right: 40, bottom: 40, left: 40 }}
+                    yearSpacing={40}
+                    monthBorderColor="#ffffff"
+                    dayBorderWidth={2}
+                    dayBorderColor="#ffffff"
                     legends={[
                         {
-                            dataFrom: 'keys',
                             anchor: 'bottom-right',
-                            direction: 'column',
-                            justify: false,
-                            translateX: 120,
-                            translateY: 0,
-                            itemsSpacing: 2,
-                            itemWidth: 100,
-                            itemHeight: 20,
-                            itemDirection: 'left-to-right',
-                            itemOpacity: 0.85,
-                            symbolSize: 20,
-                            effects: [
-                                {
-                                    on: 'hover',
-                                    style: {
-                                        itemOpacity: 1
-                                    }
-                                }
-                            ]
+                            direction: 'row',
+                            translateY: 36,
+                            itemCount: 4,
+                            itemWidth: 42,
+                            itemHeight: 36,
+                            itemsSpacing: 14,
+                            itemDirection: 'right-to-left'
                         }
                     ]}
-                    role="application"
-                    ariaLabel="Nivo bar chart demo"
-                    barAriaLabel={e=>e.id+": "+e.formattedValue+" in country: "+e.indexValue}
-              />
-            }
-            {
-              chart && chart === "line"
-                && <ResponsiveLine
-                      data={defaultBTCLine}
-                      margin={{ top: 50, right: 110, bottom: 40, left: 60 }}
-                      xScale={{ type: 'point' }}
-                      yScale={{
-                          type: 'linear',
-                          min: 'auto',
-                          max: 'auto',
-                          stacked: true,
-                          reverse: false
-                      }}
-                      yFormat=" >-.2f"
-                      axisTop={null}
-                      axisRight={null}
-                      axisBottom={{
-                          tickSize: 5,
-                          tickPadding: 5,
-                          tickRotation: 0,
-                          legend: 'date',
-                          legendOffset: 36,
-                          legendPosition: 'middle'
-                      }}
-                      axisLeft={{
-                          tickSize: 5,
-                          tickPadding: 5,
-                          tickRotation: 0,
-                          legend: 'price',
-                          legendOffset: -40,
-                          legendPosition: 'middle'
-                      }}
-                      /*Curvature */
-                      curve="cardinal"
-                      /*Color Scheme */
-                      colors={{scheme: "pastel1"}}
-                      /*Line thickness */
-                      lineWidth={'6px'}
-                      /*Grid */
-                      enableGridX={false}
-                      enableGridY={false}
-                      /* points */
-                      enablePoints={false}
-                      pointSize={0}
-                      pointColor={{ theme: 'background' }}
-                      pointBorderWidth={2}
-                      pointBorderColor={{ from: 'serieColor' }}
-                      pointLabelYOffset={-12}
-                      useMesh={true}
-                      /*legend formatting */
-                      legends={[
-                          {
-                              anchor: 'bottom-right',
-                              direction: 'column',
-                              justify: false,
-                              translateX: 100,
-                              translateY: 0,
-                              itemsSpacing: 0,
-                              itemDirection: 'left-to-right',
-                              itemWidth: 80,
-                              itemHeight: 20,
-                              itemOpacity: 0.75,
-                              symbolSize: 12,
-                              symbolShape: 'circle',
-                              symbolBorderColor: 'rgba(0, 0, 0, .5)',
-                              effects: [
-                                  {
-                                      on: 'hover',
-                                      style: {
-                                          itemBackground: 'rgba(0, 0, 0, .03)',
-                                          itemOpacity: 1
-                                      }
-                                  }
-                              ]
-                          }
-                      ]}
-                    />
-            }
+                />
 
+                }            
+            </div>
+          </div>
+        </div>
+        {/* Data editing panel */}
+        <div className={`${dataVisible ? 'text-xxs absolute right-0 top-0 h-screen flex-col place-items-center place-content-center border-l-0 border-majic-blue bg-white bg-opacity-75 backdrop-blur-sm' : 'hidden'} ${sideViewActive ? "w-1/4": "w-1/2 z-10"}`}>
+          <div className='flex flex-col p-6 pt-4 h-full w-full'>
+            <div className='py-2 flex'>
+              <div className={`${sideViewActive ? actionButtonActive: actionButton }`} onClick={toggleSideView}>
+                  {sideViewActive ? 'Exit side-by-side view' : 'View chart side-by-side'}
+              </div>
+            </div>
+            <div className='flex gap-1'>
+              <div className={`${button} ${dataEditView === "humanView" ? selBtn : undBtn }`} onClick={()=>change_data_editing_view("humanView")}><PiFinnTheHumanFill /> Human Friendly View </div>
+              <div className={`${button} ${dataEditView === "jsonView" ? selBtn : undBtn }`} onClick={()=>change_data_editing_view("jsonView")}><VscJson /> JSON</div>
+              <div className={`${button} ${dataEditView === "sheetView" ? selBtn : undBtn }`} onClick={()=>change_data_editing_view("sheetView")}><CiViewTable /> Spreadsheet</div>
+              <div className={`${button} ${dataEditView === "majicView" ? selBtn : undBtn }`} onClick={()=>change_data_editing_view("majicView")}><SlMagicWand /> Majic</div>
+            </div>
             {
-              chart && chart === "line2"
-                && <ResponsiveLine
-                      data={defaultBTCLine}
-                      margin={{ top: 50, right: 110, bottom: 40, left: 60 }}
-                      xScale={{ type: 'point' }}
-                      yScale={{
-                          type: 'linear',
-                          min: 'auto',
-                          max: 'auto',
-                          stacked: true,
-                          reverse: false
-                      }}
-                      yFormat=" >-.2f"
-                      axisTop={null}
-                      axisRight={null}
-                      axisBottom={{
-                          tickSize: 5,
-                          tickPadding: 5,
-                          tickRotation: 0,
-                          legend: 'transportation',
-                          legendOffset: 36,
-                          legendPosition: 'middle'
-                      }}
-                      axisLeft={{
-                          tickSize: 5,
-                          tickPadding: 5,
-                          tickRotation: 0,
-                          legend: 'count',
-                          legendOffset: -40,
-                          legendPosition: 'middle'
-                      }}
-                      /*Curvature */
-                      curve="cardinal"
-                      /*Color Scheme */
-                      colors={{scheme: "pastel1"}}
-                      /*Line thickness */
-                      lineWidth={'6px'}
-                      /*Grid */
-                      enableGridX={false}
-                      enableGridY={false}
-                      /* points */
-                      enablePoints={false}
-                      pointSize={0}
-                      pointColor={{ theme: 'background' }}
-                      pointBorderWidth={2}
-                      pointBorderColor={{ from: 'serieColor' }}
-                      pointLabelYOffset={-12}
-                      useMesh={true}
-                      /*legend formatting */
-                      legends={[
-                          {
-                              anchor: 'bottom-right',
-                              direction: 'column',
-                              justify: false,
-                              translateX: 100,
-                              translateY: 0,
-                              itemsSpacing: 0,
-                              itemDirection: 'left-to-right',
-                              itemWidth: 80,
-                              itemHeight: 20,
-                              itemOpacity: 0.75,
-                              symbolSize: 12,
-                              symbolShape: 'circle',
-                              symbolBorderColor: 'rgba(0, 0, 0, .5)',
-                              effects: [
-                                  {
-                                      on: 'hover',
-                                      style: {
-                                          itemBackground: 'rgba(0, 0, 0, .03)',
-                                          itemOpacity: 1
-                                      }
-                                  }
-                              ]
-                          }
-                      ]}
-                    />
-            }
-            {
-              chart && chart === "ghTrack"
-                && <ResponsiveCalendar
-                data={defaultGhData}
-                from="2015-03-01"
-                to="2016-07-12"
-                emptyColor="#eeeeee"
-                colors={[ '#61cdbb', '#97e3d5', '#e8c1a0', '#f47560' ]}
-                margin={{ top: 40, right: 40, bottom: 40, left: 40 }}
-                yearSpacing={40}
-                monthBorderColor="#ffffff"
-                dayBorderWidth={2}
-                dayBorderColor="#ffffff"
-                legends={[
-                    {
-                        anchor: 'bottom-right',
-                        direction: 'row',
-                        translateY: 36,
-                        itemCount: 4,
-                        itemWidth: 42,
-                        itemHeight: 36,
-                        itemsSpacing: 14,
-                        itemDirection: 'right-to-left'
+              /* humanView */
+              dataEditView === "humanView" && 
+                <div className='flex flex-col gap-2 py-10 px-10'>
+                  <div className=''>Human Friendly View</div>
+                  <div className=''><span className='bg-majic-accent text-white px-1 pt-1'>Click</span> any value to change.</div>                  
+                  <div className='font-bold pt-2 text-sm'>Your Data</div>
+                  <div className='flex flex-wrap gap-4'>
+                    <div className='flex gap-2'><div>x-axis: </div><div className='font-black'>{xAxis}</div></div>
+                    <div className='flex gap-2'><div>y-axis: </div> <div className='font-black'>{yAxis}</div></div>
+                  </div>
+                  <div className='flex'>
+                    <div className={button + " "+ undBtn} onClick={()=>setHorizontalTable(!horizontalTable)}>{ horizontalTable ? 'Vertical' : 'Horizontal'} </div>
+                  </div>
+                  {/*Data table container */}
+                  <div className='px-4 py-5'>
+                    { horizontalTable ? 
+                        <div>
+                          {liveData.map((item, key) => (
+                            <React.Fragment>
+                              <div key={key} className='w-fit'>
+                                <div className='grid grid-flow-col grid-rows-2 auto-cols-auto'>
+                                  <div className={tbl_Label + " row-span-2"}><EditField val={item.id} keyval={key} saveVal={saveValues} type={'id'}/></div>
+                                  <div className={tbl_axis}>{xAxis}</div>
+                                  <div className={tbl_axis}>{yAxis}</div>
+                                  {item.data.map((dataPoint, index) => (
+                                    (index+1) === item.data.length ?
+                                      <React.Fragment key={index}>
+                                        <div className={tbl_cell}>
+                                          <EditField val={dataPoint.x} keyval={key} saveVal={saveValues} type={'x'} dataIndex={index}/>
+                                          </div>
+                                        <div className={tbl_cell}>
+                                          <EditField val={dataPoint.y} keyval={key} saveVal={saveValues} type={'y'} dataIndex={index}/></div>
+                                        {
+                                          addingXY 
+                                            ? <>
+                                                <div key={index + 1} className='flex flex-col place-items-center px-1 row-span-2 border border-majic-blue mx-2'>
+                                                  <div className='text-center'><textarea placeholder={`new ${xAxis}`} className='max-w-12' style={{resize: 'none'}} onChange={handleXDataAdd}/></div>
+                                                  <div className='text-center'><textarea placeholder={`new ${yAxis}`} className='max-w-12' style={{resize: 'none'}} onChange={handleYDataAdd}/></div>
+                                                </div>
+                                                <div className={`${selBtn} ${button} my-auto`}>+ Multi</div>
+                                                <div className={`${actionButton} my-auto ${tempX.length >0 && tempY.length >0 ? '': 'disabled hover:bg-majic-blue hover:text-black'}`} onClick={()=>saveAddXY(key)}>Save</div>
+                                              </>
+                                            : <div key={index + 1} className='flex place-items-center px-1 bg-majic-blue rounded-r-lg row-span-2' onClick={()=>triggerAddXY()}>
+                                                <IoAddCircle />
+                                              </div>
+                                        }
+                                        
+                                      </React.Fragment>
+                                      : <React.Fragment key={index}>
+                                        <div className={tbl_cell}><EditField val={dataPoint.x} keyval={key} saveVal={saveValues} type={'x'} dataIndex={index}/></div>
+                                        <div className={tbl_cell}><EditField val={dataPoint.y} keyval={key} saveVal={saveValues} type={'y'} dataIndex={index}/></div>
+                                      </React.Fragment>
+                                  ))}
+                                </div>
+                                { (key+1) === liveData.length && 
+                                  <div className='flex place-content-center py-1 text-lg text-black'><IoAddCircle /></div>}
+                              </div>                              
+                             </React.Fragment>
+                          ))}
+                        </div>
+                        :
+                        <div className="">
+                          {liveData.map((item, key) => (
+                            <div key={key} className='grid grid-cols-2 grid-rows-auto'>
+                              <div className={tbl_Label + " col-span-2"}>{item.id}</div>
+                              <div className={tbl_axis}>{xAxis}</div>
+                              <div className={tbl_axis}>{yAxis}</div>
+                              {item.data.map((dataPoint, index) => (
+                                <React.Fragment key={index}>
+                                  <div className={tbl_cell}>{dataPoint.x}</div>
+                                  <div className={tbl_cell}>{dataPoint.y}</div>
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
                     }
-                ]}
-            />
+                  </div>
+                  
+                  <div>Your Data Preview</div>
+                  <div className='bg-majic-white p-4' >
+                    <pre onClick={()=>toggleIsEditing()}>{JSON.stringify(liveData, null, 2)}</pre>
+                  </div>
+                </div>
+            }
+             
+            { /* JSON View */
+            dataEditView === "jsonView" &&
+              <div className='py-8'>
+              {
+                isEditing 
+                  ? <div >
+                      <div className='flex px-2 py-2 gap-1 w-full'>
+                        <div className={`${actionButton} p-1 w-1/6`} onClick={()=>handleSaveData()}>Save</div>
+                        {isEditing && <div className={`${button} ${undBtn}`} onClick={toggleIsEditing}>Close Edit View</div>}
+                        <div className='flex w-5/6 place-content-end pr-5 gap-2'>
+                          <div className={`${button}  ${undBtn} p-1`} onClick={()=>toggleDataView()}>Close</div>
+                          <div className={`${button}  ${undBtn} p-1`} onClick={()=>setLiveData(activeData)}>Reset Data</div>
+                        </div>
+                      </div>
+                      <textarea value={JSON.stringify(liveData, null, 2)} onChange={handleDataChange}  className='h-dvh w-full'/>
+                    </div>
+                  : <div >
+                      <pre onClick={()=>toggleIsEditing()}>{JSON.stringify(liveData, null, 2)}</pre>
+                    </div>
+              }
+              </div>
+            }
 
-            }            
+            {
+              /* humanView */
+              ["sheetView", "majicView"].includes(dataEditView) && 
+                <div>
+                  This is currently under construction.
+                  </div>
+            }
+
+            
+          </div>
         </div>
       </div>
+      
       <div className={`${actionButton} mb-20`}>
         Start New Chart
       </div>

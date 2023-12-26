@@ -27,6 +27,7 @@ module.exports = {
         'majic-grey': "#7D8491",
         'majic-white': "#FBFBFF",
         'majic-blue': '#A5D8FF',
+        'majic-accent': '#B27092'
       },
       keyframes: {
         shiver: {
