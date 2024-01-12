@@ -7,11 +7,7 @@ const openai = new OpenAI({
 export default async (req, res) => {
     try{
         const data = await openai.chat.completions.create({
-            messages: [
-                { role: "user", content: "generate a compltely random data set in csv format. Pick a random topic. Pick column labels for the data which should be on topic and relevant. Please provide only the data, without any additional explanations or text."}, 
-                {role: "system", content: "save this data for analysis step"},
-                {role: "user", content: "What is the best way to graphically represent this data? What stastical analysis could present interesting insights on the data? Please respond in 2 arrays. 1st array is a list of ways that the data could be graphically represented. The 2nd array is a list of stastical analysis that could pose interesting insights. provide arrays in the following format [['','']['','','']]. Don't label the arrays as 1st array and 2nd array, just provide the arrays. Add any additional explanations to a 3rd array in the parent array. Don't provide any additonal explanations or text beyond what is inside the array."},
-            ],
+            messages: [{ role: "user", content: "generate a compltely random data set in csv format. Pick a random topic. Pick column labels for the data which should be on topic and relevant. Please provide only the data, without any additional explanations or text."}],
             model: "gpt-3.5-turbo",
             temperature: 0.5,
             max_tokens: 1000,
