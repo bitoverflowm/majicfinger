@@ -7,6 +7,10 @@ import { ResponsiveBar } from '@nivo/bar'
 import { ResponsiveLine } from '@nivo/line'
 import { ResponsiveCalendar } from '@nivo/calendar'
 
+
+import parse from 'html-react-parser';
+import { CsvToHtmlTable } from 'react-csv-to-table';
+
 import { IoBarChartOutline, IoAddCircle, IoAdd } from "react-icons/io5";
 import { BsClipboardData } from "react-icons/bs";
 import { VscJson } from "react-icons/vsc";
@@ -19,14 +23,12 @@ import { LuTimerReset } from "react-icons/lu";
 import { MdOutlineCreateNewFolder } from "react-icons/md";
 import { GoEyeClosed } from "react-icons/go";
 
-
-
 import EditField from '@/components/mjUtils/editField'
 
 
 export default function Home() {
 
-  const [chart, setChart] = useState('line')
+  const [chart, setChart] = useState('AI')
   const [dataVisible, setDataVisible] = useState(0)
 
   //States for views
@@ -56,7 +58,9 @@ export default function Home() {
   const [tempX, setTempX] = useState('')
   const [tempY, setTempY] = useState('')
 
-  const defaultBarData = [
+
+
+  const defaultBarData0 = [
     {
       "country": "AD",
       "hot dog": 175,
@@ -163,6 +167,29 @@ export default function Home() {
       "donutColor": "hsl(280, 70%, 50%)"
     }
   ]
+
+  const defaultBarData = [
+    {
+      "Borough": "Manhattan",
+      "Hotels": 200,
+    },
+    {
+      "Borough": "Brooklyn",
+      "Hotels": 150,
+    },
+    {
+      "Borough": "Queens",
+      "Hotels": 100,
+    },
+    {
+      "Borough": "The Bronx",
+      "Hotels": 50,
+    },
+    {
+      "Borough": "Staten Island",
+      "Hotels": 20,
+    }
+  ];
 
   const defaultBTCLine = [
     {
@@ -2820,6 +2847,44 @@ export default function Home() {
     }
   };
 
+  //AI
+  const [generatedData, setGeneratedData] = useState()
+  const [tableCode, setTableCode] = useState()
+  const [reccommendedCharts, setReccommendedCharts] = useState()
+  const [reccommendedStats, setReccommendedStats] = useState()
+
+  async function genrateRandomData(){
+    //promot: "generate a compltely random data set in csv format and return what type of chart will be the best way to present this data and why"
+
+    try{
+      const res = await fetch('/api/ai/generateRandomData', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      if(res.status === 200){
+        const data = await res.json()
+        setGeneratedData(data.data)
+        //setTableCode(data.response)
+        console.log("parsing the data", data.summary)
+        try {
+          // Replace single quotes with double quotes
+          const validJsonString = data.summary.replace(/'/g, '"');
+          const parsedArray = JSON.parse(validJsonString);
+          setReccommendedCharts(parsedArray[0])
+          setReccommendedStats(parsedArray[1])
+        } catch (error) {
+            console.error('Error parsing JSON string:', error);
+        }
+      } else {
+        throw new Error(await res.text())
+      }
+    } catch(error){
+      console.log("an error occurred")
+    }
+  }
+
 
   useEffect(()=> {
     setActiveData(defaultBTCLine)
@@ -2829,6 +2894,7 @@ export default function Home() {
   }, [])
 
 
+
   return (
     <div className='w-full max-h-screen bg-white flex flex-col place-content-center place-items-center'>
       {editingCell && <div className='absolute top-0 bg-majic-accent px-6 py-3 rounded-b-lg text-xs font-bold shadow-xl text-white z-20'>Click anywhere to save changes</div>}
@@ -2836,6 +2902,7 @@ export default function Home() {
       <div className='absolute top-10 left-10 flex flex-col z-20'>
         <div className='text-xxs font-bold'>Switch Chart Type:</div>
         <div className='flex py-2 gap-2 text-sm'>
+          <div onClick={()=>setChart('ai')} className={`${button} ${chart === 'ai' ? selBtn : undBtn}`}><IoBarChartOutline /> AI</div>
           <div onClick={()=>setChart('bar')} className={`${button} ${chart === 'bar' ? selBtn : undBtn}`}><IoBarChartOutline /> Bar</div>
           <div onClick={()=>setChart('line')} className={`${button} ${chart === 'line' ? selBtn : undBtn}`}><IoBarChartOutline /> Line</div>
           <div onClick={()=>setChart('ghTrack')} className={`${button} ${chart === 'ghTrack' ? selBtn : undBtn}`}><IoBarChartOutline /> Calendar Chart</div>
@@ -2868,126 +2935,102 @@ export default function Home() {
             <div className='min-w-[800px] min-h-[600px] h-4/6 p-20 p-10 bg-majic-white shadow-xl rounded-lg text-center'>
                 <div className='text-xs font-bold'>Chart Heading</div>
                 {
+                  chart && chart === "ai"
+                   && <div className='text-xs'>
+                    Are you ready to have some fun?
+                    <div>Where do you want to start?</div>
+                    <div className='flex w-full place-content-center py-2 gap-2'>
+                      <div className={`${button} ${false ? selBtn : undBtn}`}>Generate a Data Set</div>
+                      <div className={`${button} ${true ? selBtn : undBtn}`} onClick={()=>genrateRandomData()}>Click to Generate Random Data</div>
+                      {/*TODO: allow users to select whether they want real data or doesnt matter, allow them to select data based on what chart type they may want */}
+                    </div>
+                    <div>
+                      { /*TODO: come back to this 
+                        <textarea className="w-full bg-white h-32 rounded-lg text-left p-4 shadow-inner resize-none" type="text" placeholder="Describe your product" value={description} onChange={e => setDescription(e.target.value)} maxLength={250}/>*/
+                      }
+                      {
+                        generatedData && <div><CsvToHtmlTable data={generatedData} csvDelimiter="," tableClassName="table table-striped table-hover"/></div> //<div dangerouslySetInnerHTML={{ __html: tableCode[0] }} />
+                      }
+                      { reccommendedCharts &&
+                        <div>
+                          {reccommendedCharts.map((graphType, index) => (
+                              <div key={index} className="button">
+                                  {graphType}
+                              </div>
+                          ))}
+                        </div>
+                      }
+                      { reccommendedStats &&
+                        <div>
+                          {reccommendedStats.map((statType, index) => (
+                              <div key={index} className="button">
+                                  {statType}
+                              </div>
+                          ))}
+                        </div>
+                      }
+                    </div>
+                   </div>
+                }
+                {
                   chart && chart === "bar" 
                     &&             
-                      <ResponsiveBar
+                    <ResponsiveBar
                         data={defaultBarData}
-                        keys={[
-                            'hot dog',
-                            'burger',
-                            'sandwich',
-                            'kebab',
-                            'fries',
-                            'donut'
-                        ]}
-                        indexBy="country"
+                        keys={['Hotels']}
+                        indexBy="Borough"
                         margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
                         padding={0.3}
                         valueScale={{ type: 'linear' }}
                         indexScale={{ type: 'band', round: true }}
                         colors={{ scheme: 'nivo' }}
-                        defs={[
-                            {
-                                id: 'dots',
-                                type: 'patternDots',
-                                background: 'inherit',
-                                color: '#38bcb2',
-                                size: 4,
-                                padding: 1,
-                                stagger: true
-                            },
-                            {
-                                id: 'lines',
-                                type: 'patternLines',
-                                background: 'inherit',
-                                color: '#eed312',
-                                rotation: -45,
-                                lineWidth: 6,
-                                spacing: 10
-                            }
-                        ]}
-                        fill={[
-                            {
-                                match: {
-                                    id: 'fries'
-                                },
-                                id: 'dots'
-                            },
-                            {
-                                match: {
-                                    id: 'sandwich'
-                                },
-                                id: 'lines'
-                            }
-                        ]}
-                        borderColor={{
-                            from: 'color',
-                            modifiers: [
-                                [
-                                    'darker',
-                                    1.6
-                                ]
-                            ]
-                        }}
+                        borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
                         axisTop={null}
                         axisRight={null}
                         axisBottom={{
-                            tickSize: 5,
-                            tickPadding: 5,
-                            tickRotation: 0,
-                            legend: 'country',
-                            legendPosition: 'middle',
-                            legendOffset: 32,
-                            truncateTickAt: 0
+                          tickSize: 5,
+                          tickPadding: 5,
+                          tickRotation: 0,
+                          legend: 'Borough',
+                          legendPosition: 'middle',
+                          legendOffset: 32
                         }}
                         axisLeft={{
-                            tickSize: 5,
-                            tickPadding: 5,
-                            tickRotation: 0,
-                            legend: 'food',
-                            legendPosition: 'middle',
-                            legendOffset: -40,
-                            truncateTickAt: 0
+                          tickSize: 5,
+                          tickPadding: 5,
+                          tickRotation: 0,
+                          legend: 'Hotels',
+                          legendPosition: 'middle',
+                          legendOffset: -40
                         }}
                         labelSkipWidth={12}
                         labelSkipHeight={12}
-                        labelTextColor={{
-                            from: 'color',
-                            modifiers: [
-                                [
-                                    'darker',
-                                    1.6
-                                ]
-                            ]
-                        }}
+                        labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
                         legends={[
-                            {
-                                dataFrom: 'keys',
-                                anchor: 'bottom-right',
-                                direction: 'column',
-                                justify: false,
-                                translateX: 120,
-                                translateY: 0,
-                                itemsSpacing: 2,
-                                itemWidth: 100,
-                                itemHeight: 20,
-                                itemDirection: 'left-to-right',
-                                itemOpacity: 0.85,
-                                symbolSize: 20,
-                                effects: [
-                                    {
-                                        on: 'hover',
-                                        style: {
-                                            itemOpacity: 1
-                                        }
-                                    }
-                                ]
-                            }
+                          {
+                            dataFrom: 'keys',
+                            anchor: 'bottom-right',
+                            direction: 'column',
+                            justify: false,
+                            translateX: 120,
+                            translateY: 0,
+                            itemsSpacing: 2,
+                            itemWidth: 100,
+                            itemHeight: 20,
+                            itemDirection: 'left-to-right',
+                            itemOpacity: 0.85,
+                            symbolSize: 20,
+                            effects: [
+                              {
+                                on: 'hover',
+                                style: {
+                                  itemOpacity: 1
+                                }
+                              }
+                            ]
+                          }
                         ]}
-                        role="application"
-                        ariaLabel="Nivo bar chart demo"
-                        barAriaLabel={e=>e.id+": "+e.formattedValue+" in country: "+e.indexValue}
-                  />
+                      />
                 }
                 {
                   chart && chart === "line"
