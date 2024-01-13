@@ -168,29 +168,7 @@ export default function Home() {
     }
   ]
 
-  const defaultBarData = [
-    {
-      "Borough": "Manhattan",
-      "Hotels": 200,
-    },
-    {
-      "Borough": "Brooklyn",
-      "Hotels": 150,
-    },
-    {
-      "Borough": "Queens",
-      "Hotels": 100,
-    },
-    {
-      "Borough": "The Bronx",
-      "Hotels": 50,
-    },
-    {
-      "Borough": "Staten Island",
-      "Hotels": 20,
-    }
-  ];
-
+  const defaultBarData = [ { "x-axis name": "Clothing", "category1": 100, "category1color": "hsl(94, 70%, 50%)", "category2": 25, "category2color": "hsl(178, 70%, 50%)", "category3": 2500, "category3color": "hsl(80, 70%, 50%)" }, { "x-axis name": "Electronics", "category1": 150, "category1color": "hsl(94, 70%, 50%)", "category2": 50, "category2color": "hsl(178, 70%, 50%)", "category3": 7500, "category3color": "hsl(80, 70%, 50%)" }, { "x-axis name": "Home Decor", "category1": 75, "category1color": "hsl(94, 70%, 50%)", "category2": 40, "category2color": "hsl(178, 70%, 50%)", "category3": 3000, "category3color": "hsl(80, 70%, 50%)" }, { "x-axis name": "Books", "category1": 200, "category1color": "hsl(94, 70%, 50%)", "category2": 15, "category2color": "hsl(178, 70%, 50%)", "category3": 3000, "category3color": "hsl(80, 70%, 50%)" }, { "x-axis name": "Toys", "category1": 50, "category1color": "hsl(94, 70%, 50%)", "category2": 30, "category2color": "hsl(178, 70%, 50%)", "category3": 1500, "category3color": "hsl(80, 70%, 50%)" } ]
   const defaultBTCLine = [
     {
       "id": "BTC Price",
@@ -2849,11 +2827,16 @@ export default function Home() {
 
   //AI
   const [generatedData, setGeneratedData] = useState()
-  const [tableCode, setTableCode] = useState()
   const [reccommendedCharts, setReccommendedCharts] = useState()
   const [reccommendedStats, setReccommendedStats] = useState()
+  const [graph, setGraph] = useState()
+  const [formattedData, setFormattedData] = useState()
+  const [graphKeys, setGraphKeys] = useState()
+  const [yAxisName, setYAxisName] = useState()
+  const [assistantId, setAssistantId] = useState()
+  const [threadId, setThreadId] = useState()
 
-  async function genrateRandomData(){
+  const genrateRandomData = async () => {
     //promot: "generate a compltely random data set in csv format and return what type of chart will be the best way to present this data and why"
 
     try{
@@ -2866,8 +2849,11 @@ export default function Home() {
       if(res.status === 200){
         const data = await res.json()
         setGeneratedData(data.data)
+        setAssistantId(data.assistant_id)
+        setThreadId(data.thread_id)
+        console.log("the assistant ID: ", data.assistant_id)
         //setTableCode(data.response)
-        console.log("parsing the data", data.summary)
+        console.log("parsing the summary", data.summary)
         try {
           // Replace single quotes with double quotes
           const validJsonString = data.summary.replace(/'/g, '"');
@@ -2881,6 +2867,28 @@ export default function Home() {
         throw new Error(await res.text())
       }
     } catch(error){
+      console.log("an error occurred")
+    }
+  }
+
+  const buildGraph = async (graphId) => {
+    setGraph(graphId)
+    try {
+      const res = await fetch(`/api/ai/generateGraph?threadId=${threadId}?assistantId=${assistantId}`, {
+        method: 'GET',
+        header: {
+          'Content-Type': 'application/json'
+        }
+      })
+      if(res.status === 200){
+        const data = res.json()
+        setFormattedData(data.data)
+        setGraphKeys(data.keys)
+        setYAxisName(data.y)
+      }else{
+        throw new Error(await res.text())
+      }
+    } catch (error) {
       console.log("an error occurred")
     }
   }
@@ -2952,18 +2960,93 @@ export default function Home() {
                         generatedData && <div><CsvToHtmlTable data={generatedData} csvDelimiter="," tableClassName="table table-striped table-hover"/></div> //<div dangerouslySetInnerHTML={{ __html: tableCode[0] }} />
                       }
                       { reccommendedCharts &&
-                        <div>
+                        <div className='flex py-2 w-full place-content-center place-items-center gap-2'>
+                          <div className='text-xs'>Click to Generate</div>
                           {reccommendedCharts.map((graphType, index) => (
-                              <div key={index} className="button">
+                              <div key={index} className={`${button} ${graph === index ? selBtn : undBtn}`} onClick={()=>buildGraph(index)}>
                                   {graphType}
                               </div>
                           ))}
                         </div>
                       }
+                      {
+                        graphKeys && 
+                          <div>
+                            <ResponsiveBar
+                              data={formattedData}
+                              keys={graphKeys}
+                              indexBy="x-axisName"
+                              margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
+                              padding={0.3}
+                              valueScale={{ type: 'linear' }}
+                              indexScale={{ type: 'band', round: true }}
+                              colors={{ scheme: 'nivo' }}
+                              axisTop={null}
+                              axisRight={null}
+                              axisBottom={{
+                                  tickSize: 5,
+                                  tickPadding: 5,
+                                  tickRotation: 0,
+                                  legend: 'x-axisName',
+                                  legendPosition: 'middle',
+                                  legendOffset: 32,
+                                  truncateTickAt: 0
+                              }}
+                              axisLeft={{
+                                  tickSize: 5,
+                                  tickPadding: 5,
+                                  tickRotation: 0,
+                                  legend: {yAxisName},
+                                  legendPosition: 'middle',
+                                  legendOffset: -40,
+                                  truncateTickAt: 0
+                              }}
+                              labelSkipWidth={12}
+                              labelSkipHeight={12}
+                              labelTextColor={{
+                                  from: 'color',
+                                  modifiers: [
+                                      [
+                                          'darker',
+                                          1.6
+                                      ]
+                                  ]
+                              }}
+                              legends={[
+                                  {
+                                      dataFrom: 'keys',
+                                      anchor: 'bottom-right',
+                                      direction: 'column',
+                                      justify: false,
+                                      translateX: 120,
+                                      translateY: 0,
+                                      itemsSpacing: 2,
+                                      itemWidth: 100,
+                                      itemHeight: 20,
+                                      itemDirection: 'left-to-right',
+                                      itemOpacity: 0.85,
+                                      symbolSize: 20,
+                                      effects: [
+                                          {
+                                              on: 'hover',
+                                              style: {
+                                                  itemOpacity: 1
+                                              }
+                                          }
+                                      ]
+                                  }
+                              ]}
+                              role="application"
+                              ariaLabel="Nivo bar chart demo"
+                              barAriaLabel={e=>e.id+": "+e.formattedValue+" in x-axisName: "+e.indexValue}
+                              />
+                          </div>
+                      }
                       { reccommendedStats &&
-                        <div>
+                      <div className='flex py-2 w-full place-content-center place-items-center gap-2'>
+                        <div className='text-xs'>Click to Analyze</div>
                           {reccommendedStats.map((statType, index) => (
-                              <div key={index} className="button">
+                              <div key={index} className={`${button} ${selBtn}`}>
                                   {statType}
                               </div>
                           ))}
@@ -2977,60 +3060,72 @@ export default function Home() {
                     &&             
                     <ResponsiveBar
                         data={defaultBarData}
-                        keys={['Hotels']}
-                        indexBy="Borough"
+                        keys={[ 'category1', 'category2', 'category3' ]}
+                        indexBy="x-axis name"
                         margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
                         padding={0.3}
                         valueScale={{ type: 'linear' }}
                         indexScale={{ type: 'band', round: true }}
                         colors={{ scheme: 'nivo' }}
-                        borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
                         axisTop={null}
                         axisRight={null}
                         axisBottom={{
-                          tickSize: 5,
-                          tickPadding: 5,
-                          tickRotation: 0,
-                          legend: 'Borough',
-                          legendPosition: 'middle',
-                          legendOffset: 32
+                            tickSize: 5,
+                            tickPadding: 5,
+                            tickRotation: 0,
+                            legend: 'x-axis name',
+                            legendPosition: 'middle',
+                            legendOffset: 32,
+                            truncateTickAt: 0
                         }}
                         axisLeft={{
-                          tickSize: 5,
-                          tickPadding: 5,
-                          tickRotation: 0,
-                          legend: 'Hotels',
-                          legendPosition: 'middle',
-                          legendOffset: -40
+                            tickSize: 5,
+                            tickPadding: 5,
+                            tickRotation: 0,
+                            legend: 'total_revenue',
+                            legendPosition: 'middle',
+                            legendOffset: -40,
+                            truncateTickAt: 0
                         }}
                         labelSkipWidth={12}
                         labelSkipHeight={12}
-                        labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-                        legends={[
-                          {
-                            dataFrom: 'keys',
-                            anchor: 'bottom-right',
-                            direction: 'column',
-                            justify: false,
-                            translateX: 120,
-                            translateY: 0,
-                            itemsSpacing: 2,
-                            itemWidth: 100,
-                            itemHeight: 20,
-                            itemDirection: 'left-to-right',
-                            itemOpacity: 0.85,
-                            symbolSize: 20,
-                            effects: [
-                              {
-                                on: 'hover',
-                                style: {
-                                  itemOpacity: 1
-                                }
-                              }
+                        labelTextColor={{
+                            from: 'color',
+                            modifiers: [
+                                [
+                                    'darker',
+                                    1.6
+                                ]
                             ]
-                          }
+                        }}
+                        legends={[
+                            {
+                                dataFrom: 'keys',
+                                anchor: 'bottom-right',
+                                direction: 'column',
+                                justify: false,
+                                translateX: 120,
+                                translateY: 0,
+                                itemsSpacing: 2,
+                                itemWidth: 100,
+                                itemHeight: 20,
+                                itemDirection: 'left-to-right',
+                                itemOpacity: 0.85,
+                                symbolSize: 20,
+                                effects: [
+                                    {
+                                        on: 'hover',
+                                        style: {
+                                            itemOpacity: 1
+                                        }
+                                    }
+                                ]
+                            }
                         ]}
-                      />
+                        role="application"
+                        ariaLabel="Nivo bar chart demo"
+                        barAriaLabel={e=>e.id+": "+e.formattedValue+" in x-axis name: "+e.indexValue}
+    />
                 }
                 {
                   chart && chart === "line"
