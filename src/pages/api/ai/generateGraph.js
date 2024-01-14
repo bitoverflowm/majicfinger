@@ -10,11 +10,15 @@ export default async (req, res) => {
         const thread_id = req.query.threadId
         const assistant_id = req.query.assistantId
 
-        let dataPrompt = `Reformat the previous csv data into the following format (these are all placeholders):
+        let dataPrompt = `Review the previous csv and extract interesting segments, columns or samles of the previous csv so that I can create a bar chart. Format in json, without any additional explanations or text, do not add intro text or outro texts, do not provide a response like 'Sure', only output the object [], not even variable assignments. Format the response in following manner (only replace placeholders marked by <>):
 
-        [ { "x-axisName": x-axisName, "cat1": cat1Val, "cat1color": "hsl value", "cat2": cat2Val, "caty2color": "hsl value", "cat3": cat3val, "cat3color": "hsl value", }, { "x-axis name": "name example 2", "category1": 125, "category1color": "hsl(94, 70%, 50%)", "category2": 39, "category2color": "hsl(178, 70%, 50%)", "category3": 62, "category3color": "hsl(80, 70%, 50%)"}, ... ]
-        
-        Depending on the csv data there might just be 1 cat (catVal, catColor) or 2, 3, 4, 5, etc. Match the csv data exactly up to this format and remove any missing columns, categories or irelevant entries. Assign pleasing hsl colors. Output the object, without any additional explanations or text, do not add intro text or outro texts, do not provide a response like 'Sure', only output the object [], not even variable assignments.`
+        Example: [{'category': 'Apples', 'Cost': 33}, 
+        {'category': 'Bananas', 'Cost': 78}, 
+        {'category': 'Pears', 'Cost': 14}, 
+        {'category': 'Grapes', 'Cost': 41}]
+
+        Desired Format: [{ 'category': <category name>, <value name>: <value>}, { 'category': <category name 2>, <value name>: <value 2>}]
+        `
     
         //add message to thread with above prompt
         console.log("Creating message")
@@ -26,7 +30,7 @@ export default async (req, res) => {
             }
         );
         
-        console.log("Creating data Run")
+        console.log("Creating Graph data Message")
 
         const dataRun = await openai.beta.threads.runs.create(
             thread_id,
@@ -36,22 +40,36 @@ export default async (req, res) => {
         )
 
         console.log("Polling to check data run")
-        const completedRun = await pollRunStatus(thread_id, dataRun.id);
-        console.log("data poll complete")
+        await pollRunStatus(thread_id, dataRun.id);
+        console.log("data pull complete")
         
         // Fetch the thread details to get the response
-        const threadDetails = await openai.beta.threads.messages.list(dataRun.thread_id,
+        const threadDetails = await openai.beta.threads.messages.list(thread_id,
             {
-                order: 'desc', limit: '1'
+                order: 'desc', limit: '2'
             });
-        const formattedGraphData = threadDetails.data.find(msg => msg.role === "assistant" && msg.run_id === dataRun.id)?.content[0].text.value;
+        console.log("thread details: ", threadDetails)
+        const formattedGraphData = threadDetails.data.find(msg => msg.role === "assistant")?.content[0].text.value;
         console.log("formatted Graph data: ", formattedGraphData)
+
+        
 
         /*getting graph keys */
         const keyMessage = await openai.beta.threads.messages.create(
             thread_id,
             { 
-                role: "user", content: "return an array of categories in the data we just formatted data above"
+                role: "user", content: `return an array of category value names in the above formatted data. Return only the name of the array and nothing else:
+
+                Example: for this data: [{'Fruit': 'Apples', 'Cost': 33}, 
+                {'Fruit': 'Bananas', 'Cost': 78}, 
+                {'Fruit': 'Pears', 'Cost': 14}, 
+                {'Fruit': 'Grapes', 'Cost': 41}]
+        
+                Expected Output: ['Fruit']
+                Note "Fruit" is the desired output not "Cost".
+        
+                Desired Format: ['<Key Value Name>', etc]
+                                `
             }
         );
 
@@ -62,23 +80,34 @@ export default async (req, res) => {
             }
         )
 
-        console.log("Polling to check data run")
-        await pollRunStatus(thread_id, dataRun.id);
-        console.log("data poll complete")
+        console.log("Polling to check Key run")
+        await pollRunStatus(thread_id, keyRun.id);
+        console.log("Key poll complete")
         
         // Fetch the thread details to get the response
-        const keyThreadDetails = await openai.beta.threads.messages.list(dataRun.thread_id,
+        const keyThreadDetails = await openai.beta.threads.messages.list(thread_id,
             {
-                order: 'desc', limit: '1'
+                order: 'desc', limit: '2'
             });
-        const formattedKeyData = keyThreadDetails.data.find(msg => msg.role === "assistant" && msg.run_id === dataRun.id)?.content[0].text.value;
-        console.log("formatted Graph data: ", formattedKeyData)
+        console.log("key thread details: ", keyThreadDetails)
+        const formattedKeyData = keyThreadDetails.data.find(msg => msg.role === "assistant")?.content[0].text.value;
+        console.log("formatted Key data: ", formattedKeyData)
 
         /*getting graph y-axis name */
         const yMessage = await openai.beta.threads.messages.create(
             thread_id,
             { 
-                role: "user", content: "return the y-axis name for formatted data"
+                role: "user", content: `return the y-axis name that best matches a measure for category value name in the above formatted data. Return only the name of the y-axis nothing else:
+
+                Example: for this data: [{"category": "Apples", "Cost": 33}, 
+                {"category": "Bananas", "Cost": 78}, 
+                {"category": "Pears", "Cost": 14}, 
+                {"category": "Grapes", "Cost": 41}]
+
+                Expected Output: 'Cost'
+
+                Desired Format: <y-axis name>
+                        `
             }
         );
 
@@ -90,15 +119,15 @@ export default async (req, res) => {
         )
 
         console.log("Polling to check data run")
-        await pollRunStatus(thread_id, dataRun.id);
+        await pollRunStatus(thread_id, yRun.id);
         console.log("data poll complete")
         
         // Fetch the thread details to get the response
-        const yThreadDetails = await openai.beta.threads.messages.list(dataRun.thread_id,
+        const yThreadDetails = await openai.beta.threads.messages.list(thread_id,
             {
-                order: 'desc', limit: '1'
+                order: 'desc', limit: '2'
             });
-        const formattedYData = keyThreadDetails.data.find(msg => msg.role === "assistant" && msg.run_id === dataRun.id)?.content[0].text.value;
+        const formattedYData = yThreadDetails.data.find(msg => msg.role === "assistant")?.content[0].text.value;
         console.log("formatted Y data: ", formattedYData)
 
         res.status(200).json({success: true, data:formattedGraphData, keys: formattedKeyData, y: formattedYData})

@@ -168,7 +168,15 @@ export default function Home() {
     }
   ]
 
-  const defaultBarData = [ { "x-axis name": "Clothing", "category1": 100, "category1color": "hsl(94, 70%, 50%)", "category2": 25, "category2color": "hsl(178, 70%, 50%)", "category3": 2500, "category3color": "hsl(80, 70%, 50%)" }, { "x-axis name": "Electronics", "category1": 150, "category1color": "hsl(94, 70%, 50%)", "category2": 50, "category2color": "hsl(178, 70%, 50%)", "category3": 7500, "category3color": "hsl(80, 70%, 50%)" }, { "x-axis name": "Home Decor", "category1": 75, "category1color": "hsl(94, 70%, 50%)", "category2": 40, "category2color": "hsl(178, 70%, 50%)", "category3": 3000, "category3color": "hsl(80, 70%, 50%)" }, { "x-axis name": "Books", "category1": 200, "category1color": "hsl(94, 70%, 50%)", "category2": 15, "category2color": "hsl(178, 70%, 50%)", "category3": 3000, "category3color": "hsl(80, 70%, 50%)" }, { "x-axis name": "Toys", "category1": 50, "category1color": "hsl(94, 70%, 50%)", "category2": 30, "category2color": "hsl(178, 70%, 50%)", "category3": 1500, "category3color": "hsl(80, 70%, 50%)" } ]
+  const defaultBarData = [{'category': 'Segment 1', 'Value': 345678901234}, {'category': 'Segment 2', 'Value': 456789012345}, {'category': 'Segment 3', 'Value': 567890123456}, {'category': 'Segment 4', 'Value': 678901234567}, {'category': 'Segment 5', 'Value': 789012345678}, {'category': 'Segment 6', 'Value': 890123456789}]
+
+  const x = ['category']
+
+  /*const defaultBarData =  [
+    {"category": "Sample 1", "Data 1": 33, "Color 1": "hsl(0, 50%, 50%)"}, 
+    {"category": "Sample 2", "Data 1": 78, "Color 2": "hsl(50, 50%, 50%)"}, 
+    {"category": "Sample 3", "Data 1": 14, "Color 3": "hsl(100, 50%, 50%)"}, 
+    {"category": "Sample 4", "Data 1": 41, "Color 4": "hsl(150, 50%, 50%)"}]*/
   const defaultBTCLine = [
     {
       "id": "BTC Price",
@@ -2835,6 +2843,7 @@ export default function Home() {
   const [yAxisName, setYAxisName] = useState()
   const [assistantId, setAssistantId] = useState()
   const [threadId, setThreadId] = useState()
+  const [graphReady, setGraphReady] = useState()
 
   const genrateRandomData = async () => {
     //promot: "generate a compltely random data set in csv format and return what type of chart will be the best way to present this data and why"
@@ -2874,17 +2883,26 @@ export default function Home() {
   const buildGraph = async (graphId) => {
     setGraph(graphId)
     try {
-      const res = await fetch(`/api/ai/generateGraph?threadId=${threadId}?assistantId=${assistantId}`, {
+      const res = await fetch(`/api/ai/generateGraph?threadId=${threadId}&assistantId=${assistantId}`, {
         method: 'GET',
         header: {
           'Content-Type': 'application/json'
         }
       })
+      console.log("res: ", res)
       if(res.status === 200){
-        const data = res.json()
-        setFormattedData(data.data)
-        setGraphKeys(data.keys)
+        const data = await res.json()
+        console.log("Data attained :", data)
+        console.log("Formatted Data type :", typeof(data.data))
+        let formattedDataTemp = data.data.replace(/\n/g, "").replace(/'/g, '"');
+        console.log("formantted data: ", JSON.parse(formattedDataTemp))
+        let newGraphData = JSON.parse(formattedDataTemp)
+        setFormattedData(newGraphData)
+        setGraphKeys(JSON.parse(data.keys.replace(/'/g, '"')))
+        console.log("keys ", JSON.parse(data.keys.replace(/'/g, '"')))
         setYAxisName(data.y)
+        console.log("yAxisName: ", data.y)
+        console.log("keys set")
       }else{
         throw new Error(await res.text())
       }
@@ -2900,6 +2918,14 @@ export default function Home() {
     setXAxis('date')
     setYAxis('price')
   }, [])
+
+  useEffect(() => {
+    if(formattedData && graphKeys && setYAxisName){
+      console.log("data should be mapping now")
+      setGraphReady(true)
+
+    }
+  }, [formattedData, graphKeys, yAxisName])
 
 
 
@@ -2957,7 +2983,7 @@ export default function Home() {
                         <textarea className="w-full bg-white h-32 rounded-lg text-left p-4 shadow-inner resize-none" type="text" placeholder="Describe your product" value={description} onChange={e => setDescription(e.target.value)} maxLength={250}/>*/
                       }
                       {
-                        generatedData && <div><CsvToHtmlTable data={generatedData} csvDelimiter="," tableClassName="table table-striped table-hover"/></div> //<div dangerouslySetInnerHTML={{ __html: tableCode[0] }} />
+                        generatedData && <div><CsvToHtmlTable data={generatedData && generatedData} csvDelimiter="," tableClassName="table table-striped table-hover"/></div> //<div dangerouslySetInnerHTML={{ __html: tableCode[0] }} />
                       }
                       { reccommendedCharts &&
                         <div className='flex py-2 w-full place-content-center place-items-center gap-2'>
@@ -2970,12 +2996,13 @@ export default function Home() {
                         </div>
                       }
                       {
-                        graphKeys && 
-                          <div>
+                        graphReady && 
+                          <div className='w-screen h-screen'>
+                            Here is your chart
                             <ResponsiveBar
                               data={formattedData}
-                              keys={graphKeys}
-                              indexBy="x-axisName"
+                              keys={[yAxisName]}
+                              indexBy={graphKeys[0]}
                               margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
                               padding={0.3}
                               valueScale={{ type: 'linear' }}
@@ -2987,7 +3014,7 @@ export default function Home() {
                                   tickSize: 5,
                                   tickPadding: 5,
                                   tickRotation: 0,
-                                  legend: 'x-axisName',
+                                  legend: graphKeys[0],
                                   legendPosition: 'middle',
                                   legendOffset: 32,
                                   truncateTickAt: 0
@@ -2996,7 +3023,7 @@ export default function Home() {
                                   tickSize: 5,
                                   tickPadding: 5,
                                   tickRotation: 0,
-                                  legend: {yAxisName},
+                                  legend: yAxisName,
                                   legendPosition: 'middle',
                                   legendOffset: -40,
                                   truncateTickAt: 0
@@ -3038,7 +3065,7 @@ export default function Home() {
                               ]}
                               role="application"
                               ariaLabel="Nivo bar chart demo"
-                              barAriaLabel={e=>e.id+": "+e.formattedValue+" in x-axisName: "+e.indexValue}
+                              barAriaLabel={e=>e.id+": "+e.formattedValue+" in category: "+e.indexValue}
                               />
                           </div>
                       }
@@ -3060,8 +3087,8 @@ export default function Home() {
                     &&             
                     <ResponsiveBar
                         data={defaultBarData}
-                        keys={[ 'category1', 'category2', 'category3' ]}
-                        indexBy="x-axis name"
+                        keys={["Value name"]}
+                        indexBy="category"
                         margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
                         padding={0.3}
                         valueScale={{ type: 'linear' }}
@@ -3073,7 +3100,7 @@ export default function Home() {
                             tickSize: 5,
                             tickPadding: 5,
                             tickRotation: 0,
-                            legend: 'x-axis name',
+                            legend: x[0],
                             legendPosition: 'middle',
                             legendOffset: 32,
                             truncateTickAt: 0
@@ -3082,7 +3109,7 @@ export default function Home() {
                             tickSize: 5,
                             tickPadding: 5,
                             tickRotation: 0,
-                            legend: 'total_revenue',
+                            legend: 'Value name',
                             legendPosition: 'middle',
                             legendOffset: -40,
                             truncateTickAt: 0
@@ -3124,7 +3151,7 @@ export default function Home() {
                         ]}
                         role="application"
                         ariaLabel="Nivo bar chart demo"
-                        barAriaLabel={e=>e.id+": "+e.formattedValue+" in x-axis name: "+e.indexValue}
+                        barAriaLabel={e=>e.id+": "+e.formattedValue+" in category: "+e.indexValue}
     />
                 }
                 {

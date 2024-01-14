@@ -18,7 +18,9 @@ export default async (req, res) => {
         const dataRun = await openai.beta.threads.createAndRun({
             assistant_id: assistant.id,
             thread: {
-                messages: [{ role: "user", content: "Generate data about an interesting topic, in csv format (values of value derivatives like value1, value2 are not allowed). Ensure that data is workable data to conduct data anslysis on. Pick the columns labels. Remember this csv data, we will use it in the next steps. Output absolutely only the csvData, no explanations, no additional text, no introduction, no plesantries, no outro texts, no 'Sure', no 'Data generated' only output the csv data" }]
+                messages: [{ role: "user", content: `Generate data about an interesting topic, in csv format. Remember this csv data, we will use it in the next steps. Output absolutely only the csvData, no explanations, no additional text, no introduction, no plesantries, no outro texts, no 'Sure', no 'Data generated' only output the csv data:
+                
+                Desired Format: <csv data>` }]
             }
         });
 
@@ -33,7 +35,10 @@ export default async (req, res) => {
 
         const analysisMessage = await openai.beta.threads.messages.create(
             dataRun.thread_id,
-            { role: "user", content: "Please generate 2 arrays: 1st array is a list of possible visualizations that could be carried out on the previous csv data. The 2nd array is a list of data analysis that could be carried out and what specifically we are analyzing. Your response should be in the following format [['','']['','','']]. Do not output labels, only output the arrays. Do not provide any additional explanations or text. Do not add intro text or outro texts, do not even provide a response like 'Sure', only output the arrays in the following format  [['','']['','','']]" }
+            { role: "user", content: `Please generate 2 arrays: 1st array is a list of possible visualizations that could be carried out on the previous csv data. The 2nd array is a list of data analysis that could be carried out and what specifically we are analyzing. Your response should be in the following format [['',''] , ['','','']]. Do not output labels, only output the arrays. Do not provide any additional explanations or text. Do not add intro text or outro texts, do not even provide a response like 'Sure', only output the arrays in the following format:  
+            
+            Desired Format: [['<visualization1>', '<visualization2>', '<visualization3>', etc] , ['<analysis1>', '<analysis2>', '<analysis3>',etc]]
+            ` }
         )
 
         const analysisRun = await openai.beta.threads.runs.create(
