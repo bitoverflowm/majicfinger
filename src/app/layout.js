@@ -1,4 +1,5 @@
 import { AnalyticsWrapper } from '@/components/analytics';
+import Nav from '@/components/nav';
 
 import './globals.css'
 
@@ -11,7 +12,10 @@ export default function RootLayout({ children }) {
       */}
       <head />
       <body>
-        <div className=' flex items-center justify-center'>
+        <div>
+          <Nav/>
+        </div>
+        <div className=''>
           {children}
           <AnalyticsWrapper />
         </div>

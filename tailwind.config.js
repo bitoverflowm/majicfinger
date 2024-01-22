@@ -10,8 +10,8 @@ module.exports = {
   ],
   theme: {
     fontFamily: {
-      'title': ['Orelega One', 'serif'],
-      'body': ['Inter', 'sans-serif']
+      'title': ['Bodoni Moda', 'serif'],
+      'body': ['Open Sans', 'sans-serif']
     },
     extend: {
       width: {
@@ -27,7 +27,12 @@ module.exports = {
         'majic-grey': "#7D8491",
         'majic-white': "#FBFBFF",
         'majic-blue': '#A5D8FF',
-        'majic-accent': '#802392'
+        'majic-accent': '#802392',
+        'lychee-black': '#121619',
+        'lychee-red': '#BA0B31',
+        'lychee-green': '#73956F',
+        'lychee-white': '#F4EDEA',
+        'lychee-peach': '#FFE3E0',
       },
       keyframes: {
         shiver: {
