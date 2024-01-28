@@ -4,9 +4,11 @@ import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
 import "ag-grid-community/styles/ag-theme-quartz.css"; // Theme
 
-const GridView = ({data}) => {
+const GridView = ({data, fmtCols}) => {
     // we expect the following columns to be present
-    const [colDefs, setColDefs] = useState([
+    const [colDefs, setColDefs] = useState();
+    
+    const placeholder = [
         {field: 'athlete'},
         {field: 'age'},
         {field: 'country', /*cellRenderer: */},
@@ -20,9 +22,11 @@ const GridView = ({data}) => {
         {field: 'price', 
         // Return a formatted string for this column
         valueFormatter: params => { return '$' + params.value.toLocaleString(); }},
-    ]);
+    ]
     
-    const [rowData, setRowData] = useState([
+    const [rowData, setRowData] = useState()
+
+    const placeHolderData = [
         {
             "athlete": "Gong Jinjie",
             "age": 25,
@@ -140,7 +144,7 @@ const GridView = ({data}) => {
             "total": 1,
             "price": 99
         }
-    ])
+    ]
 
     //Apply settings across all columns
     const defaultColDef = useMemo(() => ({
@@ -150,8 +154,9 @@ const GridView = ({data}) => {
     }))
 
     useEffect(() => {
-        console.log(data)
-    }, [data])
+        data && setRowData(data)
+        fmtCols && setColDefs(fmtCols)
+    }, [data, fmtCols])
 
 
 

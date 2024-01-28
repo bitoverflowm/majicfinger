@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import * as XLSX from 'xlsx'
 import ReactTable from 'react-table'
 //import { CsvToHtmlTable } from 'react-csv-to-table';
@@ -11,8 +11,10 @@ import GridView from "../gridView";
 const ActionMenu = () => {
     
     const [working, setWorking] = useState()
-    const [data, setData] = useState(true)
+    const [data, setData] = useState()
     const [csv, setCSV] = useState()
+    const [fmtData, setFmtData] = useState()
+    const [fmtCols, setFmtCols] = useState()
     
     const handleFileUpload = (e) => {
         const file = e.target.files[0]
@@ -38,6 +40,22 @@ const ActionMenu = () => {
 
         reader.readAsBinaryString(file);
     }
+
+    useEffect(()=> {
+        if(data && data.length > 0){
+            const keys = Object.keys(data[0])
+            const columnsLabels = keys.map(key => {
+                // Handle any price headings
+                if (key === 'price') {
+                    return { field: key, valueFormatter: params => '$' + params.value.toLocaleString() }
+                }
+                return { field: key }
+            })
+            
+            setFmtCols(columnsLabels)
+            
+        }
+    }, [data])
 
     return(
         <div className="flex flex-col place-items-center w-screen absolute left-0 px-48 pt-20 -mt-16">
@@ -102,9 +120,9 @@ const ActionMenu = () => {
                         <CsvToHtmlTable data={csv} csvDelimiter="," tableClassName="table-auto" tableRowClassName="border" tableColumnClassName="border w-32"/>
                         }
                     {
-                        data &&
+                        fmtCols && data &&
                             <div className="mt-32 h-screen w-screen flex place-content-center place-items-center">
-                                <GridView data={data}/>
+                                <GridView data={data} fmtCols={fmtCols}/>
                             </div>
                     }
             </div>
