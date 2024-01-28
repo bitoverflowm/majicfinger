@@ -89,6 +89,7 @@ body {
   overflow-x: hidden;
   font-family: 'Open Sans', sans-serif;
   background: no-repeat center/cover url("/background.png");
+  background-attachment: fixed;
 }
 
 a {

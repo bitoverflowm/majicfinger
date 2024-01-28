@@ -11,7 +11,7 @@ import GridView from "../gridView";
 const ActionMenu = () => {
     
     const [working, setWorking] = useState()
-    const [data, setData] = useState()
+    const [data, setData] = useState(true)
     const [csv, setCSV] = useState()
     
     const handleFileUpload = (e) => {
@@ -102,7 +102,10 @@ const ActionMenu = () => {
                         <CsvToHtmlTable data={csv} csvDelimiter="," tableClassName="table-auto" tableRowClassName="border" tableColumnClassName="border w-32"/>
                         }
                     {
-                        <GridView />
+                        data &&
+                            <div className="mt-32 h-screen w-screen flex place-content-center place-items-center">
+                                <GridView data={data}/>
+                            </div>
                     }
             </div>
         </div>
