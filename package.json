@@ -24,6 +24,7 @@
     "@tryghost/admin-api": "^1.13.8",
     "@tryghost/content-api": "^1.11.13",
     "@vercel/analytics": "^0.1.11",
+    "ag-grid-react": "^31.0.3",
     "autoprefixer": "10.4.13",
     "aws-sdk": "^2.1359.0",
     "cookie": "^0.5.0",

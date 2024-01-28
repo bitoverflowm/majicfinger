@@ -3,7 +3,8 @@
 import { useState } from "react"
 import * as XLSX from 'xlsx'
 import ReactTable from 'react-table'
-import { CsvToHtmlTable } from 'react-csv-to-table';
+//import { CsvToHtmlTable } from 'react-csv-to-table';
+import GridView from "../gridView";
 //import "react-table/react-table.css";
 
 
@@ -30,6 +31,7 @@ const ActionMenu = () => {
             const csv = XLSX.utils.sheet_to_csv(worksheet);
             setData(json); // Now you have your JSON data
             setCSV(csv)
+
             console.log(csv)
             console.log(json)
         };
@@ -96,9 +98,12 @@ const ActionMenu = () => {
                         </div>
             }
             <div className="w-screen">
-                    {csv &&
+                    {false &&
                         <CsvToHtmlTable data={csv} csvDelimiter="," tableClassName="table-auto" tableRowClassName="border" tableColumnClassName="border w-32"/>
                         }
+                    {
+                        <GridView />
+                    }
             </div>
         </div>
     )
