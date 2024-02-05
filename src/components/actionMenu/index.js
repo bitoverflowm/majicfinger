@@ -12,8 +12,11 @@ import { AgChartsReact } from 'ag-charts-react';
 
 import GridView from "../gridView";
 import ChartView from "../chartView";
+import ChartDataMods from "../chartView/chartDataMods";
 
-
+import { MdDataset } from "react-icons/md";
+import { AiOutlineAppstoreAdd } from "react-icons/ai";
+import { FaChartLine } from "react-icons/fa6";
 
 const ActionMenu = () => {
     
@@ -24,8 +27,14 @@ const ActionMenu = () => {
     const [fmtCols, setFmtCols] = useState()
     const [chartActive, setChartActive] = useState()
 
+    const [xKey, setXKey] = useState('mission')
+    const [yKey, setYKey] = useState('price')
+    const [type, setType] = useState('bar')
+    const [dflt, setDflt] = useState(true)
+
     const uploadRef = useRef(null)
     const gridRef = useRef(null)
+    const chartRef = useRef(null)
     
     const handleFileUpload = (e) => {
         const file = e.target.files[0]
@@ -44,12 +53,12 @@ const ActionMenu = () => {
             const csv = XLSX.utils.sheet_to_csv(worksheet);
             setData(json); // Now you have your JSON data
             setCSV(csv)
-
-            console.log(csv)
-            console.log(json)
+            setDflt(false)
         };
 
         reader.readAsBinaryString(file);
+        setWorking('grid')
+        
     }
 
     useEffect(()=> {
@@ -63,8 +72,7 @@ const ActionMenu = () => {
                 return { field: key }
             })
             
-            setFmtCols(columnsLabels)
-            
+            setFmtCols(columnsLabels)           
         }
     }, [data])
 
@@ -75,6 +83,7 @@ const ActionMenu = () => {
     useEffect(()=>{
         working === 'upload' && uploadRef.current.scrollIntoView({behavior: 'smooth'})
         working === 'grid' && gridRef.current.scrollIntoView({behavior:'smooth'})
+        working === 'chart' && chartRef.current.scrollIntoView({behavior: 'smooth'})
     }, [working])
 
     useEffect(()=>{
@@ -97,7 +106,7 @@ const ActionMenu = () => {
 
     return(
         <div className="flex flex-col place-items-center w-screen absolute left-0 px-48 pt-20 -mt-16">
-            <div className="flex gap-16">
+            <div className="flex gap-12">
                 <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
                     <div className="font-title text-3xl font-bold">
                         Generate a Data Set
@@ -131,18 +140,32 @@ const ActionMenu = () => {
                         Go
                     </div>
                 </div>
-                <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
+                <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300" onClick={()=>setWorking('chart')}>
                     <div className="font-title text-3xl font-bold">
-                        Analyze and Chart Live Data
+                        Visualize your Data
                     </div>
                     <div className="py-3 text-sm">
-                        Pull public data streams.<div></div> Request new api integrations.
+                        Analyze, Chart, Customize  <div></div> With beautiful charts and graph.
                     </div>
                     <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
                         Go
                     </div>
                 </div>
-            </div>            
+                <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300" onClick={()=>setWorking('')}>
+                    <div className="font-title text-3xl font-bold">
+                        Live Data
+                    </div>
+                    <div className="py-3 text-sm">
+                        Pull public data, or APIs, private data sources<div></div> Pro users can request and vote on new api integrations.
+                    </div>
+                    <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
+                        Go
+                    </div>
+                </div>
+            </div>
+            <div className="h-96 py-56">
+                <img src={"./fruit.png"}/>
+            </div>
             {
                 working && working === 'upload' &&
                     <div className="h-dvh flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 text-lychee-black my-20 w-1/2 bg-lychee-peach rounded-md backdrop-blur-md text-center" ref={uploadRef}>
@@ -150,6 +173,7 @@ const ActionMenu = () => {
                             Let's Start With Your Data:
                         </div>
                         <div className="text-xs text-slate-600 pb-2">*Must be .csv or Excel File (.xlsx) </div>
+                        <div className="text-xs text-red-400 pb-2">*Warning: this action will replace <span className="px-1 underline hover:text-black cursor-pointer" onClick={()=>setWorking('grid')}>the current data</span> stored this session </div>
                         <form className="flex flex-col items-center pb-6">
                             <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">
                                 Click to Upload
@@ -166,16 +190,37 @@ const ActionMenu = () => {
             <div className="w-screen">
                     {
                         fmtCols && data &&
-                            <div className="mt-32 h-screen w-screen flex flex-col place-content-center place-items-center" ref={gridRef}>
-                                <GridView data={data} fmtCols={fmtCols}/>
-                                <div className="bg-black text-white" onClick={()=>generateChartHandler()}>Generate Chart</div>
+                            <div className="mt-32 h-screen w-screen flex place-content-center place-items-center" ref={gridRef}>
+                                <div className="w-2/12 shadow-2xl h-screen">
+                                    <div className="flex gap-1 px-2 py-2 border border-white rounded-lg w-1/2 place-items-center ml-8 shadow-xl hover:bg-black hover:text-white text-sm cursor-pointer" onClick={()=>setWorking('upload')}><AiOutlineAppstoreAdd className="text-xl"/> Uplod New Data</div>
+                                    <div className="flex gap-1 px-2 py-2 border border-white rounded-lg w-1/2 place-items-center ml-8 shadow-xl hover:bg-black hover:text-white text-sm cursor-pointer mt-3" onClick={()=>setWorking('grid')}><MdDataset />Review Data</div>
+                                    <div className="flex gap-1 px-2 py-2 border border-white rounded-lg w-1/2 place-items-center ml-8 shadow-xl bg-black text-white hover:bg-white hover:text-black text-sm cursor-pointer mt-3" onClick={()=>setWorking('chart')}><FaChartLine /> Generate Chart</div>
+                                </div>
+                                <div className="h-5/6 w-8/12 px-20">
+                                    <GridView data={data} fmtCols={fmtCols}/>
+                                </div>
+                                <div className="w-2/12">
+                                    
+                                </div>
                             </div>
+                            
                     }
                     {
                         fmtCols && data &&
-                            <div className="mt-32 h-screen w-screen flex flex-col place-content-center place-items-center">
-                                <ChartView data={data} fmtCols={fmtCols}/>
-                                <div className="bg-black text-white">Do something</div>
+                            <div className="mt-32 h-screen w-screen flex place-content-center place-items-center" ref={chartRef}>
+                                <div className="w-2/12 shadow-2xl h-screen pt-10">
+                                    <div className="flex gap-1 px-2 py-2 border border-white rounded-lg w-1/2 place-items-center ml-8 shadow-xl hover:bg-black hover:text-white text-sm cursor-pointer" onClick={()=>setWorking('upload')}><AiOutlineAppstoreAdd className="text-xl"/> Uplod New Data</div>
+                                    <div className="flex gap-1 px-2 py-2 border border-white rounded-lg w-1/2 place-items-center ml-8 shadow-xl hover:bg-black hover:text-white text-sm cursor-pointer mt-3" onClick={()=>setWorking('grid')}><MdDataset />Review Data</div>
+                                    <div className="mt-3 ml-8">
+                                        <ChartDataMods fmtCols={fmtCols} setType={setType} setXKey={setXKey} setYKey={setYKey}/>
+                                    </div>
+                                </div>
+                                <div className="h-5/6 w-8/12 px-20">
+                                    <ChartView data={data} fmtCols={fmtCols} xKey={xKey} yKey={yKey} type={type} dflt={dflt}/>
+                                </div>
+                                <div className="w-2/12">
+                                    
+                                </div>
                             </div>
                             
                     }
