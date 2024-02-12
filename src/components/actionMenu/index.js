@@ -202,8 +202,7 @@ const ActionMenu = () => {
                                 <div className="w-2/12">
                                     
                                 </div>
-                            </div>
-                            
+                            </div>                            
                     }
                     {
                         fmtCols && data &&
@@ -212,11 +211,11 @@ const ActionMenu = () => {
                                     <div className="flex gap-1 px-2 py-2 border border-white rounded-lg w-1/2 place-items-center ml-8 shadow-xl hover:bg-black hover:text-white text-sm cursor-pointer" onClick={()=>setWorking('upload')}><AiOutlineAppstoreAdd className="text-xl"/> Uplod New Data</div>
                                     <div className="flex gap-1 px-2 py-2 border border-white rounded-lg w-1/2 place-items-center ml-8 shadow-xl hover:bg-black hover:text-white text-sm cursor-pointer mt-3" onClick={()=>setWorking('grid')}><MdDataset />Review Data</div>
                                     <div className="mt-3 ml-8">
-                                        <ChartDataMods fmtCols={fmtCols} setType={setType} setXKey={setXKey} setYKey={setYKey}/>
+                                        <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>
                                     </div>
                                 </div>
                                 <div className="h-5/6 w-8/12 px-20">
-                                    <ChartView data={data} fmtCols={fmtCols} xKey={xKey} yKey={yKey} type={type} dflt={dflt}/>
+                                    <ChartView data={data} fmtCols={fmtCols} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey} type={type} dflt={dflt}/>
                                 </div>
                                 <div className="w-2/12">
                                     
