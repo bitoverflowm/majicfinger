@@ -1,4 +1,3 @@
-import { AnalyticsWrapper } from '@/components/analytics';
 import Nav from '@/components/nav';
 
 import './globals.css'
@@ -17,7 +16,6 @@ export default function RootLayout({ children }) {
         </div>
         <div className=''>
           {children}
-          <AnalyticsWrapper />
         </div>
       </body>
     </html>
