@@ -17,6 +17,9 @@ import ChartDataMods from "../chartView/chartDataMods";
 import { MdDataset } from "react-icons/md";
 import { AiOutlineAppstoreAdd } from "react-icons/ai";
 import { FaChartLine } from "react-icons/fa6";
+import { ImMagicWand } from "react-icons/im";
+import AIMode from "../aiMode";
+
 
 const ActionMenu = () => {
     
@@ -35,6 +38,8 @@ const ActionMenu = () => {
     const uploadRef = useRef(null)
     const gridRef = useRef(null)
     const chartRef = useRef(null)
+
+    const [ aiOpen, setAiOpen ] = useState(true)
     
     const handleFileUpload = (e) => {
         const file = e.target.files[0]
@@ -104,8 +109,18 @@ const ActionMenu = () => {
         }
     }, [])
 
+    
+
     return(
         <div className="flex flex-col place-items-center w-screen absolute left-0 px-48 pt-20 -mt-16">
+            { aiOpen &&
+                <div className="fixed right-0 top-0 h-dvh w-1/4 bg-lychee-white backgroung-blur-xl flex place-items-center place-content-center px-6">
+                    <AIMode setData={setData} setWorking={setWorking}/>
+                </div>
+            }
+            <div className="fixed bottom-10 right-10 flex items-center justify-center px-3 py-2 text-xs gap-2 bg-lychee-red rounded-full text-white z-10 cursor-pointer hover:bg-white hover:text-black" onClick={()=>setAiOpen(true)}>
+                <ImMagicWand /> Activate Lychee AI
+            </div>
             <div className="flex gap-12">
                 <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
                     <div className="font-title text-3xl font-bold">
