@@ -2853,40 +2853,7 @@ export default function Home() {
   const [xName, setXName] = useState()
 
 
-  const genrateRandomData = async () => {
-    //promot: "generate a compltely random data set in csv format and return what type of chart will be the best way to present this data and why"
 
-    try{
-      const res = await fetch('/api/ai/generateRandomData', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-      if(res.status === 200){
-        const data = await res.json()
-        setGeneratedData(data.data)
-        setAssistantId(data.assistant_id)
-        setThreadId(data.thread_id)
-        console.log("the assistant ID: ", data.assistant_id)
-        //setTableCode(data.response)
-        console.log("parsing the summary", data.summary)
-        try {
-          // Replace single quotes with double quotes
-          const validJsonString = data.summary.replace(/'/g, '"');
-          const parsedArray = JSON.parse(validJsonString);
-          setReccommendedCharts(parsedArray[0])
-          setReccommendedStats(parsedArray[1])
-        } catch (error) {
-            console.error('Error parsing JSON string:', error);
-        }
-      } else {
-        throw new Error(await res.text())
-      }
-    } catch(error){
-      console.log("an error occurred")
-    }
-  }
 
   const buildGraph = async (graphId) => {
     setGraph(graphId)
@@ -2939,7 +2906,6 @@ export default function Home() {
 
   return (
     <div className='w-full bg-white flex flex-col place-content-center place-items-center'>
-      {editingCell && <div className='absolute top-0 bg-majic-accent px-6 py-3 rounded-b-lg text-xs font-bold shadow-xl text-white z-20'>Click anywhere to save changes</div>}
       {/* Control panel */}
       <div className='absolute top-10 left-10 flex flex-col z-20'>
         <div className='text-xxs font-bold'>Switch Chart Type:</div>

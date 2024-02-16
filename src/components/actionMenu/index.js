@@ -115,7 +115,7 @@ const ActionMenu = () => {
         <div className="flex flex-col place-items-center w-screen absolute left-0 px-48 pt-20 -mt-16">
             { aiOpen &&
                 <div className="fixed right-0 top-0 h-dvh w-1/4 bg-lychee-white backgroung-blur-xl flex place-items-center place-content-center px-6">
-                    <AIMode setData={setData} setWorking={setWorking}/>
+                    <AIMode setData={setData} setWorking={setWorking} setDflt={setDflt}/>
                 </div>
             }
             <div className="fixed bottom-10 right-10 flex items-center justify-center px-3 py-2 text-xs gap-2 bg-lychee-red rounded-full text-white z-10 cursor-pointer hover:bg-white hover:text-black" onClick={()=>setAiOpen(true)}>

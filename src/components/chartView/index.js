@@ -70,7 +70,7 @@ const ChartView = ({data, fmtCols, type, xKey, setXKey, yKey, setYKey, dflt }) =
 
     useEffect(()=> {
         if(chartOptions){
-            console.log(chartOptions)
+            //console.log(chartOptions)
         }
     }, [chartOptions])
 

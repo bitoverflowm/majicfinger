@@ -6,7 +6,7 @@ import { AiOutlineLoading3Quarters } from "react-icons/ai";
 
 
 
-const AIMode = ({setData, setWorking}) => {
+const AIMode = ({setData, setWorking, setDflt}) => {
     
     const [generatedData, setGeneratedData] = useState()
     const [assistantId, setAssistantId] = useState()
@@ -35,20 +35,15 @@ const AIMode = ({setData, setWorking}) => {
             const startIndex = dataText.indexOf('['); // Assuming '[' is the start of JSON data
             const endIndex = dataText.lastIndexOf(']') + 1; // Assuming ']' is the end of JSON data
             const jsonString = dataText.substring(startIndex, endIndex);
-            console.log("some more data: ", jsonString)
 
             // Parse the JSON string into an object
             const jsonData = JSON.parse(jsonString);
 
-            console.log("the data: ", jsonData)
-
             setData(jsonData)
+            setDflt(false)
             setGeneratedData(jsonData)
             setAssistantId(data.assistant_id)
             setThreadId(data.thread_id)
-            console.log("the assistant ID: ", data.assistant_id)
-            //setTableCode(data.response)
-            console.log("parsing the summary", data.summary)
             try {
               // Replace single quotes with double quotes
               const validJsonString = data.summary.replace(/'/g, '"');
@@ -103,8 +98,7 @@ const AIMode = ({setData, setWorking}) => {
                 <div>Reccommended Charts: {reccommendedCharts}</div>
                 <div>Reccommended Stats: {reccommendedStats}</div>
             </div>
-
-        }        
+        }
     </div>
   )
 
