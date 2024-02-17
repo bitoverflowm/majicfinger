@@ -1,4 +1,5 @@
 import OpenAI from "openai"
+import { pollRunStatus } from "./aiUtils";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_SECRET,
@@ -96,32 +97,5 @@ Reformat the csv into this format. Assign pleasing colors to the color categorie
 * return the list of keys to match with the formatted data
  */
 
-
-async function checkRunStatus(threadId, runId) {
-    const runStatus = await openai.beta.threads.runs.retrieve(threadId, runId);
-    return runStatus;
-}
-
-// Polling mechanism
-function pollRunStatus(threadId, runId, interval = 5000, timeout = 60000, analysisRun=null) {
-    return new Promise((resolve, reject) => {
-        const startTime = Date.now();
-        
-        const intervalId = setInterval(async () => {
-            const elapsed = Date.now() - startTime;
-            if (elapsed > timeout) {
-                clearInterval(intervalId);
-                reject(new Error("Timeout reached while waiting for run completion"));
-            }
-
-            const runStatus = await checkRunStatus(threadId, runId);
-            console.log(runStatus.status)
-            if (runStatus && runStatus.status === "completed") { // Check the correct property for completion
-                clearInterval(intervalId);
-                resolve(runStatus);
-            }
-        }, interval);
-    });
-}
 
 //and return what type of chart will be the best way to present this data and why

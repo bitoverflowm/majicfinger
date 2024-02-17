@@ -1,6 +1,5 @@
 import { use, useEffect, useState } from 'react';
 import { AgChartsReact } from 'ag-charts-react';
-import { set } from 'mongoose';
 
 const ChartView = ({data, fmtCols, type, xKey, setXKey, yKey, setYKey, dflt }) => {
     
