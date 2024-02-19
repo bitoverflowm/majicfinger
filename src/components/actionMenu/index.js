@@ -7,6 +7,8 @@ import { MdDataset } from "react-icons/md";
 import { AiOutlineAppstoreAdd } from "react-icons/ai";
 import { FaChartLine } from "react-icons/fa6";
 import { ImMagicWand } from "react-icons/im";
+import { GoEyeClosed } from "react-icons/go";
+
 
 import GridView from "../gridView";
 import ChartView from "../chartView";
@@ -108,13 +110,20 @@ const ActionMenu = () => {
     return(
         <div className="flex flex-col place-items-center w-screen absolute left-0 px-48 pt-20 -mt-16">
             { aiOpen &&
-                <div className="fixed right-0 top-0 h-dvh w-1/4 bg-lychee-white backgroung-blur-xl flex place-items-center place-content-center px-6">
-                    <AIMode data={data} setData={setData} setWorking={setWorking} setDflt={setDflt}/>
+                <div className="fixed right-0 top-0 h-dvh w-1/4 bg-lychee-white backgroung-blur-xl flex flex-col place-items-center place-content-center px-6">
+                    <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setAiOpen(false)}><GoEyeClosed /></div>
+                    <div className="grow flex place-items-center place-content-center">
+                        <AIMode data={data} setData={setData} setWorking={setWorking} setDflt={setDflt}/>
+                    </div>
                 </div>
             }
-            <div className="fixed bottom-10 right-10 flex items-center justify-center px-3 py-2 text-xs gap-2 bg-lychee-red rounded-full text-white z-10 cursor-pointer hover:bg-white hover:text-black" onClick={()=>setAiOpen(true)}>
-                <ImMagicWand /> Activate Lychee AI
-            </div>
+            {
+                !(aiOpen) &&
+                    <div className="fixed bottom-10 right-10 flex items-center justify-center px-3 py-2 text-xs gap-2 bg-lychee-red rounded-full text-white z-10 cursor-pointer hover:bg-white hover:text-black" onClick={()=>setAiOpen(true)}>
+                        <ImMagicWand /> Activate Lychee AI
+                    </div>
+            }
+            
             <div className="flex gap-12">
                 <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
                     <div className="font-title text-3xl font-bold">
