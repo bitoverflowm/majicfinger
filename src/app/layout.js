@@ -11,7 +11,7 @@ export default function RootLayout({ children }) {
       */}
       <head />
       <body>
-        <div>
+        <div className=''>
           <Nav/>
         </div>
         <div className=''>

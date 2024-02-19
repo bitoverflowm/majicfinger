@@ -30,9 +30,9 @@ module.exports = {
         'majic-accent': '#802392',
         'lychee-black': '#121619',
         'lychee-red': '#BA0B31',
-        'lychee-green': '#73956F',
+        'lychee-green': '#3AA29F',
         'lychee-white': '#F4EDEA',
-        'lychee-peach': '#FFE3E0',
+        'lychee-peach': '#7F7EFF',//'#0081AF',
       },
       keyframes: {
         shiver: {

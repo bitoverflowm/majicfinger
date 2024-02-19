@@ -9,7 +9,7 @@ const Nav = () => {
         <div className="max-w-48 p-6">
           <img src={"./logo.png"}/>
         </div>
-        <div className="flex place-items-center w-full place-content-end pr-10 gap-6 text-xs font-bold">
+        <div className="flex place-items-center w-full place-content-end pr-10 gap-6 text-xs font-bold hidden">
           <div>What is Lychee</div>
           <div>Upload Data</div>
           <div>Create Charts/Graphs</div>

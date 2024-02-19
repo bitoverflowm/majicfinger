@@ -9,6 +9,7 @@ import { FaChartLine } from "react-icons/fa6";
 import { ImMagicWand } from "react-icons/im";
 import { GoEyeClosed } from "react-icons/go";
 
+import { useMyState  } from '@/context/stateContext'
 
 import GridView from "../gridView";
 import ChartView from "../chartView";
@@ -19,7 +20,7 @@ import AIMode from "../aiMode";
 
 const ActionMenu = () => {
     
-    const [working, setWorking] = useState()
+    const{ working, setWorking } = useMyState()
     const [data, setData] = useState()
     const [csv, setCSV] = useState()
     const [fmtData, setFmtData] = useState()
@@ -35,7 +36,7 @@ const ActionMenu = () => {
     const gridRef = useRef(null)
     const chartRef = useRef(null)
 
-    const [ aiOpen, setAiOpen ] = useState(true)
+    const { aiOpen, setAiOpen } = useMyState()
     
     const handleFileUpload = (e) => {
         const file = e.target.files[0]
