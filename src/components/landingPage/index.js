@@ -20,8 +20,8 @@ const LandingPage = () => {
     }, [view])
 
     return (
-        <div className='font-body pt-10 '>
-            <div className='py-20 h-screen'>
+        <div className='font-body pt-5'>
+            <div className='py-10 h-screen'>
                 <div className='overflow-hidden absolute top-0 left-0 p-24 -z-10 blur-md'>
                     <video autoPlay loop muted playsInline className="h-dvh w-screen max-w-screen rounded-br-3xl rounded-tl-3xl">
                         <source src="./bg4.mp4" type="video/mp4" />
@@ -55,17 +55,33 @@ const LandingPage = () => {
                         </div>
                     </div>
                 </div>
-            </div>
-            <div className='h-64 overflow-hidden rounded-tl-3xl rounded-br-3xl hidden'>
-                <video autoPlay loop muted playsInline className="w-screen h-auto max-w-screen -mt-56">
-                    <source src="./bg0.mp4" type="video/mp4" />
-                    Your browser does not support the video tag.
-                </video>
-            </div>            
-            <div ref={firstRef} className='px-10'>
-                <div className="flex place-content-center py-2">
-                    <img src={"./fruit.png"}/>
+                <div className="w-3/5 justify-center bg-slate-200/30 rounded-2xl mx-auto mt-10 py-5">
+                    <div className='text-xs font-bold text-slate-500'>
+                        Used, trusted and beta tested by people at:                        
+                    </div>
+                    <div className='flex gap-20 py-4 place-content-center place-items-center grayscale'>
+                        <div className="flex-shrink">
+                            <img src="./jpm.svg"  alt="jpm" className='h-6'/>   
+                        </div>
+                        <div className="flex-shrink">
+                            <img src="./goldman.svg"  alt="goldman" className='h-8'/>   
+                        </div>
+                        <div className="flex-shrink">
+                            <img src="./meta.svg"  alt="meta" className='h-8'/>   
+                        </div>
+                        <div className="flex-shrink">
+                            <img src="./google.svg"  alt="meta" className='h-8'/>   
+                        </div>
+                        <div className="flex-shrink">
+                            <img src="./apple.svg"  alt="apple" className='h-8'/>   
+                        </div>
+                        <div className="flex-shrink">
+                            <img src="./mit.svg"  alt="mit" className='h-8'/>   
+                        </div>
+                    </div>
                 </div>
+            </div>       
+            <div ref={firstRef} className='px-10 pt-20'>
                 <div className='text-8xl font-title'>
                     Our <span className='font-black text-lychee-peach'>Features:</span>
                 </div>

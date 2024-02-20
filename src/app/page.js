@@ -17,16 +17,7 @@ export default function Home() {
         <div className='text-center'>
           <LandingPage />
         </div>
-        <div className="bg-lychee-white bg-opacity-50 w-2/3 px-64 pt-20 pb-96">
-            <div className="font-black text-2xl font-title py-4">
-              Lychee.
-            </div>
-            <div className="text-4xl text-lychee-green">
-              Analyze and Visualize Data
-            </div>
-            <div className="text-4xl text-lychee-green pb-16">
-              Without <span className="">Spreadsheets</span>
-            </div>
+        <div className="">
             <ActionMenu />
         </div>
       </div>
