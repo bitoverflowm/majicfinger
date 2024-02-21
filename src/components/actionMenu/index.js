@@ -8,6 +8,8 @@ import { AiOutlineAppstoreAdd } from "react-icons/ai";
 import { FaChartLine } from "react-icons/fa6";
 import { ImMagicWand } from "react-icons/im";
 import { GoEyeClosed } from "react-icons/go";
+import { CiExport } from "react-icons/ci";
+
 
 import { useMyState  } from '@/context/stateContext'
 
@@ -19,8 +21,15 @@ import AIMode from "../aiMode";
 
 
 const ActionMenu = () => {
-    
+    /*
+     * Context hooks
+     */
+    const { aiOpen, setAiOpen } = useMyState()
     const{ working, setWorking } = useMyState()
+
+    /*
+     * State hooks
+     */
     const [data, setData] = useState()
     const [csv, setCSV] = useState()
     const [fmtData, setFmtData] = useState()
@@ -35,8 +44,8 @@ const ActionMenu = () => {
     const uploadRef = useRef(null)
     const gridRef = useRef(null)
     const chartRef = useRef(null)
-
-    const { aiOpen, setAiOpen } = useMyState()
+   
+    const [emailVisible, setEmailVisible] = useState(false)
     
     const handleFileUpload = (e) => {
         const file = e.target.files[0]
@@ -61,6 +70,11 @@ const ActionMenu = () => {
         reader.readAsBinaryString(file);
         setWorking('grid')
         
+    }
+
+    const emailHandler = (e) => {
+        const email = e.target.value
+        console.log(email)
     }
 
     useEffect(()=> {
@@ -113,12 +127,6 @@ const ActionMenu = () => {
                     </div>
                 </div>
             }
-            {
-                !(aiOpen) &&
-                    <div className="fixed bottom-10 right-10 flex items-center justify-center px-3 py-2 text-xs gap-2 bg-lychee-red rounded-full text-white z-10 cursor-pointer hover:bg-white hover:text-black" onClick={()=>setAiOpen(true)}>
-                        <ImMagicWand /> Activate Lychee AI
-                    </div>
-            }
 
             <div className="flex flex-col w-screen h-screen place-content-center place-items-center bg-majic-white">
                 <div className="flex gap-2 py-10">
@@ -126,7 +134,15 @@ const ActionMenu = () => {
                     <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setAiOpen(true)}>Generate Data</div>
                     <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('grid')}>Table</div>
                     <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('chart')}>Chart</div>
+                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('dashboard')}>Dashboard</div>
                     <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('integrations')}>Integrations</div>
+                    {
+                        !(aiOpen) &&
+                            <div className="border border-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer flex items-center justify-center gap-2 bg-lychee-red rounded-full text-white z-10" onClick={()=>setAiOpen(true)}>
+                                <ImMagicWand /> Activate Lychee AI
+                            </div>
+                    }
+                    <div className="border border-slate-400 text-lychee-black rounded-full hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('export')}><CiExport /></div>
                     <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('roadmap')}>Roadmap</div>
                     <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                 </div>
@@ -171,37 +187,343 @@ const ActionMenu = () => {
                             
                     }
                     {
-                        working && working === 'getLychee' &&
-                            <div className="w-full flex flex-col gap-10 place-content-center">
-                                <div className="text-center">
-                                    <div className='text-8xl font-title'>
-                                        <span className='font-black text-lychee-peach'>Opportunity</span> For Life.
+                        working && working === 'integrations' && 
+                            <div className="w-full flex flex-col gap-10 place-content-center place-items-center">
+                                <div className="text-8xl font-title">Coming Soon</div>
+                                <div className="text-lychee-peach">We are working on it. Stay tuned</div>
+                                <div>I am working on a Sneak Preview. If you are a LifeTime member, you can vote on which one you would like to see an example of first</div>
+                                <div className="flex gap-10">
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Connect to X
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Instantly pull your data from X
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Populate the data table, for raw analysis
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Chart any aspect of your live data
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Lychee AI can help you discover things you never dreamed of.
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Add live data flow to the Dashboard section and create alerts
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote for X Integration</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
                                     </div>
-                                    <div className='text-8xl font-title'>
-                                        <span className='font-black text-lychee-peach'>Instant</span> Access For Life.
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Connect to Youtube
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Instantly pull your data from X
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Populate the data table, for raw analysis
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Chart any aspect of your live data
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Lychee AI can help you discover things you never dreamed of.
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Add live data flow to the Dashboard section and create alerts
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote for YouTube Integration</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
+                                    </div>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Connect to Instagram
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Instantly pull your data from X
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Populate the data table, for raw analysis
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Chart any aspect of your live data
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Lychee AI can help you discover things you never dreamed of.
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Add live data flow to the Dashboard section and create alerts
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote for Instagram Integration</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
                                     </div>
                                 </div>
-                                <div className="flex w-full place-content-center gap-10">
-                                    <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
-                                        <div className="font-title text-3xl font-bold">
-                                            Generate a Data Set
+                            </div>
+                    }
+                    {
+                        working && working === 'export' && 
+                            <div className="w-full flex flex-col gap-10 place-content-center place-items-center">
+                                <div className="text-8xl font-title">Coming Soon</div>
+                                <div className="text-lychee-peach">We are working on it. Stay tuned</div>
+                                <div>If you are a LifeTime member, you can vote on which export source we should make available firts</div>
+                                <div className="flex gap-10">
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                URL Links
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Hosted browser link that you can share with anyone
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
+                                    </div>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Twitter Share
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Sharable post on Twitter
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
+                                    </div>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Printible file
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                A printible file version
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
+                                    </div>
+                                </div>
+                            </div>
+                    }
+                    {
+                        working && working === 'dashboard' && 
+                            <div className="w-full flex flex-col gap-10 place-content-center place-items-center">
+                                <div className="text-8xl font-title">Coming Soon</div>
+                                <div className="text-lychee-peach">We are working on it. Stay tuned</div>
+                                <div>Demonstration:</div>
+                                <div className="flex gap-10">
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                URL Links
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Hosted browser link that you can share with anyone
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
+                                    </div>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Twitter Share
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Sharable post on Twitter
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
+                                    </div>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Printible file
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                A printible file version
+                                            </div>
+                                            <div className="flex place-content-center">
+                                                <div className="bg-lychee-green text-center font-title font-black rounded-full px-3 py-1">Vote</div>
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
+                                    </div>
+                                </div>
+                            </div>
+                    }
+                    {
+                        working && working === 'getLychee' &&
+                            <div className="w-full flex flex-col gap-10 place-content-center place-items-center">
+                                <div className="text-8xl font-title">You Have <span className="text-lychee-peach">2 Options.</span></div>
+                                <div className="flex w-full place-content-center gap-10 place-items-center">
+                                    <div className="w-1/4">
+                                        <div className="px-10 py-6 flex flex-col gap-3">
+                                            <div><span className="font-title text-4xl">1.</span> If you're interested and want this, but don't want to pay now, that's cool too.</div>
+                                            <div>You can still use free trial.</div>
+                                            <div>Keep in mind that you will have to pay a monthly subscription if you wait until then and pay extra for custom features too. </div>
+                                            <div>(Planned Sub price $69.99/month)</div>
                                         </div>
-                                        <div className="py-3 text-sm">
-                                            Create completely random data, or request specific data
-                                        </div>
-                                        <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
-                                            Go
+                                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Free until subscription kicks in
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                1 file upload at a time
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Up to 512 MB data upload.
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                1 AI requests/ month include
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                $0.00
+                                            </div>
+                                            <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
+                                                Go
+                                            </div>
+                                            {
+                                                emailVisible &&
+                                                    <form className="flex flex-col items-center pb-6">
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Enter your email"
+                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
+                                                            onChange={emailHandler}
+                                                        />
+                                                    </form>
+                                            }
                                         </div>
                                     </div>
-                                    <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
-                                        <div className="font-title text-3xl font-bold">
-                                            Generate a Data Set
+                                    <div>
+                                        Or
+                                    </div>
+                                    <div className="w-1/4">
+                                        <div className="px-10 py-6 flex flex-col gap-3">
+                                            <div><span className="font-title text-4xl">2.</span> You can get instant access to everything above and more bonus updates rolling in the future, <span className="text-lychee-peach">at not a single penny more than what you pay today.</span></div>
+                                            <div className="text-lychee-peach">Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else.</div>
                                         </div>
-                                        <div className="py-3 text-sm">
-                                            Create completely random data, or request specific data
-                                        </div>
-                                        <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
-                                            Go
+                                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => window.location.href = 'https://buy.stripe.com/3cscP66Oq7CS6Eo28f'}>
+                                            <div className="font-title text-3xl font-bold">
+                                                Get Lifetime Access
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Includes all future updates.
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Get up to 512 MB data upload. get access to more storage when availabe.
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                Help Lychee grow, expand in early stages of buildout.
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                200 AI requests/ month include
+                                            </div>
+                                            <div className="py-3 text-sm">
+                                                $29.99
+                                            </div>
+                                            <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
+                                                Go
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
