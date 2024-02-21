@@ -1,5 +1,5 @@
 import dbConnect from "@/lib/dbConnect";
-import User from "@/models/Users";
+import Feature from "@/models/Features";
 
 export default async function handler(req, res) {
     const {
@@ -12,11 +12,11 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET": /* Get a model by its ID */
             try {
-                const user = await User.findById(id);
-                if(!user) {
+                const feature = await Feature.findById(id);
+                if(!feature) {
                     return res.status(400).json({success: false});
                 }
-                res.status(200).json({success: true, data: user});
+                res.status(200).json({success: true, data: feature});
             } catch (error) {
                 res.status(400).json({success: false});
             }
@@ -29,22 +29,22 @@ export default async function handler(req, res) {
                     ...req.body,
                     },
                 };
-                const user = await User.findByIdAndUpdate(id, update, {
+                const feature = await Feature.findByIdAndUpdate(id, update, {
                     new: true,
                     runValidators: true,
                     });
-                if(!user) {
+                if(!feature) {
                     return res.status(400).json({success: false});
                 }
-                res.status(200).json({success: true, data: user});
+                res.status(200).json({success: true, data: feature});
             } catch (error) {
                 res.status(400).json({success: false});
             }
             break;
         case "DELETE": /* Delete a model by its ID */
             try {
-                const deleteUser = await User.deleteOne({_id: id});
-                if(!deleteUser) {
+                const deleteFeature = await Feature.deleteOne({_id: id});
+                if(!deleteFeature) {
                     return res.status(400).json({success: false});
                 }
                 res.status(200).json({success: true, data: {}});

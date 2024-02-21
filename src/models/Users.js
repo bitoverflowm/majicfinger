@@ -12,6 +12,10 @@ const UserSchema = new mongoose.Schema({
         required: [true, "Email is required"],
         maxLength: [240, "Email cannot be more than 240 characters"],
     },
+    lifetimeMember: {
+        type: Boolean,
+        default: false,
+    },
     token: {
         type: Number
     },

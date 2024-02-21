@@ -12,15 +12,21 @@ import { CiExport } from "react-icons/ci";
 
 
 import { useMyState  } from '@/context/stateContext'
+import { useUser } from '@/lib/hooks';
+
+import Login from "../login";
 
 import GridView from "../gridView";
 import ChartView from "../chartView";
 import ChartDataMods from "../chartView/chartDataMods";
+import Roadmap from "../roadmap";
 
 import AIMode from "../aiMode";
 
 
 const ActionMenu = () => {
+    const user = useUser()
+
     /*
      * Context hooks
      */
@@ -150,22 +156,44 @@ const ActionMenu = () => {
                     {
                         working && working === 'upload' &&
                             <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 text-lychee-black w-1/2 h-1/2 bg-lychee-peach rounded-md backdrop-blur-md text-center">
-                                <div className="py-2 font-title text-2xl">
-                                    Let's Start With Your Data:
-                                </div>
-                                <div className="text-xs text-slate-600 pb-2">*Must be .csv or Excel File (.xlsx) </div>
-                                <div className="text-xs text-red-400 pb-2">*Warning: this action will replace <span className="px-1 underline hover:text-black cursor-pointer" onClick={()=>setWorking('grid')}>the current data</span> stored this session </div>
-                                <form className="flex flex-col items-center pb-6">
-                                    <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">
-                                        Click to Upload
-                                    </label>
-                                    <input id="file-upload" type="file" accept=".xlsx" onChange={handleFileUpload} className="hidden" />
-                                </form>
-                                <div className="text-xs text-slate-600 pb-2">If you don't have your own data, 
-                                    <span className="underline hover:font-black cursor-pointer px-1" onClick={()=>setWorking('grid')}>click here</span> to use sample data or have Lychee  
-                                    <span className="underline hover:font-black cursor-pointer px-1">generate</span> 
-                                    a fresh data set 
-                                </div>
+                                {
+                                    user 
+                                        ?
+                                        <>
+                                            <div className="py-2 font-title text-2xl">
+                                                Let's Start With Your Data:
+                                            </div>
+                                            <div className="text-xs text-slate-600 pb-2">*Must be .csv or Excel File (.xlsx) </div>
+                                            <div className="text-xs text-red-400 pb-2">*Warning: this action will replace <span className="px-1 underline hover:text-black cursor-pointer" onClick={()=>setWorking('grid')}>the current data</span> stored this session </div>
+                                            <form className="flex flex-col items-center pb-6">
+                                                <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">
+                                                    Click to Upload
+                                                </label>
+                                                <input id="file-upload" type="file" accept=".xlsx" onChange={handleFileUpload} className="hidden" />
+                                            </form>
+                                            <div className="text-xs text-slate-600 pb-2">If you don't have your own data, 
+                                                <span className="underline hover:font-black cursor-pointer px-1" onClick={()=>setWorking('grid')}>click here</span> to use sample data or have Lychee  
+                                                <span className="underline hover:font-black cursor-pointer px-1">generate</span> 
+                                                a fresh data set 
+                                            </div>
+                                        </>
+                                        :   
+                                        <>
+                                        <div className="py-2 font-title text-2xl">
+                                                Let's Start With Your Data:
+                                            </div>
+                                            <div className="text-xs text-red-400 pb-2">*Please register before uploading your data </div>
+                                            <div className="block my-6 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" onClick={()=>setWorking('getLychee')}>
+                                                Click Here
+                                            </div>
+                                            <div className="text-xs text-slate-600 pb-2">If you don't have your own data, 
+                                                <span className="underline hover:font-black cursor-pointer px-1" onClick={()=>setWorking('grid')}>click here</span> to use sample data or have Lychee  
+                                                <span className="underline hover:font-black cursor-pointer px-1" onClick={()=>setAiOpen(true)}>generate</span> 
+                                                a fresh data set 
+                                            </div>
+                                        </>
+                                }
+                                
                             </div>
                     }
                     {
@@ -483,14 +511,7 @@ const ActionMenu = () => {
                                             </div>
                                             {
                                                 emailVisible &&
-                                                    <form className="flex flex-col items-center pb-6">
-                                                        <input
-                                                            type="email"
-                                                            placeholder="Enter your email"
-                                                            className="mt-4 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular"
-                                                            onChange={emailHandler}
-                                                        />
-                                                    </form>
+                                                    <Login />
                                             }
                                         </div>
                                     </div>
@@ -528,6 +549,9 @@ const ActionMenu = () => {
                                     </div>
                                 </div>
                             </div>
+                    }
+                    {
+                        working && working === 'roadmap' && <Roadmap />
                     }
                 </div>
             </div>                        

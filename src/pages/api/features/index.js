@@ -1,5 +1,5 @@
 import dbConnect from "@/lib/dbConnect";
-import User from "@/models/Users";
+import Feature from "@/models/Features";
 
 export default async function handler(req, res) {
     const {method} = req;
@@ -9,21 +9,21 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET":
             try {
-                const users = await User.find({
+                const features = await Feature.find({
                     /* find all the data in our database */
                 });
-                res.status(200).json({success: true, data: users});
+                res.status(200).json({success: true, data: features});
             } catch (error) {
                 res.status(400).json({success: false});
             }
             break;
         case "POST":
             try {
-                const user = await User.create(
+                const feature = await Feature.create(
                     /* create a new model in the database */
                     req.body
                 );
-                res.status(201).json({success: true, data: user});
+                res.status(201).json({success: true, data: feature});
             } catch (error) {
                 res.status(400).json({success: false});
             }
