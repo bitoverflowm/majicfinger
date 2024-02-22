@@ -19,7 +19,7 @@ const QuickNav = () => {
     }, [aiOpen])
 
     return (
-        <div className='hidden sm:block fixed top-10 right-10 z-20 bg-white/30 rounded-xl px-8 py-5 text-lychee-black shadow-2xl flex flex-col gap-2 text-xs backdrop-blur-2xl place-items-center'>
+        <div className='hidden lg:block fixed top-10 right-10 z-20 bg-white/30 rounded-xl px-8 py-5 text-lychee-black shadow-2xl flex flex-col gap-2 text-xs backdrop-blur-2xl place-items-center'>
             {
                 user ? 
                     <div className='flex flex-col gap-4 place-content-center place-items-center'>

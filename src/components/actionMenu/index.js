@@ -214,14 +214,14 @@ const ActionMenu = () => {
                     }
                     {
                         fmtCols && data && ((working && working === 'chart') || !working) &&
-                            <div className="h-5/6 w-full flex flex-col sm:flex-row">
-                                <div className="hidden sm:block w-2/12 shadow-2xl px-5 py-10 rounded mx-10">
+                            <div className="h-5/6 w-full flex flex-col xl:flex-row">
+                                <div className="hidden xl:block w-2/12 shadow-2xl px-5 py-10 rounded mx-10">
                                     <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>
                                 </div>
-                                <div className="h-auto w-[450px] sm:h-[750px] sm:w-[1200px] px-1 sm:px-10">
+                                <div className="h-auto w-[450px] xl:h-[750px] sm:w-[1200px] px-1 xl:px-10">
                                     <ChartView data={data} fmtCols={fmtCols} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey} type={type} dflt={dflt}/>
                                 </div>
-                                <div className="sm:hidden shadow-2xl px-5 py-10 rounded mx-10">
+                                <div className="xl:hidden shadow-2xl px-5 py-10 rounded mx-10">
                                     <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>
                                 </div>
                             </div>
