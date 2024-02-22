@@ -150,7 +150,7 @@ const ActionMenu = () => {
                 </div>
             }
 
-            <div className="flex flex-col max-w-screen sm:w-screen max-h-screen h-svh place-content-center place-items-center bg-majic-white" id="dashboard-section">
+            <div className="flex flex-col w-screen max-w-screen sm:w-screen max-h-screen h-svh place-content-center place-items-center bg-majic-white" id="dashboard-section">
                 <div className="flex flex-wrap place-items-center place-content-center gap-2 sm:py-10 px-4">
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
@@ -214,12 +214,15 @@ const ActionMenu = () => {
                     }
                     {
                         fmtCols && data && ((working && working === 'chart') || !working) &&
-                            <div className="h-5/6 w-full flex">
-                                <div className="w-2/12 shadow-2xl px-5 py-10 rounded mx-10">
+                            <div className="h-5/6 w-full flex flex-col sm:flex-row">
+                                <div className="hidden sm:block w-2/12 shadow-2xl px-5 py-10 rounded mx-10">
                                     <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>
                                 </div>
-                                <div className="h-full w-[1200px] px-10">
+                                <div className="h-auto w-[450px] sm:h-full sm:w-[1200px] px-1 sm:px-10">
                                     <ChartView data={data} fmtCols={fmtCols} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey} type={type} dflt={dflt}/>
+                                </div>
+                                <div className="sm:hidden shadow-2xl px-5 py-10 rounded mx-10">
+                                    <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>
                                 </div>
                             </div>
                             
