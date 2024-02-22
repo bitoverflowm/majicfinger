@@ -4,7 +4,11 @@ const Roadmap = () => {
     const [roadmapData, setRoadmapData] = useState([]);
 
     useEffect(() => {
-        fetch('api/features')
+        const featuresUrl = process.env.NODE_ENV === 'development' 
+                      ? 'http://localhost:3000/api/features/' 
+                      : 'https://www.lych3e.com/api/features/';
+
+        fetch(featuresUrl)
             .then(response => response.json())
             .then(data => setRoadmapData(data.data))
             .catch(error => console.error(error));
