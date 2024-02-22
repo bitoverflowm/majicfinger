@@ -170,7 +170,7 @@ const LandingPage = () => {
                                 </div>
                             </div>
                             <div className='flex place-content-center'>
-                                <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('second')}>
+                                <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('second')}>
                                     But how?
                                 </div>
                             </div>                
@@ -220,7 +220,7 @@ const LandingPage = () => {
                                 </div>
                             </div>
                         </div>
-                        <div ref={thirdRef} className='sm:px-10 sm:py-20'>
+                        <div ref={thirdRef} className='w-96 mx-auto sm:w-screen sm:px-10 sm:py-20'>
                             <div className='text-6xl sm:text-8xl font-title'>Susan's <span className='text-lychee-peach'>Instant Win</span></div>
                             <div className='py-10 sm:py-20 text-center flex flex-col gap-2'>
                                 <div className='text-2xl font-black text-lychee-peach'>
@@ -285,13 +285,13 @@ const LandingPage = () => {
                                 </div>
                             </div>
                             <div className='flex place-content-center py-10'>
-                                <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('fourth')}>
+                                <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('fourth')}>
                                     Need More?
                                 </div>
                             </div>
                         </div>
-                        <div ref={fourthRef} className='py-20'>
-                            <div className='text-8xl font-title px-64'>What Our <span className='text-lychee-peach'>Legendary Beta Testers Have To Say:</span></div>
+                        <div ref={fourthRef} className=' w-96 mx-auto sm:w-screen py-10 sm:py-20'>
+                            <div className='text-6xl sm:text-8xl font-title sm:px-64'>What Our <span className='text-lychee-peach'>Legendary Beta Testers Have To Say:</span></div>
                             <div className='py-20 text-center flex flex-col sm:flex-row sm:flex-wrap gap-2 place-content-center gap-6'>
                                 <div className='text-center sm:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
                                     <div>
@@ -302,17 +302,6 @@ const LandingPage = () => {
                                     </div>
                                     <div>
                                         - Sarah L. Data Researcher
-                                    </div>
-                                </div>
-                                <div className='text-center sm:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
-                                    <div>
-                                        Running a marketing agency almost solo is hard as it is. And when you don't have coding knowledge and there are all these complex tools in the market, you find yourself in need of help.
-                                    </div>
-                                    <div>
-                                        Lychee made this possible for us to provide instant solutions to our clients, without burning a hole in the treasury.
-                                    </div>
-                                    <div>
-                                        - Michael Shapran, Founder Of Richify Agency
                                     </div>
                                 </div>
                                 <div className='text-center sm:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
@@ -335,11 +324,21 @@ const LandingPage = () => {
                                         - Jessica L. Business University Student
                                     </div>
                                 </div>
-                                
+                                <div className='text-center sm:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
+                                    <div>
+                                        Running a marketing agency almost solo is hard as it is. And when you don't have coding knowledge and there are all these complex tools in the market, you find yourself in need of help.
+                                    </div>
+                                    <div>
+                                        Lychee made this possible for us to provide instant solutions to our clients, without burning a hole in the treasury.
+                                    </div>
+                                    <div>
+                                        - Michael Shapran, Founder Of Richify Agency
+                                    </div>
+                                </div>                            
                             </div>            
                         </div>
                         <div className='flex place-content-center'>
-                                <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('fifth')}>
+                                <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('fifth')}>
                                     I want it
                                 </div>
                         </div>
@@ -370,8 +369,8 @@ const LandingPage = () => {
                                 </div>
                             </div>
                             <div className='flex place-content-center mb-56'>
-                                <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
-                                    Learn More
+                                <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
+                                    Get It
                                 </div>
                             </div>
                         </div>

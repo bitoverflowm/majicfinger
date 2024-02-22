@@ -150,8 +150,8 @@ const ActionMenu = () => {
                 </div>
             }
 
-            <div className="flex flex-col w-screen max-w-screen sm:w-screen max-h-screen h-svh place-content-center place-items-center bg-majic-white" id="dashboard-section">
-                <div className="flex flex-wrap place-items-center place-content-center gap-2 sm:py-10 px-4">
+            <div className="flex flex-col min-h-[100vh] w-screen max-w-screen sm:w-screen min-h-screen place-content-center place-items-center bg-majic-white" id="dashboard-section">
+                <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 sm:py-10 px-4">
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
@@ -218,7 +218,7 @@ const ActionMenu = () => {
                                 <div className="hidden sm:block w-2/12 shadow-2xl px-5 py-10 rounded mx-10">
                                     <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>
                                 </div>
-                                <div className="h-auto w-[450px] sm:h-full sm:w-[1200px] px-1 sm:px-10">
+                                <div className="h-auto w-[450px] sm:h-[750px] sm:w-[1200px] px-1 sm:px-10">
                                     <ChartView data={data} fmtCols={fmtCols} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey} type={type} dflt={dflt}/>
                                 </div>
                                 <div className="sm:hidden shadow-2xl px-5 py-10 rounded mx-10">
@@ -493,10 +493,10 @@ const ActionMenu = () => {
                     }
                     {
                         working && working === 'getLychee' &&
-                            <div className="w-full flex flex-col gap-10 place-content-center place-items-center">
-                                <div className="text-8xl font-title">You Have <span className="text-lychee-peach">2 Options.</span></div>
-                                <div className="flex w-full place-content-center gap-10">
-                                    <div className="w-1/4">
+                            <div className="w-96 sm:w-full flex flex-col gap-10 place-content-center place-items-center">
+                                <div className="pt-6 sm:pt-2 text-6xl sm:text-8xl font-title text-center">You Have <span className="text-lychee-peach">2 Options.</span></div>
+                                <div className="flex flex-col w-96 sm:flex-row sm:w-full place-content-center gap-10">
+                                    <div className="text-center sm:text-left sm:w-1/4">
                                         <div className="px-10 py-6 flex flex-col gap-3">
                                             <div className="font-title text-4xl text-center">1.</div>
                                             <div> If you're interested and want this, but don't want to pay now, that's cool too.</div>
@@ -530,11 +530,11 @@ const ActionMenu = () => {
                                             <div>(Planned Sub price $69.99/month) + Data usage rates</div>
                                         </div>
                                     </div>
-                                    <div className="pt-32">
+                                    <div className="pt-10 text-center sm:pt-32">
                                         Or
                                     </div>
-                                    <div className="w-1/4">
-                                        <div className="px-10 py-6 flex flex-col gap-3">
+                                    <div className="sm:w-1/4">
+                                        <div className="text-center sm:text-left px-10 py-6 flex flex-col gap-3">
                                             <div className="font-title text-4xl text-center">2.</div>
                                             <div> You can get instant access to everything and more bonus updates (being released every week), <span className="text-lychee-peach">at not a single penny more than what you pay today.</span></div>
                                             <div className="text-lychee-peach">Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else.</div>
