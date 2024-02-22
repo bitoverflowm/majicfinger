@@ -8,8 +8,8 @@ const FAQ = () => {
     const { setWorking } = useMyState()
 
     return (
-            <div className="p-4 max-w-2xl mx-auto flex flex-col gap-6">
-                <div className="text-8xl font-bold mb-4"><span className='text-lychee-peach'>Frequently</span> Asked Questions</div>
+            <div className="p-4 w-96 sm:max-w-2xl sm:mx-auto flex flex-col gap-6">
+                <div className="text-4xl sm:text-8xl font-bold mb-4"><span className='text-lychee-peach'>Frequently</span> Asked Questions</div>
                 <div>
                     <div className="text-2xl">1. What does the lifetime access offer include?</div>
                     <div>
@@ -70,7 +70,7 @@ const FAQ = () => {
                         To secure your lifetime access, make sure to complete your purchase before the pre-order period expires. Once it ends, lifetime access will no longer be available, and Lychee will transition to a subscription model.
                     </div>
                 </div>
-                <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
+                <div className='bg-lychee-green text-lychee-black font-black text-center w-56 mx-auto hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
                     I want it
                 </div>
 

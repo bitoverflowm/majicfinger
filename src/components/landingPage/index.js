@@ -45,18 +45,18 @@ const LandingPage = () => {
                                 <div className='text-sm sm:text-md font-black text-lychee-peach p-10'>
                                     We'll save you from all the complex yabba-dabba-doos out there.
                                 </div>
-                                <div className='text-5xl sm:text-8xl font-title'>
+                                <div className='text-6xl sm:text-8xl font-title'>
                                     <span className='font-black text-lychee-peach'>Instant</span> Graphs.
                                 </div>
-                                <div className='text-5xl sm:text-8xl font-title'>
+                                <div className='text-6xl sm:text-8xl font-title'>
                                 <span className='font-black text-lychee-peach'>Zero</span> Hassle.
                                 </div>
                                 <div className='flex place-content-center py-10'>
-                                    <div className='font-black bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-3 sm:px-5 py-2 sm:py-4 rounded-full text-xs' onClick={()=>setView('first')}>
+                                    <div className='font-black bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-3 sm:px-5 py-2 sm:py-4 rounded-full text-sm' onClick={()=>setView('first')}>
                                         Cool... tell me more?
                                     </div>
                                 </div>
-                                <div className='text-sm sm:text-lg'>
+                                <div className='text-md sm:text-lg'>
                                     <div>
                                         Seriously.
                                     </div>
@@ -68,15 +68,15 @@ const LandingPage = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="w-3/5 justify-center bg-slate-200/30 rounded-2xl mx-auto mt-10 py-5">
+                            <div className="w-96 sm:w-3/5 justify-center bg-slate-200/30 rounded-2xl mx-auto mt-10 py-5">
                                 <div className='text-xs font-bold text-slate-500'>
                                     Used, trusted and beta tested by people at:                        
                                 </div>
-                                <div className='flex gap-20 py-4 place-content-center place-items-center grayscale'>
+                                <div className='flex gap-8 px-6 sm:gap-20 py-2 place-content-center place-items-center grayscale'>
                                     <div className="flex-shrink">
                                         <img src="./jpm.svg"  alt="jpm" className='h-6'/>   
                                     </div>
-                                    <div className="flex-shrink">
+                                    <div className="flex-shrink hidden sm:block">
                                         <img src="./goldman.svg"  alt="goldman" className='h-8'/>   
                                     </div>
                                     <div className="flex-shrink">
@@ -86,10 +86,10 @@ const LandingPage = () => {
                                         <img src="./google.svg"  alt="meta" className='h-8'/>   
                                     </div>
                                     <div className="flex-shrink">
-                                        <img src="./apple.svg"  alt="apple" className='h-8'/>   
+                                        <img src="./apple.svg"  alt="apple" className='h-12'/>   
                                     </div>
                                     <div className="flex-shrink">
-                                        <img src="./mit.svg"  alt="mit" className='h-8'/>   
+                                        <img src="./mit.svg"  alt="mit" className='h-6'/>   
                                     </div>
                                 </div>
                             </div>
@@ -180,7 +180,7 @@ const LandingPage = () => {
                                 <span className='font-black text-lychee-peach'>How</span> It Works:
                             </div>
                             <div className='flex flex-col sm:flex-row sm:flex-wrap gap-10 sm:py-20 place-items-center place-content-center'>
-                                <div className='p-10 shadow-xl rounded-xl w-1/4 h-72'>
+                                <div className='p-10 shadow-xl rounded-xl w-96 sm:w-1/4 h-72'>
                                     <div className='font-title text-2xl'>
                                     <span className='text-lychee-red font-title font-black text-4xl'>1.</span>  Drop Your Spreadsheet.
                                     </div>
@@ -193,7 +193,7 @@ const LandingPage = () => {
                                         </div>
                                     </div>               
                                 </div>
-                                <div className='p-10 shadow-xl rounded-xl w-1/4 h-72'>
+                                <div className='p-10 shadow-xl rounded-xl w-96 sm:w-1/4 h-72'>
                                     <div className='font-title text-2xl'>
                                     <span className='text-lychee-red font-title font-black text-4xl'>2.</span>  Watch The Magic.
                                     </div>
@@ -203,7 +203,7 @@ const LandingPage = () => {
                                         </div>                            
                                     </div>               
                                 </div>
-                                <div className='p-10 shadow-xl rounded-xl w-1/4 h-72'>
+                                <div className='p-10 shadow-xl rounded-xl w-96 sm:w-1/4 h-72'>
                                     <div className='font-title text-2xl'>
                                         <span className='text-lychee-red font-title font-black text-4xl'>3.</span> Any Chart You Want.
                                     </div>
@@ -221,7 +221,7 @@ const LandingPage = () => {
                             </div>
                         </div>
                         <div ref={thirdRef} className='sm:px-10 sm:py-20'>
-                            <div className='text-4xl sm:text-8xl font-title'>Susan's <span className='text-lychee-peach'>Instant Win</span></div>
+                            <div className='text-6xl sm:text-8xl font-title'>Susan's <span className='text-lychee-peach'>Instant Win</span></div>
                             <div className='py-10 sm:py-20 text-center flex flex-col gap-2'>
                                 <div className='text-2xl font-black text-lychee-peach'>
                                     The clock struck 11:43 pm.
