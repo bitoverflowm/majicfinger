@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
 const Roadmap = () => {
+    const [roadmapData, setRoadmapData] = useState();
+
     useEffect(async () => {
         try {
             const response = await fetch('api/features');
