@@ -30,7 +30,7 @@ module.exports = {
         'majic-accent': '#802392',
         'lychee-black': '#121619',
         'lychee-red': '#BA0B31',
-        'lychee-green': '#3AA29F',
+        'lychee-green': '#86efac',
         'lychee-white': '#F4EDEA',
         'lychee-peach': '#7F7EFF',//'#0081AF',
       },

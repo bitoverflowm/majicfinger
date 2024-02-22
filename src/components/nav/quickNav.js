@@ -40,7 +40,7 @@ const QuickNav = () => {
                                         <div className='p-2 px-3 cursor-pointer bg-white rounded-xl hover:bg-black hover:text-white shadow-inner'  onClick={()=>setWorking('grid')}>View Data</div>
                                         <div className='p-2 px-3 cursor-pointer bg-white rounded-xl hover:bg-black hover:text-white shadow-inner'  onClick={()=>setWorking('chart')}>Customize Chart</div>
                                         <div className='p-2 px-3 cursor-pointer bg-white rounded-xl hover:bg-black hover:text-white shadow-inner'  onClick={()=>setWorking('integrations')}>Integration</div>
-                                        <div className='p-2 px-3 cursor-pointer bg-white rounded-xl hover:bg-black hover:text-white shadow-inner'>Roadmap</div>
+                                        <div className='p-2 px-3 cursor-pointer bg-white rounded-xl hover:bg-black hover:text-white shadow-inner' onClick={()=>setWorking('roadmap')}>Roadmap</div>
                                         <div className='p-2 px-3 cursor-pointer bg-white rounded-xl hover:bg-black hover:text-white shadow-inner' onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                                     </div>
                                     <div className="w-16 p-4">

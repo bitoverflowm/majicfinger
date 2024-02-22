@@ -39,7 +39,7 @@ const Login = () => {
     };
 
     return (
-        <div className='text-white'>
+        <div className='bg-lychee-red font-body shadow-2xl rounded-xl text-white p-4 mb-4'>
             {
             user ? 
                 <div>
@@ -47,24 +47,27 @@ const Login = () => {
                     <div>You already have an account</div>
                 </div>
                 :
-                <form onSubmit={handleSubmit}>
-                    <label>
-                        Name (what should we call you?):
+                <form onSubmit={handleSubmit} className='flex flex-col place-items-center'>
+                    <div className='py-2 text-sm'>
+                        Name
                         <input
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
+
+                            className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
                             />
-                    </label>
-                    <label>
-                        Email:
+                    </div>
+                    <div className='py-2 text-sm'>
+                        Email
                         <input
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
                         />
-                    </label>
-                    <button type="submit">Submit</button>
+                    </div>
+                    <button type="submit" className='bg-lychee-black px-6 rounded-md py-2 text-sm mt-4'>Submit</button>
                 </form>
             }
         </div>

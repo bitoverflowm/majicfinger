@@ -9,6 +9,8 @@ import { FaChartLine } from "react-icons/fa6";
 import { ImMagicWand } from "react-icons/im";
 import { GoEyeClosed } from "react-icons/go";
 import { CiExport } from "react-icons/ci";
+import { IoCheckmarkSharp } from "react-icons/io5";
+
 
 
 import { useMyState  } from '@/context/stateContext'
@@ -121,6 +123,20 @@ const ActionMenu = () => {
         }
     }, [])
 
+    useEffect(()=>{
+        if(working){
+            scrollToSection()
+        }
+    }, [working])
+
+    const scrollToSection = (sectionId = 'dashboard-section') => {
+        const yOffset = -60; // Adjust this value based on your fixed header size or desired spacing
+        const element = document.getElementById(sectionId);
+        const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      
+        window.scrollTo({top: y, behavior: 'smooth'});
+    }
+
     
 
     return(
@@ -134,31 +150,25 @@ const ActionMenu = () => {
                 </div>
             }
 
-            <div className="flex flex-col w-screen h-screen place-content-center place-items-center bg-majic-white">
+            <div className="flex flex-col w-screen h-screen place-content-center place-items-center bg-majic-white" id="dashboard-section">
                 <div className="flex gap-2 py-10">
-                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer"  onClick={()=>setWorking('upload')}>Upload Data</div>
-                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setAiOpen(true)}>Generate Data</div>
-                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('grid')}>Table</div>
-                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('chart')}>Chart</div>
-                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('dashboard')}>Dashboard</div>
-                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('integrations')}>Integrations</div>
-                    {
-                        !(aiOpen) &&
-                            <div className="border border-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer flex items-center justify-center gap-2 bg-lychee-red rounded-full text-white z-10" onClick={()=>setAiOpen(true)}>
-                                <ImMagicWand /> Activate Lychee AI
-                            </div>
-                    }
+                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
+                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
+                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
+                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'chart' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('chart')}>Chart</div>
+                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'dashboard' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('dashboard')}>Dashboard</div>
+                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'integrations' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('integrations')}>Integrations</div>
+                    <div className={`flex  gap-2 border border-lychee-black rounded-xl  text-xs py-1 px-3 text-white ${aiOpen ? 'text-lychee-black bg-lychee-black': ' bg-lychee-red cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}><ImMagicWand /> Lychee AI</div>
                     <div className="border border-slate-400 text-lychee-black rounded-full hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('export')}><CiExport /></div>
-                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('roadmap')}>Roadmap</div>
-                    <div className="border border-lychee-black text-lychee-black rounded-xl hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
+                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
+                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                 </div>
                 <div className="w-full flex-grow flex place-content-center place-items-center">
                     {
                         working && working === 'upload' &&
                             <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 text-lychee-black w-1/2 h-1/2 bg-lychee-peach rounded-md backdrop-blur-md text-center">
                                 {
-                                    user 
-                                        ?
+                                    user ?
                                         <>
                                             <div className="py-2 font-title text-2xl">
                                                 Let's Start With Your Data:
@@ -482,69 +492,78 @@ const ActionMenu = () => {
                         working && working === 'getLychee' &&
                             <div className="w-full flex flex-col gap-10 place-content-center place-items-center">
                                 <div className="text-8xl font-title">You Have <span className="text-lychee-peach">2 Options.</span></div>
-                                <div className="flex w-full place-content-center gap-10 place-items-center">
+                                <div className="flex w-full place-content-center gap-10">
                                     <div className="w-1/4">
                                         <div className="px-10 py-6 flex flex-col gap-3">
-                                            <div><span className="font-title text-4xl">1.</span> If you're interested and want this, but don't want to pay now, that's cool too.</div>
+                                            <div className="font-title text-4xl text-center">1.</div>
+                                            <div> If you're interested and want this, but don't want to pay now, that's cool too.</div>
                                             <div>You can still use free trial.</div>
                                             <div>Keep in mind that you will have to pay a monthly subscription if you wait until then and pay extra for custom features too. </div>
                                             <div>(Planned Sub price $69.99/month)</div>
                                         </div>
                                         <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
                                             <div className="font-title text-3xl font-bold">
-                                                Free until subscription kicks in
+                                                Free until subscription tiers kick in 
                                             </div>
-                                            <div className="py-3 text-sm">
-                                                1 file upload at a time
-                                            </div>
-                                            <div className="py-3 text-sm">
-                                                Up to 512 MB data upload.
-                                            </div>
-                                            <div className="py-3 text-sm">
-                                                1 AI requests/ month include
-                                            </div>
-                                            <div className="py-3 text-sm">
+                                            <div className="flex gap-2 pt-4"><IoCheckmarkSharp className="text-green-400" />Uplod Data</div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Generate Data</div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Powerful Table </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Instant Charts</div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />1 file upload at a time (Up to 512 MB) </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />1 integration (limited based on availability)</div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" /> $10 in of AI requests credits/ month included /month for being early user </div>
+                                            <div className="py-6 text-6xl text-center">
                                                 $0.00
                                             </div>
-                                            <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
-                                                Go
-                                            </div>
+                                            {   !(emailVisible) &&
+                                                <div className="bg-lychee-green w-12 pt-1  mb-4 text-center font-black rounded-full mx-auto text-white">
+                                                    Go
+                                                </div>
+                                            }
                                             {
                                                 emailVisible &&
                                                     <Login />
                                             }
+                                            <div>(Planned Sub price $69.99/month) + Data usage rates</div>
                                         </div>
                                     </div>
-                                    <div>
+                                    <div className="pt-32">
                                         Or
                                     </div>
                                     <div className="w-1/4">
                                         <div className="px-10 py-6 flex flex-col gap-3">
-                                            <div><span className="font-title text-4xl">2.</span> You can get instant access to everything above and more bonus updates rolling in the future, <span className="text-lychee-peach">at not a single penny more than what you pay today.</span></div>
+                                            <div className="font-title text-4xl text-center">2.</div>
+                                            <div> You can get instant access to everything and more bonus updates (being released every week), <span className="text-lychee-peach">at not a single penny more than what you pay today.</span></div>
                                             <div className="text-lychee-peach">Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else.</div>
                                         </div>
                                         <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => window.location.href = 'https://buy.stripe.com/3cscP66Oq7CS6Eo28f'}>
                                             <div className="font-title text-3xl font-bold">
                                                 Get Lifetime Access
                                             </div>
-                                            <div className="py-3 text-sm">
-                                                Includes all future updates.
-                                            </div>
-                                            <div className="py-3 text-sm">
-                                                Get up to 512 MB data upload. get access to more storage when availabe.
-                                            </div>
-                                            <div className="py-3 text-sm">
-                                                Help Lychee grow, expand in early stages of buildout.
-                                            </div>
-                                            <div className="py-3 text-sm">
-                                                200 AI requests/ month include
-                                            </div>
-                                            <div className="py-3 text-sm">
+                                            <div className="flex gap-2 pt-4"><IoCheckmarkSharp className="text-green-400" />Includes all future updates. </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Includes all Features in Free tier </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Vote to prioritize feature buildouts based on your needs </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Create Personalized Dashboard</div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />3 Integrations out of the box (subject to usage limits) </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Insider/ Early bird on all future prices, topups, etc </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Multiple file uploads (each file up to 512 MB).</div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />access to more storage when availabe. </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" /> $250 in of AI requests credits/ month included for LIFE </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Help Lychee grow, expand in early stages of buildout. </div>
+                                            <div className="py-6 text-6xl text-center">
                                                 $29.99
                                             </div>
-                                            <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
+                                            <div className="bg-lychee-green w-12 py-1 text-center font-black rounded-full mx-auto text-white">
                                                 Go
                                             </div>
+                                            <div className="text-xs flex gap-2 flex-wrap pt-10">
+                                                <div className="text-black">SOLD OUT: </div>
+                                                <div className="line-through">500 Seats @ 2.99</div>
+                                                <div className="line-through">500 Seats @ 9.99</div>
+                                                <div className="line-through">500 Seats @ 14.99</div>
+                                                <div className="line-through">500 Seats @ 19.99</div>
+                                            </div>
+                                            
                                         </div>
                                     </div>
                                 </div>
@@ -553,63 +572,6 @@ const ActionMenu = () => {
                     {
                         working && working === 'roadmap' && <Roadmap />
                     }
-                </div>
-            </div>                        
-            <div className="flex gap-12 hidden">
-                <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
-                    <div className="font-title text-3xl font-bold">
-                        Generate a Data Set
-                    </div>
-                    <div className="py-3 text-sm">
-                        Create completely random data, or request specific data
-                    </div>
-                    <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
-                        Go
-                    </div>
-                </div>
-                <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300" onClick={()=>setWorking('upload')}>
-                <div className="font-title text-3xl font-bold">
-                    Upload your Spreadsheet
-                </div>
-                <div className="py-3 text-sm">
-                    Import CSV or Excel Files. <div></div> Pro user can get up to 512MB.
-                </div>
-                <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
-                    Go
-                </div>
-                </div>
-                <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
-                    <div className="font-title text-3xl font-bold">
-                        Enter Data Manually
-                    </div>
-                    <div className="py-3 text-sm">
-                        Start with an empty sheet <div></div> Do whatever you want
-                    </div>
-                    <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
-                        Go
-                    </div>
-                </div>
-                <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300" onClick={()=>setWorking('chart')}>
-                    <div className="font-title text-3xl font-bold">
-                        Visualize your Data
-                    </div>
-                    <div className="py-3 text-sm">
-                        Analyze, Chart, Customize  <div></div> With beautiful charts and graph.
-                    </div>
-                    <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
-                        Go
-                    </div>
-                </div>
-                <div className="w-1/4 bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300" onClick={()=>setWorking('')}>
-                    <div className="font-title text-3xl font-bold">
-                        Live Data
-                    </div>
-                    <div className="py-3 text-sm">
-                        Pull public data, or APIs, private data sources<div></div> Pro users can request and vote on new api integrations.
-                    </div>
-                    <div className="bg-lychee-green w-9 text-center font-title font-black rounded-full">
-                        Go
-                    </div>
                 </div>
             </div>
             <div className="h-96 py-56">

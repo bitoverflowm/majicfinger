@@ -3,8 +3,11 @@
 import React, {useRef, useState, useEffect} from 'react';
 
 import { useUser  } from '@/lib/hooks';
+import { useMyState  } from '@/context/stateContext'
  
 const LandingPage = () => {
+    const { working, setWorking } = useMyState()
+    const { aiOpen, setAiOpen } = useMyState()
     const user = useUser()
     const [view, setView] = useState()
 
@@ -45,7 +48,7 @@ const LandingPage = () => {
                                 <span className='font-black text-lychee-peach'>Zero</span> Hassle.
                                 </div>
                                 <div className='flex place-content-center py-10'>
-                                    <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('first')}>
+                                    <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('first')}>
                                         Cool... tell me more?
                                     </div>
                                 </div>
@@ -360,14 +363,9 @@ const LandingPage = () => {
                                     Don't wait.
                                 </div>
                             </div>
-                            <div className='text-8xl font-title'><span className='text-lychee-peach'>Lifetime </span> Pricing:</div>
-                            <div className='flex'>
-                                <div></div>
-                                <div></div>
-                            </div>
-                            <div className='flex place-content-center py-10'>
-                                <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('fourth')}>
-                                    Need More?
+                            <div className='flex place-content-center mb-56'>
+                                <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
+                                    Learn More
                                 </div>
                             </div>
                         </div>

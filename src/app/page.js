@@ -7,6 +7,7 @@ import ActionMenu from '@/components/actionMenu'
 import LandingPage from '@/components/landingPage'
 
 import QuickNav from '@/components/nav/quickNav'
+import FAQ from '@/components/faq'
 
 export default function Home() {
 
@@ -20,6 +21,7 @@ export default function Home() {
         <div className="">
             <ActionMenu />
         </div>
+          <FAQ />
       </div>
     </StateProvider>
   )
