@@ -8,7 +8,7 @@ const FAQ = () => {
     const { setWorking } = useMyState()
 
     return (
-            <div className="p-4 w-96 sm:max-w-2xl sm:mx-auto flex flex-col gap-6">
+            <div className="p-4 w-96 sm:w-full sm:max-w-2xl sm:mx-auto flex flex-col gap-6">
                 <div className="text-4xl sm:text-8xl font-bold mb-4"><span className='text-lychee-peach'>Frequently</span> Asked Questions</div>
                 <div>
                     <div className="text-2xl">1. What does the lifetime access offer include?</div>

@@ -26,7 +26,7 @@ const LandingPage = () => {
     }, [view])
 
     return (
-        <div className='font-body sm:pt-5'>
+        <div className='font-body sm:pt-5 text-black'>
             {
                 !(user) &&
                     <>
@@ -98,7 +98,7 @@ const LandingPage = () => {
                             <div className='text-6xl sm:text-8xl font-title'>
                                 Our <span className='font-black text-lychee-peach'>Features:</span>
                             </div>
-                            <div className='grid grid-cols-1 sm:grid-cols-3 py-6 px-64 place-items-center place-content-center'>
+                            <div className='grid grid-cols-1 sm:grid-cols-3 py-6 sm:px-64 place-items-center place-content-center'>
                                 <div className='p-2'>
                                     <div className='text-2xl'>
                                         <span className='font-black'>"Blink Of An Eye"</span> Level Instant
@@ -109,10 +109,12 @@ const LandingPage = () => {
                                         </div>
                                     </div>                 
                                 </div>
-                                <video autoPlay loop muted playsInline className="rounded-full w-96 h-72">
-                                    <source src="./graph1.mp4" type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
+                                <div className='p-2'>
+                                    <video autoPlay loop muted playsInline className="rounded-full w-96 h-72">
+                                        <source src="./graph1.mp4" type="video/mp4" />
+                                        Your browser does not support the video tag.
+                                    </video>
+                                </div>
                                 <div className='p-10'>
                                     <div className='text-2xl'>
                                         No Mumbo Jumbo.

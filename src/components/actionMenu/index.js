@@ -151,7 +151,7 @@ const ActionMenu = () => {
             }
 
             <div className="flex flex-col min-h-[100vh] w-screen max-w-screen sm:w-screen min-h-screen place-content-center place-items-center bg-majic-white" id="dashboard-section">
-                <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 sm:py-10 px-4">
+                <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 py-10 px-4">
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
@@ -493,7 +493,7 @@ const ActionMenu = () => {
                     }
                     {
                         working && working === 'getLychee' &&
-                            <div className="w-96 sm:w-full flex flex-col gap-10 place-content-center place-items-center">
+                            <div className="w-96 sm:w-full flex flex-col gap-10 place-content-center place-items-center text-lychee-black">
                                 <div className="pt-6 sm:pt-2 text-6xl sm:text-8xl font-title text-center">You Have <span className="text-lychee-peach">2 Options.</span></div>
                                 <div className="flex flex-col w-96 sm:flex-row sm:w-full place-content-center gap-10">
                                     <div className="text-center sm:text-left sm:w-1/4">
