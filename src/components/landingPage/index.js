@@ -30,7 +30,7 @@ const LandingPage = () => {
             {
                 !(user) &&
                     <>
-                        <div className='sm:py-10 h-screen overflow-hidden'>
+                        <div className='py-10 h-screen overflow-hidden'>
                             <div className='overflow-hidden absolute top-0 left-0 sm:px-24 sm:py-8 -z-10 blur-md'>
                                 <video autoPlay loop muted playsInline className="sm:h-dvh sm:w-screen sm:max-w-screen sm:rounded-br-3xl rounded-tl-3xl hidden sm:block">
                                     <source src="./bg4.mp4" type="video/mp4" />
@@ -41,8 +41,8 @@ const LandingPage = () => {
                                     Your browser does not support the video tag.
                                 </video>
                             </div>
-                            <div className='mx-auto w-3/5 bg-white sm:py-20 sm:px-32 rounded-xl shadow-2xl '>
-                                <div className='text-xs sm:text-md font-black text-lychee-peach p-10'>
+                            <div className='w-96 py-5 mx-auto sm:w-3/5 bg-white sm:py-20 sm:px-32 rounded-xl shadow-2xl '>
+                                <div className='text-sm sm:text-md font-black text-lychee-peach p-10'>
                                     We'll save you from all the complex yabba-dabba-doos out there.
                                 </div>
                                 <div className='text-5xl sm:text-8xl font-title'>
