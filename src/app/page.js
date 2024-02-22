@@ -15,7 +15,7 @@ export default function Home() {
     <StateProvider>
       <div className="p-10 flex flex-col place-items-center">
         <QuickNav />
-        <div className='text-center'>
+        <div className='text-center max-w-screen overflow-hidden'>
           <LandingPage />
         </div>
         <div className="">

@@ -11,10 +11,8 @@ export default function RootLayout({ children }) {
       */}
       <head />
       <body>
-        <div className=''>
-          <Nav/>
-        </div>
-        <div className=''>
+        <Nav/>
+        <div className='-mt-16'>
           {children}
         </div>
       </body>

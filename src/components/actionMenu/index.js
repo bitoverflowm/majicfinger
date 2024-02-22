@@ -140,7 +140,7 @@ const ActionMenu = () => {
     
 
     return(
-        <div className="flex flex-col place-items-center w-screen ">
+        <div className="flex flex-col place-items-center w-screen">
             { aiOpen &&
                 <div className="fixed right-0 top-0 h-dvh w-1/4 bg-lychee-white backgroung-blur-xl flex flex-col place-items-center place-content-center px-6">
                     <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setAiOpen(false)}><GoEyeClosed /></div>
@@ -150,8 +150,8 @@ const ActionMenu = () => {
                 </div>
             }
 
-            <div className="flex flex-col w-screen h-screen place-content-center place-items-center bg-majic-white" id="dashboard-section">
-                <div className="flex gap-2 py-10">
+            <div className="flex flex-col max-w-screen sm:w-screen max-h-screen h-svh place-content-center place-items-center bg-majic-white" id="dashboard-section">
+                <div className="flex flex-wrap place-items-center place-content-center gap-2 sm:py-10 px-4">
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
@@ -163,10 +163,10 @@ const ActionMenu = () => {
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
                     <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                 </div>
-                <div className="w-full flex-grow flex place-content-center place-items-center">
+                <div className="w-full h-5/6 sm:flex-grow flex place-content-center place-items-center">
                     {
                         working && working === 'upload' &&
-                            <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 text-lychee-black w-1/2 h-1/2 bg-lychee-peach rounded-md backdrop-blur-md text-center">
+                            <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 text-lychee-black w-5/6 sm:w-1/2 h-1/2 bg-lychee-peach rounded-md backdrop-blur-md text-center">
                                 {
                                     user ?
                                         <>
@@ -213,7 +213,7 @@ const ActionMenu = () => {
                             </div>                        
                     }
                     {
-                        fmtCols && data && working && working === 'chart' &&
+                        fmtCols && data && ((working && working === 'chart') || !working) &&
                             <div className="h-5/6 w-full flex">
                                 <div className="w-2/12 shadow-2xl px-5 py-10 rounded mx-10">
                                     <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>

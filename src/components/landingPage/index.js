@@ -26,33 +26,37 @@ const LandingPage = () => {
     }, [view])
 
     return (
-        <div className='font-body pt-5'>
+        <div className='font-body sm:pt-5'>
             {
                 !(user) &&
                     <>
-                        <div className='py-10 h-screen'>
-                            <div className='overflow-hidden absolute top-0 left-0 p-24 -z-10 blur-md'>
-                                <video autoPlay loop muted playsInline className="h-dvh w-screen max-w-screen rounded-br-3xl rounded-tl-3xl">
+                        <div className='sm:py-10 h-screen overflow-hidden'>
+                            <div className='overflow-hidden absolute top-0 left-0 sm:px-24 sm:py-8 -z-10 blur-md'>
+                                <video autoPlay loop muted playsInline className="sm:h-dvh sm:w-screen sm:max-w-screen sm:rounded-br-3xl rounded-tl-3xl hidden sm:block">
+                                    <source src="./bg4.mp4" type="video/mp4" />
+                                    Your browser does not support the video tag.
+                                </video>
+                                <video autoPlay loop muted playsInline className="sm:hidden w-full h-screen object-cover">
                                     <source src="./bg4.mp4" type="video/mp4" />
                                     Your browser does not support the video tag.
                                 </video>
                             </div>
-                            <div className='mx-auto w-3/5 bg-white py-20 px-32 rounded-xl shadow-2xl'>
-                                <div className='font-black text-lychee-peach p-10'>
+                            <div className='mx-auto w-3/5 bg-white sm:py-20 sm:px-32 rounded-xl shadow-2xl '>
+                                <div className='text-xs sm:text-md font-black text-lychee-peach p-10'>
                                     We'll save you from all the complex yabba-dabba-doos out there.
                                 </div>
-                                <div className='text-8xl font-title'>
+                                <div className='text-5xl sm:text-8xl font-title'>
                                     <span className='font-black text-lychee-peach'>Instant</span> Graphs.
                                 </div>
-                                <div className='text-8xl font-title'>
+                                <div className='text-5xl sm:text-8xl font-title'>
                                 <span className='font-black text-lychee-peach'>Zero</span> Hassle.
                                 </div>
                                 <div className='flex place-content-center py-10'>
-                                    <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('first')}>
+                                    <div className='font-black bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-3 sm:px-5 py-2 sm:py-4 rounded-full text-xs' onClick={()=>setView('first')}>
                                         Cool... tell me more?
                                     </div>
                                 </div>
-                                <div className='text-lg'>
+                                <div className='text-sm sm:text-lg'>
                                     <div>
                                         Seriously.
                                     </div>
@@ -90,18 +94,18 @@ const LandingPage = () => {
                                 </div>
                             </div>
                         </div>       
-                        <div ref={firstRef} className='px-10 pt-20'>
-                            <div className='text-8xl font-title'>
+                        <div ref={firstRef} className='sm:px-10 sm:pt-20'>
+                            <div className='text-6xl sm:text-8xl font-title'>
                                 Our <span className='font-black text-lychee-peach'>Features:</span>
                             </div>
-                            <div className='grid grid-cols-3 py-20 px-64 place-items-center place-content-center'>
+                            <div className='grid grid-cols-1 sm:grid-cols-3 py-6 px-64 place-items-center place-content-center'>
                                 <div className='p-2'>
                                     <div className='text-2xl'>
                                         <span className='font-black'>"Blink Of An Eye"</span> Level Instant
                                     </div>
                                     <div className='text-md py-5 w-64 mx-auto'>
                                         <div>
-                                            We "graphify" your spreadsheets <span className='text-lychee-green'>before you open your eyes</span> so that you <span className='text-lychee-green'>never waste a single second waiting again.</span>
+                                            We "graphify" your spreadsheets <span className='text-lychee-green font-black'>before you open your eyes</span> so that you <span className='text-lychee-green font-black'>never waste a single second waiting again.</span>
                                         </div>
                                     </div>                 
                                 </div>
@@ -115,7 +119,7 @@ const LandingPage = () => {
                                     </div>
                                     <div className='text-md py-5 w-64 mx-auto'>
                                         <div>
-                                            Sit back and enjoy a user-friendly platform that <span className='text-lychee-green'>requires no coding skills</span> or hi-fi language.
+                                            Sit back and enjoy a user-friendly platform that <span className='text-lychee-green font-black'>requires no coding skills</span> or hi-fi language.
                                         </div>
                                     </div>                 
                                 </div>
@@ -129,7 +133,9 @@ const LandingPage = () => {
                                     </div>
                                     <div className='text-md py-5 w-64 mx-auto'>
                                         <div>
-                                            <span className='text-lychee-green'>No BS features</span> you don't even need.
+                                            <span className='text-lychee-green font-black'>No BS features</span> you don't even need.
+                                        </div>
+                                        <div className='pt-2'>
                                             When we built this - we had you in mind.
                                         </div>
                                     </div>                 
@@ -144,7 +150,7 @@ const LandingPage = () => {
                                     </div>
                                     <div className='text-md py-5 w-64 mx-auto'>
                                         <div>
-                                            Choose from a variety of chart types, including pie, histogram, and bar charts. <span className='text-lychee-green'>Your data is your style.</span>
+                                            Choose from a variety of chart types, including pie, histogram, and bar charts. <span className='text-lychee-green font-black'>Your data is your style.</span>
                                         </div>
                                     </div>                 
                                 </div>
@@ -158,22 +164,22 @@ const LandingPage = () => {
                                     </div>
                                     <div className='text-md py-5 w-64 mx-auto'>
                                         <div>
-                                            No spreadsheet? Create your own from scratch. It's easier than you've ever imagined. That's right. <span className='text-lychee-green'>You don't have to bang your head in frustration using Excel.</span>
+                                            No spreadsheet? Create your own from scratch. It's easier than you've ever imagined.<div className='pt-2'> That's right.</div> <span className='text-lychee-green font-black'>You don't have to bang your head in frustration using Excel.</span>
                                         </div>
                                     </div>                 
                                 </div>
                             </div>
-                            <div className='flex place-content-center py-10'>
+                            <div className='flex place-content-center'>
                                 <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('second')}>
                                     But how?
                                 </div>
                             </div>                
                         </div>
-                        <div ref={secondRef} className='px-10 py-20'>
-                            <div className='text-8xl font-title'>
+                        <div ref={secondRef} className='sm:px-10 py-20'>
+                            <div className='text-6xl sm:text-8xl font-title'>
                                 <span className='font-black text-lychee-peach'>How</span> It Works:
                             </div>
-                            <div className='flex flex-wrap gap-10 py-20 place-items-center place-content-center'>
+                            <div className='flex flex-col sm:flex-row sm:flex-wrap gap-10 sm:py-20 place-items-center place-content-center'>
                                 <div className='p-10 shadow-xl rounded-xl w-1/4 h-72'>
                                     <div className='font-title text-2xl'>
                                     <span className='text-lychee-red font-title font-black text-4xl'>1.</span>  Drop Your Spreadsheet.
@@ -209,14 +215,14 @@ const LandingPage = () => {
                                 </div>
                             </div>
                             <div className='flex place-content-center py-10'>
-                                <div className='bg-lychee-green text-lychee-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('third')}>
+                                <div className='bg-lychee-green text-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('third')}>
                                     Need A Success Story?
                                 </div>
                             </div>
                         </div>
-                        <div ref={thirdRef} className='px-10 py-20'>
-                            <div className='text-8xl font-title'>Susan's <span className='text-lychee-peach'>Instant Win</span></div>
-                            <div className='py-20 text-center flex flex-col gap-2'>
+                        <div ref={thirdRef} className='sm:px-10 sm:py-20'>
+                            <div className='text-4xl sm:text-8xl font-title'>Susan's <span className='text-lychee-peach'>Instant Win</span></div>
+                            <div className='py-10 sm:py-20 text-center flex flex-col gap-2'>
                                 <div className='text-2xl font-black text-lychee-peach'>
                                     The clock struck 11:43 pm.
                                 </div>
@@ -286,8 +292,8 @@ const LandingPage = () => {
                         </div>
                         <div ref={fourthRef} className='py-20'>
                             <div className='text-8xl font-title px-64'>What Our <span className='text-lychee-peach'>Legendary Beta Testers Have To Say:</span></div>
-                            <div className='py-20 text-center flex flex-wrap gap-2 place-content-center gap-6'>
-                                <div className='text-center w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
+                            <div className='py-20 text-center flex flex-col sm:flex-row sm:flex-wrap gap-2 place-content-center gap-6'>
+                                <div className='text-center sm:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
                                     <div>
                                         "I am a data researcher from Florida and I have to say...this is unlike anything I've ever seen.
                                     </div>
@@ -298,7 +304,7 @@ const LandingPage = () => {
                                         - Sarah L. Data Researcher
                                     </div>
                                 </div>
-                                <div className='text-center w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
+                                <div className='text-center sm:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
                                     <div>
                                         Running a marketing agency almost solo is hard as it is. And when you don't have coding knowledge and there are all these complex tools in the market, you find yourself in need of help.
                                     </div>
@@ -309,7 +315,7 @@ const LandingPage = () => {
                                         - Michael Shapran, Founder Of Richify Agency
                                     </div>
                                 </div>
-                                <div className='text-center w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
+                                <div className='text-center sm:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
                                     <div>
                                         The thing I love most about Lychee is that it fits into my student budget AND provides me every single thing I need.
                                     </div>
@@ -338,9 +344,9 @@ const LandingPage = () => {
                                 </div>
                         </div>
                         <div ref={fifthRef} className='px-10 py-20'>
-                            <div className='text-8xl font-title'><span className='text-lychee-peach'>Opportunity </span> For Life.</div>
-                            <div className='text-8xl font-title'><span className='text-lychee-peach'>Instant </span> Access for Life.</div>
-                            <div className='py-20 text-center flex flex-col gap-2'>
+                            <div className='text-4xl sm:text-8xl font-title'><span className='text-lychee-peach'>Opportunity </span> For Life.</div>
+                            <div className='text-4xl sm:text-8xl font-title'><span className='text-lychee-peach'>Instant </span> Access for Life.</div>
+                            <div className='py-10 sm:py-20 text-center flex flex-col gap-2'>
                                 <div className='text-2xl font-black text-lychee-peach'>
                                     Before we roll this out public-public.
                                 </div>
