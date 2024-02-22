@@ -1,17 +1,14 @@
 import React, { useEffect, useState } from 'react';
 
 const Roadmap = () => {
-    const [roadmapData, setRoadmapData] = useState([]);
-
-    useEffect(() => {
-        const featuresUrl = process.env.NODE_ENV === 'development' 
-                      ? 'http://localhost:3000/api/features/' 
-                      : 'https://www.lych3e.com/api/features/';
-
-        fetch(featuresUrl)
-            .then(response => response.json())
-            .then(data => setRoadmapData(data.data))
-            .catch(error => console.error(error));
+    useEffect(async () => {
+        try {
+            const response = await fetch('api/features');
+            const data = await response.json();
+            setRoadmapData(data.data);
+        } catch (error) {
+            console.error(error);
+        }
     }, []);
 
     return (
