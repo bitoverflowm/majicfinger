@@ -28,7 +28,7 @@ const Login = () => {
                     'Content-Type': 'application/json',
                     Authorization: 'Bearer ' + didToken,
                 },
-                body: JSON.stringify({ body }),
+                body: JSON.stringify( body ),
             })
             if(res.status === 200){
                 let user = await res.json()

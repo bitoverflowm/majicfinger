@@ -44,7 +44,7 @@ export default async (req, res) => {
           throw new Error('Invalid user data received from user creation API');
         }
         let newUser = await User.findOne({ email: metadata.email })
-        let newSession = { ...metadata, userId: newUser._id };
+        let newSession = { ...metadata, userId: newUser._id, name: newUser.name};
         await setLoginSession(res, newSession);
         res.status(200).send({ done: true, newUser });
       } catch (error) {
