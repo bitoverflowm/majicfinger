@@ -162,7 +162,7 @@ const GridView = ({data, fmtCols}) => {
 
 
     return (
-        <div className="ag-theme-quartz px-20 py-20" style={{ height: '90%', width: '90%' }}>
+        <div className="ag-theme-quartz sm:px-20 py-20" style={{ height: '90%', width: '90%' }}>
             <AgGridReact 
                 defaultColDef={defaultColDef} 
                 rowData={rowData} 

@@ -208,7 +208,7 @@ const ActionMenu = () => {
                     }
                     {
                         fmtCols && data && working && working === 'grid' &&
-                            <div className="h-5/6 w-full px-20 flex place-content-center">
+                            <div className="h-screen sm:h-screen w-96 sm:w-full sm:px-20 flex place-content-center">
                                 <GridView data={data} fmtCols={fmtCols}/>
                             </div>                        
                     }
