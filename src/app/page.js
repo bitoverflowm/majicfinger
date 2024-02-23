@@ -12,12 +12,19 @@ import FAQ from '@/components/faq'
 
 export default function Home() {
 
+  const clairtyCode = `
+                      (function (c,l,a,r,i,t,y){
+                          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+                      })(window, document, "clarity", "script", "l5zqf94lap"); `
+
   return (
     <>
         <Script
+          id = "ms-clarity"
           strategy="afterInteractive"
-          src="https://www.clarity.ms/tag/l5zqf94lap"
-        />
+        >{clairtyCode}</Script>
         <StateProvider>
           <div className="p-10 flex flex-col place-items-center">
             <QuickNav />
