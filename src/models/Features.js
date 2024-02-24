@@ -23,6 +23,10 @@ const FeatureSchema = new mongoose.Schema({
         type: String,
         default: "polling votes"
     },
+    tag: {
+        type: Array,
+        default: []
+    }
 })
 
 
