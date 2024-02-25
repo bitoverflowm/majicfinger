@@ -4,8 +4,14 @@ import { useState } from 'react';
 import { TypeAnimation } from "react-type-animation";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 
-const AIMode = ({data, setData, setWorking, setDflt}) => {
-    
+import { useUser } from '@/lib/hooks';
+import { useMyState } from '@/context/stateContext';
+
+const AIMode = ({data, setData, setDflt}) => {
+    const user = useUser()
+    const { aiOpen, setAiOpen } = useMyState()
+    const{ working, setWorking } = useMyState()
+
     const [generatedData, setGeneratedData] = useState()
     const [assistantId, setAssistantId] = useState()
     const [threadId, setThreadId] = useState()
@@ -17,6 +23,9 @@ const AIMode = ({data, setData, setWorking, setDflt}) => {
     //AI specific data
     const [uploadedFile, setUploadedFile] = useState()
     const [analysis, setAnalysis] = useState()
+
+    // warnings
+    const [warning, setWarning] = useState()
 
     const genrateRandomData = async () => {
         //promot: "generate a compltely random data set in csv format and return what type of chart will be the best way to present this data and why"
@@ -97,30 +106,49 @@ const AIMode = ({data, setData, setWorking, setDflt}) => {
       }
     }
 
+    const handlePaymentOpen = () => {
+      setWorking('getLychee')
+      setAiOpen(false)
+    }
+
     /*const deleteFile = async () => {
       /*DELETE
       https://api.openai.com/v1/files/{file_id}
     }*/
     
     const triggerAction = (action) => {
+      if(!user){
+        setWarning("noUserWarning")
+      } else {
         if(action === 'generateData'){
-            genrateRandomData()
+          genrateRandomData()
         } else if(action === 'analyzeData'){
             analyzeData()
         }
+      }
     }
 
 
   return (
     <div className="flex flex-col place-content-end font-regular border-lychee-black rounded-lg border-2 min-h-2/3 w-11/12 px-10 py-4 text-xs">
         <div>Hello, I am Athena</div>
-        <div>What do you want me to help you with today?</div>
+        <div>How can I assist you today?</div>
         <div className="flex flex-wrap gap-1 p-2">
             <div className="bg-black py-1 px-2 text-white rounded-lg text-xxs cursor-pointer hover:bg-white hover:text-black" onClick={()=>triggerAction('generateData')}>Generate a Data Set</div>
             <div className="bg-black py-1 px-2 text-white rounded-lg text-xxs cursor-pointer hover:bg-white hover:text-black" onClick={()=>triggerAction('analyzeData')}>Analyze your Data</div>
-            <div className="bg-black py-1 px-2 text-white rounded-lg text-xxs">Help visualize your data</div>
-            <div className="bg-black py-1 px-2 text-white rounded-lg text-xxs"> Analyze your viaualizations</div>
+            <div className="bg-black py-1 px-2 text-white rounded-lg text-xxs" onClick={()=>triggerAction()} >Help visualize your data</div>
+            <div className="bg-black py-1 px-2 text-white rounded-lg text-xxs" onClick={()=>triggerAction()}> Analyze your visualizations</div>
         </div>
+        {
+            warning && warning === "noUserWarning" &&
+            <>
+              <div className="text-red-600 p-1">Note: Each AI request incurs a processing fee. </div>
+              <div className="text-red-600 p-1">Register now for our lifetime membership to get a limited time offer of $100 in FREE AI credits every month.</div>
+              <div className="text-red-600 p-1">Free trial users receive 2 complimentary AI requests/month</div>
+              <div className='bg-lychee-green w-32 mx-auto mt-4 px-2 py-1 rounded-md' onClick={()=>handlePaymentOpen()}>Click to register</div>
+            </>
+
+        }
         {
             loading &&
             <div><AiOutlineLoading3Quarters className='animate-spin'/>

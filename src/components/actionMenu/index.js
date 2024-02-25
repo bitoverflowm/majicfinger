@@ -140,7 +140,7 @@ const ActionMenu = () => {
     return(
         <div className="flex flex-col place-items-center w-screen">
             { aiOpen &&
-                <div className="fixed right-0 top-0 h-dvh w-1/4 bg-lychee-white backgroung-blur-xl flex flex-col place-items-center place-content-center px-6">
+                <div className="fixed right-0 top-0 h-dvh w-full z-30 sm:w-1/4 bg-lychee-white backgroung-blur-xl flex flex-col place-items-center place-content-center px-6">
                     <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setAiOpen(false)}><GoEyeClosed /></div>
                     <div className="grow flex place-items-center place-content-center">
                         <AIMode data={data} setData={setData} setWorking={setWorking} setDflt={setDflt}/>
@@ -501,18 +501,21 @@ const ActionMenu = () => {
                                             <div>You can still use free trial.</div>
                                             <div>Keep in mind that you will have to pay a monthly subscription if you wait until then and pay extra for custom features too. </div>
                                             <div>(Planned Sub price $69.99/month)</div>
+                                            <div className="underline">*No credit card required</div>
                                         </div>
                                         <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
                                             <div className="font-title text-3xl font-bold">
                                                 Free until subscription tiers kick in 
                                             </div>
-                                            <div className="flex gap-2 pt-4"><IoCheckmarkSharp className="text-green-400" />Uplod Data</div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Generate Data</div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Powerful Table </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Instant Charts</div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />1 file upload at a time (Up to 512 MB) </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />1 integration (limited based on availability)</div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" /> $10 in of AI requests credits/ month included /month for being early user </div>
+                                            <div className="text-left place-items-left place-content-left">
+                                                <div className="flex gap-2 pt-4 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Upload Data</div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Generate Data</div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Powerful Table </div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Instant Charts</div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />1 file upload at a time (Up to 512 MB) </div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />1 integration (limited based on availability)</div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400 h-12 w-12" /> $10 in of AI requests credits/ month included /month for being early user, until subscriptions kick in  </div>
+                                            </div>
                                             <div className="py-6 text-6xl text-center">
                                                 $0.00
                                             </div>
@@ -549,7 +552,7 @@ const ActionMenu = () => {
                                             <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Insider/ Early bird on all future prices, topups, etc </div>
                                             <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Multiple file uploads (each file up to 512 MB).</div>
                                             <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />access to more storage when availabe. </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" /> $250 in of AI requests credits/ month included for LIFE </div>
+                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" /> $100 in of AI requests credits/ month included for LIFE </div>
                                             <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Help Lychee grow, expand in early stages of buildout. </div>
                                             <div className="py-6 text-6xl text-center">
                                                 $29.99
