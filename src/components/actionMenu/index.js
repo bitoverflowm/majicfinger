@@ -30,8 +30,12 @@ const ActionMenu = () => {
     /*
      * Context hooks
      */
-    const { aiOpen, setAiOpen } = useMyState()
-    const{ working, setWorking } = useMyState()
+    const contextState = useMyState()
+    // Safely access context values with optional chaining
+    const aiOpen = contextState?.aiOpen;
+    const setAiOpen = contextState?.setAiOpen;
+    const working = contextState?.working;
+    const setWorking = contextState?.setWorking;
 
     /*
      * State hooks
@@ -514,7 +518,7 @@ const ActionMenu = () => {
                                                 <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Instant Charts</div>
                                                 <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />1 file upload at a time (Up to 512 MB) </div>
                                                 <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />1 integration (limited based on availability)</div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400 h-12 w-12" /> $10 in of AI requests credits/ month included /month for being early user, until subscriptions kick in  </div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400 h-12 w-12" /> $10 in AI requests credits/ month included for being early user, until subscriptions kick in  </div>
                                             </div>
                                             <div className="py-6 text-6xl text-center">
                                                 $0.00

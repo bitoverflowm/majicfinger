@@ -37,25 +37,25 @@ const FAQ = () => {
                 <div>
                     <div className="text-2xl">5. Can I share my lifetime access with others?</div>
                     <div>
-                        Your lifetime access is intended for individual use only. But, if you have team members who would like access, we have enterprise custom pricing, you can contact us at xyz@xyz.com.
+                        Your lifetime access is intended for individual use only. But, if you have team members who would like access, we have enterprise custom pricing, you can contact us at lychee@bitoverflow.org
                     </div>
                 </div>
                 <div>
                     <div className="text-2xl">6. What happens if I encounter issues after the pre-order period?</div>
                     <div>
-                        Our dedicated support team is here to assist you. If you encounter any issues or have questions, simply reach out to xyz@xyz.com, and we'll provide the support you need as soon as possible.
+                        Our dedicated support team is here to assist you. If you encounter any issues or have questions, simply reach out to lychee@bitoverflow.org , and we'll provide the support you need as soon as possible.
                     </div>
                 </div>
                 <div>
                     <div className="text-2xl">7. How long is the pre-order period for lifetime access?</div>
                     <div>
-                        The pre-order period for lifetime access is [specific duration]. After this period, Lychee will transition to a subscription model, and lifetime access will no longer be available.
+                        The pre-order period for lifetime access is limited time only. After this period, Lychee will transition to a subscription model, and lifetime access will no longer be available.
                     </div>
                 </div>
                 <div>
                     <div className="text-2xl">8. If I don't like it, can I request a refund for my lifetime access purchase?</div>
                     <div>
-                        If you don't like the platform or it doesn't match your needs after you purchase, get in touch with us at xyz@zyz.com and we'll refund you. No questions asked.
+                        If you don't like the platform or it doesn't match your needs after you purchase, get in touch with us at lychee@bitoverflow.org and we'll refund you. No questions asked.
                     </div>
                 </div>
                 <div>
