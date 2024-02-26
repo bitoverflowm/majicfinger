@@ -12,41 +12,28 @@ export default async (req, res) => {
     const metadata = await magic.users.getMetadataByToken(didToken)
     let user = await User.findOne({ email: metadata.email })
 
+    console.log("user search: ", user)
+
     if (!user) {
-      // User not found in the database, create a new user
-      const userUrl = process.env.NODE_ENV === 'development' 
-                      ? 'http://localhost:3000/api/users/' 
-                      : 'https://www.lych3e.com/api/users/';
       try {
-        const createUserRes = await fetch(userUrl, {
-          method: 'POST',
-          headers: {
-              Accept: 'application/json',
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-              "name": req.body.name,
-              "email": metadata.email,
-              "mgkpublicAddress": metadata.publicAddress,
-              "confirmedAt": metadata.confirmedAt ? new Date(metadata.confirmedAt) : null,
-              "lastLoginAt": metadata.lastLoginAt ? new Date(metadata.lastLoginAt) : null,
-              "mgkIssuer": metadata.issuer,
-              "metadata": metadata.metadata,
-          }),
+        console.log("name", req.body.name, "email", metadata.email, "mgkpublicAddress", metadata.publicAddress, "confirmedAt", metadata.confirmedAt, "lastLoginAt", metadata.lastLoginAt, "mgkIssuer", metadata.issuer, "metadata", metadata.metadata)
+
+        user = await User.create({
+          name: req.body.name,
+          email: metadata.email,
+          mgkpublicAddress: metadata.publicAddress,
+          confirmedAt: metadata.confirmedAt ? new Date(metadata.confirmedAt) : null,
+          lastLoginAt: metadata.lastLoginAt ? new Date(metadata.lastLoginAt) : null,
+          mgkIssuer: metadata.issuer,
+          metadata: metadata.metadata,
         });
 
-        if(!createUserRes.ok) {
-          throw new Error('Failed to add user to db');
-        }
+        // If the creation is successful, user will be the created document
+        // No need for the previous check as an unsuccessful creation would have thrown an error
 
-        user = await createUserRes.json();
-        if (!user || !user.data || !user.data._id) {
-          throw new Error('Invalid user data received from user creation API');
-        }
-        let newUser = await User.findOne({ email: metadata.email })
-        let newSession = { ...metadata, userId: newUser._id, name: newUser.name};
+        let newSession = { ...metadata, userId: user._id, name: user.name};
         await setLoginSession(res, newSession);
-        res.status(200).send({ done: true, newUser });
+        res.status(200).send({ done: true, newUser: user });
       } catch (error) {
         console.error(error, "Error in user creation or session setting");
         res.status(500).send("Internal Server Error");

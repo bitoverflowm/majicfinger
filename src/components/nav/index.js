@@ -10,7 +10,7 @@ const Nav = () => {
     const user = useUser()
 
     return (
-      <div className="flex w-full p-10 sm:p-6">
+      <div className="flex w-full p-10 sm:p-6 z-40">
         <div className="max-w-48">
           <img src={"./logo.png"}/>
         </div>
