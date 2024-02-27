@@ -2,6 +2,8 @@
 
 //import { CsvToHtmlTable } from 'react-csv-to-table';
 import Script from 'next/script'
+import { GoogleAnalytics } from '@next/third-parties/google'
+
 import { StateProvider } from '@/context/stateContext'
 
 import ActionMenu from '@/components/actionMenu'
@@ -25,6 +27,7 @@ export default function Home() {
           id = "ms-clarity"
           strategy="afterInteractive"
         >{clairtyCode}</Script>
+        <GoogleAnalytics gaId="G-G8X2NEPTEG" />
         <StateProvider>
           <div className="p-10 flex flex-col place-items-center">
             <QuickNav />
