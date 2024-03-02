@@ -18,8 +18,11 @@ export default async (req, res) => {
         if (endpointSecret) {
             try {
                 console.log("Checking stripe signature")
+                console.log("req: ", req)
                 const rawBody = await buffer(req)
+                console.log("rawBody: ", rawBody.toString())
                 const sig = req.headers['stripe-signature'];
+                console.log("sig: ", sig)
                 event = stripe.webhooks.constructEvent(
                     rawBody.toString(),
                     sig,
