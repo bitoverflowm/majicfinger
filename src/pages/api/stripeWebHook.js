@@ -46,9 +46,7 @@ export default async (req, res) => {
         switch (event.type) {
             case 'checkout.session.completed':
                 console.log("Checking if session is for Lychee")
-                const sessionDetails = await stripe.checkout.sessions.listLineItems(event.data.object.id)
-                const lineItems = sessionDetails.line_items.data.description;
-                if(lineItems === 'Lychee LifeTime Access'){
+                if(session.amount_total === 2999){
                     const session = event.data.object;
                     const email = session.customer_details.email || session.customer_email;
                     const name = session.customer_details.name || session.name;
