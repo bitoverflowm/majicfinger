@@ -1,23 +1,27 @@
 import dbConnect from '../../lib/dbConnect'
 import User from '../../models/Users'
+import { buffer } from "micro";
 
 export default async (req, res) => {
     if (req.method !== 'POST') return res.status(405).end();
     console.log("web hook update notification received")
     
     try {
-        let event = req.body
+        
         //check endpoint secret before even doing anything else 
         console.log("checking endpoint secret")
         const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
         const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        let event
 
         if (endpointSecret) {
             try {
+                const rawBody = await buffer(req)
+                const sig = req.headers['stripe-signature'];
                 event = stripe.webhooks.constructEvent(
-                    req.body,
-                    req.headers['stripe-signature'],
+                    rawBody.toString(),
+                    sig,
                     endpointSecret
                 );
             } catch (err) {
