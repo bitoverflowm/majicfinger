@@ -2,6 +2,12 @@ import dbConnect from '../../lib/dbConnect'
 import User from '../../models/Users'
 import { buffer } from "micro";
 
+export const config = {
+    api: {
+      bodyParser: false,
+    },
+  };
+
 export default async (req, res) => {
     if (req.method !== 'POST') return res.status(405).end();
     console.log("web hook update notification received")
@@ -19,8 +25,8 @@ export default async (req, res) => {
             try {
                 console.log("Checking stripe signature")
                 //console.log("req: ", req)
-                console.log("req.body: ", req.body)
-                const rawBody = await buffer(req.body)
+                console.log("pre buffer ")
+                const rawBody = await buffer(req)
                 console.log("rawBody: ", rawBody.toString())
                 const sig = req.headers['stripe-signature'];
                 console.log("sig: ", sig)
