@@ -84,6 +84,6 @@ async function updateUserSubscription(email, name, amount) {
             });
     } else {
         // User found in the database            
-        await User.findByIdAndUpdate(user._id, { name: name, paymentTotal: amount, lifetimeMember: lifetimeMember, token: token, confirmedAt: confirmedAt, lastLoginAt: lastLoginAt });
+        await User.findByIdAndUpdate(user._id, { name: name, paymentTotal: amount, lifetimeMember: true, token: 777.777, confirmedAt: new Date()});
     }
 }
