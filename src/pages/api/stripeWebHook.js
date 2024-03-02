@@ -46,8 +46,8 @@ export default async (req, res) => {
         switch (event.type) {
             case 'checkout.session.completed':
                 console.log("Checking if session is for Lychee")
+                const session = event.data.object;
                 if(session.amount_total === 2999){
-                    const session = event.data.object;
                     const email = session.customer_details.email || session.customer_email;
                     const name = session.customer_details.name || session.name;
                     const amount = session.amount_total;
