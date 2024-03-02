@@ -52,7 +52,10 @@ export default async (req, res) => {
                     const name = session.customer_details.name || session.name;
                     const amount = session.amount_total;
                     await updateUserSubscription(email, name, amount);
-                    } 
+                    console.log("User updated")
+                    res.status(200).send({ done: true });
+                    return
+                    }
                 else{
                     throw new Error("Not a Lychee session");
                 }                
