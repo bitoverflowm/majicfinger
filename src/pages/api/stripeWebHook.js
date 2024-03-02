@@ -23,6 +23,7 @@ export default async (req, res) => {
 
         if (endpointSecret) {
             try {
+                console.log("description: ", req.body.description)
                 console.log("Checking stripe signature")
                 //console.log("req: ", req)
                 console.log("pre buffer ")
@@ -46,9 +47,7 @@ export default async (req, res) => {
         switch (event.type) {
             case 'checkout.session.completed':
                 console.log("Checking if session is for Lychee")
-                const sessionDetails = await stripe.checkout.sessions.retrieve(event.data.object.id,
-                        { expand: ['line_items'] }
-                    )
+                const sessionDetails = await stripe.checkout.sessions.listLineItems.retrieve(event.data.object.id)
                 const lineItems = sessionDetails.line_items.data.description;
                 if(lineItems === 'Lychee LifeTime Access'){
                     const session = event.data.object;
