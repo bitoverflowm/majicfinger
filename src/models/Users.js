@@ -12,6 +12,10 @@ const UserSchema = new mongoose.Schema({
         required: [true, "Email is required"],
         maxLength: [240, "Email cannot be more than 240 characters"],
     },
+    paymentTotal: {
+        type: Number,
+        default: 0,
+    },
     lifetimeMember: {
         type: Boolean,
         default: false,
@@ -24,11 +28,9 @@ const UserSchema = new mongoose.Schema({
     },
     mgkIssuer: {
         type: String,
-        required: [true, "MagkIssuer is required"],
     },
     mgkpublicAddress: {
         type: String,
-        required: [true, "MagkpublicAddress is required"],
     },
     confirmedAt: {
         type: Date,
