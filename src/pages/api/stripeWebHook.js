@@ -11,6 +11,8 @@ export default async (req, res) => {
         console.log("checking endpoint secret")
         const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
         if (endpointSecret) {
             try {
                 event = stripe.webhooks.constructEvent(
