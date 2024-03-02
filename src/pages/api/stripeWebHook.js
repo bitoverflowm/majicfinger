@@ -17,6 +17,7 @@ export default async (req, res) => {
 
         if (endpointSecret) {
             try {
+                console.log("Checking stripe signature")
                 const rawBody = await buffer(req)
                 const sig = req.headers['stripe-signature'];
                 event = stripe.webhooks.constructEvent(
@@ -29,6 +30,8 @@ export default async (req, res) => {
                 return res.status(400).send(`Webhook Error: ${err.message}`);
             }
         }
+
+        console.log("Endpoint chack completed")
 
         switch (event.type) {
             case 'checkout.session.completed':
