@@ -19,7 +19,8 @@ export default async (req, res) => {
             try {
                 console.log("Checking stripe signature")
                 //console.log("req: ", req)
-                const rawBody = await buffer(req)
+                console.log("req.body: ", req.body)
+                const rawBody = await buffer(req.body)
                 console.log("rawBody: ", rawBody.toString())
                 const sig = req.headers['stripe-signature'];
                 console.log("sig: ", sig)
