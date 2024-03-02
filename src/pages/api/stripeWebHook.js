@@ -23,7 +23,6 @@ export default async (req, res) => {
 
         if (endpointSecret) {
             try {
-                console.log("description: ", req.body.description)
                 console.log("Checking stripe signature")
                 //console.log("req: ", req)
                 console.log("pre buffer ")
