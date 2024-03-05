@@ -15,7 +15,7 @@ const Dashbaord = () => {
 
     useEffect(() => {
         if(!user){
-            router.push('/')
+            router.push('/login')
         }
     },[user])
 
