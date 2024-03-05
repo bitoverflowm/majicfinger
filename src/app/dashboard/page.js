@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, use } from "react"
+import { useEffect } from "react"
 
 import { useUser } from '@/lib/hooks';
 import { StateProvider } from '@/context/stateContext'
@@ -10,7 +10,7 @@ import ActionMenu from "@/components/actionMenu";
 
 
 const Dashbaord = () => {
-    const user = useUser({ redirectTo: '/', redirectIfNotFound: true })
+    const user = useUser()
     const router = useRouter()
 
     useEffect(() => {
