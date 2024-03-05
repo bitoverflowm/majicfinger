@@ -5,7 +5,7 @@ export const metadata = {
   title: 'Lychee',
   description: 'Analyze and Visualize Data. Without Spreadsheets.',
   verification: {
-    other: { _foundr: ['1e04ca29b3242af44ee799e756cfafce'] },
+    other: { _foundr: ['973f2a49e12fad2ad799756c823a6d3b'] },
   }
 };
 
