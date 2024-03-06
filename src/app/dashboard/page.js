@@ -7,6 +7,7 @@ import { StateProvider } from '@/context/stateContext'
 
 import { useRouter } from "next/navigation";
 import ActionMenu from "@/components/actionMenu";
+import Nav from "@/components/nav";
 
 
 const Dashbaord = () => {
@@ -21,7 +22,10 @@ const Dashbaord = () => {
 
     return (
         <StateProvider>
-            <ActionMenu />
+            <Nav/>
+            <div className="p-2">
+                <ActionMenu />
+            </div>
         </StateProvider>
     )
 }

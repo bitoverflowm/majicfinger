@@ -16,11 +16,11 @@ const Login = ({noName}) => {
 
     const user = useUser()
 
-    useEffect(() => {
+    /*useEffect(() => {
         if(user) {
             router.push('/dashboard')
         }
-    }, [user])
+    }, [user])*/
 
     const handleSubmit = async (e) => {
         setLoading(true);

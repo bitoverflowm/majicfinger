@@ -1,5 +1,7 @@
 import Nav from '@/components/nav';
 import './globals.css'
+
+import { StateProvider } from '@/context/stateContext'
  
 export const metadata = {
   title: 'Lychee',
@@ -16,10 +18,8 @@ export default function RootLayout({ children }) {
         <head /> will contain the components returned by the nearest parent
         head.js. Find out more at https://beta.nextjs.org/docs/api-reference/file-conventions/head
       */}
-      
       <body>
-        <Nav/>
-        <div className='-mt-16'>
+        <div className=''>
           {children}
         </div>
       </body>

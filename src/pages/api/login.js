@@ -6,18 +6,15 @@ import User from '../../models/Users'
 export default async (req, res) => {
   try {
     if (req.method !== 'POST') return res.status(405).end();
+    
     await dbConnect()
 
     const didToken = req.headers.authorization.slice(7)
     const metadata = await magic.users.getMetadataByToken(didToken)
     let user = await User.findOne({ email: metadata.email })
 
-    console.log("user search: ", user)
-
     if (!user) {
       try {
-        console.log("name", req.body.name, "email", metadata.email, "mgkpublicAddress", metadata.publicAddress, "confirmedAt", metadata.confirmedAt, "lastLoginAt", metadata.lastLoginAt, "mgkIssuer", metadata.issuer, "metadata", metadata.metadata)
-
         user = await User.create({
           name: req.body.name,
           email: metadata.email,

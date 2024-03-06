@@ -11,6 +11,7 @@ import LandingPage from '@/components/landingPage'
 
 import QuickNav from '@/components/nav/quickNav'
 import FAQ from '@/components/faq'
+import Nav from '@/components/nav'
 
 export default function Home() {
 
@@ -29,8 +30,8 @@ export default function Home() {
         >{clairtyCode}</Script>
         <GoogleAnalytics gaId="G-G8X2NEPTEG" />
         <StateProvider>
+          <Nav/>
           <div className="p-10 flex flex-col place-items-center">
-            <QuickNav />
             <div className='text-center max-w-screen overflow-hidden'>
               <LandingPage />
             </div>
