@@ -17,7 +17,7 @@ const Dashbaord = () => {
         if(!user){
             router.push('/login')
         }
-    },[user])
+    }, [user])
 
     return (
         <StateProvider>
