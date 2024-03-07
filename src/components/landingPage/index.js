@@ -92,14 +92,21 @@ const LandingPage = () => {
                                         <img src="./mit.svg"  alt="mit" className='h-6'/>   
                                     </div>
                                 </div>
-                                <div className='text-xs font-bold text-slate-500'>
-                                    Featured on:
-                                </div>
                                 <div className='flex gap-8 px-6 md:gap-20 py-2 place-content-center place-items-center grayscale'>
-                                    <div className="flex-shrink">
-                                        <Link href="https://theresanaiforthat.com/ai/lychee-1709679284/?ref=featured&v=966544"><img width="300" src="https://media.theresanaiforthat.com/featured3.png"/></Link>
+                                    <div>
+                                        <div className='text-xs font-bold text-slate-500 py-2'>
+                                            Featured on:
+                                        </div>
+                                        <div className="flex-shrink">
+                                            <Link href="https://theresanaiforthat.com/ai/lychee-1709679284/?ref=featured&v=966544"><img width="300" src="https://media.theresanaiforthat.com/featured3.png"/></Link>
+                                        </div>
                                     </div>
-                                    
+                                    <div>
+                                        <div className='text-xs font-bold text-slate-500 py-2'>Funding Powered by "Free The Creator"</div>
+                                        <div className="flex-shrink">
+                                            <Link href="https://www.producthunt.com/posts/free-the-creator?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-free&#0045;the&#0045;creator" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443245&theme=dark" alt="Free The Creator - $750 million in grants awaits your single click | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
+                                        </div>
+                                    </div>                                    
                                 </div>
                             </div>
                         </div>       
