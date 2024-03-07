@@ -6,10 +6,34 @@ import { useMyState  } from '@/context/stateContext'
 import { useUser  } from '@/lib/hooks';
 import Link from 'next/link'
 
+import { useRouter } from 'next/navigation'
+
 
 const Nav = () => {
     const { working, setWorking } = useMyState()
     const user = useUser()
+
+    const router = useRouter();
+
+    const handleLogout = async () => {
+      //e.preventDefault(); // Prevent the default link behavior
+
+      try {
+        const response = await fetch('/api/logout', {
+          method: 'POST', // Make sure to use POST if your logout API expects it
+        });
+
+        // If the logout was successful, redirect to the homepage
+        if (response.ok) {
+          router.push('/');
+        } else {
+          // Handle errors or unsuccessful logout attempts here
+          console.error('Logout failed');
+        }
+      } catch (error) {
+        console.error('An error occurred during logout', error);
+      }
+    };
 
     return (
       <div className="flex w-full p-10 sm:p-6 z-40">
@@ -26,7 +50,7 @@ const Nav = () => {
                 <div className='rounded-full bg-lychee-peach text-white p-2 px-4 capitalize'>
                     {user.name ? user.name : user.email.split('@')[0]}
                 </div>
-                <Link href="/api/logout" className='cursor-pointer hover:text-slate-300'>Logout</Link>
+                <div onClick={()=>handleLogout()} className='cursor-pointer hover:text-slate-300'>Logout</div>
             </div>
         }
       </div>      
