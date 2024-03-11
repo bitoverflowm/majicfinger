@@ -1,7 +1,17 @@
 //import { MongoClient } from 'mongodb'
 import mongoose from 'mongoose'
 
-const MONGODB_URI = process.env.MONGODB_URI
+
+const isProduction = process.env.NODE_ENV === 'production';
+let MONGODB_URI
+
+
+if (isProduction) {
+  MONGODB_URI = process.env.MONGODB_URI
+} else {
+  MONGODB_URI = process.env.MONGODB_URI_DEV
+}
+
 
 if (!MONGODB_URI) {
   throw new Error(

@@ -47,9 +47,8 @@ const Nav = () => {
                 <div className='p-2 px-3 cursor-pointer bg-lychee-green font-bold rounded-xl hover:bg-black hover:text-white shadow-inner' onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
             </div>
             :<div className='w-full flex gap-4 place-content-end place-items-center'>
-                <div className='text-xs font-bold text-slate-500 py-2'>Funding Powered by "Free The Creator"</div>
                 <div className="max-w-40">
-                    <Link href="https://www.producthunt.com/posts/free-the-creator?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-free&#0045;the&#0045;creator" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443245&theme=dark" alt="Free The Creator - $750 million in grants awaits your single click | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
+                    <Link href="https://www.producthunt.com/posts/lychee-3?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-lychee&#0045;3" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443500&theme=neutral" alt="Lychee - AI&#0045;Powered&#0032;Data&#0032;Visualization&#0032;in&#0032;0&#0046;32&#0032;seconds&#0046; | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
                 </div>
                 <div className='rounded-full bg-lychee-peach text-white p-2 px-4 capitalize'>
                     {user.name ? user.name : user.email.split('@')[0]}
@@ -60,6 +59,5 @@ const Nav = () => {
       </div>      
     )
   }
-
 
 export default Nav;

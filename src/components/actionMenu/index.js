@@ -26,7 +26,6 @@ import AIMode from "../aiMode";
 
 const ActionMenu = () => {
     const user = useUser()
-
     /*
      * Context hooks
      */
@@ -36,21 +35,18 @@ const ActionMenu = () => {
     const setAiOpen = contextState?.setAiOpen;
     const working = contextState?.working;
     const setWorking = contextState?.setWorking;
+    const data  = contextState?.data;
+    const setData = contextState?.setData;
+
+    const fmtCols = contextState?.fmtCols
+    const setFmtCols = contextState?.setFmtCols
+    const dflt = contextState?.dflt
+    const setDflt = contextState?.setDflt
 
     /*
      * State hooks
      */
-    const [data, setData] = useState()
-    const [csv, setCSV] = useState()
-    const [fmtData, setFmtData] = useState()
-    const [fmtCols, setFmtCols] = useState()
-    const [chartActive, setChartActive] = useState()
-
-    const [xKey, setXKey] = useState('mission')
-    const [yKey, setYKey] = useState('price')
-    const [type, setType] = useState('bar')
-    const [dflt, setDflt] = useState(true)
-
+    //const [csv, setCSV] = useState()
     const uploadRef = useRef(null)
     const gridRef = useRef(null)
     const chartRef = useRef(null)
@@ -73,13 +69,13 @@ const ActionMenu = () => {
             const json = XLSX.utils.sheet_to_json(worksheet);
             const csv = XLSX.utils.sheet_to_csv(worksheet);
             setData(json); // Now you have your JSON data
-            setCSV(csv)
+            //setCSV(csv)
             setDflt(false)
         };
 
         reader.readAsBinaryString(file);
-        setWorking('grid')
-        
+        setWorking('grid')        
+
     }
 
     const emailHandler = (e) => {
@@ -87,43 +83,6 @@ const ActionMenu = () => {
         console.log(email)
     }
 
-    useEffect(()=> {
-        if(data && data.length > 0){
-            const keys = Object.keys(data[0])
-            const columnsLabels = keys.map(key => {
-                // Handle any price headings
-                /*if (key === 'price') {
-                    return { field: key, valueFormatter: params => '$' + params.value.toLocaleString() }
-                }*/
-                return { field: key }
-            })
-            
-            setFmtCols(columnsLabels)           
-        }
-    }, [data])
-
-    const generateChartHandler = () =>{
-        setChartActive(true)
-    }
-
-
-    useEffect(()=>{
-        if(!data){
-            fetch('https://www.ag-grid.com/example-assets/space-mission-data.json') // Fetch data from server
-            .then(result => result.json()) // Convert to JSON
-            .then(rowData => setData(rowData)); // Update state of `rowData`
-
-            setFmtCols([
-                { field: "mission" },
-                { field: "company" },
-                { field: "location" },
-                { field: "date" },
-                { field: "price" },
-                { field: "successful" },
-                { field: "rocket" }
-              ])
-        }
-    }, [])
 
     useEffect(()=>{
         if(working){
@@ -139,7 +98,6 @@ const ActionMenu = () => {
         window.scrollTo({top: y, behavior: 'smooth'});
     }
 
-    
 
     return(
         <div className="flex flex-col place-items-center w-screen">
@@ -211,20 +169,20 @@ const ActionMenu = () => {
                     {
                         fmtCols && data && working && working === 'grid' &&
                             <div className="h-screen sm:h-screen w-96 sm:w-full sm:px-20 flex place-content-center">
-                                <GridView data={data} fmtCols={fmtCols}/>
+                                <GridView />
                             </div>                        
                     }
                     {
                         fmtCols && data && ((working && working === 'chart') || !working) &&
                             <div className="h-5/6 w-full flex flex-col xl:flex-row">
                                 <div className="hidden xl:block w-2/12 shadow-2xl px-5 py-10 rounded mx-10">
-                                    <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>
+                                    <ChartDataMods/>
                                 </div>
                                 <div className="h-auto w-[450px] xl:h-[750px] sm:w-[1200px] px-1 xl:px-10">
-                                    <ChartView data={data} fmtCols={fmtCols} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey} type={type} dflt={dflt}/>
+                                    <ChartView/>
                                 </div>
                                 <div className="xl:hidden shadow-2xl px-5 py-10 rounded mx-10">
-                                    <ChartDataMods fmtCols={fmtCols} type={type} setType={setType} xKey={xKey} setXKey={setXKey} yKey={yKey} setYKey={setYKey}/>
+                                    <ChartDataMods />
                                 </div>
                             </div>
                             

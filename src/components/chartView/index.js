@@ -1,81 +1,29 @@
 import { use, useEffect, useState } from 'react';
 import { AgChartsReact } from 'ag-charts-react';
 
-const ChartView = ({data, fmtCols, type, xKey, setXKey, yKey, setYKey, dflt }) => {
-    
-    /*const [chartOptions, setChartOptions] = useState({
-        data: data, 
-        series: [{ type: 'bar', xKey: 'athelete', yKey: 'age'}]
-    })*/
+import { useMyState  } from '@/context/stateContext'
 
-    const [chartOptions, setChartOptions] = useState({
-        // Data: Data to be displayed in the chart
-        data: data,
-        // Series: Defines which chart type and data to use
-        series: [{ type: 'bar', xKey: 'mission', yKey: 'price' }],
-      });
 
-    useEffect(() => {
-        if(type === 'scatter'){
-            console.log('scattering')
-            console.log('xKey', xKey)
-            console.log('yKey', yKey)
-            setChartOptions({
-                series: [{
-                        type: 'scatter',
-                        data: data,
-                        xKey: xKey ? xKey : chartOptions.series[0].xKey,
-                        yKey: yKey ? yKey : chartOptions.series[0].yKey
-                    }],
-                })
-        }else{
-            setChartOptions(prevOptions => ({
-                ...prevOptions,
-                series: [{
-                        type: type ? type : chartOptions.series[0].type,
-                        xKey: xKey ? xKey : chartOptions.series[0].xKey,
-                        yKey: yKey ? yKey : chartOptions.series[0].yKey
-                    }],
-            }))
-        }
-    }, [type, xKey, yKey])
+const ChartView = () => {
 
-    useEffect(()=> {
-        if(!(dflt)){
-            if(type === 'scatter'){
-                setChartOptions({
-                    series: [{
-                            type: 'scatter',
-                            data: data,
-                            xKey: fmtCols[0].field,
-                            yKey: fmtCols[1].field
-                        }],
-                    })
-                }
-            else{
-                setChartOptions({
-                    data: data,
-                    series: [{
-                            type: chartOptions.series[0].type,
-                            xKey: fmtCols[0].field,
-                            yKey: fmtCols[1].field
-                        }],
-                    })
-            }
-            setXKey(fmtCols[0].field)
-            setYKey(fmtCols[1].field)
-        }
-    }, [data, fmtCols])
+    const contextState = useMyState()
+
+    let chartOptions = contextState?.chartOptions || {};
 
     useEffect(()=> {
         if(chartOptions){
-            //console.log(chartOptions)
+            console.log('chart Options:', chartOptions)
         }
     }, [chartOptions])
 
 
     return(
-        <AgChartsReact options={chartOptions} />
+        <>
+            <div className='text-center text-xl font-bold py-2'>Title</div>
+            <div className='text-center text-sm font-bold py-2'>Sub title</div>
+            <AgChartsReact options={chartOptions} />
+            <div className='text-center text-xxs'>Footnotes</div>
+        </>
     )
 }
 
