@@ -196,21 +196,23 @@ const ActionMenu = () => {
                     }
                     {
                         fmtCols && data && ((working && working === 'chart') || !working) &&
-                            <div className="h-5/6 w-full flex flex-col xl:flex-row">
+                            <div className="h-full w-full">
                                 <div className="bg-white shadow-lg rounded-xl text-xxs px-3 py-2 w-96 mx-auto">
                                     <div className="font-bold">Coming Soon:</div>
                                     <div>✨More charts, more colors, more features, more analysis</div>
                                     <div>* Become a lifetime member to vote on which features to accelerate</div>
                                     <div className="text-lychee-red">* If you are on mobile I apologize, mobile view and app coming soon</div>
                                 </div>
-                                <div className="hidden xl:block w-2/12 shadow-xl rounded-sm mx-5">
-                                    <ChartDataMods/>
-                                </div>
-                                <div className="h-auto w-[450px] xl:h-[750px] sm:w-[1200px] px-1 xl:px-10">
-                                    <ChartView/>
-                                </div>
-                                <div className="xl:hidden shadow-2xl px-5 py-10 rounded mx-10">
-                                    <ChartDataMods />
+                                <div className="h-5/6 w-full flex flex-col xl:flex-row">
+                                    <div className="hidden xl:block w-2/12 shadow-xl rounded-sm mx-5">
+                                        <ChartDataMods/>
+                                    </div>
+                                    <div className="h-auto w-[450px] xl:h-[750px] sm:w-[1200px] px-1 xl:px-10">
+                                        <ChartView/>
+                                    </div>
+                                    <div className="xl:hidden shadow-2xl px-5 py-10 rounded mx-10">
+                                        <ChartDataMods />
+                                    </div>
                                 </div>
                             </div>
                             
