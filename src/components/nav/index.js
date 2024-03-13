@@ -44,17 +44,11 @@ const Nav = () => {
           !(user) ?
             <div className="pt-3 w-full text-sm pr-6  flex gap-4 place-content-end place-items-center " >
                 <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Have Questions?</Link></div>
-                <div className="max-w-40">
-                    <Link href="https://www.producthunt.com/posts/lychee-3?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-lychee&#0045;3" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443500&theme=neutral" alt="Lychee - AI&#0045;Powered&#0032;Data&#0032;Visualization&#0032;in&#0032;0&#0046;32&#0032;seconds&#0046; | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
-                </div>
                 <div className='underline cursor-pointer hover:text-lychee-green'><Link href="/login">Already have an account?</Link></div>
                 <div className='p-2 px-3 cursor-pointer bg-lychee-green font-bold rounded-xl hover:bg-black hover:text-white shadow-inner' onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
             </div>
             :<div className='w-full flex gap-4 place-content-end place-items-center'>
                 <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Have Questions?</Link></div>
-                <div className="max-w-40">
-                    <Link href="https://www.producthunt.com/posts/lychee-3?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-lychee&#0045;3" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443500&theme=neutral" alt="Lychee - AI&#0045;Powered&#0032;Data&#0032;Visualization&#0032;in&#0032;0&#0046;32&#0032;seconds&#0046; | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
-                </div>
                 <div className='rounded-full bg-lychee-peach text-white p-2 px-4 capitalize'>
                     {user.name ? user.name : user.email.split('@')[0]}
                 </div>
