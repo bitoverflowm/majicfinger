@@ -43,7 +43,7 @@ const LandingPage = () => {
                                 </div>
                                 <div className='mx-auto py-10'>
                                     <div className='py-1 text-xs'>
-                                        We preapared a quick explainer video for you:
+                                        We prepared a quick explainer video for you:
                                     </div>
                                     <div className='flex place-items-center place-content-center'>
                                         <video width="450" height="340" controls preload="none" className='rounded-lg'>
