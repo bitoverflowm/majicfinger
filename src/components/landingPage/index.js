@@ -46,7 +46,7 @@ const LandingPage = () => {
                                         We prepared a quick explainer video for you:
                                     </div>
                                     <div className='flex place-items-center place-content-center'>
-                                        <iframe width="560" height="315" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                                        <iframe width="560" height="315" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="Lychee promo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowFullScreen></iframe>
                                     </div>                                    
                                 </div>
                                 <div className='flex place-content-center pb-4'>
