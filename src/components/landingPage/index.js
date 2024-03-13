@@ -46,10 +46,7 @@ const LandingPage = () => {
                                         We prepared a quick explainer video for you:
                                     </div>
                                     <div className='flex place-items-center place-content-center'>
-                                        <video width="450" height="340" controls preload="none" className='rounded-lg'>
-                                        <source src="./lycheePromo.mp4" type="video/mp4" />
-                                        Your browser does not support the video tag.
-                                        </video>
+                                        <iframe width="560" height="315" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
                                     </div>                                    
                                 </div>
                                 <div className='flex place-content-center pb-4'>
@@ -95,14 +92,11 @@ const LandingPage = () => {
                                 </div>
                                 <div className='px-6 py-2 grayscale'>
                                     <div className='text-xs font-bold text-slate-500 py-2'>
-                                        Featured on:
+                                        ❤️
                                     </div>
                                     <div className='flex place-items-center place-content-center gap-4'>
-                                        <div className="flex-shrink">
-                                            <Link href="https://theresanaiforthat.com/ai/lychee-1709679284/?ref=featured&v=966544"><img width="300" src="https://media.theresanaiforthat.com/featured3.png"/></Link>
-                                        </div>
-                                        <div className="flex-shrink">
-                                            <Link href="https://www.producthunt.com/posts/lychee-3?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-lychee&#0045;3" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443245&theme=dark" alt="Lychee - AI&#0045;Powered&#0032;Data&#0032;Visualization&#0032;in&#0032;0&#0046;32&#0032;seconds&#0046; | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
+                                        <div className="max-w-40">
+                                            <Link href="https://www.producthunt.com/posts/lychee-3?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-lychee&#0045;3" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443500&theme=neutral" alt="Lychee - AI&#0045;Powered&#0032;Data&#0032;Visualization&#0032;in&#0032;0&#0046;32&#0032;seconds&#0046; | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
                                         </div>
                                     </div>                                        
                                 </div>
