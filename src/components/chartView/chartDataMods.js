@@ -1,7 +1,14 @@
+const { useState } = require('react');
+
+import { FaSortDown } from "react-icons/fa";
+
 import { useMyState } from '@/context/stateContext'
+import BgPanel from '../aesthetics/bgPanel';
+import Group from './ui/group';
 
 const ChartDataMods = () => {
     const contextState = useMyState()
+    const [show, setShow] = useState(false)
 
     const xKey = contextState?.xKey || '';
     const setXKey = contextState?.setXKey || {};
@@ -19,37 +26,21 @@ const ChartDataMods = () => {
     
     return (
         <div className="">
-            <div className="text-xs px-2 py-2">Chart Type</div>
-            <div className="flex flex-wrap gap-2 pr-2 pb-4">
-                {
-                    chartTypes.map(
-                        (opt, key) => <div key={key} className={`px-2 py-2 border border-white rounded-lg shadow-xl text-xs cursor-pointer ${type === opt ? 'bg-black text-white hover:bg-white hover:text-black': 'bg-white text-black hover:bg-black hover:text-white'} `} onClick={()=>setType(opt)}>{opt}</div>
-                    )
-                }
+            <div>
+                <Group title={'Select your chart type'} options={chartTypes} val={type} call={setType} opened={true}/>
             </div>
-            <div>Choose X-axis</div>
-            <div className="flex flex-wrap gap-2 pr-2 pb-4">
-                {
-                    xOptions && xOptions.map(
-                        (opt, key) => <div key={key} className={`px-2 py-2 border border-white rounded-lg shadow-xl text-xs cursor-pointer ${xKey === opt ? 'bg-black text-white hover:bg-white hover:text-black': 'bg-white text-black hover:bg-black hover:text-white'} `} onClick={()=>setXKey(opt)}>{opt}</div>
-                    )
-                }
+            <div>
+                <Group title={'Set X-axis'} options={xOptions} val={xKey} call={setXKey} opened={false}/>
             </div>
-            <div>Set Y-axis</div>
-            <div className="flex flex-wrap gap-2 pr-2 pb-4">
-                {
-                    yOptions && yOptions.map(
-                        (opt, key) => <div key={key} className={`px-2 py-2 border border-white rounded-lg shadow-xl text-xs cursor-pointer ${yKey === opt ? 'bg-black text-white hover:bg-white hover:text-black': 'bg-white text-black hover:bg-black hover:text-white'} `} onClick={()=>setYKey(opt)}>{opt}</div>
-                    )
-                }
+            <div>
+                <Group title={'Set Y-axis'} options={yOptions} val={yKey} call={setYKey} opened={false}/>
             </div>
-            <div>Direction</div>
-            <div className="flex flex-wrap gap-2 pr-2 pb-4">
-                {
-                    directions && directions.map(
-                        (opt, key) => <div key={key} className={`px-2 py-2 border border-white rounded-lg shadow-xl text-xs cursor-pointer ${direction === opt ? 'bg-black text-white hover:bg-white hover:text-black': 'bg-white text-black hover:bg-black hover:text-white'} `} onClick={()=>setDirection(opt)}>{opt}</div>
-                    )
-                }
+            <div>
+                <Group title={'Direction'} options={directions} val={direction} call={setDirection} opened={false}/>
+            </div>
+            <div className='text-sm hidden'>Background</div>
+            <div className="hidden">
+                <BgPanel />
             </div>
             
         </div>

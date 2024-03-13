@@ -14,7 +14,7 @@ const GridView = () => {
     let defaultColDef = contextState?.defaultColDef || {};
 
     return (
-        <div className="ag-theme-quartz sm:px-20 py-20" style={{ height: '90%', width: '90%' }}>
+        <div className="ag-theme-quartz sm:px-20 py-10" style={{ height: '90%', width: '90%' }}>
             <AgGridReact 
                 defaultColDef={defaultColDef} 
                 rowData={rowData} 

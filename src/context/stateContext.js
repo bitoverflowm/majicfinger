@@ -20,6 +20,8 @@ export const StateProvider = ({ children }) => {
   const [type, setType] = useState('bar')
   const [colDefs, setColDefs] = useState()
   const [rowData, setRowData] = useState()
+  const [bgColor, setBgColor] = useState()
+  const [themeColor, setThemeColor] = useState()
 
   const [data, setData] = useState()
 
@@ -29,10 +31,6 @@ export const StateProvider = ({ children }) => {
     data: data,
     // Series: Defines which chart type and data to use
     series: [{ type: 'bar', xKey: 'mission', yKey: 'price', direction: "horizontal", fill: '#BA0B31'}],
-    // Background we will use Lychee BASS component instead of AGcharts
-    background: {
-      fill: "black",
-    },
     //animation TODO: fix not working
     animation: [{enabled: true, duration: 0.1}],
     //labeling x, y, and even other axers
@@ -107,9 +105,10 @@ export const StateProvider = ({ children }) => {
                       xKey: xKey ? xKey : chartOptions.series[0].xKey,
                       yKey: yKey ? yKey : chartOptions.series[0].yKey,
                   }],
-                  background: {
-                    fill: "aliceblue",
-                  },
+              theme: themeColor ? themeColor : 'ag-default',
+              background: {
+                visible: false,
+              }
               })
       }else{
           setChartOptions(prevOptions => ({
@@ -120,12 +119,13 @@ export const StateProvider = ({ children }) => {
                       yKey: yKey ? yKey : chartOptions.series[0].yKey,
                       direction: direction ? direction: chartOptions.series[0].direction,
                   }],
+              theme: themeColor ? themeColor : 'ag-default',
               background: {
-                fill: "aliceblue",
-              },
+                visible: false,
+              }
           }))
       }
-  }, [type, xKey, yKey, direction])
+  }, [type, xKey, yKey, direction, themeColor])
 
   const extractData = (cols) => {
     let arr = cols.map(items => items.field)
@@ -217,7 +217,7 @@ export const StateProvider = ({ children }) => {
   }, [])
 
   return (
-    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef}}>
+    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, themeColor, setThemeColor}}>
       {children}
     </StateContext.Provider>
   );

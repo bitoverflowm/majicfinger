@@ -9,6 +9,7 @@ const ChartView = () => {
     const contextState = useMyState()
 
     let chartOptions = contextState?.chartOptions || {};
+    let bgColor = contextState?.bgColor || '';
 
     useEffect(()=> {
         if(chartOptions){
@@ -18,12 +19,12 @@ const ChartView = () => {
 
 
     return(
-        <>
+        <div className={`h-full w-full rounded-lg p-20 overflow-hidden`} style={{background: bgColor}}>
             <div className='text-center text-xl font-bold py-2'>Title</div>
             <div className='text-center text-sm font-bold py-2'>Sub title</div>
             <AgChartsReact options={chartOptions} />
-            <div className='text-center text-xxs'>Footnotes</div>
-        </>
+            <div className='text-center text-xxs -mt-10'>Footnotes</div>
+        </div>
     )
 }
 

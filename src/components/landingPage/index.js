@@ -26,37 +26,38 @@ const LandingPage = () => {
     }, [view])
 
     return (
-        <div className='font-body sm:pt-5 text-black'>
+        <div className='font-body sm:pt-5 text-black' >
             {
                 !(user) &&
                     <>
-                        <div className='py-10 h-screen overflow-hidden'>
-                            <div className='overflow-hidden absolute top-0 left-0 xl:px-24 xl:py-8 -z-10 blur-md'>
-                                <video autoPlay loop muted playsInline className="xl:h-dvh xl:w-screen xl:max-w-screen xl:rounded-br-3xl rounded-tl-3xl hidden xl:block">
-                                    <source src="./bg4.mp4" type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
-                                <video autoPlay loop muted playsInline className="xl:hidden w-full h-screen object-cover">
-                                    <source src="./bg4.mp4" type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
-                            </div>
-                            <div className='w-96 py-5 mx-auto sm:w-10/12 xl:w-3/5 bg-white xl:py-20 xl:px-32 rounded-xl shadow-2xl '>
-                                <div className='text-sm xl:text-md font-black text-lychee-peach p-10'>
+                        <div className='min-h-screen' style={{ /*backgroundImage: "url('./bg.jpg')", backgroundSize: 'cover', backgroundRepeat: 'no-repeat'*/}}>
+                            <div className='w-96 py-5 mx-auto sm:w-10/12 xl:w-3/5 bg-white xl:py-20 xl:px-32 rounded-xl shadow-2xl bg-slate-200/60 backdrop-blur-xl'>
+                                <div className='text-sm xl:text-md font-black text-black p-10'>
                                     We'll save you from all the complex yabba-dabba-doos out there.
                                 </div>
                                 <div className='text-6xl xl:text-8xl font-title'>
                                     <span className='font-black text-lychee-peach'>Instant</span> Graphs.
                                 </div>
                                 <div className='text-6xl xl:text-8xl font-title'>
-                                <span className='font-black text-lychee-peach'>Zero</span> Hassle.
+                                <span className='font-black'>Zero</span> Hassle.
                                 </div>
-                                <div className='flex place-content-center py-10'>
-                                    <div className='font-black bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-3 xl:px-5 py-2 xl:py-4 rounded-full text-sm' onClick={()=>setView('first')}>
+                                <div className='mx-auto py-10'>
+                                    <div className='py-1 text-xs'>
+                                        We preapared a quick explainer video for you:
+                                    </div>
+                                    <div className='flex place-items-center place-content-center'>
+                                        <video width="450" height="340" controls preload="none" className='rounded-lg'>
+                                        <source src="./lycheePromo.mp4" type="video/mp4" />
+                                        Your browser does not support the video tag.
+                                        </video>
+                                    </div>                                    
+                                </div>
+                                <div className='flex place-content-center pb-4'>
+                                    <div className='font-bold bg-black text-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-3 xl:px-5 py-2 xl:py-4 rounded-full text-xs' onClick={()=>setView('first')}>
                                         Cool... tell me more?
                                     </div>
                                 </div>
-                                <div className='text-md xl:text-lg'>
+                                <div className='text-md xl:text-lg pb-4'>
                                     <div>
                                         Seriously.
                                     </div>
@@ -92,21 +93,18 @@ const LandingPage = () => {
                                         <img src="./mit.svg"  alt="mit" className='h-6'/>   
                                     </div>
                                 </div>
-                                <div className='flex gap-8 px-6 md:gap-20 py-2 place-content-center place-items-center grayscale'>
-                                    <div>
-                                        <div className='text-xs font-bold text-slate-500 py-2'>
-                                            Featured on:
-                                        </div>
+                                <div className='px-6 py-2 grayscale'>
+                                    <div className='text-xs font-bold text-slate-500 py-2'>
+                                        Featured on:
+                                    </div>
+                                    <div className='flex place-items-center place-content-center gap-4'>
                                         <div className="flex-shrink">
                                             <Link href="https://theresanaiforthat.com/ai/lychee-1709679284/?ref=featured&v=966544"><img width="300" src="https://media.theresanaiforthat.com/featured3.png"/></Link>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <div className='text-xs font-bold text-slate-500 py-2'>Funding Powered by "Free The Creator"</div>
                                         <div className="flex-shrink">
-                                            <Link href="https://www.producthunt.com/posts/free-the-creator?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-free&#0045;the&#0045;creator" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443245&theme=dark" alt="Free The Creator - $750 million in grants awaits your single click | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
+                                            <Link href="https://www.producthunt.com/posts/lychee-3?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-lychee&#0045;3" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443245&theme=dark" alt="Lychee - AI&#0045;Powered&#0032;Data&#0032;Visualization&#0032;in&#0032;0&#0046;32&#0032;seconds&#0046; | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
                                         </div>
-                                    </div>                                    
+                                    </div>                                        
                                 </div>
                             </div>
                         </div>       
@@ -198,7 +196,7 @@ const LandingPage = () => {
                                 <span className='font-black text-lychee-peach'>How</span> It Works:
                             </div>
                             <div className='flex flex-col lg:flex-row gap-10 sm:py-20 place-items-center place-content-center'>
-                                <div className='p-10 shadow-xl rounded-xl w-96 sm:w-1/4 lg:h-72'>
+                                <div className='p-10 shadow-xl rounded-xl w-96 lg:w-1/4 lg:h-72'>
                                     <div className='font-title text-2xl'>
                                     <span className='text-lychee-red font-title font-black text-4xl'>1.</span>  Drop Your Spreadsheet.
                                     </div>
@@ -211,7 +209,7 @@ const LandingPage = () => {
                                         </div>
                                     </div>               
                                 </div>
-                                <div className='p-10 shadow-xl rounded-xl w-96 sm:w-1/4 lg:h-72'>
+                                <div className='p-10 shadow-xl rounded-xl w-96 lg:w-1/4 lg:h-72'>
                                     <div className='font-title text-2xl'>
                                     <span className='text-lychee-red font-title font-black text-4xl'>2.</span>  Watch The Magic.
                                     </div>
@@ -221,7 +219,7 @@ const LandingPage = () => {
                                         </div>                            
                                     </div>               
                                 </div>
-                                <div className='p-10 shadow-xl rounded-xl w-96 sm:w-1/4 lg:h-72'>
+                                <div className='p-10 shadow-xl rounded-xl w-96 lg:w-1/4 lg:h-72'>
                                     <div className='font-title text-2xl'>
                                         <span className='text-lychee-red font-title font-black text-4xl'>3.</span> Any Chart You Want.
                                     </div>
