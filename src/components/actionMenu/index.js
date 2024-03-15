@@ -4,24 +4,14 @@ import { useState, useEffect, useRef } from "react"
 import * as XLSX from 'xlsx'
 import Link from 'next/link'
 
-import { MdDataset } from "react-icons/md";
-import { AiOutlineAppstoreAdd } from "react-icons/ai";
-import { FaChartLine } from "react-icons/fa6";
-import { ImMagicWand } from "react-icons/im";
 import { GoEyeClosed } from "react-icons/go";
 import { CiExport } from "react-icons/ci";
 import { IoCheckmarkSharp } from "react-icons/io5";
-import { FaXTwitter } from "react-icons/fa6";
-import { ImYoutube2 } from "react-icons/im";
-import { BiLogoInstagramAlt } from "react-icons/bi";
-import { FaCcStripe } from "react-icons/fa";
-import { FaLinkedin } from "react-icons/fa";
-import { BiLogoGmail } from "react-icons/bi";
-import { FaMeta } from "react-icons/fa6";
+import { ImYoutube2, ImMagicWand } from "react-icons/im";
+import { BiLogoInstagramAlt, BiLogoGmail } from "react-icons/bi";
+import { FaCcStripe, FaLinkedin } from "react-icons/fa";
+import { FaMeta, FaXTwitter } from "react-icons/fa6";
 import { CgAppleWatch } from "react-icons/cg";
-
-
-
 
 import { useMyState  } from '@/context/stateContext'
 import { useUser } from '@/lib/hooks';
@@ -32,6 +22,8 @@ import GridView from "../gridView";
 import ChartView from "../chartView";
 import ChartDataMods from "../chartView/chartDataMods";
 import Roadmap from "../roadmap";
+
+import Integrations from "../integrations";
 
 import AIMode from "../aiMode";
 
@@ -228,6 +220,7 @@ const ActionMenu = () => {
                                     <div>✨Add any of this to your dashboard</div>
                                     <div>* Become a lifetime member to vote on which integrations to build first</div>
                                 </div>
+                                <div><Integrations /></div>
                                 <div className="text-xs">Pull Your Live Data Feed Directly From</div>
                                 <div className="flex flex-wrap gap-10">
                                     <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
