@@ -61,39 +61,41 @@ export const StateProvider = ({ children }) => {
   const [direction, setDirection] = useState('vertical')
   
   useEffect(()=> {
-      if((data && fmtCols)){
-          if(type === 'scatter'){
-              setChartOptions({
-                  series: [{
-                          type: 'scatter',
-                          data: data,
-                          xKey: fmtCols[0].field,
-                          yKey: fmtCols[1].field,
-                      }
-                    ],
-                  background: {
-                    fill: "black",
-                  },
-                  })
-              }
-          else{
-              setChartOptions({
-                  data: data,
-                  series: [{
-                          type: chartOptions.series[0].type,
-                          xKey: fmtCols[0].field,
-                          yKey: fmtCols[1].field,
-                      }
-                    ],
-                      background: {
-                        visible: false,
-                      },
-                  })
+    console.log("data changed", data)
+    data && setRowData(data)
+    fmtCols && setColDefs(fmtCols)
+    if(data && fmtCols){
+      if(type === 'scatter'){
+          setChartOptions({
+              series: [{
+                      type: 'scatter',
+                      data: data,
+                      xKey: fmtCols[0].field,
+                      yKey: fmtCols[1].field,
+                  }
+                ],
+              background: {
+                fill: "black",
+              },
+              })
           }
-          setXKey(fmtCols[0].field)
-          setYKey(fmtCols[1].field)
-      //}
-    }
+      else{
+          setChartOptions({
+              data: data,
+              series: [{
+                      type: chartOptions.series[0].type,
+                      xKey: fmtCols[0].field,
+                      yKey: fmtCols[1].field,
+                  }
+                ],
+                  background: {
+                    visible: false,
+                  },
+              })
+      }
+      setXKey(fmtCols[0].field)
+      setYKey(fmtCols[1].field)
+  }
   }, [data, fmtCols])
 
   useEffect(() => {
@@ -133,10 +135,6 @@ export const StateProvider = ({ children }) => {
     setYOptions(arr)
   }
 
-  useEffect(() => {
-    data && setRowData(data)
-    fmtCols && setColDefs(fmtCols)
-}, [data, fmtCols])
 
   useEffect(()=> {
     fmtCols && extractData(fmtCols)

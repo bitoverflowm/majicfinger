@@ -4,7 +4,7 @@ import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
 import "ag-grid-community/styles/ag-theme-quartz.css"; // Theme
 
-const GridView = () => {
+const GridView = ({sample = false}) => {
 
     const contextState = useMyState()
     
@@ -17,7 +17,7 @@ const GridView = () => {
         <div className="ag-theme-quartz sm:px-20 py-10" style={{ height: '90%', width: '90%' }}>
             <AgGridReact 
                 defaultColDef={defaultColDef} 
-                rowData={rowData} 
+                rowData={sample ? rowData.slice(0,3) : rowData} 
                 columnDefs={colDefs} 
                 pagination={true}
                 onCellValueChanged={event => console.log(`New Cell Value: ${event.value}`)}

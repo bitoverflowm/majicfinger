@@ -3,7 +3,7 @@ import api from 'usgs-earthquake-api'
 
 // Define your helper functions here
 const fetchEarthquakeData = async (lat, long) => {
-    const earthquakes = await api.query.earthquakes({ limit: 1, maxdepth: 5 });
+    const earthquakes = await api.query.earthquakes({ limit: 10, maxdepth:8, latitude: lat, longitude: long, maxradius: 100});
     return earthquakes
 }
 

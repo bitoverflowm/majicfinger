@@ -7,11 +7,8 @@ import Link from 'next/link'
 import { GoEyeClosed } from "react-icons/go";
 import { CiExport } from "react-icons/ci";
 import { IoCheckmarkSharp } from "react-icons/io5";
-import { ImYoutube2, ImMagicWand } from "react-icons/im";
-import { BiLogoInstagramAlt, BiLogoGmail } from "react-icons/bi";
-import { FaCcStripe, FaLinkedin } from "react-icons/fa";
-import { FaMeta, FaXTwitter } from "react-icons/fa6";
-import { CgAppleWatch } from "react-icons/cg";
+import { ImMagicWand } from "react-icons/im";
+
 
 import { useMyState  } from '@/context/stateContext'
 import { useUser } from '@/lib/hooks';
@@ -209,47 +206,7 @@ const ActionMenu = () => {
                             </div>
                             
                     }
-                    {
-                        working && working === 'integrations' && 
-                            <div className="w-full flex flex-col gap-10 place-content-center place-items-center px-10">
-                                <div className="bg-white shadow-lg rounded-xl text-xxs px-3 py-2 w-96 mx-auto">
-                                    <div className="font-bold">Coming Soon:</div>
-                                    <div>✨Pull live raw data streams from your favorite providers </div>
-                                    <div>✨Get unprecedented insights on your data with the help of Lychee AI</div>
-                                    <div>✨Chart any aspect of your data stream</div>
-                                    <div>✨Add any of this to your dashboard</div>
-                                    <div>* Become a lifetime member to vote on which integrations to build first</div>
-                                </div>
-                                <div><Integrations /></div>
-                                <div className="text-xs">Pull Your Live Data Feed Directly From</div>
-                                <div className="flex flex-wrap gap-10">
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                                        <FaXTwitter />
-                                    </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                                        <ImYoutube2 />
-                                    </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                                        <BiLogoInstagramAlt />
-                                    </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                                        <FaCcStripe />
-                                    </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                                        <FaLinkedin />
-                                    </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                                        <BiLogoGmail />
-                                    </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                                        <FaMeta />
-                                    </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                                        <CgAppleWatch />
-                                    </div>
-                                </div>
-                            </div>
-                    }
+                    { working && working === 'integrations' && <Integrations />}
                     {
                         working && working === 'export' && 
                             <div className="w-full flex flex-col gap-10 place-content-center place-items-center">
