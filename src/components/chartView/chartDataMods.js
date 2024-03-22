@@ -3,8 +3,8 @@ const { useState } = require('react');
 import { FaSortDown } from "react-icons/fa";
 
 import { useMyState } from '@/context/stateContext'
-import BgPanel from '../aesthetics/bgPanel';
 import Group from './ui/group';
+import ColorPanel from "./panels/colorPanel";
 
 const ChartDataMods = () => {
     const contextState = useMyState()
@@ -38,11 +38,9 @@ const ChartDataMods = () => {
             <div>
                 <Group title={'Direction'} options={directions} val={direction} call={setDirection} opened={false}/>
             </div>
-            <div className='text-sm hidden'>Background</div>
-            <div className="hidden">
-                <BgPanel />
-            </div>
-            
+            <div>
+                <ColorPanel />
+            </div>            
         </div>
     )
     

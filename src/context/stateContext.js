@@ -21,16 +21,34 @@ export const StateProvider = ({ children }) => {
   const [colDefs, setColDefs] = useState()
   const [rowData, setRowData] = useState()
   const [bgColor, setBgColor] = useState()
+  const [bgType, setBgType] = useState('solid')
   const [themeColor, setThemeColor] = useState()
 
   const [data, setData] = useState()
 
   const [fmtCols, setFmtCols] = useState()
 
+  const [chartTheme, setChartTheme] = useState({
+    baseTheme: "ag-default",
+    palette: {
+      fills: ["#cdb4db", "#ffc8dd", "#ffafcc", "#bde0fe", "#a2d2ff", "#fff"],
+      strokes: ["gray"],
+    },
+  })
+
+  useEffect(()=>{
+    chartOptions &&
+      setChartOptions(prevOptions => ({
+          ...prevOptions,
+          theme: chartTheme
+        }))
+  }, [chartTheme])
+
   const [chartOptions, setChartOptions] = useState({ // Data: Data to be displayed in the chart
+    theme: chartTheme,
     data: data,
     // Series: Defines which chart type and data to use
-    series: [{ type: 'bar', xKey: 'mission', yKey: 'price', direction: "horizontal", fill: '#BA0B31'}],
+    series: [{ type: 'bar', xKey: 'mission', yKey: 'price', direction: "horizontal"}],
     //animation TODO: fix not working
     animation: [{enabled: true, duration: 0.1}],
     //labeling x, y, and even other axers
@@ -61,12 +79,13 @@ export const StateProvider = ({ children }) => {
   const [direction, setDirection] = useState('vertical')
   
   useEffect(()=> {
-    console.log("data changed", data)
     data && setRowData(data)
     fmtCols && setColDefs(fmtCols)
     if(data && fmtCols){
       if(type === 'scatter'){
-          setChartOptions({
+          setChartOptions(prevOptions => ({
+              ...prevOptions,
+              theme: chartTheme,
               series: [{
                       type: 'scatter',
                       data: data,
@@ -74,13 +93,12 @@ export const StateProvider = ({ children }) => {
                       yKey: fmtCols[1].field,
                   }
                 ],
-              background: {
-                fill: "black",
-              },
-              })
+              }))
           }
       else{
-          setChartOptions({
+          setChartOptions(prevOptions => ({
+              ...prevOptions,
+              theme: chartTheme,
               data: data,
               series: [{
                       type: chartOptions.series[0].type,
@@ -91,7 +109,7 @@ export const StateProvider = ({ children }) => {
                   background: {
                     visible: false,
                   },
-              })
+              }))
       }
       setXKey(fmtCols[0].field)
       setYKey(fmtCols[1].field)
@@ -100,7 +118,9 @@ export const StateProvider = ({ children }) => {
 
   useEffect(() => {
       if(type === 'scatter'){
-          setChartOptions({
+          setChartOptions(prevOptions => ({
+              ...prevOptions,
+              theme: chartTheme,
               series: [{
                       type: 'scatter',
                       data: data,
@@ -111,7 +131,7 @@ export const StateProvider = ({ children }) => {
               background: {
                 visible: false,
               }
-              })
+              }))
       }else{
           setChartOptions(prevOptions => ({
               ...prevOptions,
@@ -180,14 +200,11 @@ export const StateProvider = ({ children }) => {
             { field: "rocket" }
           ])
 
-        setChartOptions({
+        setChartOptions(prevOptions => ({
+          ...prevOptions,
           data: rowData,
           // Series: Defines which chart type and data to use
-          series: [{ type: 'bar', xKey: 'mission', yKey: 'price', direction: "horizontal", fill: '#BA0B31'}],
-          // Background we will use Lychee BASS component instead of AGcharts
-          background: {
-            fill: "aliceblue",
-          },
+          series: [{ type: 'bar', xKey: 'mission', yKey: 'price', direction: "horizontal"}],
           //animation TODO: fix not working
           animation: [{enabled: true, duration: 0.1}],
           //labeling x, y, and even other axers
@@ -210,12 +227,12 @@ export const StateProvider = ({ children }) => {
                 },
               }
             ]
-        })
+        }))
     }
   }, [])
 
   return (
-    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, themeColor, setThemeColor}}>
+    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, bgType, setBgType, themeColor, setThemeColor, chartTheme, setChartTheme}}>
       {children}
     </StateContext.Provider>
   );
