@@ -101,7 +101,7 @@ const ActionMenu = () => {
 
 
     return(
-        <div className="flex flex-col place-items-center w-screen">
+        <div className="flex flex-col w-screen">
             { aiOpen &&
                 <div className="fixed right-0 top-0 h-dvh w-full z-30 sm:w-1/4 bg-lychee-white backgroung-blur-xl flex flex-col place-items-center place-content-center px-6">
                     <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setAiOpen(false)}><GoEyeClosed /></div>
@@ -111,7 +111,7 @@ const ActionMenu = () => {
                 </div>
             }
 
-            <div className="flex flex-col min-h-[100vh] w-screen max-w-screen sm:w-screen min-h-screen place-content-center place-items-center bg-majic-white" id="dashboard-section">
+            <div className="flex flex-col w-screen min-h-screen" id="dashboard-section">
                 <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 py-4 px-4 text-xxs">
                     <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
                     <div className={`shadow-xl rounded-md py-1 px-2 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
@@ -124,10 +124,10 @@ const ActionMenu = () => {
                     <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
                     <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                 </div>
-                <div className="w-full h-full">
+                <div className="w-full h-full flex place-content-center">
                     {
                         working && working === 'upload' &&
-                            <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 text-lychee-black w-5/6 sm:w-1/2 h-1/2 bg-lychee-peach rounded-md backdrop-blur-md text-center">
+                            <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl py-12 px-10 text-lychee-black w-5/6 sm:w-1/2 h-1/2 rounded-md backdrop-blur-md text-center mt-10">
                                 {
                                     user ?
                                         <>
@@ -341,7 +341,7 @@ const ActionMenu = () => {
                     }
                 </div>
             </div>
-            <div className="py-4 max-w-8">
+            <div className="py-4 max-w-8 mx-auto">
                 <div>
                 <img src={"./fruit.png"} />
                 </div>

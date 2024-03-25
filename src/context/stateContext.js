@@ -152,7 +152,29 @@ export const StateProvider = ({ children }) => {
                   }],
               background: {
                 visible: false,
-              }
+              },
+              axes: [
+                {
+                  type: "category",
+                  position: "bottom",
+                  title: {
+                    text: xKey,
+                  },
+                },
+                {
+                  type: "number",
+                  position: "left",
+                  title: {
+                    text: yKey,
+                  },
+                  label: {
+                    formatter: ({ value }) => formatNumber(value),
+                  },
+                  gridLine: {
+                    enabled: gridLinesEnabled
+                  }
+                },
+          ]
               }))
       }else{
           setChartOptions(prevOptions => ({
@@ -165,7 +187,29 @@ export const StateProvider = ({ children }) => {
                   }],
               background: {
                 visible: false,
-              }
+              },
+              axes: [
+                {
+                  type: "category",
+                  position: "bottom",
+                  title: {
+                    text: xKey,
+                  },
+                },
+                {
+                  type: "number",
+                  position: "left",
+                  title: {
+                    text: yKey,
+                  },
+                  label: {
+                    formatter: ({ value }) => formatNumber(value),
+                  },
+                  gridLine: {
+                    enabled: gridLinesEnabled
+                  }
+                },
+          ]
           }))
       }
   }, [type, xKey, yKey, direction, themeColor])

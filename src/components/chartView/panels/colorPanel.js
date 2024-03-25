@@ -284,14 +284,14 @@ const ColorPanel = () => {
                         </div>
                         <div className='flex gap-2 w-1/6 place-content-end cursor-pointer' onClick={()=>setOpen(!open)}> {open ?  <AiOutlineClose /> : <FaSortDown />} </div>
                     </div>
-                    <div className='pt-2'>Background</div>
+                    <div className='pt-2 pb-1'>Background</div>
                     <div className='flex w-full place-content-center'>
                         <div className='flex w-5/6 h-8'>
                             <div className={`w-2/6 rounded-md`} style={bgType === 'gradients' ? {'background-image': bgColor}:{background: bgColor}}/>
                         </div>
                         <div className='flex gap-2 w-1/6 place-content-end cursor-pointer' onClick={()=>setBgOpen(!bgOpen)}> {bgOpen ?  <AiOutlineClose /> : <FaSortDown />} </div>
                     </div>
-                    <div className='pt-2'>Stroke</div>
+                    <div className='pt-2 pb-1'>Stroke</div>
                     <div className='flex w-full place-content-center'>
                         <div className='flex w-5/6 h-8'>
                             <div className={`w-2/6 rounded-md`} style={{'background': strokeColor}}/>
@@ -349,7 +349,7 @@ const ColorPanel = () => {
                                 leave="transition-opacity duration-150"
                                 leaveFrom="opacity-100 h-auto"
                                 leaveTo="opacity-0">
-                                    <div className="grid grid-cols-2 gap-2 pr-2 pb-4 pl-2 py-2">
+                                    <div className="grid grid-cols-8 gap-2 pr-2 pb-4 pl-2 py-6">
                                         {
                                             bgPalette && bgPalette.solids.map((solid, key) => (
                                                 <div
