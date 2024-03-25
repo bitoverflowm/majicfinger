@@ -124,7 +124,7 @@ const ActionMenu = () => {
                     <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
                     <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                 </div>
-                <div className="w-full h-full sm:flex-grow flex place-content-center place-items-center">
+                <div className="w-full h-full">
                     {
                         working && working === 'upload' &&
                             <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 text-lychee-black w-5/6 sm:w-1/2 h-1/2 bg-lychee-peach rounded-md backdrop-blur-md text-center">
@@ -189,7 +189,7 @@ const ActionMenu = () => {
                                 <div className="hidden xl:block w-2/12 shadow-xl rounded-sm mx-5">
                                     <ChartDataMods/>
                                 </div>
-                                <div className="">
+                                <div className="w-[450px] h-[750px] sm:w-[1200px]">
                                     <ChartView/>
                                 </div>
                                 <div className="xl:hidden shadow-2xl px-5 py-10 rounded mx-10">

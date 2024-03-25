@@ -31,7 +31,7 @@ export default function Home() {
         <GoogleAnalytics gaId="G-G8X2NEPTEG" />
         <StateProvider>
           <Nav/>
-          <div className="p-10 flex flex-col place-items-center">
+          <div className="flex flex-col place-items-center">
             <div className='text-center max-w-screen overflow-hidden'>
               <LandingPage />
             </div>

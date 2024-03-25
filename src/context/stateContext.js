@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo, use } from 'react';
 
 // Create the state context
 export const StateContext = createContext();
@@ -32,6 +32,7 @@ export const StateProvider = ({ children }) => {
 
   const [fmtCols, setFmtCols] = useState()
 
+  /* Themes and colors */
   const [chartTheme, setChartTheme] = useState({
     baseTheme: "ag-default",
     palette: {
@@ -47,6 +48,24 @@ export const StateProvider = ({ children }) => {
           theme: chartTheme
         }))
   }, [chartTheme])
+
+  const [gridLinesEnabled, setGridLinesEnabled] = useState(false)
+
+  useEffect(()=> {
+    chartOptions && chartOptions.theme.overrides && 
+      setChartOptions(prevOptions => ({
+          ...prevOptions,
+          axes: [
+            ...prevOptions.axes[0],
+            {
+              ...prevOptions.axes[1],
+              gridLine: {
+                enabled: gridLinesEnabled
+              }
+            }
+          ]
+        }))
+  }, [gridLinesEnabled])
 
   const [chartOptions, setChartOptions] = useState({ // Data: Data to be displayed in the chart
     theme: chartTheme,
@@ -73,12 +92,15 @@ export const StateProvider = ({ children }) => {
           label: {
             formatter: ({ value }) => formatNumber(value),
           },
+          gridLine: {
+            enabled: gridLinesEnabled
+          }
         },
   ]})
 
   const [xOptions, setXOptions] = useState()
   const [yOptions, setYOptions] = useState()
-  const [chartTypes] = useState(['bar', 'line', 'area', 'scatter', 'bubble', 'pie', 'histogram', 'combination'])
+  const [chartTypes] = useState(['bar', 'line', 'area', 'scatter', 'bubble', 'pie'])
   const [directions] = useState(['horizontal', 'vertical'])
   const [direction, setDirection] = useState('vertical')
   
@@ -89,7 +111,6 @@ export const StateProvider = ({ children }) => {
       if(type === 'scatter'){
           setChartOptions(prevOptions => ({
               ...prevOptions,
-              theme: chartTheme,
               series: [{
                       type: 'scatter',
                       data: data,
@@ -102,7 +123,6 @@ export const StateProvider = ({ children }) => {
       else{
           setChartOptions(prevOptions => ({
               ...prevOptions,
-              theme: chartTheme,
               data: data,
               series: [{
                       type: chartOptions.series[0].type,
@@ -124,14 +144,12 @@ export const StateProvider = ({ children }) => {
       if(type === 'scatter'){
           setChartOptions(prevOptions => ({
               ...prevOptions,
-              theme: chartTheme,
               series: [{
                       type: 'scatter',
                       data: data,
                       xKey: xKey ? xKey : chartOptions.series[0].xKey,
                       yKey: yKey ? yKey : chartOptions.series[0].yKey,
                   }],
-              theme: themeColor ? themeColor : 'ag-default',
               background: {
                 visible: false,
               }
@@ -145,7 +163,6 @@ export const StateProvider = ({ children }) => {
                       yKey: yKey ? yKey : chartOptions.series[0].yKey,
                       direction: direction ? direction: chartOptions.series[0].direction,
                   }],
-              theme: themeColor ? themeColor : 'ag-default',
               background: {
                 visible: false,
               }
@@ -229,6 +246,9 @@ export const StateProvider = ({ children }) => {
                 label: {
                   formatter: ({ value }) => formatNumber(value),
                 },
+                gridLine: {
+                  enabled: gridLinesEnabled
+                }
               }
             ]
         }))
@@ -236,7 +256,7 @@ export const StateProvider = ({ children }) => {
   }, [])
 
   return (
-    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, bgType, setBgType, chartTheme, setChartTheme, strokeColor, setStrokeColor, title, setTitle, subTitle, setSubTitle}}>
+    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, bgType, setBgType, chartTheme, setChartTheme, strokeColor, setStrokeColor, title, setTitle, subTitle, setSubTitle, gridLinesEnabled, setGridLinesEnabled}}>
       {children}
     </StateContext.Provider>
   );
