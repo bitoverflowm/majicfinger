@@ -11,6 +11,9 @@ const ChartView = () => {
     let chartOptions = contextState?.chartOptions || {};
     let bgColor = contextState?.bgColor || '';
     let bgType = contextState?.bgType || '';
+    let title = contextState?.title || '';
+    let subTitle = contextState?.subTitle || '';
+
 
     useEffect(()=> {
         if(chartOptions){
@@ -20,11 +23,11 @@ const ChartView = () => {
 
 
     return(
-        <div className={`h-full w-full rounded-lg p-20 overflow-hidden`} style={bgType === 'gradients' ? {'background-image': bgColor}:{background: bgColor}}>
-            <div className='text-center text-xl font-bold py-2'>Title</div>
-            <div className='text-center text-sm font-bold py-2'>Sub title</div>
+        <div className={`h-full w-full rounded-lg px-12 pb-10 pt-10 w-[450px] h-[750px] sm:w-[1200px]`} style={bgType === 'gradients' ? {'background-image': bgColor}:{background: bgColor}}>
+            <div className='text-center text-xl font-bold py-2'>{title}</div>
+            <div className='text-center text-sm font-bold py-2'>{subTitle}</div>
             <AgChartsReact options={chartOptions} />
-            <div className='text-center text-xxs -mt-10'>Footnotes</div>
+            {/*<div className='text-center text-xxs'>Footnotes</div>*/}
         </div>
     )
 }

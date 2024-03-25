@@ -27,6 +27,8 @@ const ColorPanel = () => {
     const [color5, setColor5] = useState('')
     const [open, setOpen] = useState(false);
     const [bgOpen, setBgOpen] = useState(false);
+    const [strokeOpen, setStrokeOpen] = useState(false);
+    const [strokeColor, setStrokeColor] = useState('')
 
     useEffect(()=>{
         chartTheme &&
@@ -36,17 +38,224 @@ const ColorPanel = () => {
             setColor3(chartTheme.palette.fills[3])
             setColor4(chartTheme.palette.fills[4])
             setColor5(chartTheme.palette.fills[5])
-
+            setStrokeColor(chartTheme.palette.strokes)
     }), [chartTheme]
 
     const handleColorSelection = (key) => {
         setChartTheme(prevTheme => ({
             ...prevTheme,
             palette: {
-                fills: colorPalettes[key]
+                fills: colorPalettes[key],
+                strokes: prevTheme.palette.strokes
             }
         }))
         setOpen(false)
+    }
+
+    const handleStrokeSelection = (key) => {
+        setChartTheme(prevTheme => ({
+            ...prevTheme,
+            palette: {
+                fills: prevTheme.palette.fills,
+                strokes: [bgPalette.solids[key]]
+            },
+            overrides: {
+                common: {
+                    axes: {
+                      number: {
+                        tick: {
+                            color: bgPalette.solids[key],
+                        },
+                        crosshair: {
+                            stroke: bgPalette.solids[key],
+                        },
+                        line: {
+                            color: bgPalette.solids[key],
+                        },
+                        gridLine: {
+                            style: [
+                                {
+                                    stroke: bgPalette.solids[key],
+                                }
+                            ]
+                        },
+                        label: {
+                            color: bgPalette.solids[key],
+                        },
+                        crossLines: {
+                            stroke: bgPalette.solids[key],
+                            label: {
+                                color: bgPalette.solids[key],
+                            }
+                        }
+                      },
+                      log: {
+                        tick: {
+                            color: bgPalette.solids[key],
+                        },
+                        crosshair: {
+                            stroke: bgPalette.solids[key],
+                        },
+                        line: {
+                            color: bgPalette.solids[key],
+                        },
+                        gridLine: {
+                            style: [
+                                {
+                                    stroke: bgPalette.solids[key],
+                                }
+                            ]
+                        },
+                        label: {
+                            color: bgPalette.solids[key],
+                        },
+                        crossLines: {
+                            stroke: bgPalette.solids[key],
+                            label: {
+                                color: bgPalette.solids[key],
+                            }
+                        }
+                      },
+                      category: {
+                        tick: {
+                            color: bgPalette.solids[key],
+                        },
+                        crosshair: {
+                            stroke: bgPalette.solids[key],
+                        },
+                        line: {
+                            color: bgPalette.solids[key],
+                        },
+                        gridLine: {
+                            style: [
+                                {
+                                    stroke: bgPalette.solids[key],
+                                }
+                            ]
+                        },
+                        label: {
+                            color: bgPalette.solids[key],
+                        },
+                        crossLines: {
+                            stroke: bgPalette.solids[key],
+                            label: {
+                                color: bgPalette.solids[key],
+                            }
+                        }
+                      },
+                      time: {
+                        tick: {
+                            color: bgPalette.solids[key],
+                        },
+                        crosshair: {
+                            stroke: bgPalette.solids[key],
+                        },
+                        line: {
+                            color: bgPalette.solids[key],
+                        },
+                        gridLine: {
+                            style: [
+                                {
+                                    stroke: bgPalette.solids[key],
+                                }
+                            ]
+                        },
+                        label: {
+                            color: bgPalette.solids[key],
+                        },
+                        crossLines: {
+                            stroke: bgPalette.solids[key],
+                            label: {
+                                color: bgPalette.solids[key],
+                            }
+                        }
+                      },
+                      'angle-category': {
+                        tick: {
+                            color: bgPalette.solids[key],
+                        },
+                        crosshair: {
+                            stroke: bgPalette.solids[key],
+                        },
+                        line: {
+                            color: bgPalette.solids[key],
+                        },
+                        gridLine: {
+                            style: [
+                                {
+                                    stroke: bgPalette.solids[key],
+                                }
+                            ]
+                        },
+                        label: {
+                            color: bgPalette.solids[key],
+                        },
+                        crossLines: {
+                            stroke: bgPalette.solids[key],
+                            label: {
+                                color: bgPalette.solids[key],
+                            }
+                        }
+                      },
+                      'radius-category': {
+                        tick: {
+                            color: bgPalette.solids[key],
+                        },
+                        crosshair: {
+                            stroke: bgPalette.solids[key],
+                        },
+                        line: {
+                            color: bgPalette.solids[key],
+                        },
+                        gridLine: {
+                            style: [
+                                {
+                                    stroke: bgPalette.solids[key],
+                                }
+                            ]
+                        },
+                        label: {
+                            color: bgPalette.solids[key],
+                        },
+                        crossLines: {
+                            stroke: bgPalette.solids[key],
+                            label: {
+                                color: bgPalette.solids[key],
+                            }
+                        }
+                      },
+                      'radius-number': {
+                        tick: {
+                            color: bgPalette.solids[key],
+                        },
+                        crosshair: {
+                            stroke: bgPalette.solids[key],
+                        },
+                        line: {
+                            color: bgPalette.solids[key],
+                        },
+                        gridLine: {
+                            style: [
+                                {
+                                    stroke: bgPalette.solids[key],
+                                }
+                            ]
+                        },
+                        label: {
+                            color: bgPalette.solids[key],
+                        },
+                        crossLines: {
+                            stroke: bgPalette.solids[key],
+                            label: {
+                                color: bgPalette.solids[key],
+                            }
+                        }
+                      },
+                    },
+                  },
+            }
+        }))
+        setStrokeOpen(false)
     }
 
     const handleBgSelection = (key) => {
@@ -82,6 +291,13 @@ const ColorPanel = () => {
                         </div>
                         <div className='flex gap-2 w-1/6 place-content-end cursor-pointer' onClick={()=>setBgOpen(!bgOpen)}> {bgOpen ?  <AiOutlineClose /> : <FaSortDown />} </div>
                     </div>
+                    <div className='pt-2'>Stroke</div>
+                    <div className='flex w-full place-content-center'>
+                        <div className='flex w-5/6 h-8'>
+                            <div className={`w-2/6 rounded-md`} style={{'background': strokeColor}}/>
+                        </div>
+                        <div className='flex gap-2 w-1/6 place-content-end cursor-pointer' onClick={()=>setStrokeOpen(!strokeOpen)}> {strokeOpen ?  <AiOutlineClose /> : <FaSortDown />} </div>
+                    </div>
                     <Transition 
                         show={open}
                         enter="transition-opacity duration-1000"
@@ -110,14 +326,14 @@ const ColorPanel = () => {
                             </div>
                     </Transition>
                     <Transition 
-                        show={bgOpen}
+                        show={bgOpen || strokeOpen}
                         enter="transition-opacity duration-1000"
                         enterFrom="opacity-0 h-0"
                         enterTo="opacity-100 h-auto"
                         leave="transition-opacity duration-150"
                         leaveFrom="opacity-100 h-auto"
                         leaveTo="opacity-0">
-                            <div className='flex gap-2 w-full place-content-center pr-2 pb-4 pl-2'> 
+                            <div className={` ${strokeOpen && 'hidden'} flex gap-2 w-full place-content-center pr-2 pb-4 pl-2`}> 
                                 <div 
                                     className={`px-2 py-1 border border-white rounded-lg shadow-sm text-xs cursor-pointer ${bgType === 'solids' ? 'bg-black text-white hover:bg-white hover:text-black': 'bg-white text-black hover:bg-black hover:text-white'}`}
                                     onClick={()=>setBgType('solids')}>Solid</div>
@@ -126,7 +342,7 @@ const ColorPanel = () => {
                                     onClick={()=>setBgType('gradients')}>Gradient</div>
                             </div>
                             <Transition 
-                                show={bgType === 'solids'}
+                                show={bgType === 'solids' || strokeOpen}
                                 enter="transition-opacity duration-1000"
                                 enterFrom="opacity-0 h-0"
                                 enterTo="opacity-100 h-auto"
@@ -139,7 +355,7 @@ const ColorPanel = () => {
                                                 <div
                                                     key={key}
                                                     className={'flex rounded-md h-6 cursor-pointer hover:border hover:border-black'}
-                                                    onClick={() => handleBgSelection(key)}
+                                                    onClick={() => strokeOpen ? handleStrokeSelection(key) : handleBgSelection(key)}
                                                     style={{background: solid}}/>
                                             ))
                                         }

@@ -1,6 +1,8 @@
 const { useState } = require('react');
 
 import { FaSortDown } from "react-icons/fa";
+import { HiOutlinePencilSquare } from "react-icons/hi2";
+
 
 import { useMyState } from '@/context/stateContext'
 import Group from './ui/group';
@@ -22,10 +24,17 @@ const ChartDataMods = () => {
     const setDirection = contextState?.setDirection || {};
     const type = contextState?.type || '';
     const setType = contextState?.setType || {};
+    const title = contextState?.title || '';
+    const setTitle = contextState?.setTitle || {};
+    const subTitle = contextState?.subTitle || '';
+    const setSubTitle = contextState?.setSubTitle || {};
 
     
     return (
         <div className="">
+            <div className="pl-5 pr-3">
+                <div className="flex gap-2 text-xxs w-full">Title: <div className="w-full">{title}</div> <div className="place-self-right"><HiOutlinePencilSquare /></div></div>
+            </div>
             <div>
                 <Group title={'Select your chart type'} options={chartTypes} val={type} call={setType} opened={true}/>
             </div>
@@ -40,7 +49,13 @@ const ChartDataMods = () => {
             </div>
             <div>
                 <ColorPanel />
-            </div>            
+            </div>
+            <div className="text-xxs px-3 py-2">
+                <div className="font-bold">Coming Soon:</div>
+                <div>✨More charts, better charts, more colors</div>
+                <div onClick={()=>setWorking('getLychee')} className="cursor-pointer">* Become a <span className="underline">lifetime</span> member to vote on which features to accelerate</div>
+                <div className="sm:hidden text-lychee-red">* If you are on mobile I apologize, mobile view and app coming soon</div>
+            </div>       
         </div>
     )
     

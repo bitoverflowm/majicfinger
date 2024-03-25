@@ -36,25 +36,29 @@ const Nav = () => {
     };
 
     return (
-      <div className="flex w-full p-10 sm:p-6 z-40">
-        <div className="max-w-48">
+      <div className="flex w-full px-8 pt-4 pb-1 z-40 bg-white">
+        <div className="max-w-24">
           <Link href="/"> <img src={"./logo.png"}/></Link>
         </div>
-        {
-          !(user) ?
-            <div className="pt-3 w-full text-sm pr-6  flex gap-4 place-content-end place-items-center " >
-                <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Have Questions?</Link></div>
-                <div className='underline cursor-pointer hover:text-lychee-green'><Link href="/login">Already have an account?</Link></div>
-                <div className='p-2 px-3 cursor-pointer bg-lychee-green font-bold rounded-xl hover:bg-black hover:text-white shadow-inner' onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
-            </div>
-            :<div className='w-full flex gap-4 place-content-end place-items-center'>
-                <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Have Questions?</Link></div>
-                <div className='rounded-full bg-lychee-peach text-white p-2 px-4 capitalize'>
-                    {user.name ? user.name : user.email.split('@')[0]}
-                </div>
-                <div onClick={()=>handleLogout()} className='cursor-pointer hover:text-slate-300'>Logout</div>
-            </div>
-        }
+        <div className='text-xxs w-full flex gap-4 place-content-end place-items-center'>
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/new">What's new!</Link></div>
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Have Questions?</Link></div>
+          {
+            !(user) ?
+              <>
+                  <div className='underline cursor-pointer hover:text-lychee-green'><Link href="/login">Already have an account?</Link></div>
+                  <div className='p-2 px-3 cursor-pointer bg-lychee-green font-bold rounded-xl hover:bg-black hover:text-white shadow-inner' onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
+              </>
+              :<>
+                  <div className='rounded-full bg-lychee-peach text-white p-2 px-4 capitalize'>
+                      {user.name ? user.name : user.email.split('@')[0]}
+                  </div>
+                  <div onClick={()=>handleLogout()} className='cursor-pointer hover:text-slate-300'>Logout</div>
+              </>
+          }
+        </div>
       </div>      
     )
   }

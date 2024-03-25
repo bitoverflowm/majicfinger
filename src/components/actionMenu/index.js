@@ -6,7 +6,7 @@ import Link from 'next/link'
 
 import { GoEyeClosed } from "react-icons/go";
 import { CiExport } from "react-icons/ci";
-import { IoCheckmarkSharp } from "react-icons/io5";
+import { IoCheckmarkSharp, IoWarningOutline  } from "react-icons/io5";
 import { ImMagicWand } from "react-icons/im";
 
 
@@ -112,19 +112,19 @@ const ActionMenu = () => {
             }
 
             <div className="flex flex-col min-h-[100vh] w-screen max-w-screen sm:w-screen min-h-screen place-content-center place-items-center bg-majic-white" id="dashboard-section">
-                <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 py-10 px-4">
-                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
-                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
-                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
-                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'chart' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('chart')}>Chart</div>
-                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'dashboard' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('dashboard')}>Dashboard</div>
-                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'integrations' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('integrations')}>Integrations</div>
-                    <div className={`flex  gap-2 border border-lychee-black rounded-xl  text-xs py-1 px-3 text-white ${aiOpen ? 'text-lychee-black bg-lychee-black': ' bg-lychee-red cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}><ImMagicWand /> Lychee AI</div>
-                    <div className="border border-slate-400 text-lychee-black rounded-full hover:bg-lychee-black hover:text-white text-xs py-1 px-3 cursor-pointer" onClick={()=>setWorking('export')}><CiExport /></div>
-                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
-                    <div className={`border border-lychee-black rounded-xl  text-xs py-1 px-3 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
+                <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 py-4 px-4 text-xxs">
+                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
+                    <div className={`shadow-xl rounded-md py-1 px-2 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
+                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
+                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'chart' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('chart')}>Chart</div>
+                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'dashboard' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('dashboard')}>Dashboard</div>
+                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'integrations' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('integrations')}>Integrations</div>
+                    <div className={`flex gap-2 shadow-xl rounded-md py-1 px-2 text-white ${aiOpen ? 'text-lychee-black bg-lychee-black': ' bg-lychee-red cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}><ImMagicWand /> Lychee AI</div>
+                    <div className="shadow-xl rounded-md py-1 px-2 hover:bg-lychee-black hover:text-white cursor-pointer" onClick={()=>setWorking('export')}><CiExport /></div>
+                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
+                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                 </div>
-                <div className="w-full h-5/6 sm:flex-grow flex place-content-center place-items-center">
+                <div className="w-full h-full sm:flex-grow flex place-content-center place-items-center">
                     {
                         working && working === 'upload' &&
                             <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 text-lychee-black w-5/6 sm:w-1/2 h-1/2 bg-lychee-peach rounded-md backdrop-blur-md text-center">
@@ -135,7 +135,7 @@ const ActionMenu = () => {
                                                 Let's Start With Your Data:
                                             </div>
                                             <div className="text-xs text-slate-600 pb-2">*Must be .csv or Excel File (.xlsx) </div>
-                                            <div className="text-xs text-red-400 pb-2">*Warning: this action will replace <span className="px-1 underline hover:text-black cursor-pointer" onClick={()=>setWorking('grid')}>the current data</span> stored this session </div>
+                                            <div className="text-xs text-red-400 pb-2 flex"><IoWarningOutline /> Warning: this action will replace <span className="px-1 underline hover:text-black cursor-pointer" onClick={()=>setWorking('grid')}>the current data</span> stored this session </div>
                                             <form className="flex flex-col items-center pb-6">
                                                 <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">
                                                     Click to Upload
@@ -185,23 +185,15 @@ const ActionMenu = () => {
                     }
                     {
                         fmtCols && data && ((working && working === 'chart') || !working) &&
-                            <div className="h-full w-full">
-                                <div className="bg-white shadow-lg rounded-xl text-xxs px-3 py-2 w-96 mx-auto">
-                                    <div className="font-bold">Coming Soon:</div>
-                                    <div>✨More charts, more colors, more features, more analysis</div>
-                                    <div>* Become a lifetime member to vote on which features to accelerate</div>
-                                    <div className="text-lychee-red">* If you are on mobile I apologize, mobile view and app coming soon</div>
+                            <div className="h-full w-full flex flex-col xl:flex-row">
+                                <div className="hidden xl:block w-2/12 shadow-xl rounded-sm mx-5">
+                                    <ChartDataMods/>
                                 </div>
-                                <div className="h-5/6 w-full flex flex-col xl:flex-row">
-                                    <div className="hidden xl:block w-2/12 shadow-xl rounded-sm mx-5">
-                                        <ChartDataMods/>
-                                    </div>
-                                    <div className="h-auto w-[450px] xl:h-[750px] sm:w-[1200px] px-1 xl:px-10">
-                                        <ChartView/>
-                                    </div>
-                                    <div className="xl:hidden shadow-2xl px-5 py-10 rounded mx-10">
-                                        <ChartDataMods />
-                                    </div>
+                                <div className="">
+                                    <ChartView/>
+                                </div>
+                                <div className="xl:hidden shadow-2xl px-5 py-10 rounded mx-10">
+                                    <ChartDataMods />
                                 </div>
                             </div>
                             
@@ -349,8 +341,11 @@ const ActionMenu = () => {
                     }
                 </div>
             </div>
-            <div className="h-96 py-56">
-                <img src={"./fruit.png"}/>
+            <div className="py-4 max-w-8">
+                <div>
+                <img src={"./fruit.png"} />
+                </div>
+                
             </div>
         </div>
     )

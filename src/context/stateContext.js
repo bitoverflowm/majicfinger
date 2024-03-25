@@ -23,6 +23,10 @@ export const StateProvider = ({ children }) => {
   const [bgColor, setBgColor] = useState()
   const [bgType, setBgType] = useState('solid')
   const [themeColor, setThemeColor] = useState()
+  const [strokeColor, setStrokeColor] = useState('#000')
+
+  const [title, setTitle] = useState('Space Missions')
+  const [subTitle, setSubTitle] = useState('Space Missions by Price')
 
   const [data, setData] = useState()
 
@@ -32,7 +36,7 @@ export const StateProvider = ({ children }) => {
     baseTheme: "ag-default",
     palette: {
       fills: ["#cdb4db", "#ffc8dd", "#ffafcc", "#bde0fe", "#a2d2ff", "#fff"],
-      strokes: ["gray"],
+      strokes: ["#000"],
     },
   })
 
@@ -232,7 +236,7 @@ export const StateProvider = ({ children }) => {
   }, [])
 
   return (
-    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, bgType, setBgType, themeColor, setThemeColor, chartTheme, setChartTheme}}>
+    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, bgType, setBgType, chartTheme, setChartTheme, strokeColor, setStrokeColor, title, setTitle, subTitle, setSubTitle}}>
       {children}
     </StateContext.Provider>
   );
