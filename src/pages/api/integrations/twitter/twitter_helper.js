@@ -16,21 +16,149 @@ const twitterBearer = bearer.readWrite;
 
 const twitterClient = client.readWrite;
 
-
-// Define your helper functions here
-const fetchTwitterUserByHandle = async (handle) => {
+// Fetch Twitter user data by handle
+const fetch_twitter_user_by_handle = async (handle, userFields, tweetFields, expansions) => {
     //const userData = await twitterClient.v2.userByUsername(handle);
     const userData = await twitterBearer.v2.userByUsername(handle, {
         //A comma separated list of User fields to display
-        "user.fields": ["created_at"],
+        "user.fields": userFields,
         
         //A comma separated list of Tweet fields to display.
-        "tweet.fields": ["created_at"],
+        "tweet.fields": tweetFields,
         
         //A comma separated list of fields to expand
-        expansions: ["pinned_tweet_id"]
+        expansions: expansions
       });
     return userData
+}
+
+// Fetch multiple Twitter users using array of handles/usernaames
+const fetch_twitter_users_by_handles = async (handles, userFields, tweetFields, expansions) => {
+    const userData = await twitterBearer.v2.usersByUsernames(handles, {
+        //A comma separated list of User fields to display
+        "user.fields": userFields,
+        
+        //A comma separated list of Tweet fields to display.
+        "tweet.fields": tweetFields,
+        
+        //A comma separated list of fields to expand
+        expansions: expansions
+      });
+    return userData
+}
+
+// Fetch Twitter user data by single id
+const fetch_twitter_user_by_id = async (id, userFields, tweetFields, expansions) => {
+    const userData = await twitterBearer.v2.user(id, {
+        //A comma separated list of User fields to display
+        "user.fields": userFields,
+        
+        //A comma separated list of Tweet fields to display.
+        "tweet.fields": tweetFields,
+        
+        //A comma separated list of fields to expand
+        expansions: expansions
+      });
+    return userData
+}
+
+// Fetch multiple Twitter users using array of ids
+const fetch_twitter_users_by_ids = async (ids, userFields, tweetFields, expansions) => {
+    const userData = await twitterBearer.v2.users(ids, {
+        //A comma separated list of User fields to display
+        "user.fields": userFields,
+        
+        //A comma separated list of Tweet fields to display.
+        "tweet.fields": tweetFields,
+        
+        //A comma separated list of fields to expand
+        expansions: expansions
+      });
+    return userData
+}
+
+// Fetch tweets liked by a user by User Id
+const fetch_twitter_users_liked_tweets_by_id = async (id, userFields, tweetFields, placeFields, expansions) => {
+    const userData = await twitterBearer.v2.userLikedTweets(ids, {
+        //A comma separated list of User fields to display
+        "user.fields": userFields,
+        
+        //A comma separated list of Tweet fields to display.
+        "tweet.fields": tweetFields,
+
+        "place.fields": placeFields,
+        
+        //A comma separated list of fields to expand
+        expansions: expansions
+      });
+    return userData
+}
+
+// Fetch Twitter users following a given user by user ID 
+const fetch_twitter_followers_by_id = async (id, userFields, tweetFields, expansions) => {
+    const userData = await twitterBearer.v2.followers(id, {
+        //A comma separated list of User fields to display
+        "user.fields": userFields,
+        
+        //A comma separated list of Tweet fields to display.
+        "tweet.fields": tweetFields,
+        
+        //A comma separated list of fields to expand
+        expansions: expansions,
+        asPaginator: true
+      });
+    return userData
+}
+
+
+// Fetch Twitter users following a given user by user ID 
+const fetch_twitter_following_by_id = async (id, userFields, tweetFields, expansions) => {
+    const userData = await twitterBearer.v2.following(id, {
+        //A comma separated list of User fields to display
+        "user.fields": userFields,
+        
+        //A comma separated list of Tweet fields to display.
+        "tweet.fields": tweetFields,
+        
+        //A comma separated list of fields to expand
+        expansions: expansions,
+        asPaginator: true
+      });
+    return userData
+}
+
+//fetch lists owned by user id -> returns list of list IDs
+// Fetch Twitter users following a given user by user ID 
+const fetch_twitter_owned_lists_by_id = async (id, listFields, userFields, expansions) => {
+    const listData = await twitterBearer.v2.listsOwned(id, {
+        //A comma separated list of User fields to display
+        "user.fields": userFields,
+
+        //A comma separated list of Tweet fields to display.
+        "list.fields": listFields,
+        
+        //A comma separated list of fields to expand
+        expansions: expansions,
+        asPaginator: true
+      });
+    return listData
+}
+
+//fetch lists data by list id
+// Fetch Twitter users following a given user by user ID 
+const fetch_twitter_list_by_list_id = async (id, listFields, userFields, expansions) => {
+    const listData = await twitterBearer.v2.list(id, {
+        //A comma separated list of User fields to display
+        "user.fields": userFields,
+
+        //A comma separated list of Tweet fields to display.
+        "list.fields": listFields,
+        
+        //A comma separated list of fields to expand
+        expansions: expansions,
+        asPaginator: true
+      });
+    return listData
 }
 
 const processTwitterData = (data) => {
@@ -39,5 +167,13 @@ const processTwitterData = (data) => {
 
 // Export the helper functions
 module.exports = {
-    fetchTwitterUserByHandle,
+    fetch_twitter_user_by_handle,
+    fetch_twitter_users_by_handles,
+    fetch_twitter_user_by_id,
+    fetch_twitter_users_by_ids,
+    fetch_twitter_users_liked_tweets_by_id,
+    fetch_twitter_followers_by_id,
+    fetch_twitter_following_by_id,
+    fetch_twitter_owned_lists_by_id,
+    fetch_twitter_list_by_list_id
 };

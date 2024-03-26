@@ -1,0 +1,11 @@
+import React from 'react';
+
+const ParamToggles = ({field_type, val, toggle, arr}) => {
+    // Your component logic here
+
+    return (
+        <div className={`${arr.includes(val) ? 'bg-lychee-peach text-white': 'bg-white text-black'} border-slate-200 border px-2 p-1 rounded-md cursor-pointer m-1 my-2`} onClick={()=>toggle(field_type,  val)}>{val}</div>
+    );
+};
+
+export default ParamToggles;

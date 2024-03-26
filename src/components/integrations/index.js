@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { fetchEarthquakeData } from './earthquake_helper';
 import { Transition } from '@headlessui/react';
-import { BiLogoInstagramAlt, BiLogoGmail } from "react-icons/bi";
+import { BiLogoInstagramAlt, BiLogoGmail, BiDownArrow } from "react-icons/bi";
 import { FaCcStripe, FaLinkedin } from "react-icons/fa";
 import { FaMeta, FaXTwitter } from "react-icons/fa6";
 import { CgAppleWatch } from "react-icons/cg";
 import { ImYoutube2 } from "react-icons/im";
 import { WiEarthquake } from "react-icons/wi";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
+import { SiQuickbooks } from "react-icons/si";
+import { MdOutlineArrowBackIosNew } from "react-icons/md";
 
 
 import { useMyState  } from '@/context/stateContext'
@@ -20,48 +22,83 @@ const Integrations = () => {
     const data  = contextState?.data;
     const setData = contextState?.setData;
     const setDflt = contextState?.setDflt;
+    const setWorking = contextState?.setWorking;
 
     const [connectData, setConnectData] = useState();
     const [loading, setLoading] = useState(false);
     const [connected, setConnected] = useState(false);
 
+    const [connecting, setConneting] = useState();
+
     const fetchEarthQuakesHandler = async (lat, long) => {
         setLoading(true);
         let quakes = await fetchEarthquakeData(lat, long);
-        console.log(quakes)
-        let data = quakes.features.map(feature => feature.properties);
-        console.log(data)
+        let data = quakes.features.map(feature => feature.properties)
         setData(data);
         setConnected(true);
         setDflt(false)
         setLoading(false);
     }
 
-    return (
-        <div className='place-self-start'>
-            <div className="relative bg-white shadow-lg rounded-xl text-xxs px-3 py-2 w-96 mx-auto">
-                <div className="font-bold">Coming Soon:</div>
-                <div>✨Pull live raw data streams from your favorite providers </div>
-                <div>✨Get unprecedented insights on your data with the help of Lychee AI</div>
-                <div>✨Chart any aspect of your data stream</div>
-                <div>✨Add any of this to your dashboard</div>
-                <div>* Become a lifetime member to vote on which integrations to build first</div>
-            </div>
 
-            <div className='text-xxs py-10 flex flex-col gap-4'>
-                <div className='py-4'>
-                    <div>Try it here! </div>
-                    <div>Click to pull live data:</div>
-                </div>
-                
+    return (
+        <div className='w-full bg-white grid place-items-center py-10'>
+            <Transition 
+                    show={!connecting}
+                    enter="transition-opacity duration-1000"
+                    enterFrom="opacity-0"
+                    enterTo="opacity-100 h-auto"
+                    leave="transition-opacity duration-150"
+                    leaveFrom="opacity-100 h-auto"
+                    leaveTo="opacity-0">
+                    <div className='text-4xl font-body font-black w-1/3 text-center'>
+                        Connect directly to your favorite data sources
+                    </div>
+                    <div className='text-sm py-4'>Powerful, RAW, no download necessary</div>
+                    <div className='text-xxs'>* Become a lifetime member to vote on which integrations will be most useful to you.</div>
+                            <div className='font-bold text-xl pt-10 text-slate-500'>Ready for you to cook...</div>
+                    <div className='flex gap-4 py-10'>
+                        <div className='border border-slate-100 rounded-xl h-[260px] w-[350px] pl-10 pt-10 bg-slate-100/20 shadow-lg hover:shadow-xl hover:bg-lychee-red hover:text-white cursor-pointer transition ease-in-out delay-150 hover:scale-110 duration-300' onClick={()=>setConneting('twitter')}>
+                            <div className='text-4xl py-2'><FaXTwitter /></div>
+                            <div className='text-4xl pt-2 pb-2 font-black'>Twitter/ X</div>
+                            <div className='flex font-bold text-sm place-items-end gap-2 pt-10'>Start pulling <div className='hover:animate-bounce'><BiDownArrow /></div></div>
+                        </div>
+                        <div className='border border-slate-100 rounded-xl h-[260px] w-[350px] pl-10 pt-10 bg-slate-100/20 shadow-lg hover:shadow-xl hover:bg-lychee-red hover:text-white cursor-pointer transition ease-in-out delay-150 hover:scale-110 duration-300' onClick={()=>setConneting('earthquakes')}>
+                            <div className='text-4xl py-2'><WiEarthquake /></div>
+                            <div className='text-4xl pt-2 pb-2 font-black'>Earthquakes</div>
+                            <div className='flex font-bold text-sm place-items-end gap-2 pt-10'>Start pulling <div className='hover:animate-bounce'><BiDownArrow /></div></div>
+                        </div>
+                    </div>
+            </Transition>
+            <Transition 
+                    show={connecting === 'twitter'}
+                    enter="transition-opacity duration-1000"
+                    enterFrom="opacity-0 h-0"
+                    enterTo="opacity-100 h-auto"
+                    leave="transition-opacity duration-150"
+                    leaveFrom="opacity-100 h-auto"
+                    leaveTo="opacity-0">
+                        <div className='w-full h-full'>
+                            <div className='text-sm flex place-items-center cursor-pointer hover:text-lychee-red' onClick={()=>setConneting()}><MdOutlineArrowBackIosNew /> <div className='text-xxs'>Back </div></div>
+                            <div className=''>
+                                <div className='text-xxs text-lychee-peach underline cursor-pointer' onClick={()=>setWorking('getLychee')}>Subscribe to use the full extent of this feature</div>
+                                <div className='text-xxs'>If enough LifeTime members vote for Twitter, we can subscribe to the enterprise plan, which will give us access to: </div>
+                                <div className='text-xxs'>- Rate-limited access to suite of v2 endpoints, including search and  filtered stream</div>
+                                <div className='text-xxs'>- More than 1,000,000 requests per month</div>
+                                <div className='text-xxs'>- Complete streams: replay, engagement metrics, backfill, and more features</div>
+                            </div>
+                            <TwitterIntegration data={data} setData={setData} setDflt={setDflt}/>
+                        </div>
+            </Transition>
+            
+            <div className='text-xxs py-10 flex flex-col gap-4 hidden'>                
                 <div className='px-10 flex gap-4'>
                     <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold sm:w-1/4 flex flex-col place-items-center"  onClick={()=>setConnectData('earthquake')}>
                         <div className='text-lg font-title font-bold'>Earthquakes</div>
-                        <WiEarthquake />
+                        
                     </div>
                     <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold sm:w-1/4 flex flex-col place-items-center"  onClick={()=>setConnectData('twitter')}>
-                        <div className='text-lg font-title font-bold'>X (Twitter)</div>
-                        <FaXTwitter />
+                        <div className='text-lg font-title font-bold'>X (Twitter)</div>                        
                     </div>
                 </div>
                 <Transition 
@@ -101,30 +138,7 @@ const Integrations = () => {
                             }
                         </div>
                 </Transition>
-                <Transition 
-                    show={connectData === 'twitter'}
-                    enter="transition-opacity duration-1000"
-                    enterFrom="opacity-0 h-0"
-                    enterTo="opacity-100 h-auto"
-                    leave="transition-opacity duration-150"
-                    leaveFrom="opacity-100 h-auto"
-                    leaveTo="opacity-0">
-                        <div className='text-xs font-body font-thin w-full'>
-                            <div className=''>Pull data from Twitter directly. Analyze, chart and use AI to gain unprecedented insights.</div>
-                            <div className='text-xxs'>*As we all know, Twitter API is no longer free. So if you feel that direct Twitter integration will be valuable, please join Lifetime membership. </div>
-                            <div className='text-xxs'>If enough LifeTime members request Twitter, we can subscribe to the enterprise plan, which will give us access to: </div>
-                            <div className='text-xxs'>- Rate-limited access to suite of v2 endpoints, including search and  filtered stream</div>
-                            <div className='text-xxs'>- More than 1,000,000 Posts per month - GET at the app level</div>
-                            <div className='text-xxs'>- More than 300,000 Posts per month - posting limit at the app level</div>
-                            <div className='text-xxs'>- Complete streams: replay, engagement metrics, backfill, and more features</div>
-                            <div className='text-xxs text-lychee-red'>Must be Lifetime member to use Twitter integration</div>
 
-                            {
-                                <TwitterIntegration data={data} setData={setData} setDflt={setDflt}/>
-                            }
-                            
-                        </div>
-                </Transition>
 
 
                 <div>Future Integrations</div>        
@@ -149,6 +163,9 @@ const Integrations = () => {
                     </div>
                     <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
                         <CgAppleWatch />
+                    </div>
+                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                        <SiQuickbooks />
                     </div>
                 </div>
             </div>
