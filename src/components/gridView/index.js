@@ -17,7 +17,7 @@ const GridView = ({sample = false}) => {
         <div className="ag-theme-quartz sm:px-20 py-10" style={{ height: '90%', width: '90%' }}>
             <AgGridReact 
                 defaultColDef={defaultColDef} 
-                rowData={sample ? rowData.slice(0,3) : rowData} 
+                rowData={sample  ? rowData.slice(0,3) : rowData} 
                 columnDefs={colDefs} 
                 pagination={true}
                 onCellValueChanged={event => console.log(`New Cell Value: ${event.value}`)}

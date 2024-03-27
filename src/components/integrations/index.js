@@ -42,7 +42,7 @@ const Integrations = () => {
 
 
     return (
-        <div className='w-full bg-white grid place-items-center py-10'>
+        <div className=' w-full bg-white grid place-items-center py-10'>
             <Transition 
                     show={!connecting}
                     enter="transition-opacity duration-1000"
@@ -50,13 +50,14 @@ const Integrations = () => {
                     enterTo="opacity-100 h-auto"
                     leave="transition-opacity duration-150"
                     leaveFrom="opacity-100 h-auto"
-                    leaveTo="opacity-0">
-                    <div className='text-4xl font-body font-black w-1/3 text-center'>
+                    leaveTo="opacity-0"
+                    className={"w-full grid place-content-center"}>
+                    <div className='text-6xl font-body font-black w-1/2 mx-auto text-center'>
                         Connect directly to your favorite data sources
                     </div>
-                    <div className='text-sm py-4'>Powerful, RAW, no download necessary</div>
-                    <div className='text-xxs'>* Become a lifetime member to vote on which integrations will be most useful to you.</div>
-                            <div className='font-bold text-xl pt-10 text-slate-500'>Ready for you to cook...</div>
+                    <div className='font-title mx-auto text-xl py-4'>Powerful, Straight From The Horses Mouth, No Download Necessary</div>
+                    <div className='text-xs mx-auto'>* Join now to vote on which integrations will be most useful to you.</div>
+                    <div className='font-bold text-xl pt-10 text-slate-500'>Ready for you to try...</div>
                     <div className='flex gap-4 py-10'>
                         <div className='border border-slate-100 rounded-xl h-[260px] w-[350px] pl-10 pt-10 bg-slate-100/20 shadow-lg hover:shadow-xl hover:bg-lychee-red hover:text-white cursor-pointer transition ease-in-out delay-150 hover:scale-110 duration-300' onClick={()=>setConneting('twitter')}>
                             <div className='text-4xl py-2'><FaXTwitter /></div>
@@ -77,15 +78,17 @@ const Integrations = () => {
                     enterTo="opacity-100 h-auto"
                     leave="transition-opacity duration-150"
                     leaveFrom="opacity-100 h-auto"
-                    leaveTo="opacity-0">
-                        <div className='w-full h-full'>
-                            <div className='text-sm flex place-items-center cursor-pointer hover:text-lychee-red' onClick={()=>setConneting()}><MdOutlineArrowBackIosNew /> <div className='text-xxs'>Back </div></div>
+                    leaveTo="opacity-0"
+                    className="w-5/6">
+                        <div className='pl-10 text-sm flex place-items-center cursor-pointer hover:text-lychee-red' onClick={()=>setConneting()}><MdOutlineArrowBackIosNew /> <div className='text-xxs'>Back </div></div>
+                        <div className='grid place-items-center'>                            
                             <div className=''>
-                                <div className='text-xxs text-lychee-peach underline cursor-pointer' onClick={()=>setWorking('getLychee')}>Subscribe to use the full extent of this feature</div>
-                                <div className='text-xxs'>If enough LifeTime members vote for Twitter, we can subscribe to the enterprise plan, which will give us access to: </div>
-                                <div className='text-xxs'>- Rate-limited access to suite of v2 endpoints, including search and  filtered stream</div>
-                                <div className='text-xxs'>- More than 1,000,000 requests per month</div>
-                                <div className='text-xxs'>- Complete streams: replay, engagement metrics, backfill, and more features</div>
+                                <div className='text-lychee-peach underline cursor-pointer' onClick={()=>setWorking('getLychee')}>Subscribe to use the full extent of this feature</div>
+                                <div className=''>Vote for more Twitter integrations if this is useful for you </div>
+                                <div className=''>If enough votes, I will enroll Lychee for Twitter Enterprise Access:</div>
+                                <div className=''>- Search and  filtered Streams</div>
+                                <div className=''>- More than 1,000,000 requests per month</div>
+                                <div className=''>- Complete streams: replay, engagement metrics, backfill, and more features</div>
                             </div>
                             <TwitterIntegration data={data} setData={setData} setDflt={setDflt}/>
                         </div>

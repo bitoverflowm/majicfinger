@@ -1,4 +1,4 @@
-import { fetch_twitter_user_by_handle } from './twitter_helper';
+import { fetch_twitter_user_by_handle } from '../twitter_helper';
 
 export default async (req, res) => {
     try {
@@ -17,7 +17,11 @@ export default async (req, res) => {
         }
 
         let user_data = await fetch_twitter_user_by_handle(handle, userFields.join(','), tweetFields.join(','), expansions.join(','));
-        res.status(200).send({ done: true, userData: user_data });
+        // Destructure and restructure the user_data object
+        const { public_metrics, ...rest } = user_data.data;
+        const userData = { ...rest, ...public_metrics };
+
+        res.status(200).send({ done: true, userData: userData });
     } catch (error) {
       console.error(error);
       res.status(error.status || 500).send(error.message);

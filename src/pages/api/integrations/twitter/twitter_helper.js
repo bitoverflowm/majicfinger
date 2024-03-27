@@ -78,18 +78,19 @@ const fetch_twitter_users_by_ids = async (ids, userFields, tweetFields, expansio
 }
 
 // Fetch tweets liked by a user by User Id
-const fetch_twitter_users_liked_tweets_by_id = async (id, userFields, tweetFields, placeFields, expansions) => {
-    const userData = await twitterBearer.v2.userLikedTweets(ids, {
+const fetch_twitter_users_liked_tweets_by_id = async (id, userFields, tweetFields, expansions) => {
+  console.log('starting to create requiests')
+    const userData = await twitterBearer.v2.userLikedTweets(id, {
         //A comma separated list of User fields to display
         "user.fields": userFields,
         
         //A comma separated list of Tweet fields to display.
         "tweet.fields": tweetFields,
 
-        "place.fields": placeFields,
+        //"place.fields": placeFields,
         
         //A comma separated list of fields to expand
-        expansions: expansions
+        expansions: expansions,
       });
     return userData
 }
