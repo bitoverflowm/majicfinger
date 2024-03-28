@@ -27,6 +27,7 @@ const Integrations = () => {
     const [connectData, setConnectData] = useState();
     const [loading, setLoading] = useState(false);
     const [connected, setConnected] = useState(false);
+    const [helperOpen, setHelperOpen] = useState(false);
 
     const [connecting, setConneting] = useState();
 
@@ -40,9 +41,39 @@ const Integrations = () => {
         setLoading(false);
     }
 
+    useEffect(() => {
+        if(connecting && connecting==='twitter'){
+            setHelperOpen(true)
+        }
+    }, [connecting])
+
 
     return (
         <div className='w-full bg-white grid place-items-center py-10 px-20'>
+            <Transition
+                show={helperOpen}
+                enter="transition-opacity duration-1000"
+                enterFrom="opacity-0 h-0"
+                enterTo="opacity-100 h-auto"
+                leave="transition-opacity duration-150"
+                leaveFrom="opacity-100 h-auto"
+                leaveTo="opacity-0"
+                className="fixed top-0 right-0 w-96 bg-lychee-blue h-dvh"
+            >
+                <div className='px-10 py-20 bg-white'>
+                    <div className='font-black cursor-pointer' onClick={()=>setHelperOpen(false)}>Close</div>
+                    <div>Lets get you connected to {connecting}</div>
+                    <div>Don't worry it's very straight forward.</div>
+                    <div>
+                        Lychee's Twitter integration enables access to Twitter in unique and advanced ways (with no code or download at all). Tap into core elements of Twitter like: Tweets, Direct Messages, Spaces, Lists, users, and more.
+                    </div>
+
+                </div>
+                
+
+
+
+            </Transition>
             <Transition 
                     show={!connecting}
                     enter="transition-opacity duration-1000"

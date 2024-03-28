@@ -36,7 +36,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting}) => {
     const [loading, setLoading] = useState(false);
     const [connected, setConnected] = useState(false);
 
-    const [handle, setHandle] = useState('misterrpink1');
+    const [handle, setHandle] = useState('');
     const [editingHandle, setEditingHandle] = useState(false);
     const [originalVal, setOriginalVal] = useState('');
 
@@ -182,13 +182,13 @@ const TwitterIntegration = ({ setData, setDflt, connecting}) => {
             <div className='w-full py-10'>
                 {/* Username pull */}
                 <div className='flex gap-10 place-items-center'>
-                    <div className='w-96'>Enter a username to analyze</div>
-                    <div className='border border-slate-100 w-96 rounded-md py-2'>
+                    <div className='flex nowrap font-black text-slate-600'>Enter any username to begin</div>
+                    <div className={`border w-96 rounded-md py-2 ${handle === '' ? 'border-lychee-red border-2' : 'border-slate-100 border-0'}`}>
                         <div className="px-1 flex gap-2 w-full twitter-handle-input" onClick={()=>!editingHandle && editHandler('handle')}>
                             {
                             editingHandle ? 
                                 <input type="text" autoFocus={true} value={handle} onChange={(e)=>setHandle(e.target.value)}/>
-                                : <div className="">@{handle}</div>
+                                : <div className=''>@{handle}</div>
                             }
                             {editingHandle &&
                                 <div className="w-full flex gap-1 place-content-end">
