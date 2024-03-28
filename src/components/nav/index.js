@@ -1,7 +1,5 @@
 'use client'
-//import React, { useState, useEffect } from 'react'
 
-//import { CsvToHtmlTable } from 'react-csv-to-table';
 import { useMyState  } from '@/context/stateContext'
 import { useUser  } from '@/lib/hooks';
 import Link from 'next/link'
@@ -36,26 +34,26 @@ const Nav = () => {
     };
 
     return (
-      <div className="flex w-full px-8 pt-4 pb-1 z-40 bg-white">
-        <div className="max-w-24">
+      <div className="flex w-full px-8 pt-3 pb-2 z-40 bg-white">
+        <div className="w-24">
           <Link href="/"> <img src={"./logo.png"}/></Link>
         </div>
-        <div className='text-xxs w-full flex gap-4 place-content-end place-items-center'>
+        <div className='text-xxs w-full flex gap-3 place-content-end place-items-center'>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>
-          <div className='cursor-pointer hover:text-lychee-green'><Link href="/new">What's new!</Link></div>
-          <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Have Questions?</Link></div>
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/new">What's new?</Link></div>
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact me?</Link></div>
           {
             !(user) ?
               <>
-                  <div className='underline cursor-pointer hover:text-lychee-green'><Link href="/login">Already have an account?</Link></div>
-                  <div className='p-2 px-3 cursor-pointer bg-lychee-green font-bold rounded-xl hover:bg-black hover:text-white shadow-inner' onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
+                  <div className='p-2 px-3 rounded-2xl cursor-pointer text-white bg-lychee-black hover:bg-lychee-white hover:text-lychee-black'><Link href="/login">Log In</Link></div>
+                  <div className='p-2 px-3 rounded-2xl cursor-pointer text-white bg-lychee-green hover:bg-lychee-white hover:text-black' onClick={()=>setWorking('getLychee')}>Sign Up</div>
               </>
               :<>
-                  <div className='rounded-full bg-lychee-peach text-white p-2 px-4 capitalize'>
+                  <div className='p-2 px-3 rounded-2xl text-white bg-lychee-black capitalize'>
                       {user.name ? user.name : user.email.split('@')[0]}
                   </div>
-                  <div onClick={()=>handleLogout()} className='cursor-pointer hover:text-slate-300'>Logout</div>
+                  <div onClick={()=>handleLogout()} className='p-2 px-3 rounded-2xl cursor-pointer text-lychee-black bg-lychee-white hover:bg-lychee-red hover:text-white'>Logout</div>
               </>
           }
         </div>

@@ -1,7 +1,7 @@
-import Nav from '@/components/nav';
+//import Nav from '@/components/nav';
 import './globals.css'
 
-import { StateProvider } from '@/context/stateContext'
+//import { StateProvider } from '@/context/stateContext'
  
 export const metadata = {
   title: 'Lychee',

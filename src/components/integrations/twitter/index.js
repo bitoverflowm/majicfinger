@@ -1,19 +1,38 @@
 import React, { useEffect } from 'react';
 import { useState } from 'react';
 import { Transition } from '@headlessui/react';
+import { useShepherdTour } from "react-shepherd";
+import "shepherd.js/dist/css/shepherd.css";
+import Script from 'next/script';
+
+import steps from './tourSteps';
 
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { HiOutlinePencilSquare } from "react-icons/hi2"
 import { BiDownArrow, BiUpArrow } from "react-icons/bi";
+
+import { useUser } from '@/lib/hooks';
 
 import GridView from '../../gridView';
 
 import ParamToggles from './paramToggles';
 import { params } from './params';
 
+const tourOptions = {
+    defaultStepOptions: {
+        scrollTo: true,
+        cancelIcon: {
+            enabled: true,
+        },
+    },
+    useModalOverlay: true,
+  };
 
-const TwitterIntegration = ({ setData, setDflt}) => {
-    // Your component logic goes here
+
+const TwitterIntegration = ({ setData, setDflt, connecting}) => {
+    const user = useUser();
+    const tour = useShepherdTour({ tourOptions, steps: steps });
+    
     const [loading, setLoading] = useState(false);
     const [connected, setConnected] = useState(false);
 
@@ -149,16 +168,23 @@ const TwitterIntegration = ({ setData, setDflt}) => {
         } finally {
             setLoading(false);
         }
-    }
+    }    
+
+    useEffect(()=> {
+        if(connecting && connecting === 'twitter' && !(user)){
+            tour.start()
+        }
+    }, [connecting])
 
     return (
         <div className='w-3/5 mx-auto text-sm'>
+            <Script type="module" src="shepherd.js/dist/shepherd.js" />
             <div className='w-full py-10'>
                 {/* Username pull */}
                 <div className='flex gap-10 place-items-center'>
                     <div className='w-96'>Enter a username to analyze</div>
                     <div className='border border-slate-100 w-96 rounded-md py-2'>
-                        <div className="px-1 flex gap-2 w-full " onClick={()=>!editingHandle && editHandler('handle')}>
+                        <div className="px-1 flex gap-2 w-full twitter-handle-input" onClick={()=>!editingHandle && editHandler('handle')}>
                             {
                             editingHandle ? 
                                 <input type="text" autoFocus={true} value={handle} onChange={(e)=>setHandle(e.target.value)}/>
@@ -198,14 +224,14 @@ const TwitterIntegration = ({ setData, setDflt}) => {
                     className={'grid grid-cols-3 pt-8'}>
                         <div className=''>
                             <div className='font-bold text-slate-600 text-xs'>Get user's pinned tweet?</div>
-                            <div className='flex flex-wrap'>
+                            <div className='flex flex-wrap pinned_tweet_tour'>
                                 {params.user_by_handle.expansions.map((val) => (
                                     <ParamToggles key={val} field_type="expansions" val={val} toggle={() => toggleParams('expansions', val)} arr={expansions}/>
                                 ))}
                             </div>
                             {/*<ParamToggles field_type='expansions' val='pinned_tweet_id' toggle={toggleParams} arr={expansions}/>*/}
                         </div>
-                        <div className=''>
+                        <div className='pinned_tweet_details_tour'>
                             <div className='font-bold text-slate-600 text-xs'>Pinned Tweet Details</div>
                             {/* For tweetFields */}
                             <div className='flex flex-wrap'>
@@ -214,7 +240,7 @@ const TwitterIntegration = ({ setData, setDflt}) => {
                                 ))}
                             </div>
                         </div>
-                        <div>
+                        <div className='user_details_tour'>
                             {/* For userFields */}
                             <div className='font-bold text-slate-600 text-xs'>User Details</div>
                             <div className='flex flex-wrap'>

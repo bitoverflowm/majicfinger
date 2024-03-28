@@ -9,7 +9,6 @@ import { StateProvider } from '@/context/stateContext'
 import ActionMenu from '@/components/actionMenu'
 import LandingPage from '@/components/landingPage'
 
-import QuickNav from '@/components/nav/quickNav'
 import FAQ from '@/components/faq'
 import Nav from '@/components/nav'
 
@@ -31,7 +30,7 @@ export default function Home() {
         <GoogleAnalytics gaId="G-G8X2NEPTEG" />
         <StateProvider>
           <Nav/>
-          <div className="flex flex-col place-items-center">
+          <div className="flex flex-col place-items-center bg-white/20">
             <div className='text-center max-w-screen overflow-hidden'>
               <LandingPage />
             </div>

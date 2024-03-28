@@ -42,7 +42,7 @@ const Integrations = () => {
 
 
     return (
-        <div className=' w-full bg-white grid place-items-center py-10'>
+        <div className='w-full bg-white grid place-items-center py-10 px-20'>
             <Transition 
                     show={!connecting}
                     enter="transition-opacity duration-1000"
@@ -70,6 +70,33 @@ const Integrations = () => {
                             <div className='flex font-bold text-sm place-items-end gap-2 pt-10'>Start pulling <div className='hover:animate-bounce'><BiDownArrow /></div></div>
                         </div>
                     </div>
+                    <div>Future Integrations</div>        
+                    <div className="flex flex-wrap gap-10">
+                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                            <ImYoutube2 />
+                        </div>
+                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                            <BiLogoInstagramAlt />
+                        </div>
+                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                            <FaCcStripe />
+                        </div>
+                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                            <FaLinkedin />
+                        </div>
+                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                            <BiLogoGmail />
+                        </div>
+                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                            <FaMeta />
+                        </div>
+                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                            <CgAppleWatch />
+                        </div>
+                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
+                            <SiQuickbooks />
+                        </div>
+                    </div>
             </Transition>
             <Transition 
                     show={connecting === 'twitter'}
@@ -82,96 +109,9 @@ const Integrations = () => {
                     className="w-5/6">
                         <div className='pl-10 text-sm flex place-items-center cursor-pointer hover:text-lychee-red' onClick={()=>setConneting()}><MdOutlineArrowBackIosNew /> <div className='text-xxs'>Back </div></div>
                         <div className='grid place-items-center'>                            
-                            <div className=''>
-                                <div className='text-lychee-peach underline cursor-pointer' onClick={()=>setWorking('getLychee')}>Subscribe to use the full extent of this feature</div>
-                                <div className=''>Vote for more Twitter integrations if this is useful for you </div>
-                                <div className=''>If enough votes, I will enroll Lychee for Twitter Enterprise Access:</div>
-                                <div className=''>- Search and  filtered Streams</div>
-                                <div className=''>- More than 1,000,000 requests per month</div>
-                                <div className=''>- Complete streams: replay, engagement metrics, backfill, and more features</div>
-                            </div>
-                            <TwitterIntegration data={data} setData={setData} setDflt={setDflt}/>
+                            <TwitterIntegration setData={setData} setDflt={setDflt} connecting={connecting}/>
                         </div>
             </Transition>
-            
-            <div className='text-xxs py-10 flex flex-col gap-4 hidden'>                
-                <div className='px-10 flex gap-4'>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold sm:w-1/4 flex flex-col place-items-center"  onClick={()=>setConnectData('earthquake')}>
-                        <div className='text-lg font-title font-bold'>Earthquakes</div>
-                        
-                    </div>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold sm:w-1/4 flex flex-col place-items-center"  onClick={()=>setConnectData('twitter')}>
-                        <div className='text-lg font-title font-bold'>X (Twitter)</div>                        
-                    </div>
-                </div>
-                <Transition 
-                    show={connectData === 'earthquake'}
-                    enter="transition-opacity duration-1000"
-                    enterFrom="opacity-0 h-0"
-                    enterTo="opacity-100 h-auto"
-                    leave="transition-opacity duration-150"
-                    leaveFrom="opacity-100 h-auto"
-                    leaveTo="opacity-0">
-                        <div className='text-xs font-body font-thin w-full flex flex-col place-items-center'>
-                            <div className=''>Pick a location</div>
-                            <div className='text-xxs'>*Lifetime members can request new locations and criteria</div>
-                            <div className='flex flex-wrap gap-2'>
-                                <div className="bg-white shadow-xl px-3 py-2 my-2 text-xs rounded-lg hover:bg-black hover:text-white cursor-pointer" onClick={()=>fetchEarthQuakesHandler(32.715736, -117.161087)}>San Diego</div>
-                                <div className="bg-white shadow-xl px-3 py-2 my-2 text-xs rounded-lg hover:bg-black hover:text-white cursor-pointer" onClick={()=>fetchEarthQuakesHandler(40.730610, -73.935242)}>New York</div>
-                                <div className="bg-white shadow-xl px-3 py-2 my-2 text-xs rounded-lg hover:bg-black hover:text-white cursor-pointer" onClick={()=>fetchEarthQuakesHandler(27.700001, 85.333336)}>Kathmandu</div>
-                                <div className="bg-white shadow-xl px-3 py-2 my-2 text-xs rounded-lg hover:bg-black hover:text-white cursor-pointer" onClick={()=>fetchEarthQuakesHandler(35.652832,139.839478)}>Tokyo</div>
-                            </div>
-                            {   loading &&
-                                    <div className='flex place-items-center animate-pulse gap-2'>
-                                        <AiOutlineLoading3Quarters className='animate-spin'/>
-                                            Loading...
-                                    </div>
-                            }
-                            {
-                                connected && <div>
-                                                <div>{connectData} has been connected. </div>
-                                                <div>Go to Table or Chart to view the full data set</div>
-                                                <div>The data below is just a preview</div>
-                                            </div>
-                            }
-                            {
-                                connected && <div className='h-96 w-full'>
-                                                <GridView sample={true}/>
-                                            </div>
-                            }
-                        </div>
-                </Transition>
-
-
-
-                <div>Future Integrations</div>        
-                <div className="flex flex-wrap gap-10">
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                        <ImYoutube2 />
-                    </div>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                        <BiLogoInstagramAlt />
-                    </div>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                        <FaCcStripe />
-                    </div>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                        <FaLinkedin />
-                    </div>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                        <BiLogoGmail />
-                    </div>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                        <FaMeta />
-                    </div>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                        <CgAppleWatch />
-                    </div>
-                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-4 px-4 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300 font-title text-3xl font-bold"  onClick={() => setEmailVisible(true)}>
-                        <SiQuickbooks />
-                    </div>
-                </div>
-            </div>
         
         </div>
     );

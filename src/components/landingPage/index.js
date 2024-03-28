@@ -5,21 +5,30 @@ import React, {useRef, useState, useEffect} from 'react';
 
 import { useUser  } from '@/lib/hooks';
 import { useMyState  } from '@/context/stateContext'
+
+import { FaPlay  } from "react-icons/fa";
+import { MdArrowRight, MdOutlineSmartDisplay  } from "react-icons/md";
+
+
+
  
 const LandingPage = () => {
     const { working, setWorking } = useMyState()
     const { aiOpen, setAiOpen } = useMyState()
     const user = useUser()
     const [view, setView] = useState()
+    const [isHovered, setIsHovered] = useState(false);
 
     const firstRef = useRef(null)
     const secondRef = useRef(null)
     const thirdRef = useRef(null)
     const fourthRef = useRef(null)
     const fifthRef = useRef(null)
+    const featuresRef = useRef(null)
 
     useEffect(()=>{
         view === 'first' && firstRef.current.scrollIntoView({behavior: 'smooth'})
+        view === 'features' && featuresRef.current.scrollIntoView({behavior: 'smooth'})
         view === 'second' && secondRef.current.scrollIntoView({behavior: 'smooth'})
         view === 'third' && thirdRef.current.scrollIntoView({behavior: 'smooth'})
         view === 'fourth' && fourthRef.current.scrollIntoView({behavior: 'smooth'})
@@ -31,43 +40,99 @@ const LandingPage = () => {
             {
                 !(user) &&
                     <>
-                        <div className='min-h-screen' style={{ /*backgroundImage: "url('./bg.jpg')", backgroundSize: 'cover', backgroundRepeat: 'no-repeat'*/}}>
-                            <div className='w-96 py-5 mx-auto sm:w-10/12 xl:w-3/5 bg-white xl:py-20 xl:px-32 rounded-xl shadow-2xl bg-slate-200/60 backdrop-blur-xl'>
-                                <div className='text-sm xl:text-md font-black text-black p-10'>
+                        <div className='min-h-screen'>
+                            <div className='w-11/12 max-w-[1500px] py-5 mx-auto rounded-xl shadow-xl shadow-slate-200 bg-white/80'>
+                                <div className='text-md xl:text-md text-black pt-10 pb-6'>
                                     We'll save you from all the complex yabba-dabba-doos out there.
                                 </div>
-                                <div className='text-6xl xl:text-8xl font-title'>
-                                    <span className='font-black text-lychee-peach'>Instant</span> Graphs.
+                                <div className='text-7xl font-title font-black'>
+                                    <span className='text-lychee-green'>Instant</span> Graphs.
                                 </div>
-                                <div className='text-6xl xl:text-8xl font-title'>
-                                <span className='font-black'>Zero</span> Hassle.
+                                <div className='text-7xl font-title font-black'>
+                                    Zero Hassle.
                                 </div>
-                                <div className='mx-auto py-10'>
-                                    <div className='py-1 text-xs'>
-                                        We prepared a quick explainer video for you:
+                                <div className='flex place-content-center py-3'>
+                                    <div className='flex place-items-center gap-2 py-1 px-2 bg-lychee-white/30 rounded-2xl text-black'>
+                                        <div className='text-xxs'> +5K happy unique users WorldWide</div> 
                                     </div>
-                                    <div className='flex place-items-center place-content-center'>
-                                        <iframe width="560" height="315" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="Lychee promo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowFullScreen></iframe>
-                                    </div>                                    
+                                </div>
+                                <div className='flex flex-wrap gap-4 px-8 py-8'>
+                                    <div className='grid col-span-2 place-items-center gap-2'>
+                                        <div className='py-2 text-xs'>
+                                            
+                                        </div>
+                                        <div className='relative flex justify-center items-center place-items-center place-content-center'>
+                                            <iframe width="480" height="335" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="Lychee promo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" className='rounded-xl shadow-xl' allowFullScreen></iframe>
+                                            {!isHovered && 
+                                            <div className="text-lychee-black cursor-pointer absolute top-0 left-0 w-full h-full bg-lychee-blue flex flex-col gap-4 justify-center items-center rounded-xl text-4xl" onMouseEnter={() => setIsHovered(true)}>
+                                                <div className='py-2 text-xs'>
+                                                    We prepared a quick explainer video for you
+                                                </div>
+                                                <FaPlay />
+                                            </div>
+                                            }
+                                        </div>                                    
+                                    </div>
+                                    <div className='grow basis-1/4 grid place-items-center gap-2'>
+                                        <div className='py-2 text-xs text-black rounded-full '>
+                                            ✨ New!
+                                        </div>
+                                        <div className='pl-8 py-8 text-left rounded-xl bg-lychee-green h-fit w-full shadow-xl cursor-pointer transition ease-in-out delay-10 bg-gradient-to-r hover:scale-110 hover:from-lychee-green hover:to-lychee-blue duration-500' onClick={()=>setWorking('integrations')}>
+                                            <div className='text-4xl text-white'>Query,</div>  
+                                            <div className='text-4xl text-white'>Analyze,</div>
+                                            <div className='text-4xl text-white'>Visualize,</div>
+                                            <div className='text-4xl text-white'>Live data</div>
+                                            <div className='text-xs text-white pt-2'>Without leaving Lychee. Without a single line of code.</div>
+                                            <div className='flex flex-wrap pt-4 px-2 gap-1'>
+                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Twitter</div>
+                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Earthquake</div>
+                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Instagram</div>
+                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Quickbooks</div>
+                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>BTC</div>
+                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>ETH</div>
+                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Stocks</div>
+                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>YouTube</div>
+                                            </div>
+                                            <div className='text-xxs text-white pt-2'>
+                                                * vote on which integrations you want me to priotitize
+                                            </div>
+                                        </div>                                    
+                                    </div>
+                                    <div className='grow basis-1/4 flex flex-col place-items-center gap-2'>
+                                        <div className='py-2 text-xs text-black rounded-full '>
+                                            🦄 New: Repeat after me ... "Data is beautiful"
+                                        </div>
+                                        <div className='grow pl-8 p-4 pt-8 text-left rounded-xl border-lychee-black border-4 shadow-xl w-full'>
+                                            <div className='text-2xl text-black'>Curated collection of beautiful colors and pallates updated daily</div>
+                                        </div>
+                                        <div className='grow pl-8 p-4 pt-8 text-left rounded-xl bg-lychee-white w-full shadow-xl'>
+                                            <div className='text-4xl text-black'>Gallery</div>  
+                                            <div className='text-xs text-black pt-2'>
+                                                Browse over 100 charts, graphs, tools, you name it...
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className='text-md xl:text-lg pb-4'>
+                                        <div>
+                                            Seriously.
+                                        </div>
+                                        <div>
+                                            Stop paying for features you don't even need.
+                                        </div>
+                                        <div>
+                                            Let our AI do the heavy lifting for you.
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className='flex place-content-center pb-4'>
-                                    <div className='font-bold bg-black text-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-3 xl:px-5 py-2 xl:py-4 rounded-full text-xs' onClick={()=>setView('first')}>
+                                    <div className='font-bold border-2 border-lychee-black text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-3 xl:px-5 py-2 xl:py-4 rounded-full text-xs' onClick={()=>setView('first')}>
                                         Cool... tell me more?
                                     </div>
                                 </div>
-                                <div className='text-md xl:text-lg pb-4'>
-                                    <div>
-                                        Seriously.
-                                    </div>
-                                    <div>
-                                        Stop paying for features you don't even need.
-                                    </div>
-                                    <div>
-                                        Let our AI do the heavy lifting for you.
-                                    </div>
-                                </div>
                             </div>
-                            <div className="w-96 sm:w-10/12 xl:w-3/5 justify-center bg-slate-200/30 rounded-2xl mx-auto mt-10 py-5">
+                            <div className="w-96 sm:w-10/12 xl:w-3/5 justify-center bg-slate-300/70 rounded-2xl mx-auto mt-10 py-5">
                                 <div className='text-xs font-bold text-slate-500'>
                                     Used, trusted and beta tested by people at:                        
                                 </div>
@@ -91,21 +156,72 @@ const LandingPage = () => {
                                         <img src="./mit.svg"  alt="mit" className='h-6'/>   
                                     </div>
                                 </div>
-                                <div className='px-6 py-2 grayscale'>
-                                    <div className='text-xs font-bold text-slate-500 py-2'>
-                                        ❤️
-                                    </div>
-                                    <div className='flex place-items-center place-content-center gap-4'>
-                                        <div className="max-w-40">
-                                            <Link href="https://www.producthunt.com/posts/lychee-3?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-lychee&#0045;3" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=443500&theme=neutral" alt="Lychee - AI&#0045;Powered&#0032;Data&#0032;Visualization&#0032;in&#0032;0&#0046;32&#0032;seconds&#0046; | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" /></Link>
-                                        </div>
-                                    </div>                                        
-                                </div>
                             </div>
                         </div>       
-                        <div ref={firstRef} className='xl:px-10 xl:pt-20'>
-                            <div className='text-6xl xl:text-8xl font-title'>
-                                Our <span className='font-black text-lychee-peach'>Features:</span>
+                        <div className=' xl:px-10 xl:pt-20 pb-10 bg-lychee-white mt-10'>
+                            <div ref={firstRef} className='bg-white w-full py-20 rounded-2xl'>
+                                <div className='text-8xl font-title px-96'>What Our <span className='text-lychee-blue'>Legendary Users Have To Say</span></div>
+                                <div className='flex flex-wrap place-items-center place-content-center gap-4 px-20 py-20'>
+                                    <Link href="https://theresanaiforthat.com/ai/lychee?comment_id=10781">
+                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                                <div>It's like the chart editor i wish i had for the last 10 years. Love it.</div>
+                                                <div>- Bernard</div>
+                                                <div className='text-xl float-right'><MdArrowRight /> </div>
+                                        </div>
+                                    </Link>
+                                    <Link href="https://www.producthunt.com/products/lychee-3/reviews?review=744208 ">
+                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                                <div>I really can't express in words how much I needed this.</div>
+                                                <div>Changed my whole working game. My peers looked at this thing jaws dropped haha.</div>
+                                                <div>Looking forward to the future of Lychee!</div>
+                                                <div>- Amal Khan</div>
+                                                <div className='text-xl float-right'><MdArrowRight /> </div>
+                                        </div>
+                                    </Link>
+                                    <Link href="https://www.producthunt.com/products/lychee-3?comment=3321659#lychee-3">
+                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black   cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                                <div>Data scientists, marketers & managers would love this {':)'} Instant hands-free graph generation! Congrats on the launch!</div>
+                                                <div>- Charles Teh</div>
+                                                <div className='text-xl float-right'><MdArrowRight /> </div>
+                                        </div>
+                                    </Link>
+                                    <Link href="https://www.producthunt.com/products/lychee-3?comment=3320264#lychee-3">
+                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                                <div>OMG finally a reasonable tool to get my charting done fast!
+                                                    Do you think you will add more capabilities like Numpy Pandas library integrations @misterrpink </div>
+                                                <div>- Mar</div>
+                                                <div className='text-xl float-right'><MdArrowRight /> </div>
+                                        </div>
+                                    </Link>
+                                    <Link href="https://www.producthunt.com/products/lychee-3?comment=3320062#lychee-3">
+                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                                <div>Nice! Visualizing data made simple. Great help for anyone in the data landscape. Good luck!</div>
+                                                <div>- Henry Habib</div>
+                                                <div className='text-xl float-right'><MdArrowRight /> </div>
+                                        </div>
+                                    </Link>
+                                    <Link href="https://www.producthunt.com/products/lychee-3?comment=3320062#lychee-3">
+                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                                <div>Didn't I just see you launch a project a few days ago?
+                                                    bro you are on fire!</div>
+                                                    <div>love this project.</div>
+                                                    <div>I'll actually use this every day</div>
+                                                    <div>god I hate excel
+                                                    also why am I downloading a new software every few months?
+                                                    Microsoft is unhinged at this point</div>
+                                                <div>- Youu</div>
+                                                <div className='text-xl float-right'><MdArrowRight /> </div>
+                                        </div>
+                                    </Link>
+                                </div>
+                                
+                                <div className='bg-lychee-go w-32 mx-auto rounded-full py-1 cursor-pointer hover:bg-lychee-black hover:text-white' onClick={()=>setView('features')}>
+                                    Keep Going
+                                </div>
+                            </div>
+                        
+                            <div ref={featuresRef} className='pt-48 text-6xl xl:text-8xl font-title'>
+                                Our <span className='font-black text-lychee-black'>Features:</span>
                             </div>
                             <div className='grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 py-6 sm:px-20 lg:px-56 xl:px-64 place-items-center place-content-center'>
                                 <div className='p-2'>
@@ -181,57 +297,12 @@ const LandingPage = () => {
                                 </div>
                             </div>
                             <div className='flex place-content-center'>
-                                <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('second')}>
-                                    But how?
+                                <div className='bg-white text-lychee-black font-bold hover:bg-lychee-black hover:text-lychee-white cursor-pointer px-5 py-4 rounded-full text-xs shadow-xl' onClick={()=>setView('second')}>
+                                    Need a Success Story?
                                 </div>
                             </div>                
                         </div>
                         <div ref={secondRef} className='sm:px-10 py-20'>
-                            <div className='text-6xl sm:text-8xl font-title'>
-                                <span className='font-black text-lychee-peach'>How</span> It Works:
-                            </div>
-                            <div className='flex flex-col lg:flex-row gap-10 sm:py-20 place-items-center place-content-center'>
-                                <div className='p-10 shadow-xl rounded-xl w-96 lg:w-1/4 lg:h-72'>
-                                    <div className='font-title text-2xl'>
-                                    <span className='text-lychee-red font-title font-black text-4xl'>1.</span>  Drop Your Spreadsheet.
-                                    </div>
-                                    <div className='text-sm lg:text-md py-5 mx-auto'>
-                                        <div className='pb-6'>
-                                            Drag that Excel sheet into our beautiful upload box for us to <span className='text-lychee-peach'>instant graph-ify it.</span> 
-                                        </div>
-                                        <div>
-                                        If you don't have one, you can make it here too. <span className='text-lychee-peach'>We made it simple.</span> 
-                                        </div>
-                                    </div>               
-                                </div>
-                                <div className='p-10 shadow-xl rounded-xl w-96 lg:w-1/4 lg:h-72'>
-                                    <div className='font-title text-2xl'>
-                                    <span className='text-lychee-red font-title font-black text-4xl'>2.</span>  Watch The Magic.
-                                    </div>
-                                    <div className='text-sm lg:text-md py-5 mx-auto'>
-                                        <div className='pb-6'>
-                                        When we say instant, we mean it. Your chart will be ready <span className='text-lychee-peach'>the moment you hit</span> the "generate" button.
-                                        </div>                            
-                                    </div>               
-                                </div>
-                                <div className='p-10 shadow-xl rounded-xl w-96 lg:w-1/4 lg:h-72'>
-                                    <div className='font-title text-2xl'>
-                                        <span className='text-lychee-red font-title font-black text-4xl'>3.</span> Any Chart You Want.
-                                    </div>
-                                    <div className='text-md py-5 mx-auto'>
-                                        <div className='pb-6'>
-                                        Take control. Choose from a palette of dynamic chart options. <span className='text-lychee-peach'>Your data, your style.</span> 
-                                        </div>
-                                    </div>               
-                                </div>
-                            </div>
-                            <div className='flex place-content-center py-10'>
-                                <div className='bg-lychee-green text-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('third')}>
-                                    Need A Success Story?
-                                </div>
-                            </div>
-                        </div>
-                        <div ref={thirdRef} className='w-96 mx-auto sm:w-screen sm:px-10 sm:py-20'>
                             <div className='text-6xl sm:text-8xl font-title'>Susan's <span className='text-lychee-peach'>Instant Win</span></div>
                             <div className='py-10 sm:py-20 text-center flex flex-col gap-2'>
                                 <div className='text-2xl font-black text-lychee-peach'>
@@ -295,95 +366,12 @@ const LandingPage = () => {
                                     She has it FOREVER.
                                 </div>
                             </div>
-                            <div className='flex place-content-center py-10'>
-                                <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('fourth')}>
-                                    Need More?
-                                </div>
-                            </div>
-                        </div>
-                        <div ref={fourthRef} className=' w-96 mx-auto sm:w-screen py-10 sm:py-20'>
-                            <div className='text-6xl lg:text-8xl font-title xl:px-64'>What Our <span className='text-lychee-peach'>Legendary Beta Testers Have To Say:</span></div>
-                            <div className='py-20 text-center flex flex-col lg:flex-row sm:flex-wrap gap-2 place-items-center place-content-center gap-6'>
-                                <div className='text-center w-5/6 lg:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
-                                    <div>
-                                        "I am a data researcher from Florida and I have to say...this is unlike anything I've ever seen.
-                                    </div>
-                                    <div>
-                                        In a world that thinks everyone wants more and more features, <span className='font-bold text-lychee-peach'>this is the only software that actually listened to the few of us that wants to keep things simple.</span>
-                                    </div>
-                                    <div>
-                                        - Sarah L. Data Researcher
-                                    </div>
-                                </div>
-                                <div className='text-center w-5/6 lg:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
-                                    <div>
-                                        The thing I love most about Lychee is that it fits into my student budget AND provides me every single thing I need.
-                                    </div>
-                                    <div>
-                                        <span className='font-bold text-lychee-peach'>And it's not all those complex hi-fi things that need pro knowledge.</span>
-                                    </div>
-                                    <div>
-                                        Realistically, I just need a tool to turn my spreadsheets into graphs, selection of different types of graphs, and export.
-                                    </div>
-                                    <div>
-                                        That's it.
-                                    </div>
-                                    <div className='font-black'>
-                                        I'm so glad I came across this tool, it's priceless.
-                                    </div>
-                                    <div className='font-black'>
-                                        - Jessica L. Business University Student
-                                    </div>
-                                </div>
-                                <div className='text-center w-5/6 lg:w-1/4 shadow-xl p-10 flex flex-col gap-4 place-items-center place-content-center'>
-                                    <div>
-                                        Running a marketing agency almost solo is hard as it is. And when you don't have coding knowledge and there are all these complex tools in the market, you find yourself in need of help.
-                                    </div>
-                                    <div>
-                                        Lychee made this possible for us to provide instant solutions to our clients, without burning a hole in the treasury.
-                                    </div>
-                                    <div>
-                                        - Michael Shapran, Founder Of Richify Agency
-                                    </div>
-                                </div>                            
-                            </div>            
-                        </div>
-                        <div className='flex place-content-center'>
-                                <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setView('fifth')}>
-                                    I want it
-                                </div>
-                        </div>
-                        <div ref={fifthRef} className='px-10 py-20'>
-                            <div className='text-4xl sm:text-8xl font-title'><span className='text-lychee-peach'>Opportunity </span> For Life.</div>
-                            <div className='text-4xl sm:text-8xl font-title'><span className='text-lychee-peach'>Instant </span> Access for Life.</div>
-                            <div className='py-10 sm:py-20 text-center flex flex-col gap-2'>
-                                <div className='text-2xl font-black text-lychee-peach'>
-                                    Before we roll this out public-public.
-                                </div>
-                                <div>
-                                    We're going to give you a special offer.
-                                </div>
-                                <div>
-                                    If you get this now...
-                                </div>
-                                <div>
-                                    You have it for your lifetime.
-                                </div>
-                                <div className='text-2xl font-black pt-2 text-lychee-peach'>
-                                    No paying for monthly subscriptions.
-                                </div>
-                                <div>
-                                    We'll move to monthly pricing soon.
-                                </div>
-                                <div>
-                                    Don't wait.
-                                </div>
-                            </div>
                             <div className='flex place-content-center mb-56'>
                                 <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
-                                    Get It
+                                    Try It Now
                                 </div>
                             </div>
+                            
                         </div>
                     </>                    
             }

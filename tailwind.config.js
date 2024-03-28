@@ -31,9 +31,12 @@ module.exports = {
         'majic-accent': '#802392',
         'lychee-black': '#121619',
         'lychee-red': '#BA0B31',
-        'lychee-green': '#86efac',
-        'lychee-white': '#F4EDEA',
-        'lychee-peach': '#7F7EFF',//'#0081AF',
+        'lychee-green': '#004FFF',
+        'lychee-white': '#D9C5B2',
+        'lychee-peach': '#FFC07F', //'#8EBDF6',//'#0081AF',,
+        'lychee-blue': '#8EBDF6',
+        'lychee-amaranth': '#A21640',
+        'lychee-go': '#7DDE92'
       },
       keyframes: {
         shiver: {
