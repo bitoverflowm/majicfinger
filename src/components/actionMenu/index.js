@@ -59,22 +59,41 @@ const ActionMenu = () => {
         
         if (!file) {
             return; // Exit if no file is selected
-        }    
+        }
+
+        const fileType = file.name.split('.').pop().toLowerCase();
 
         const reader = new FileReader();
+
         reader.onload = (e) => {
-            const data = e.target.result;
-            const workbook = XLSX.read(data, { type: 'binary' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet);
-            const csv = XLSX.utils.sheet_to_csv(worksheet);
-            setData(json); // Now you have your JSON data
+            let data = e.target.result;
+            //data = data.trim();
+            
+            if (fileType === 'csv') {
+                // If the file is a CSV, use this block to process it
+                console.log(data)
+                const json = XLSX.utils.sheet_to_json(XLSX.read(data, { type: 'binary' }).Sheets.Sheet1);
+                console.log(json)
+                setData(json); // Set your state with the JSON data
+            } else if (fileType === 'xlsx') {
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+                //const csv = XLSX.utils.sheet_to_csv(worksheet);
+                setData(json); // Now you have your JSON data
+            }
             //setCSV(csv)
             setDflt(false)
         };
 
-        reader.readAsBinaryString(file);
+        // Decide how to read the file based on its type
+        if (fileType === 'csv') {
+            reader.readAsText(file); // Use readAsArrayBuffer for both CSV and XLSX,
+                                            // but process CSV data differently
+        } else if (fileType === 'xlsx') {
+            reader.readAsArrayBuffer(file); // Use readAsArrayBuffer for XLSX
+        }
         setWorking('grid')        
 
     }
@@ -140,7 +159,7 @@ const ActionMenu = () => {
                                                 <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">
                                                     Click to Upload
                                                 </label>
-                                                <input id="file-upload" type="file" accept=".xlsx" onChange={handleFileUpload} className="hidden" />
+                                                <input id="file-upload" type="file" accept=".xlsx, .csv" onChange={handleFileUpload} className="hidden" />
                                             </form>
                                             <div className="text-xs text-slate-600 pb-2">If you don't have your own data, 
                                                 <span className="underline hover:font-black cursor-pointer px-1" onClick={()=>setWorking('grid')}>click here</span> to use sample data or have Lychee  
