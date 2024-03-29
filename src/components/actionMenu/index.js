@@ -305,32 +305,28 @@ const ActionMenu = () => {
                     {
                         working && working === 'getLychee' &&
                             <div className="w-96 sm:w-full flex flex-col gap-10 place-content-center place-items-center text-lychee-black">
-                                <div className="pt-6 sm:pt-2 text-6xl sm:text-8xl font-title text-center">You Have <span className="text-lychee-peach">2 Options.</span></div>
                                 <div className="flex flex-col w-96 sm:flex-row sm:w-full place-content-center gap-10">
                                     <div className="text-center sm:text-left sm:w-1/4">
                                         <div className="px-10 py-6 flex flex-col gap-3">
-                                            <div className="font-title text-4xl text-center">1.</div>
-                                            <div> If you're interested and want this, but don't want to pay now, that's cool too.</div>
-                                            <div>You can still use free trial.</div>
-                                            <div>Keep in mind that you will have to pay a monthly subscription if you wait until then and pay extra for custom features too. </div>
-                                            <div>(Planned Sub price $69.99/month)</div>
+                                            <div>7 day free trial.</div>
+                                            <div>I will be increasing the subprice as I release new features get released</div>
+                                            <div>Please check out the Roadmap for planned features and price adjustments</div>
+                                            <div>(Final Planned Sub price $69.99/month)</div>
+                                            <div>However your sub price will <span className="font-black">not</span> be adjuted for a full 24 months after registration</div>
                                             <div className="underline">*No credit card required</div>
                                         </div>
                                         <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
-                                            <div className="font-title text-3xl font-bold">
-                                                Free until subscription tiers kick in 
-                                            </div>
                                             <div className="text-left place-items-left place-content-left">
                                                 <div className="flex gap-2 pt-4 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Upload Data</div>
                                                 <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Generate Data</div>
                                                 <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Powerful Table </div>
                                                 <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Instant Charts</div>
                                                 <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />1 file upload at a time (Up to 512 MB) </div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />1 integration (limited based on availability)</div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400 h-12 w-12" /> $10 in AI requests credits/ month included for being early user, until subscriptions kick in  </div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />3 integration (limited based on availability)</div>
+                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" /> $100 in AI requests credits/ month included for being early user</div>
                                             </div>
                                             <div className="py-6 text-6xl text-center">
-                                                $0.00
+                                                $9.99
                                             </div>
                                             {   !(emailVisible) &&
                                                 <div className="bg-lychee-green w-12 pt-1  mb-4 text-center font-black rounded-full mx-auto text-white">
@@ -353,7 +349,7 @@ const ActionMenu = () => {
                                             <div> You can get instant access to everything and more bonus updates (being released every week), <span className="text-lychee-peach">at not a single penny more than what you pay today.</span></div>
                                             <div className="text-lychee-peach">Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else.</div>
                                         </div>
-                                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => window.location.href = 'https://buy.stripe.com/3cscP66Oq7CS6Eo28f'}>
+                                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => window.location.href = 'https://buy.stripe.com/cN2bL2gp03mC5AkfZ9'}>
                                             <div className="font-title text-3xl font-bold">
                                                 Get Lifetime Access
                                             </div>
@@ -368,17 +364,18 @@ const ActionMenu = () => {
                                             <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" /> $100 in of AI requests credits/ month included for LIFE </div>
                                             <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Help Lychee grow, expand in early stages of buildout. </div>
                                             <div className="py-6 text-6xl text-center">
-                                                $29.99
+                                                $69.99
                                             </div>
                                             <div className="bg-lychee-green w-12 py-1 text-center font-black rounded-full mx-auto text-white">
                                                 Go
                                             </div>
                                             <div className="text-xs flex gap-2 flex-wrap pt-10">
                                                 <div className="text-black">SOLD OUT: </div>
-                                                <div className="line-through">500 Seats @ 2.99</div>
-                                                <div className="line-through">500 Seats @ 9.99</div>
-                                                <div className="line-through">500 Seats @ 14.99</div>
-                                                <div className="line-through">500 Seats @ 19.99</div>
+                                                <div className="line-through">$2.99</div>
+                                                <div className="line-through">$9.99</div>
+                                                <div className="line-through">$14.99</div>
+                                                <div className="line-through">$19.99</div>
+                                                <div className="line-through">$29.99</div>
                                             </div>
                                             
                                         </div>
