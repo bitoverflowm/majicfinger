@@ -1,4 +1,4 @@
-import { fetch_twitter_users_liked_tweets_by_id } from '../twitter_helper';
+import { fetch_twitter_owned_lists_by_id } from '../twitter_helper';
 
 export default async (req, res) => {
     try {
@@ -10,13 +10,13 @@ export default async (req, res) => {
         // Extract the "handle" from the URL query parameters
         // Extract data from the request body
         const { handleId } = req.query;
-        const { userFields, tweetFields, expansions } = req.body;
+        const { thirdParam, tweetFields, expansions } = req.body;
 
         if (!handleId) {
             return res.status(400).send('Missing handle parameter');
         }
 
-        let user_data = await fetch_twitter_users_liked_tweets_by_id(handleId, userFields.join(','), tweetFields.join(','), expansions.join(','));
+        let user_data = await fetch_twitter_owned_lists_by_id(handleId, thirdParam.join(','), tweetFields.join(','), expansions.join(','));
         // Destructure and restructure the user_data object
         // Map over the data array and restructure each item
         console.log(user_data)

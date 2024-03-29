@@ -27,6 +27,8 @@ export default function Home() {
           id = "ms-clarity"
           strategy="afterInteractive"
         >{clairtyCode}</Script>
+        <Script async src="https://cdn.promotekit.com/promotekit.js" data-promotekit="03b8c588-8350-4a0c-97f0-0a839509e8e0" strategy="afterInteractive"/>
+        <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
         <GoogleAnalytics gaId="G-G8X2NEPTEG" />
         <StateProvider>
           <Nav/>

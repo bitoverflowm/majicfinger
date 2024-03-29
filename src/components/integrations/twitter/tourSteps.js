@@ -158,7 +158,7 @@ const steps = [
       buttons: [
         {
           text: 'next',
-          action: tour => tour.next(),
+          action: function() { return this.show('4'); },
         },
       ],
       classes: "",

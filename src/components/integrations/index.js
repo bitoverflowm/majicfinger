@@ -10,6 +10,10 @@ import { WiEarthquake } from "react-icons/wi";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { SiQuickbooks } from "react-icons/si";
 import { MdOutlineArrowBackIosNew } from "react-icons/md";
+import { IoHelp } from "react-icons/io5";
+import { IoMdClose } from "react-icons/io";
+
+
 
 
 import { useMyState  } from '@/context/stateContext'
@@ -30,6 +34,7 @@ const Integrations = () => {
     const [helperOpen, setHelperOpen] = useState(false);
 
     const [connecting, setConneting] = useState();
+    const [stepName, setStepName] = useState();
 
     const fetchEarthQuakesHandler = async (lat, long) => {
         setLoading(true);
@@ -43,6 +48,7 @@ const Integrations = () => {
 
     useEffect(() => {
         if(connecting && connecting==='twitter'){
+            setStepName('twitterStart')
             setHelperOpen(true)
         }
     }, [connecting])
@@ -50,28 +56,66 @@ const Integrations = () => {
 
     return (
         <div className='w-full bg-white grid place-items-center py-10 px-20'>
+            <div className={`${helperOpen && 'hidden'} flex gap-2 cursor-pointer text-xs place-items-center hover:text-lychee-go`} onClick={()=>setHelperOpen(true)}><div className={`shadow-md rounded-full py-1 px-2  text-lychee-black  hover:bg-lychee-black hover:text-white`}  ><IoHelp /></div>Open Helper</div>
             <Transition
                 show={helperOpen}
-                enter="transition-opacity duration-1000"
-                enterFrom="opacity-0 h-0"
-                enterTo="opacity-100 h-auto"
-                leave="transition-opacity duration-150"
-                leaveFrom="opacity-100 h-auto"
-                leaveTo="opacity-0"
+                enter="transition ease-in-out duration-300 transform"
+                enterFrom="translate-x-full"
+                enterTo="0"
+                leave="transition ease-in-out duration-300 transform"
+                leaveFrom="0"
+                leaveTo="translate-x-full"
                 className="fixed top-0 right-0 w-96 bg-lychee-blue h-dvh"
             >
-                <div className='px-10 py-20 bg-white'>
-                    <div className='font-black cursor-pointer' onClick={()=>setHelperOpen(false)}>Close</div>
-                    <div>Lets get you connected to {connecting}</div>
-                    <div>Don't worry it's very straight forward.</div>
-                    <div>
-                        Lychee's Twitter integration enables access to Twitter in unique and advanced ways (with no code or download at all). Tap into core elements of Twitter like: Tweets, Direct Messages, Spaces, Lists, users, and more.
-                    </div>
+                <div className='font-black cursor-pointer' onClick={()=>setHelperOpen(false)}><IoMdClose /></div>
+                {
+                    stepName === 'twitterStart' &&
+                        <div className='px-10 py-20 bg-white'>
+                        <div>Lets get set started with {connecting}</div>
+                        <div>It's super simple.</div>
+                        <div className='pt-4'>Lychee's Twitter integration enables access to Twitter in unique and advanced ways (with no code or download at all). Tap into core elements of Twitter like: Tweets, Direct Messages, Spaces, Lists, users, and more.
+                        </div>
+                        <div>
+                            For now, you have the choice between:
+                        </div>
+                        <div className='font-bold'>
+                            Username pull:
+                        </div>
+                        <div>
+                            <div>You can then gather public user data including: </div>
+                            <div>
+                                <div>User Follows and followers</div>
+                                <div>user's tweets</div>
+                                <div>engagement metrics on the user's tweets</div>
+                                <div>etc.</div>
+                            </div>
+                        </div>
+                        <div className='font-bold'>
+                            Tweets pull:
+                        </div>
+                        <div>
+                            <div>The Tweet is one of the primary resources on Twitter. In its simplest form, a Tweet can contain up to 280 characters and can be posted either publicly or privately, depending on an account’s settings. </div>
+                            <div>Pull all recent tweets</div>
+                            <div>Query tweets based on keywords</div>
+                            <div>You can get the given tweet's/ group of tweets'</div>
+                            <div>
+                                <div>Author</div>
+                                <div>geo/place_id</div>
+                                <div>info about the media attached to the given tweet</div>
+                                <div>tweet creation date, referenced tweets, source, raw text form of the tweet, language, etc</div>
+                                <div>public metrics and engagement stats about the tweet</div>
+                            </div>
+                        </div>
 
-                </div>
+                        </div>
+                }
+                {
+                    stepName === 'userSearch' &&
+                        <div>
+                            User Search info
+                        </div>
+                }
                 
-
-
 
             </Transition>
             <Transition 
@@ -140,7 +184,7 @@ const Integrations = () => {
                     className="w-5/6">
                         <div className='pl-10 text-sm flex place-items-center cursor-pointer hover:text-lychee-red' onClick={()=>setConneting()}><MdOutlineArrowBackIosNew /> <div className='text-xxs'>Back </div></div>
                         <div className='grid place-items-center'>                            
-                            <TwitterIntegration setData={setData} setDflt={setDflt} connecting={connecting}/>
+                            <TwitterIntegration setData={setData} setDflt={setDflt} connecting={connecting} stepName={stepName} setStepName={setStepName}/>
                         </div>
             </Transition>
         

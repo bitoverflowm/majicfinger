@@ -118,9 +118,31 @@ const ActionMenu = () => {
         window.scrollTo({top: y, behavior: 'smooth'});
     }
 
+    useEffect(() => {
+        // Ensure the code runs only if jQuery is available
+        if (typeof window !== "undefined" && window.$) {
+          const modifyUrls = () => {
+            $('a[href^="https://buy.stripe.com/"]').each(function(){
+              const oldBuyUrl = $(this).attr("href");
+              const referralId = window.promotekit_referral;
+              if (!oldBuyUrl.includes("client_reference_id")) {
+                  const newBuyUrl = oldBuyUrl + "?client_reference_id=" + referralId;
+                  $(this).attr("href", newBuyUrl);
+              }
+            });
+            $('[pricing-table-id]').each(function(){
+              $(this).attr("client-reference-id", window.promotekit_referral);
+            });
+          };
+    
+          // Using setTimeout to delay the execution, ensuring scripts have loaded
+          setTimeout(modifyUrls, 2000);
+        }
+      }, []);
+
 
     return(
-        <div className="flex flex-col w-screen">
+        <div className="flex flex-col w-screen bg-white">
             { aiOpen &&
                 <div className="fixed right-0 top-0 h-dvh w-full z-30 sm:w-1/4 bg-lychee-white backgroung-blur-xl flex flex-col place-items-center place-content-center px-6">
                     <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setAiOpen(false)}><GoEyeClosed /></div>
@@ -131,29 +153,38 @@ const ActionMenu = () => {
             }
 
             <div className="flex flex-col w-screen min-h-screen" id="dashboard-section">
-                <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 py-4 px-4 text-xxs">
-                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
-                    <div className={`shadow-xl rounded-md py-1 px-2 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
-                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
-                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'chart' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('chart')}>Chart</div>
-                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'dashboard' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('dashboard')}>Dashboard</div>
-                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'integrations' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('integrations')}>Integrations</div>
+                <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 py-4 px-4 text-sm">
+                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
+                    <div className={`shadow-lg rounded-md py-1 px-2 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
+                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
+                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'chart' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('chart')}>Chart</div>
+                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'dashboard' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('dashboard')}>Dashboard</div>
+                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'integrations' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('integrations')}>Integrations</div>
                     <div className={`flex gap-2 shadow-xl rounded-md py-1 px-2 text-white ${aiOpen ? 'text-lychee-black bg-lychee-black': ' bg-lychee-red cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}><ImMagicWand /> Lychee AI</div>
-                    <div className="shadow-xl rounded-md py-1 px-2 hover:bg-lychee-black hover:text-white cursor-pointer" onClick={()=>setWorking('export')}><CiExport /></div>
-                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
-                    <div className={`shadow-xl rounded-md py-1 px-2 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
+                    <div className="shadow-lg rounded-md py-1 px-2 hover:bg-lychee-black hover:text-white cursor-pointer" onClick={()=>setWorking('export')}><CiExport /></div>
+                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
+                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                 </div>
                 <div className="w-full h-full flex place-content-center">
                     {
                         working && working === 'upload' &&
-                            <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-2xl py-12 px-10 text-lychee-black w-5/6 sm:w-1/2 h-1/2 rounded-md backdrop-blur-md text-center mt-10">
+                            <div className="flex flex-col place-items-center place-content-center bg-white rounded-md shadow-lg py-12 px-10 text-lychee-black w-5/6 sm:w-1/2 h-1/2 rounded-md backdrop-blur-md text-center mt-10 bg-gradient-to-r from-lychee-white/10 to-lychee-white/20 ">
                                 {
                                     user ?
                                         <>
                                             <div className="py-2 font-title text-2xl">
                                                 Let's Start With Your Data:
                                             </div>
-                                            <div className="text-xs text-slate-600 pb-2">*Must be .csv or Excel File (.xlsx) </div>
+                                            <div className="text-sm text-slate-600 pb-2">*Must be .csv or Excel File (.xlsx) </div>
+                                            <div className="bg-white/40 rounded-xl p-8 text-left">
+                                                <div className="text-sm font-bold text-slate-600 pb-2">Note: Some feature limitations: </div>
+                                                <div className="text-sm text-slate-600 pb-2">Please clean your data and upload only the columns you want to chart along with the data, any headers and footers will interfere with upload read  </div>
+                                                <div className="text-sm text-slate-600 pb-2">Data uploader currently only handles 1 sheet at a time </div>
+                                                <div className="text-sm text-slate-600 pb-2">Keep your data columns names standard (i.e. ".", "quotes", other random punctuation marks will probably break the upload code) </div>
+                                                <div className="text-sm text-slate-600 pb-2">Underscore "_" and hypens "-" are acceptable  </div>
+                                                <div className="text-xs text-slate-600 pb-2">Please be patient, I am working as fast as possible to accommodate all requests and requirements ❤️ </div>
+                                            </div>
+                                            
                                             <div className="text-xs text-red-400 pb-2 flex"><IoWarningOutline /> Warning: this action will replace <span className="px-1 underline hover:text-black cursor-pointer" onClick={()=>setWorking('grid')}>the current data</span> stored this session </div>
                                             <form className="flex flex-col items-center pb-6">
                                                 <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">

@@ -36,7 +36,9 @@ module.exports = {
         'lychee-peach': '#FFC07F', //'#8EBDF6',//'#0081AF',,
         'lychee-blue': '#8EBDF6',
         'lychee-amaranth': '#A21640',
-        'lychee-go': '#7DDE92'
+        'lychee-go': '#7DDE92',
+        'soft': '#CBF1F5',
+        'softer': '#E3FDFD'
       },
       keyframes: {
         shiver: {
