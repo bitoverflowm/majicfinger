@@ -39,6 +39,7 @@ const Nav = () => {
           <Link href="/"> <img src={"./logo.png"}/></Link>
         </div>
         <div className='text-xxs w-full flex gap-3 place-content-end place-items-center'>
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/affiliates">Be my cofounder|become an affiliate</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/new">What's new?</Link></div>
