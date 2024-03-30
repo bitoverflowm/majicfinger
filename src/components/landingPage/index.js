@@ -11,7 +11,6 @@ import { MdArrowRight, MdOutlineSmartDisplay  } from "react-icons/md";
 import CountUp from 'react-countup'
 
 
-
  
 const LandingPage = () => {
     const { working, setWorking } = useMyState()
@@ -156,220 +155,148 @@ const LandingPage = () => {
                                 </div>
                             </div>
                         </div>       
-                        <div className=' xl:px-10 xl:pt-20 pb-10 bg-lychee-white mt-10'>
-                            <div ref={firstRef} className='bg-white w-full py-20 rounded-2xl'>
-                                <div className='text-8xl font-title px-96'>What Our <span className='text-lychee-blue'>Legendary Users Have To Say</span></div>
-                                <div className='flex flex-wrap place-items-center place-content-center gap-4 px-20 py-20'>
-                                    <Link href="https://theresanaiforthat.com/ai/lychee?comment_id=10781">
-                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                        <div className='pb-10 mt-10'>
+                            <div ref={firstRef} className='bg-white w-full py-20'>
+                                <div className='text-8xl font-title px-96'>What Our <span className='text-lychee-amaranth'>Legendary Users Have To Say</span></div>
+                                <div className='flex flex-wrap items-stretch place-items-center place-content-center gap-4 px-20 py-20 max-w-[1350px] mx-auto'>
+                                    <Link href="https://theresanaiforthat.com/ai/lychee?comment_id=10781" >
+                                        <div className='h-full pt-24 bg-black text-white rounded-xl max-w-96 hover:bg-lychee-go hover:text-lychee-black cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>It's like the chart editor i wish i had for the last 10 years. Love it.</div>
                                                 <div>- Bernard</div>
-                                                <div className='text-xl float-right'><MdArrowRight /> </div>
                                         </div>
+                                        <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                     <Link href="https://www.producthunt.com/products/lychee-3/reviews?review=744208 ">
-                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                        <div className='h-full bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>I really can't express in words how much I needed this.</div>
                                                 <div>Changed my whole working game. My peers looked at this thing jaws dropped haha.</div>
                                                 <div>Looking forward to the future of Lychee!</div>
                                                 <div>- Amal Khan</div>
-                                                <div className='text-xl float-right'><MdArrowRight /> </div>
                                         </div>
+                                        <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                     <Link href="https://www.producthunt.com/products/lychee-3?comment=3321659#lychee-3">
-                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black   cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                        <div className='h-full pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black   cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>Data scientists, marketers & managers would love this {':)'} Instant hands-free graph generation! Congrats on the launch!</div>
                                                 <div>- Charles Teh</div>
-                                                <div className='text-xl float-right'><MdArrowRight /> </div>
                                         </div>
+                                        <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                     <Link href="https://www.producthunt.com/products/lychee-3?comment=3320264#lychee-3">
-                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                        <div className='h-full pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>OMG finally a reasonable tool to get my charting done fast!
                                                     Do you think you will add more capabilities like Numpy Pandas library integrations @misterrpink </div>
                                                 <div>- Mar</div>
-                                                <div className='text-xl float-right'><MdArrowRight /> </div>
                                         </div>
+                                        <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                     <Link href="https://www.producthunt.com/products/lychee-3?comment=3320062#lychee-3">
-                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                        <div className='h-full pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>Nice! Visualizing data made simple. Great help for anyone in the data landscape. Good luck!</div>
                                                 <div>- Henry Habib</div>
-                                                <div className='text-xl float-right'><MdArrowRight /> </div>
                                         </div>
+                                        <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                     <Link href="https://www.producthunt.com/products/lychee-3?comment=3320062#lychee-3">
-                                        <div className='bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
-                                                <div>Didn't I just see you launch a project a few days ago?
-                                                    bro you are on fire!</div>
+                                        <div className='h-full bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                     <div>love this project.</div>
                                                     <div>I'll actually use this every day</div>
                                                     <div>god I hate excel
                                                     also why am I downloading a new software every few months?
                                                     Microsoft is unhinged at this point</div>
-                                                <div>- Youu</div>
-                                                <div className='text-xl float-right'><MdArrowRight /> </div>
+                                                    <div> -Yu </div>
                                         </div>
+                                        <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                 </div>
                                 
-                                <div className='bg-lychee-go w-32 mx-auto rounded-full py-1 cursor-pointer hover:bg-lychee-black hover:text-white' onClick={()=>setView('features')}>
+                                <div className='bg-lychee-green font-black text-white w-40 mx-auto rounded-2xl py-2 px-3 cursor-pointer hover:bg-lychee-black hover:text-white' onClick={()=>setView('features')}>
                                     Keep Going
                                 </div>
                             </div>
-                        
-                            <div ref={featuresRef} className='pt-48 text-6xl xl:text-8xl font-title'>
-                                Our <span className='font-black text-lychee-black'>Features:</span>
-                            </div>
-                            <div className='grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 py-6 sm:px-20 lg:px-56 xl:px-64 place-items-center place-content-center'>
-                                <div className='p-2'>
-                                    <div className='text-2xl'>
-                                        <span className='font-black'>"Blink Of An Eye"</span> Level Instant
-                                    </div>
-                                    <div className='text-md py-5 w-64 mx-auto'>
-                                        <div>
-                                            We "graphify" your spreadsheets <span className='text-lychee-green font-black'>before you open your eyes</span> so that you <span className='text-lychee-green font-black'>never waste a single second waiting again.</span>
-                                        </div>
-                                    </div>                 
+
+
+                            <div className='bg-gradient-to-r from-soft to-softer pb-20'>
+                                <div ref={featuresRef} className='pt-48 text-6xl xl:text-8xl font-title'>
+                                    Our <span className='font-black text-lychee-black'>Features:</span>
                                 </div>
-                                <div className='p-2'>
-                                    <video autoPlay loop muted playsInline className="rounded-full w-96 h-72">
-                                        <source src="./graph1.mp4" type="video/mp4" />
+                                <div className='grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 py-6 sm:px-20 lg:px-56 xl:px-64 place-items-center place-content-center'>
+                                    <div className='p-2'>
+                                        <div className='text-2xl'>
+                                            <span className='font-black'>"Blink Of An Eye"</span> Level Instant
+                                        </div>
+                                        <div className='text-md py-5 w-64 mx-auto'>
+                                            <div>
+                                                We "graphify" your spreadsheets <span className='text-lychee-green font-black'>before you open your eyes</span> so that you <span className='text-lychee-green font-black'>never waste a single second waiting again.</span>
+                                            </div>
+                                        </div>                 
+                                    </div>
+                                    <div className='p-2'>
+                                        <video autoPlay loop muted playsInline className="rounded-full w-96 h-72">
+                                            <source src="./graph1.mp4" type="video/mp4" />
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    </div>
+                                    <div className='p-10'>
+                                        <div className='text-2xl'>
+                                            No Mumbo Jumbo.
+                                        </div>
+                                        <div className='text-md py-5 w-64 mx-auto'>
+                                            <div>
+                                                Sit back and enjoy a user-friendly platform that <span className='text-lychee-green font-black'>requires no coding skills</span> or hi-fi language.
+                                            </div>
+                                        </div>                 
+                                    </div>
+                                    <video autoPlay loop muted playsInline className="rounded-bl-full rounded-tr-full w-96 h-72">
+                                        <source src="./graph4.mp4" type="video/mp4" />
                                         Your browser does not support the video tag.
                                     </video>
-                                </div>
-                                <div className='p-10'>
-                                    <div className='text-2xl'>
-                                        No Mumbo Jumbo.
+                                    <div className='p-10'>
+                                        <div className='text-2xl'>
+                                            Cost-Effective.
+                                        </div>
+                                        <div className='text-md py-5 w-64 mx-auto'>
+                                            <div>
+                                                <span className='text-lychee-green font-black'>No BS features</span> you don't even need.
+                                            </div>
+                                            <div className='pt-2'>
+                                                When we built this - we had you in mind.
+                                            </div>
+                                        </div>                 
                                     </div>
-                                    <div className='text-md py-5 w-64 mx-auto'>
-                                        <div>
-                                            Sit back and enjoy a user-friendly platform that <span className='text-lychee-green font-black'>requires no coding skills</span> or hi-fi language.
+                                    <video autoPlay loop muted playsInline className="rounded-tl-full rounded-tr-full w-96 h-72">
+                                        <source src="./graph3.mp4" type="video/mp4" />
+                                        Your browser does not support the video tag.
+                                    </video>
+                                    <div className='p-10'>
+                                        <div className='text-2xl'>
+                                            Variety Of Chart Options.
                                         </div>
-                                    </div>                 
-                                </div>
-                                <video autoPlay loop muted playsInline className="rounded-bl-full rounded-tr-full w-96 h-72">
-                                    <source src="./graph4.mp4" type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
-                                <div className='p-10'>
-                                    <div className='text-2xl'>
-                                        Cost-Effective.
+                                        <div className='text-md py-5 w-64 mx-auto'>
+                                            <div>
+                                                Choose from a variety of chart types, including pie, histogram, and bar charts. <span className='text-lychee-green font-black'>Your data is your style.</span>
+                                            </div>
+                                        </div>                 
                                     </div>
-                                    <div className='text-md py-5 w-64 mx-auto'>
-                                        <div>
-                                            <span className='text-lychee-green font-black'>No BS features</span> you don't even need.
+                                    <video autoPlay loop muted playsInline className="rounded-b-full w-96 h-72">
+                                        <source src="./graph2.mp4" type="video/mp4" />
+                                        Your browser does not support the video tag.
+                                    </video>
+                                    <div className='p-10'>
+                                        <div className='text-2xl'>
+                                            The Excel Killer.
                                         </div>
-                                        <div className='pt-2'>
-                                            When we built this - we had you in mind.
-                                        </div>
-                                    </div>                 
-                                </div>
-                                <video autoPlay loop muted playsInline className="rounded-tl-full rounded-tr-full w-96 h-72">
-                                    <source src="./graph3.mp4" type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
-                                <div className='p-10'>
-                                    <div className='text-2xl'>
-                                        Variety Of Chart Options.
+                                        <div className='text-md py-5 w-64 mx-auto'>
+                                            <div>
+                                                No spreadsheet? Create your own from scratch. It's easier than you've ever imagined.<div className='pt-2'> That's right.</div> <span className='text-lychee-green font-black'>You don't have to bang your head in frustration using Excel.</span>
+                                            </div>
+                                        </div>                 
                                     </div>
-                                    <div className='text-md py-5 w-64 mx-auto'>
-                                        <div>
-                                            Choose from a variety of chart types, including pie, histogram, and bar charts. <span className='text-lychee-green font-black'>Your data is your style.</span>
-                                        </div>
-                                    </div>                 
                                 </div>
-                                <video autoPlay loop muted playsInline className="rounded-b-full w-96 h-72">
-                                    <source src="./graph2.mp4" type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
-                                <div className='p-10'>
-                                    <div className='text-2xl'>
-                                        The Excel Killer.
-                                    </div>
-                                    <div className='text-md py-5 w-64 mx-auto'>
-                                        <div>
-                                            No spreadsheet? Create your own from scratch. It's easier than you've ever imagined.<div className='pt-2'> That's right.</div> <span className='text-lychee-green font-black'>You don't have to bang your head in frustration using Excel.</span>
-                                        </div>
-                                    </div>                 
+                                <div className='bg-lychee-green font-black text-white w-40 mx-auto rounded-2xl py-2 px-3 cursor-pointer hover:bg-lychee-black hover:text-white' onClick={()=>setWorking('getLychee')}>
+                                    Check it Out
                                 </div>
                             </div>
-                            <div className='flex place-content-center'>
-                                <div className='bg-white text-lychee-black font-bold hover:bg-lychee-black hover:text-lychee-white cursor-pointer px-5 py-4 rounded-full text-xs shadow-xl' onClick={()=>setView('second')}>
-                                    Need a Success Story?
-                                </div>
-                            </div>                
-                        </div>
-                        <div ref={secondRef} className='sm:px-10 py-20'>
-                            <div className='text-6xl sm:text-8xl font-title'>Susan's <span className='text-lychee-peach'>Instant Win</span></div>
-                            <div className='py-10 sm:py-20 text-center flex flex-col gap-2'>
-                                <div className='text-2xl font-black text-lychee-peach'>
-                                    The clock struck 11:43 pm.
-                                </div>
-                                <div>
-                                    Susan realized she had only 17 minutes to submit her data analysis paper.
-                                </div>
-                                <div>
-                                    She was tensed because all she had left was to turn her spreadsheets into charts.
-                                </div>
-                                <div>
-                                    What did she do?
-                                </div>
-                                <div className='text-2xl font-black pt-2 text-lychee-peach'>
-                                    That's right. She Googled.
-                                </div>
-                                <div>
-                                    She came across some tools, but most of them were complex, and needed coding skills.
-                                </div>
-                                <div>
-                                    Sure, there were some AI tools, but the thing is, when she inputted some prompts, the results were this.
-                                </div>
-                                <div className='text-2xl font-black pt-2 text-lychee-peach'>
-                                    "We cannot process your query."
-                                </div>
-                                <div>
-                                    Our Dear Susan continued searching.
-                                </div>
-                                <div>
-                                    Until she checked Product Hunt and saw us.
-                                </div>
-                                <div>
-                                    "Lychee? Guess...I'll try this for the last time."
-                                </div>
-                                <div>
-                                    With just a sliver of hope, she uploaded her spreadsheet into the box.
-                                </div>
-                                <div>
-                                    Boom.
-                                </div>
-                                <div>
-                                    Done.
-                                </div>
-                                <div className='text-2xl font-black pt-2 text-lychee-peach'>
-                                    She finished and exported ALL 9 graphs of her spreadsheets in under 3 minutes.
-                                </div>
-                                <div>
-                                    Paper submitted 4 minutes before the deadline.
-                                </div>
-                                <div>
-                                    As a university student, she was THRILLED that she got this tool at a steal.
-                                </div>
-                                <div>
-                                    What's even more exciting?
-                                </div>
-                                <div>
-                                    She doesn't even have to pay monthly.
-                                </div>
-                                <div className='text-2xl font-black pt-2 text-lychee-peach'>
-                                    She has it FOREVER.
-                                </div>
-                            </div>
-                            <div className='flex place-content-center mb-56'>
-                                <div className='bg-lychee-green text-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
-                                    Try It Now
-                                </div>
-                            </div>
-                            
                         </div>
                     </>                    
             }
