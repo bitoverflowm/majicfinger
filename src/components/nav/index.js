@@ -38,25 +38,27 @@ const Nav = () => {
         <div className="w-24">
           <Link href="/"> <img src={"./logo.png"}/></Link>
         </div>
-        <div className='text-xxs w-full flex gap-3 place-content-end place-items-center'>
-          <div className='cursor-pointer hover:text-lychee-green'><Link href="/affiliates">Be my cofounder|become an affiliate</Link></div>
+        <div className='text-xs w-full flex gap-6 place-content-end place-items-center'>
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/affiliates">Make $ with Lychee</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/new">What's new?</Link></div>
-          <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact me?</Link></div>
-          {
-            !(user) ?
-              <>
-                  <div className='p-2 px-3 rounded-2xl cursor-pointer text-white bg-lychee-black hover:bg-lychee-white hover:text-lychee-black'><Link href="/login">Log In</Link></div>
-                  <div className='p-2 px-3 rounded-2xl cursor-pointer text-white bg-lychee-green hover:bg-lychee-white hover:text-black' onClick={()=>setWorking('getLychee')}>Sign Up</div>
-              </>
-              :<>
-                  <div className='p-2 px-3 rounded-2xl text-white bg-lychee-black capitalize'>
-                      {user.name ? user.name : user.email.split('@')[0]}
-                  </div>
-                  <div onClick={()=>handleLogout()} className='p-2 px-3 rounded-2xl cursor-pointer text-lychee-black bg-lychee-white hover:bg-lychee-red hover:text-white'>Logout</div>
-              </>
-          }
+          <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact</Link></div>
+          <div className="flex gap-2">
+            {
+              !(user) ?
+                <>
+                    <div className='p-2 px-3 rounded-2xl cursor-pointer text-white bg-lychee-black hover:bg-lychee-white hover:text-lychee-black'><Link href="/login">Log In</Link></div>
+                    <div className='p-2 px-3 rounded-2xl cursor-pointer text-white bg-lychee-green hover:bg-lychee-white hover:text-black' onClick={()=>setWorking('getLychee')}>Sign Up</div>
+                </>
+                :<>
+                    <div className='p-2 px-3 rounded-2xl text-white bg-lychee-black capitalize'>
+                        {user.name ? user.name : user.email.split('@')[0]}
+                    </div>
+                    <div onClick={()=>handleLogout()} className='p-2 px-3 rounded-2xl cursor-pointer text-lychee-black bg-lychee-white hover:bg-lychee-red hover:text-white'>Logout</div>
+                </>
+            }
+          </div>
         </div>
       </div>      
     )

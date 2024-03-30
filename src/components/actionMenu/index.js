@@ -8,7 +8,8 @@ import { GoEyeClosed } from "react-icons/go";
 import { CiExport } from "react-icons/ci";
 import { IoCheckmarkSharp, IoWarningOutline  } from "react-icons/io5";
 import { ImMagicWand } from "react-icons/im";
-
+import { LuMoveLeft } from "react-icons/lu";
+import { FaCircle } from "react-icons/fa6";
 
 import { useMyState  } from '@/context/stateContext'
 import { useUser } from '@/lib/hooks';
@@ -304,83 +305,102 @@ const ActionMenu = () => {
                     }
                     {
                         working && working === 'getLychee' &&
-                            <div className="w-96 sm:w-full flex flex-col gap-10 place-content-center place-items-center text-lychee-black">
-                                <div className="flex flex-col w-96 sm:flex-row sm:w-full place-content-center gap-10">
-                                    <div className="text-center sm:text-left sm:w-1/4">
-                                        <div className="px-10 py-6 flex flex-col gap-3">
-                                            <div>7 day free trial.</div>
-                                            <div>I will be increasing the subprice as I release new features get released</div>
-                                            <div>Please check out the Roadmap for planned features and price adjustments</div>
-                                            <div>(Final Planned Sub price $69.99/month)</div>
-                                            <div>However your sub price will <span className="font-black">not</span> be adjuted for a full 24 months after registration</div>
-                                            <div className="underline">*No credit card required</div>
-                                        </div>
-                                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
-                                            <div className="text-left place-items-left place-content-left">
-                                                <div className="flex gap-2 pt-4 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Upload Data</div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Generate Data</div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Powerful Table </div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />Instant Charts</div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />1 file upload at a time (Up to 512 MB) </div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" />3 integration (limited based on availability)</div>
-                                                <div className="flex gap-2 place-items-left place-content-left"><IoCheckmarkSharp className="text-green-400" /> $100 in AI requests credits/ month included for being early user</div>
-                                            </div>
-                                            <div className="py-6 text-6xl text-center">
-                                                $9.99
-                                            </div>
-                                            {   !(emailVisible) &&
-                                                <div className="bg-lychee-green w-12 pt-1  mb-4 text-center font-black rounded-full mx-auto text-white">
-                                                    Go
-                                                </div>
-                                            }
-                                            {
-                                                emailVisible &&
-                                                    <Login />
-                                            }
-                                            <div>(Planned Sub price $69.99/month) + Data usage rates</div>
-                                        </div>
+                            <div className="w-96 sm:w-full text-lychee-black">
+                                <div className="flex px-20 pt-10">
+                                    <div className="px-20 basis-1/2 grid gap-2 text-lg">
+                                        <div className="font-black text-xl text-center pb-8">Already helping 5,000+ Lychee users win back their time. </div>
+                                        <div className="capitalize">Hi <Link href={"https://twitter.com/misterrpink1"} className="underline">misterrpink</Link> here,</div>
+                                        <div>I'm the solo dev, builder, founder of Lychee.</div>
+                                        <div>I love data. But, even as an AI specialist, epigenetic researcher and builder, looking at data day in day out...</div>
+                                        <div className="text-2xl py-4 px-10 text-lychee-red">99.99999% of the time I do not need the overhead.... <div></div> Also why do I keep writing Python sripts for charts?</div>
+                                        <div>That is why I built Lychee. </div>
+                                        <div>All we gotta do now is focus on <span className="font-black text-lychee-red">the results.</span></div>
+                                        <div>I would love to offer Lychee to you for free, but I need to charge a price to be able to deliver the best features to you.</div>
+                                        <div>This way I can focus all of my attention on saving you time and headache </div>
+                                        <div>so here are some ... </div>
                                     </div>
-                                    <div className="pt-10 text-center sm:pt-32">
-                                        Or
-                                    </div>
-                                    <div className="sm:w-1/4">
-                                        <div className="text-center sm:text-left px-10 py-6 flex flex-col gap-3">
-                                            <div className="font-title text-4xl text-center">2.</div>
-                                            <div> You can get instant access to everything and more bonus updates (being released every week), <span className="text-lychee-peach">at not a single penny more than what you pay today.</span></div>
-                                            <div className="text-lychee-peach">Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else.</div>
-                                        </div>
-                                        <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => window.location.href = 'https://buy.stripe.com/cN2bL2gp03mC5AkfZ9'}>
-                                            <div className="font-title text-3xl font-bold">
-                                                Get Lifetime Access
+                                    <div className="w-1/2 flex place-items-center place-content-center">
+                                        <div className="p-10 rounded-xl w-1/2 border border-1 border-lychee-green">
+                                            <div className="font-black text-center pb-4"> Our Pledge </div>
+                                            <div className="p-1">
+                                                10% of all profits will be donated to charity.
                                             </div>
-                                            <div className="flex gap-2 pt-4"><IoCheckmarkSharp className="text-green-400" />Includes all future updates. </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Includes all Features in Free tier </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Vote to prioritize feature buildouts based on your needs </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Create Personalized Dashboard</div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />3 Integrations out of the box (subject to usage limits) </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Insider/ Early bird on all future prices, topups, etc </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Multiple file uploads (each file up to 512 MB).</div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />access to more storage when availabe. </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" /> $100 in of AI requests credits/ month included for LIFE </div>
-                                            <div className="flex gap-2"><IoCheckmarkSharp className="text-green-400" />Help Lychee grow, expand in early stages of buildout. </div>
-                                            <div className="py-6 text-6xl text-center">
-                                                $69.99
+                                            <div className="font-black p-1">Every quarter</div>
+                                            <div className="font-black p-1">YOU the community can vote on</div>
+                                            <div className="p-1">
+                                                A different charity, program, research initiative, donation, Kick Starter project, community investment, scholarship ...
                                             </div>
-                                            <div className="bg-lychee-green w-12 py-1 text-center font-black rounded-full mx-auto text-white">
-                                                Go
-                                            </div>
-                                            <div className="text-xs flex gap-2 flex-wrap pt-10">
-                                                <div className="text-black">SOLD OUT: </div>
-                                                <div className="line-through">$2.99</div>
-                                                <div className="line-through">$9.99</div>
-                                                <div className="line-through">$14.99</div>
-                                                <div className="line-through">$19.99</div>
-                                                <div className="line-through">$29.99</div>
-                                            </div>
-                                            
+                                            <div className="text-center pt-8">❤️ <Link href={"https://twitter.com/misterrpink1"}>Misterrpink </Link></div>
                                         </div>
                                     </div>
                                 </div>
+                                <div className="grid w-full place-content-left font-black text-6xl pl-36 py-10">
+                                    <div>Simple and</div>
+                                    <div>Sustainable Pricing</div>
+                                </div>
+                                <div className="grid px-32 mx-auto">
+                                    <div className="grid grid-cols-3 text-center place-items-center"> 
+                                        <div></div>
+                                        <div></div>
+                                        <div className="py-4 font-black">Life Time Deal</div>
+                                    </div>
+                                    <div className="grid grid-cols-3 h-64"> 
+                                        <div className="w-11/12 shadow-sm flex flex-col place-items-center place-content-center bg-slate-100 ">
+                                            <div className="text-8xl font-black">9.99/m</div>
+                                        </div>
+                                        <div className="w-11/12 shadow-sm flex flex-col place-items-center place-content-center bg-slate-100">
+                                            <div className="text-8xl font-black">6.99/m</div>
+                                            <div className="font-black text-xl pt-2">Annual</div>
+                                        </div>
+                                        <div className="w-11/12 shadow-sm flex flex-col place-items-center place-content-center bg-lychee-green">
+                                            <div className="text-8xl font-black text-white">69.99</div>
+                                            <div className="text-white font-black pt-2 text-xl">One Time Payment</div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 text-center py-4 text-lychee-green font-black"> 
+                                        <div><div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/bIY16o5Km8GW4wgeV6">Start Trial</Link></div></div>
+                                        <div> 
+                                            <div>Get 3 months free</div>
+                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/6oEdTa2ya5uK1k47sF">Start Trial</Link></div></div>                                        
+                                        <div>
+                                            <div>{'<'}0.99/month</div>
+                                            <div className="font-thin">If you use Lychee for 5 years</div>
+                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/cN2bL2gp03mC5AkfZ9">Start Trial</Link></div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3">
+                                        <div className="col-span-2 pr-10">
+                                            <div className="text-center font-black">All Plans Include</div>
+                                            <div className="text-center pb-4">7 day free trial.</div>
+                                            <div className="bg-slate-100 flex px-20 py-10">
+                                                <div className="w-1/2">
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> Upload Data</div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> Generate Data</div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> Powerful Table</div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> Personalized Dashboard </div>
+                                                </div>
+                                                <div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> 1,000+ Charts (new charts added daily)</div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> 10,000+ Curated color pallates uploaded daily</div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> 512 MB file upload space *</div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> 3 integrations *</div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> $100 in Lychee Tokens/ month *</div>
+                                                    <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> 100% Data ownership </div>
+                                                </div> 
+                                            </div>
+                                        </div>
+                                        <div className="grid place-content-center">
+                                            <div className="text-center font-black">Lifetime Membership </div>
+                                            <div className="flex place-items-center gap-4 place-content-center"> <LuMoveLeft /> includes all features</div>
+                                            <div className="pt-4">
+                                                <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div>Includes all Future features</div>
+                                                <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> Check Roadmap to see how prices will be changed in the future</div>
+                                                <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> Not a single penny more than what you pay today.</div>
+                                                <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>                                    
                             </div>
                     }
                     {

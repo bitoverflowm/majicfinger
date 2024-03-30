@@ -8,6 +8,7 @@ import { useMyState  } from '@/context/stateContext'
 
 import { FaPlay  } from "react-icons/fa";
 import { MdArrowRight, MdOutlineSmartDisplay  } from "react-icons/md";
+import CountUp from 'react-countup'
 
 
 
@@ -52,8 +53,8 @@ const LandingPage = () => {
                                     Zero Hassle.
                                 </div>
                                 <div className='flex place-content-center py-3'>
-                                    <div className='flex place-items-center gap-2 py-1 px-2 bg-lychee-white/30 rounded-2xl text-black'>
-                                        <div className='text-xxs'> +5K happy unique users WorldWide</div> 
+                                    <div className='flex place-items-center gap-2 py-2 px-4 bg-lychee-white/30 rounded-full text-black'>
+                                        <div className='text-sm'> +5K happy unique users WorldWide</div> 
                                     </div>
                                 </div>
                                 <div className='flex flex-wrap gap-4 px-8 py-8'>
@@ -98,18 +99,15 @@ const LandingPage = () => {
                                             </div>
                                         </div>                                    
                                     </div>
-                                    <div className='grow basis-1/4 flex flex-col place-items-center gap-2'>
-                                        <div className='py-2 text-xs text-black rounded-full '>
-                                            🦄 New: Repeat after me ... "Data is beautiful"
+                                    <div className='grow basis-1/4 grid place-items-center gap-2 '>
+                                        <div className='py-2 px-5 text-xs text-center'>
+                                            🦄 Repeat after me ... "Data is beautiful"
                                         </div>
-                                        <div className='grow pl-8 p-4 pt-8 text-left rounded-xl border-lychee-black border-4 shadow-xl w-full'>
-                                            <div className='text-2xl text-black'>Curated collection of beautiful colors and pallates updated daily</div>
-                                        </div>
-                                        <div className='grow pl-8 p-4 pt-8 text-left rounded-xl bg-lychee-white w-full shadow-xl'>
-                                            <div className='text-4xl text-black'>Gallery</div>  
-                                            <div className='text-xs text-black pt-2'>
-                                                Browse over 100 charts, graphs, tools, you name it...
+                                        <div className='flex flex-col gap-2 w-full min-h-[335px] pl-8 p-4 pt-8 text-left rounded-xl border-lychee-black border-4 shadow-xl w-full '>
+                                            <div className='text-8xl text-lychee-black text-black pt-2'>
+                                                <CountUp end={796000} duration={5} />
                                             </div>
+                                            <div className='text-4xl text-lychee-green pt-2'> beautiful curated colors, pallates, charts, graphs, tools updated daily</div>
                                         </div>
                                     </div>
                                 </div>
@@ -367,7 +365,7 @@ const LandingPage = () => {
                                 </div>
                             </div>
                             <div className='flex place-content-center mb-56'>
-                                <div className='bg-lychee-green text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
+                                <div className='bg-lychee-green text-white hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-5 py-4 rounded-full text-xs' onClick={()=>setWorking('getLychee')}>
                                     Try It Now
                                 </div>
                             </div>
