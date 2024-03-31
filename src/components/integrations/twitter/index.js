@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import Image from 'next/image';
 import { useState } from 'react';
 import { Transition } from '@headlessui/react';
 import { useShepherdTour } from "react-shepherd";
@@ -10,6 +11,10 @@ import steps from './tourSteps';
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { HiOutlinePencilSquare } from "react-icons/hi2"
 import { BiDownArrow, BiUpArrow } from "react-icons/bi";
+import { IoSearch } from "react-icons/io5";
+import { IoIosAddCircleOutline } from "react-icons/io";
+
+
 
 import { useUser } from '@/lib/hooks';
 
@@ -17,6 +22,7 @@ import GridView from '../../gridView';
 
 import ParamToggles from './paramToggles';
 import { params } from './params';
+import twitterDemoData from './twitterDemoData';
 
 const tourOptions = {
     defaultStepOptions: {
@@ -36,7 +42,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
     const [loading, setLoading] = useState(false);
     const [connected, setConnected] = useState(false);
 
-    const [handle, setHandle] = useState('');
+    const [handle, setHandle] = useState('elonmusk');
     const [editingHandle, setEditingHandle] = useState(false);
     const [originalVal, setOriginalVal] = useState('');
 
@@ -194,13 +200,61 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
         }
     }, [connecting])
 
-    /* Step handler */
+    
+    // staging data - this is twitter data being pulled before user submits for charting.
+    const [stagingData, setStagingData] = useState(twitterDemoData.elonmusk);
+
 
     
     {/*<Script type="module" src="shepherd.js/dist/shepherd.js" /> */}
 
     return (
-        <div className='w-full mx-auto px-48'>
+        <div className='flex w-full p-10 '>
+            <div className='bg-white shadow-xl basis-3/12 px-2'>
+                <div className='dropdown w-full text-sm'>
+                    <div className='flex text-black place-items-center' tabIndex={0} role="button"> 
+                        <div className='rounded-full bg-slate-200 w-[25px] h-[25px] mx-1' > 
+                            {stagingData 
+                                ? <Image src={stagingData.userData.profile_image_url} width={25} height={25} className='rounded-full'/>
+                                : <AiOutlineLoading3Quarters className='animate-spin'/>}
+                        </div>
+                        <div className='mr-2 ml-1 font-bold'>
+                            {stagingData
+                                ? stagingData.userData.name
+                                : <AiOutlineLoading3Quarters className='animate-spin'/>}
+                        </div>
+                        <div className='text-black flex-grow mr-4'>
+                            {handle ? '@'+handle : <AiOutlineLoading3Quarters className='animate-spin'/>}
+                        </div>
+                        <div className='pr-2'>
+                            <IoSearch />                        
+                        </div>
+                    </div>
+                    <div tabIndex={0} className="dropdown-content z-[1] card card-compact w-64 p-2 shadow bg-primary text-primary-content">
+                        <div className="card-body">
+                        <h3 className="card-title">Card title!</h3>
+                        <p>you can use any element as a dropdown.</p>
+                        </div>
+                    </div>
+
+                </div>
+                <div className='pt-3 px-2 '>
+                    <div className='text-slate-600 text-xs font-thin'>Available actions</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> Get {handle}'s Pinned Tweet</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center'><div><IoIosAddCircleOutline /></div> Get tweets liked by {handle}</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> Get {handle}'s followers</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center'><div><IoIosAddCircleOutline /></div> Get user's followed by {handle}</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> Get lists owned by {handle}</div>
+                </div>
+                <div className='pt-3'>
+                    <div className='text-slate-600 text-xs font-thin'>Inspiration</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> What are your competitor's most popular tweets?</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center'><div><IoIosAddCircleOutline /></div> Who are your biggest fans?</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> Who are your competitor's biggest followers?</div>
+                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-b'><div><IoIosAddCircleOutline /></div> Make a list and start a contest?</div>
+                </div>                
+            </div>
+
             {
                 connected && <div className='w-5/6'>
                                 <div className='font-black text-slate-600'>Your data preview...</div>

@@ -6,7 +6,7 @@ const nextConfig = {
     esmExternals: 'loose'
   },
   images: {
-    domains: [''],
+    domains: ['pbs.twimg.com'],
   },
 }
 

@@ -10,6 +10,7 @@ import { IoCheckmarkSharp, IoWarningOutline  } from "react-icons/io5";
 import { ImMagicWand } from "react-icons/im";
 import { LuMoveLeft } from "react-icons/lu";
 import { FaCircle } from "react-icons/fa6";
+import { MdArrowRightAlt } from "react-icons/md";
 
 import { useMyState  } from '@/context/stateContext'
 import { useUser } from '@/lib/hooks';
@@ -44,16 +45,6 @@ const ActionMenu = () => {
     const setFmtCols = contextState?.setFmtCols
     const dflt = contextState?.dflt
     const setDflt = contextState?.setDflt
-
-    /*
-     * State hooks
-     */
-    //const [csv, setCSV] = useState()
-    const uploadRef = useRef(null)
-    const gridRef = useRef(null)
-    const chartRef = useRef(null)
-   
-    const [emailVisible, setEmailVisible] = useState(false)
     
     const handleFileUpload = (e) => {
         const file = e.target.files[0]
@@ -99,11 +90,6 @@ const ActionMenu = () => {
 
     }
 
-    const emailHandler = (e) => {
-        const email = e.target.value
-        console.log(email)
-    }
-
 
     useEffect(()=>{
         if(working){
@@ -143,7 +129,7 @@ const ActionMenu = () => {
 
 
     return(
-        <div className="flex flex-col w-screen bg-white">
+        <div className="w-screen bg-white">
             { aiOpen &&
                 <div className="fixed right-0 top-0 h-dvh w-full z-30 sm:w-1/4 bg-lychee-white backgroung-blur-xl flex flex-col place-items-center place-content-center px-6">
                     <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setAiOpen(false)}><GoEyeClosed /></div>
@@ -153,18 +139,22 @@ const ActionMenu = () => {
                 </div>
             }
 
-            <div className="flex flex-col w-screen min-h-screen" id="dashboard-section">
-                <div className="h-1/6 flex flex-wrap place-items-center place-content-center gap-2 py-4 px-4 text-sm">
-                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'upload' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('upload')}>Upload Data</div>
-                    <div className={`shadow-lg rounded-md py-1 px-2 ${aiOpen ? 'bg-lychee-red text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}>Generate Data</div>                    
-                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'grid' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('grid')}>Table</div>
-                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'chart' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('chart')}>Chart</div>
-                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'dashboard' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}  onClick={()=>setWorking('dashboard')}>Dashboard</div>
-                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'integrations' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('integrations')}>Integrations</div>
-                    <div className={`flex gap-2 shadow-xl rounded-md py-1 px-2 text-white ${aiOpen ? 'text-lychee-black bg-lychee-black': ' bg-lychee-red cursor-pointer hover:bg-lychee-black hover:text-white'} `} onClick={()=>setAiOpen(true)}><ImMagicWand /> Lychee AI</div>
-                    <div className="shadow-lg rounded-md py-1 px-2 hover:bg-lychee-black hover:text-white cursor-pointer" onClick={()=>setWorking('export')}><CiExport /></div>
-                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('roadmap')}>Roadmap</div>
-                    <div className={`shadow-lg rounded-md py-1 px-2 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'font-bold bg-green-300 text-lychee-black cursor-pointer hover:bg-lychee-black hover:text-white'} `}   onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
+            <div className="w-screen min-h-screen" id="dashboard-section">
+                <div className="h-1/6 flex place-items-center place-content-center py-2 text-xs">
+                    {
+                        !(user) && <div className="flex">Check it out right here <MdArrowRightAlt /> </div>
+                    }
+                    <div className="flex py-2 px-4">
+                        <div className={`rounded-l-full py-3 px-4 ${working === 'upload' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('upload')}>Upload</div>
+                        <div className={`py-3 px-4 ${working === 'grid' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('grid')}>Table</div>
+                        <div className={`py-3 px-4 ${working === 'chart' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('chart')}>Chart</div>
+                        <div className={`py-3 px-4 ${working === 'dashboard' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('dashboard')}>Dashboard</div>
+                        <div className={`py-3 px-4 ${working === 'integrations' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('integrations')}>Integrations</div>
+                        <div className={`py-3 px-4 ${aiOpen ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setAiOpen(true)}>Lychee AI</div>
+                        <div className={`py-3 px-4 ${working === 'export' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('export')}><CiExport /></div>
+                        <div className={`py-3 px-4 ${working === 'roadmap' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('roadmap')}>Roadmap</div>
+                        <div className={`rounded-r-full py-3 px-4 ${working === 'getLychee' ? 'bg-lychee-black text-white': 'text-black font-black shadow-2xl text-black bg-lychee-go/60 cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('getLychee')}>Get Lychee</div>
+                    </div>
                 </div>
                 <div className="w-full h-full flex place-content-center">
                     {
@@ -236,15 +226,12 @@ const ActionMenu = () => {
                     }
                     {
                         fmtCols && data && ((working && working === 'chart') || !working) &&
-                            <div className="h-full w-full flex flex-col xl:flex-row">
-                                <div className="hidden xl:block w-2/12 shadow-xl rounded-sm mx-5">
+                            <div className="min-h-screen w-screen flex flex-col xl:flex-row">
+                                <div className="py-5 h-fit xl:block w-2/12 shadow-xl rounded-sm mx-5">
                                     <ChartDataMods/>
                                 </div>
-                                <div className="w-[450px] h-[750px] sm:w-[1200px]">
+                                <div className="w-[450px] h-[750px] sm:w-[1200px] 2xl:w-[1700px] 2xl:h-[1000px]">
                                     <ChartView/>
-                                </div>
-                                <div className="xl:hidden shadow-2xl px-5 py-10 rounded mx-10">
-                                    <ChartDataMods />
                                 </div>
                             </div>
                             
@@ -270,31 +257,31 @@ const ActionMenu = () => {
                                     <div>* Become a lifetime member to vote on which features to accelerate</div>
                                 </div>
                                 <div className="flex flex-wrap gap-4">
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300" >
                                             <div className="font-regular text-sm">
                                                 Select which Data Streams you want on your dashboard
                                             </div>
                                             <div>📡</div>
                                     </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300" >
                                             <div className="font-regular text-sm">
                                                 Define programmatic rules to occur based on your data
                                             </div>
                                             <div>👩‍💻</div>
                                     </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
                                             <div className="font-regular text-sm">
                                                 Connect the dots however you want
                                             </div>
                                             <div>🚀</div>
                                     </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300" >
                                             <div className="font-regular text-sm">
                                                 Share your dashboard view with your team or audience
                                             </div>
                                             <div>👀</div>
                                     </div>
-                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300"  onClick={() => setEmailVisible(true)}>
+                                    <div className="bg-white rounded-md shadow-2xl border-l-4 border-lychee-black py-12 px-10 hover:bg-lychee-black hover:text-lychee-white hover:border-lychee-red cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300">
                                             <div className="font-regular text-sm">
                                                 Export your dashboard to yout apple watch or any mobile device or URL link
                                             </div>
@@ -409,10 +396,7 @@ const ActionMenu = () => {
                 </div>
             </div>
             <div className="py-4 max-w-8 mx-auto">
-                <div>
-                <img src={"./fruit.png"} />
-                </div>
-                
+                <div><img src={"./fruit.png"} /></div>                
             </div>
         </div>
     )

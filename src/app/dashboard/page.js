@@ -23,9 +23,7 @@ const Dashbaord = () => {
     return (
         <StateProvider>
             <Nav/>
-            <div className="p-2">
-                <ActionMenu />
-            </div>
+            <ActionMenu />
         </StateProvider>
     )
 }

@@ -50,5 +50,8 @@
     "use-count-up": "^3.0.1",
     "usgs-earthquake-api": "^1.0.32",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "daisyui": "^4.9.0"
   }
 }
