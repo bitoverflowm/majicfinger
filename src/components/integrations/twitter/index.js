@@ -8,8 +8,7 @@ import Script from 'next/script';
 
 import steps from './tourSteps';
 
-import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { HiOutlinePencilSquare } from "react-icons/hi2"
+import { AiOutlineLoading3Quarters, AiOutlineArrowLeft } from "react-icons/ai";
 import { BiDownArrow, BiUpArrow } from "react-icons/bi";
 import { IoSearch } from "react-icons/io5";
 import { IoIosAddCircleOutline } from "react-icons/io";
@@ -203,6 +202,12 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
     
     // staging data - this is twitter data being pulled before user submits for charting.
     const [stagingData, setStagingData] = useState(twitterDemoData.elonmusk);
+    const [paramsOpen, setParamsOpen] = useState(false)
+
+    const queryHandler = (q) => {
+        setParamsOpen(true)
+        setStepName(q)
+    }
 
 
     
@@ -238,22 +243,82 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                     </div>
 
                 </div>
-                <div className='pt-3 px-2 '>
-                    <div className='text-slate-600 text-xs font-thin'>Available actions</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> Get {handle}'s Pinned Tweet</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center'><div><IoIosAddCircleOutline /></div> Get tweets liked by {handle}</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> Get {handle}'s followers</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center'><div><IoIosAddCircleOutline /></div> Get user's followed by {handle}</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> Get lists owned by {handle}</div>
+                <div className='pt-3'>
+                    <div className='px-2 cursor-pointer text-slate-600 text-xs font-thin'>Available actions</div>
+                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center border-y' onClick={()=>queryHandler('user_pinned_tweet')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get {handle}'s Pinned Tweet</div>
+                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center' onClick={()=>queryHandler('user_likes_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get tweets liked by {handle}</div>
+                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center border-y' onClick={()=>queryHandler('user_followers_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get {handle}'s followers</div>
+                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center' onClick={()=>queryHandler('user_follows_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get user's followed by {handle}</div>
+                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center border-y' onClick={()=>queryHandler('user_owned_lists_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get lists owned by {handle}</div>
                 </div>
                 <div className='pt-3'>
-                    <div className='text-slate-600 text-xs font-thin'>Inspiration</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> What are your competitor's most popular tweets?</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center'><div><IoIosAddCircleOutline /></div> Who are your biggest fans?</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-y'><div><IoIosAddCircleOutline /></div> Who are your competitor's biggest followers?</div>
-                    <div className='text-sm mt-1 py-2 flex gap-2 place-items-center border-b'><div><IoIosAddCircleOutline /></div> Make a list and start a contest?</div>
+                    <div className='text-slate-600 text-xs font-thin border-b'>Inspiration</div>
+                    <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> What are your competitor's most popular tweets?</div>
+                    <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Who are your biggest fans?</div>
+                    <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Who are your competitor's biggest followers?</div>
+                    <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Make a list and start a contest?</div>
                 </div>                
             </div>
+            <Transition
+                show={!(stepName) === false && paramsOpen}
+                enter="transition-opacity duration-1000"
+                enterFrom="opacity-0 basis-0/12"
+                enterTo="opacity-100 basis-3/12"
+                leave="transition-opacity duration-150"
+                leaveFrom="opacity-100 basis-3/12"
+                leaveTo="opacity-0 basis-0/12"
+                className={'bg-white shadow-xl px-2 basis-3/12'}>
+                    <div className='flex cursor-pointer hover:text-lychee-red text-xs pl-2' onClick={()=>setParamsOpen(false)}> <AiOutlineArrowLeft /> Close </div>
+                    {
+                        stepName && params[stepName].expansions &&
+                            <>
+                                <div className='font-bold text-slate-600 text-xs'>Get user's pinned tweet?</div>
+                                <div className='flex flex-wrap pinned_tweet_tour'>
+                                    {params.user_by_handle.expansions.map((val) => (
+                                        <ParamToggles key={val} field_type="expansions" val={val} toggle={() => toggleParams('expansions', val)} arr={expansions}/>
+                                    ))}
+                                </div>
+                            </>
+                    }
+                    {
+                        stepName && params[stepName].tweetFields &&
+                            <div className=''>
+                                <div className='font-bold text-slate-600 text-xs'>Pinned Tweet Details</div>
+                                {/* For tweetFields */}
+                                <div className='flex flex-wrap'>
+                                    {params.user_by_handle.tweetFields.map((val) => (
+                                        <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
+                                    ))}
+                                </div>
+                            </div>
+                    }
+                    {
+                        stepName && params[stepName].userFields &&
+                            <div className=''>
+                                <div className='font-bold text-slate-600 text-xs'>Pinned Tweet Details</div>
+                                {/* For tweetFields */}
+                                <div className='flex flex-wrap'>
+                                    {params.user_by_handle.tweetFields.map((val) => (
+                                        <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
+                                    ))}
+                                </div>
+                            </div>
+                    }
+                    {
+                        stepName && params[stepName]['list.fields'] &&
+                            <div className=''>
+                                <div className='font-bold text-slate-600 text-xs'>Pinned Tweet Details</div>
+                                {/* For tweetFields */}
+                                <div className='flex flex-wrap'>
+                                    {params.user_by_handle.tweetFields.map((val) => (
+                                        <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
+                                    ))}
+                                </div>
+                            </div>
+                    }
+            </Transition>
+
+
 
             {
                 connected && <div className='w-5/6'>

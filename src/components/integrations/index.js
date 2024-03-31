@@ -57,9 +57,7 @@ const Integrations = () => {
     return (
         <div className='w-full min-h-screen flex px-5'>
             {/* helper section*/}
-            <>
-                <div className={`${helperOpen && 'hidden'} fixed -right-8 top-60 -rotate-90 flex gap-2 cursor-pointer text-sm place-items-center bg-lychee-black text-white pt-4 pb-8 pl-4 pr-6 rounded-t-xl transition duration-150 hover:-translate-x-2.5 hover:bg-gradient-to-r hover:from-lychee-black hover:to-lychee-red `} onClick={()=>setHelperOpen(true)}><IoHelp /> Helper</div>
-            </>
+            <div className={`${helperOpen && 'hidden'} fixed -right-8 top-60 -rotate-90 flex gap-2 cursor-pointer text-sm place-items-center bg-lychee-black text-white pt-4 pb-8 pl-4 pr-6 rounded-t-xl transition duration-150 hover:-translate-x-2.5 hover:bg-gradient-to-r hover:from-lychee-black hover:to-lychee-red `} onClick={()=>setHelperOpen(true)}><IoHelp /> Helper</div>
             {/* end of helper section*/}
             <div className='bg-lychee-green rounded-3xl px-6 py-7'>                                        
                 <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaSquareXTwitter /><div className='text-xxs text-center pt-2'>Twitter</div></div>
@@ -73,7 +71,6 @@ const Integrations = () => {
                 <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaStrava  /><div className='text-xxs text-center pt-2'>Strava</div></div>
                 <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><SiQuickbooks /><div className='text-xxs text-center pt-3'>QuickBooks</div></div>
                 <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><IoMdAdd  /><div className='text-xxs text-center pt-2'>More</div></div>
-
             </div>
             <div className='w-full h-full'>
                 <TwitterIntegration setData={setData} setDflt={setDflt} connecting={connecting} stepName={stepName} setStepName={setStepName}/>
