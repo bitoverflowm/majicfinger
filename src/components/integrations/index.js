@@ -67,7 +67,7 @@ const Integrations = () => {
                     leave="transition ease-in-out duration-300 transform"
                     leaveFrom="0"
                     leaveTo="translate-x-full"
-                    className="fixed top-0 right-0 w-2/5 bg-slate-100/40 backdrop-blur-2xl h-dvh shadow-xl px-10 pt-10"
+                    className="fixed top-0 right-0 w-2/5 bg-slate-100/40 backdrop-blur-2xl h-dvh shadow-xl px-10 pt-10 z-20"
                 >
                     <div className='font-black cursor-pointer' onClick={()=>setHelperOpen(false)}><IoMdClose /></div>
                     {

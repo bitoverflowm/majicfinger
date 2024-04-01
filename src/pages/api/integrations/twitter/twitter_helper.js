@@ -106,7 +106,6 @@ const fetch_twitter_followers_by_id = async (id, userFields, tweetFields, expans
         
         //A comma separated list of fields to expand
         expansions: expansions,
-        asPaginator: true
       });
     return userData
 }
@@ -140,7 +139,6 @@ const fetch_twitter_owned_lists_by_id = async (id, listFields, userFields, expan
         
         //A comma separated list of fields to expand
         expansions: expansions,
-        asPaginator: true
       });
     return listData
 }

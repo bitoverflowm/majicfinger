@@ -47,7 +47,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
 
     //User search by handle and get ID
     const [userSearchOpen, setUserSearchOpen] = useState(true);
-    const [userHandleId, setUserHandleId] = useState();
+    const [userHandleId, setUserHandleId] = useState(27260086);
     
     //User likes by user Id
     const [userLikesOpen, setUserLikesOpen] = useState(false);
@@ -114,7 +114,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
             } else {
                 setTweetFields([...tweetFields, value]);
             }
-        } else if(fieldType === 'list.fields'){
+        } else if(fieldType === 'listFields'){
             if(listFields.includes(value)){
                 setListFields(listFields.filter(item => item !== value));
             } else {
@@ -124,8 +124,38 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
     }
 
 
+    
+    // staging data - this is twitter data being pulled before user submits for charting.
+    const [stagingData, setStagingData] = useState(twitterDemoData.elonmusk);
+    const [paramsOpen, setParamsOpen] = useState(false)
+    const [demoUserNames, setDemoUserNames] = useState(['elonmusk', 'justinbieber', 'christiano', 'jack', 'kanyewest', 'BarackObama', 'lychee_xyz', 'spaceX'])
+    const [searchingUserName, setSearchingUserName] = useState()
+
+    const queryHandler = (q) => {
+        setParamsOpen(true)
+        setStepName(q)
+        setHelperOpen(true)
+    }
+
+    const triggerUserPull = async (e, username) => {
+        if(username && demoUserNames.includes(username)){
+            setHandle(username)
+            setUserHandleId(twitterDemoData[username].userData.id)
+            setStagingData(twitterDemoData[username])
+            e.target.parentElement.parentElement.parentElement.removeAttribute('open');
+        }else{
+            setEditingHandle(false)
+            setHandle(searchingUserName)
+            await fetchTwitterHandler('user_by_handle')
+            e.target.parentElement.parentElement.parentElement.removeAttribute('open');
+        }
+        
+    }
+
     const fetchTwitterHandler = async (ask) => {
         setLoading(true);
+        setParamsOpen(false);
+        setHelperOpen(false);
 
         try {
             // Append the handle as a query parameter in the URL
@@ -159,7 +189,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
             }else{
                 const url = new URL(`/api/integrations/twitter/${ask}`, window.location.origin);
                 url.searchParams.append('handleId', userHandleId);
-                let thirdParam = tweetFields ? tweetFields : listFields
+                let thirdParam = tweetFields.len ? tweetFields : listFields
                 let res = await fetch(url, {
                     method: 'POST',
                     headers: {
@@ -190,35 +220,6 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
             console.error("Fetch error:", error);
         } finally {
             setLoading(false);
-        }
-    }    
-
-    useEffect(()=> {
-        if(connecting && connecting === 'twitter' && !(user)){
-            tour.start()
-        }
-    }, [connecting])
-
-    
-    // staging data - this is twitter data being pulled before user submits for charting.
-    const [stagingData, setStagingData] = useState(twitterDemoData.elonmusk);
-    const [paramsOpen, setParamsOpen] = useState(false)
-    const [demoUserNames, setDemoUserNames] = useState(['elonmusk', 'justinbieber', 'christiano', 'jack', 'kanyewest', 'BarackObama', 'lychee_xyz', 'spaceX'])
-    const [searchingUserName, setSearchingUserName] = useState()
-
-    const queryHandler = (q) => {
-        setParamsOpen(true)
-        setStepName(q)
-        setHelperOpen(true)
-    }
-
-    const triggerUserPull = async (username) => {
-        if(demoUserNames.includes(username)){
-            setHandle(username)
-            setStagingData(twitterDemoData[username])
-        }else{
-            setHandle(username)
-            await fetchTwitterHandler('user_by_handle')
         }
     }
 
@@ -255,7 +256,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                             </div>
                             <div className=''>
                                 {demoUserNames.map((username) => (
-                                    <div key={username} className='flex place-items-center cursor-pointer py-1 hover:bg-lychee-go/20' onClick={()=>triggerUserPull(username)}>
+                                    <div key={username} className='flex place-items-center cursor-pointer py-1 hover:bg-lychee-go/20' onClick={(e)=>triggerUserPull(e, username)}>
                                         <div className='rounded-full bg-slate-200 w-[25px] h-[25px] mx-1 flex place-items-center place-content-center' > 
                                             {twitterDemoData[username] 
                                                 ? <Image src={twitterDemoData[username].userData.profile_image_url} width={25} height={25} className='rounded-full'/>
@@ -286,7 +287,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                                 }
                                 {editingHandle &&
                                     <div className="w-full flex gap-1 place-content-end">
-                                        <div className="py-1 px-2 bg-lychee-green text-white cursor-pointer hover:bg-lychee-black hover:text-white rounded-md" onClick={()=>setEditingHandle(false)}>Search</div>
+                                        <div className="py-1 px-2 bg-lychee-green text-white cursor-pointer hover:bg-lychee-black hover:text-white rounded-md" onClick={(e)=>triggerUserPull(e)}>Search</div>
                                         <div className="py-1 px-2 bg-slate-200 cursor-pointer hover:bg-lychee-black hover:text-white rounded-md" onClick={()=>cancelHandler('handle')}>Cancel</div>
                                     </div>
                                     }
@@ -311,7 +312,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                     <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Make a list and start a contest?</div>
                 </div>
                 <Transition
-                    show={stagingData && !(stagingData.userData) === false}
+                    show={stagingData && Boolean(stagingData.userData)}
                     enter="transition-opacity duration-1000"
                     enterFrom="opacity-0 basis-0/12"
                     enterTo="opacity-100 basis-3/12"
@@ -320,7 +321,8 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                     leaveTo="opacity-0 basis-0/12"
                     className={'bg-slate-100 pt-4 shadow-lg px-4 h-fit pb-4'}>
                         <div className='text-xs font-black'>{handle}'s User Data</div>
-                        <div className='pt-2 grid grid-cols-2'>
+                        <div className='pt-2 grid grid-cols-2 text-xs'>
+                            {stagingData.userData.id && <div> Id: {stagingData.userData.id}</div>}
                             {stagingData.userData.followers_count && <div> Followers: {stagingData.userData.followers_count}</div>}
                             {stagingData.userData.location && <div> location tag: {stagingData.userData.location} </div>}
                             {stagingData.userData.verified_type && <div> verified type: {stagingData.userData.verified_type} </div>}
@@ -360,7 +362,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                             <>
                                 <div className='font-bold text-slate-600 text-xs'></div>
                                 <div className='flex flex-wrap pinned_tweet_tour'>
-                                    {params.user_by_handle.expansions.map((val) => (
+                                    {params[stepName].expansions.map((val) => (
                                         <ParamToggles key={val} field_type="expansions" val={val} toggle={() => toggleParams('expansions', val)} arr={expansions}/>
                                     ))}
                                 </div>
@@ -407,240 +409,16 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                         <div className='shadow-sm px-3 py-1 bg-lychee-go text-lychee-black border border-lychee-go cursor-pointer hover:bg-lychee-green hover:text-white hover:border-lychee-green rounded-md hover:shadow-lychee-green hover:shadow-2xl' onClick={()=>fetchTwitterHandler(stepName)}>Connect</div>
                     </div>
             </Transition>
-
-
-
-
-            {
-                connected && <div className='w-5/6'>
-                                <div className='font-black text-slate-600'>Your data preview...</div>
-                                <div className='h-96 w-[1800px] -ml-16'>
-                                    <GridView sample={true}/>
-                                </div>
-                                <div className='px-10 -mt-10 text-sm pb-10'>
-                                    <div className='font-bold text-slate-800'>What's Next?</div>
-                                    <div>Go to Table to view your data set</div>
-                                    <div>Go to Chart to visualize your data</div>
-                                    <div>Or you can... </div>
-                                </div>
-                            </div>
-            }
-            {
-                stepName === 'twitterStart' &&
-                    <div className='flex gap-4 py-20'>
-                        <div>
-                            <div className='max-w-64 mx-auto bg-lychee-blue/60 p-2 px-3 rounded-md hover:bg-black hover:text-white cursor-pointer' onClick={()=>setStepName('userSearch')}>Username</div>
-                            <div className='px-10 py-4'>
-                                <div className='font-black text-slate-600'>get userdata:</div>
-                                <div className='px-2'>
-                                    <div>followers and follwing</div>
-                                    <div>pinned tweet</div>
-                                    <div>engagement stats</div>
-                                    <div>liked tweets</div>
-                                    <div>tweets</div>
-                                    <div>tweet stats</div>
-                                    <div>Lists and lists stats</div>
-                                    <div>follwer and follower data</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <div className='max-w-64 mx-auto bg-lychee-black text-white p-2 px-3 rounded-md hover:bg-lychee-blue/60 hover:text-black cursor-pointer' onClick={()=>setStepName('tweetSearch')}>Tweets</div>
-                            <div className='px-10 py-4'>
-                                <div className='font-black text-slate-600'>get general tweetdata:</div>
-                                <div className='px-2'>
-                                    <div>get the most recent tweets</div>
-                                    <div>query tweets by keywords</div>
-                                    <div>engagement stats</div>
-                                    <div>liked tweets</div>
-                                    <div>tweet stats</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-            }
-            {
-                stepName === 'userSearch' &&
-                    <>
-                    {/* Username pull */}
-                    <div className='flex gap-10 place-items-center'>
-                        <div className='font-black text-slate-600'>Enter a username</div>
-                        <div className={`border w-96 rounded-md py-2 ${handle === '' ? 'border-lychee-red border-2' : 'border-slate-100 border-0'}`}>
-                            <div className="px-1 flex gap-2 w-full twitter-handle-input" onClick={()=>!editingHandle && editHandler('handle')}>
-                                {
-                                editingHandle ? 
-                                    <input type="text" autoFocus={true} value={handle} onChange={(e)=>setHandle(e.target.value)} style={{ outline: 'none' }}/>
-                                    : <div className=''>@{handle}</div>
-                                }
-                                {editingHandle &&
-                                    <div className="w-full flex gap-1 place-content-end">
-                                        <div className="py-1 px-2 bg-lychee-green text-white cursor-pointer hover:bg-lychee-black hover:text-white rounded-md" onClick={()=>setEditingHandle(false)}>Save</div>
-                                        <div className="py-1 px-2 bg-slate-200 cursor-pointer hover:bg-lychee-black hover:text-white rounded-md" onClick={()=>cancelHandler('handle')}>Cancel</div>
-                                        </div>}
-                            </div>
-                        </div>
-                    </div>
-                    <Transition 
-                        show={!(handle==='')}
-                        enter="transition-opacity duration-1000"
-                        enterFrom="opacity-0 h-0"
-                        enterTo="opacity-100 h-auto"
-                        leave="transition-opacity duration-150"
-                        leaveFrom="opacity-100 h-auto"
-                        leaveTo="opacity-0"
-                        className={'pt-8'}>
-                        <div className='flex gap-4'>
-                            <div className='flex place-items-center place-content-center gap-2 cursor-pointer' onClick={()=>detailOpenHandler('userSearch')}>
-                                {
-                                    userSearchOpen
-                                        ? <><div className='text-xs' >Collapse </div>
-                                            <div className='hover:animate-bounce'><BiUpArrow /></div></>
-                                        : <><div className='text-xs'>Data Options </div>
-                                            <div className='hover:animate-bounce'><BiDownArrow /></div></>
-                                }
-                            </div>
-                        </div>
-                    </Transition>
-                    <Transition 
-                        show={!(handle==='') && userSearchOpen }
-                        enter="transition-opacity duration-1000"
-                        enterFrom="opacity-0 h-0"
-                        enterTo="opacity-100 h-auto"
-                        leave="transition-opacity duration-150"
-                        leaveFrom="opacity-100 h-auto"
-                        leaveTo="opacity-0"
-                        className={'grid grid-cols-3 pt-8'}>
-                            <div className=''>
-                                <div className='font-bold text-slate-600 text-xs'>Get user's pinned tweet?</div>
-                                <div className='flex flex-wrap pinned_tweet_tour'>
-                                    {params.user_by_handle.expansions.map((val) => (
-                                        <ParamToggles key={val} field_type="expansions" val={val} toggle={() => toggleParams('expansions', val)} arr={expansions}/>
-                                    ))}
-                                </div>
-                                {/*<ParamToggles field_type='expansions' val='pinned_tweet_id' toggle={toggleParams} arr={expansions}/>*/}
-                            </div>
-                            <div className='pinned_tweet_details_tour'>
-                                <div className='font-bold text-slate-600 text-xs'>Pinned Tweet Details</div>
-                                {/* For tweetFields */}
-                                <div className='flex flex-wrap'>
-                                    {params.user_by_handle.tweetFields.map((val) => (
-                                        <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className='user_details_tour'>
-                                {/* For userFields */}
-                                <div className='font-bold text-slate-600 text-xs'>User Details</div>
-                                <div className='flex flex-wrap'>
-                                    {params.user_by_handle.userFields.map((val) => (
-                                        <ParamToggles key={val} field_type="userFields" val={val} toggle={() => toggleParams('userFields', val)} arr={userFields}/>
-                                    ))}
-                                </div>
-                            </div>
-                    </Transition>
-                    <Transition 
-                        show={!(handle==='')}
-                        enter="transition-opacity duration-1000"
-                        enterFrom="opacity-0 h-0"
-                        enterTo="opacity-100 h-auto"
-                        leave="transition-opacity duration-150"
-                        leaveFrom="opacity-100 h-auto"
-                        leaveTo="opacity-0"
-                        className={'pt-8'}>
-                        <div className='flex place-content-center gap-4'>
-                            <div className='px-3 py-1 bg-black text-white cursor-pointer hover:bg-lychee-peach rounded-md' onClick={()=>fetchTwitterHandler('fetchUserByHandle')}>Connect</div>
-                        </div>
-                    </Transition>
-                    </>
-            }
-            {
-                stepName === 'userSearch1' &&
-                    <div className='gap-10 place-items-center'>
-                        go deeper, and select one of the following options:
-                        <div className='flex gap-2'>
-                            <div className='bg-lychee-blue/70 hover:bg-black hover:text-white cursor-pointer px-3 py-1' onClick={()=>setStepName('userLikesById')}>Tweets Liked by @{userHandleId && handle}</div>
-                            <div className='bg-lychee-blue/70 hover:bg-black hover:text-white cursor-pointer px-3 py-1' onClick={()=>setStepName('userFollowersById')}>Who follows @{userHandleId && handle}</div>
-                            <div className='bg-lychee-blue/70 hover:bg-black hover:text-white cursor-pointer px-3 py-1' onClick={()=>setStepName('userFollowsById')}>Who does @{userHandleId && handle} follow</div>
-                            <div className='bg-lychee-blue/70 hover:bg-black hover:text-white cursor-pointer px-3 py-1' onClick={()=>setStepName('userOwnedListsById')}>Lists owned by @{userHandleId && handle}</div>
-                        </div>
-                    </div>
-            }
-            <Transition 
-                show={['userLikesById', 'userFollowersById', 'userFollowingById', 'userOwnedListsById'].includes(stepName)}
+            <Transition
+                show={Boolean(userHandleId)}
                 enter="transition-opacity duration-1000"
-                enterFrom="opacity-0 h-0"
-                enterTo="opacity-100 h-auto"
+                enterFrom="opacity-0 basis-0/12"
+                enterTo="opacity-100 basis-3/12"
                 leave="transition-opacity duration-150"
-                leaveFrom="opacity-100 h-auto"
-                leaveTo="opacity-0"
-                className={'px-56'}>                            
-                {/* Get likes by user */}
-                <div className='flex gap-10 place-items-center'>
-                    <div className='w-96 font-bold text-slate-500 py-5'>Geting  
-                        {stepName === 'userLikesById' && ' Tweets Liked By'} 
-                        {stepName === 'userFollowersById' && ' Users Following'}
-                        {stepName === 'userFollowingById' && ' Users Followed by'}
-                        {stepName === 'userOwnedListsById' && ' Lists owned by'}
-                            @{userHandleId && handle}</div>
-                </div>
-
-                <div className='flex'>
-                    <div>
-                        <div className='font-bold text-slate-600 text-xs'>Get general info</div>
-                        <div className='flex flex-wrap'>
-                            {params[stepName] && params[stepName].expansions.map((val) => (
-                                <ParamToggles key={val} field_type="expansions" val={val} toggle={() => toggleParams('expansions', val)} arr={expansions}/>
-                            ))}
-                        </div>
-
-                    </div>
-                    {
-                        params[stepName] && params[stepName].tweetFields &&
-                        <div className=''>
-                            <div className='font-bold text-slate-600 text-xs'>Liked Tweet Details</div>
-                            {/* For tweetFields */}
-                            <div className='flex flex-wrap'>
-                                {params[stepName].tweetFields.map((val) => (
-                                    <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
-                                ))}
-                            </div>
-                        </div>
-                    }
-                    {
-                        params[stepName] && params[stepName].userFields &&
-                            <div>
-                                {/* For userFields */}
-                                <div className='font-bold text-slate-600 text-xs'>General User Details</div>
-                                <div className='flex flex-wrap'>
-                                    {params[stepName].userFields.map((val) => (
-                                        <ParamToggles key={val} field_type="userFields" val={val} toggle={() => toggleParams('userFields', val)} arr={userFields}/>
-                                    ))}
-                                </div>
-                            </div>
-                    }
-                    {
-                        params[stepName] && params[stepName]['list.fields'] &&
-                            <div>
-                                {/* For userFields */}
-                                <div className='font-bold text-slate-600 text-xs'>List Details</div>
-                                <div className='flex flex-wrap'>
-                                    {params[stepName]['list.fields'].map((val) => (
-                                        <ParamToggles key={val} field_type='list.fields' val={val} toggle={() => toggleParams('list.fields', val)} arr={userFields}/>
-                                    ))}
-                                </div>
-                            </div>
-                    }
-                </div>
-                
-                
-                <div className='flex mx-auto'>
-                    {
-                        userHandleId ?
-                            <div className={`px-3 py-1 bg-black text-white cursor-pointer hover:bg-lychee-peach rounded-md `} disabled onClick={()=>fetchTwitterHandler(stepName)}>Connect</div>
-                            : <div>Connect username before using this feature</div>
-                    }
-                    
-                </div>
+                leaveFrom="opacity-100 basis-3/12"
+                leaveTo="opacity-0 basis-0/12"
+                className={'h-full flex-grow basis-7/12 h-fit flex place-content-center'}>
+                    <GridView />
             </Transition>
             {loading &&
             <div className='flex place-items-center animate-pulse gap-2'>
