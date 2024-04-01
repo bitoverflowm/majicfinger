@@ -14,6 +14,7 @@ import { IoHelp } from "react-icons/io5";
 import { IoMdClose, IoMdAdd  } from "react-icons/io";
 import { FaSquareXTwitter } from "react-icons/fa6";
 
+import { definitions } from './twitter/definitions';
 
 
 import { useMyState  } from '@/context/stateContext'
@@ -58,25 +59,7 @@ const Integrations = () => {
         <div className='w-full min-h-screen flex px-5'>
             {/* helper section*/}
             <div className={`${helperOpen && 'hidden'} fixed -right-8 top-60 -rotate-90 flex gap-2 cursor-pointer text-sm place-items-center bg-lychee-black text-white pt-4 pb-8 pl-4 pr-6 rounded-t-xl transition duration-150 hover:-translate-x-2.5 hover:bg-gradient-to-r hover:from-lychee-black hover:to-lychee-red `} onClick={()=>setHelperOpen(true)}><IoHelp /> Helper</div>
-            {/* end of helper section*/}
-            <div className='bg-lychee-green rounded-3xl px-6 py-7'>                                        
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaSquareXTwitter /><div className='text-xxs text-center pt-2'>Twitter</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><WiEarthquake /><div className='text-xxs text-center pt-2'>Earthquakes</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><BiLogoInstagramAlt /><div className='text-xxs text-center pt-2'>Instagram</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaCcStripe /><div className='text-xxs text-center pt-2'>Stripe</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaLinkedin /><div className='text-xxs text-center pt-2'>LinkedIn</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaMeta /><div className='text-xxs text-center pt-2'>Meta</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><CgAppleWatch /><div className='text-xxs text-center pt-2'>Apple Watch</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><ImYoutube2 /><div className='text-xxs text-center pt-2'>Youtube</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaStrava  /><div className='text-xxs text-center pt-2'>Strava</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><SiQuickbooks /><div className='text-xxs text-center pt-3'>QuickBooks</div></div>
-                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><IoMdAdd  /><div className='text-xxs text-center pt-2'>More</div></div>
-            </div>
-            <div className='w-full h-full'>
-                <TwitterIntegration setData={setData} setDflt={setDflt} connecting={connecting} stepName={stepName} setStepName={setStepName}/>
-            </div>
-            <div className='hidden'>
-                <Transition
+            <Transition
                     show={helperOpen}
                     enter="transition ease-in-out duration-300 transform"
                     enterFrom="translate-x-full"
@@ -84,7 +67,7 @@ const Integrations = () => {
                     leave="transition ease-in-out duration-300 transform"
                     leaveFrom="0"
                     leaveTo="translate-x-full"
-                    className="fixed top-0 right-0 w-96 bg-lychee-blue h-dvh"
+                    className="fixed top-0 right-0 w-2/5 bg-slate-100/40 backdrop-blur-2xl h-dvh shadow-xl px-10 pt-10"
                 >
                     <div className='font-black cursor-pointer' onClick={()=>setHelperOpen(false)}><IoMdClose /></div>
                     {
@@ -129,14 +112,49 @@ const Integrations = () => {
                             </div>
                     }
                     {
-                        stepName === 'userSearch' &&
-                            <div>
-                                User Search info
+                        stepName && 
+                            <div className='mt-4 pt-4 px-10 bg-white/30'>
+                                <div className='text-xl text-slate-500'>Hi there,  </div>
+                                <div className='pt-1 text-xl text-slate-500'>With each "action" you are querying the entire integration platform.  </div>
+                                <div className='pt-1 text-xl text-slate-500'>That's billions upon billions of data points</div>
+                                <div className='pt-1 text-xl text-slate-500'>If you think Twitter is a lot of data, think about Twitter + Instagram + linkedin + quickbooks ... </div>
+                                <div className='pt-1 text-xl text-slate-500'>With Lychee you have the world's data at your fingertips</div>
+                                <div className='pt-4 text-2xl'>Options</div>
+                                <div className='pt-1'>Each option in a given action has a specific meaning and function listed below: </div>
+                                
+                                {
+                                    definitions && Object.entries(definitions).map(([key, value], i) => (
+                                        <div key={i} className='py-1 text-xs flex gap-4 hover:bg-slate-100'>
+                                            <div className='font-bold text-slate-400 basis-1/5'>{key}: </div>
+                                            <div className='basis-4/5'>{value}</div>
+                                        </div>
+                                    ))
+                                }
+                                
                             </div>
                     }
                     
+                    
 
-                </Transition>
+            </Transition>
+            {/* end of helper section*/}
+            <div className='bg-lychee-green rounded-3xl px-6 py-7'>                                        
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaSquareXTwitter /><div className='text-xxs text-center pt-2'>Twitter</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><WiEarthquake /><div className='text-xxs text-center pt-2'>Earthquakes</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><BiLogoInstagramAlt /><div className='text-xxs text-center pt-2'>Instagram</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaCcStripe /><div className='text-xxs text-center pt-2'>Stripe</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaLinkedin /><div className='text-xxs text-center pt-2'>LinkedIn</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaMeta /><div className='text-xxs text-center pt-2'>Meta</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><CgAppleWatch /><div className='text-xxs text-center pt-2'>Apple Watch</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><ImYoutube2 /><div className='text-xxs text-center pt-2'>Youtube</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><FaStrava  /><div className='text-xxs text-center pt-2'>Strava</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><SiQuickbooks /><div className='text-xxs text-center pt-3'>QuickBooks</div></div>
+                <div className='text-white text-5xl text-white py-2 text-center flex flex-col place-items-center'><IoMdAdd  /><div className='text-xxs text-center pt-2'>More</div></div>
+            </div>
+            <div className='w-full h-full'>
+                <TwitterIntegration setData={setData} setDflt={setDflt} connecting={connecting} stepName={stepName} setStepName={setStepName} setHelperOpen={setHelperOpen}/>
+            </div>
+            <div className='hidden'>
                 <Transition 
                         show={!connecting}
                         enter="transition-opacity duration-1000"

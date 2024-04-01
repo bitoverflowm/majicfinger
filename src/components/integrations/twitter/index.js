@@ -34,7 +34,7 @@ const tourOptions = {
   };
 
 
-const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepName}) => {
+const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepName, setHelperOpen}) => {
     const user = useUser();
     const tour = useShepherdTour({ tourOptions, steps: steps });
     
@@ -207,6 +207,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
     const queryHandler = (q) => {
         setParamsOpen(true)
         setStepName(q)
+        setHelperOpen(true)
     }
 
 
@@ -214,8 +215,8 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
     {/*<Script type="module" src="shepherd.js/dist/shepherd.js" /> */}
 
     return (
-        <div className='flex w-full p-10 '>
-            <div className='bg-white shadow-xl basis-3/12 px-2'>
+        <div className='flex w-full p-10 h-full'>
+            <div className='bg-white shadow-xl basis-3/12 px-2 h-fit'>
                 <div className='dropdown w-full text-sm'>
                     <div className='flex text-black place-items-center' tabIndex={0} role="button"> 
                         <div className='rounded-full bg-slate-200 w-[25px] h-[25px] mx-1' > 
@@ -267,12 +268,16 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                 leave="transition-opacity duration-150"
                 leaveFrom="opacity-100 basis-3/12"
                 leaveTo="opacity-0 basis-0/12"
-                className={'bg-white shadow-xl px-2 basis-3/12'}>
-                    <div className='flex cursor-pointer hover:text-lychee-red text-xs pl-2' onClick={()=>setParamsOpen(false)}> <AiOutlineArrowLeft /> Close </div>
+                className={'ml-2 bg-white shadow-lg basis-3/12 px-4 h-fit pb-4'}>
+                    <div className='flex cursor-pointer hover:text-lychee-red text-xs ' onClick={()=>setParamsOpen(false)}> <AiOutlineArrowLeft /> Close </div>
+                    <div className='pt-2'>
+                        <div className='text-sm font-bold text-slate-500'>Select the data points you want to examine</div>
+                        <div className='text-xs pt-1'>These will be your "columns"</div>
+                    </div>
                     {
                         stepName && params[stepName].expansions &&
                             <>
-                                <div className='font-bold text-slate-600 text-xs'>Get user's pinned tweet?</div>
+                                <div className='font-bold text-slate-600 text-xs'></div>
                                 <div className='flex flex-wrap pinned_tweet_tour'>
                                     {params.user_by_handle.expansions.map((val) => (
                                         <ParamToggles key={val} field_type="expansions" val={val} toggle={() => toggleParams('expansions', val)} arr={expansions}/>
@@ -283,10 +288,10 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                     {
                         stepName && params[stepName].tweetFields &&
                             <div className=''>
-                                <div className='font-bold text-slate-600 text-xs'>Pinned Tweet Details</div>
+                                <div className='font-bold text-slate-600 text-xs'>Tweet Details</div>
                                 {/* For tweetFields */}
                                 <div className='flex flex-wrap'>
-                                    {params.user_by_handle.tweetFields.map((val) => (
+                                    {params[stepName].tweetFields.map((val) => (
                                         <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
                                     ))}
                                 </div>
@@ -295,11 +300,11 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                     {
                         stepName && params[stepName].userFields &&
                             <div className=''>
-                                <div className='font-bold text-slate-600 text-xs'>Pinned Tweet Details</div>
+                                <div className='font-bold text-slate-600 text-xs'>User Details</div>
                                 {/* For tweetFields */}
                                 <div className='flex flex-wrap'>
-                                    {params.user_by_handle.tweetFields.map((val) => (
-                                        <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
+                                    {params[stepName].userFields.map((val) => (
+                                        <ParamToggles key={val} field_type="userFields" val={val} toggle={() => toggleParams('userFields', val)} arr={userFields}/>
                                     ))}
                                 </div>
                             </div>
@@ -307,15 +312,19 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                     {
                         stepName && params[stepName]['list.fields'] &&
                             <div className=''>
-                                <div className='font-bold text-slate-600 text-xs'>Pinned Tweet Details</div>
+                                <div className='font-bold text-slate-600 text-xs'>List Details</div>
                                 {/* For tweetFields */}
                                 <div className='flex flex-wrap'>
-                                    {params.user_by_handle.tweetFields.map((val) => (
-                                        <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
+                                    {params[stepName]['list.fields'].map((val) => (
+                                        <ParamToggles key={val} field_type="listFields" val={val} toggle={() => toggleParams('listFields', val)} arr={listFields}/>
                                     ))}
                                 </div>
                             </div>
                     }
+                    <div className='flex place-content-end gap-4 text-xs'>
+                        <div className='px-3 py-1 bg-white text-lychee-red border border-lychee-red cursor-pointer hover:bg-lychee-red hover:text-white rounded-md' onClick={()=>clearHandler()}>Clear</div>
+                        <div className='shadow-sm px-3 py-1 bg-lychee-go text-lychee-black border border-lychee-go cursor-pointer hover:bg-lychee-green hover:text-white hover:border-lychee-green rounded-md hover:shadow-lychee-green hover:shadow-2xl' onClick={()=>fetchTwitterHandler(stepName)}>Connect</div>
+                    </div>
             </Transition>
 
 
