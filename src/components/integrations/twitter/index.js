@@ -12,7 +12,7 @@ import { AiOutlineLoading3Quarters, AiOutlineArrowLeft } from "react-icons/ai";
 import { BiDownArrow, BiUpArrow } from "react-icons/bi";
 import { IoSearch } from "react-icons/io5";
 import { IoIosAddCircleOutline } from "react-icons/io";
-
+import { PiUserSwitch } from "react-icons/pi";
 
 
 import { useUser } from '@/lib/hooks';
@@ -73,7 +73,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
 
     const cancelHandler = (origin) => {
         if(origin === 'handle'){
-            setHandle(originalVal)
+            setSearchingUserName()
             setEditingHandle(false)
             setOriginalVal('')
         } /*else if(origin === 'subTitle'){
@@ -129,7 +129,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
 
         try {
             // Append the handle as a query parameter in the URL
-            if(ask === 'fetchUserByHandle'){
+            if(ask === 'user_by_handle'){
                 const url = new URL('/api/integrations/twitter/userhandle', window.location.origin);
                 url.searchParams.append('handle', handle);
                 let res = await fetch(url, {
@@ -203,11 +203,23 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
     // staging data - this is twitter data being pulled before user submits for charting.
     const [stagingData, setStagingData] = useState(twitterDemoData.elonmusk);
     const [paramsOpen, setParamsOpen] = useState(false)
+    const [demoUserNames, setDemoUserNames] = useState(['elonmusk', 'justinbieber', 'christiano', 'jack', 'kanyewest', 'BarackObama', 'lychee_xyz', 'spaceX'])
+    const [searchingUserName, setSearchingUserName] = useState()
 
     const queryHandler = (q) => {
         setParamsOpen(true)
         setStepName(q)
         setHelperOpen(true)
+    }
+
+    const triggerUserPull = async (username) => {
+        if(demoUserNames.includes(username)){
+            setHandle(username)
+            setStagingData(twitterDemoData[username])
+        }else{
+            setHandle(username)
+            await fetchTwitterHandler('user_by_handle')
+        }
     }
 
 
@@ -216,9 +228,9 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
 
     return (
         <div className='flex w-full p-10 h-full'>
-            <div className='bg-white shadow-xl basis-3/12 px-2 h-fit'>
-                <div className='dropdown w-full text-sm'>
-                    <div className='flex text-black place-items-center' tabIndex={0} role="button"> 
+            <div className='bg-white shadow-xl basis-3/12 h-fit'>
+                <div className='dropdown w-full text-sm hover:bg-lychee-green/10 p-1 py-2'>
+                    <div className='flex text-black place-items-center ' tabIndex={0} role="button"> 
                         <div className='rounded-full bg-slate-200 w-[25px] h-[25px] mx-1' > 
                             {stagingData 
                                 ? <Image src={stagingData.userData.profile_image_url} width={25} height={25} className='rounded-full'/>
@@ -236,10 +248,49 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                             <IoSearch />                        
                         </div>
                     </div>
-                    <div tabIndex={0} className="dropdown-content z-[1] card card-compact w-64 p-2 shadow bg-primary text-primary-content">
-                        <div className="card-body">
-                        <h3 className="card-title">Card title!</h3>
-                        <p>you can use any element as a dropdown.</p>
+                    <div tabIndex={0} className='z-[1] w-full p-3 bg-lychee-green/10 backdrop-blur-sm shadow-2xl mt-2 dropdown-content'>
+                        <div className='bg-white/90 p-2'>
+                            <div className="text-xs font-bold text-slate-500">
+                                Available
+                            </div>
+                            <div className=''>
+                                {demoUserNames.map((username) => (
+                                    <div key={username} className='flex place-items-center cursor-pointer py-1 hover:bg-lychee-go/20' onClick={()=>triggerUserPull(username)}>
+                                        <div className='rounded-full bg-slate-200 w-[25px] h-[25px] mx-1 flex place-items-center place-content-center' > 
+                                            {twitterDemoData[username] 
+                                                ? <Image src={twitterDemoData[username].userData.profile_image_url} width={25} height={25} className='rounded-full'/>
+                                                : <AiOutlineLoading3Quarters className='animate-spin'/>}
+                                        </div>
+                                        <div className='mr-2 ml-1 font-bold'>
+                                            {twitterDemoData[username] 
+                                                ? twitterDemoData[username].userData.name
+                                                : <progress className="progress w-56 progress-primary" />}
+                                        </div>
+                                        <div className='text-black flex-grow mr-4'>
+                                            {username ? '@'+username : <AiOutlineLoading3Quarters className='animate-spin'/>}
+                                        </div>
+                                        <div className='hover:animate-spin hover:text-lychee-red text-lg'>
+                                            <PiUserSwitch />                       
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className='mt-2 p-2'> Add New Search </div>
+                            <div className={`flex`}>
+                                {
+                                    editingHandle 
+                                        ? <input className='px-3' type="text" autoFocus={true} value={searchingUserName} onChange={(e)=>setSearchingUserName(e.target.value)} style={{ outline: 'none' }}/>
+                                        : <div className='w-full bg-lychee-go cursor-pointer hover:bg-lychee-white/60 text-black flex place-content-center py-1' onClick={()=>setEditingHandle(true)}>
+                                            <IoSearch />
+                                        </div>
+                                }
+                                {editingHandle &&
+                                    <div className="w-full flex gap-1 place-content-end">
+                                        <div className="py-1 px-2 bg-lychee-green text-white cursor-pointer hover:bg-lychee-black hover:text-white rounded-md" onClick={()=>setEditingHandle(false)}>Search</div>
+                                        <div className="py-1 px-2 bg-slate-200 cursor-pointer hover:bg-lychee-black hover:text-white rounded-md" onClick={()=>cancelHandler('handle')}>Cancel</div>
+                                    </div>
+                                    }
+                            </div>
                         </div>
                     </div>
 
@@ -253,12 +304,42 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                     <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center border-y' onClick={()=>queryHandler('user_owned_lists_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get lists owned by {handle}</div>
                 </div>
                 <div className='pt-3'>
-                    <div className='text-slate-600 text-xs font-thin border-b'>Inspiration</div>
+                    <div className='text-slate-600 text-xs font-thin border-b pl-2 pb-1'>Inspo</div>
                     <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> What are your competitor's most popular tweets?</div>
                     <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Who are your biggest fans?</div>
                     <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Who are your competitor's biggest followers?</div>
                     <div className='px-2 cursor-pointer hover:bg-soft/40 text-sm py-2 flex gap-2 place-items-center border-b'><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Make a list and start a contest?</div>
-                </div>                
+                </div>
+                <Transition
+                    show={stagingData && !(stagingData.userData) === false}
+                    enter="transition-opacity duration-1000"
+                    enterFrom="opacity-0 basis-0/12"
+                    enterTo="opacity-100 basis-3/12"
+                    leave="transition-opacity duration-150"
+                    leaveFrom="opacity-100 basis-3/12"
+                    leaveTo="opacity-0 basis-0/12"
+                    className={'bg-slate-100 pt-4 shadow-lg px-4 h-fit pb-4'}>
+                        <div className='text-xs font-black'>{handle}'s User Data</div>
+                        <div className='pt-2 grid grid-cols-2'>
+                            {stagingData.userData.followers_count && <div> Followers: {stagingData.userData.followers_count}</div>}
+                            {stagingData.userData.location && <div> location tag: {stagingData.userData.location} </div>}
+                            {stagingData.userData.verified_type && <div> verified type: {stagingData.userData.verified_type} </div>}
+                            {stagingData.userData.verified && <div> verified?  {stagingData.userData.verified} </div>}
+                            {stagingData.userData.description && <div> description: {stagingData.userData.description} </div>}
+                            {stagingData.userData.name && <div> name: {stagingData.userData.name} </div>}
+                            {stagingData.userData.url && <div> url: {stagingData.userData.url} </div>}
+                            {stagingData.userData.protected && <div> protected: {stagingData.userData.protected} </div>}
+                            {stagingData.userData.followers_count && <div> followers count: {stagingData.userData.followers_count} </div>}
+                            {stagingData.userData.following_count && <div> following count: {stagingData.userData.following_count} </div>}
+                            {stagingData.userData.tweet_count && <div> tweet count: {stagingData.userData.tweet_count} </div>}
+                            {stagingData.userData.listed_count && <div> listed count: {stagingData.userData.listed_count} </div>}
+                            {stagingData.userData.like_count && <div> like count count: {stagingData.userData.like_count} </div>}
+                        </div>
+                        
+                        <div className='flex place-content-end gap-4 text-xs'>
+                            
+                        </div>
+                </Transition>            
             </div>
             <Transition
                 show={!(stepName) === false && paramsOpen}
@@ -326,6 +407,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                         <div className='shadow-sm px-3 py-1 bg-lychee-go text-lychee-black border border-lychee-go cursor-pointer hover:bg-lychee-green hover:text-white hover:border-lychee-green rounded-md hover:shadow-lychee-green hover:shadow-2xl' onClick={()=>fetchTwitterHandler(stepName)}>Connect</div>
                     </div>
             </Transition>
+
 
 
 

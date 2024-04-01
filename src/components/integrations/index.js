@@ -133,9 +133,6 @@ const Integrations = () => {
                                 
                             </div>
                     }
-                    
-                    
-
             </Transition>
             {/* end of helper section*/}
             <div className='bg-lychee-green rounded-3xl px-6 py-7'>                                        
