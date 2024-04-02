@@ -20,14 +20,23 @@ export default async (req, res) => {
         // Destructure and restructure the user_data object
         // Map over the data array and restructure each item
         console.log(user_data)
-        const modifiedData = user_data['_realData'].data.map(item => {
-            const { public_metrics, ...rest } = item;
-            return { ...rest, ...public_metrics };
-        });
-
-        console.log('new: ', modifiedData)
-
-        res.status(200).send({ done: true, userData: modifiedData });
+        if(user_data['_realData'].meta.result_count === 0){
+            console.log('no lists owned')
+            res.status(200).send({done: true, userData: [], rateLimit: user_data['_rateLimit'], resultCount: user_data['_realData'].meta})
+        }else{
+            const modifiedData = user_data['_realData'].data.map(item => {
+                const { public_metrics, ...rest } = item;
+                return { ...rest, ...public_metrics };
+            });
+    
+            const rateLimit = user_data['_rateLimit']
+            const resultCount = user_data['_realData'].meta
+    
+            console.log('new: ', modifiedData)
+    
+            res.status(200).send({ done: true, userData: modifiedData, rateLimit: rateLimit, resultCount: resultCount});
+        }
+        
     } catch (error) {
       console.error(error);
       res.status(error.status || 500).send(error.message);

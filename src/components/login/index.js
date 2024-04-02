@@ -16,12 +16,6 @@ const Login = ({noName}) => {
 
     const user = useUser()
 
-    /*useEffect(() => {
-        if(user) {
-            router.push('/dashboard')
-        }
-    }, [user])*/
-
     const handleSubmit = async (e) => {
         setLoading(true);
         e.preventDefault();

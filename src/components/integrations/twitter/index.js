@@ -2,14 +2,11 @@ import React, { useEffect } from 'react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { Transition } from '@headlessui/react';
-import { useShepherdTour } from "react-shepherd";
 import "shepherd.js/dist/css/shepherd.css";
-import Script from 'next/script';
+import { CountdownCircleTimer } from 'react-countdown-circle-timer';
 
-import steps from './tourSteps';
 
-import { AiOutlineLoading3Quarters, AiOutlineArrowLeft } from "react-icons/ai";
-import { BiDownArrow, BiUpArrow } from "react-icons/bi";
+import { AiOutlineLoading3Quarters, AiOutlineArrowLeft, AiTwotoneExclamationCircle } from "react-icons/ai";
 import { IoSearch } from "react-icons/io5";
 import { IoIosAddCircleOutline } from "react-icons/io";
 import { PiUserSwitch } from "react-icons/pi";
@@ -23,20 +20,8 @@ import ParamToggles from './paramToggles';
 import { params } from './params';
 import twitterDemoData from './twitterDemoData';
 
-const tourOptions = {
-    defaultStepOptions: {
-        scrollTo: true,
-        cancelIcon: {
-            enabled: true,
-        },
-    },
-    useModalOverlay: true,
-  };
-
-
-const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepName, setHelperOpen}) => {
+const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepName, setHelperOpen, setWorking}) => {
     const user = useUser();
-    const tour = useShepherdTour({ tourOptions, steps: steps });
     
     const [loading, setLoading] = useState(false);
     const [connected, setConnected] = useState(false);
@@ -49,27 +34,11 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
     const [userSearchOpen, setUserSearchOpen] = useState(true);
     const [userHandleId, setUserHandleId] = useState(27260086);
     
-    //User likes by user Id
-    const [userLikesOpen, setUserLikesOpen] = useState(false);
-    
     const [expansions, setExpansions] = useState([]);
     const [userFields, setUserFields] = useState([]);
     const [tweetFields, setTweetFields] = useState([]);
     const [listFields, setListFields] = useState([]);
-
-    const detailOpenHandler = (section) => {
-        setExpansions([])
-        setUserFields([])
-        setTweetFields([])
-        setListFields([])
-        if(section === 'userSearch'){
-            setUserSearchOpen(!userSearchOpen);
-            userLikesOpen && setUserLikesOpen(!userLikesOpen);
-        } else if(section === 'userLikes'){
-            setUserLikesOpen(!userLikesOpen);
-            userSearchOpen && setUserSearchOpen(!userSearchOpen);
-        }
-    }
+    const [showWarning, setShowWarning] = useState(false);
 
     const cancelHandler = (origin) => {
         if(origin === 'handle'){
@@ -80,17 +49,6 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
             setSubTitle(originalVal)
             setEditingSubTitle(false)
             setOriginalVal('')
-        }*/
-        
-    }
-
-    const editHandler = (origin) => {
-        if(origin === 'handle'){
-            setOriginalVal(handle)
-            setEditingHandle(true)                   
-        }/*else if(origin === 'subTitle'){
-            setOriginalVal(subTitle)
-            setEditingSubTitle(true)                   
         }*/
         
     }
@@ -123,20 +81,22 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
         }
     }
 
-
-    
     // staging data - this is twitter data being pulled before user submits for charting.
     const [stagingData, setStagingData] = useState(twitterDemoData.elonmusk);
     const [paramsOpen, setParamsOpen] = useState(false)
-    const [demoUserNames, setDemoUserNames] = useState(['elonmusk', 'justinbieber', 'christiano', 'jack', 'kanyewest', 'BarackObama', 'lychee_xyz', 'spaceX'])
+    const [demoUserNames] = useState(['elonmusk', 'justinbieber', 'christiano', 'jack', 'lychee_xyz', 'spaceX', 'misterrpink1'])// 'kanyewest', 'BarackObama', 'lychee_xyz', 'spaceX'])
     const [searchingUserName, setSearchingUserName] = useState()
+    const [rateInfo, setRateInfo] = useState()
 
     const queryHandler = (q) => {
         setParamsOpen(true)
         setStepName(q)
         setHelperOpen(true)
     }
-
+    
+    /* 
+    *  username search handler
+    */ 
     const triggerUserPull = async (e, username) => {
         if(username && demoUserNames.includes(username)){
             setHandle(username)
@@ -145,81 +105,100 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
             e.target.parentElement.parentElement.parentElement.removeAttribute('open');
         }else{
             setEditingHandle(false)
-            setHandle(searchingUserName)
-            await fetchTwitterHandler('user_by_handle')
-            e.target.parentElement.parentElement.parentElement.removeAttribute('open');
-        }
-        
+            if(!user){
+                setShowWarning(true)
+            }else{
+                setHandle(searchingUserName)
+                await fetchTwitterHandler('user_by_handle', searchingUserName)
+            }
+            //e.target.parentElement.parentElement.parentElement.removeAttribute('open');
+        }     
     }
 
-    const fetchTwitterHandler = async (ask) => {
+    const fetchTwitterHandler = async (ask, searchingUserName) => {
         setLoading(true);
         setParamsOpen(false);
         setHelperOpen(false);
 
         try {
             // Append the handle as a query parameter in the URL
-            if(ask === 'user_by_handle'){
+            if(ask === 'user_by_handle' ){
                 const url = new URL('/api/integrations/twitter/userhandle', window.location.origin);
-                url.searchParams.append('handle', handle);
+                url.searchParams.append('handle', searchingUserName);
+                let allExpansions = params['user_by_handle'].expansions
+                let allUserFields = params['user_by_handle'].userFields
+                let allTweetFields = params['user_by_handle'].tweetFields
                 let res = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ expansions, userFields, tweetFields}),
+                    body: JSON.stringify({ expansions: allExpansions, userFields: allUserFields, tweetFields: allTweetFields}),
                 });
 
                 if (res.status === 200) {
-                    let twitterUserData = await res.json();
-                    console.log(twitterUserData);
+                    let resUserData = await res.json();
+                    console.log(resUserData);
                     setConnected(true);
-                    setData([twitterUserData.userData]);
+                    setData([resUserData.userData]);
+                    setStagingData(resUserData)
                     setDflt(false);
-                    setUserHandleId(twitterUserData.userData.id);
+                    setUserHandleId(resUserData.userData.id);
                     setUserSearchOpen(false);
-                    setStepName('userSearch1');
-                    setExpansions([])
-                    setUserFields([])
-                    setTweetFields([])
-                    setListFields([])
+                    setSearchingUserName('')
+                    setRateInfo(resUserData.rateLimit)
                 } else {
                     console.error("Twitter User Data pull failed");
                 }
             }else{
-                const url = new URL(`/api/integrations/twitter/${ask}`, window.location.origin);
-                url.searchParams.append('handleId', userHandleId);
-                let thirdParam = tweetFields.len ? tweetFields : listFields
-                let res = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ expansions, userFields, thirdParam }),
-                });
+                if(demoUserNames.includes(handle)){
+                    //let thirdParam = tweetFields.length > 0 ? tweetFields : listFields
+                    if(ask === 'user_likes_by_id'){
+                        setConnected(true)
+                        setData(twitterDemoData[handle].liked_tweets)
+                        setDflt(false)                        
+                    }else if(ask === 'user_owned_lists_by_id'){
+                        setConnected(true)
+                        setData(twitterDemoData[handle].owned_lists)
+                        setDflt(false)
+                    } else if(ask === 'user_pinned_tweet'){
+                        console.log("user pimnmed tweet", twitterDemoData[handle].userData)
+                        setConnected(true)
+                        setData([twitterDemoData[handle].userData])
+                        setDflt(false)
+                    }
+                }else{
+                    const url = new URL(`/api/integrations/twitter/${ask}`, window.location.origin);
+                    url.searchParams.append('handleId', userHandleId);
+                    let thirdParam = tweetFields.length > 0 ? tweetFields : listFields
+                    let res = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ expansions, userFields, thirdParam }),
+                    });
 
-                if (res.status === 200) {
-                    let userLikesData = await res.json();
-                    console.log(userLikesData);
-                    setConnected(true);
-                    setData(userLikesData.userData);
-                    setDflt(false);
-                    //setUserHandleId(twitterUserData.userData.data.id);
-                    setUserSearchOpen(false);
-                    setExpansions([])
-                    setUserFields([])
-                    setTweetFields([])
-                    setListFields([])
-                } else {
-                    console.error("Twitter User Data pull failed");
-                }
+                    if (res.status === 200) {
+                        let resData = await res.json();
+                        console.log(resData);
+                        setConnected(true);
+                        setData(resData.userData);
+                        setDflt(false);
+                        setRateInfo(resData.rateLimit)
+                    } else {
+                        console.error("Twitter User Data pull failed");
+                    }
+                }                
             }
-            
-            
         } catch (error) {
             console.error("Fetch error:", error);
         } finally {
             setLoading(false);
+            setExpansions([])
+            setUserFields([])
+            setTweetFields([])
+            setListFields([])
         }
     }
 
@@ -229,6 +208,16 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
 
     return (
         <div className='flex w-full p-10 h-full'>
+            {
+                showWarning 
+                    &&
+                    <div className='toast toast-center z-40 bg-lychee-red text-white mr-10 mb-10 cursor-pointer' onClick={()=>setWorking("getLychee")} >
+                        <div>
+                            Please Subscribe to Make this Request
+                        </div>
+                        <div className="">Get Lychee</div>
+                    </div>
+            }
             <div className='bg-white shadow-xl basis-3/12 h-fit'>
                 <div className='dropdown w-full text-sm hover:bg-lychee-green/10 p-1 py-2'>
                     <div className='flex text-black place-items-center ' tabIndex={0} role="button"> 
@@ -297,12 +286,12 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
 
                 </div>
                 <div className='pt-3'>
-                    <div className='px-2 cursor-pointer text-slate-600 text-xs font-thin'>Available actions</div>
-                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center border-y' onClick={()=>queryHandler('user_pinned_tweet')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get {handle}'s Pinned Tweet</div>
-                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center' onClick={()=>queryHandler('user_likes_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get tweets liked by {handle}</div>
-                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center border-y' onClick={()=>queryHandler('user_followers_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get {handle}'s followers</div>
-                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center' onClick={()=>queryHandler('user_follows_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get user's followed by {handle}</div>
-                    <div className='px-2 cursor-pointer hover:bg-slate-100/30 text-sm mt-1 py-2 flex gap-2 place-items-center border-y' onClick={()=>queryHandler('user_owned_lists_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get lists owned by {handle}</div>
+                    <div className='px-2 cursor-pointer text-slate-600 text-xs font-thin border-b'>Available actions</div>
+                    <div className={`${stepName === 'user_pinned_tweet' ? 'bg-lychee-black text-white' : 'hover:bg-slate-100/30 cursor-pointer' } px-2 text-sm mt-1 py-2 flex gap-2 place-items-center border-b`} onClick={()=>queryHandler('user_pinned_tweet')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get {handle}'s Pinned Tweet</div>
+                    <div className={`${stepName === 'user_likes_by_id' ? 'bg-lychee-black text-white' : 'hover:bg-slate-100/30 cursor-pointer' } px-2 text-sm mt-1 py-2 flex gap-2 place-items-center border-b`} onClick={()=>queryHandler('user_likes_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get tweets liked by {handle}</div>
+                    <div className={`px-2 cursor-pointer hover:bg-lychee-red/10 text-sm mt-1 py-2 flex gap-2 place-items-center border-b`} onClick={()=>setWorking('getLychee')}><div className='hover:animate-spin'><AiTwotoneExclamationCircle /></div> Get {handle}'s followers<div className='ml-auto bg-lychee-go/30 px-2 border border-lychee-go rounded-xl'>Register and Vote to Activate</div></div>
+                    <div className={`px-2 cursor-pointer hover:bg-lychee-red/10 text-sm mt-1 py-2 flex gap-2 place-items-center border-b`} onClick={()=>setWorking('getLychee')}><div className='hover:animate-spin'><AiTwotoneExclamationCircle /></div> Get user's followed by {handle}<div className='ml-auto bg-lychee-go/30 px-2 border border-lychee-go rounded-xl'>Register and Vote to Activate</div></div>
+                    <div className={`${stepName === 'user_owned_lists_by_id' ? 'bg-lychee-black text-white' : 'hover:bg-slate-100/30 cursor-pointer' } px-2 text-sm mt-1 py-2 flex gap-2 place-items-center border-b`} onClick={()=>queryHandler('user_owned_lists_by_id')}><div className='hover:animate-spin'><IoIosAddCircleOutline /></div> Get lists owned by {handle}</div>
                 </div>
                 <div className='pt-3'>
                     <div className='text-slate-600 text-xs font-thin border-b pl-2 pb-1'>Inspo</div>
@@ -337,12 +326,50 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                             {stagingData.userData.listed_count && <div> listed count: {stagingData.userData.listed_count} </div>}
                             {stagingData.userData.like_count && <div> like count count: {stagingData.userData.like_count} </div>}
                         </div>
-                        
-                        <div className='flex place-content-end gap-4 text-xs'>
-                            
+                </Transition>
+                <Transition
+                    show={Boolean(rateInfo)} //rateInfo && 
+                    enter="transition-opacity duration-1000"
+                    enterFrom="opacity-0 basis-0/12"
+                    enterTo="opacity-100 basis-3/12"
+                    leave="transition-opacity duration-150"
+                    leaveFrom="opacity-100 basis-3/12"
+                    leaveTo="opacity-0 basis-0/12"
+                    className={'bg-slate-100 pt-4 shadow-lg px-4 h-fit pb-4'}>
+                        <div className='text-xs font-black'>Community Rate Info</div>
+                        <div className='pt-2 text-xs grid grid-cols-2'>
+                            <div>
+                                {rateInfo && rateInfo.limit && <div> {stepName} Community Limit: {rateInfo.limit}</div>}
+                                {rateInfo && rateInfo.remaining && <div> Community pool's remaining requests for {stepName}: {rateInfo.remaining}</div>}                            
+                            </div>
+                            {rateInfo && rateInfo.reset && 
+                                <div className='flex flex-col place-items-end'>
+                                        <div> Resets in</div>
+                                        <CountdownCircleTimer
+                                            isPlaying
+                                            size={45}
+                                            duration={Math.floor(((Number(rateInfo.reset) * 1000) - Date.now()) / 1000)}
+                                            colors={['#004777', '#F7B801', '#A30000', '#A30000']}
+                                            colorsTime={[
+                                                Math.floor(((Number(rateInfo.reset) * 1000) - Date.now()) / 1000),
+                                                Math.floor((2/3) * Math.floor(((Number(rateInfo.reset) * 1000) - Date.now()) / 1000)),
+                                                Math.floor((1/3) * Math.floor(((Number(rateInfo.reset) * 1000) - Date.now()) / 1000)),
+                                                0
+                                            ]}
+                                        >
+                                            {({ remainingTime }) => remainingTime}
+                                        </CountdownCircleTimer>
+                                </div>
+                            }
                         </div>
-                </Transition>            
+                        <div className='text-xs'>
+                              You can move to private request limits that are much higher when you register and connect your Twitter account
+                        </div>
+                </Transition>
             </div>
+            {
+                /* Parameter Slider */
+            }
             <Transition
                 show={!(stepName) === false && paramsOpen}
                 enter="transition-opacity duration-1000"
@@ -409,6 +436,9 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                         <div className='shadow-sm px-3 py-1 bg-lychee-go text-lychee-black border border-lychee-go cursor-pointer hover:bg-lychee-green hover:text-white hover:border-lychee-green rounded-md hover:shadow-lychee-green hover:shadow-2xl' onClick={()=>fetchTwitterHandler(stepName)}>Connect</div>
                     </div>
             </Transition>
+            {
+                /* Grid View */
+            }
             <Transition
                 show={Boolean(userHandleId)}
                 enter="transition-opacity duration-1000"
@@ -421,10 +451,10 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                     <GridView />
             </Transition>
             {loading &&
-            <div className='flex place-items-center animate-pulse gap-2'>
-                <AiOutlineLoading3Quarters className='animate-spin'/>
-                    Loading...
-            </div>
+                <div className='flex place-items-center animate-pulse gap-2'>
+                    <AiOutlineLoading3Quarters className='animate-spin'/>
+                        Loading...
+                </div>
             }
                 
         </div>

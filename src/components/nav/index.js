@@ -41,7 +41,7 @@ const Nav = () => {
         <div className='text-sm w-full flex gap-6 place-content-end place-items-center'>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/affiliates">Make $ with Lychee</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
-          <div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>
+          {/*<div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>*/}
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/new">What's new?</Link></div>
           <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact</Link></div>
           <div className="flex gap-2">

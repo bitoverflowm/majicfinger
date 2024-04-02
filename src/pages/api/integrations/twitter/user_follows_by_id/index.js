@@ -25,9 +25,12 @@ export default async (req, res) => {
             return { ...rest, ...public_metrics };
         });
 
+        const rateLimit = user_data['_rateLimit']
+        const resultCount = user_data['_realData'].meta
+
         console.log('new: ', modifiedData)
 
-        res.status(200).send({ done: true, userData: modifiedData });
+        res.status(200).send({ done: true, userData: modifiedData, rateLimit: rateLimit, resultCount: resultCount});
     } catch (error) {
       console.error(error);
       res.status(error.status || 500).send(error.message);
