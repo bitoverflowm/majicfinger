@@ -49,7 +49,7 @@ const Integrations = () => {
 
 
     return (
-        <div className='w-full min-h-screen flex px-5'>
+        <div className='w-full min-h-screen sm:flex px-5'>
             {/* helper section*/}
             <div className={`${helperOpen && 'hidden'} fixed -right-8 top-60 -rotate-90 flex gap-2 cursor-pointer text-sm place-items-center bg-lychee-black text-white pt-4 pb-8 pl-4 pr-6 rounded-t-xl transition duration-150 hover:-translate-x-2.5 hover:bg-gradient-to-r hover:from-lychee-black hover:to-lychee-red `} onClick={()=>setHelperOpen(true)}><IoHelp /> Helper</div>
             <Transition
@@ -87,7 +87,7 @@ const Integrations = () => {
                     }
             </Transition>
             {/* end of helper section*/}
-            <div className='bg-lychee-green rounded-3xl py-7'>                                        
+            <div className='bg-lychee-green rounded-3xl py-7 hidden sm:block'>                                        
                 <div className={`text-5xl py-2 text-center flex flex-col place-items-center ${activeAPI !== 'twitter' ? 'text-white hover:bg-white hover:text-black cursor-pointer': 'bg-white text-black'}  px-6`} onClick={()=>setActiveAPI('twitter')}><FaSquareXTwitter /><div className='text-xxs text-center pt-2'>Twitter</div></div>
                 <div className={`text-5xl py-2 text-center flex flex-col place-items-center ${activeAPI !== 'earthquake' ? 'text-white hover:bg-white hover:text-black cursor-pointer': 'bg-white text-black'}  px-6`} onClick={()=>setActiveAPI('earthquake')}><WiEarthquake /><div className='text-xxs text-center pt-2'>Earthquakes</div></div>
                 <div className={`text-5xl py-2 text-center flex flex-col place-items-center ${activeAPI !== 'instagram' ? 'text-white hover:bg-white hover:text-black cursor-pointer': 'bg-white text-black'}  px-6`} onClick={()=>setActiveAPI('instagram')}><BiLogoInstagramAlt /><div className='text-xxs text-center pt-2'>Instagram</div></div>
@@ -100,7 +100,7 @@ const Integrations = () => {
                 <div className={`text-5xl py-2 text-center flex flex-col place-items-center ${activeAPI !== 'quickBooks' ? 'text-white hover:bg-white hover:text-black cursor-pointer': 'bg-white text-black'}  px-6`} onClick={()=>setActiveAPI('quickBooks')}><SiQuickbooks /><div className='text-xxs text-center pt-3'>QuickBooks</div></div>
                 <div className={`text-5xl py-2 text-center flex flex-col place-items-center ${activeAPI !== 'more' ? 'text-white hover:bg-white hover:text-black cursor-pointer': 'bg-white text-black'}  px-6`} onClick={()=>setActiveAPI('more')}><IoMdAdd  /><div className='text-xxs text-center pt-2'>More</div></div>
             </div>
-            <div className='w-full h-full'>
+            <div className='w-full h-full hidden sm:block'>
                 { activeAPI === 'twitter' &&
                     <TwitterIntegration setData={setData} setDflt={setDflt} stepName={stepName} setStepName={setStepName} setHelperOpen={setHelperOpen} setWorking={setWorking}/>
                 }
@@ -122,6 +122,12 @@ const Integrations = () => {
                             Get Lychee Now
                         </div>
                 </Transition>
+            </div>
+            <div className='text-2xl py-20 sm:hidden'>
+                Currently Integrations Only works on Larger screens.
+            </div>
+            <div className='text-6xl sm:hidden'>
+                Mobile version of integrations to Twitter, Instagram, Youtube, Quickbooks, Stripe, etc coming soon. 
             </div>
         </div>
     );

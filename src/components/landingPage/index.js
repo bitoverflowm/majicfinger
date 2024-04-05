@@ -9,6 +9,9 @@ import { useMyState  } from '@/context/stateContext'
 import { FaPlay  } from "react-icons/fa";
 import { MdArrowRight, MdOutlineSmartDisplay  } from "react-icons/md";
 import CountUp from 'react-countup'
+import { Transition } from '@headlessui/react';
+
+import TypedText from '../ui/typeText';
 
 
  
@@ -18,6 +21,7 @@ const LandingPage = () => {
     const user = useUser()
     const [view, setView] = useState()
     const [isHovered, setIsHovered] = useState(false);
+    const [isHovered1, setIsHovered1] = useState(false);
 
     const firstRef = useRef(null)
     const secondRef = useRef(null)
@@ -41,74 +45,34 @@ const LandingPage = () => {
                 !(user) &&
                     <>
                         <div className='min-h-screen'>
-                            <div className='w-11/12 max-w-[1500px] py-5 mx-auto rounded-xl shadow-xl shadow-slate-200 bg-white/80'>
-                                <div className='text-md xl:text-md text-black pt-10 pb-6'>
+                            <div className='w-screen sm:w-11/12 sm:max-w-[1500px] py-5 mx-auto rounded-xl shadow-xl shadow-slate-200 bg-white/80'>
+                                <div className='px-12 pt-4 sm:px-0 text-md xl:text-md text-black sm:pt-10 sm:pb-6'>
                                     We'll save you from all the complex yabba-dabba-doos out there.
                                 </div>
-                                <div className='text-7xl font-title font-black'>
-                                    <span className='text-lychee-green'>Instant</span> Graphs.
-                                </div>
-                                <div className='text-7xl font-title font-black'>
+                                <div className='h-44 pt-10 sm:pt-0 px-4 sm:h-24'>
+                                    <TypedText/>
+                                </div>                                
+                                <div className='pt-4 sm:pt-0 text-7xl font-title font-black'>
                                     Zero Hassle.
                                 </div>
-                                <div className='flex place-content-center py-3'>
-                                    <div className='flex place-items-center gap-2 py-2 px-4 bg-lychee-white/30 rounded-full text-black'>
-                                        <div className='text-sm'> +5K happy unique users WorldWide</div> 
-                                    </div>
-                                </div>
-                                <div className='flex flex-wrap gap-4 px-8 py-8'>
-                                    <div className='grid col-span-2 place-items-center gap-2'>
-                                        <div className='py-2 text-xs'>
-                                            
-                                        </div>
-                                        <div className='relative flex justify-center items-center place-items-center place-content-center'>
-                                            <iframe width="480" height="335" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="Lychee promo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" className='rounded-xl shadow-xl' allowFullScreen></iframe>
-                                            {!isHovered && 
-                                            <div className="text-lychee-black cursor-pointer absolute top-0 left-0 w-full h-full bg-lychee-blue flex flex-col gap-4 justify-center items-center rounded-xl text-4xl" onMouseEnter={() => setIsHovered(true)}>
-                                                <div className='py-2 text-xs'>
-                                                    We prepared a quick explainer video for you
-                                                </div>
+                                <div className='flex px-8 py-8 place-items-center place-content-center'>
+                                    <div className='relative flex justify-center items-center place-items-center place-content-center'>
+                                        <iframe width="480" height="335" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="Lychee promo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" className='rounded-xl shadow-xl' allowFullScreen></iframe>
+                                        {!isHovered1 && 
+                                        <div className="text-white cursor-pointer absolute top-0 left-0 w-full h-full bg-lychee-black flex flex-col justify-center items-center rounded-xl text-4xl" onMouseEnter={() => setIsHovered1(true)}>
+                                            <div className='text-8xl font-black'>
+                                                Lychee
+                                            </div>
+                                            <div className='text-lg font-title'>
+                                                v 1.1.1
+                                            </div>
+                                            <div className='text-sm pt-4'>
                                                 <FaPlay />
                                             </div>
-                                            }
-                                        </div>                                    
-                                    </div>
-                                    <div className='grow basis-1/4 grid place-items-center gap-2'>
-                                        <div className='py-2 text-xs text-black rounded-full '>
-                                            ✨ New!
                                         </div>
-                                        <div className='pl-8 py-8 text-left rounded-xl bg-lychee-green h-fit w-full shadow-xl cursor-pointer transition ease-in-out delay-10 bg-gradient-to-r hover:scale-110 hover:from-lychee-green hover:to-lychee-blue duration-500' onClick={()=>setWorking('integrations')}>
-                                            <div className='text-4xl text-white'>Query,</div>  
-                                            <div className='text-4xl text-white'>Analyze,</div>
-                                            <div className='text-4xl text-white'>Visualize,</div>
-                                            <div className='text-4xl text-white'>Live data</div>
-                                            <div className='text-xs text-white pt-2'>Without leaving Lychee. Without a single line of code.</div>
-                                            <div className='flex flex-wrap pt-4 px-2 gap-1'>
-                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Twitter</div>
-                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Earthquake</div>
-                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Instagram</div>
-                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Quickbooks</div>
-                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>BTC</div>
-                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>ETH</div>
-                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Stocks</div>
-                                                <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>YouTube</div>
-                                            </div>
-                                            <div className='text-xxs text-white pt-2'>
-                                                * vote on which integrations you want me to priotitize
-                                            </div>
-                                        </div>                                    
-                                    </div>
-                                    <div className='grow basis-1/4 grid place-items-center gap-2 '>
-                                        <div className='py-2 px-5 text-xs text-center'>
-                                            🦄 Repeat after me ... "Data is beautiful"
-                                        </div>
-                                        <div className='flex flex-col gap-2 w-full min-h-[335px] pl-8 p-4 pt-8 text-left rounded-xl border-lychee-black border-4 shadow-xl w-full '>
-                                            <div className='text-8xl text-lychee-black text-black pt-2'>
-                                                <CountUp end={796000} duration={5} />
-                                            </div>
-                                            <div className='text-4xl text-lychee-green pt-2'> beautiful curated colors, pallates, charts, graphs, tools updated daily</div>
-                                        </div>
-                                    </div>
+                                        }
+                                    </div>                                     
+
                                 </div>
                                 <div>
                                     <div className='text-md xl:text-lg pb-4'>
@@ -123,13 +87,43 @@ const LandingPage = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className='flex place-content-center pb-4'>
+                                <div className='flex gap-4 place-content-center place-items-center pb-4'>
                                     <div className='font-bold border-2 border-lychee-black text-lychee-black hover:bg-lychee-white hover:text-lychee-black cursor-pointer px-3 xl:px-5 py-2 xl:py-4 rounded-full text-xs' onClick={()=>setView('first')}>
                                         Cool... tell me more?
                                     </div>
+                                    or
+                                    <div className='relative flex justify-center items-center place-items-center place-content-center'>
+                                            <Transition
+                                                show={isHovered}
+                                                enter="transition ease-in-out duration-300 transform"
+                                                enterFrom="h-0 w-0"
+                                                enterTo="h-[335px] w-[480px]"
+                                                leave="transition ease-in-out duration-300 transform"
+                                                leaveFrom="h-[335px] w-[480px]"
+                                                leaveTo="h-0 w-0"
+                                                className=""
+                                            >
+                                                <iframe width="480" height="335" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="Lychee promo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" className='rounded-xl shadow-xl' allowFullScreen></iframe>
+                                            </Transition>
+                                            {!isHovered && 
+                                                <div className="border border-lychee-green text-lychee-green cursor-pointer flex gap-4 justify-center items-center rounded-full px-3 xl:px-5 py-2 xl:py-4 " onClick={() => setIsHovered(true)}>
+                                                <div className='text-xs'>
+                                                    Watch another video:
+                                                </div>
+                                                <div className='text-xs'>
+                                                <FaPlay />
+                                                </div>
+                                            </div>
+                                            }
+                                    </div>  
                                 </div>
                             </div>
                             <div className="w-96 sm:w-10/12 xl:w-3/5 justify-center bg-slate-300/70 rounded-2xl mx-auto mt-10 py-5">
+                                <div className='flex place-content-center py-3'>
+                                    <div className='flex place-items-center gap-2 py-2 px-4 bg-lychee-black text-white rounded-full'>
+                                        <div className='text-sm'> +9K happy unique users WorldWide</div> 
+                                    </div>
+                                </div>
                                 <div className='text-xs font-bold text-slate-500'>
                                     Used, trusted and beta tested by people at:                        
                                 </div>
@@ -154,13 +148,46 @@ const LandingPage = () => {
                                     </div>
                                 </div>
                             </div>
+                            <div className='w-screen sm:pt-10 sm:w-1/2 mx-auto px-4' ref={firstRef}>
+                                <div className='pt-10 sm:pt-0 py-2 text-xs text-black rounded-full '>
+                                    ✨ Just released in Lychee v1.1.1!
+                                </div>
+                                <div className=' pl-8 py-8 text-left rounded-xl bg-lychee-green shadow-xl cursor-pointer transition ease-in-out delay-10 bg-gradient-to-r hover:scale-110 hover:from-lychee-green hover:to-lychee-blue duration-500' onClick={()=>setWorking('integrations')}>
+                                    <div className='text-4xl text-white'>Query,</div>  
+                                    <div className='text-4xl text-white'>Analyze,</div>
+                                    <div className='text-4xl text-white'>Visualize,</div>
+                                    <div className='text-4xl text-white'>Live data</div>
+                                    <div className='text-xs text-white pt-2'>Without leaving Lychee. Without a single line of code.</div>
+                                    <div className='flex flex-wrap pt-4 px-2 gap-1'>
+                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Twitter</div>
+                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Earthquake</div>
+                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Instagram</div>
+                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Quickbooks</div>
+                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>BTC</div>
+                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>ETH</div>
+                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Stocks</div>
+                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>YouTube</div>
+                                    </div>
+                                </div>                                    
+                            </div>
+                            <div className='w-screen sm:w-1/2 mx-auto  px-4'>
+                                <div className='py-2 px-5 text-xs text-center'>
+                                    "
+                                </div>
+                                <div className='flex flex-col gap-2 w-full min-h-[335px] pl-8 p-4 pt-8 text-left rounded-xl border-lychee-black border-4 shadow-xl w-full '>
+                                    <div className='text-8xl text-lychee-black text-black pt-2'>
+                                        <CountUp end={796000} duration={30} />
+                                    </div>
+                                    <div className='text-4xl text-lychee-green pt-2'> beautifully curated colors, pallates, charts, graphs, tools updated daily</div>
+                                </div>
+                            </div>
                         </div>       
                         <div className='pb-10 mt-10'>
-                            <div ref={firstRef} className='bg-white w-full py-20'>
-                                <div className='text-8xl font-title px-96'>What Our <span className='text-lychee-amaranth'>Legendary Users Have To Say</span></div>
-                                <div className='flex flex-wrap items-stretch place-items-center place-content-center gap-4 px-20 py-20 max-w-[1350px] mx-auto'>
+                            <div  className='bg-white w-screen sm:w-full py-20'>
+                                <div className='text-4xl sm:text-8xl font-title px-6 sm:px-96'>What Our <span className='text-lychee-amaranth'>Legendary Users Have To Say</span></div>
+                                <div className='flex flex-wrap items-stretch place-items-center place-content-center gap-4 sm:px-20 py-20 sm:max-w-[1350px] mx-auto'>
                                     <Link href="https://theresanaiforthat.com/ai/lychee?comment_id=10781" >
-                                        <div className='h-full pt-24 bg-black text-white rounded-xl max-w-96 hover:bg-lychee-go hover:text-lychee-black cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                        <div className='h-full py-10 sm:pt-24 bg-black text-white rounded-xl max-w-96 hover:bg-lychee-go hover:text-lychee-black cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>It's like the chart editor i wish i had for the last 10 years. Love it.</div>
                                                 <div>- Bernard</div>
                                         </div>
@@ -176,14 +203,14 @@ const LandingPage = () => {
                                         <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                     <Link href="https://www.producthunt.com/products/lychee-3?comment=3321659#lychee-3">
-                                        <div className='h-full pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black   cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                        <div className='h-full py-10 sm:pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black   cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>Data scientists, marketers & managers would love this {':)'} Instant hands-free graph generation! Congrats on the launch!</div>
                                                 <div>- Charles Teh</div>
                                         </div>
                                         <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                     <Link href="https://www.producthunt.com/products/lychee-3?comment=3320264#lychee-3">
-                                        <div className='h-full pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                        <div className='h-full py-10 sm:pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>OMG finally a reasonable tool to get my charting done fast!
                                                     Do you think you will add more capabilities like Numpy Pandas library integrations @misterrpink </div>
                                                 <div>- Mar</div>
@@ -191,7 +218,7 @@ const LandingPage = () => {
                                         <div className='text-white -mt-8 text-xl float-right bottom-0'><MdArrowRight /> </div>
                                     </Link>
                                     <Link href="https://www.producthunt.com/products/lychee-3?comment=3320062#lychee-3">
-                                        <div className='h-full pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
+                                        <div className='h-full py-10 sm:pt-20 bg-black text-white rounded-xl px-10 py-10 max-w-96 hover:bg-lychee-go hover:text-lychee-black  cursor-pointer hover:-translate-y-6 transition ease-in-out delay-150 hover:scale-110 duration-300'>
                                                 <div>Nice! Visualizing data made simple. Great help for anyone in the data landscape. Good luck!</div>
                                                 <div>- Henry Habib</div>
                                         </div>

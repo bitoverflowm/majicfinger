@@ -144,7 +144,7 @@ const ActionMenu = () => {
                     {
                         !(user) && <div className="flex">Check it out right here <MdArrowRightAlt /> </div>
                     }
-                    <div className="flex py-2 px-4">
+                    <div className="flex flex-wrap py-2 px-4">
                         <div className={`rounded-l-full py-3 px-4 ${working === 'upload' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('upload')}>Upload</div>
                         <div className={`py-3 px-4 ${working === 'grid' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('grid')}>Table</div>
                         <div className={`py-3 px-4 ${working === 'chart' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('chart')}>Chart</div>
@@ -227,16 +227,16 @@ const ActionMenu = () => {
                     {
                         fmtCols && data && ((working && working === 'chart') || !working) &&
                             <div className="min-h-screen w-screen flex flex-col xl:flex-row">
-                                <div className="py-5 h-fit xl:block w-2/12 shadow-xl rounded-sm mx-5">
+                                <div className="py-5 h-fit xl:block sm:w-2/12 shadow-xl rounded-sm mx-5">
                                     <ChartDataMods/>
                                 </div>
-                                <div className="w-[450px] h-[750px] sm:w-[1200px] 2xl:w-[1700px] 2xl:h-[1000px]">
+                                <div className="w-[450px] h-[450px] sm:w-[1200px] 2xl:w-[1700px] 2xl:h-[1000px]">
                                     <ChartView/>
                                 </div>
                             </div>
                             
                     }
-                    { working && working === 'integrations' && <Integrations />}
+                    { working && working === 'integrations' && <Integrations/>}
                     {
                         working && working === 'export' && 
                             <div className="w-full flex flex-col gap-10 place-content-center place-items-center">
@@ -292,21 +292,21 @@ const ActionMenu = () => {
                     }
                     {
                         working && working === 'getLychee' &&
-                            <div className="w-96 sm:w-full text-lychee-black">
-                                <div className="flex px-20 pt-10">
+                            <div className="w-screen sm:w-full text-lychee-black">
+                                <div className="sm:flex sm:px-20 pt-10">
                                     <div className="px-20 basis-1/2 grid gap-2 text-lg">
                                         <div className="font-black text-xl text-center pb-8">Already helping 5,000+ Lychee users win back their time. </div>
                                         <div className="capitalize">Hi <Link href={"https://twitter.com/misterrpink1"} className="underline">misterrpink</Link> here,</div>
                                         <div>I'm the solo dev, builder, founder of Lychee.</div>
                                         <div>I love data. But, even as an AI specialist, epigenetic researcher and builder, looking at data day in day out...</div>
-                                        <div className="text-2xl py-4 px-10 text-lychee-red">99.99999% of the time I do not need the overhead.... <div></div> Also why do I keep writing Python sripts for charts?</div>
-                                        <div>That is why I built Lychee. </div>
+                                        <div className="text-2xl py-4 sm:px-10 text-lychee-red">99.99999% of the time I do not need the overhead of the tools available.... <div></div> Also why do I keep writing Python sripts for charts?</div><div>And why is everything so ugly</div>
+                                        <div className="pt-6 text-lychee-go font-black">Lychee is my answer to all those questions. </div>
                                         <div>All we gotta do now is focus on <span className="font-black text-lychee-red">the results.</span></div>
                                         <div>I would love to offer Lychee to you for free, but I need to charge a price to be able to deliver the best features to you.</div>
                                         <div>This way I can focus all of my attention on saving you time and headache </div>
                                         <div>so here are some ... </div>
                                     </div>
-                                    <div className="w-1/2 flex place-items-center place-content-center">
+                                    <div className="sr-only sm:not-sr-only w-1/2 flex place-items-center place-content-center">
                                         <div className="p-10 rounded-xl w-1/2 border border-1 border-lychee-green">
                                             <div className="font-black text-center pb-4"> Our Pledge </div>
                                             <div className="p-1">
@@ -321,11 +321,11 @@ const ActionMenu = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="grid w-full place-content-left font-black text-6xl pl-36 py-10">
+                                <div className="grid sm:w-full place-content-center sm:place-content-left  font-black text-2xl sm:text-6xl sm:pl-36 py-10">
                                     <div>Simple and</div>
                                     <div>Sustainable Pricing</div>
                                 </div>
-                                <div className="grid px-32 mx-auto">
+                                <div className="hidden sm:block grid sm:px-32 mx-auto">
                                     <div className="grid grid-cols-3 text-center place-items-center"> 
                                         <div></div>
                                         <div></div>
@@ -387,7 +387,68 @@ const ActionMenu = () => {
                                             </div>
                                         </div>
                                     </div>
-                                </div>                                    
+                                </div>
+                                <div className="sm:hidden mx-auto px-4">
+                                    <div className="p-4 border border-2 boarder-black">
+                                        <Link href="https://buy.stripe.com/bIY16o5Km8GW4wgeV6">
+                                            <div className="text-center">
+                                                <div className="text-8xl font-black pb-4">9.99/m</div>
+                                                <div className="bg-lychee-go text-lychee-black py-3 px-3 rounded-full w-40 mx-auto mt-1">GET STARTED</div>
+                                            </div>
+                                            <div className="text-center font-black">What you get</div>
+                                                <div className="text-center pb-4">7 day free trial.</div>
+                                                <div className="bg-slate-100">
+                                                    <div className="">
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> Upload Data</div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> Generate Data</div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> Powerful Table</div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> Personalized Dashboard </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> 1,000+ Charts (new charts added daily)</div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> 10,000+ Curated color pallates uploaded daily</div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> 512 MB file upload space *</div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> 3 integrations *</div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> $100 in Lychee Tokens/ month *</div>
+                                                        <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> 100% Data ownership </div>
+                                                    </div> 
+                                                </div>                                           
+                                        </Link>
+                                    </div>
+                                    <div className="p-4 border border-2 boarder-black">
+                                        <Link href="https://buy.stripe.com/6oEdTa2ya5uK1k47sF">
+                                            <div className="text-center">
+                                                <div className="text-8xl font-black pb-4">6.99/m</div>
+                                                <div className="font-black text-xl pt-2">Annual</div>
+                                                <div className="bg-lychee-go text-lychee-black py-3 px-3 rounded-full w-40 mx-auto mt-1">GET STARTED</div>
+                                            </div>
+                                            <div className="text-center font-black">What you get</div>
+                                                <div className="text-center pb-4">Everything in Monthly Tier</div>
+                                                <div className="text-center pb-4">3 months free (tacked onto the end)</div>                                          
+                                        </Link>
+                                    </div>
+                                    <div className="p-4 border border-2 boarder-black">
+                                        <Link href="https://buy.stripe.com/cN2bL2gp03mC5AkfZ9">
+                                            <div className="text-center bg-lychee-green">
+                                                <div className="text-8xl font-black text-white">69.99</div>
+                                                <div className="text-white font-black pt-2 text-xl">One Time Payment</div>
+                                            </div>
+                                            <div className="text-center">
+                                            <div>{'<'}0.99/month</div>
+                                                <div className="font-thin">If you use Lychee for 5 years</div>
+                                                <div className="py-4 font-black">Life Time Deal</div>
+                                                <div className="bg-lychee-go text-lychee-black py-3 px-3 rounded-full w-40 mx-auto mt-1">GET STARTED</div>
+                                            </div>
+                                            <div className="text-center font-black">What you get</div>
+                                                <div className="text-center pb-4">Everything in Monthly Tier</div>
+                                                <div className="text-center pb-4">A single payment</div>
+                                                <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> Includes all Future features</div>
+                                                <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> Check Roadmap to see how prices will be changed in the future</div>
+                                                <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> Not a single penny more than what you pay today.</div>
+                                                <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-green"><FaCircle /></div> C Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else.</div>
+                                        </Link>
+                                    </div>
+                                </div>                                  
                             </div>
                     }
                     {
