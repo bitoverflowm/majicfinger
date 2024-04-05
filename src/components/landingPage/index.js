@@ -57,7 +57,7 @@ const LandingPage = () => {
                                 </div>
                                 <div className='flex px-8 py-8 place-items-center place-content-center'>
                                     <div className='relative flex justify-center items-center place-items-center place-content-center'>
-                                        <iframe width="480" height="335" src="https://www.youtube.com/embed/mwm-0sAPvWI?si=CYWpVwnnop8JMSXm" title="Lychee promo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" className='rounded-xl shadow-xl' allowFullScreen></iframe>
+                                        <iframe width="480" height="315" src="https://www.youtube.com/embed/e73q7SiJia0?si=XAPvJpIlB7mo5lx0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen;" referrerpolicy="strict-origin-when-cross-origin" className='rounded-xl shadow-xl' allowfullscreen></iframe>
                                         {!isHovered1 && 
                                         <div className="text-white cursor-pointer absolute top-0 left-0 w-full h-full bg-lychee-black flex flex-col justify-center items-center rounded-xl text-4xl" onMouseEnter={() => setIsHovered1(true)}>
                                             <div className='text-8xl font-black'>
