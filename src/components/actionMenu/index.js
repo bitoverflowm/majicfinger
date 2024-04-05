@@ -334,6 +334,7 @@ const ActionMenu = () => {
                                     <div className="grid grid-cols-3 h-64"> 
                                         <div className="w-11/12 shadow-sm flex flex-col place-items-center place-content-center bg-slate-100 ">
                                             <div className="text-8xl font-black">9.99/m</div>
+                                            <div className="font-black text-xl pt-2">7 day trial</div>
                                         </div>
                                         <div className="w-11/12 shadow-sm flex flex-col place-items-center place-content-center bg-slate-100">
                                             <div className="text-8xl font-black">6.99/m</div>
@@ -345,20 +346,19 @@ const ActionMenu = () => {
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 text-center py-4 text-lychee-green font-black"> 
-                                        <div><div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/bIY16o5Km8GW4wgeV6">Start Trial</Link></div></div>
+                                        <div><div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/bIY16o5Km8GW4wgeV6">Get Started</Link></div></div>
                                         <div> 
-                                            <div>Get 3 months free</div>
-                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/6oEdTa2ya5uK1k47sF">Start Trial</Link></div></div>                                        
+                                            <div>Get 3 months free (added to end of period)</div>
+                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/6oEdTa2ya5uK1k47sF">Get Started</Link></div></div>                                        
                                         <div>
                                             <div>{'<'}0.99/month</div>
                                             <div className="font-thin">If you use Lychee for 5 years</div>
-                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/cN2bL2gp03mC5AkfZ9">Start Trial</Link></div>
+                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/cN2bL2gp03mC5AkfZ9">Get Started</Link></div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3">
                                         <div className="col-span-2 pr-10">
                                             <div className="text-center font-black">All Plans Include</div>
-                                            <div className="text-center pb-4">7 day free trial.</div>
                                             <div className="bg-slate-100 flex px-20 py-10">
                                                 <div className="w-1/2">
                                                     <div className="flex gap-2 place-items-center py-1"><div className="text-xs text-lychee-go"><FaCircle /></div> Upload Data</div>

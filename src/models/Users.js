@@ -20,6 +20,15 @@ const UserSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    subscriptionType: {
+        type: String,
+    },
+    nextPaymentDate: {
+        type: Date,
+    },
+    netPay: {
+        type: Number,
+    },
     token: {
         type: Number
     },
