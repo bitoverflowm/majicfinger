@@ -11,7 +11,7 @@ export function useMyState() {
 }
 
 // Create the state provider component
-export const StateProvider = ({ children }) => {
+export const StateProvider = ({ children, bento=false }) => {
   const [dflt, setDflt] = useState(true)
   const [working, setWorking] = useState(null);
   const [aiOpen, setAiOpen] = useState(null);
@@ -244,13 +244,17 @@ export const StateProvider = ({ children }) => {
   //Apply settings across all columns
   const defaultColDef = useMemo(() => ({
     filter: true, // Enable filtering on all columns
-    maxWidth: 120,
+    //maxWidth: 120,
     editable: true,
     background: {visible: false},
+    resizable: true,
+    singleClickEdit: true,
+    stopEditingWhenCellsLoseFocus : true,
   }))
 
   useEffect(()=>{
-    if(!data){
+    if(!data && !bento){
+        setDflt(true)
         fetch('https://www.ag-grid.com/example-assets/space-mission-data.json') // fetch default data
         .then(result => result.json()) // Convert to JSON
         .then(rowData => setData(rowData)); // Update state of `rowData`

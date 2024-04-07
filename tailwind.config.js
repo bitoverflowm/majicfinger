@@ -1,69 +1,102 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  mode: 'jit',
+  darkMode: ["class"],
   content: [
-    "./app/**/*.{js,ts,jsx,tsx}",
-    "./pages/**/*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}",
- 
-    // Or if using `src` directory:
-    "./src/**/*.{js,ts,jsx,tsx}",
+    './pages/**/*.{js,jsx}',
+    './components/**/*.{js,jsx}',
+    './app/**/*.{js,jsx}',
+    './src/**/*.{js,jsx}',
   ],
+  prefix: "",
   theme: {
-    fontFamily: {
-      'title': ['Bodoni Moda', 'serif'],
-      'body': ['Open Sans', 'sans-serif']
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
     },
     extend: {
-      width: {
-        '88': '22rem'
-      },
-      fontSize: {
-        'xxs': '0.600rem',
-      },
-      aspectRatio: {
-        '9/16': '56.25%',
-      },
       colors: {
-        'majic-grey': "#7D8491",
-        'majic-white': "#FBFBFF",
-        'majic-blue': '#A5D8FF',
-        'majic-accent': '#802392',
-        'lychee-black': '#121619',
-        'lychee-red': '#BA0B31',
-        'lychee-green': '#004FFF',
-        'lychee-white': '#D9C5B2',
-        'lychee-peach': '#FFC07F', //'#8EBDF6',//'#0081AF',,
-        'lychee-blue': '#8EBDF6',
-        'lychee-amaranth': '#A21640',
-        'lychee-go': '#7DDE92',
-        'soft': '#CBF1F5',
-        'softer': '#E3FDFD'
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
-        shiver: {
-          '0%, 100%': { transform: 'rotate(-1deg) translateX(0.25%) translateY(0.25%)' },
-          '50%': { transform: 'rotate(1deg) translateX(-0.25%) translateY(-0.25%)' },
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
-        border: {
-          '0%': { backgroundPosition: '10% 0%' },
-          '50%': { backgroundPosition: '91% 100%' },
-          '100%': { backgroundPosition: '10% 0%' }
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
-        background: {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(calc(-100% - var(--gap)))" },
+        },
+        "marquee-vertical": {
+          from: { transform: "translateY(0)" },
+          to: { transform: "translateY(calc(-100% - var(--gap)))" },
+        },
+        meteor: {
+          "0%": { transform: "rotate(215deg) translateX(0)", opacity: 1 },
+          "70%": { opacity: 1 },
+          "100%": {
+            transform: "rotate(215deg) translateX(-500px)",
+            opacity: 0,
+          },
+        },
+        grid: {
+          "0%": { transform: "translateY(-50%)" },
+          "100%": { transform: "translateY(0)" },
         },
       },
       animation: {
-        shiver: 'shiver 0.25s linear infinite',
-        border: 'border 2s ease-in-out infinite',
-        background: 'background 2s ease-in-out infinite',
+        meteor: "meteor 5s linear infinite",
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+        marquee: "marquee var(--duration) linear infinite",
+        "marquee-vertical": "marquee-vertical var(--duration) linear infinite",
+        grid: "grid 15s linear infinite",
+
       },
     },
   },
-  plugins: [
-    require('@tailwindcss/aspect-ratio'),
-    require("daisyui")
-  ],
+  plugins: [require("tailwindcss-animate")],
 }

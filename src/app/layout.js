@@ -1,5 +1,7 @@
 //import Nav from '@/components/nav';
 import './globals.css'
+import { Toaster } from "@/components/ui/toaster"
+
 
 //import { StateProvider } from '@/context/stateContext'
  
@@ -22,6 +24,7 @@ export default function RootLayout({ children }) {
         <div className=''>
           {children}
         </div>
+        <Toaster />
       </body>
     </html>
   )
