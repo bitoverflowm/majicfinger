@@ -67,10 +67,7 @@ export function StickyHeader() {
     <div ref={headerParentRef} className="">
         <header className="mx-auto flex max-w-5xl items-center justify-between bg-transparent px-10 py-7 dark:bg-transparent">
           <div className="hidden flex-row items-center justify-center gap-2 lg:flex">
-            <Link href="/" className="flex h-8 w-8"> 
-                <img src={"./logo.png"} className="h-full w-full"/>
-            </Link>
-            <a href="#">Katsu by Lychee</a>
+            <Link href="/" className="cursor-pointer">Katsu</Link>
           </div>
           {/* <h1 className="hidden lg:flex">Logo</h1> */}
           <div className="absolute inset-x-0 top-6 z-50 flex items-center justify-center">
@@ -94,8 +91,8 @@ export function StickyHeader() {
             >
               <ul className="flex h-full w-full flex-row justify-between gap-6 lg:flex-row lg:justify-start lg:gap-1">
                 <li className="flex items-center justify-center px-2 py-0.5">
-                  <Link href="/" className="flex h-8 w-8 lg:hidden"> <img src={"./logo.png"}/></Link>
-                  <a href="#" className="hidden lg:flex">
+                  <Link href="/" className="flex h-8 w-8 lg:hidden cursor-pointer"> Katsu </Link>
+                  <a href="/" className="hidden lg:flex">
                     Home
                   </a>
                 </li>

@@ -34,6 +34,10 @@ import {
     DrawerTrigger,
   } from "@/components/ui/drawer"
   import { Button } from "@/components/ui/button"
+import { Toaster } from "@/components/ui/sonner"
+
+
+import Saves from '@/components/saves'
 
 
 const Katsu = () => {
@@ -162,6 +166,7 @@ const Katsu = () => {
 
     return (
         <div>
+            <Toaster />
            <div className="fixed bottom-10 right-10">
                 <ModeToggle />
             </div>
@@ -200,6 +205,7 @@ const Katsu = () => {
                             <TabsTrigger value="grid">Edit Content</TabsTrigger>
                             <TabsTrigger value="bento">View Bento</TabsTrigger>
                             <TabsTrigger value="deploy">Deploy</TabsTrigger>
+                            <TabsTrigger value="save">Save</TabsTrigger>
                             <TabsTrigger value="getlychee">Get Lychee</TabsTrigger>
                         </TabsList>
                         <div className='flex'>   
@@ -277,6 +283,9 @@ const Katsu = () => {
                     </TabsContent>
                     <TabsContent value="bento" className="px-5 overflow-hidden py-6 place-items-center place-content-center h-5/6 w-5/6">
                         {data ? <BentoDemo data={data}/> : <Progress value={progress} className="w-[60%]" />}
+                    </TabsContent>
+                    <TabsContent value="save" className="px-5 overflow-hidden py-6 place-items-center place-content-center h-5/6 w-5/6">
+                        <Saves />
                     </TabsContent>
                 </Tabs>
             </div>
