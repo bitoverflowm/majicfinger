@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { motion, useScroll, useTransform  } from "framer-motion";
+
 import { IoWarningOutline  } from "react-icons/io5";
 import BrowserFrame from "react-browser-frame";
 import * as XLSX from 'xlsx'
@@ -50,6 +52,11 @@ const Katsu = () => {
 
     const [loading, setLoading] = useState(false)
     const [progress, setProgress] = React.useState(0)
+
+    const { scrollYProgress } = useScroll();
+
+    const width = useTransform(scrollYProgress, [0, 1], ['50vw', '100vw']);
+    const height = useTransform(scrollYProgress, [0, 1], ['50vh', '100vh']);
 
     /*useEffect(() => {
         if(!user){
@@ -163,39 +170,38 @@ const Katsu = () => {
         const timer = setTimeout(() => setProgress(99), 500)
         return () => clearTimeout(timer)
       }, [])
+    
 
     return (
         <div>
-            <Toaster />
+           <Toaster />
            <div className="fixed bottom-10 right-10">
                 <ModeToggle />
             </div>
-            <StickyHeader />
             <div className="relative h-full w-full items-center justify-center overflow-hidden">
                 <Meteors number={30} />
-                <div className="px-60 pt-36 pb-10 text-center ">
-                    
-                    <h1 className="text-8xl font-bold">Welcome to Katsu</h1>
-                    <p className="py-6">Created by MisterrPink. Powered by Lychee.</p>
-                    <div className=''>Ever dreamed of being able to create bento boxes as beautiful as this</div> 
+                <div className="w-1/2 mx-auto pt-36 pb-10 text-center">
+                    <h1 className="text-8xl font-bold">Ever Dreamed of Creating Bentos as Beautiful as This?</h1>
                 </div>
-                <div className='max-w-screen px-60'>
-                    <BrowserFrame url="http://www.yourname.lych3e.com">
-                        <div className='p-5'>
-                            {
-                                loading ? <Progress value={progress} className="w-[60%]" /> : <BentoDemo data={data}/>
-
-                            }
-                            
+                    <motion.div
+                        style={{
+                            width,
+                            height,
+                            backgroundColor: "blue",
+                            transition: "transform 0.5s",
+                        }}
+                    >
+                        <div className='max-w-screen px-60'>
+                            <BrowserFrame url="http://www.yourname.lych3e.com">
+                                <div className='p-5'>
+                                    {
+                                        loading ? <Progress value={progress} className="w-[60%]" /> : <BentoDemo data={data}/>
+                                    }                            
+                                </div>
+                            </BrowserFrame>
                         </div>
-                    </BrowserFrame>
-                </div>
-            </div>
-            <div className='grid pl-64 w-full p-20'>
-                <div>It's pretty hard to do</div>
-                <div>But I did the work for you</div>
-                <div>Built on top of Lychee's ground breaking tech, you now can!</div>
-                <div>Not a single line of code needs to be written</div>
+                </motion.div>
+                
             </div>
 
             <div className='min-h-screen w-full flex justify-items-center'>
