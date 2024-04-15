@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { motion, useScroll, useTransform  } from "framer-motion";
+import { motion, AnimatePresence} from "framer-motion";
 
 import { IoWarningOutline  } from "react-icons/io5";
 import BrowserFrame from "react-browser-frame";
@@ -23,7 +23,6 @@ import Backgrounds from './backgrounds';
 /* Shadcn imports
  * 
  */
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import {
     Drawer,
@@ -41,9 +40,15 @@ import { Toaster } from "@/components/ui/sonner"
 
 import Saves from '@/components/saves'
 
+const bentoVariants = {
+    open: { height: "100vh", width: "100vw" },
+    closed: { height: "75vh", width: "60vw" },
+  }
 
 const Katsu = () => {
     const contextState = useMyState()
+
+    const [started, setStarted] = useState(false)
 
     const data = contextState?.data
     const setDflt = contextState?.setDflt
@@ -53,16 +58,6 @@ const Katsu = () => {
     const [loading, setLoading] = useState(false)
     const [progress, setProgress] = React.useState(0)
 
-    const { scrollYProgress } = useScroll();
-
-    const width = useTransform(scrollYProgress, [0, 1], ['50vw', '100vw']);
-    const height = useTransform(scrollYProgress, [0, 1], ['50vh', '100vh']);
-
-    /*useEffect(() => {
-        if(!user){
-            router.push('/login')
-        }
-    }, [user])*/
     const handleFileUpload = (e) => {
         const file = e.target.files[0]
         
@@ -173,137 +168,124 @@ const Katsu = () => {
     
 
     return (
-        <div>
+        <div className='min-h-screen '>
            <Toaster />
            <div className="fixed bottom-10 right-10">
                 <ModeToggle />
             </div>
-            <div className="relative h-full w-full items-center justify-center overflow-hidden">
-                <Meteors number={30} />
-                <div className="w-1/2 mx-auto pt-36 pb-10 text-center">
-                    <h1 className="text-8xl font-bold">Ever Dreamed of Creating Bentos as Beautiful as This?</h1>
-                </div>
+            <AnimatePresence>
+                { !started &&
                     <motion.div
-                        style={{
-                            width,
-                            height,
-                            backgroundColor: "blue",
-                            transition: "transform 0.5s",
-                        }}
+                        initial={{ height: '400px', opacity: 0}}
+                        animate={{ height: '420px', opacity: 1}}
+                        exit={{ height: '0px', opacity: 0}}
+                        transition={{ ease: "easeOut", duration: 0.2 }}
                     >
-                        <div className='max-w-screen px-60'>
-                            <BrowserFrame url="http://www.yourname.lych3e.com">
-                                <div className='p-5'>
-                                    {
-                                        loading ? <Progress value={progress} className="w-[60%]" /> : <BentoDemo data={data}/>
-                                    }                            
+                        <div className="w-1/3 mx-auto pt-36 pb-10 text-center">
+                            <h1 className="text-6xl font-bold"> Create Bentos That'll Make Your Friends Jealous?</h1>
+                            <div className='' onClick={()=>setStarted(true)}>Go</div>
+                        </div>
+                    </motion.div>
+                }
+            </AnimatePresence>
+            <div className="flex place-items-center place-content-center px-10">
+                <motion.div
+                    animate={started ? "open" : "closed"}
+                    viewport={{once: true}}
+                    variants={bentoVariants}
+                    className='flex place-items-center place-content-center'
+                >
+                    {!started ? 
+                        <BrowserFrame url="http://www.yourname.lych3e.com">                
+                            <div className='flex justify-items-center'>
+                                <div className="px-5 overflow-hidden py-6 place-items-center place-content-center">
+                                    {data ? <BentoDemo data={data}/> : <Progress value={progress} className="w-[60%]" />}
                                 </div>
-                            </BrowserFrame>
+                            </div>
+                        </BrowserFrame>
+                        : <div className='grid w-full justify-items-center'>
+                            <div className='flex'>   
+                                <Drawer>
+                                    <DrawerTrigger asChild>
+                                        <Button variant="outline">View Icons</Button>
+                                    </DrawerTrigger>
+                                    <DrawerContent>
+                                        <div className="mx-auto w-full">
+                                            <DrawerHeader>
+                                                <DrawerTitle>Here are the icons</DrawerTitle>
+                                                <DrawerDescription>Click on the icon to save to your clipboard. Then paste it into Icon column in the Grid</DrawerDescription>
+                                                <IconSelector />
+                                            </DrawerHeader>                            
+                                        </div>
+                                        <DrawerFooter>
+                                            <DrawerClose asChild>
+                                                <Button variant="outline">Close</Button>
+                                            </DrawerClose>
+                                        </DrawerFooter>
+                                    </DrawerContent>
+                                </Drawer>
+                                <Drawer>
+                                    <DrawerTrigger asChild>
+                                        <Button variant="outline">View Colors</Button>
+                                    </DrawerTrigger>
+                                    <DrawerContent>
+                                        <div className="mx-auto w-full">
+                                            <DrawerHeader>
+                                                <DrawerTitle>Here are the colors</DrawerTitle>
+                                                <DrawerDescription>Click to copy the color and paste it into background_color column to set the background color of that specific bento card</DrawerDescription>
+                                                <KatsuColors />
+                                            </DrawerHeader>                            
+                                        </div>
+                                        <DrawerFooter>
+                                            <DrawerClose asChild>
+                                                <Button variant="outline">Close</Button>
+                                            </DrawerClose>
+                                        </DrawerFooter>
+                                    </DrawerContent>
+                                </Drawer>
+                                <Drawer>
+                                    <DrawerTrigger asChild>
+                                        <Button variant="outline">Seggify</Button>
+                                    </DrawerTrigger>
+                                    <DrawerContent>
+                                        <div className="mx-auto w-full">
+                                            <DrawerHeader>
+                                                <DrawerTitle>These are elements that add a little more "je ne sais quoi" to your bento</DrawerTitle>
+                                                <DrawerDescription>Click to copy the keyword and paste it into background column to set the background color of that specific bento card</DrawerDescription>
+                                                <Backgrounds />
+                                            </DrawerHeader>                            
+                                        </div>
+                                        <DrawerFooter>
+                                            <DrawerClose asChild>
+                                                <Button variant="outline">Close</Button>
+                                            </DrawerClose>
+                                        </DrawerFooter>
+                                    </DrawerContent>
+                                </Drawer>
+                            </div>
+                            
+                            <div className="w-full place-items-center place-content-center hidden">
+                                <div className='text-center py-4'>Just click and edit the grid below to update the bento</div>
+                                <form className="flex flex-col items-center pb-6">
+                                    <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">
+                                        Click to Upload
+                                    </label>
+                                    <input id="file-upload" type="file" accept=".xlsx, .csv" onChange={handleFileUpload} className="hidden" />
+                                </form>
+                                <div className="h-[900px] flex place-content-center">
+                                    <GridView />
+                                </div>
+                            </div>
+                            <div className="px-5 overflow-hidden py-6 w-full">
+                                {data ? <BentoDemo data={data}/> : <Progress value={progress} className="w-[60%]" />}
+                            </div>
+                            <div value="save" className="px-5 overflow-hidden py-6 place-items-center place-content-center h-5/6 w-5/6 hidden">
+                                <Saves />
+                            </div>
                         </div>
+                        }
                 </motion.div>
-                
-            </div>
-
-            <div className='min-h-screen w-full flex justify-items-center'>
-                <Tabs defaultValue="grid" className="w-full flex flex-col place-items-center place-content-center">
-                    <div className='flex gap-2'>
-                        <TabsList>
-                            <TabsTrigger value="grid">Edit Content</TabsTrigger>
-                            <TabsTrigger value="bento">View Bento</TabsTrigger>
-                            <TabsTrigger value="deploy">Deploy</TabsTrigger>
-                            <TabsTrigger value="save">Save</TabsTrigger>
-                            <TabsTrigger value="getlychee">Get Lychee</TabsTrigger>
-                        </TabsList>
-                        <div className='flex'>   
-                            <Drawer>
-                                <DrawerTrigger asChild>
-                                    <Button variant="outline">View Icons</Button>
-                                </DrawerTrigger>
-                                <DrawerContent>
-                                    <div className="mx-auto w-full">
-                                        <DrawerHeader>
-                                            <DrawerTitle>Here are the icons</DrawerTitle>
-                                            <DrawerDescription>Click on the icon to save to your clipboard. Then paste it into Icon column in the Grid</DrawerDescription>
-                                            <IconSelector />
-                                        </DrawerHeader>                            
-                                    </div>
-                                    <DrawerFooter>
-                                        <DrawerClose asChild>
-                                            <Button variant="outline">Close</Button>
-                                        </DrawerClose>
-                                    </DrawerFooter>
-                                </DrawerContent>
-                            </Drawer>
-                            <Drawer>
-                                <DrawerTrigger asChild>
-                                    <Button variant="outline">View Colors</Button>
-                                </DrawerTrigger>
-                                <DrawerContent>
-                                    <div className="mx-auto w-full">
-                                        <DrawerHeader>
-                                            <DrawerTitle>Here are the colors</DrawerTitle>
-                                            <DrawerDescription>Click to copy the color and paste it into background_color column to set the background color of that specific bento card</DrawerDescription>
-                                            <KatsuColors />
-                                        </DrawerHeader>                            
-                                    </div>
-                                    <DrawerFooter>
-                                        <DrawerClose asChild>
-                                            <Button variant="outline">Close</Button>
-                                        </DrawerClose>
-                                    </DrawerFooter>
-                                </DrawerContent>
-                            </Drawer>
-                            <Drawer>
-                                <DrawerTrigger asChild>
-                                    <Button variant="outline">Seggify</Button>
-                                </DrawerTrigger>
-                                <DrawerContent>
-                                    <div className="mx-auto w-full">
-                                        <DrawerHeader>
-                                            <DrawerTitle>These are elements that add a little more "je ne sais quoi" to your bento</DrawerTitle>
-                                            <DrawerDescription>Click to copy the keyword and paste it into background column to set the background color of that specific bento card</DrawerDescription>
-                                            <Backgrounds />
-                                        </DrawerHeader>                            
-                                    </div>
-                                    <DrawerFooter>
-                                        <DrawerClose asChild>
-                                            <Button variant="outline">Close</Button>
-                                        </DrawerClose>
-                                    </DrawerFooter>
-                                </DrawerContent>
-                            </Drawer>
-                        </div>
-                    </div>
-                    
-                    <TabsContent value="grid" className="w-full place-items-center place-content-center">
-                        <div className='text-center py-4'>Just click and edit the grid below to update the bento</div>
-                        <form className="flex flex-col items-center pb-6">
-                            <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">
-                                Click to Upload
-                            </label>
-                            <input id="file-upload" type="file" accept=".xlsx, .csv" onChange={handleFileUpload} className="hidden" />
-                        </form>
-                        <div className="h-[900px] flex place-content-center">
-                            <GridView />
-                        </div>
-                    </TabsContent>
-                    <TabsContent value="bento" className="px-5 overflow-hidden py-6 place-items-center place-content-center h-5/6 w-5/6">
-                        {data ? <BentoDemo data={data}/> : <Progress value={progress} className="w-[60%]" />}
-                    </TabsContent>
-                    <TabsContent value="save" className="px-5 overflow-hidden py-6 place-items-center place-content-center h-5/6 w-5/6">
-                        <Saves />
-                    </TabsContent>
-                </Tabs>
-            </div>
-            
-            <div>
-                <div className="text-xs text-red-400 pb-2 flex"><IoWarningOutline /> Warning: this action will replace the current data stored this session </div>
-                    
-                </div>
-            <div>Click the cells to edit the data </div>
-            
-            <div>Instant Bento created:</div>
-            
+            </div>       
         </div>
     );
 };

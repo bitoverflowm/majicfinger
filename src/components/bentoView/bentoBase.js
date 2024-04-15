@@ -32,7 +32,7 @@ export function BentoDemo({data}) {
   const [mainBg, setMainBg] = useState()
   
   return (
-    <div className="relative flex flex-col h-full w-full items-center justify-center overflow-hidden rounded-lg border bg-background p-20 shadow-sm">
+    <div className="h-full w-full overflow-hidden rounded-lg border bg-background shadow-sm">
       {mainBg === 'retroGrid' && <RetroGrid />}
       {mainBg === 'dotPattern' && <DotPattern className={cn(
           "[mask-image:radial-gradient(400px_circle_at_center,white,transparent)]",
@@ -45,7 +45,7 @@ export function BentoDemo({data}) {
         className={cn(
           "[mask-image:linear-gradient(to_bottom_right,white,transparent,transparent)] ",
         )} />}
-      <div className="w-1/2 pt-3 pb-12 z-40">
+      <div className="pt-3 pb-12 z-40">
         <Menubar>
           <MenubarMenu>
             <MenubarTrigger>Change Bento Background</MenubarTrigger>
@@ -68,11 +68,7 @@ export function BentoDemo({data}) {
             </MenubarTrigger>
           </MenubarMenu>         
         </Menubar>
-      </div>
-
-      
-
-      
+      </div>      
       <BentoGrid>
           {data && data.map((feature, idx) => (
             <BentoCard key={idx} {...feature} />
