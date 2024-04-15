@@ -8,6 +8,13 @@ import Globe from "./globe";
 
 import { toast } from "@/components/ui/use-toast";
 
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+
 
 const BentoGrid = ({ children, className }) => {
   return (
@@ -55,44 +62,54 @@ const BentoCard = ({
         className,
       )}
       style={{ backgroundColor: background_color ? background_color: '' }}
-      onClick={()=>clickHandler()}
     >
-      <div>{background && background === "globe" && <Globe className="top-0 h-[600px] w-[600px] transition-all duration-300 ease-out [mask-image:linear-gradient(to_top,transparent_30%,#000_100%)] group-hover:scale-105 sm:left-40" />}</div>
-      <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
-        {IconComponent && <IconComponent className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />}
-        <div className="text-8xl font-black text-neutral-700 dark:text-neutral-300">
-          {heading}
+      <ContextMenu>
+        <ContextMenuTrigger>
+        
+        <div>{background && background === "globe" && <Globe className="top-0 h-[600px] w-[600px] transition-all duration-300 ease-out [mask-image:linear-gradient(to_top,transparent_30%,#000_100%)] group-hover:scale-105 sm:left-40" />}</div>
+        <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
+          {IconComponent && <IconComponent className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />}
+          <div className="text-8xl font-black text-neutral-700 dark:text-neutral-300">
+            {heading}
+          </div>
+          <p className="max-w-lg text-neutral-400">{description}</p>
         </div>
-        <p className="max-w-lg text-neutral-400">{description}</p>
-      </div>
 
-      { href && href !=="/" && href !=="" ?
-        <div
-        className={cn(
-          "pointer-events-none absolute bottom-0 flex w-full translate-y-10 transform-gpu flex-row items-center p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100",
-        )}
-        >
-          <Button variant="ghost" asChild size="sm" className="pointer-events-auto">
-            <Link href={href}>
-              {cta}
-              <ArrowRightIcon className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        : <div
-        className={cn(
-          "pointer-events-none absolute bottom-0 flex w-full translate-y-10 transform-gpu flex-row items-center p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100",
-        )}
-        >
-          <Button variant="ghost" asChild size="sm" className="pointer-events-auto">
-            <>
-              {cta}
-              <ArrowRightIcon className="ml-2 h-4 w-4" />
-            </>
-          </Button>
-        </div>
-      }
-      <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:bg-black/[.03] group-hover:dark:bg-neutral-800/10" />
+        { href && href !=="/" && href !=="" ?
+          <div
+          className={cn(
+            "pointer-events-none absolute bottom-0 flex w-full translate-y-10 transform-gpu flex-row items-center p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100",
+          )}
+          >
+            <Button variant="ghost" asChild size="sm" className="pointer-events-auto">
+              <Link href={href}>
+                {cta}
+                <ArrowRightIcon className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          : <div
+          className={cn(
+            "pointer-events-none absolute bottom-0 flex w-full translate-y-10 transform-gpu flex-row items-center p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100",
+          )}
+          >
+            <Button variant="ghost" asChild size="sm" className="pointer-events-auto">
+              <>
+                {cta}
+                <ArrowRightIcon className="ml-2 h-4 w-4" />
+              </>
+            </Button>
+          </div>
+        }
+        <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:bg-black/[.03] group-hover:dark:bg-neutral-800/10" />
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem>Profile</ContextMenuItem>
+          <ContextMenuItem>Billing</ContextMenuItem>
+          <ContextMenuItem>Team</ContextMenuItem>
+          <ContextMenuItem>Subscription</ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     </div>
   );
 }
