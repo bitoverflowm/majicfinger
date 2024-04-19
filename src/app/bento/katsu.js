@@ -121,7 +121,7 @@ const Katsu = () => {
                         animate={{ height: '50vh', opacity: 1}}
                         exit={{ height: '0px', opacity: 0}}
                         transition={{ ease: "easeOut", duration: 0.2 }}
-                        className='flex bg-black py-42 text-white place-items-center place-content-center overflow-hidden w-screen'
+                        className='flex bg-black py-42 text-white place-items-center place-content-center overflow-hidden'
                     >                        
                         <div className="w-1/2 text-center">
                             <h1 className="text-8xl font-bold py-4">Bentos That Stand Out</h1>

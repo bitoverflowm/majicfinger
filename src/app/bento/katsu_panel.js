@@ -32,8 +32,8 @@ import {
 } from "@/components/ui/sheet"
 
 import IconSelector from '@/components/icons/iconSelector';
-import KatsuColors from './katsu_colors';
-import Backgrounds from './backgrounds';
+import KatsuColors from '@/components/panels/katsu_colors';
+import Backgrounds from '@/components/panels/backgrounds';
 
 import Saves from '@/components/saves'
 import GridView from "@/components/gridView";

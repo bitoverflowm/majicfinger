@@ -88,7 +88,7 @@ export function BentoDemo({data, demo=true}) {
               "[mask-image:linear-gradient(to_bottom_right,white,transparent,transparent)] ",
             )} />}   
             {data && data.map((feature, idx) => (
-              <BentoCard key={idx} {...feature} />
+              <BentoCard key={idx} index={idx} {...feature} />
             ))}
         </BentoGrid>
       </div>
