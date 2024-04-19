@@ -33,6 +33,7 @@ import {
 
 import KatsuColors from '@/components/panels/katsu_colors';
 import Backgrounds from '@/components/panels/backgrounds';
+import IconSelector from '@/components/icons/iconSelector';
 
 const BentoGrid = ({ children, className }) => {
   return (
@@ -64,16 +65,10 @@ const BentoCard = ({
 
   const IconComponent = iconMap[Icon]
 
-  const [bgColorOpen, setBgColorOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [option, setOption] = useState()
 
-    
-  const clickHandler = () => {
-    toast({
-      description: `Feature clicked!`,
-    });
-  };
-
-  const updateCellData = (field, newValue, closer) => {
+  const updateCellData = (field, newValue) => {
     console.log('updating: ', index, field, newValue)
     setData(prevData => {
       // Create a new array with updated data
@@ -88,8 +83,13 @@ const BentoCard = ({
     toast({
       description: `${field} updated to ${newValue}`,
     });
-    closer(false)
+    setDrawerOpen(false)
   };
+
+  const drawerOpenHandler = (option) => {
+    setDrawerOpen(true)
+    setOption(option)
+  }
 
   return(
     <div
@@ -145,21 +145,27 @@ const BentoCard = ({
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuLabel>Options:</ContextMenuLabel>
-          <ContextMenuItem > <div onClick={()=>setBgColorOpen(true)} className="flex gap-3 place-items-center">Background Color: <Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: background_color ? background_color: '' }} /> </div>
+          <ContextMenuItem > 
+            <div onClick={()=>drawerOpenHandler('BackgroundColor')} className="flex gap-3 place-items-center">Background Color: <Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: background_color ? background_color: '' }} /> </div>
           </ContextMenuItem>
-          <ContextMenuItem>Text</ContextMenuItem>
-          <ContextMenuItem>Team</ContextMenuItem>
+          <ContextMenuItem> <div onClick={()=>drawerOpenHandler('SexyBackground')} className="flex gap-3 place-items-center">😻 Sexy Backgrounds: {background ? background : 'none selected'} </div></ContextMenuItem>
+          <ContextMenuItem> <div onClick={()=>drawerOpenHandler('Icons')} className="flex gap-3 place-items-center">Icon: {IconComponent && <IconComponent className="h-4 w-4 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />} </div></ContextMenuItem>
           <ContextMenuItem>Subscription</ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-      <Drawer open={bgColorOpen} onOpenChange={setBgColorOpen}>
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent>
             <div className="mx-auto w-full">
                 <DrawerHeader>
-                    <DrawerTitle>Here are the colors</DrawerTitle>
-                    <DrawerDescription>Click to copy the color and paste it into background_color column to set the background color of that specific bento card</DrawerDescription>
-                    <KatsuColors updateBgColor={updateCellData} setBgColorOpen={setBgColorOpen}/>
-                </DrawerHeader>                            
+                    <DrawerTitle>Pick a {option} from our library</DrawerTitle>
+                    {option === 'SexyBackground' && <DrawerDescription>These are elements that add a little more "je ne sais quoi" to your bento</DrawerDescription>}
+                    <DrawerDescription>Just click and you're done</DrawerDescription>
+                </DrawerHeader>
+                
+                { option === 'BackgroundColor' && <KatsuColors updateBgColor={updateCellData}/> }
+                { option === 'SexyBackground' && <Backgrounds updateBackground={updateCellData}/> }
+                { option === 'Icons' && <IconSelector updateIcon={updateCellData}/> }
+                
             </div>
             <DrawerFooter>
                 <DrawerClose asChild>

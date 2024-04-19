@@ -7,7 +7,7 @@ import { toast } from "@/components/ui/use-toast";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-const KatsuColors = ({updateBgColor, setBgColorOpen}) => {
+const KatsuColors = ({updateBgColor}) => {
     // Your component logic here
     
     // Function to copy icon name to clipboard
@@ -37,7 +37,7 @@ const KatsuColors = ({updateBgColor, setBgColorOpen}) => {
                             <div
                                 key={key}
                                 className={'flex rounded-md h-6 cursor-pointer hover:border hover:border-black'}
-                                onClick={()=>updateBgColor('background_color', solid, setBgColorOpen)}
+                                onClick={()=>updateBgColor('background_color', solid)}
                                 style={{background: solid}}/>
                         ))
                     }
