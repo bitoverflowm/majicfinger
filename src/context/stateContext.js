@@ -303,8 +303,16 @@ export const StateProvider = ({ children, bento=false }) => {
     }
   }, [])
 
+  /*
+   * Bento Specific states
+   */
+
+  const [bentoContainer, setBentoContainer] = useState({
+    'background' : null,
+  })
+
   return (
-    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, bgType, setBgType, chartTheme, setChartTheme, strokeColor, setStrokeColor, title, setTitle, subTitle, setSubTitle, gridLinesEnabled, setGridLinesEnabled}}>
+    <StateContext.Provider value={{working, setWorking, aiOpen, setAiOpen, chartOptions, setChartOptions, dflt, setDflt, xKey, setXKey, yKey, setYKey, type, setType, data, setData, fmtCols, setFmtCols, xOptions, setXOptions, yOptions, setYOptions, chartTypes, directions, direction, setDirection, colDefs, rowData, defaultColDef, bgColor, setBgColor, bgType, setBgType, chartTheme, setChartTheme, strokeColor, setStrokeColor, title, setTitle, subTitle, setSubTitle, gridLinesEnabled, setGridLinesEnabled, bentoContainer, setBentoContainer}}>
       {children}
     </StateContext.Provider>
   );

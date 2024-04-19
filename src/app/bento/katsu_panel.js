@@ -38,7 +38,7 @@ import Backgrounds from '@/components/panels/backgrounds';
 import Saves from '@/components/saves'
 import GridView from "@/components/gridView";
 import BentoView from "@/components/bentoView";
-import { BentoDemo } from "@/components/bentoView/bentoBase";
+import { BentoBase } from "@/components/bentoView/bentoBase";
 
 const KatsuPanel = ({data}) => {
     // Your component logic goes here
@@ -260,14 +260,16 @@ const KatsuPanel = ({data}) => {
                     </div>
                 </div>
                 <div className="overflow-hidden w-5/6 mx-auto">
-                    {data ? <BentoDemo data={data} demo={false}/> : <Progress value={progress} className="w-[60%]" />}
+                    {data && <BentoBase data={data} demo={false}/>}
                 </div>
                 <div value="save" className="px-5 overflow-hidden py-6 place-items-center place-content-center h-5/6 w-5/6 hidden">
                     <Saves />
                 </div>
             </div>
             {
-                /* Grid View */
+                /* Progress bar unused 
+                <Progress value={progress} className="w-[60%]" />
+                */
             }           
     </div>
     );

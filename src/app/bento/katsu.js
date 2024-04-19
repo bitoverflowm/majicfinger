@@ -12,7 +12,7 @@ import { useMyState  } from '@/context/stateContext'
 import { ModeToggle } from "@/components/ui/modeToggle";
 
 
-import { BentoDemo } from "@/components/bentoView/bentoBase";
+import { BentoBase } from "@/components/bentoView/bentoBase";
 
 /* Shadcn imports
  * 
@@ -144,7 +144,7 @@ const Katsu = () => {
                         <BrowserFrame url="http://www.yourname.lych3e.com">                
                             <div className='flex justify-items-center'>
                                 <div className="px-5 overflow-hidden py-6 place-items-center place-content-center">
-                                    {data ? <BentoDemo data={data}/> : <Progress value={progress} className="w-[60%]" />}
+                                    {data ? <BentoBase data={data}/> : <Progress value={progress} className="w-[60%]" />}
                                 </div>
                             </div>
                         </BrowserFrame>

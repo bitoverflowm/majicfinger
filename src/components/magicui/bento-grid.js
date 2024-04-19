@@ -31,6 +31,19 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer"
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+
 import KatsuColors from '@/components/panels/katsu_colors';
 import Backgrounds from '@/components/panels/backgrounds';
 import IconSelector from '@/components/icons/iconSelector';
@@ -50,6 +63,7 @@ const BentoGrid = ({ children, className }) => {
 
 const BentoCard = ({
   index,
+  setData,
   heading,
   className,
   background,
@@ -59,17 +73,18 @@ const BentoCard = ({
   cta,
   background_color
 }) => {
-  const contextState = useMyState()
-  const setData = contextState?.setData;
-  const data = contextState?.data;
+  //const contextState = useMyState()
+  //const setData = contextState?.setData;
+  //const data = contextState?.data;
 
   const IconComponent = iconMap[Icon]
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [option, setOption] = useState()
+  const [textEditOpen, setTextEditOpen] = useState(false)
 
   const updateCellData = (field, newValue) => {
-    console.log('updating: ', index, field, newValue)
+    //console.log('updating: ', index, field, newValue)
     setData(prevData => {
       // Create a new array with updated data
       const newData = prevData.map((item, id) => {
@@ -80,10 +95,14 @@ const BentoCard = ({
       });
       return newData;
     });
-    toast({
-      description: `${field} updated to ${newValue}`,
-    });
-    setDrawerOpen(false)
+    if(drawerOpen){
+      toast({
+        description: `${field} updated to ${newValue}`,
+      });
+      setDrawerOpen(false)
+    }else{
+
+    }    
   };
 
   const drawerOpenHandler = (option) => {
@@ -150,7 +169,7 @@ const BentoCard = ({
           </ContextMenuItem>
           <ContextMenuItem> <div onClick={()=>drawerOpenHandler('SexyBackground')} className="flex gap-3 place-items-center">😻 Sexy Backgrounds: {background ? background : 'none selected'} </div></ContextMenuItem>
           <ContextMenuItem> <div onClick={()=>drawerOpenHandler('Icons')} className="flex gap-3 place-items-center">Icon: {IconComponent && <IconComponent className="h-4 w-4 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />} </div></ContextMenuItem>
-          <ContextMenuItem>Subscription</ContextMenuItem>
+          <ContextMenuItem><div onClick={()=>setTextEditOpen(true)} className="flex w-full">Text</div></ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -174,6 +193,38 @@ const BentoCard = ({
             </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      { textEditOpen &&
+            <div className="absolute right-0 z-10 h-full w-1/2 pr-10 flex flex-col place-items-center place-content-center bg-slate-200/30 backdrop-blur-md">
+                  <div className="mx-auto w-full">
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="heading" className="text-right">
+                          Heading
+                        </Label>
+                        <Input
+                          id="heading"
+                          defaultValue={heading}
+                          className="col-span-3"
+                          onChange={(e)=>updateCellData('heading', e.target.value)}
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="username" className="text-right">
+                          Description
+                        </Label>
+                        <Input
+                          id="description"
+                          defaultValue={description}
+                          className="col-span-3"
+                          onChange={(e)=>updateCellData('description', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setTextEditOpen(false)}>Close</div>
+            </div>
+        }
     </div>
   );
 }
