@@ -1,7 +1,7 @@
 
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
-import { HandIcon } from "@radix-ui/react-icons"
+import { useState, useEffect, useRef } from "react";
+import { HandIcon, UpdateIcon } from "@radix-ui/react-icons"
 
 import {
   Menubar,
@@ -44,6 +44,8 @@ export function BentoBase({data, demo=true}) {
 
   const [drawerOpen, setDrawerOpen] = useState()
   const [option, setOption] = useState()
+  const [animationsStart, setAnimationsStart] = useState()
+  const startAnimationRef = useRef(null);
 
   const bentoContainer = contextState?.bentoContainer
   const setBentoContainer = contextState?.setBentoContainer
@@ -64,6 +66,12 @@ export function BentoBase({data, demo=true}) {
     setDrawerOpen(true)
     setOption(option)
   }
+
+  const triggerAnimation = () => {
+    if (startAnimationRef.current) {
+      startAnimationRef.current(); // Call the start function of CountUp
+    }
+  };
   
   return (
     <div className="bg-white">
@@ -103,8 +111,16 @@ export function BentoBase({data, demo=true}) {
                   <MenubarTrigger>
                     Randomize Colors
                   </MenubarTrigger>
-                </MenubarMenu>     
+                </MenubarMenu>
               </Menubar>
+              <div>
+                <Label htmlFor="font-size" className="text-right pr-1">
+                  Play Animations
+                </Label>
+                <Button variant={"outline"} size="icon" onClick={()=> triggerAnimation()}>
+                  <UpdateIcon className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
       }
@@ -124,7 +140,7 @@ export function BentoBase({data, demo=true}) {
               "[mask-image:linear-gradient(to_bottom_right,white,transparent,transparent)] ",
             )} />}   
             {data && data.map((feature, idx) => (
-              <BentoCard key={idx} index={idx} setData={setData} {...feature} />
+              <BentoCard key={idx} index={idx} startAnimationRef={startAnimationRef} setData={setData} {...feature} />
             ))}
         </BentoGrid>
       </div>
@@ -152,14 +168,3 @@ export function BentoBase({data, demo=true}) {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-

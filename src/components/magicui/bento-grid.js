@@ -34,18 +34,17 @@ import {
 } from "@/components/ui/drawer"
 
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
 
 import KatsuColors from '@/components/panels/katsu_colors';
 import Backgrounds from '@/components/panels/backgrounds';
@@ -66,6 +65,7 @@ const BentoGrid = ({ children, className }) => {
 
 const BentoCard = ({
   index,
+  startAnimationRef,
   setData,
   heading,
   heading_style,
@@ -158,6 +158,25 @@ const BentoCard = ({
       });
   }
 
+  const updateAnimation = (target, animation) => {
+    console.log(target, animation);
+    setData( prevData => {
+      const newData = prevData.map((item, id) => {
+        if(id === index){
+          return {
+                  ...item, 
+                  heading_style: {
+                    ...item.heading_style,
+                    "animation" : animation
+                  }
+              };
+        }
+        return item;
+      });
+      return newData;
+    });
+  }
+
   const drawerOpenHandler = (option) => {
     setDrawerOpen(true)
     setOption(option)
@@ -182,8 +201,9 @@ const BentoCard = ({
             <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
               {IconComponent && <IconComponent className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />}
               <div className={`text-8xl text-neutral-700 dark:text-neutral-300`} style={heading_style && heading_style}>
-                {heading_style && heading_style.countUp ? <CountUp
-                        end={parseFloat(heading.replace(/[^0-9-.]/g, ''))} // removes any non-numeric characters except minus and decimal
+                {heading_style && ['countUp', 'countDown'].includes(heading_style.animation) && <CountUp
+                        start={heading_style.animation === 'countUp' ? 0: parseFloat(heading.replace(/[^0-9-.]/g, ''))} 
+                        end={heading_style.animation === 'countUp' ? parseFloat(heading.replace(/[^0-9-.]/g, '')) : 0} // removes any non-numeric characters except minus and decimal
                         prefix={heading.includes('$') ? '$' : ''}
                         suffix={heading.includes('%') ? '%' : ''}
                         separator=","
@@ -193,7 +213,14 @@ const BentoCard = ({
                         useEasing={true}
                         useGrouping={true}
                         startOnMount={true}  // Starts count up when the component mounts
-                      /> : heading}
+                        ref={startAnimationRef}
+                        redraw={true}
+                      >
+                        {({ countUpRef }) => (
+                          <span ref={countUpRef}>{heading}</span>
+                        )}
+                      </CountUp> }
+                  {heading_style && heading_style.animation === 'none' && heading}
               </div>
               <p className="max-w-lg text-neutral-400">{description}</p>
             </div>
@@ -302,11 +329,31 @@ const BentoCard = ({
                           <DoubleArrowDownIcon className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="col-span-4 flex px-2 gap-1 place-items-center">
+                      <div className="col-span-2 flex px-2 gap-1 place-items-center">
                         <Label htmlFor="font-size" className="text-right pr-1">
                           Color
                         </Label>
                         <div onClick={()=>drawerOpenHandler('HeadingColor')} className="flex gap-3 place-items-center"><Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: heading_style && heading_style.color ? heading_style.color: '' }} /> </div>
+                      </div>
+                      <div className="col-span-2 flex px-2 gap-1 place-items-center">
+                        <Label htmlFor="animation" className="text-right pr-1">
+                          Animate
+                        </Label>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline">{heading_style.animation}</Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-56">
+                            <DropdownMenuLabel> Pick An Animation </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuRadioGroup value={heading_style.animation} onValueChange={(value)=>updateAnimation('heading_style', value)}>
+                              <DropdownMenuRadioItem value="none">None</DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="countUp">Count Up</DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="countDown">Count Down</DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="typing">Typing</DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
