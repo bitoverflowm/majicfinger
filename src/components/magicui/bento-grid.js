@@ -1,16 +1,16 @@
 import { useState } from "react";
 
 import Link from "next/link";
+import { ArrowRightIcon, FontBoldIcon, FontItalicIcon, TextAlignLeftIcon, TextAlignCenterIcon, TextAlignRightIcon, DoubleArrowUpIcon, DoubleArrowDownIcon } from "@radix-ui/react-icons";
+import CountUp from 'react-countup';
+
+import Globe from "./globe";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRightIcon, FontBoldIcon, FontItalicIcon, TextAlignLeftIcon, TextAlignCenterIcon, TextAlignRightIcon, DoubleArrowUpIcon, DoubleArrowDownIcon } from "@radix-ui/react-icons";
-
 
 import { iconMap } from "../icons/iconMap";
 
 import { useMyState  } from '@/context/stateContext'
-
-import Globe from "./globe";
 
 import { toast } from "@/components/ui/use-toast";
 
@@ -109,6 +109,12 @@ const BentoCard = ({
     }    
   };
 
+  const parseNumberFromString = (value) => {
+    const numberPattern = /\d+/g;  // Regex to extract digits
+    let result = value.match(numberPattern);
+    return result ? parseInt(result.join(''), 10) : 0;
+  }
+
   const updateTypography = (typeField, newValue) => {
     //eval step
     //console.log(typeField, newValue)
@@ -176,7 +182,18 @@ const BentoCard = ({
             <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
               {IconComponent && <IconComponent className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />}
               <div className={`text-8xl text-neutral-700 dark:text-neutral-300`} style={heading_style && heading_style}>
-                {heading}
+                {heading_style && heading_style.countUp ? <CountUp
+                        end={parseFloat(heading.replace(/[^0-9-.]/g, ''))} // removes any non-numeric characters except minus and decimal
+                        prefix={heading.includes('$') ? '$' : ''}
+                        suffix={heading.includes('%') ? '%' : ''}
+                        separator=","
+                        decimals={heading.includes('.') ? 2 : 0}
+                        decimal="."
+                        duration={2.75}
+                        useEasing={true}
+                        useGrouping={true}
+                        startOnMount={true}  // Starts count up when the component mounts
+                      /> : heading}
               </div>
               <p className="max-w-lg text-neutral-400">{description}</p>
             </div>

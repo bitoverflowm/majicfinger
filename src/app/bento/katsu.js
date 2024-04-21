@@ -52,7 +52,8 @@ const Katsu = () => {
                     'fontWeight': 900,
                     'fontStyle': 'non-italic',
                     'textAlign': 'left',
-                    'fontSize': '96px'
+                    'fontSize': '96px',
+                    'countUp': 1,
                 },
                 "description": "startups",
                 "href": "/",
@@ -68,7 +69,8 @@ const Katsu = () => {
                     'fontWeight': 900,
                     'fontStyle': 'non-italic',
                     'textAlign': 'left',
-                    'fontSize': '96px'
+                    'fontSize': '96px',
+                    'countUp': 1,                    
                 },
                 "description": "Followers on X",
                 "href": "/",
@@ -84,7 +86,8 @@ const Katsu = () => {
                     'fontWeight': 900,
                     'fontStyle': 'non-italic',
                     'textAlign': 'left',
-                    'fontSize': '96px'
+                    'fontSize': '96px',
+                    'countUp': 0,
                 },
                 "description": "Monthly Revenue",
                 "href": "/",
@@ -100,7 +103,8 @@ const Katsu = () => {
                     'fontWeight': 900,
                     'fontStyle': 'non-italic',
                     'textAlign': 'left',
-                    'fontSize': '96px'
+                    'fontSize': '96px',
+                    'countUp': -1,
                 },
                 "description": "Newsletter Readers.",
                 "className": "col-span-3 lg:col-span-1",
