@@ -48,6 +48,12 @@ const Katsu = () => {
             setData([{
                 "Icon": 'RocketIcon',
                 "heading": "17",
+                "heading_style": {
+                    'fontWeight': 900,
+                    'fontStyle': 'non-italic',
+                    'textAlign': 'left',
+                    'fontSize': '96px'
+                },
                 "description": "startups",
                 "href": "/",
                 "cta": "Learn more",
@@ -58,6 +64,12 @@ const Katsu = () => {
             {
                 "Icon": 'TwitterLogoIcon',
                 "heading": "56,000",
+                "heading_style": {
+                    'fontWeight': 900,
+                    'fontStyle': 'non-italic',
+                    'textAlign': 'left',
+                    'fontSize': '96px'
+                },
                 "description": "Followers on X",
                 "href": "/",
                 "cta": "Learn more",
@@ -68,6 +80,12 @@ const Katsu = () => {
             {
                 "Icon": 'SketchLogoIcon',
                 "heading": "$65,000",
+                "heading_style": {
+                    'fontWeight': 900,
+                    'fontStyle': 'non-italic',
+                    'textAlign': 'left',
+                    'fontSize': '96px'
+                },
                 "description": "Monthly Revenue",
                 "href": "/",
                 "cta": "Learn more",
@@ -78,6 +96,12 @@ const Katsu = () => {
             {
                 "Icon": 'CalendarIcon',
                 "heading": "7,000",
+                "heading_style": {
+                    'fontWeight': 900,
+                    'fontStyle': 'non-italic',
+                    'textAlign': 'left',
+                    'fontSize': '96px'
+                },
                 "description": "Newsletter Readers.",
                 "className": "col-span-3 lg:col-span-1",
                 "href": "/",

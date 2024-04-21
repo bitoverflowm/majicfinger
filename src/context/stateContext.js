@@ -309,6 +309,7 @@ export const StateProvider = ({ children, bento=false }) => {
 
   const [bentoContainer, setBentoContainer] = useState({
     'background' : null,
+    'background_color': ''
   })
 
   return (

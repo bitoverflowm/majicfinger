@@ -3,7 +3,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRightIcon } from "@radix-ui/react-icons";
+import { ArrowRightIcon, FontBoldIcon, FontItalicIcon, TextAlignLeftIcon, TextAlignCenterIcon, TextAlignRightIcon, DoubleArrowUpIcon, DoubleArrowDownIcon } from "@radix-ui/react-icons";
+
+
 import { iconMap } from "../icons/iconMap";
 
 import { useMyState  } from '@/context/stateContext'
@@ -43,6 +45,7 @@ import {
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
 
 import KatsuColors from '@/components/panels/katsu_colors';
 import Backgrounds from '@/components/panels/backgrounds';
@@ -65,6 +68,7 @@ const BentoCard = ({
   index,
   setData,
   heading,
+  heading_style,
   className,
   background,
   Icon,
@@ -105,6 +109,49 @@ const BentoCard = ({
     }    
   };
 
+  const updateTypography = (typeField, newValue) => {
+    //eval step
+    //console.log(typeField, newValue)
+    if(typeField === 'fontWeight'){
+      newValue = newValue ? 900 : 500
+    }else if(typeField === 'fontStyle'){
+      newValue = newValue ? 'italic': 'normal'
+    }else if(typeField === 'textLeft'){
+      typeField = 'textAlign'
+      newValue = 'left'
+    }else if(typeField === 'textCenter'){
+      typeField = 'textAlign'
+      newValue = 'center'
+    }else if(typeField === 'textRight'){
+      typeField = 'textAlign'
+      newValue = 'right'
+    } else if(typeField === 'fontSizeIncrease'){
+      typeField = 'fontSize'
+      newValue = String(parseInt(heading_style.fontSize) + 10) +'px' 
+    } else if(typeField === 'fontSizeDecrease'){
+      typeField = 'fontSize'
+      newValue = String(parseInt(heading_style.fontSize) - 10) +'px' 
+    } else if(typeField === 'headingColor'){
+      typeField = 'color'
+      setDrawerOpen(false)
+    }
+    setData( prevData => {
+        const newData = prevData.map((item, id) => {
+          if(id === index){
+            return {
+                    ...item, 
+                    heading_style: {
+                      ...item.heading_style,
+                      [typeField] : newValue 
+                    }
+                };
+          }
+          return item;
+        });
+        return newData;
+      });
+  }
+
   const drawerOpenHandler = (option) => {
     setDrawerOpen(true)
     setOption(option)
@@ -128,7 +175,7 @@ const BentoCard = ({
             <div>{background && background === "globe" && <Globe className="top-0 h-[600px] w-[600px] transition-all duration-300 ease-out [mask-image:linear-gradient(to_top,transparent_30%,#000_100%)] group-hover:scale-105 sm:left-40" />}</div>
             <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
               {IconComponent && <IconComponent className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />}
-              <div className="text-8xl font-black text-neutral-700 dark:text-neutral-300">
+              <div className={`text-8xl text-neutral-700 dark:text-neutral-300`} style={heading_style && heading_style}>
                 {heading}
               </div>
               <p className="max-w-lg text-neutral-400">{description}</p>
@@ -184,6 +231,7 @@ const BentoCard = ({
                 { option === 'BackgroundColor' && <KatsuColors updateBgColor={updateCellData}/> }
                 { option === 'SexyBackground' && <Backgrounds updateBackground={updateCellData}/> }
                 { option === 'Icons' && <IconSelector updateIcon={updateCellData}/> }
+                { option === 'HeadingColor' && <KatsuColors updateBgColor={updateTypography} mod={'headingColor'}/> }
                 
             </div>
             <DrawerFooter>
@@ -195,31 +243,65 @@ const BentoCard = ({
       </Drawer>
 
       { textEditOpen &&
-            <div className="absolute right-0 z-10 h-full w-1/2 pr-10 flex flex-col place-items-center place-content-center bg-slate-200/30 backdrop-blur-md">
-                  <div className="mx-auto w-full">
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="heading" className="text-right">
-                          Heading
-                        </Label>
-                        <Input
-                          id="heading"
-                          defaultValue={heading}
-                          className="col-span-3"
-                          onChange={(e)=>updateCellData('heading', e.target.value)}
-                        />
+            <div className="absolute right-0 z-10 h-full w-5/6 pl-4 flex flex-col place-items-center place-content-center bg-slate-200/30 backdrop-blur-md">
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-10 items-center gap-1">
+                      <Label htmlFor="heading" className="text-right">
+                        Main
+                      </Label>
+                      <Input
+                        id="heading"
+                        defaultValue={heading}
+                        className="col-span-4"
+                        onChange={(e)=>updateCellData('heading', e.target.value)}
+                      />
+                      <Button variant={heading_style && heading_style.fontWeight === 900 ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontWeight', heading_style.fontWeight === 900 ? false: true )}>
+                        <FontBoldIcon className="h-4 w-4"/>
+                      </Button>
+                      <Button variant={heading_style && heading_style.fontStyle === 'italic' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontStyle', heading_style.fontStyle === 'italic' ? false: true )}>
+                        <FontItalicIcon className="h-4 w-4" />
+                      </Button>
+                      <div className="flex col-span-3 px-2 gap-1">
+                        <Button variant={heading_style && heading_style.textAlign === 'left' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textLeft', heading_style.fontStyle === 'left' ? false: true )}>
+                          <TextAlignLeftIcon className="h-4 w-4" />
+                        </Button>
+                        <Button variant={heading_style && heading_style.textAlign === 'center' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textCenter', heading_style.fontStyle === 'center' ? false: true )}>
+                          <TextAlignCenterIcon className="h-4 w-4" />
+                        </Button>
+                        <Button variant={heading_style && heading_style.textAlign === 'right' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textRight', heading_style.fontStyle === 'right' ? false: true )}>
+                          <TextAlignRightIcon className="h-4 w-4" />
+                        </Button>                      
                       </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="username" className="text-right">
-                          Description
+                    </div>
+                    <div className="grid grid-cols-10 items-center gap-1">
+                      <div className="col-span-4 flex px-2 gap-1 place-items-center">
+                        <Label htmlFor="font-size" className="text-right pr-1">
+                          Font Size
                         </Label>
-                        <Input
-                          id="description"
-                          defaultValue={description}
-                          className="col-span-3"
-                          onChange={(e)=>updateCellData('description', e.target.value)}
-                        />
+                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeIncrease')}>
+                          <DoubleArrowUpIcon className="h-4 w-4" />
+                        </Button>
+                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeDecrease')}>
+                          <DoubleArrowDownIcon className="h-4 w-4" />
+                        </Button>
                       </div>
+                      <div className="col-span-4 flex px-2 gap-1 place-items-center">
+                        <Label htmlFor="font-size" className="text-right pr-1">
+                          Color
+                        </Label>
+                        <div onClick={()=>drawerOpenHandler('HeadingColor')} className="flex gap-3 place-items-center"><Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: heading_style && heading_style.color ? heading_style.color: '' }} /> </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="username" className="text-right">
+                        Sub
+                      </Label>
+                      <Input
+                        id="description"
+                        defaultValue={description}
+                        className="col-span-3"
+                        onChange={(e)=>updateCellData('description', e.target.value)}
+                      />
                     </div>
                   </div>
                   <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setTextEditOpen(false)}>Close</div>
