@@ -47,6 +47,11 @@ const Katsu = () => {
             setLoading(true)
             setData([{
                 "Icon": 'RocketIcon',
+                "icon_style": {
+                    'color': '#404040',
+                    'height': '48px',
+                    'width': '48px'
+                },
                 "heading": "17",
                 "heading_style": {
                     'fontWeight': 900,
@@ -56,6 +61,12 @@ const Katsu = () => {
                     'animation': 'countUp',
                 },
                 "description": "startups",
+                "description_style": {
+                    'fontWeight': 100,
+                    'fontStyle': 'non-italic',
+                    'textAlign': 'left',
+                    'fontSize': '20px',
+                },
                 "href": "/",
                 "cta": "Learn more",
                 "className": "col-span-3 lg:col-span-1",
@@ -64,6 +75,11 @@ const Katsu = () => {
             },
             {
                 "Icon": 'TwitterLogoIcon',
+                "icon_style": {
+                    'color': '#404040',
+                    'height': '48px',
+                    'width': '48px'
+                },
                 "heading": "56,000",
                 "heading_style": {
                     'fontWeight': 900,
@@ -73,6 +89,12 @@ const Katsu = () => {
                     'animation': 'countUp',
                 },
                 "description": "Followers on X",
+                "description_style": {
+                    'fontWeight': 100,
+                    'fontStyle': 'non-italic',
+                    'textAlign': 'left',
+                    'fontSize': '20px',
+                },
                 "href": "/",
                 "cta": "Learn more",
                 "className": "col-span-3 lg:col-span-2",
@@ -81,6 +103,11 @@ const Katsu = () => {
             },
             {
                 "Icon": 'SketchLogoIcon',
+                "icon_style": {
+                    'color': '#404040',
+                    'height': '48px',
+                    'width': '48px'
+                },
                 "heading": "$65,000",
                 "heading_style": {
                     'fontWeight': 900,
@@ -90,6 +117,12 @@ const Katsu = () => {
                     'animation': 'countUp',
                 },
                 "description": "Monthly Revenue",
+                "description_style": {
+                    'fontWeight': 100,
+                    'fontStyle': 'non-italic',
+                    'textAlign': 'left',
+                    'fontSize': '20px',
+                },
                 "href": "/",
                 "cta": "Learn more",
                 "className": "col-span-3 lg:col-span-2",
@@ -98,6 +131,11 @@ const Katsu = () => {
             },
             {
                 "Icon": 'CalendarIcon',
+                "icon_style": {
+                    'color': '#404040',
+                    'height': '48px',
+                    'width': '48px'
+                },
                 "heading": "7,000",
                 "heading_style": {
                     'fontWeight': 900,
@@ -107,6 +145,12 @@ const Katsu = () => {
                     'animation': 'countUp',
                 },
                 "description": "Newsletter Readers.",
+                "description_style": {
+                    'fontWeight': 100,
+                    'fontStyle': 'non-italic',
+                    'textAlign': 'left',
+                    'fontSize': '20px',
+                },
                 "className": "col-span-3 lg:col-span-1",
                 "href": "/",
                 "cta": "Learn more",

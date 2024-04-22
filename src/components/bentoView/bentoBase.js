@@ -44,8 +44,6 @@ export function BentoBase({data, demo=true}) {
 
   const [drawerOpen, setDrawerOpen] = useState()
   const [option, setOption] = useState()
-  const [animationsStart, setAnimationsStart] = useState()
-  const startAnimationRef = useRef(null);
 
   const bentoContainer = contextState?.bentoContainer
   const setBentoContainer = contextState?.setBentoContainer
@@ -66,12 +64,6 @@ export function BentoBase({data, demo=true}) {
     setDrawerOpen(true)
     setOption(option)
   }
-
-  const triggerAnimation = () => {
-    if (startAnimationRef.current) {
-      startAnimationRef.current(); // Call the start function of CountUp
-    }
-  };
   
   return (
     <div className="bg-white">
@@ -115,9 +107,9 @@ export function BentoBase({data, demo=true}) {
               </Menubar>
               <div>
                 <Label htmlFor="font-size" className="text-right pr-1">
-                  Play Animations
+                  Save
                 </Label>
-                <Button variant={"outline"} size="icon" onClick={()=> triggerAnimation()}>
+                <Button variant={"outline"} size="icon">
                   <UpdateIcon className="h-4 w-4" />
                 </Button>
               </div>
@@ -140,7 +132,7 @@ export function BentoBase({data, demo=true}) {
               "[mask-image:linear-gradient(to_bottom_right,white,transparent,transparent)] ",
             )} />}   
             {data && data.map((feature, idx) => (
-              <BentoCard key={idx} index={idx} startAnimationRef={startAnimationRef} setData={setData} {...feature} />
+              <BentoCard key={idx} index={idx} setData={setData} {...feature} />
             ))}
         </BentoGrid>
       </div>

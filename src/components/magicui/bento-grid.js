@@ -65,14 +65,15 @@ const BentoGrid = ({ children, className }) => {
 
 const BentoCard = ({
   index,
-  startAnimationRef,
   setData,
   heading,
   heading_style,
   className,
   background,
   Icon,
+  icon_style,
   description,
+  description_style,
   href,
   cta,
   background_color
@@ -115,11 +116,15 @@ const BentoCard = ({
     return result ? parseInt(result.join(''), 10) : 0;
   }
 
-  const updateTypography = (typeField, newValue) => {
+  const updateTypography = (typeField, newValue, source) => {
     //eval step
     //console.log(typeField, newValue)
     if(typeField === 'fontWeight'){
-      newValue = newValue ? 900 : 500
+      if(source === 'heading_style'){
+        newValue = newValue ? 900 : 500
+      }else{
+        newValue = newValue ? 500 : 100
+      }
     }else if(typeField === 'fontStyle'){
       newValue = newValue ? 'italic': 'normal'
     }else if(typeField === 'textLeft'){
@@ -133,24 +138,59 @@ const BentoCard = ({
       newValue = 'right'
     } else if(typeField === 'fontSizeIncrease'){
       typeField = 'fontSize'
-      newValue = String(parseInt(heading_style.fontSize) + 10) +'px' 
+      if(source === 'heading_style'){
+        newValue = String(parseInt(heading_style.fontSize) + 10) +'px' 
+      }else{
+        newValue = String(parseInt(description_style.fontSize) + 10) +'px' 
+      }      
     } else if(typeField === 'fontSizeDecrease'){
       typeField = 'fontSize'
-      newValue = String(parseInt(heading_style.fontSize) - 10) +'px' 
+      if(source === 'heading_style'){
+        newValue = String(parseInt(heading_style.fontSize) - 10) +'px' 
+      }else{
+        newValue = String(parseInt(description_style.fontSize) - 10) +'px' 
+      }
     } else if(typeField === 'headingColor'){
       typeField = 'color'
+      source = 'heading_style'
+      setDrawerOpen(false)
+    } else if(typeField === 'descriptionColor'){
+      typeField = 'color'
+      source = 'description_style'
+      setDrawerOpen(false)
+    } else if(typeField ==='iconColor'){
+      typeField = 'color'
+      source = 'icon_style'
       setDrawerOpen(false)
     }
     setData( prevData => {
         const newData = prevData.map((item, id) => {
           if(id === index){
-            return {
-                    ...item, 
-                    heading_style: {
-                      ...item.heading_style,
-                      [typeField] : newValue 
-                    }
-                };
+            if(source === 'heading_style'){
+              return {
+                ...item, 
+                heading_style: {
+                  ...item.heading_style,
+                  [typeField] : newValue 
+                }
+              };
+            } else if(source === 'description_style') {
+              return {
+                ...item, 
+                description_style: {
+                  ...item.description_style,
+                  [typeField] : newValue 
+                }
+            };
+            } else {
+              return {
+                ...item, 
+                icon_style: {
+                  ...item.icon_style,
+                  [typeField] : newValue 
+                }
+              }
+            }            
           }
           return item;
         });
@@ -199,7 +239,7 @@ const BentoCard = ({
         <ContextMenuTrigger className={`flex flex-col h-full place-content-end`}>
             <div>{background && background === "globe" && <Globe className="top-0 h-[600px] w-[600px] transition-all duration-300 ease-out [mask-image:linear-gradient(to_top,transparent_30%,#000_100%)] group-hover:scale-105 sm:left-40" />}</div>
             <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
-              {IconComponent && <IconComponent className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />}
+              {IconComponent && <IconComponent className="origin-left transform-gpu transition-all duration-300 ease-in-out group-hover:scale-75" style={icon_style && icon_style} />}
               <div className={`text-8xl text-neutral-700 dark:text-neutral-300`} style={heading_style && heading_style}>
                 {heading_style && ['countUp', 'countDown'].includes(heading_style.animation) && <CountUp
                         start={heading_style.animation === 'countUp' ? 0: parseFloat(heading.replace(/[^0-9-.]/g, ''))} 
@@ -213,16 +253,11 @@ const BentoCard = ({
                         useEasing={true}
                         useGrouping={true}
                         startOnMount={true}  // Starts count up when the component mounts
-                        ref={startAnimationRef}
                         redraw={true}
-                      >
-                        {({ countUpRef }) => (
-                          <span ref={countUpRef}>{heading}</span>
-                        )}
-                      </CountUp> }
+                      /> }
                   {heading_style && heading_style.animation === 'none' && heading}
               </div>
-              <p className="max-w-lg text-neutral-400">{description}</p>
+              <p className="max-w-lg text-neutral-400" style={description_style && description_style}>{description}</p>
             </div>
 
             { href && href !=="/" && href !=="" ?
@@ -260,6 +295,11 @@ const BentoCard = ({
           </ContextMenuItem>
           <ContextMenuItem> <div onClick={()=>drawerOpenHandler('SexyBackground')} className="flex gap-3 place-items-center">😻 Sexy Backgrounds: {background ? background : 'none selected'} </div></ContextMenuItem>
           <ContextMenuItem> <div onClick={()=>drawerOpenHandler('Icons')} className="flex gap-3 place-items-center">Icon: {IconComponent && <IconComponent className="h-4 w-4 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />} </div></ContextMenuItem>
+          <ContextMenuItem>
+            <div className="col-span-2 flex px-2 gap-1 place-items-center">
+                <div onClick={()=>drawerOpenHandler('IconColor')} className="flex gap-3 place-items-center">Icon Color:  <Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: icon_style && icon_style.color ? icon_style.color: '' }} /></div>
+            </div>
+          </ContextMenuItem>
           <ContextMenuItem><div onClick={()=>setTextEditOpen(true)} className="flex w-full">Text</div></ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -276,6 +316,8 @@ const BentoCard = ({
                 { option === 'SexyBackground' && <Backgrounds updateBackground={updateCellData}/> }
                 { option === 'Icons' && <IconSelector updateIcon={updateCellData}/> }
                 { option === 'HeadingColor' && <KatsuColors updateBgColor={updateTypography} mod={'headingColor'}/> }
+                { option === 'DescriptionColor' && <KatsuColors updateBgColor={updateTypography} mod={'descriptionColor'}/> }
+                { option === 'IconColor' && <KatsuColors updateBgColor={updateTypography} mod={'iconColor'}/> }
                 
             </div>
             <DrawerFooter>
@@ -299,20 +341,20 @@ const BentoCard = ({
                         className="col-span-4"
                         onChange={(e)=>updateCellData('heading', e.target.value)}
                       />
-                      <Button variant={heading_style && heading_style.fontWeight === 900 ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontWeight', heading_style.fontWeight === 900 ? false: true )}>
+                      <Button variant={heading_style && heading_style.fontWeight === 900 ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontWeight', heading_style.fontWeight === 900 ? false: true, 'heading_style' )}>
                         <FontBoldIcon className="h-4 w-4"/>
                       </Button>
-                      <Button variant={heading_style && heading_style.fontStyle === 'italic' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontStyle', heading_style.fontStyle === 'italic' ? false: true )}>
+                      <Button variant={heading_style && heading_style.fontStyle === 'italic' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontStyle', heading_style.fontStyle === 'italic' ? false: true, 'heading_style' )}>
                         <FontItalicIcon className="h-4 w-4" />
                       </Button>
                       <div className="flex col-span-3 px-2 gap-1">
-                        <Button variant={heading_style && heading_style.textAlign === 'left' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textLeft', heading_style.fontStyle === 'left' ? false: true )}>
+                        <Button variant={heading_style && heading_style.textAlign === 'left' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textLeft', heading_style.fontStyle === 'left' ? false: true, 'heading_style' )}>
                           <TextAlignLeftIcon className="h-4 w-4" />
                         </Button>
-                        <Button variant={heading_style && heading_style.textAlign === 'center' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textCenter', heading_style.fontStyle === 'center' ? false: true )}>
+                        <Button variant={heading_style && heading_style.textAlign === 'center' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textCenter', heading_style.fontStyle === 'center' ? false: true, 'heading_style' )}>
                           <TextAlignCenterIcon className="h-4 w-4" />
                         </Button>
-                        <Button variant={heading_style && heading_style.textAlign === 'right' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textRight', heading_style.fontStyle === 'right' ? false: true )}>
+                        <Button variant={heading_style && heading_style.textAlign === 'right' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textRight', heading_style.fontStyle === 'right' ? false: true, 'heading_style' )}>
                           <TextAlignRightIcon className="h-4 w-4" />
                         </Button>                      
                       </div>
@@ -322,10 +364,10 @@ const BentoCard = ({
                         <Label htmlFor="font-size" className="text-right pr-1">
                           Font Size
                         </Label>
-                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeIncrease')}>
+                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeIncrease', 'val','heading_style')}>
                           <DoubleArrowUpIcon className="h-4 w-4" />
                         </Button>
-                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeDecrease')}>
+                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeDecrease', 'val', 'heading_style')}>
                           <DoubleArrowDownIcon className="h-4 w-4" />
                         </Button>
                       </div>
@@ -350,22 +392,57 @@ const BentoCard = ({
                               <DropdownMenuRadioItem value="none">None</DropdownMenuRadioItem>
                               <DropdownMenuRadioItem value="countUp">Count Up</DropdownMenuRadioItem>
                               <DropdownMenuRadioItem value="countDown">Count Down</DropdownMenuRadioItem>
-                              <DropdownMenuRadioItem value="typing">Typing</DropdownMenuRadioItem>
                             </DropdownMenuRadioGroup>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="username" className="text-right">
-                        Sub
+                    <div className="grid grid-cols-10 items-center gap-1">
+                      <Label htmlFor="description" className="text-right">
+                        Description
                       </Label>
                       <Input
                         id="description"
                         defaultValue={description}
-                        className="col-span-3"
+                        className="col-span-4"
                         onChange={(e)=>updateCellData('description', e.target.value)}
                       />
+                      <Button variant={description_style && description_style.fontWeight === 500 ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontWeight', description_style.fontWeight === 500 ? false: true, 'description_style' )}>
+                        <FontBoldIcon className="h-4 w-4"/>
+                      </Button>
+                      <Button variant={description_style && description_style.fontStyle === 'italic' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontStyle', description_style.fontStyle === 'italic' ? false: true, 'description_style' )}>
+                        <FontItalicIcon className="h-4 w-4" />
+                      </Button>
+                      <div className="flex col-span-3 px-2 gap-1">
+                        <Button variant={description_style && description_style.textAlign === 'left' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textLeft', description_style.fontStyle === 'left' ? false: true, 'description_style' )}>
+                          <TextAlignLeftIcon className="h-4 w-4" />
+                        </Button>
+                        <Button variant={description_style && description_style.textAlign === 'center' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textCenter', description_style.fontStyle === 'center' ? false: true , 'description_style')}>
+                          <TextAlignCenterIcon className="h-4 w-4" />
+                        </Button>
+                        <Button variant={description_style && description_style.textAlign === 'right' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textRight', description_style.fontStyle === 'right' ? false: true, 'description_style' )}>
+                          <TextAlignRightIcon className="h-4 w-4" />
+                        </Button>                      
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-10 items-center gap-1">
+                      <div className="col-span-4 flex px-2 gap-1 place-items-center">
+                        <Label htmlFor="font-size" className="text-right pr-1">
+                          Font Size
+                        </Label>
+                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeIncrease', 'val', 'description_style')}>
+                          <DoubleArrowUpIcon className="h-4 w-4" />
+                        </Button>
+                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeDecrease','val' ,'description_style')}>
+                          <DoubleArrowDownIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="col-span-2 flex px-2 gap-1 place-items-center">
+                        <Label htmlFor="font-size" className="text-right pr-1">
+                          Color
+                        </Label>
+                        <div onClick={()=>drawerOpenHandler('DescriptionColor')} className="flex gap-3 place-items-center"><Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: description_style && description_style.color ? description_style.color: '' }} /> </div>
+                      </div>
                     </div>
                   </div>
                   <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setTextEditOpen(false)}>Close</div>
