@@ -1,5 +1,5 @@
-import dbConnect from "../../../lib/dbConnect";
-import Bento from "../../../models/Bentos";
+import dbConnect from "@/lib/dbConnect";
+import Bento from "@/models/Bentos";
 
 export default async function handler(req, res) {
     const {
