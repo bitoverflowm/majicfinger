@@ -106,13 +106,13 @@ export function KatsuPay() {
       <div className="mx-auto flex max-w-screen-xl flex-col gap-8 px-4 py-14 md:px-8">
         <div className="mx-auto max-w-5xl text-center">
           <h4 className="text-xl font-bold tracking-tight text-black dark:text-white">
-            What export format is best for you?
+            What export format do you prefer?
           </h4>
           <h2 className="text-5xl font-bold tracking-tight text-black dark:text-white sm:text-6xl">
             Cast Your Vote
           </h2>
           <p className="mt-6 text-xl leading-8 text-black/80 dark:text-white">
-            Choose which export format works <strong>best for you</strong> AND get access to Katsu <strong> FOR LIFE </strong> including <strong>ALL</strong> future updates.
+            AND <br/> get access to Katsu <strong> FOR LIFE </strong> including <strong>ALL</strong> future updates.
           </p>
         </div>
 

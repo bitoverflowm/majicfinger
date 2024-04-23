@@ -8,7 +8,9 @@ import BrowserFrame from "react-browser-frame";
 import { Progress } from "@/components/ui/progress";
 import { BentoBase } from "@/components/bentoView/bentoBase";
 
-export function Hero({data, progress, setStarted }) {
+import Meteors from "@/components/magicui/meteors";
+
+export function Hero({data, progress, setStarted, background_color }) {
   const fadeInRef = useRef(null);
   const fadeInInView = useInView(fadeInRef, {
     once: true,
@@ -30,10 +32,11 @@ export function Hero({data, progress, setStarted }) {
       <div className="relative h-full overflow-hidden py-14">
         <div className="container z-10 flex flex-col">
           <div className="mt-20 grid grid-cols-1">
-            <div className="flex flex-col items-center gap-6 pb-8 text-center">
+            <div className="flex flex-col items-center gap-6 text-center">
+              <Meteors />
               <motion.h1
                 ref={fadeInRef}
-                className="text-balance bg-gradient-to-br from-black from-30% to-black/60 bg-clip-text py-6 text-5xl font-medium leading-none tracking-tighter text-transparent dark:from-white dark:to-white/40 sm:text-6xl md:text-7xl lg:text-8xl"
+                className="text-balance bg-gradient-to-br from-black from-30% to-black/60 bg-clip-text py-6 text-5xl font-medium leading-none tracking-tighter text-transparent dark:from-white dark:to-white/40 sm:text-6xl md:text-7xl lg:text-8xl px-2"
                 animate={fadeInInView ? "animate" : "initial"}
                 variants={fadeUpVariants}
                 initial={false}
@@ -44,7 +47,7 @@ export function Hero({data, progress, setStarted }) {
                   type: "spring",
                 }}
               >
-                Bentos So Tasty <br /> Your Friends Will Be Jealous <br />
+                Mouth-Wateringly  <br /> Delicious Bentos <br />
               </motion.h1>
 
               <motion.p
@@ -59,7 +62,7 @@ export function Hero({data, progress, setStarted }) {
                   type: "spring",
                 }}
               >
-                Generate your own in 0.32 seconds; Increase engagement by 500%
+                Generate yours in {'<'} 0.32 seconds <br /> Boost <span className="line-through">street cred</span> engagement by {'>'} 500%
               </motion.p>
 
               <motion.div
@@ -107,12 +110,13 @@ export function Hero({data, progress, setStarted }) {
           >
             <div
               className={cn(
-                "absolute inset-0 bottom-1/2 h-full w-full transform-gpu [filter:blur(120px)]",
+                "absolute inset-0 bottom-1/2 h-full w-full transform-gpu [filter:blur(100px)] opacity-10",
               )}
+              style={{backgroundColor: background_color}}
             />
-                <BrowserFrame url="http://www.yourname.lych3e.com">                
+                <BrowserFrame url="http://www.yourname.lych3e.com">             
                     <div className='flex justify-items-center'>
-                        <div className="overflow-hidden w-5/6 mx-auto px-5 overflow-hidden py-6 place-items-center place-content-center">
+                        <div className="overflow-hidden w-5/6 mx-auto px-5 overflow-hidden py-6 place-items-center place-content-center">                          
                             {data ? <BentoBase data={data} demo={true}/> : <Progress value={progress} className="w-[60%]" />}
                         </div>
                     </div>

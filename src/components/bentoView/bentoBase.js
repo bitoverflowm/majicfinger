@@ -71,10 +71,9 @@ export function BentoBase({data, demo}) {
     setOption(option)
   }
 
-  const ramdomColorHandler = () => {
+  const ramdomColorHandler = (demo) => {
     const randomIndex = Math.floor(Math.random() * colorPalettes.length); // Random index from 0 to length-1
     const selectedPalette = colorPalettes[randomIndex];
-    console.log(selectedPalette)
     setBentoContainer(prevState => ({
       ...prevState,
       background_color: selectedPalette[0] // Randomly selects one of the colors for the background
@@ -98,10 +97,25 @@ export function BentoBase({data, demo}) {
           }
       }));
     });
-    toast({
-      description: "We randomized your colors with ❤️!",
-    });
+    !(demo) && toast({description: "We randomized your colors with ❤️!" });
   }
+
+  useEffect(() => {
+    let intervalId;
+
+    if (demo) {
+      intervalId = setInterval(() => {
+        ramdomColorHandler(demo);
+      }, 3000); // Runs every 3 seconds
+    }
+
+    // Cleanup function to clear the interval when the component unmounts or the `demo` prop changes
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [demo]); 
 
   const lycheeList = [
     "Chart your data in <0.32 seconds",
@@ -126,9 +140,9 @@ export function BentoBase({data, demo}) {
                     <MenubarItem onClick={()=>editBentoContainer('background', '')}>
                       Clear
                     </MenubarItem>
-                    <MenubarItem onClick={()=>editBentoContainer('background', 'retroGrid')}>
+                    {/*<MenubarItem onClick={()=>editBentoContainer('background', 'retroGrid')}>
                       Retro Grid
-                    </MenubarItem>
+                    </MenubarItem>*/}
                     <MenubarItem onClick={()=>editBentoContainer('background', 'dotPattern')}>
                       Dot Pattern
                     </MenubarItem>

@@ -1,16 +1,16 @@
 import { StateProvider } from '@/context/stateContext'
 
-import Katsu from "./katsu";
+import KatsuBase from "./katsuBase";
 
-const Bento = () => {
+const Katsu = () => {
     //const user = useUser()
   
     return (
         <StateProvider bento={true}>
-            <Katsu />
+            <KatsuBase />
         </StateProvider>
 
     )
 }
 
-export default Bento
+export default Katsu

@@ -61,7 +61,7 @@ const Nav = () => {
               <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
               {/*<div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>*/}
               <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact</Link></div>
-              <div className='cursor-pointer hover:text-lychee-green'><Link href="/bento">Katsu</Link></div>
+              <div className='cursor-pointer hover:text-lychee-green'><Link href="/katsu">Katsu</Link></div>
 
             </nav>
             <Sheet>

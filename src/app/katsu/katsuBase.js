@@ -19,7 +19,7 @@ const bentoVariants = {
     closed: { height: "75vh", width: "60vw" },
   }
 
-const Katsu = () => {
+const KatsuBase = () => {
     const contextState = useMyState()
 
     const [started, setStarted] = useState(false)
@@ -28,6 +28,7 @@ const Katsu = () => {
     const setDflt = contextState?.setDflt
     const setData = contextState?.setData
     const dflt = contextState?.dflt
+    const bentoContainer = contextState?.bentoContainer
 
     const [loading, setLoading] = useState(false)
     const [progress, setProgress] = React.useState(0)
@@ -181,7 +182,7 @@ const Katsu = () => {
                             exit={{ height: '0px', opacity: 0}}
                             transition={{ ease: "easeOut", duration: 0.2 }}
                         >
-                            <Hero data={data} progress={progress} setStarted={setStarted}/>
+                            <Hero data={data} progress={progress} setStarted={setStarted} background_color={bentoContainer && bentoContainer.background_color}/>
                         </motion.div>
                 }                
             </AnimatePresence>
@@ -202,4 +203,4 @@ const Katsu = () => {
     );
 };
 
-export default Katsu;
+export default KatsuBase;

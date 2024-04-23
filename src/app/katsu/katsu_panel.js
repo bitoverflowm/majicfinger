@@ -125,10 +125,10 @@ const KatsuPanel = ({data}) => {
                         <DropdownMenuTrigger asChild>
                             <Button variant="secondary" size="icon" className="rounded-full">
                                 <IoWarningOutline className="h-5 w-5" />
-                                <span className="sr-only">Toggle user menu</span>
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>🚧 Under Construction</DropdownMenuLabel>
                         <DropdownMenuLabel>My Account</DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem>Settings</DropdownMenuItem>
