@@ -39,6 +39,8 @@ import KatsuColors from '@/components/panels/katsu_colors';
 import Backgrounds from '@/components/panels/backgrounds';
 import IconSelector from '@/components/icons/iconSelector';
 
+import { colorPalettes } from '@/components/chartView/panels/colorPalette';
+
 export function BentoBase({data, demo=true}) {
   const contextState = useMyState()
 
@@ -63,6 +65,38 @@ export function BentoBase({data, demo=true}) {
   const drawerOpenHandler = (option) => {
     setDrawerOpen(true)
     setOption(option)
+  }
+
+  const ramdomColorHandler = () => {
+    const randomIndex = Math.floor(Math.random() * colorPalettes.length); // Random index from 0 to length-1
+    const selectedPalette = colorPalettes[randomIndex];
+    console.log(selectedPalette)
+    setBentoContainer(prevState => ({
+      ...prevState,
+      background_color: selectedPalette[0] // Randomly selects one of the colors for the background
+    }));
+    // Update each Bento card with colors from the palette
+    setData(prevData => {
+      return prevData.map((item, index) => ({
+          ...item,
+          background_color: selectedPalette[index % selectedPalette.length], // Cycles through the palette
+          icon_style: {
+              ...item.icon_style,
+              color: selectedPalette[(index + 1) % selectedPalette.length] // Ensures different color for icon
+          },
+          heading_style: {
+              ...item.heading_style,
+              color: selectedPalette[(index + 1) % selectedPalette.length]
+          },
+          description_style: {
+              ...item.description_style,
+              color: selectedPalette[(index + 1) % selectedPalette.length]
+          }
+      }));
+    });
+    toast({
+      description: "We randomized your colors with ❤️!",
+    });
   }
   
   return (
@@ -101,7 +135,7 @@ export function BentoBase({data, demo=true}) {
                 </MenubarMenu>
                 <MenubarMenu>
                   <MenubarTrigger>
-                    Randomize Colors
+                    <div className="" onClick={()=>ramdomColorHandler()}>Random Colors</div>
                   </MenubarTrigger>
                 </MenubarMenu>
               </Menubar>
