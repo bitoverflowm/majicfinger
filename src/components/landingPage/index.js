@@ -76,7 +76,7 @@ const LandingPage = () => {
                                 <div className='pt-10 sm:pt-0 py-2 text-xs text-black rounded-full '>
                                     ✨ Just released in Lychee v1.1.1!
                                 </div>
-                                <div className=' pl-8 py-8 text-left rounded-xl bg-lychee-green shadow-xl cursor-pointer transition ease-in-out delay-10 bg-gradient-to-r hover:scale-110 hover:from-lychee-green hover:to-lychee-blue duration-500' onClick={()=>setWorking('integrations')}>
+                                <div className=' pl-8 py-8 text-left rounded-xl bg-black shadow-xl cursor-pointer transition ease-in-out delay-10 bg-gradient-to-r hover:scale-110 hover:from-lychee-green hover:to-lychee-blue duration-500' onClick={()=>setWorking('integrations')}>
                                     <div className='text-4xl text-white'>Query,</div>  
                                     <div className='text-4xl text-white'>Analyze,</div>
                                     <div className='text-4xl text-white'>Visualize,</div>

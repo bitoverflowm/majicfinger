@@ -6,6 +6,7 @@ import { GoogleAnalytics } from '@next/third-parties/google'
 
 import 'tailwindcss/tailwind.css';
 
+import Link from 'next/link';
 
 import { StateProvider } from '@/context/stateContext'
 
@@ -14,6 +15,12 @@ import LandingPage from '@/components/landingPage'
 
 import FAQ from '@/components/faq'
 import Nav from '@/components/nav'
+
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert"
 
 export default function Home() {
 
@@ -36,6 +43,14 @@ export default function Home() {
         <StateProvider>
           <Nav/>
           <div className="flex flex-col place-items-center bg-white/20">
+            <div className='mx-auto mt-8'>
+              <Alert>
+                <AlertTitle> 🚧 Heads up!</AlertTitle>
+                <AlertDescription>
+                  I am moving some things around. You can still use the platform, but things might break. <br /> Also don't forget to checkout <Link href="/katsu">Katsu</Link>, our ltest release - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
+                </AlertDescription>
+              </Alert>
+            </div>
             <div className='text-center max-w-screen overflow-hidden'>
               <LandingPage />
             </div>
