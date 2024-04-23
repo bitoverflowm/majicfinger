@@ -2,25 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence} from "framer-motion";
-
-
-import BrowserFrame from "react-browser-frame";
-import * as XLSX from 'xlsx'
-
 import { useMyState  } from '@/context/stateContext'
-
-import { ModeToggle } from "@/components/ui/modeToggle";
-
-
-import { BentoBase } from "@/components/bentoView/bentoBase";
 
 /* Shadcn imports
  * 
  */
 import { Progress } from "@/components/ui/progress"
-
-import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/sonner"
+
+import { Hero } from './hero';
 
 import KatsuPanel from './katsu_panel';
 
@@ -178,33 +168,24 @@ const Katsu = () => {
         const timer = setTimeout(() => setProgress(99), 500)
         return () => clearTimeout(timer)
       }, [])
-    
 
     return (
-        <div className='h-lvh'>
+        <div>
            <Toaster />
-           <div className="fixed bottom-10 right-10">
-                <ModeToggle />
-            </div>
             <AnimatePresence>
-                { !started &&
-                    <motion.div
-                        initial={{ height: '40vh', opacity: 1}}
-                        animate={{ height: '50vh', opacity: 1}}
-                        exit={{ height: '0px', opacity: 0}}
-                        transition={{ ease: "easeOut", duration: 0.2 }}
-                        className='flex bg-black py-42 text-white place-items-center place-content-center overflow-hidden'
-                    >                        
-                        <div className="w-1/2 text-center">
-                            <h1 className="text-8xl font-bold py-4">Bentos That Stand Out</h1>
-                            <p className='pb-8'>Soooo tasty, it'll make your friends jealous</p>
-                            <Button className="shadow-2xl bg-purple-500 text-fuchsia-50" onClick={()=>setStarted(true)}>
-                                Create One Now
-                            </Button>
-                        </div>
-                    </motion.div>
-                }
+                {
+                    !(started) &&
+                        <motion.div
+                            initial={{ height: '40vh', opacity: 1}}
+                            animate={{ height: '50vh', opacity: 1}}
+                            exit={{ height: '0px', opacity: 0}}
+                            transition={{ ease: "easeOut", duration: 0.2 }}
+                        >
+                            <Hero data={data} progress={progress} setStarted={setStarted}/>
+                        </motion.div>
+                }                
             </AnimatePresence>
+           
             <div className="flex place-items-center place-content-center">
                 <motion.div
                     animate={started ? "open" : "closed"}
@@ -212,18 +193,9 @@ const Katsu = () => {
                     variants={bentoVariants}
                     className='flex place-items-center place-content-center'
                 >
-                    {!started ? 
-                        <BrowserFrame url="http://www.yourname.lych3e.com">                
-                            <div className='flex justify-items-center'>
-                                <div className="px-5 overflow-hidden py-6 place-items-center place-content-center">
-                                    {data ? <BentoBase data={data}/> : <Progress value={progress} className="w-[60%]" />}
-                                </div>
-                            </div>
-                        </BrowserFrame>
-                        : <div className='grid w-full justify-items-center'>
-                            <KatsuPanel data={data}/>
-                        </div>
-                        }
+                    {started &&
+                        <KatsuPanel data={data}/>
+                    }
                 </motion.div>
             </div>       
         </div>

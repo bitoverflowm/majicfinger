@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import Link from "next/link";
-import { ArrowRightIcon, FontBoldIcon, FontItalicIcon, TextAlignLeftIcon, TextAlignCenterIcon, TextAlignRightIcon, DoubleArrowUpIcon, DoubleArrowDownIcon } from "@radix-ui/react-icons";
+import { ArrowRightIcon, FontBoldIcon, FontItalicIcon, TextAlignLeftIcon, TextAlignCenterIcon, TextAlignRightIcon, DoubleArrowUpIcon, DoubleArrowDownIcon, ExitIcon } from "@radix-ui/react-icons";
 import CountUp from 'react-countup';
 
 import Globe from "./globe";
@@ -226,7 +226,7 @@ const BentoCard = ({
     <div
       key={heading}
       className={cn(
-        "group relative rounded-xl col-span-3 overflow-hidden flex flex-col justify-end",
+        "internalGradualEffect group relative rounded-xl col-span-3 overflow-hidden flex flex-col justify-end",
         // light styles
         `bg-white [box-shadow:0_0_0_1px_rgba(0,0,0,.03),0_2px_4px_rgba(0,0,0,.05),0_12px_24px_rgba(0,0,0,.05)]`,
         // dark styles
@@ -290,17 +290,15 @@ const BentoCard = ({
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuLabel>Options:</ContextMenuLabel>
+          <ContextMenuItem><div onClick={()=>setTextEditOpen(true)} className="flex w-full">Text</div></ContextMenuItem>
+          <ContextMenuItem> <div onClick={()=>drawerOpenHandler('SexyBackground')} className="flex gap-3 place-items-center">Special Effect {background ? background : 'none'} </div></ContextMenuItem>
           <ContextMenuItem > 
             <div onClick={()=>drawerOpenHandler('BackgroundColor')} className="flex gap-3 place-items-center">Background Color: <Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: background_color ? background_color: '' }} /> </div>
-          </ContextMenuItem>
-          <ContextMenuItem> <div onClick={()=>drawerOpenHandler('SexyBackground')} className="flex gap-3 place-items-center">😻 Sexy Backgrounds: {background ? background : 'none selected'} </div></ContextMenuItem>
+          </ContextMenuItem>          
           <ContextMenuItem> <div onClick={()=>drawerOpenHandler('Icons')} className="flex gap-3 place-items-center">Icon: {IconComponent && <IconComponent className="h-4 w-4 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />} </div></ContextMenuItem>
           <ContextMenuItem>
-            <div className="col-span-2 flex px-2 gap-1 place-items-center">
-                <div onClick={()=>drawerOpenHandler('IconColor')} className="flex gap-3 place-items-center">Icon Color:  <Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: icon_style && icon_style.color ? icon_style.color: '' }} /></div>
-            </div>
-          </ContextMenuItem>
-          <ContextMenuItem><div onClick={()=>setTextEditOpen(true)} className="flex w-full">Text</div></ContextMenuItem>
+            <div onClick={()=>drawerOpenHandler('IconColor')} className="flex gap-3 place-items-center">Icon Color:  <Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: icon_style && icon_style.color ? icon_style.color: '' }} /></div>
+          </ContextMenuItem>          
         </ContextMenuContent>
       </ContextMenu>
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -309,7 +307,6 @@ const BentoCard = ({
                 <DrawerHeader>
                     <DrawerTitle>Pick a {option} from our library</DrawerTitle>
                     {option === 'SexyBackground' && <DrawerDescription>These are elements that add a little more "je ne sais quoi" to your bento</DrawerDescription>}
-                    <DrawerDescription>Just click and you're done</DrawerDescription>
                 </DrawerHeader>
                 
                 { option === 'BackgroundColor' && <KatsuColors updateBgColor={updateCellData}/> }
@@ -330,99 +327,105 @@ const BentoCard = ({
 
       { textEditOpen &&
             <div className="absolute right-0 z-10 h-full w-5/6 pl-4 flex flex-col place-items-center place-content-center bg-slate-200/30 backdrop-blur-md">
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-10 items-center gap-1">
-                      <Label htmlFor="heading" className="text-right">
+                  <div className="grid gap-1">
+                    <div className="p-1">
+                      <Label htmlFor="heading" className="">
                         Main
                       </Label>
-                      <Input
-                        id="heading"
-                        defaultValue={heading}
-                        className="col-span-4"
-                        onChange={(e)=>updateCellData('heading', e.target.value)}
-                      />
-                      <Button variant={heading_style && heading_style.fontWeight === 900 ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontWeight', heading_style.fontWeight === 900 ? false: true, 'heading_style' )}>
-                        <FontBoldIcon className="h-4 w-4"/>
-                      </Button>
-                      <Button variant={heading_style && heading_style.fontStyle === 'italic' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontStyle', heading_style.fontStyle === 'italic' ? false: true, 'heading_style' )}>
-                        <FontItalicIcon className="h-4 w-4" />
-                      </Button>
-                      <div className="flex col-span-3 px-2 gap-1">
-                        <Button variant={heading_style && heading_style.textAlign === 'left' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textLeft', heading_style.fontStyle === 'left' ? false: true, 'heading_style' )}>
-                          <TextAlignLeftIcon className="h-4 w-4" />
+                      <div className="grid grid-cols-10 items-center gap-1">  
+                        <Input
+                          id="heading"
+                          defaultValue={heading}
+                          className="col-span-4"
+                          onChange={(e)=>updateCellData('heading', e.target.value)}
+                        />
+                        <Button variant={heading_style && heading_style.fontWeight === 900 ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontWeight', heading_style.fontWeight === 900 ? false: true, 'heading_style' )}>
+                          <FontBoldIcon className="h-4 w-4"/>
                         </Button>
-                        <Button variant={heading_style && heading_style.textAlign === 'center' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textCenter', heading_style.fontStyle === 'center' ? false: true, 'heading_style' )}>
-                          <TextAlignCenterIcon className="h-4 w-4" />
+                        <Button variant={heading_style && heading_style.fontStyle === 'italic' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontStyle', heading_style.fontStyle === 'italic' ? false: true, 'heading_style' )}>
+                          <FontItalicIcon className="h-4 w-4" />
                         </Button>
-                        <Button variant={heading_style && heading_style.textAlign === 'right' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textRight', heading_style.fontStyle === 'right' ? false: true, 'heading_style' )}>
-                          <TextAlignRightIcon className="h-4 w-4" />
-                        </Button>                      
+                        <div className="flex col-span-3 px-2 gap-1">
+                          <Button variant={heading_style && heading_style.textAlign === 'left' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textLeft', heading_style.fontStyle === 'left' ? false: true, 'heading_style' )}>
+                            <TextAlignLeftIcon className="h-4 w-4" />
+                          </Button>
+                          <Button variant={heading_style && heading_style.textAlign === 'center' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textCenter', heading_style.fontStyle === 'center' ? false: true, 'heading_style' )}>
+                            <TextAlignCenterIcon className="h-4 w-4" />
+                          </Button>
+                          <Button variant={heading_style && heading_style.textAlign === 'right' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textRight', heading_style.fontStyle === 'right' ? false: true, 'heading_style' )}>
+                            <TextAlignRightIcon className="h-4 w-4" />
+                          </Button>                      
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-10 items-center gap-1">
+                        <div className="col-span-2 gap-1 place-items-center">
+                            <Label htmlFor="font-size" className="text-right pr-1">
+                              Font Size
+                            </Label>
+                          <div>
+                          <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeIncrease', 'val','heading_style')}>
+                            <DoubleArrowUpIcon className="h-4 w-4" />
+                          </Button>
+                          <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeDecrease', 'val', 'heading_style')}>
+                            <DoubleArrowDownIcon className="h-4 w-4" />
+                          </Button>
+                          </div>
+                        </div>
+                        <div className="col-span-1 px-2 place-items-center">
+                          <Label htmlFor="font-size" className="">
+                            Color
+                          </Label>
+                          <Button onClick={()=>drawerOpenHandler('HeadingColor')} size="icon" variant="outline" style={{ backgroundColor: heading_style && heading_style.color ? heading_style.color: '' }} />
+                        </div>
+                        <div className="px-6 -mt-1">
+                          <Label htmlFor="animation" className="text-right pr-1">
+                            Animate
+                          </Label>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" className="py-1">{heading_style.animation}</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                              <DropdownMenuLabel> Pick An Animation </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuRadioGroup value={heading_style.animation} onValueChange={(value)=>updateAnimation('heading_style', value)}>
+                                <DropdownMenuRadioItem value="none">None</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="countUp">Count Up</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="countDown">Count Down</DropdownMenuRadioItem>
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-10 items-center gap-1">
-                      <div className="col-span-4 flex px-2 gap-1 place-items-center">
-                        <Label htmlFor="font-size" className="text-right pr-1">
-                          Font Size
-                        </Label>
-                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeIncrease', 'val','heading_style')}>
-                          <DoubleArrowUpIcon className="h-4 w-4" />
-                        </Button>
-                        <Button variant={"outline"} size="icon" onClick={()=> updateTypography('fontSizeDecrease', 'val', 'heading_style')}>
-                          <DoubleArrowDownIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="col-span-2 flex px-2 gap-1 place-items-center">
-                        <Label htmlFor="font-size" className="text-right pr-1">
-                          Color
-                        </Label>
-                        <div onClick={()=>drawerOpenHandler('HeadingColor')} className="flex gap-3 place-items-center"><Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: heading_style && heading_style.color ? heading_style.color: '' }} /> </div>
-                      </div>
-                      <div className="col-span-2 flex px-2 gap-1 place-items-center">
-                        <Label htmlFor="animation" className="text-right pr-1">
-                          Animate
-                        </Label>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline">{heading_style.animation}</Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-56">
-                            <DropdownMenuLabel> Pick An Animation </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuRadioGroup value={heading_style.animation} onValueChange={(value)=>updateAnimation('heading_style', value)}>
-                              <DropdownMenuRadioItem value="none">None</DropdownMenuRadioItem>
-                              <DropdownMenuRadioItem value="countUp">Count Up</DropdownMenuRadioItem>
-                              <DropdownMenuRadioItem value="countDown">Count Down</DropdownMenuRadioItem>
-                            </DropdownMenuRadioGroup>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-10 items-center gap-1">
-                      <Label htmlFor="description" className="text-right">
+                    <div className="p-1">
+                      <Label htmlFor="description">
                         Description
                       </Label>
-                      <Input
-                        id="description"
-                        defaultValue={description}
-                        className="col-span-4"
-                        onChange={(e)=>updateCellData('description', e.target.value)}
-                      />
-                      <Button variant={description_style && description_style.fontWeight === 500 ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontWeight', description_style.fontWeight === 500 ? false: true, 'description_style' )}>
-                        <FontBoldIcon className="h-4 w-4"/>
-                      </Button>
-                      <Button variant={description_style && description_style.fontStyle === 'italic' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontStyle', description_style.fontStyle === 'italic' ? false: true, 'description_style' )}>
-                        <FontItalicIcon className="h-4 w-4" />
-                      </Button>
-                      <div className="flex col-span-3 px-2 gap-1">
-                        <Button variant={description_style && description_style.textAlign === 'left' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textLeft', description_style.fontStyle === 'left' ? false: true, 'description_style' )}>
-                          <TextAlignLeftIcon className="h-4 w-4" />
+                      <div className="grid grid-cols-10 items-center gap-1">
+                        <Input
+                          id="description"
+                          defaultValue={description}
+                          className="col-span-4"
+                          onChange={(e)=>updateCellData('description', e.target.value)}
+                        />
+                        <Button variant={description_style && description_style.fontWeight === 500 ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontWeight', description_style.fontWeight === 500 ? false: true, 'description_style' )}>
+                          <FontBoldIcon className="h-4 w-4"/>
                         </Button>
-                        <Button variant={description_style && description_style.textAlign === 'center' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textCenter', description_style.fontStyle === 'center' ? false: true , 'description_style')}>
-                          <TextAlignCenterIcon className="h-4 w-4" />
+                        <Button variant={description_style && description_style.fontStyle === 'italic' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('fontStyle', description_style.fontStyle === 'italic' ? false: true, 'description_style' )}>
+                          <FontItalicIcon className="h-4 w-4" />
                         </Button>
-                        <Button variant={description_style && description_style.textAlign === 'right' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textRight', description_style.fontStyle === 'right' ? false: true, 'description_style' )}>
-                          <TextAlignRightIcon className="h-4 w-4" />
-                        </Button>                      
+                        <div className="flex col-span-3 px-2 gap-1">
+                          <Button variant={description_style && description_style.textAlign === 'left' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textLeft', description_style.fontStyle === 'left' ? false: true, 'description_style' )}>
+                            <TextAlignLeftIcon className="h-4 w-4" />
+                          </Button>
+                          <Button variant={description_style && description_style.textAlign === 'center' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textCenter', description_style.fontStyle === 'center' ? false: true , 'description_style')}>
+                            <TextAlignCenterIcon className="h-4 w-4" />
+                          </Button>
+                          <Button variant={description_style && description_style.textAlign === 'right' ? "outlineSelected": "outline"} size="icon" onClick={()=> updateTypography('textRight', description_style.fontStyle === 'right' ? false: true, 'description_style' )}>
+                            <TextAlignRightIcon className="h-4 w-4" />
+                          </Button>                      
+                        </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-10 items-center gap-1">
@@ -439,13 +442,13 @@ const BentoCard = ({
                       </div>
                       <div className="col-span-2 flex px-2 gap-1 place-items-center">
                         <Label htmlFor="font-size" className="text-right pr-1">
-                          Color
+                          Font Color
                         </Label>
-                        <div onClick={()=>drawerOpenHandler('DescriptionColor')} className="flex gap-3 place-items-center"><Button variant="outline" className='h-6 w-6' disabled style={{ backgroundColor: description_style && description_style.color ? description_style.color: '' }} /> </div>
+                        <div  className="flex gap-3 place-items-center"><Button variant="outline" size={'icon'} style={{ backgroundColor: description_style && description_style.color ? description_style.color: '' }} onClick={()=>drawerOpenHandler('DescriptionColor')}/> </div>
                       </div>
                     </div>
                   </div>
-                  <div className="cursor-pointer mt-10 p-3 rounded-full hover:text-lychee-red hover:bg-white" onClick={()=>setTextEditOpen(false)}>Close</div>
+                  <Button variant="outline" size='icon' className="absolute top-2 right-2 cursor-pointer" onClick={()=>setTextEditOpen(false)}><ExitIcon /></Button>
             </div>
         }
     </div>

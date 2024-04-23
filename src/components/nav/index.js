@@ -5,11 +5,28 @@ import { useUser  } from '@/lib/hooks';
 import Link from 'next/link'
 
 import { useRouter } from 'next/navigation'
-import { IoMenu } from "react-icons/io5";
+import { IoWarningOutline } from "react-icons/io5";
+
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+
+import { Button } from "@/components/ui/button"
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 
 const Nav = () => {
-    const { working, setWorking } = useMyState()
+    const { setWorking } = useMyState()
     const user = useUser()
 
     const router = useRouter();
@@ -35,53 +52,70 @@ const Nav = () => {
     };
 
     return (
-      <div className="flex w-full px-3 sm:px-8 pt-3 pb-2 z-40 bg-white">
-        <div className="w-28 sm:w-24">
-          <Link href="/"> <img src={"./logo.png"}/></Link>
-        </div>
-        <div className='w-0 h-0 overflow-hidden sm:h-full text-sm sm:w-full flex gap-6 place-content-end place-items-center'>
-          <div className='cursor-pointer hover:text-lychee-green'><Link href="/affiliates">Make $ with Lychee</Link></div>
-          <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
-          {/*<div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>*/}
-          <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact</Link></div>
-          <div className="flex gap-2">
-            {
-              !(user) ?
-                <>
-                    <div className='p-2 px-3 rounded-2xl cursor-pointer text-white bg-lychee-black hover:bg-lychee-white hover:text-lychee-black'><Link href="/login">Log In</Link></div>
-                    <div className='p-2 px-3 rounded-2xl cursor-pointer text-white bg-lychee-green hover:bg-lychee-white hover:text-black' onClick={()=>setWorking('getLychee')}>Sign Up</div>
-                </>
-                :<>
-                    <div className='p-2 px-3 rounded-2xl text-white bg-lychee-black capitalize'>
-                        {user.name ? user.name : user.email.split('@')[0]}
-                    </div>
-                    <div onClick={()=>handleLogout()} className='p-2 px-3 rounded-2xl cursor-pointer text-lychee-black bg-lychee-white hover:bg-lychee-red hover:text-white'>Logout</div>
-                </>
-            }
-          </div>
-        </div>
-        <div className="sm:hidden flex place-items-center justify-end flex-1">
-          <div className="">
-            {
-              !(user) &&
-                <>
-                    <div className='text-xs px-2 py-1 rounded-2xl text-black bg-lychee-go' onClick={()=>setWorking('getLychee')}>Get Lychee</div>
-                </>
-            }
-          </div>
-          <div className="flex items-stretch">
-            <div className="dropdown dropdown-end">
-              <div tabIndex={0} role="button" className="btn btn-ghost rounded-btn text-3xl"><IoMenu /></div>
-              <ul tabIndex={0} className="menu dropdown-content z-[1] p-2 shadow bg-base-100 rounded-box w-52 mt-4">
-                <li className=''><Link href="/affiliates">Make $ with Lychee</Link></li>
-                <li className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></li>
-                {/*<div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>*/}
-                <li className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact</Link></li>
-              </ul>
+      <header className="top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+            <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
+              <div className="w-28 sm:w-24">
+                <Link href="/"> <img src={"./logo.png"}/></Link>
+              </div>
+              <div className='cursor-pointer hover:text-lychee-green'><Link href="/affiliates">Make $ with Lychee</Link></div>
+              <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
+              {/*<div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>*/}
+              <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact</Link></div>
+              <div className='cursor-pointer hover:text-lychee-green'><Link href="/bento">Katsu</Link></div>
+
+            </nav>
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0 md:hidden"
+                    >
+                      <Link href="/"> <img src={"./fruit.png"} className='w-5 h-6 mx-auto'/></Link>
+                    </Button>
+                </SheetTrigger>
+                <SheetContent side="left">
+                    <nav className="grid gap-6 text-lg font-medium">
+                    <Link href="#" className="hover:text-foreground">
+                        Settings
+                    </Link>
+                    </nav>
+                </SheetContent>
+            </Sheet> 
+            <div className="flex place-content-end w-1/2 items-center gap-4 ml-auto md:gap-2 lg:gap-4">
+                <DropdownMenu>
+                      {
+                        !(user) ?
+                          <>
+                              <Button variant="secondary">
+                                <Link href="/login">Log In</Link>
+                              </Button>
+                              <Button variant="" onClick={()=>setWorking('getLychee')}>
+                                Sign Up
+                              </Button>
+                          </>
+                          :<>
+                              <DropdownMenuTrigger asChild>
+                                <div className='p-2 px-3 rounded-2xl text-white bg-lychee-black capitalize'>
+                                    {user.name ? user.name : user.email.split('@')[0]}
+                                </div>
+                              </DropdownMenuTrigger>
+                              <Button variant="secondary" size="icon" className="rounded-full" onClick={()=>handleLogout()}>
+                                Log Out
+                              </Button>
+                          </>
+                      }
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem>Settings</DropdownMenuItem>
+                      <DropdownMenuItem>Support</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem>Logout</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
-          </div>
-        </div>
-      </div>      
+        </header>
     )
   }
 

@@ -1,18 +1,8 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import Link from 'next/link';
 
 import { IoWarningOutline  } from "react-icons/io5";
 
-import {
-    Drawer,
-    DrawerClose,
-    DrawerContent,
-    DrawerDescription,
-    DrawerFooter,
-    DrawerHeader,
-    DrawerTitle,
-    DrawerTrigger,
-  } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -25,20 +15,14 @@ import {
 import {
     Sheet,
     SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet"
 
-import IconSelector from '@/components/icons/iconSelector';
-import KatsuColors from '@/components/panels/katsu_colors';
-import Backgrounds from '@/components/panels/backgrounds';
-
 import Saves from '@/components/saves'
 import GridView from "@/components/gridView";
-import BentoView from "@/components/bentoView";
 import { BentoBase } from "@/components/bentoView/bentoBase";
+
+import { toast } from "sonner"
 
 const KatsuPanel = ({data}) => {
     // Your component logic goes here
@@ -86,6 +70,14 @@ const KatsuPanel = ({data}) => {
         }        
     }
 
+    useEffect(()=>{
+        toast('Welcome to Katsu 🍛', {
+            description: "Right Click on any Bento card to edit",
+            closeButton: true,
+            duration: 99999999
+          });  
+    }, [])
+
     return (
         <div className='h-screen w-screen'>
             <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
@@ -100,83 +92,8 @@ const KatsuPanel = ({data}) => {
                         href="#"
                         className="text-foreground transition-colors hover:text-foreground"
                     >
-                        Bento
+                        Katsu
                     </div>
-                    <div
-                        href="#"
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                        Grid View
-                    </div>                    
-                    <Drawer>
-                        <DrawerTrigger asChild>
-                            <div
-                                className="text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-                            >
-                                Icons
-                            </div>
-                        </DrawerTrigger>
-                        <DrawerContent>
-                            <div className="mx-auto w-full">
-                                <DrawerHeader>
-                                    <DrawerTitle>Here are the icons</DrawerTitle>
-                                    <DrawerDescription>Click on the icon to save to your clipboard. Then paste it into Icon column in the Grid</DrawerDescription>
-                                    <IconSelector />
-                                </DrawerHeader>                            
-                            </div>
-                            <DrawerFooter>
-                                <DrawerClose asChild>
-                                    <Button variant="outline">Close</Button>
-                                </DrawerClose>
-                            </DrawerFooter>
-                        </DrawerContent>
-                    </Drawer>
-                    <Drawer>
-                        <DrawerTrigger asChild>
-                            <div
-                                className="text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-                            >
-                                Colors
-                            </div>
-                        </DrawerTrigger>
-                        <DrawerContent>
-                            <div className="mx-auto w-full">
-                                <DrawerHeader>
-                                    <DrawerTitle>Here are the colors</DrawerTitle>
-                                    <DrawerDescription>Click to copy the color and paste it into background_color column to set the background color of that specific bento card</DrawerDescription>
-                                    <KatsuColors />
-                                </DrawerHeader>                            
-                            </div>
-                            <DrawerFooter>
-                                <DrawerClose asChild>
-                                    <Button variant="outline">Close</Button>
-                                </DrawerClose>
-                            </DrawerFooter>
-                        </DrawerContent>
-                    </Drawer>
-                    <Drawer>
-                        <DrawerTrigger asChild>
-                            <div
-                                className="text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-                            >
-                                Magic Assets
-                            </div>
-                        </DrawerTrigger>
-                        <DrawerContent>
-                            <div className="mx-auto w-full">
-                                <DrawerHeader>
-                                    <DrawerTitle>These are elements that add a little more "je ne sais quoi" to your bento</DrawerTitle>
-                                    <DrawerDescription>Click to copy the keyword and paste it into background column to set the background color of that specific bento card</DrawerDescription>
-                                    <Backgrounds />
-                                </DrawerHeader>                            
-                            </div>
-                            <DrawerFooter>
-                                <DrawerClose asChild>
-                                    <Button variant="outline">Close</Button>
-                                </DrawerClose>
-                            </DrawerFooter>
-                        </DrawerContent>
-                    </Drawer>
                 </nav>
                 <Sheet>
                     <SheetTrigger asChild>
@@ -197,37 +114,13 @@ const KatsuPanel = ({data}) => {
                         >
                             <span className="sr-only">Acme Inc</span>
                         </Link>
-                        <Link
-                            href="#"
-                            className="text-muted-foreground hover:text-foreground"
-                        >
-                            Dashboard
-                        </Link>
-                        <Link
-                            href="#"
-                            className="text-muted-foreground hover:text-foreground"
-                        >
-                            Orders
-                        </Link>
-                        <Link
-                            href="#"
-                            className="text-muted-foreground hover:text-foreground"
-                        >
-                            Products
-                        </Link>
-                        <Link
-                            href="#"
-                            className="text-muted-foreground hover:text-foreground"
-                        >
-                            Customers
-                        </Link>
                         <Link href="#" className="hover:text-foreground">
                             Settings
                         </Link>
                         </nav>
                     </SheetContent>
                 </Sheet> 
-                <div className="flex place-content-end w-1/2 items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
+                <div className="flex place-content-end w-1/2 items-center gap-4 ml-auto md:gap-2 lg:gap-4">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="secondary" size="icon" className="rounded-full">

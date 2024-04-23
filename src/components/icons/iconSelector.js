@@ -18,7 +18,7 @@ const IconSelector = ({updateIcon}) => {
     };
 
     return (
-        <div>
+        <div className='w-2/3 mx-auto'>
             {Object.entries(iconMap).map(([iconName, IconComponent]) => (
                 <div key={iconName} onClick={() => updateIcon('Icon', iconName)} style={{ cursor: 'pointer', display: 'inline-block', margin: 10 }}>
                     <IconComponent className="h-6 w-6" />

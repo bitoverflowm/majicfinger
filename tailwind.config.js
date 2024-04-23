@@ -108,6 +108,11 @@ module.exports = {
             "background-position": "calc(100% + var(--shimmer-width)) 0",
           },
         },
+        gradient: {
+          to: {
+            backgroundPosition: "var(--bg-size) 0",
+          },
+        },
       },
       animation: {
         meteor: "meteor 5s linear infinite",
@@ -119,6 +124,7 @@ module.exports = {
         "spin-around": "spin-around calc(var(--speed) * 2) infinite linear",
         slide: "slide var(--speed) ease-in-out infinite alternate",
         shimmer: "shimmer 8s infinite",
+        gradient: "gradient 8s linear infinite",
       },
       slide: {
         to: {

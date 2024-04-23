@@ -8,8 +8,6 @@ import {
   MenubarContent,
   MenubarItem,
   MenubarMenu,
-  MenubarSeparator,
-  MenubarShortcut,
   MenubarTrigger,
 } from "@/components/ui/menubar"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -34,6 +32,8 @@ import { useMyState  } from '@/context/stateContext'
 import { BentoCard, BentoGrid } from "@/components/magicui/bento-grid";
 import RetroGrid from "@/components/magicui/retro-grid";
 import DotPattern from "@/components/magicui/dot-pattern";
+import AnimatedGradientText from "@/components/magicui/animated-gradient-text";
+
 
 import KatsuColors from '@/components/panels/katsu_colors';
 import Backgrounds from '@/components/panels/backgrounds';
@@ -41,7 +41,7 @@ import IconSelector from '@/components/icons/iconSelector';
 
 import { colorPalettes } from '@/components/chartView/panels/colorPalette';
 
-export function BentoBase({data, demo=true}) {
+export function BentoBase({data, demo}) {
   const contextState = useMyState()
 
   const [drawerOpen, setDrawerOpen] = useState()
@@ -68,6 +68,7 @@ export function BentoBase({data, demo=true}) {
   }
 
   const ramdomColorHandler = () => {
+    console.log("hello")
     const randomIndex = Math.floor(Math.random() * colorPalettes.length); // Random index from 0 to length-1
     const selectedPalette = colorPalettes[randomIndex];
     console.log(selectedPalette)
@@ -104,19 +105,15 @@ export function BentoBase({data, demo=true}) {
       {
         !(demo) && 
           <div>
-            <Alert className="w-1/3 mx-auto mb-10">
-              <HandIcon className="w-4 h-4"/>
-              <AlertTitle>Heads up!</AlertTitle>
-              <AlertDescription>
-                Right click any bento card to edit.
-              </AlertDescription>
-            </Alert>
             <div className="w-fit mb-4 flex place-items-center gap-4 ">
-              <Label htmlFor="">Bento Parent Options</Label>
+              <Label htmlFor="">Container Options</Label>
               <Menubar>
                 <MenubarMenu>
                   <MenubarTrigger>Background</MenubarTrigger>
                   <MenubarContent>
+                    <MenubarItem onClick={()=>editBentoContainer('background', '')}>
+                      Clear
+                    </MenubarItem>
                     <MenubarItem onClick={()=>editBentoContainer('background', 'retroGrid')}>
                       Retro Grid
                     </MenubarItem>
@@ -133,12 +130,10 @@ export function BentoBase({data, demo=true}) {
                     <div className="" onClick={()=>drawerOpenHandler('background_color')}>Background Color</div>
                   </MenubarTrigger>
                 </MenubarMenu>
-                <MenubarMenu>
-                  <MenubarTrigger>
-                    <div className="" onClick={()=>ramdomColorHandler()}>Random Colors</div>
-                  </MenubarTrigger>
-                </MenubarMenu>
               </Menubar>
+              <Button onClick={()=>ramdomColorHandler()}>
+                  Color Routlette 🎨
+              </Button>
               <div>
                 <Label htmlFor="font-size" className="text-right pr-1">
                   Save
@@ -151,7 +146,7 @@ export function BentoBase({data, demo=true}) {
           </div>
       }
       
-      <div className={`relative flex h-full w-full items-center justify-center p-10 overflow-hidden rounded-lg border shadow-sm`} style={{ backgroundColor: bentoContainer && bentoContainer.background_color && bentoContainer.background_color}}>  
+      <div className={`gradualEffect relative flex h-full w-full items-center justify-center p-10 overflow-hidden rounded-lg border shadow-sm`} style={{ backgroundColor: bentoContainer && bentoContainer.background_color && bentoContainer.background_color}}>  
         <BentoGrid>
           {bentoContainer && bentoContainer.background === 'retroGrid' && <RetroGrid />}
           {bentoContainer && bentoContainer.background === 'dotPattern' && <DotPattern className={cn(
