@@ -1,8 +1,10 @@
 "use client";
 
+import {BrowserView, MobileView} from 'react-device-detect';
+
 import { cn } from "@/lib/utils";
 import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 
 import BrowserFrame from "react-browser-frame";
 import { Progress } from "@/components/ui/progress";
@@ -10,8 +12,9 @@ import { BentoBase } from "@/components/bentoView/bentoBase";
 
 import Meteors from "@/components/magicui/meteors";
 
-export function Hero({data, progress, setStarted, background_color }) {
+export function Hero({data, progress, setStarted, background_color, width }) {
   const fadeInRef = useRef(null);
+
   const fadeInInView = useInView(fadeInRef, {
     once: true,
   });
@@ -26,6 +29,8 @@ export function Hero({data, progress, setStarted, background_color }) {
       y: 0,
     },
   };
+
+
 
   return (
     <section id="hero">
@@ -114,13 +119,27 @@ export function Hero({data, progress, setStarted, background_color }) {
               )}
               style={{backgroundColor: background_color}}
             />
-                <BrowserFrame url="http://www.yourname.lych3e.com">             
+                <BrowserView>
+                  {width <= 768 
+                        ? <div className='flex justify-items-center'>
+                              {data ? <BentoBase data={data} demo={true} mobile={true}/> : <Progress value={progress} className="w-[60%]" />}
+                          </div>                  
+                        : <BrowserFrame url="http://www.yourname.lych3e.com" className="hidden">
+                              <div className='flex justify-items-center'>
+                                <div className="overflow-hidden w-5/6 mx-auto px-5 overflow-hidden py-6 place-items-center place-content-center">                          
+                                    {data ? <BentoBase data={data} demo={true}/> : <Progress value={progress} className="w-[60%]" />}
+                                </div>
+                            </div>                       
+                          </BrowserFrame>
+                   }
+                </BrowserView>
+                <MobileView>
                     <div className='flex justify-items-center'>
                         <div className="overflow-hidden w-5/6 mx-auto px-5 overflow-hidden py-6 place-items-center place-content-center">                          
-                            {data ? <BentoBase data={data} demo={true}/> : <Progress value={progress} className="w-[60%]" />}
+                            {data ? <BentoBase data={data} demo={true} mobile={true}/> : <Progress value={progress} className="w-[60%]" />}
                         </div>
-                    </div>
-                </BrowserFrame>
+                    </div>                  
+                </MobileView>
           </motion.div>
         </div>
       </div>

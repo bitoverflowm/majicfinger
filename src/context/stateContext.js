@@ -228,7 +228,6 @@ export const StateProvider = ({ children, bento=false }) => {
   useEffect(()=> {
     if(!dflt && data && data.length > 0){
         const keys = Object.keys(data[0])
-        console.log('keys', keys)
         const columnsLabels = keys.map(key => {
             // Handle any price headings
             /*if (key === 'price') {

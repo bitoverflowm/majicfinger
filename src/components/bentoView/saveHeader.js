@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Marquee from "@/components/magicui/marquee";
@@ -165,7 +166,7 @@ export function SaveHeaader() {
                   Get access to Katsu <div></div> & Lychee For life
                 </h1>
 
-                <a
+                <Link
                   href="https://buy.stripe.com/cN2bL2gp03mC5AkfZ9"
                   className={cn(
                     buttonVariants({
@@ -177,7 +178,7 @@ export function SaveHeaader() {
                 >
                   For $69.99 Click Here
                   <ChevronRight className="ml-1 size-4 transition-all duration-300 ease-out group-hover:translate-x-1" />
-                </a>
+                </Link>
               </div>
               <div className="absolute inset-0 -z-10 rounded-full  bg-white opacity-40 blur-xl dark:bg-black" />
             </div>            

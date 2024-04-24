@@ -88,7 +88,7 @@ export function TagMe() {
             <div>
               <h3 className="text-base font-semibold">@misterrpink1</h3>
               <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                Any referrals will be greatly appreciated
+                Any shoutouts will be greatly appreciated
               </p>
             </div>
           </motion.div>

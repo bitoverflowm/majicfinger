@@ -63,9 +63,7 @@ const ActionMenu = () => {
             
             if (fileType === 'csv') {
                 // If the file is a CSV, use this block to process it
-                console.log(data)
                 const json = XLSX.utils.sheet_to_json(XLSX.read(data, { type: 'binary' }).Sheets.Sheet1);
-                console.log(json)
                 setData(json); // Set your state with the JSON data
             } else if (fileType === 'xlsx') {
                 const workbook = XLSX.read(data, { type: 'binary' });

@@ -17,9 +17,7 @@ const BentoView = () => {
     let defaultColDef = contextState?.defaultColDef || {};
 
     useEffect(() => {
-        console.log("colDefs:", colDefs);
-        console.log("defaultColDef:", defaultColDef);
-        console.log("rowData:", rowData);
+        return null
     }, [colDefs, defaultColDef, rowData]);
 
     return (

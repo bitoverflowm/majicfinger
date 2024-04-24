@@ -45,7 +45,7 @@ import { SaveHeaader } from "./saveHeader";
 import { KatsuPay } from "./katsuPay";
 import { TagMe } from "./tagMe";
 
-export function BentoBase({data, demo}) {
+export function BentoBase({data, demo, mobile}) {
   const contextState = useMyState()
 
   const [drawerOpen, setDrawerOpen] = useState()
@@ -132,13 +132,20 @@ export function BentoBase({data, demo}) {
     "Present your data in beautiful Bento formats using Katsu",
     "You vote on it I build it",
   ]
+
+  const scrollToFreeUse = () => {
+    const freeUseSection = document.getElementById('freeUse');
+    if (freeUseSection) {
+      freeUseSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
   
   return (
     <div className="bg-white">
       {
-        !(demo) && 
+        !(demo) && !(mobile) &&
           <div>
-            <div className="w-fit mb-4 flex place-items-center gap-4 ">
+            <div className={`w-fit mb-4 flex place-items-center gap-4`}>
               <Label htmlFor="">Container Options</Label>
               <Menubar>
                 <MenubarMenu>
@@ -169,10 +176,52 @@ export function BentoBase({data, demo}) {
               </Button>
               <div>
                 <Label htmlFor="font-size" className="text-right pr-1">
-                  Save
+                  {saving ? 'Back to Editing' : 'Save'}
                 </Label>
-                <Button variant={"outline"} size="icon" onClick={()=>setSaving(true)}>
-                  <PaperPlaneIcon className="h-4 w-4" />
+                <Button variant={"outline"} size="icon" onClick={()=>setSaving(!saving)}>
+                  <PaperPlaneIcon className={`h-4 w-4 ${saving && 'rotate-180'}` } />
+                </Button>
+              </div>
+            </div>
+          </div>
+      }
+      {
+        !(demo) && mobile &&
+          <div>
+            <Menubar className="w-full">
+              <MenubarMenu>
+                <MenubarTrigger>Background</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem onClick={()=>editBentoContainer('background', '')}>
+                    Clear
+                  </MenubarItem>
+                  {/*<MenubarItem onClick={()=>editBentoContainer('background', 'retroGrid')}>
+                    Retro Grid
+                  </MenubarItem>*/}
+                  <MenubarItem onClick={()=>editBentoContainer('background', 'dotPattern')}>
+                    Dot Pattern
+                  </MenubarItem>
+                  <MenubarItem onClick={()=>editBentoContainer('background', 'dotPattern2')}>
+                    Dot Pattern 2
+                  </MenubarItem>                    
+                </MenubarContent>
+              </MenubarMenu>
+              <MenubarMenu>
+                <MenubarTrigger>
+                  <div className="" onClick={()=>drawerOpenHandler('background_color')}>Background Color</div>
+                </MenubarTrigger>
+              </MenubarMenu>
+            </Menubar>            
+            <div>
+            <Button onClick={()=>ramdomColorHandler()}>
+                  Color Routlette 🎨
+              </Button>
+              <div>
+                <Label htmlFor="font-size" className="text-right pr-1">
+                  {saving ? 'Back to Editing' : 'Save'}
+                </Label>
+                <Button variant={"outline"} size="icon" onClick={()=>setSaving(!saving)}>
+                  <PaperPlaneIcon className={`h-4 w-4 ${saving && 'rotate-180'}` } />
                 </Button>
               </div>
             </div>
@@ -182,6 +231,9 @@ export function BentoBase({data, demo}) {
       
       { saving ?
         <div>
+          <div className="flex place-content-center">
+            <Button onClick={()=> scrollToFreeUse()}> How to use Katsu for Free </Button>
+          </div>
           <KatsuPay />
           <h1 className="text-center text-4xl">or</h1>
           <div className="grid grid-cols-2">
@@ -216,8 +268,8 @@ export function BentoBase({data, demo}) {
             </div>
           </div>
           <h1 className="text-center text-4xl font-bold">How to use Katsu for free?</h1>
-          <h3 className="text-center py-2">I understand, life happens, and not all of us can pay for things. If you want to use it for free:</h3>
-          <div className="py-4 flex place-items-center place-content-center">
+          <h3 className="text-center py-2">I understand, life happens, and not all of us can pay for things. <br/> So you can also use it for free, no registrations, no watermarks:</h3>
+          <div className="py-4 flex place-items-center place-content-center" id='freeUse'>
             <TagMe />
           </div>
         </div>

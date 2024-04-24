@@ -23,6 +23,7 @@ const KatsuBase = () => {
     const contextState = useMyState()
 
     const [started, setStarted] = useState(false)
+    const [width, setWidth] = useState(typeof window !== 'undefined' && window.innerWidth);
 
     const data = contextState?.data
     const setDflt = contextState?.setDflt
@@ -105,7 +106,7 @@ const KatsuBase = () => {
                     'fontStyle': 'non-italic',
                     'textAlign': 'left',
                     'fontSize': '96px',
-                    'animation': 'countUp',
+                    'animation': '',
                 },
                 "description": "Monthly Revenue",
                 "description_style": {
@@ -170,6 +171,17 @@ const KatsuBase = () => {
         return () => clearTimeout(timer)
       }, [])
 
+    function handleWindowSizeChange() {
+        setWidth(window.innerWidth);
+    }
+  
+    useEffect(() => {
+        typeof window !== 'undefined' && window.addEventListener('resize', handleWindowSizeChange);
+        return () => {
+            window && window.removeEventListener('resize', handleWindowSizeChange);
+        }
+    }, []);
+
     return (
         <div>
            <Toaster />
@@ -182,7 +194,7 @@ const KatsuBase = () => {
                             exit={{ height: '0px', opacity: 0}}
                             transition={{ ease: "easeOut", duration: 0.2 }}
                         >
-                            <Hero data={data} progress={progress} setStarted={setStarted} background_color={bentoContainer && bentoContainer.background_color}/>
+                            <Hero data={data} progress={progress} setStarted={setStarted} background_color={bentoContainer && bentoContainer.background_color} width={width}/>
                         </motion.div>
                 }                
             </AnimatePresence>
@@ -195,7 +207,7 @@ const KatsuBase = () => {
                     className='flex place-items-center place-content-center'
                 >
                     {started &&
-                        <KatsuPanel data={data}/>
+                        <KatsuPanel data={data} mobile={width && width <= 768}/>
                     }
                 </motion.div>
             </div>       

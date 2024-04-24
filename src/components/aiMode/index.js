@@ -42,7 +42,6 @@ const AIMode = ({data, setData, setDflt}) => {
 
             // Extract the JSON part
             let dataText = String(data.data)
-            console.log(dataText)
             const startIndex = dataText.indexOf('['); // Assuming '[' is the start of JSON data
             const endIndex = dataText.lastIndexOf(']') + 1; // Assuming ']' is the end of JSON data
             const jsonString = dataText.substring(startIndex, endIndex);

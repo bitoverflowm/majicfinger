@@ -24,7 +24,7 @@ import { BentoBase } from "@/components/bentoView/bentoBase";
 
 import { toast } from "sonner"
 
-const KatsuPanel = ({data}) => {
+const KatsuPanel = ({data, mobile}) => {
     // Your component logic goes here
 
     const handleFileUpload = (e) => {
@@ -44,16 +44,13 @@ const KatsuPanel = ({data}) => {
             
             if (fileType === 'csv') {
                 // If the file is a CSV, use this block to process it
-                console.log(data)
                 const json = XLSX.utils.sheet_to_json(XLSX.read(data, { type: 'binary' }).Sheets.Sheet1);
-                console.log(json)
                 setData(json); // Set your state with the JSON data
             } else if (fileType === 'xlsx') {
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 const json = XLSX.utils.sheet_to_json(worksheet);
-                console.log(json)
                 //const csv = XLSX.utils.sheet_to_csv(worksheet);
                 setData(json); // Now you have your JSON data
             }
@@ -71,11 +68,19 @@ const KatsuPanel = ({data}) => {
     }
 
     useEffect(()=>{
-        toast('Welcome to Katsu 🍛', {
-            description: "Right Click on any Bento card to edit",
-            closeButton: true,
-            duration: 99999999
-          });  
+        if(mobile){
+            toast('Welcome to Katsu 🍛', {
+                description: "Looks like you are on mobile device. I have not built mobile editing yet, feel free to look around.",
+                closeButton: true,
+                duration: 99999999
+              });
+        } else {
+            toast('Welcome to Katsu 🍛', {
+                description: "Right Click on any Bento card to edit",
+                closeButton: true,
+                duration: 99999999
+              });  
+        }        
     }, [])
 
     return (
@@ -139,7 +144,7 @@ const KatsuPanel = ({data}) => {
                     </DropdownMenu>
                 </div>
             </header>
-            <div className='p-20'>
+            <div className={ mobile ? 'p-2' : 'p-20'}>
                 <div className="w-full place-items-center place-content-center hidden">
                     <div className='text-center py-4'>Just click and edit the grid below to update the bento</div>
                     <form className="flex flex-col items-center pb-6">
@@ -153,7 +158,7 @@ const KatsuPanel = ({data}) => {
                     </div>
                 </div>
                 <div className="overflow-hidden w-5/6 mx-auto">
-                    {data && <BentoBase data={data} demo={false}/>}
+                    {data && <BentoBase data={data} demo={false} mobile={mobile} />}
                 </div>
                 <div value="save" className="px-5 overflow-hidden py-6 place-items-center place-content-center h-5/6 w-5/6 hidden">
                     <Saves />
