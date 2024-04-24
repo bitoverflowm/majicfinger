@@ -225,14 +225,14 @@ const BentoCard = ({
   }
 
   useEffect(()=> {
-    if(['countUp', 'countDown'].includes(heading_style.animation)){
+    if(['countUp', 'countDown'].includes(heading_style.animation) && !demo){
       parseInt(heading) ? '' :  toast('Headsup ', {
           description: `${heading} : You can't add countup or countdown animation to text only`,
           closeButton: true,
           duration: 90000
         });
       }
-  }, [heading, heading_style ])
+  }, [heading, heading_style, demo ])
 
   return(
     <div
