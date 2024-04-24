@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import Link from "next/link";
 import { ArrowRightIcon, FontBoldIcon, FontItalicIcon, TextAlignLeftIcon, TextAlignCenterIcon, TextAlignRightIcon, DoubleArrowUpIcon, DoubleArrowDownIcon, ExitIcon } from "@radix-ui/react-icons";
@@ -12,7 +12,7 @@ import { iconMap } from "../icons/iconMap";
 
 import { useMyState  } from '@/context/stateContext'
 
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner"
 
 import {
   ContextMenu,
@@ -101,8 +101,10 @@ const BentoCard = ({
       return newData;
     });
     if(drawerOpen){
-      toast({
+      toast('Success', {
         description: `${field} updated to ${newValue}`,
+        closeButton: true,
+        duration: 9000
       });
       setDrawerOpen(false)
     }else{
@@ -222,9 +224,19 @@ const BentoCard = ({
     setOption(option)
   }
 
+  useEffect(()=> {
+    if(['countUp', 'countDown'].includes(heading_style.animation)){
+      parseInt(heading) ? '' :  toast('Headsup ', {
+          description: `${heading} : You can't add countup or countdown animation to text only`,
+          closeButton: true,
+          duration: 90000
+        });
+      }
+  }, [heading, heading_style ])
+
   return(
     <div
-      key={heading}
+      key={index}
       className={cn(
         "internalGradualEffect group relative rounded-xl col-span-3 overflow-hidden flex flex-col justify-end",
         // light styles
@@ -241,7 +253,7 @@ const BentoCard = ({
             <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
               {IconComponent && <IconComponent className="origin-left transform-gpu transition-all duration-300 ease-in-out group-hover:scale-75" style={icon_style && icon_style} />}
               <div className={`text-8xl text-neutral-700 dark:text-neutral-300`} style={heading_style && heading_style}>
-                {heading_style && ['countUp', 'countDown'].includes(heading_style.animation) && <CountUp
+                {heading_style && ['countUp', 'countDown'].includes(heading_style.animation) && parseInt(heading) ? <CountUp
                         start={heading_style.animation === 'countUp' ? 0: parseFloat(heading.replace(/[^0-9-.]/g, ''))} 
                         end={heading_style.animation === 'countUp' ? parseFloat(heading.replace(/[^0-9-.]/g, '')) : 0} // removes any non-numeric characters except minus and decimal
                         prefix={heading.includes('$') ? '$' : ''}
@@ -254,8 +266,7 @@ const BentoCard = ({
                         useGrouping={true}
                         startOnMount={true}  // Starts count up when the component mounts
                         redraw={true}
-                      /> }
-                  {heading_style && heading_style.animation === 'none' && heading}
+                      /> : heading }
               </div>
               <p className="max-w-lg text-neutral-400" style={description_style && description_style}>{description}</p>
             </div>
@@ -334,8 +345,9 @@ const BentoCard = ({
                       </Label>
                       <div className="grid grid-cols-10 items-center gap-1">  
                         <Input
+                          key="heading-input"
                           id="heading"
-                          defaultValue={heading}
+                          value={heading ? heading : ''}
                           className="col-span-4"
                           onChange={(e)=>updateCellData('heading', e.target.value)}
                         />
@@ -404,8 +416,9 @@ const BentoCard = ({
                       </Label>
                       <div className="grid grid-cols-10 items-center gap-1">
                         <Input
+                          key="description-input"
                           id="description"
-                          defaultValue={description}
+                          value={description ? description : ''}
                           className="col-span-4"
                           onChange={(e)=>updateCellData('description', e.target.value)}
                         />

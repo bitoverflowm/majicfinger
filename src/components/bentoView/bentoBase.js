@@ -25,7 +25,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer"
 
-import { toast } from "@/components/ui/use-toast";
+import { toast } from 'sonner'
 
 import { useMyState  } from '@/context/stateContext'
 
@@ -60,8 +60,10 @@ export function BentoBase({data, demo}) {
       ...prevState,
       [field] : val
     }))
-    toast({
+    toast('Success', {
       description: `${field} updated to ${val}`,
+      closeButton: true,
+      duration: 9000
     });
     setDrawerOpen(false)
   }
@@ -97,7 +99,11 @@ export function BentoBase({data, demo}) {
           }
       }));
     });
-    !(demo) && toast({description: "We randomized your colors with ❤️!" });
+    !(demo) && toast('❤️', {
+      description: `We randomized your colors`,
+      closeButton: true,
+      duration: 9000
+    });
   }
 
   useEffect(() => {
