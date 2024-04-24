@@ -45,7 +45,7 @@ const Login = ({noName}) => {
     };
 
     return (
-        <div className='bg-lychee-red font-body shadow-2xl rounded-xl text-white p-4 mb-4'>
+        <div className='bg-black font-body shadow-2xl rounded-xl text-white p-4 mb-4'>
             {
             user ? 
                 <div>

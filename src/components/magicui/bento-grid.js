@@ -76,7 +76,8 @@ const BentoCard = ({
   description_style,
   href,
   cta,
-  background_color
+  background_color,
+  demo
 }) => {
   //const contextState = useMyState()
   //const setData = contextState?.setData;

@@ -47,7 +47,7 @@ export default function Home() {
               <Alert>
                 <AlertTitle> 🚧 Heads up!</AlertTitle>
                 <AlertDescription>
-                  I am moving some things around. You can still use the platform, but things might break. <br /> Also don't forget to checkout <Link href="/katsu">Katsu</Link>, our ltest release - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
+                  I am moving some things around. You can still use the platform, but things might break. <br /> Also don't forget to checkout <Link href="/katsu">Katsu</Link>, our latest release <br /> Katsu comes included for all Lychee Subscription tiers - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
                 </AlertDescription>
               </Alert>
             </div>

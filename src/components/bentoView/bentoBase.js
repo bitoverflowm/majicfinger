@@ -2,6 +2,7 @@
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { HandIcon, UpdateIcon, PaperPlaneIcon, CheckIcon, OpenInNewWindowIcon } from "@radix-ui/react-icons"
+import Link from "next/link";
 
 import {
   Menubar,
@@ -112,7 +113,7 @@ export function BentoBase({data, demo}) {
     if (demo) {
       intervalId = setInterval(() => {
         ramdomColorHandler(demo);
-      }, 3000); // Runs every 3 seconds
+      }, 2000); // Runs every 3 seconds
     }
 
     // Cleanup function to clear the interval when the component unmounts or the `demo` prop changes
@@ -187,7 +188,7 @@ export function BentoBase({data, demo}) {
             <div>
               <SaveHeaader />
             </div>
-            <div className="my-auto pl-8">
+            <div className="my-auto mx-auto pl-8">
               {lycheeList && lycheeList.length > 0 && (
                   <ul className="flex flex-col gap-2 font-normal">
                     {lycheeList.map((idx) => (
@@ -201,7 +202,7 @@ export function BentoBase({data, demo}) {
                     ))}
                   </ul>
                 )}
-                <div className="my-6"><AnimatedGradientText>
+                <Link href="/" className="my-6"><AnimatedGradientText>
                       <span
                         className={cn(
                           `inline animate-gradient bg-gradient-to-r from-[#ffaa40] via-[#9c40ff] to-[#ffaa40] bg-[length:var(--bg-size)_100%] bg-clip-text text-transparent`,
@@ -211,7 +212,7 @@ export function BentoBase({data, demo}) {
                       </span>
                       <OpenInNewWindowIcon className="ml-1 size-3 transition-transform duration-300 ease-in-out group-hover:translate-x-0.5" />
                     </AnimatedGradientText>
-                </div>
+                </Link>
             </div>
           </div>
           <h1 className="text-center text-4xl font-bold">How to use Katsu for free?</h1>
@@ -235,7 +236,7 @@ export function BentoBase({data, demo}) {
                 "[mask-image:linear-gradient(to_bottom_right,white,transparent,transparent)] ",
               )} />}   
               {data && data.map((feature, idx) => (
-                <BentoCard key={idx} index={idx} setData={setData} {...feature} />
+                <BentoCard key={idx} index={idx} setData={setData} demo={demo} {...feature} />
               ))}
           </BentoGrid>
         </div>
