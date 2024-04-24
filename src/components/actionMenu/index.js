@@ -338,20 +338,20 @@ const ActionMenu = () => {
                                             <div className="text-8xl font-black">6.99/m</div>
                                             <div className="font-black text-xl pt-2">Annual</div>
                                         </div>
-                                        <div className="w-11/12 shadow-sm flex flex-col place-items-center place-content-center bg-lychee-green">
-                                            <div className="text-8xl font-black text-white">69.99</div>
+                                        <div className="w-11/12 shadow-sm flex flex-col place-items-center place-content-center bg-green-400">
+                                            <div className="text-8xl font-black text-black">69.99</div>
                                             <div className="text-white font-black pt-2 text-xl">One Time Payment</div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 text-center py-4 text-lychee-green font-black"> 
-                                        <div><div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/bIY16o5Km8GW4wgeV6">Get Started</Link></div></div>
+                                        <div><div className="cursor-pointer hover:bg-black hover:text-white bg-green-300 text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/bIY16o5Km8GW4wgeV6">Get Started</Link></div></div>
                                         <div> 
                                             <div>Get 3 months free (added to end of period)</div>
-                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/6oEdTa2ya5uK1k47sF">Get Started</Link></div></div>                                        
+                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-green-300 text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/6oEdTa2ya5uK1k47sF">Get Started</Link></div></div>                                        
                                         <div>
                                             <div>{'<'}0.99/month</div>
                                             <div className="font-thin">If you use Lychee for 5 years</div>
-                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-lychee-go text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/cN2bL2gp03mC5AkfZ9">Get Started</Link></div>
+                                            <div className="cursor-pointer hover:bg-black hover:text-white bg-green-300 text-lychee-black py-2 rounded-xl w-32 mx-auto mt-1"><Link href="https://buy.stripe.com/cN2bL2gp03mC5AkfZ9">Get Started</Link></div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3">

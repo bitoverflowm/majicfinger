@@ -254,7 +254,7 @@ export function BentoBase({data, demo, mobile}) {
                     ))}
                   </ul>
                 )}
-                <Link href="/" className="my-6"><AnimatedGradientText>
+                <Link href="/"  rel="noopener noreferrer" target="_blank" className="my-6"><AnimatedGradientText>
                       <span
                         className={cn(
                           `inline animate-gradient bg-gradient-to-r from-[#ffaa40] via-[#9c40ff] to-[#ffaa40] bg-[length:var(--bg-size)_100%] bg-clip-text text-transparent`,
