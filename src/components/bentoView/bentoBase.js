@@ -113,7 +113,7 @@ export function BentoBase({data, demo, mobile}) {
     if (demo) {
       intervalId = setInterval(() => {
         ramdomColorHandler(demo);
-      }, 2000); // Runs every 3 seconds
+      }, 2000); //2000 // Runs every 3 seconds
     }
 
     // Cleanup function to clear the interval when the component unmounts or the `demo` prop changes

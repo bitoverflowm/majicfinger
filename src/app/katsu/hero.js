@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import {BrowserView, MobileView} from 'react-device-detect';
 
 import { cn } from "@/lib/utils";
@@ -73,7 +74,7 @@ export function Hero({data, progress, setStarted, background_color, width }) {
               <motion.div
                 animate={fadeInInView ? "animate" : "initial"}
                 variants={fadeUpVariants}
-                className="flex flex-col gap-4 lg:flex-row"
+                className="flex flex-col gap-4"
                 initial={false}
                 transition={{
                   duration: 0.6,
@@ -97,6 +98,11 @@ export function Hero({data, progress, setStarted, background_color, width }) {
                 >
                   Get Started
                 </button>
+
+                <div className='pt-4'>Upvote Katsu on Product Hut</div>
+                <Link href="https://www.producthunt.com/posts/katsu?utm_source=badge-featured&utm_medium=badge&utm_source=badge-katsu">
+                  <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=453874&theme=light" alt="Katsu - Mouth-Wateringly Delicious Bentos | Product Hunt" className='h-20' style={{ width: 250 }} />
+                </Link>
               </motion.div>
             </div>
           </div>
