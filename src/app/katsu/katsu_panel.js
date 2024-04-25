@@ -1,8 +1,14 @@
 import React, {useEffect} from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'
 
-import { IoWarningOutline  } from "react-icons/io5";
-
+import { IoWarningOutline } from "react-icons/io5";
+import { TerminalIcon } from 'lucide-react';
+import { 
+    Alert,
+    AlertDescription,
+    AlertTitle,
+ } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -26,6 +32,7 @@ import { toast } from "sonner"
 
 const KatsuPanel = ({data, mobile}) => {
     // Your component logic goes here
+    const router = useRouter()
 
     const handleFileUpload = (e) => {
         const file = e.target.files[0]
@@ -74,13 +81,14 @@ const KatsuPanel = ({data, mobile}) => {
                 closeButton: true,
                 duration: 99999999
               });
-        } else {
-            toast('Welcome to Katsu 🍛', {
-                description: "Right Click on any Bento card to edit",
-                closeButton: true,
+        }
+        toast("It's launch day! Use code YUMMY on checkout to get 50% off don't forget to upvote!",{
+            action: {
+                label: 'Upvote Us',
+                onClick: () => router.push('https://www.producthunt.com/posts/katsu'),
                 duration: 99999999
-              });  
-        }        
+            }            
+        })
     }, [])
 
     return (
@@ -156,6 +164,15 @@ const KatsuPanel = ({data, mobile}) => {
                     <div className="h-[900px] flex place-content-center">
                         <GridView />
                     </div>
+                </div>
+                <div className='flex place-content-center'>
+                    <Alert className="w-96 bg-green-500/20">
+                        <TerminalIcon className="h-4 w-4" />
+                        <AlertTitle>Heads up!</AlertTitle>
+                        <AlertDescription>
+                            Right click any bento card to edit the text, animations, background, etc <br />
+                        </AlertDescription>
+                    </Alert>
                 </div>
                 <div className="overflow-hidden w-5/6 mx-auto">
                     {data && <BentoBase data={data} demo={false} mobile={mobile} />}

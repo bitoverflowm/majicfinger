@@ -96,7 +96,7 @@ export function Hero({data, progress, setStarted, background_color, width }) {
                     "transform-gpu ring-offset-current transition-all duration-300 ease-out hover:ring-2 hover:ring-primary hover:ring-offset-2",
                   )}
                 >
-                  Get Started
+                  Start Now
                 </button>
 
                 <div className='pt-4'>Upvote Katsu on Product Hut</div>
