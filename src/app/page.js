@@ -54,7 +54,7 @@ export default function Home() {
             <div className='text-center max-w-screen overflow-hidden'>
               <LandingPage />
             </div>
-            <div className="">
+            <div className="max-w-screen">
                 <ActionMenu />
             </div>
               <FAQ />
