@@ -9,6 +9,7 @@ import CountUp from 'react-countup'
 
 import { Hero } from './hero';
 import { SocialProofTestimonials } from './testimonials';
+import { Flow } from './flow'
 
 
 const companies = [
@@ -71,41 +72,34 @@ const LandingPage = () => {
                             </div>
                         </section>
                         <SocialProofTestimonials />
-                        <div className=''>
-                            <div className='w-screen sm:pt-10 sm:w-1/2 mx-auto px-4' ref={firstRef}>
-                                <div className='pt-10 sm:pt-0 py-2 text-xs text-black rounded-full '>
-                                    ✨ Just released in Lychee v1.1.1!
+                        <div className='flex flex-col place-items-center text-left'>
+                            <div className='py-10'>
+                                <div className='text-2xl'>
+                                    Upload your csv, excel, google sheet, notion doc
                                 </div>
-                                <div className=' pl-8 py-8 text-left rounded-xl bg-black shadow-xl cursor-pointer transition ease-in-out delay-10 bg-gradient-to-r hover:scale-110 hover:from-lychee-green hover:to-lychee-blue duration-500' onClick={()=>setWorking('integrations')}>
-                                    <div className='text-4xl text-white'>Query,</div>  
-                                    <div className='text-4xl text-white'>Analyze,</div>
-                                    <div className='text-4xl text-white'>Visualize,</div>
-                                    <div className='text-4xl text-white'>Live data</div>
-                                    <div className='text-xs text-white pt-2'>Without leaving Lychee. Without a single line of code.</div>
-                                    <div className='flex flex-wrap pt-4 px-2 gap-1'>
-                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Twitter</div>
-                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Earthquake</div>
-                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Instagram</div>
-                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Quickbooks</div>
-                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>BTC</div>
-                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>ETH</div>
-                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>Stocks</div>
-                                        <div className='bg-white rounded-full text-xs py-1 px-2 text-lychee-green'>YouTube</div>
-                                    </div>
-                                </div>                                    
-                            </div>
-                            <div className='w-screen sm:w-1/2 mx-auto  px-4'>
-                                <div className='py-2 px-5 text-xs text-center'>
-                                    "
+                                <div className='text-2xl'>
+                                    Or pull <span className='underline text-blue-500'>directly</span> from your favorite data sources   
                                 </div>
-                                <div className='flex flex-col gap-2 w-full min-h-[335px] pl-8 p-4 pt-8 text-left rounded-xl border-lychee-black border-4 shadow-xl w-full '>
-                                    <div className='text-8xl text-lychee-black text-black pt-2'>
-                                        <CountUp end={796000} duration={30} />
-                                    </div>
-                                    <div className='text-4xl text-lychee-green pt-2'> beautifully curated colors, pallates, charts, graphs, tools updated daily</div>
+                                <div className='text-2xl'>
+                                    All from within Lychee <span className='underline text-purple-500'>not a single line of code</span>
+                                </div>
+                                <div className='text-2xl'>
+                                    Query, Operate on, Visualize, <span className='underline text-green-500'>Analyze with AI</span>
+                                </div>
+                                <div className='text-2xl'>
+                                    Create your custom Dashboard
+                                </div>
+                                <div className='text-2xl'>
+                                    Present, Share with your team, export
+                                </div>
+                                <div className='text-2xl'>
+                                    Or Host right here eg: <span className="underline text-orange-500">www.yourname.lych3e.com</span> show world can see your work!
                                 </div>
                             </div>
-                        </div>       
+                        </div>
+                        <div className='py-2 px-5 text-xs text-center flex place-content-center'>
+                            <Flow />
+                        </div>
                         <div className='pb-10 mt-10'>
                             <div className='bg-gradient-to-r from-soft to-softer pb-20'>
                                 <div ref={featuresRef} className='pt-48 text-6xl xl:text-8xl font-title'>

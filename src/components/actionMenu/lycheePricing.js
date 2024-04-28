@@ -157,7 +157,7 @@ export function LycheePricing() {
                             }}
                             className="flex flex-row gap-1"
                         >
-                            <span className="text-4xl font-bold text-black dark:text-white">
+                            <span className="text-4xl font-bold text-black dark:text-white text-center w-full">
                                 ${toHumanPrice(price.yearlyPrice, 2)}
                             <span className="text-xs"> one payment</span>
                         </span>
@@ -184,11 +184,11 @@ export function LycheePricing() {
                         }}
                         className="flex flex-row gap-1"
                     >
-                        <span className="text-4xl font-bold text-black dark:text-white">
-                        $
-                        {interval === "year"
-                            ? toHumanPrice(price.yearlyPrice, 2)
-                            : toHumanPrice(price.monthlyPrice, 2)}
+                        <span className="text-4xl font-bold text-black text-center w-full">
+                            $
+                            {interval === "year"
+                                ? toHumanPrice(price.yearlyPrice, 2)
+                                : toHumanPrice(price.monthlyPrice, 2)}
                         <span className="text-xs"> / {interval} (7 day trial)</span>
                         </span>
                     </motion.div>
@@ -196,10 +196,10 @@ export function LycheePricing() {
 
               {
                 price.singlePay ?
-                    <Link href={price && price.monthRef} className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400">
+                    <Link href={price && price.monthRef} className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm w-3/4 mx-auto">
                         Go
                     </Link>
-                    :<Link href={price && interval === "year" ? price.yearRef : price.monthRef} className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400">
+                    :<Link href={price && interval === "year" ? price.yearRef : price.monthRef} className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm rounded-sm w-3/4 mx-auto">
                         Go
                     </Link>
               }

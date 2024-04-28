@@ -300,9 +300,10 @@ const ActionMenu = () => {
                     {
                         working && working === 'getLychee' &&
                             <div className="w-screen sm:w-full text-lychee-black">
+                                <LycheePricing />
                                 <div className="sm:flex sm:px-20 pt-10">
                                     <div className="px-20 basis-1/2 grid gap-2 text-lg">
-                                        <div className="font-black text-xl text-center pb-8">Already helping 10,000+ Lychee users win back their time. </div>
+                                        <div className="font-black text-xl text-center pb-8">Already helping 11,000+ Lychee users win back their time. </div>
                                         <div className="capitalize">Hi <Link href={"https://twitter.com/misterrpink1"} className="underline">misterrpink</Link> here,</div>
                                         <div>I'm the solo dev, builder, founder of Lychee.</div>
                                         <div>Even as an AI specialist, epigenetic researcher, overall data nut, who actually enjoys coding...</div>
@@ -325,7 +326,6 @@ const ActionMenu = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <LycheePricing />
                             </div>
                     }
                     {
