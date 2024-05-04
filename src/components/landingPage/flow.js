@@ -50,7 +50,7 @@ export function Flow() {
 
   return (
     <div
-      className="relative flex h-full w-full max-w-[84rem] items-center justify-center overflow-hidden rounded-lg border bg-background p-10 md:shadow-xl"
+      className="relative flex h-full w-full max-w-[84rem] items-center justify-center overflow-hidden p-10"
       ref={containerRef}
     >
       <div className="flex h-full w-full flex-row items-stretch justify-between gap-10">

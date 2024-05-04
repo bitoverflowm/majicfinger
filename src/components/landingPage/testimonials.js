@@ -39,6 +39,8 @@ export const TestimonialCard = ({
       className,
     )}
     {...props} // Spread the rest of the props here
+    rel="noopener noreferrer"
+    target="_blank"
   >
     <div className="select-none text-sm font-normal text-neutral-700 dark:text-neutral-400">
       {description}
@@ -190,12 +192,12 @@ export function SocialProofTestimonials() {
     <section id="testimonials">
       <div className="py-14">
         <div className="container mx-auto px-4 md:px-8">
-          <h3 className="text-center text-lg font-bold text-gray-500">
+          <h3 className="text-center text-4xl font-bold">
             What Our Legendary Users Have to Say
           </h3>
-          <p className="text-xs text-slate-500">pssst... did you know all the testimonials are clickable?</p>
+          <p className="text-lg text-slate-500">pssst... did you know all the testimonials are clickable?</p>
           <div className="relative mt-6 max-h-[650px] overflow-hidden">
-            <div className="gap-4 md:columns-3 w-3/5 mx-auto">
+            <div className="gap-4 md:columns-3 w-4/5 mx-auto">
               {Array(Math.ceil(testimonials.length / 3))
                 .fill(0)
                 .map((_, i) => (

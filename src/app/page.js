@@ -43,19 +43,16 @@ export default function Home() {
         <StateProvider>
           <Nav/>
           <div className="flex flex-col place-items-center bg-white/20">
-            <div className='mx-auto mt-8'>
+            <div className='mx-auto mt-8 text-xs'>
               <Alert>
                 <AlertTitle> 🚧 Heads up!</AlertTitle>
-                <AlertDescription>
-                  I am moving some things around. You can still use the platform, but things might break. <br /> Also don't forget to checkout <Link href="/katsu">Katsu</Link>, our latest release <br /> Katsu comes included for all Lychee Subscription tiers - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
+                <AlertDescription className="text-xs">
+                  I am moving some things around. You can still use the platform, but things might break. - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
                 </AlertDescription>
               </Alert>
             </div>
             <div className='text-center max-w-screen overflow-hidden'>
               <LandingPage />
-            </div>
-            <div className="max-w-screen">
-                <ActionMenu />
             </div>
               <FAQ />
           </div>

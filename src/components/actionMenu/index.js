@@ -93,21 +93,6 @@ const ActionMenu = () => {
 
     }
 
-
-    useEffect(()=>{
-        if(working){
-            scrollToSection()
-        }
-    }, [working])
-
-    const scrollToSection = (sectionId = 'dashboard-section') => {
-        const yOffset = -60; // Adjust this value based on your fixed header size or desired spacing
-        const element = document.getElementById(sectionId);
-        const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      
-        window.scrollTo({top: y, behavior: 'smooth'});
-    }
-
     useEffect(() => {
         // Ensure the code runs only if jQuery is available
         if (typeof window !== "undefined" && window.$) {
