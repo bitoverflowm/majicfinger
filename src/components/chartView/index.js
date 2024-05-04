@@ -17,7 +17,7 @@ const ChartView = () => {
 
     useEffect(()=> {
         if(chartOptions){
-            console.log('chart Options:', chartOptions)
+            //console.log('chart Options:', chartOptions)
         }
     }, [chartOptions])
 

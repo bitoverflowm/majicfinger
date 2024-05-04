@@ -25,8 +25,8 @@ export const StateProvider = ({ children, bento=false }) => {
   const [themeColor, setThemeColor] = useState()
   const [strokeColor, setStrokeColor] = useState('#000')
 
-  const [title, setTitle] = useState('Space Missions')
-  const [subTitle, setSubTitle] = useState('Space Missions by Price')
+  const [title, setTitle] = useState('')
+  const [subTitle, setSubTitle] = useState('')
 
   const [data, setData] = useState()
 

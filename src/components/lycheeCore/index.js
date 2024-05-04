@@ -1,15 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useEffect } from "react"
 import * as XLSX from 'xlsx'
 import Link from 'next/link'
 
 import { GoEyeClosed } from "react-icons/go";
 import { CiExport } from "react-icons/ci";
-import { IoCheckmarkSharp, IoWarningOutline  } from "react-icons/io5";
-import { ImMagicWand } from "react-icons/im";
-import { LuMoveLeft } from "react-icons/lu";
-import { FaCircle } from "react-icons/fa6";
+import { IoWarningOutline  } from "react-icons/io5";
 import { MdArrowRightAlt } from "react-icons/md";
 
 /*MagicUI and Shdcn imports */
@@ -24,6 +21,7 @@ import GridView from "../gridView";
 import ChartView from "../chartView";
 import ChartDataMods from "../chartView/chartDataMods";
 import Roadmap from "../roadmap";
+import { ChartGallery } from "../chartGallery";
 
 import Integrations from "../integrations";
 
@@ -32,7 +30,7 @@ import { LycheePricing } from "./lycheePricing";
 
 
 
-const ActionMenu = () => {
+const LycheeCore = () => {
     const user = useUser()
     /*
      * Context hooks
@@ -131,11 +129,8 @@ const ActionMenu = () => {
                 </div>
             }
 
-            <div className="min-h-screen" id="dashboard-section">
-                <div className="h-1/6 flex place-items-center place-content-center py-2 text-xs">
-                    {
-                        !(user) && <div className="flex">Check it out right here <MdArrowRightAlt /> </div>
-                    }
+            <div id="dashboard-section">
+                <div className="flex place-items-center place-content-center py-2 text-xs">
                     <div className="flex flex-wrap py-2 px-4">
                         <div className={`rounded-l-full py-3 px-4 ${working === 'upload' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('upload')}>Upload</div>
                         <div className={`py-3 px-4 ${working === 'grid' ? 'bg-lychee-black text-white': 'shadow-2xl text-black bg-white cursor-pointer hover:shadow-none hover:bg-slate-50/40'} `}  onClick={()=>setWorking('grid')}>Table</div>
@@ -218,15 +213,15 @@ const ActionMenu = () => {
                     }
                     {
                         fmtCols && data && ((working && working === 'chart') || !working) &&
-                            <div className="min-h-screen flex flex-col xl:flex-row">
-                                <div className="py-5 h-fit xl:block sm:w-2/12 shadow-xl rounded-sm mx-5">
+                            <div className="flex flex-col xl:flex-row">
+                                <ChartGallery />
+                                <div className="hidden py-5 h-fit sm:w-2/12 shadow-xl rounded-sm mx-5">
                                     <ChartDataMods/>
                                 </div>
-                                <div className="w-[450px] h-[450px] sm:w-[1200px] 2xl:w-[1700px] 2xl:h-[1000px]">
+                                <div className="hidden w-[450px] h-[450px] sm:w-[1200px] 2xl:w-[1700px] 2xl:h-[1000px]">
                                     <ChartView/>
                                 </div>
                             </div>
-                            
                     }
                     { working && working === 'integrations' && <Integrations/>}
                     {
@@ -318,11 +313,8 @@ const ActionMenu = () => {
                     }
                 </div>
             </div>
-            <div className="py-4 max-w-8 mx-auto">
-                <div><img src={"./fruit.png"} /></div>                
-            </div>
         </div>
     )
 }
 
-export default ActionMenu
+export default LycheeCore
