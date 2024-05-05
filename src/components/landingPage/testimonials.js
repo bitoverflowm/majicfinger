@@ -31,7 +31,7 @@ export const TestimonialCard = ({
   <Link
     href={src}
     className={cn(
-      "mb-4 flex w-full cursor-pointer break-inside-avoid flex-col items-center justify-between gap-6 rounded-xl p-4",
+      "mb-4 flex w-full cursor-pointer break-inside-avoid flex-col items-center justify-between gap-6 rounded-xl p-4 hover:border-indigo-300",
       // light styles
       " border border-neutral-200 bg-white",
       // dark styles
@@ -195,7 +195,7 @@ export function SocialProofTestimonials() {
           <h3 className="text-center text-4xl font-bold">
             What Our Legendary Users Have to Say
           </h3>
-          <p className="text-lg text-slate-500">pssst... did you know all the testimonials are clickable?</p>
+          <p className="text-xl text-slate-500 pt-3">pssst... you can <span className="underline text-blue-500 font-black">click</span> on each testimonial?</p>
           <div className="relative mt-6 max-h-[650px] overflow-hidden">
             <div className="gap-4 md:columns-3 w-4/5 mx-auto">
               {Array(Math.ceil(testimonials.length / 3))
