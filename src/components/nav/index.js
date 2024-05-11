@@ -57,12 +57,13 @@ const Nav = () => {
               <div className="w-28 sm:w-24">
                 <Link href="/"> <img src={"./logo.png"}/></Link>
               </div>
-              <div className='cursor-pointer hover:text-lychee-green'><Link href="/affiliates">Make $ with Lychee</Link></div>
-              <div className='cursor-pointer hover:text-lychee-green'><Link href="/dataUse">Data Use</Link></div>
+              <div className='cursor-pointer'><Link href="/affiliates">Make $ with Lychee</Link></div>
+              <div className='cursor-pointer'><Link href="/dataUse">Data Use</Link></div>
               {/*<div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>*/}
-              <div className='cursor-pointer hover:text-lychee-green'><Link href="/help">Contact</Link></div>
-              <div className='cursor-pointer hover:text-lychee-green'><Link href="/katsu">Katsu</Link></div>
-
+              <div className='cursor-pointer'><Link href="/help">Contact</Link></div>
+              <div className='cursor-pointer'><Link href="/katsu">Katsu</Link></div>
+              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Request Feature</Link></div>
+              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/roadmap"  rel="noopener noreferrer" target="_blank">Vote</Link></div>
             </nav>
             <Sheet>
                 <SheetTrigger asChild>
@@ -83,6 +84,7 @@ const Nav = () => {
                 </SheetContent>
             </Sheet> 
             <div className="flex place-content-end w-1/2 items-center gap-4 ml-auto md:gap-2 lg:gap-4">
+                <div className='text-lg font-medium md:text-sm'><Link href="/affiliatePack">❤️ Affiliate Pack</Link></div>
                 <DropdownMenu>
                       {
                         !(user) ?

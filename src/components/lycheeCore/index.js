@@ -212,7 +212,7 @@ const LycheeCore = () => {
                             </div>              
                     }
                     {
-                        fmtCols && data && ((working && working === 'chart') || !working) &&
+                        fmtCols && data && ((working && working === 'chart')) &&
                             <div className="flex flex-col xl:flex-row">
                                 <ChartGallery />
                                 <div className="hidden py-5 h-fit sm:w-2/12 shadow-xl rounded-sm mx-5">

@@ -45,7 +45,7 @@ import { SaveHeaader } from "./saveHeader";
 import { KatsuPay } from "./katsuPay";
 import { TagMe } from "./tagMe";
 
-export function BentoBase({data, demo, mobile}) {
+export function BentoBase({data, demo, mobile, basic=false}) {
   const contextState = useMyState()
 
   const [drawerOpen, setDrawerOpen] = useState()

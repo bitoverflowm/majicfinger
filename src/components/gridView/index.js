@@ -65,7 +65,7 @@ const GridView = ({sample = false}) => {
                     const newValue = event.newValue;
                     updateCellData(rowIndex, field, newValue);
                   }}
-                enableRangeSelection={true}
+                //enableRangeSelection={true}
 
                 />
         </div>

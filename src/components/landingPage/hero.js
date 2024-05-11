@@ -48,7 +48,7 @@ export function Hero({readAbout}) {
                     type: "spring",
                     }}
                 >
-                    Everything Data <br /> Zero Hassle. <br />
+                    Analyze, Visualize and Present Your Data <br /> in 0.67 seconds. <br />
                 </motion.h1>
 
                 <motion.p
@@ -122,7 +122,17 @@ export function Hero({readAbout}) {
             <div className=' px-5 text-xs text-center flex place-content-center'>
                 <Flow />
             </div>
-        </div>
+            <div className="text-4xl text-left flex place-content-center">
+                <div className="p-20 w-1/2">
+                    Skip the noise, <br/>
+                    From AI to APIs <br/>
+                    From A to Z <br/>
+                    We've got you covered <br/>
+                    Unlock the most powerful, user-friendly data processing, analysis, and presentation tool on the market.
+                </div>
+            </div>
+                
+            </div>
         </section>
     );
 }
