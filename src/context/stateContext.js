@@ -214,13 +214,14 @@ export const StateProvider = ({ children, bento=false }) => {
       }
   }, [type, xKey, yKey, direction, themeColor])
 
+  //charts
   const extractData = (cols) => {
     let arr = cols.map(items => items.field)
     setXOptions(arr)
     setYOptions(arr)
   }
 
-
+  //charts
   useEffect(()=> {
     fmtCols && extractData(fmtCols)
   }, [fmtCols])

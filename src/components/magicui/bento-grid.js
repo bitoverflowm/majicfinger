@@ -9,9 +9,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { iconMap } from "../icons/iconMap";
-
-import { useMyState  } from '@/context/stateContext'
-
 import { toast } from "sonner"
 
 import {
@@ -66,6 +63,8 @@ const BentoGrid = ({ children, className }) => {
 const BentoCard = ({
   index,
   setData,
+  demo,
+  dashView,
   heading,
   heading_style,
   className,
@@ -74,10 +73,13 @@ const BentoCard = ({
   icon_style,
   description,
   description_style,
+  refType,
   href,
   cta,
   background_color,
-  demo
+  viewing,
+  setViewing,
+  navTo,
 }) => {
   //const contextState = useMyState()
   //const setData = contextState?.setData;
@@ -239,7 +241,7 @@ const BentoCard = ({
     <div
       key={index}
       className={cn(
-        "internalGradualEffect group relative rounded-xl col-span-3 overflow-hidden flex flex-col justify-end",
+        "internalGradualEffect group relative rounded-xl col-span-3 overflow-hidden flex flex-col justify-end cursor-pointer",
         // light styles
         `bg-white [box-shadow:0_0_0_1px_rgba(0,0,0,.03),0_2px_4px_rgba(0,0,0,.05),0_12px_24px_rgba(0,0,0,.05)]`,
         // dark styles
@@ -247,9 +249,10 @@ const BentoCard = ({
         className,
       )}
       style={{ backgroundColor: background_color ? background_color: '' }}
+      onClick={()=>setViewing(navTo)}
     >
       <ContextMenu>
-        <ContextMenuTrigger className={`flex flex-col h-full place-content-end`}>
+        <ContextMenuTrigger  className={`flex flex-col h-full place-content-end`}>
             <div>{background && background === "globe" && <Globe className="top-0 h-[600px] w-[600px] transition-all duration-300 ease-out [mask-image:linear-gradient(to_top,transparent_30%,#000_100%)] group-hover:scale-105 sm:left-40" />}</div>
             <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
               {IconComponent && <IconComponent className="origin-left transform-gpu transition-all duration-300 ease-in-out group-hover:scale-75" style={icon_style && icon_style} />}
@@ -290,12 +293,12 @@ const BentoCard = ({
                 "pointer-events-none absolute bottom-0 flex w-full translate-y-10 transform-gpu flex-row items-center p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100",
               )}
               >
-                <Button variant="ghost" asChild size="sm" className="pointer-events-auto">
+                <div variant="ghost" asChild size="sm" className="flex place-items-center cursor-pointer pointer-events-auto" >
                   <>
                     {cta}
                     <ArrowRightIcon className="ml-2 h-4 w-4" />
                   </>
-                </Button>
+                </div>
               </div>
             }
             <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:bg-black/[.03] group-hover:dark:bg-neutral-800/10" />

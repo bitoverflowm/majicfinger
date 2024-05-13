@@ -9,22 +9,27 @@ import { useEffect } from "react"
 import { useUser } from '@/lib/hooks';
 import { StateProvider } from '@/context/stateContext'
 import { StateProviderV2 } from '@/context/stateContextV2';
+import { useMyStateV2  } from '@/context/stateContextV2'
 
 import { useRouter } from "next/navigation";
 import LycheeCore from "@/components/lycheeCore";
 
+import DashBody from './dashBody';
 import Nav from "./components/nav";
-import SideNav from './components/sideNav'
+
 
 import { Toaster } from "@/components/ui/sonner"
 
 import { toast } from "sonner"
-import KatsuView from './components/katsuView';
+
 
 
 const Dashbaord = () => {
     const user = useUser()
     const router = useRouter()
+    const contextStateV2 = useMyStateV2()
+
+    const viewing = contextStateV2?.viewing;
 
     const clairtyCode = `
         (function (c,l,a,r,i,t,y){
@@ -60,14 +65,8 @@ const Dashbaord = () => {
                     <header>
                         <Nav/>
                     </header>
-                    <main className='flex place-content-center'>
-                        <SideNav/>
-                        { true &&
-                            <div className='w-full min-h-screen'>
-                                <KatsuView />
-                            </div>                        
-                        }
-                        
+                    <main className=''>
+                        <DashBody user={user}/>
                     </main>                      
                     {/*<LycheeCore />*/}
                 </StateProviderV2>
