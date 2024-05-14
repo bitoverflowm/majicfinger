@@ -22,12 +22,22 @@ const GridViewV2 = () => {
     
     //Apply settings across all columns
     const defaultColDef = useMemo(() => ({
-        filter: false, // Enable filtering on all columns
+        filter: true, // Enable filtering on all columns
         //maxWidth: 120,
-        editable: false,
+        editable: true,
         background: {visible: false},
         resizable: true,
-        singleClickEdit: false,
+        singleClickEdit: true,
+        stopEditingWhenCellsLoseFocus : true,
+    }))
+
+    const autoSizeStrategy = {
+        type: 'fitGridWidth',
+        defaultMinWidth: 100,
+    };
+
+    const gridOptions = useMemo(()=> ({
+        onCellClicked: (e) => toast({description: 'Hit Enter to accept change'}),
     }))
 
     const updateCellData = (rowIndex, field, newValue) => {
@@ -42,29 +52,31 @@ const GridViewV2 = () => {
           });
           return newData;
         });
-      };
+        toast({
+            description: `Data updated. Also reflected in Chart!`,
+        });  
+    };
 
-      const handleAddRow = () => {
+    const handleAddRow = () => {
         let newRow = {}
         connectedCols.forEach(colName => {
             newRow[colName] = ""; // Initialize each property to an empty string or any default value
         });
-        setConnectedData([...data, newRow])
+        setConnectedData([...connectedData, newRow])
         toast({
             description: `New Row added!`,
-        });
-        
-      }
+        });        
+    }
 
     return (
-        <div className="ag-theme-quartz sm:px-20 py-10" style={{ height: '90%', width: '90%' }}>
-            <div className=' w-full py-2 flex justify-end' onClick={()=>handleAddRow()}>
+        <div className="ag-theme-quartz" style={{ height: '100%', width: '100%' }}>
+            <div className='w-full py-2 flex justify-end' onClick={()=>handleAddRow()}>
                 <Button variant="outline" size="icon">
                     <PlusIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
                     <span className="sr-only">Add New Row</span>
                 </Button>           
             </div>
-            <div className='h-screen'>
+            <div className='h-[900px]'>
                 <AgGridReact 
                     defaultColDef={defaultColDef} 
                     rowData={connectedData} 
@@ -76,6 +88,8 @@ const GridViewV2 = () => {
                         const newValue = event.newValue;
                         updateCellData(rowIndex, field, newValue);
                     }}
+                    gridOptions={gridOptions}
+                    autoSizeStrategy={autoSizeStrategy}
                     //enableRangeSelection={true}
 
                     />

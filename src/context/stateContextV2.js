@@ -258,12 +258,158 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         }
     }, [connectedData])
 
+    //charts
+    const extractData = (cols) => {
+        let arr = cols.map(items => items.field)
+        setXOptions(arr)
+        setYOptions(arr)
+    }
+
+    //charts
+    useEffect(()=> {
+        connectedCols && extractData(connectedCols)
+    }, [connectedCols])
+
+    //chart specifics
+    const [title, setTitle] = useState()
+    const [subTitle, setSubTitle] = useState()
+    const [chartTypes] = useState(['bar', 'line', 'area', 'scatter', 'bubble', 'pie'])
+    const [type, setType] = useState('bar')
+    const [xOptions, setXOptions] = useState()
+    const [yOptions, setYOptions] = useState()
     
+    /* Themes and colors */
+    const [chartTheme, setChartTheme] = useState({
+        baseTheme: "ag-default",
+        palette: {
+            fills: ["#cdb4db", "#ffc8dd", "#ffafcc", "#bde0fe", "#a2d2ff", "#fff"],
+            strokes: ["#000"],
+        },
+    })
 
+    const [chartOptions, setChartOptions] = useState({ // Data: Data to be displayed in the chart
+        theme: chartTheme,
+        data: connectedData,
+        // Series: Defines which chart type and data to use
+        series: [{ type: 'bar', xKey: '', yKey: '', direction: "vertical"}],
+        //animation TODO: fix not working
+        //animation: [{enabled: true, duration: 0.1}],
+        //labeling x, y, and even other axers
+        axes: [
+            {
+              type: "category",
+              position: "bottom",
+              title: {
+                text: '',
+              },
+            },
+            {
+              type: "number",
+              position: "left",
+              title: {
+                text: '',
+              },
+              label: {
+                formatter: ({ value }) => formatNumber(value),
+              },
+              gridLine: {
+                enabled: false
+              }
+            },
+    ]})
 
+    const [xKey, setXKey] = useState('')
+    const [yKey, setYKey] = useState('')
+    const [gridLinesEnabled, setGridLinesEnabled] = useState(false)
+    const [directions] = useState(['horizontal', 'vertical'])
+    const [direction, setDirection] = useState('vertical')
+    const [themeColor, setThemeColor] = useState()
+
+    useEffect(()=>{
+        if(type === 'scatter'){
+            setChartOptions(prevOptions => ({
+                ...prevOptions,
+                series: [{
+                        type: 'scatter',
+                        data: connectedData,
+                        xKey: xKey ? xKey : chartOptions.series[0].xKey,
+                        yKey: yKey ? yKey : chartOptions.series[0].yKey,
+                    }],
+                background: {
+                  visible: false,
+                },
+                axes: [
+                  {
+                    type: "category",
+                    position: "bottom",
+                    title: {
+                      text: xKey,
+                    },
+                  },
+                  {
+                    type: "number",
+                    position: "left",
+                    title: {
+                      text: yKey,
+                    },
+                    label: {
+                      formatter: ({ value }) => formatNumber(value),
+                    },
+                    gridLine: {
+                      enabled: gridLinesEnabled
+                    }
+                  },
+            ]
+                }))
+        }else{
+            setChartOptions(prevOptions => ({
+                    ...prevOptions,
+                    data: connectedData,
+                    series: [{
+                            type: type ? type : chartOptions.series[0].type,
+                            xKey: xKey ? xKey : chartOptions.series[0].xKey,
+                            yKey: yKey ? yKey : chartOptions.series[0].yKey,
+                            direction: direction ? direction: chartOptions.series[0].direction,
+                        }],
+                    background: {
+                    visible: false,
+                },
+                axes: [
+                {
+                    type: "category",
+                    position: "bottom",
+                    title: {
+                        text: xKey,
+                    },
+                },
+                {
+                    type: "number",
+                    position: "left",
+                    title: {
+                        text: yKey,
+                    },
+                    label: {
+                        formatter: ({ value }) => formatNumber(value),
+                    },
+                    gridLine: {
+                        enabled: gridLinesEnabled
+                    }
+                },
+            ]
+            }))
+        }
+    }, [connectedData, type, xKey, yKey, direction, themeColor])
+
+    useEffect(()=>{
+        chartOptions &&
+          setChartOptions(prevOptions => ({
+              ...prevOptions,
+              theme: chartTheme
+            }))
+      }, [chartTheme])
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, previewChartOptions}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions}}>
             {children}
         </StateContextV2.Provider>
     )
