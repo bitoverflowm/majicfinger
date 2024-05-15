@@ -100,7 +100,7 @@ const IntegrationPlayground = () => {
                         id="model"
                         className="items-start [&_[data-description]]:hidden"
                       >
-                        <SelectValue placeholder="Select a model" />
+                        <SelectValue placeholder="Pick an option to search for?" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="user_pinned_tweet">
@@ -139,56 +139,56 @@ const IntegrationPlayground = () => {
                     </Select>
                   </div>
                   <div className='pt-2'>
-                        <div className='text-sm font-bold text-slate-500'>Select the data points you want to examine</div>
-                        <div className='text-xs pt-1'>These will be your "columns"</div>
-                    </div>
-                    {
-                        stepName && params[stepName].expansions &&
-                            <>
-                                <div className='font-bold text-slate-600 text-xs'></div>
-                                <div className='flex flex-wrap pinned_tweet_tour'>
-                                    {params[stepName].expansions.map((val) => (
-                                        <ParamToggles key={val} field_type="expansions" val={val} toggle={() => toggleParams('expansions', val)} arr={expansions}/>
-                                    ))}
-                                </div>
-                            </>
-                    }
-                    {
-                        stepName && params[stepName].tweetFields &&
-                            <div className=''>
-                                <div className='font-bold text-slate-600 text-xs'>Tweet Details</div>
-                                {/* For tweetFields */}
-                                <div className='flex flex-wrap'>
-                                    {params[stepName].tweetFields.map((val) => (
-                                        <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
-                                    ))}
-                                </div>
+                    <div className='text-sm text-muted-foreground'>Select the granular data points you want to examine</div>
+                    <div className='text-sm text-muted-foreground'>These will be your "columns"</div>
+                </div>
+                {
+                    stepName && params[stepName].expansions &&
+                        <>
+                            <div className='font-bold text-slate-600 text-xs'></div>
+                            <div className='flex flex-wrap pinned_tweet_tour'>
+                                {params[stepName].expansions.map((val) => (
+                                    <ParamToggles key={val} field_type="expansions" val={val} toggle={() => toggleParams('expansions', val)} arr={expansions}/>
+                                ))}
                             </div>
-                    }
-                    {
-                        stepName && params[stepName].userFields &&
-                            <div className=''>
-                                <div className='font-bold text-slate-600 text-xs'>User Details</div>
-                                {/* For tweetFields */}
-                                <div className='flex flex-wrap'>
-                                    {params[stepName].userFields.map((val) => (
-                                        <ParamToggles key={val} field_type="userFields" val={val} toggle={() => toggleParams('userFields', val)} arr={userFields}/>
-                                    ))}
-                                </div>
+                        </>
+                }
+                {
+                    stepName && params[stepName].tweetFields &&
+                        <div className=''>
+                            <div className='font-bold text-slate-600 text-xs'>Tweet Details</div>
+                            {/* For tweetFields */}
+                            <div className='flex flex-wrap'>
+                                {params[stepName].tweetFields.map((val) => (
+                                    <ParamToggles key={val} field_type="tweetFields" val={val} toggle={() => toggleParams('tweetFields', val)} arr={tweetFields}/>
+                                ))}
                             </div>
-                    }
-                    {
-                        stepName && params[stepName]['list.fields'] &&
-                            <div className=''>
-                                <div className='font-bold text-slate-600 text-xs'>List Details</div>
-                                {/* For tweetFields */}
-                                <div className='flex flex-wrap'>
-                                    {params[stepName]['list.fields'].map((val) => (
-                                        <ParamToggles key={val} field_type="listFields" val={val} toggle={() => toggleParams('listFields', val)} arr={listFields}/>
-                                    ))}
-                                </div>
+                        </div>
+                }
+                {
+                    stepName && params[stepName].userFields &&
+                        <div className=''>
+                            <div className='font-bold text-slate-600 text-xs'>User Details</div>
+                            {/* For tweetFields */}
+                            <div className='flex flex-wrap'>
+                                {params[stepName].userFields.map((val) => (
+                                    <ParamToggles key={val} field_type="userFields" val={val} toggle={() => toggleParams('userFields', val)} arr={userFields}/>
+                                ))}
                             </div>
-                    }
+                        </div>
+                }
+                {
+                    stepName && params[stepName]['list.fields'] &&
+                        <div className=''>
+                            <div className='font-bold text-slate-600 text-xs'>List Details</div>
+                            {/* For tweetFields */}
+                            <div className='flex flex-wrap'>
+                                {params[stepName]['list.fields'].map((val) => (
+                                    <ParamToggles key={val} field_type="listFields" val={val} toggle={() => toggleParams('listFields', val)} arr={listFields}/>
+                                ))}
+                            </div>
+                        </div>
+                }
                     <div className='flex place-content-end gap-4 text-xs'>
                         <div className='px-3 py-1 bg-white text-lychee-red border border-lychee-red cursor-pointer hover:bg-lychee-red hover:text-white rounded-md' onClick={()=>clearHandler()}>Clear</div>
                         <div className='shadow-sm px-3 py-1 bg-lychee-go text-lychee-black border border-lychee-go cursor-pointer hover:bg-lychee-green hover:text-white hover:border-lychee-green rounded-md hover:shadow-lychee-green hover:shadow-2xl' onClick={()=>fetchTwitterHandler(stepName)}>Connect</div>
