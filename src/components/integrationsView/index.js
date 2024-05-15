@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import IntegrationPlayground from "./integrationPlayground";
+
 const tiles = [
   {
     icon: <HeartHandshake className="size-full" />,
@@ -107,6 +109,8 @@ const Card = (card) => {
 };
 
 export function IntegrationsView() {
+  const [playView, setPlayView] = useState('twitter')
+
   const [randomTiles1, setRandomTiles1] = useState([]);
   const [randomTiles2, setRandomTiles2] = useState([]);
   const [randomTiles3, setRandomTiles3] = useState([]);
@@ -124,84 +128,108 @@ export function IntegrationsView() {
 
   return (
     <div>
-        <section id="cta">
-            <div className="py-14">
-                <div className="container flex w-full flex-col items-center justify-center p-4">
-                <div className="relative flex w-full max-w-[1000px] flex-col items-center justify-center overflow-hidden rounded-[2rem] border">
-                    <Marquee
-                    reverse
-                    className="-delay-[200ms] [--duration:20s]"
-                    repeat={4}
-                    >
-                    {randomTiles1.map((review, idx) => (
-                        <Card key={idx} {...review} />
-                    ))}
-                    </Marquee>
-                    <Marquee reverse className="[--duration:30s]" repeat={4}>
-                    {randomTiles2.map((review, idx) => (
-                        <Card key={idx} {...review} />
-                    ))}
-                    </Marquee>
-                    <Marquee
-                    reverse
-                    className="-delay-[200ms] [--duration:20s]"
-                    repeat={4}
-                    >
-                    {randomTiles3.map((review, idx) => (
-                        <Card key={idx} {...review} />
-                    ))}
-                    </Marquee>
-                    <Marquee reverse className="[--duration:30s]" repeat={4}>
-                    {randomTiles4.map((review, idx) => (
-                        <Card key={idx} {...review} />
-                    ))}
-                    </Marquee>
-                    <div className="absolute z-10">
-                    <div className="mx-auto size-24 rounded-[2rem] border bg-white/10 p-3 shadow-2xl backdrop-blur-md dark:bg-black/10 lg:size-32">
-                        <HeartHandshake className="mx-auto size-16 text-black dark:text-white lg:size-24" />
-                    </div>
-                    <div className="z-10 mt-4 flex flex-col items-center text-center text-primary">
-                        <h1 className="text-3xl font-bold lg:text-4xl">
-                        Connect to Anything
-                        </h1>
-                        <p className="mt-2">
-                        Just Pick a Data Source <br/>
-                        Twitter, Strava, QuickBooks, Stripe, you name it, we can do it. <br />If you don't see an integration you want, request it below
-                        </p>
-                        <a
-                        href="/"
-                        className={cn(
-                            buttonVariants({
-                            size: "lg",
-                            variant: "outline",
-                            }),
-                            "group mt-4 rounded-[2rem] px-6",
-                        )}
-                        >
-                        Request
-                        <ChevronRight className="ml-1 size-4 transition-all duration-300 ease-out group-hover:translate-x-1" />
-                        </a>
-                    </div>
-                    <div className="absolute inset-0 -z-10 rounded-full  bg-white opacity-40 blur-xl dark:bg-black" />
-                    </div>
-                    <div className="absolute inset-x-0 bottom-0 h-full bg-gradient-to-b from-transparent to-white to-70% dark:to-black" />
-                </div>
-                </div>
+      {
+        playView === 'twitter' 
+          ? <div>
+              <IntegrationPlayground />
             </div>
-        </section>
-        <div>
-            <div className="">Ready for You Now</div>
-            <div className="flex">
-                <div>Twitter</div>
-                <div>Strava</div>
+          :
+          <>
+            <section id="cta">
+              <div className="py-14">
+                  <div className="container flex w-full flex-col items-center justify-center p-4">
+                  <div className="relative flex w-full max-w-[1000px] flex-col items-center justify-center overflow-hidden rounded-[2rem] border">
+                      <Marquee
+                      reverse
+                      className="-delay-[200ms] [--duration:20s]"
+                      repeat={4}
+                      >
+                      {randomTiles1.map((review, idx) => (
+                          <Card key={idx} {...review} />
+                      ))}
+                      </Marquee>
+                      <Marquee reverse className="[--duration:30s]" repeat={4}>
+                      {randomTiles2.map((review, idx) => (
+                          <Card key={idx} {...review} />
+                      ))}
+                      </Marquee>
+                      <Marquee
+                      reverse
+                      className="-delay-[200ms] [--duration:20s]"
+                      repeat={4}
+                      >
+                      {randomTiles3.map((review, idx) => (
+                          <Card key={idx} {...review} />
+                      ))}
+                      </Marquee>
+                      <Marquee reverse className="[--duration:30s]" repeat={4}>
+                      {randomTiles4.map((review, idx) => (
+                          <Card key={idx} {...review} />
+                      ))}
+                      </Marquee>
+                      <div className="absolute z-10">
+                      <div className="mx-auto size-24 rounded-[2rem] border bg-white/10 p-3 shadow-2xl backdrop-blur-md dark:bg-black/10 lg:size-32">
+                          <HeartHandshake className="mx-auto size-16 text-black dark:text-white lg:size-24" />
+                      </div>
+                      <div className="z-10 mt-4 flex flex-col items-center text-center text-primary">
+                          <h1 className="text-3xl font-bold lg:text-4xl">
+                          Connect to Anything
+                          </h1>
+                          <p className="mt-2">
+                          Just Pick a Data Source <br/>
+                          Twitter, Strava, QuickBooks, Stripe, you name it, we can do it. <br />If you don't see an integration you want, request it below
+                          </p>
+                          <a
+                          href="/"
+                          className={cn(
+                              buttonVariants({
+                              size: "lg",
+                              variant: "outline",
+                              }),
+                              "group mt-4 rounded-[2rem] px-6",
+                          )}
+                          >
+                          Request
+                          <ChevronRight className="ml-1 size-4 transition-all duration-300 ease-out group-hover:translate-x-1" />
+                          </a>
+                      </div>
+                      <div className="absolute inset-0 -z-10 rounded-full  bg-white opacity-40 blur-xl dark:bg-black" />
+                      </div>
+                      <div className="absolute inset-x-0 bottom-0 h-full bg-gradient-to-b from-transparent to-white to-70% dark:to-black" />
+                  </div>
+                  </div>
+              </div>
+          </section>
+          <div className="text-justify leading-loose">
+            <div className="text-4xl font-strong text-center py-8">On a mission to connect 100,000 + data sources by 2026</div>
+            <div className="text-sm w-1/3 mx-auto grid grid-cols-2 gap-10">
+              <div>
+                <div className="pb-1">Hi everyone, </div>
+                <div className="pb-1">Misterrpink here. This section of Lychee is the apple of my eye. Yes AI is cool, and being able to do a full spectum analysis on data at the click of a button is otherworldly.</div>
+                <div>But if you have worked with data. You know, accessing valuable data, is a time-consuming if not difficult feat.</div>
+              </div>
+              <div>
+                <div className="pb-1">You need to code or do a lot of manual work and downloads for for each data set</div>
+                <div className="pb-1">Finally No more Coding Python Scripts, no more reading API docs, no more downloading csvs, no more figuring out what do do with xml files.</div>
+                <br/>
+              </div>            
             </div>
-        </div>
-        <div>
-            Some Example flows
-        </div>
-        <div>
-            Integrations coming soon
-        </div>
+          </div>
+          <div>
+              <div className="">Ready for You Now</div>
+              <div className="flex">
+                  <div>Twitter</div>
+              </div>
+          </div>
+          <div>
+              Some Example flows
+          </div>
+          <div>
+              Integrations coming soon
+          </div>
+          </>
+      }
+        
 
     </div>
   );
