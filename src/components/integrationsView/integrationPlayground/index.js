@@ -50,7 +50,7 @@ const IntegrationPlayground = () => {
     const [rateInfo, setRateInfo] = useState()
     const [searchingUserName, setSearchingUserName] = useState()
 
-    const [demoUserNames] = useState(['elonmusk', 'justinbieber', 'christiano', 'jack', 'lychee_xyz', 'spaceX'])// 'kanyewest', 'BarackObama', 'lychee_xyz', 'spaceX'])
+    const [demoUserNames] = useState(['elonmusk', 'justinbieber', 'christiano', 'jack', 'lychee_xyz', 'spaceX', 'misterrpink1'])// 'kanyewest', 'BarackObama', 'lychee_xyz', 'spaceX'])
 
     const toggleParams = (fieldType, value) => {
         if(fieldType === 'expansions'){

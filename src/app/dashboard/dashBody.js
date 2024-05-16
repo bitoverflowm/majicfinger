@@ -23,7 +23,7 @@ const DashBody = ({user}) => {
                 <SideNav user={user}/>
             </div>
             <div className='w-full px-20'>
-                { viewing === 'dashboard' && <div className="py-28"><KatsuView user={user}/></div> }               
+                { viewing === 'dashboard' && <div className="py-28"><KatsuView user={user}/></div> }              
                 { viewing === 'dataStart' && <div className="py-16"><DataView user={user}/></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'charts' && <div className="py-16 h-screen"><ChartViewV2 user={user}/></div> }

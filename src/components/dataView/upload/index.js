@@ -90,8 +90,8 @@ const Upload = ({user}) => {
             <h1 className='text-4xl font-extrabold'>
                 Upload Your Data
             </h1>
-            <div className="grid gap-4 p-10 grid-cols-3 h-full place-items-center place-content-center">
-                <div>
+            <div className="grid gap-6 grid-cols-3 h-full place-content-center">
+                <div className='pt-24'>
                     <Card>
                         <CardHeader>
                         <CardTitle></CardTitle>
@@ -103,8 +103,8 @@ const Upload = ({user}) => {
                         <CardContent>
                             <div className="grid gap-2">
                                 <div className="grid gap-3">
-                                    <Label htmlFor="name">*must be csv or excel</Label>
-                                    <Input
+                                    <Label htmlFor="file-upload">*must be csv or excel</Label>
+                                    <Input className=""
                                         id="file-upload" type="file" accept=".xlsx, .csv" onChange={handleFileUpload}
                                     />
                                 </div>
@@ -116,54 +116,59 @@ const Upload = ({user}) => {
                         </CardContent>
                     </Card>
                 </div>
-                <div className='col-span-2'>
-                    {
+                <div className='col-span-2 flex flex-col gap-2 h-screen pt-24 pb-20'>
+                    <Card className="h-1/2">
+                        <CardHeader className="flex flex-row items-center">
+                            <div className="grid gap-2">
+                                <CardTitle>Data Preview</CardTitle>
+                                <CardDescription>
+                                    Preview of your your data. You can click the button below to view all of your data. In the grid, you can also sort, filter, execute operations, on your data.
+                                </CardDescription>
+                            </div>
+                            {
+                                dataConnected &&
+                                    <div asChild size="sm" className="ml-auto gap-1" onClick={()=>setViewing('dataStart')}>
+                                        View All Data
+                                        <ArrowUpRight className="h-4 w-4" />
+                                    </div>
+                            }
+                        </CardHeader>
+                        {
                             dataConnected && 
-                                <Card className="">
-                                    <CardHeader className="flex flex-row items-center">
-                                        <div className="grid gap-2">
-                                        <CardTitle>Preview Data</CardTitle>
-                                        <CardDescription>
-                                            We can do so much more with this data
-                                        </CardDescription>
-                                        </div>
-                                        <div asChild size="sm" className="ml-auto gap-1" onClick={()=>setViewing('dataStart')}>
-                                            Dive Deeper
-                                            <ArrowUpRight className="h-4 w-4" />
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <PreviewGrid />
-                                    </CardContent>
-                                </Card>
-                    }
-                <div>
-                    {
-                            dataConnected && 
-                                <Card className="">
-                                    <CardHeader className="flex flex-row items-center">
-                                        <div className="grid gap-2">
-                                        <CardTitle>Preview Chart</CardTitle>
-                                        <CardDescription>
-                                            Go charts to start playing around with your data. Or view gallery to see what's possible.
-                                        </CardDescription>
-                                        </div>
-                                        <div asChild size="sm" className="ml-auto gap-1" onClick={()=>setViewing('charts')}>
-                                            Charts
-                                            <ArrowUpRight className="h-4 w-4" />
-                                        </div>
-                                        <div asChild size="sm" className="ml-auto gap-1" onClick={()=>setViewing('gallery')}>
-                                            Gallery
-                                            <ArrowUpRight className="h-4 w-4" />
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <PreviewChart />
-                                    </CardContent>
-                                </Card>
-                    }                                        
-                </div>
-                    
+                                <CardContent>
+                                    <PreviewGrid />
+                                </CardContent>
+                        }
+                    </Card>
+                    <Card className="h-1/2">
+                        <CardHeader className="flex flex-row items-center">
+                            <div className="grid gap-2">
+                                <CardTitle>Chart Preview</CardTitle>
+                                <CardDescription>
+                                    Go charts to start playing around with your data. Or view gallery to see what's possible.
+                                </CardDescription>    
+                                {
+                                    dataConnected && 
+                                        <>
+                                            <div asChild size="sm" className="ml-auto gap-1" onClick={()=>setViewing('charts')}>
+                                                Charts
+                                                <ArrowUpRight className="h-4 w-4" />
+                                            </div>
+                                            <div asChild size="sm" className="ml-auto gap-1" onClick={()=>setViewing('gallery')}>
+                                                Gallery
+                                                <ArrowUpRight className="h-4 w-4" />
+                                            </div>
+                                        </>
+                                }
+                            </div>
+                        </CardHeader>
+                        {
+                            dataConnected &&
+                                <CardContent>
+                                    <PreviewChart />
+                                </CardContent>
+                        }
+                    </Card>
                 </div>
             </div>
         </div>

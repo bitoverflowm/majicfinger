@@ -84,7 +84,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
     // staging data - this is twitter data being pulled before user submits for charting.
     const [stagingData, setStagingData] = useState(twitterDemoData.elonmusk);
     const [paramsOpen, setParamsOpen] = useState(false)
-    const [demoUserNames] = useState(['elonmusk', 'justinbieber', 'christiano', 'jack', 'lychee_xyz', 'spaceX', 'misterrpink1'])// 'kanyewest', 'BarackObama', 'lychee_xyz', 'spaceX'])
+    
     const [searchingUserName, setSearchingUserName] = useState()
     const [rateInfo, setRateInfo] = useState()
 
@@ -115,92 +115,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
         }     
     }
 
-    const fetchTwitterHandler = async (ask, searchingUserName) => {
-        setLoading(true);
-        setParamsOpen(false);
-        setHelperOpen(false);
-
-        try {
-            // Append the handle as a query parameter in the URL
-            if(ask === 'user_by_handle' ){
-                const url = new URL('/api/integrations/twitter/userhandle', window.location.origin);
-                url.searchParams.append('handle', searchingUserName);
-                let allExpansions = params['user_by_handle'].expansions
-                let allUserFields = params['user_by_handle'].userFields
-                let allTweetFields = params['user_by_handle'].tweetFields
-                let res = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ expansions: allExpansions, userFields: allUserFields, tweetFields: allTweetFields}),
-                });
-
-                if (res.status === 200) {
-                    let resUserData = await res.json();
-                    console.log(resUserData);
-                    setConnected(true);
-                    setData([resUserData.userData]);
-                    setStagingData(resUserData)
-                    setDflt(false);
-                    setUserHandleId(resUserData.userData.id);
-                    setUserSearchOpen(false);
-                    setSearchingUserName('')
-                    setRateInfo(resUserData.rateLimit)
-                } else {
-                    console.error("Twitter User Data pull failed");
-                }
-            }else{
-                if(demoUserNames.includes(handle)){
-                    //let thirdParam = tweetFields.length > 0 ? tweetFields : listFields
-                    if(ask === 'user_likes_by_id'){
-                        setConnected(true)
-                        setData(twitterDemoData[handle].liked_tweets)
-                        setDflt(false)                        
-                    }else if(ask === 'user_owned_lists_by_id'){
-                        setConnected(true)
-                        setData(twitterDemoData[handle].owned_lists)
-                        setDflt(false)
-                    } else if(ask === 'user_pinned_tweet'){
-                        console.log("user pimnmed tweet", twitterDemoData[handle].userData)
-                        setConnected(true)
-                        setData([twitterDemoData[handle].userData])
-                        setDflt(false)
-                    }
-                }else{
-                    const url = new URL(`/api/integrations/twitter/${ask}`, window.location.origin);
-                    url.searchParams.append('handleId', userHandleId);
-                    let thirdParam = tweetFields.length > 0 ? tweetFields : listFields
-                    let res = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ expansions, userFields, thirdParam }),
-                    });
-
-                    if (res.status === 200) {
-                        let resData = await res.json();
-                        console.log(resData);
-                        setConnected(true);
-                        setData(resData.userData);
-                        setDflt(false);
-                        setRateInfo(resData.rateLimit)
-                    } else {
-                        console.error("Twitter User Data pull failed");
-                    }
-                }                
-            }
-        } catch (error) {
-            console.error("Fetch error:", error);
-        } finally {
-            setLoading(false);
-            setExpansions([])
-            setUserFields([])
-            setTweetFields([])
-            setListFields([])
-        }
-    }
+   
 
 
     
@@ -208,16 +123,6 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
 
     return (
         <div className='flex w-full p-10 h-full'>
-            {
-                showWarning 
-                    &&
-                    <div className='toast toast-center z-40 bg-lychee-red text-white mr-10 mb-10 cursor-pointer' onClick={()=>setWorking("getLychee")} >
-                        <div>
-                            Please Subscribe to Make this Request
-                        </div>
-                        <div className="">Get Lychee</div>
-                    </div>
-            }
             <div className='bg-white shadow-xl basis-3/12 h-fit'>
                 <div className='dropdown w-full text-sm hover:bg-lychee-green/10 p-1 py-2'>
                     <div className='flex text-black place-items-center ' tabIndex={0} role="button"> 
@@ -260,7 +165,7 @@ const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepNam
                                             {username ? '@'+username : <AiOutlineLoading3Quarters className='animate-spin'/>}
                                         </div>
                                         <div className='hover:animate-spin hover:text-lychee-red text-lg'>
-                                            <PiUserSwitch />                       
+                                            <PiUserSwitch />
                                         </div>
                                     </div>
                                 ))}
