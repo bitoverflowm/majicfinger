@@ -19,7 +19,7 @@ const DashBody = ({user}) => {
 
     return(
         <div className="w-full flex">
-            <div className="fixed inset-y-0 left-0 z-20 flex-col border-r bg-background sm:flex">
+            <div className="z-20 inset-y-0  flex-col border-r bg-background sm:flex">
                 <SideNav user={user}/>
             </div>
             <div className='w-full px-20'>

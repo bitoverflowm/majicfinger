@@ -14,7 +14,7 @@ import {
 const Nav = () => {
   return (
     <div className="absolute top-0 flex h-8 w-full items-center gap-4 border-b bg-background px-4 md:px-6">
-        <div className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6 pl-16">
+        <div className="hidden flex-col gap-6 text-lg font-medium md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6 pl-16">
             <Link
             href="#"
             className="text-muted-foreground transition-colors hover:text-foreground"
