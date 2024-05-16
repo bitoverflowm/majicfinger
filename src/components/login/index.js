@@ -7,8 +7,14 @@ import { Magic } from 'magic-sdk';
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { useRouter } from 'next/navigation';
 
+import { useMyStateV2  } from '@/context/stateContextV2'
+
+import { Button } from '../ui/button';
 
 const Login = ({noName}) => {
+    const contextStateV2 = useMyStateV2()
+    const setViewing = contextStateV2?.setViewing
+
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
@@ -37,7 +43,7 @@ const Login = ({noName}) => {
             })
             if(res.status === 200){
                 let user = await res.json()
-                router.push('/dashboard')
+                setViewing('dataStart')
             } else {
                 console.error("Magic Login Failed", await res.text())
                 alert("There was an issue with login and sub, please message @misterrpink1 on twitter.")
@@ -45,48 +51,49 @@ const Login = ({noName}) => {
     };
 
     return (
-        <div className='bg-black font-body shadow-2xl rounded-xl text-white p-4 mb-4'>
-            {
-            user ? 
-                <div>
-                    <h1>Welcome {user.email}</h1>
-                    <div>You already have an account</div>
-                </div>
-                :
-                <form onSubmit={handleSubmit} className='flex flex-col place-items-center'>
-                    {
-                        loading 
-                           ?
-                            <div><AiOutlineLoading3Quarters className='animate-spin'/>
-                                Loading...
-                            </div>
-                            : <>
-                                <div className='py-2 text-sm'>
-                                    Name
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-            
-                                        className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
+        <div className='flex place-items-center place-content-center h-dvh w-full'>
+            <div className='bg-black font-body shadow-2xl rounded-xl text-white p-4 mb-4 w-96 mx-auto'>
+                {
+                user ? 
+                    <div>
+                        <h1>Welcome to Lychee {user.email}</h1>
+                        <div>You have an account</div>
+                        <Button onClick={()=>setViewing('dashboard')} >Go to your dashboard</Button>
+                    </div>
+                    :
+                    <form onSubmit={handleSubmit} className='flex flex-col place-items-center'>
+                        {
+                            loading 
+                            ?
+                                <div><AiOutlineLoading3Quarters className='animate-spin'/>
+                                    Loading...
+                                </div>
+                                : <>
+                                    <div className='py-2 text-sm'>
+                                        Name
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                
+                                            className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
+                                            />
+                                    </div>
+                                    <div className='py-2 text-sm'>
+                                        Email
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
                                         />
-                                </div>
-                                <div className='py-2 text-sm'>
-                                    Email
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
-                                    />
-                                </div>
-                                <button type="submit" className='bg-lychee-black px-6 rounded-md py-2 text-sm mt-4'>Submit</button>
-                            </>
-                    }
-
-                    
-                </form>
-            }
+                                    </div>
+                                    <button type="submit" className='bg-lychee-black px-6 rounded-md py-2 text-sm mt-4'>Submit</button>
+                                </>
+                        }                        
+                    </form>
+                }
+            </div>
         </div>
     );
 };

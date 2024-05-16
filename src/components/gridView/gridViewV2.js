@@ -11,7 +11,10 @@ import { Button } from "@/components/ui/button"
 import { PlusIcon } from "@radix-ui/react-icons"
 import { toast } from "@/components/ui/use-toast";
 
-const GridViewV2 = () => {
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { VscCircleFilled } from 'react-icons/vsc'
+
+const GridViewV2 = ({user}) => {
 
     const contextStateV2 = useMyStateV2()
 
@@ -19,6 +22,7 @@ const GridViewV2 = () => {
     let connectedCols = contextStateV2?.connectedCols || [];
     let connectedData = contextStateV2?.connectedData || [];
     let setConnectedData = contextStateV2?.setConnectedData || [];
+    let setViewing = contextStateV2?.setViewing
     
     //Apply settings across all columns
     const defaultColDef = useMemo(() => ({
@@ -70,6 +74,18 @@ const GridViewV2 = () => {
 
     return (
         <div className="ag-theme-quartz" style={{ height: '100%', width: '100%' }}>
+            <div className='w-1/3 mx-auto py-8'>
+                {
+                    connectedData.length >= 1 && !(user) && 
+                        <Alert onClick={()=>setViewing('register')} className="cursor-pointer">
+                            <VscCircleFilled className="h-5 w-5"/>
+                            <AlertTitle>Heads up!</AlertTitle>
+                            <AlertDescription >
+                                Want to save your work? Click here to register.
+                            </AlertDescription>
+                        </Alert>
+                }
+            </div>
             <div className='w-full py-2 flex justify-end' onClick={()=>handleAddRow()}>
                 <Button variant="outline" size="icon">
                     <PlusIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -91,9 +107,7 @@ const GridViewV2 = () => {
                     gridOptions={gridOptions}
                     autoSizeStrategy={autoSizeStrategy}
                     //enableRangeSelection={true}
-
                     />
-
             </div>
         </div>
     )

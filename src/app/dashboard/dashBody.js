@@ -9,6 +9,7 @@ import Upload from '@/components/dataView/upload'
 import ChartViewV2 from "@/components/chartView/chartViewV2";
 import { ChartGallery } from "@/components/chartGallery";
 import { IntegrationsView } from "@/components/integrationsView";
+import Login from "@/components/login";
 
 
 
@@ -31,6 +32,7 @@ const DashBody = ({user}) => {
                 { viewing === 'integrations' && <div className="py-16"><IntegrationsView/></div> }
                 { viewing === 'ai' && "AI" }
                 { viewing === 'presentation' && "Start Writing a Report Here" }
+                { viewing === 'register' && <div className="py-16"><Login/></div>}
             </div>
         </div>
     )

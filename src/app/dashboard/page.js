@@ -22,8 +22,6 @@ import { Toaster } from "@/components/ui/sonner"
 
 import { toast } from "sonner"
 
-
-
 const Dashbaord = () => {
     const user = useUser()
     const router = useRouter()

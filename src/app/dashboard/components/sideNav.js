@@ -35,7 +35,7 @@ const SideNav = () => {
 
   return (
             <div className="px-2 min-h-screen">
-              <nav className="grid gap-6 text-lg font-medium">
+              <nav className="grid gap-6 text-xs font-medium">
                 <div className="flex place-content-center pt-8">
                   <Link
                     href="/dashboard"
@@ -123,28 +123,29 @@ const SideNav = () => {
                   Presentation
                 </div>
               </nav>
-              <div className="absolute mt-auto bottom-20 w-40 ">
+              <div className="pt-20 w-40">
                 <Card>
-                  <CardHeader className="p-2 pt-0 md:p-4">
-                    <CardTitle>50% off</CardTitle>
+                  <CardHeader className="p-4">
+                    <CardTitle className="text-sm font-black text-green-500">50% off</CardTitle>
                     <CardDescription>
-                      <span className="line-through pr-1">$150</span>
-                      $69.99 <br/> One time payment for Life Time access
+                      <div>$69.99</div>
+                      <div className="line-through pr-1">$150</div>
+                      One time payment for Life Time access
                       (other options also available)
                       <br/>
                       <br/>
                       39 seats remaining before price increase
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="p-2 pt-0 md:p-4 md:pt-0">
-                    <Button size="sm" className="">
+                  <CardContent className="w-full">
+                    <Button size="sm" className="mx-auto">
                       Upgrade
                     </Button>
                   </CardContent>
                 </Card>
               </div>
             </div>   
-  )
-}
+        )
+      }
 
 export default SideNav
