@@ -16,6 +16,7 @@ import {
 
 import { useUser } from '@/lib/hooks';
 import { useMyStateV2  } from '@/context/stateContextV2'
+import { Badge } from "@/components/ui/badge"
 
 const Nav = () => {
   const user = useUser()
@@ -26,6 +27,7 @@ const Nav = () => {
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
   const setDataSetName = contextStateV2?.setDataSetName
+  const savedDataSets = contextStateV2?.savedDataSets
 
 
   const handleLogout = async () => {
@@ -83,6 +85,7 @@ const Nav = () => {
     <div className="absolute top-0 flex w-full items-center gap-4 border-b bg-background py-2 px-5">
           { user ?
               <div className="flex items-center gap-4 ml-auto md:gap-2 lg:gap-4">
+                {savedDataSets.length > 0 && <div> Your Saved Data <Badge>{savedDataSets.length}</Badge> </div>}
                 {connectedData && !(dataSetName) && <div className="flex"><div>You have unsaved data </div> <Button onClick={()=>handleSave()}>Save</Button></div>}
                 {connectedData && dataSetName && <div className="flex"><div>You have unsaved data </div> <Button>Save</Button></div>}
                 <DropdownMenu>

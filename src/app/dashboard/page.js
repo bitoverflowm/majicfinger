@@ -11,9 +11,6 @@ import { StateProvider } from '@/context/stateContext'
 import { StateProviderV2 } from '@/context/stateContextV2';
 import { useMyStateV2  } from '@/context/stateContextV2'
 
-import { useRouter } from "next/navigation";
-import LycheeCore from "@/components/lycheeCore";
-
 import DashBody from './dashBody';
 import Nav from "./components/nav";
 
@@ -23,11 +20,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
 
 const Dashbaord = () => {
-    const user = useUser()
-    const router = useRouter()
-    const contextStateV2 = useMyStateV2()
-
-    const viewing = contextStateV2?.viewing;
+    const user = useUser()    
 
     const clairtyCode = `
         (function (c,l,a,r,i,t,y){
@@ -40,8 +33,8 @@ const Dashbaord = () => {
         if(!user){
             //router.push('/login')
         }else{
-            toast('Welcome!', {
-                description: "",
+            toast('Hey!', {
+                description: `Welcome ${user.email}`,
                 closeButton: true,
                 duration: 99999999
               });

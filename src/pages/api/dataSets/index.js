@@ -4,6 +4,7 @@ import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
 
 export default async function handler(req, res) {
     const {
+        query: { uid },
         method,
         body: { data_set_name, data, created_date, last_saved_date, labels, source, user_id }, // Destructure these from req.body
     } = req;
@@ -11,6 +12,21 @@ export default async function handler(req, res) {
     await dbConnect();
 
     switch (method) {
+        case "GET":
+            try {
+                const savedDataSets = await DataSet.find({ user_id: uid })
+                    .select('data_set_name created_date last_saved_date labels source user_id')
+                    .exec();
+
+                if (!savedDataSets || savedDataSets.length === 0) {
+                    return res.status(404).json({ success: false, message: "No Saved Projects" });
+                }
+
+                res.status(200).json({ success: true, data: savedDataSets });
+            } catch (error) {
+                res.status(400).json({ success: false });
+            }
+            break;
         case "POST":
             try {
                 // Validate user_id or assume it's already validated and is being sent in correct format
@@ -35,7 +51,7 @@ export default async function handler(req, res) {
             break;
 
         default:
-            res.setHeader('Allow', ['POST']); // Specify allowed method
+            res.setHeader('Allow', ['GET', 'POST']); // Specify allowed method
             res.status(405).end(`Method ${method} Not Allowed`); // Use 405 for method not allowed
     }
 }

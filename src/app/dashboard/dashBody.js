@@ -11,12 +11,40 @@ import { ChartGallery } from "@/components/chartGallery";
 import { IntegrationsView } from "@/components/integrationsView";
 import Login from "@/components/login";
 
-
+import { toast } from "sonner"
 
 const DashBody = ({user}) => {
     const contextStateV2 = useMyStateV2()
 
     const viewing = contextStateV2?.viewing
+    const savedDataSets = contextStateV2?.savedDataSets
+    const setSavedDataSets = contextStateV2?.setSavedDataSets
+
+    useEffect(() => {
+        if(user){
+            console.log("fetching users saved work")
+            fetch(`/api/dataSets?uid=${user.userId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Fetched Data:', data.data);
+                    setSavedDataSets(data.data); // Assuming you have a state to hold the fetched data
+                    toast('Project History Loaded!', {
+                        description: `We just pulled your saved project history.`,
+                        closeButton: true,
+                        duration: 99999999
+                      });
+                } else {
+                    console.error('Failed to fetch saved projects:', data.message);
+                }
+            })
+        }
+    }, [user])
 
     return(
         <div className="w-full flex">
