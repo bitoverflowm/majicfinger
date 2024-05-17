@@ -226,7 +226,8 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
 
     //data management
-    
+    const [dataSetName, setDataSetName] = useState()
+
     //Connected Data is active working data. 
     const [dataConnected, setDataConnected] = useState() //boolean, do we have connected data or not
     const [connectedData, setConnectedData] = useState()
@@ -409,7 +410,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       }, [chartTheme])
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName}}>
             {children}
         </StateContextV2.Provider>
     )

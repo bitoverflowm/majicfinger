@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import Router from 'next/router'
-import useSWR from 'swr'
+import useSWR, { mutate }  from 'swr'
 
 
 const fetcher = (url) =>
@@ -28,3 +28,7 @@ export function useUser({ redirectTo, redirectIfFound, redirectIfNotFound } = {}
 
   return error ? null : user
 }
+
+export const mutateUser = () => {
+  mutate('/api/user');
+};

@@ -27,7 +27,7 @@ const DataView = ({user}) => {
                     <div className='w-1/3 mx-auto py-8'>
                         {
                             !(user) && 
-                                <Alert onClick={()=>setViewing('subscribe')} className="cursor-pointer">
+                                <Alert onClick={()=>setViewing('register')} className="cursor-pointer">
                                     <VscCircleFilled className="h-5 w-5"/>
                                     <AlertTitle>Heads up!</AlertTitle>
                                     <AlertDescription >

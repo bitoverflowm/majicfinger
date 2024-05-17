@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 
-import { useUser  } from '@/lib/hooks';
+import { useUser, mutateUser } from '@/lib/hooks';
 import { Magic } from 'magic-sdk';
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { useRouter } from 'next/navigation';
@@ -23,8 +23,8 @@ const Login = ({noName}) => {
     const user = useUser()
 
     const handleSubmit = async (e) => {
-        setLoading(true);
         e.preventDefault();
+        setLoading(true);
         // Your async logic here
         const magic = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY)
             const didToken = await magic.auth.loginWithMagicLink({ email: email })
@@ -42,11 +42,13 @@ const Login = ({noName}) => {
                 body: JSON.stringify( body ),
             })
             if(res.status === 200){
-                let user = await res.json()
-                setViewing('dataStart')
+                mutateUser()
+                setLoading(false)
+                //setViewing('dataStart')
             } else {
                 console.error("Magic Login Failed", await res.text())
                 alert("There was an issue with login and sub, please message @misterrpink1 on twitter.")
+                setLoading(false)
             }
     };
 
@@ -65,7 +67,8 @@ const Login = ({noName}) => {
                         {
                             loading 
                             ?
-                                <div><AiOutlineLoading3Quarters className='animate-spin'/>
+                                <div>
+                                    <AiOutlineLoading3Quarters className='animate-spin'/>
                                     Loading...
                                 </div>
                                 : <>
