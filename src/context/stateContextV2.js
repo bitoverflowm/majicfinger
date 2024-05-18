@@ -287,7 +287,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [chartTheme, setChartTheme] = useState({
         baseTheme: "ag-default",
         palette: {
-            fills: ["#cdb4db", "#ffc8dd", "#ffafcc", "#bde0fe", "#a2d2ff", "#fff"],
+            fills: ["#cdb4db"],
             strokes: ["#000"],
         },
     })
@@ -377,33 +377,58 @@ export const StateProviderV2 = ({children, initialSettings}) => {
                             direction: direction ? direction: chartOptions.series[0].direction,
                         }],
                     background: {
-                    visible: false,
-                },
-                axes: [
-                {
-                    type: "category",
-                    position: "bottom",
-                    title: {
-                        text: xKey,
-                    },
-                },
-                {
-                    type: "number",
-                    position: "left",
-                    title: {
-                        text: yKey,
-                    },
-                    label: {
-                        formatter: ({ value }) => formatNumber(value),
-                    },
-                    gridLine: {
-                        enabled: gridLinesEnabled
-                    }
-                },
-            ]
-            }))
-        }
-    }, [connectedData, type, xKey, yKey, direction, themeColor])
+                                visible: false,
+                            },
+                    axes: direction && direction === 'horizontal' ? [{
+                                        type: "category",
+                                        position: "left",
+                                        title: {
+                                            text: xKey,
+                                        },
+                                    },
+                                    {
+                                        type: "number",
+                                        position: "bottom",
+                                        title: {
+                                            text: yKey,
+                                        },
+                                        label: {
+                                            formatter: ({ value }) => formatNumber(value),
+                                        },
+                                        gridLine: {
+                                            enabled: gridLinesEnabled
+                                        }
+                                    }] : [
+                                        {
+                                            type: "category",
+                                            position: "bottom",
+                                            title: {
+                                                text: xKey,
+                                            },
+                                        },
+                                        {
+                                            type: "number",
+                                            position: "left",
+                                            title: {
+                                                text: yKey,
+                                            },
+                                            label: {
+                                                formatter: ({ value }) => formatNumber(value),
+                                            },
+                                            gridLine: {
+                                                enabled: gridLinesEnabled
+                                            }
+                                        },
+                                    ]
+                            }))
+                        }
+                    }, [connectedData, type, xKey, yKey, direction, themeColor])
+
+    
+    const [bgColor, setBgColor] = useState()
+    const [textColor, setTextColor] = useState()
+    const [cardColor, setCardColor] = useState()
+
 
     useEffect(()=>{
         chartOptions &&
@@ -413,8 +438,10 @@ export const StateProviderV2 = ({children, initialSettings}) => {
             }))
       }, [chartTheme])
 
+    
+
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor}}>
             {children}
         </StateContextV2.Provider>
     )
