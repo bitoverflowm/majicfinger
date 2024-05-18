@@ -229,6 +229,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [dataSetName, setDataSetName] = useState()
     //all saved DataSets
     const [savedDataSets, setSavedDataSets] = useState()
+    const [loadedDataMeta, setLoadedDataMeta] = useState()
 
 
     //Connected Data is active working data. 
@@ -413,7 +414,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       }, [chartTheme])
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta}}>
             {children}
         </StateContextV2.Provider>
     )

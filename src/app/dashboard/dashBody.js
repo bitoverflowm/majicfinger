@@ -17,7 +17,7 @@ const DashBody = ({user}) => {
     const contextStateV2 = useMyStateV2()
 
     const viewing = contextStateV2?.viewing
-    const savedDataSets = contextStateV2?.savedDataSets
+    //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
 
     useEffect(() => {

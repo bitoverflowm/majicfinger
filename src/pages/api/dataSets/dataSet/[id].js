@@ -26,7 +26,11 @@ export default async function handler(req, res) {
                 // Prepare the update object
                 const update = {
                     $set: {
-                    ...req.body,
+                        data_set_name: req.body.data_set_name,
+                        data: req.body.data,
+                        last_saved_date: new Date(),
+                        labels: req.body.labels,
+                        source: req.body.source,
                     },
                 };
                 const updatedDataSet = await DataSet.findByIdAndUpdate(id, update, {

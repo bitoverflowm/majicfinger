@@ -33,7 +33,6 @@ export default async function handler(req, res) {
                 if (!mongoose.Types.ObjectId.isValid(user_id)) {
                     return res.status(400).json({ success: false, message: "Invalid user_id" });
                 }
-
                 const newDataSet = await DataSet.create({
                     data_set_name,
                     data,

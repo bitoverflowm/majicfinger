@@ -25,6 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { FaCircle } from "react-icons/fa"
 
 const SideNav = () => {
   
@@ -34,7 +35,7 @@ const SideNav = () => {
   const setViewing = contextStateV2?.setViewing
 
   return (
-            <div className="px-2 min-h-screen">
+            <div className="px-2 min-h-screen flex flex-col">
               <nav className="grid gap-6 text-xs font-medium">
                 <div className="flex place-content-center pt-8">
                   <Link
@@ -45,7 +46,7 @@ const SideNav = () => {
                   </Link>
                 </div>                
                 <div
-                  className={`cursor-pointer flex items-center gap-4 px-2.5 ${viewing === 'dashboard' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'} `}
+                  className={`cursor-pointer flex items-center gap-4 px-2.5 ${viewing === 'dashboard' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'} `}
                   onClick={() => setViewing('dashboard')}
                 >
                   <LayoutDashboard className="h-5 w-5" />
@@ -123,24 +124,24 @@ const SideNav = () => {
                   Presentation
                 </div>
               </nav>
-              <div className="pt-20 w-40">
+              <div className="mt-auto mb-10 w-56">
                 <Card>
                   <CardHeader className="p-4">
-                    <CardTitle className="text-sm font-black text-green-500">50% off</CardTitle>
+                    <CardTitle className="text-xl text-green-500 text-center">50% off</CardTitle>
                     <CardDescription>
-                      <div>$69.99</div>
-                      <div className="line-through pr-1">$150</div>
-                      One time payment for Life Time access
-                      (other options also available)
-                      <br/>
-                      <br/>
-                      39 seats remaining before price increase
+                      <div className="text-sm text-center">$69.99</div>
+                      <div className="pb-1 text-center">One Time Payment for Life Time Access</div>
+                      <div className="line-through text-xs text-center">Normally $150</div>
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="w-full">
-                    <Button size="sm" className="mx-auto">
-                      Upgrade
-                    </Button>
+                  <CardContent className="w-full text-xs">
+                    <div className="p-3 bg-slate-100/80 rounded-md">BONUS: $100/month of Free AI credits, for life, on the house</div>
+                    <div className="flex py-2 place-content-center">
+                      <Button size="sm" className="text-xs">
+                        See Pricing
+                      </Button>
+                    </div>
+                    <div className="text-[10px] flex gap-2 place-items-center"><FaCircle className="text-green-400 animate-pulse" /> 39 seats remaining before price increase</div>
                   </CardContent>
                 </Card>
               </div>
