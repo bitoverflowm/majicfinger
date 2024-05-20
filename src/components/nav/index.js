@@ -84,7 +84,6 @@ const Nav = () => {
                 </SheetContent>
             </Sheet> 
             <div className="flex place-content-end w-1/2 items-center gap-4 ml-auto md:gap-2 lg:gap-4">
-                <div className='text-lg font-medium md:text-sm'><Link href="/affiliatePack">❤️ Affiliate Pack</Link></div>
                 <DropdownMenu>
                       {
                         !(user) ?
