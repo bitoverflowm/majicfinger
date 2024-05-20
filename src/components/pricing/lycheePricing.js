@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { CheckIcon, Cross1Icon } from "@radix-ui/react-icons";
 import { motion } from "framer-motion";
-import { Loader } from "lucide-react";
 import { useState } from "react";
 
 
@@ -80,7 +78,7 @@ const lycheePrices = [
   },
 ];
 
-export function LycheePricing() {
+export function Pricing() {
   const [interval, setInterval] = useState("month");
 
   return (

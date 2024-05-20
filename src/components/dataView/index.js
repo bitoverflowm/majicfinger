@@ -5,7 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 
 //import Image from 'next/image'
-import GridViewV2 from '@/components/gridView/gridViewV2'
+import GridView from '@/components/gridView'
 import { VscCircleFilled } from 'react-icons/vsc'
 
 const DataView = ({user}) => {
@@ -21,7 +21,7 @@ const DataView = ({user}) => {
             </h1>
             {
                 connectedData ? <div className='min-h-screen'>
-                                    <GridViewV2 />
+                                    <GridView />
                                 </div>      
                 : <div className="py-20">
                     <div className='w-1/3 mx-auto py-8'>

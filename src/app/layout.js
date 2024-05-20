@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/toaster"
  
 export const metadata = {
   title: 'Lychee',
-  description: 'Analyze and Visualize Data. Without Spreadsheets.',
+  description: 'Find, get, analyze and visualize Data supercharged with AI. The best alternative to Excel and Google Sheets.',
   verification: {
     other: { _foundr: ['973f2a49e12fad2ad799756c823a6d3b'] },
   }

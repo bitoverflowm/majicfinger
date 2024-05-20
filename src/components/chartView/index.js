@@ -1,4 +1,4 @@
-import { use, useEffect, useState } from 'react';
+
 import { AgChartsReact } from 'ag-charts-react';
 
 import { useMyState  } from '@/context/stateContext'
@@ -13,13 +13,6 @@ const ChartView = () => {
     let bgType = contextState?.bgType || '';
     let title = contextState?.title || '';
     let subTitle = contextState?.subTitle || '';
-
-
-    useEffect(()=> {
-        if(chartOptions){
-            //console.log('chart Options:', chartOptions)
-        }
-    }, [chartOptions])
 
 
     return(

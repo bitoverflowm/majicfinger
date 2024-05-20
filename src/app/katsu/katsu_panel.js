@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/sheet"
 
 import Saves from '@/components/saves'
-import GridView from "@/components/gridView";
 import { BentoBase } from "@/components/bentoView/bentoBase";
 
 import { toast } from "sonner"
@@ -155,15 +154,6 @@ const KatsuPanel = ({data, mobile}) => {
             <div className={ mobile ? 'p-2' : 'p-20'}>
                 <div className="w-full place-items-center place-content-center hidden">
                     <div className='text-center py-4'>Just click and edit the grid below to update the bento</div>
-                    <form className="flex flex-col items-center pb-6">
-                        <label className="block mt-2 px-4 py-2 bg-lychee-black text-lychee-white hover:text-lychee-black hover:bg-lychee-peach rounded-full shadow-xl cursor-pointer text-center text-xs font-regular" htmlFor="file-upload">
-                            Click to Upload
-                        </label>
-                        <input id="file-upload" type="file" accept=".xlsx, .csv" onChange={handleFileUpload} className="hidden" />
-                    </form>
-                    <div className="h-[900px] flex place-content-center">
-                        <GridView />
-                    </div>
                 </div>
                 <div className='flex place-content-center'>
                     <Alert className="w-96 bg-green-500/20">

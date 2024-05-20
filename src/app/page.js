@@ -10,7 +10,6 @@ import Link from 'next/link';
 
 import { StateProvider } from '@/context/stateContext'
 
-import LycheeCore from '@/components/lycheeCore'
 import LandingPage from '@/components/landingPage'
 
 import FAQ from '@/components/faq'

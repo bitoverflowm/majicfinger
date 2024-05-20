@@ -18,7 +18,6 @@ import { definitions } from './twitter/definitions';
 
 
 import { useMyState  } from '@/context/stateContext'
-import GridView from '../gridView';
 import TwitterIntegration from './twitter';
 
 const Integrations = () => {

@@ -14,8 +14,6 @@ import { PiUserSwitch } from "react-icons/pi";
 
 import { useUser } from '@/lib/hooks';
 
-import GridView from '../../gridView';
-
 import ParamToggles from './paramToggles';
 import { params } from './params';
 import twitterDemoData from './twitterDemoData';

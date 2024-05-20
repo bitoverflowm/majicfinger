@@ -20,7 +20,7 @@ const Help = () => {
                         If you use Twitter/ X  <Link href={'https://twitter.com/misterrpink1'} className='underline'> @misterrpink1 </Link>
                     </div>
                     <div>
-                        Instagram: <Link href={'https://www.instagram.com/misterrpink1_builds/'} className='underline'> @misterrpink1 </Link>
+                        Instagram: <Link href={'https://www.instagram.com/misterrpink1_builds/'} className='underline'> @misterrpink1_builds </Link>
                     </div>
                     <div>
                         Youtube: <Link href={'https://www.youtube.com/channel/UCoUiZMQF-4BNN6UL1AfHRDw'} className='underline'> @misterrpink1 </Link>

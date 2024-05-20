@@ -58,8 +58,7 @@ const Dashbaord = () => {
                     </header>
                     <main className=''>
                         <DashBody user={user}/>
-                    </main>                      
-                    {/*<LycheeCore />*/}
+                    </main>
                 </StateProviderV2>
             </StateProvider>
         </div>

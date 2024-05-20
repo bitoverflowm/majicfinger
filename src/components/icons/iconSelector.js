@@ -3,7 +3,6 @@ import { iconMap } from './iconMap';
 import { toast } from "@/components/ui/use-toast";
 
 const IconSelector = ({updateIcon}) => {
-    //const toast = useToast(); // Assuming useToast is a hook that returns a function to show toasts
 
     // Function to copy icon name to clipboard
     const copyToClipboard = async (iconName) => {
