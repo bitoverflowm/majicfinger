@@ -14,7 +14,7 @@ import { colorPalettes } from '@/components/chartView/panels/colorPalette';
 
 export function BentoBase({data, dashView, demo, bentoContainer, setDashData, setBentoContainer, viewing, setViewing}) { 
 
-    const [pause, setPause] = useState()
+  const [pause, setPause] = useState()
 
   const ramdomColorHandler = () => {
     const randomIndex = Math.floor(Math.random() * colorPalettes.length); // Random index from 0 to length-1

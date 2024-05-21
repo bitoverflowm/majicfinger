@@ -17,12 +17,10 @@ const ChartViewV2 = () => {
     let title = contextStateV2?.title || 'placeholder';
     let subTitle = contextStateV2?.subTitle || 'placeholder';
 
-
-
     return(
-        <div className='h-full w-full flex gap-6'>
+        <div className='h-full w-full flex gap-6 gradualEffect'>
             <div className={`w-4/5 h-full rounded-lg px-12 pb-10 pt-10 `} style={{background: bgColor && bgColor}}>
-                <div className='w-full h-full rounded-lg p-20' style={{background: cardColor && cardColor}}>
+                <div className='w-full h-full rounded-lg p-20 internalGradualEffect' style={{background: cardColor && cardColor}}>
                     <div className='text-center text-xl font-bold py-2' style={{color: textColor && textColor}}>{title}</div>
                     <div className='text-center text-sm font-bold py-2' style={{color: textColor && textColor}}>{subTitle}</div>
                     <AgChartsReact options={chartOptions ? chartOptions : previewChartOptions} />
