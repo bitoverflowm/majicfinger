@@ -356,7 +356,7 @@ const ChartDataModsV2 = () => {
           </fieldset>
           <fieldset className="grid gap-6 rounded-lg border p-4">
             <legend className="-ml-1 px-1 text-sm font-medium">Aesthetics</legend>
-            <div className="grid gap-3">
+            <div className="grid gap-3 grid-cols-2">
               <Drawer>
                 <DrawerTrigger>
                   <div className="border border-1 border-slate-200 flex place-content-center py-1 rounded-md cursor-pointer gap-2"><Paintbrush /> Background</div>
@@ -411,7 +411,7 @@ const ChartDataModsV2 = () => {
               </Drawer>
               <Drawer>
                 <DrawerTrigger>
-                  <div className="border border-1 border-slate-200 flex place-content-center py-1 rounded-md cursor-pointer gap-2"><Paintbrush /> Chart Stroke Color</div>
+                  <div className="border border-1 border-slate-200 flex place-content-center py-1 rounded-md cursor-pointer gap-2"><Paintbrush /> Stroke Color</div>
                 </DrawerTrigger>
                 <DrawerContent>
                   <KatsuColors updateBgColor={handleStrokeSelection}/>

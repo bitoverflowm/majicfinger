@@ -1,51 +1,22 @@
-import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import moment from "moment"
 
-import { CircleUser, Menu, Package2  } from "lucide-react"
+import { Menu } from "lucide-react"
 
+//Shdcn
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
-
-
 import { useUser } from '@/lib/hooks';
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { Badge } from "@/components/ui/badge"
-
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
-
 import { toast } from "sonner"
 
 const Nav = () => {
@@ -53,6 +24,7 @@ const Nav = () => {
   const router = useRouter();
   const contextStateV2 = useMyStateV2()
 
+  const viewing = contextStateV2?.viewing
   const setViewing = contextStateV2?.setViewing
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
@@ -61,10 +33,22 @@ const Nav = () => {
   const setConnectedData = contextStateV2?.setConnectedData
   const loadedDataMeta = contextStateV2?.loadedDataMeta
   const setLoadedDataMeta = contextStateV2?.setLoadedDataMeta
+  const savedCharts = contextStateV2?.savedCharts
+  const setSavedCharts = contextStateV2?.setSavedCharts
+  const loadedChartMeta = contextStateV2?.loadedChartMeta
+  const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta
+  const chartOptions = contextStateV2?.chartOptions
+  const chartTheme = contextStateV2?.chartTheme
+  const bgColor = contextStateV2?.bgColor
+  const textColor = contextStateV2?.textColor
+  const cardColor = contextStateV2?.cardColor
+  const title = contextStateV2?.title
+  const subTitle = contextStateV2?.subTitle
 
   const [isOpen, setIsOpen] = useState(false) 
   const [saveIsOpen, setSaveIsOpen] = useState(false)
   const [newDataName, setNewDataName] = useState()
+  const [newChartName, setNewChartName] = useState()
 
   const handleLogout = async () => {
     //e.preventDefault(); // Prevent the default link behavior
@@ -89,7 +73,7 @@ const Nav = () => {
   const [overwrite, setOverwrite] = useState(true)
 
   const handleSave = async () => {
-      if(overwrite){
+      if(false && overwrite){
         fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
           method: 'PUT',
           headers: {
@@ -113,32 +97,69 @@ const Nav = () => {
             // Handle the error here
         });
       }else{
-        //console.log("data to save: ", data)
-        // Here you can add code to save the projectName to a database or state management
-        fetch('/api/dataSets', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ 
-                  data_set_name: newDataName,
-                  data: connectedData,
-                  created_date: new Date(),
-                  last_saved_date: new Date(),
-                  labels: ['test'],
-                  source: 'userUpload',
-                  user_id: user.userId,           
-              }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                toast(`Your Data has been saved as ${newDataName}`)
-                // Handle the response data here
-            })
-            .catch(error => {
-                console.error('Error saving Data:', error);
-                // Handle the error here
-            });
+        if(viewing === 'charts'){
+          // console.log("data to save: ", data)
+          // Here you can add code to save the projectName to a database or state management
+          fetch('/api/charts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                chart_name: newChartName,
+                chart_properties: [{
+                  'chartOptions': chartOptions,
+                  'chartTheme': chartTheme,
+                  'bgColor': bgColor,
+                  'textColor': textColor,
+                  'cardColor': cardColor,
+                  'title': title,
+                  'subTitle': subTitle
+                }],
+                created_date: new Date(),
+                last_saved_date: new Date(),
+                labels: ['test'],
+                user_id: user.userId,           
+                data_set_id: loadedDataMeta._id
+            }),
+          })
+          .then(response => response.json())
+          .then(data => {
+              toast(`Your Chart has been saved as ${newChartName}`)
+              // Handle the response data here
+          })
+          .catch(error => {
+              console.error('Error saving Data:', error);
+              // Handle the error here
+          });
+        }else{
+          // console.log("data to save: ", data)
+          // Here you can add code to save the projectName to a database or state management
+          fetch('/api/dataSets', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                data_set_name: newDataName,
+                data: connectedData,
+                created_date: new Date(),
+                last_saved_date: new Date(),
+                labels: ['test'],
+                source: 'userUpload',
+                user_id: user.userId,           
+            }),
+          })
+          .then(response => response.json())
+          .then(data => {
+              toast(`Your Data has been saved as ${newDataName}`)
+              // Handle the response data here
+          })
+          .catch(error => {
+              console.error('Error saving Data:', error);
+              // Handle the error here
+          });
+        }
       }
       setSaveIsOpen(false)
   }
@@ -207,54 +228,96 @@ const Nav = () => {
                 {connectedData && 
                   <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
                     <DialogTrigger asChild>
-                      <Button>Save Work</Button>
+                      <Button>Save {viewing === 'charts' ? 'Chart':  'Data'}</Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
                       <DialogHeader>
-                        <DialogTitle>Save Data Set</DialogTitle>
+                        <DialogTitle>{viewing === 'charts' ? 'Save Chart' : 'Save Data Set'}</DialogTitle>
                         <DialogDescription>
                           { loadedDataMeta && loadedDataMeta.data_set_name && `You are currently connected to ${loadedDataMeta.data_set_name}`}
                         </DialogDescription>
                       </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        {
-                          loadedDataMeta && loadedDataMeta.data_set_name &&
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="overwrite" className="text-right">
-                                Overwrite {loadedDataMeta.data_set_name} ?
-                              </Label>
-                              <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
+                      {
+                        viewing === "charts" 
+                          ?<div className="grid gap-4 py-4">
+                              {
+                                false && loadedDataMeta && loadedDataMeta.data_set_name &&
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="overwrite" className="text-right">
+                                      Overwrite {loadedDataMeta.data_set_name} ?
+                                    </Label>
+                                    <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
+                                  </div>
+                              }
+                              {
+                                false && loadedDataMeta && loadedDataMeta.data_set_name && !(overwrite) &&
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">
+                                      Data Sheet Name
+                                    </Label>
+                                    <Input
+                                      id="name"
+                                      defaultValue="Pied-Piper"
+                                      className="col-span-3"
+                                      onChange={(e)=>setNewDataName(e.target.value)}
+                                    />
+                                  </div>
+                              }
+                              {
+                                !(loadedChartMeta) &&
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">
+                                      Name your chart
+                                    </Label>
+                                    <Input
+                                      id="name"
+                                      defaultValue="Pied-Piper"
+                                      className="col-span-3"
+                                      onChange={(e)=>setNewChartName(e.target.value)}
+                                    />
+                                  </div>
+                              }
                             </div>
-                        }
-                        {
-                          loadedDataMeta && loadedDataMeta.data_set_name && !(overwrite) &&
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="name" className="text-right">
-                                Data Sheet Name
-                              </Label>
-                              <Input
-                                id="name"
-                                defaultValue="Pied-Piper"
-                                className="col-span-3"
-                                onChange={(e)=>setNewDataName(e.target.value)}
-                              />
-                            </div>
-                        }
-                        {
-                          !(loadedDataMeta) &&
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="name" className="text-right">
-                                Name your data sheet
-                              </Label>
-                              <Input
-                                id="name"
-                                defaultValue="Pied-Piper"
-                                className="col-span-3"
-                                onChange={(e)=>setNewDataName(e.target.value)}
-                              />
-                            </div>
-                        }
-                      </div>
+                          : <div className="grid gap-4 py-4">
+                          {
+                            loadedDataMeta && loadedDataMeta.data_set_name &&
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="overwrite" className="text-right">
+                                  Overwrite {loadedDataMeta.data_set_name} ?
+                                </Label>
+                                <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
+                              </div>
+                          }
+                          {
+                            loadedDataMeta && loadedDataMeta.data_set_name && !(overwrite) &&
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="name" className="text-right">
+                                  Data Sheet Name
+                                </Label>
+                                <Input
+                                  id="name"
+                                  defaultValue="Pied-Piper"
+                                  className="col-span-3"
+                                  onChange={(e)=>setNewDataName(e.target.value)}
+                                />
+                              </div>
+                          }
+                          {
+                            !(loadedDataMeta) &&
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="name" className="text-right">
+                                  Name your data sheet
+                                </Label>
+                                <Input
+                                  id="name"
+                                  defaultValue="Pied-Piper"
+                                  className="col-span-3"
+                                  onChange={(e)=>setNewDataName(e.target.value)}
+                                />
+                              </div>
+                          }
+                        </div>                          
+                      }                      
                       <DialogFooter>
                         <Button type="submit" onClick={()=>handleSave()}>Save changes</Button>
                       </DialogFooter>
