@@ -19,6 +19,7 @@ const DashBody = ({user}) => {
     const viewing = contextStateV2?.viewing
     //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
+    const setSavedCharts = contextStateV2?.setSavedCharts
 
     useEffect(() => {
         if(user){
@@ -32,7 +33,6 @@ const DashBody = ({user}) => {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    console.log('Fetched Data:', data.data);
                     setSavedDataSets(data.data); // Assuming you have a state to hold the fetched data
                     toast('Project History Loaded!', {
                         description: `We just pulled your saved project history.`,
@@ -45,6 +45,33 @@ const DashBody = ({user}) => {
             })
         }
     }, [user])
+
+    useEffect(() => {
+        if(user){
+            console.log("fetching users saved work")
+            fetch(`/api/charts?uid=${user.userId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    setSavedCharts(data.data);
+                    toast('Chart History Loaded!', {
+                        description: `We just pulled your saved charts.`,
+                        closeButton: true,
+                        duration: 99999999
+                      });
+                } else {
+                    console.error('Failed to fetch saved Charts:', data.message);
+                }
+            })
+        }
+    }, [user])
+
+    
 
     return(
         <div className="w-full flex">

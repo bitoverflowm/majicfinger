@@ -24,8 +24,10 @@ const Nav = () => {
   const router = useRouter();
   const contextStateV2 = useMyStateV2()
 
+  //what component are we viewing
   const viewing = contextStateV2?.viewing
   const setViewing = contextStateV2?.setViewing
+
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
   const setDataSetName = contextStateV2?.setDataSetName
@@ -33,10 +35,11 @@ const Nav = () => {
   const setConnectedData = contextStateV2?.setConnectedData
   const loadedDataMeta = contextStateV2?.loadedDataMeta
   const setLoadedDataMeta = contextStateV2?.setLoadedDataMeta
+
+  //saving charts
   const savedCharts = contextStateV2?.savedCharts
   const setSavedCharts = contextStateV2?.setSavedCharts
-  const loadedChartMeta = contextStateV2?.loadedChartMeta
-  const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta
+  //current chart view properties
   const chartOptions = contextStateV2?.chartOptions
   const chartTheme = contextStateV2?.chartTheme
   const bgColor = contextStateV2?.bgColor
@@ -44,6 +47,19 @@ const Nav = () => {
   const cardColor = contextStateV2?.cardColor
   const title = contextStateV2?.title
   const subTitle = contextStateV2?.subTitle
+
+  //loading charts
+  const loadedChartMeta = contextStateV2?.loadedChartMeta
+  const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta
+
+  //setting loaded chart values for viewing
+  const setChartOptions = contextStateV2?.setChartOptions
+  const setChartTheme = contextStateV2?.setChartTheme
+  const setBgColor = contextStateV2?.setBgColor
+  const setTextColor = contextStateV2?.setTextColor
+  const setCardColor = contextStateV2?.setCardColor
+  const setTitle = contextStateV2?.setTitle
+  const setSubTitle = contextStateV2?.setSubTitle
 
   const [isOpen, setIsOpen] = useState(false) 
   const [saveIsOpen, setSaveIsOpen] = useState(false)
@@ -73,29 +89,61 @@ const Nav = () => {
   const [overwrite, setOverwrite] = useState(true)
 
   const handleSave = async () => {
-      if(false && overwrite){
-        fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
-          method: 'PUT',
-          headers: {
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-              data_set_name: loadedDataMeta.data_set_name,
-              data: connectedData,
-              last_saved_date: new Date(),
-              labels: ['test'],
-              source: 'userUpload',       
-          }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            toast(`Your Data has been saved as ${loadedDataMeta.data_set_name}`)
-            // Handle the response data here
-        })
-        .catch(error => {
-            console.error('Error saving Data:', error);
-            // Handle the error here
-        });
+      if(overwrite){
+        if(viewing === 'charts'){
+          alert('overwrite mode')
+          fetch(`/api/charts/chart/${loadedChartMeta._id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                chart_name: loadedChartMeta.chart_name,
+                chart_properties: [{
+                  'chartOptions': chartOptions,
+                  'chartTheme': chartTheme,
+                  'bgColor': bgColor,
+                  'textColor': textColor,
+                  'cardColor': cardColor,
+                  'title': title,
+                  'subTitle': subTitle
+                }],
+                last_saved_date: new Date(),
+                labels: ['test'],
+            }),
+          })
+          .then(response => response.json())
+          .then(data => {
+              toast(`Your Chart has been saved as ${loadedChartMeta.chart_name}`)
+          })
+          .catch(error => {
+              console.error('Error saving Data:', error);
+              // Handle the error here
+          });
+        }else{
+            fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                  data_set_name: loadedDataMeta.data_set_name,
+                  data: connectedData,
+                  last_saved_date: new Date(),
+                  labels: ['test'],
+                  source: 'userUpload',       
+              }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                toast(`Your Data has been saved as ${loadedDataMeta.data_set_name}`)
+                // Handle the response data here
+            })
+            .catch(error => {
+                console.error('Error saving Data:', error);
+                // Handle the error here
+            });
+        }        
       }else{
         if(viewing === 'charts'){
           // console.log("data to save: ", data)
@@ -188,17 +236,69 @@ const Nav = () => {
     }    
   }
 
+  const loadChart = async (chartId, chartMeta) => {
+    if(loadedChartMeta && chartId === loadedChartMeta._id){
+      //now we construct the chart
+      setChartOptions(chartOptions)
+      setChartTheme(chartTheme)
+      setBgColor(bgColor)
+      setTextColor(textColor)
+      setCardColor(cardColor)
+      setTitle(title)
+      setSubTitle(subTitle)          
+      setViewing('charts')
+      setIsOpen(false)
+    }else{
+      fetch(`/api/charts/chart/${chartId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }).then(response => response.json())
+        .then(res =>{
+          console.log(res.data)
+          //letting system know that a new chart has been propogated
+          setLoadedChartMeta(chartMeta)
+          //now we construct the chart
+          setChartOptions(res.data.chart_properties[0].chartOptions)
+          setBgColor(res.data.chart_properties[0].bgColor)
+          setTextColor(res.data.chart_properties[0].textColor)
+          setCardColor(res.data.chart_properties[0].cardColor)
+          setTitle(res.data.chart_properties[0].title)
+          setSubTitle(res.data.chart_properties[0].subTitle)
+          setChartTheme(res.data.chart_properties[0].chartTheme)
+          toast.success(`Chart: ${res.data.chart_properties[0].title} loaded`, {
+            duration: 99999999
+          })
+
+          fetch(`/api/dataSets/dataSet/${chartMeta.data_set_id}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }).then(response => response.json())
+            .then(dataSheetRes =>{
+              console.log(dataSheetRes.data)
+              setConnectedData(dataSheetRes.data.data)
+              setLoadedDataMeta(savedDataSets.find(ds => ds._id === chartMeta.data_set_id))
+          })
+          setIsOpen(false)
+          setViewing('charts')
+        })
+    }    
+  }
+
 
   return (
     <div className="absolute top-0 flex w-full items-center gap-4 border-b bg-background py-2 px-5">
           { user ?
               <div className="flex items-center gap-4 ml-auto md:gap-2 lg:gap-4">
-                {savedDataSets && savedDataSets.length > 0 && 
+                {((savedDataSets && savedDataSets.length > 0) || (savedCharts && savedCharts.length > 0)) && 
                   <Sheet open={isOpen} onOpenChange={setIsOpen}>
                     <SheetTrigger asChild>
                       <div className="cursor-pointer hover:bg-black hover:text-white py-1 px-2 rounded-md" onClick={()=>setIsOpen(true)}> 
                         View Saved Data 
-                        <Badge className='ml-1'>{savedDataSets.length}</Badge> 
+                        <Badge className='ml-1'>{savedDataSets && savedDataSets.length}</Badge> 
                       </div>
                     </SheetTrigger>
                     <SheetContent>
@@ -208,15 +308,30 @@ const Nav = () => {
                           Chick on a project to load and begin work.
                         </SheetDescription>
                       </SheetHeader>
+                      <div>Your Data</div>
                       <div className="pt-4">
-                        { 
-                          savedDataSets.map(
+                        {
+                          savedDataSets && savedDataSets.length > 0 && savedDataSets.map(
                             (dataSet)=> 
                               <div key={dataSet._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadDataSheet(dataSet._id, dataSet)}>
                                 <div className="flex">{dataSet.data_set_name}<div className="ml-auto">{loadedDataMeta && loadedDataMeta._id === dataSet._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
                                 <div className="font-muted">Source: {dataSet.source}</div>
                                 <div className="py-1">Edited: {moment(dataSet.last_saved_date).format('ddd MMM YY h:mm a')}</div>
                                 <div className="flex">{dataSet.labels.map((label)=> <Badge>{label}</Badge>)}</div>
+                                <Separator className="my-2" />
+                              </div>
+                              )
+                        }
+                      </div>
+                      <div>Your Charts</div>
+                      <div className="pt-4">
+                        { 
+                          savedCharts && savedCharts.length > 0 && savedCharts.map(
+                            (chart)=> 
+                              <div key={chart._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadChart(chart._id, chart)}>
+                                <div className="flex">{chart.chart_name}<div className="ml-auto">{loadedChartMeta && loadedChartMeta._id === chart._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                <div className="py-1">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
+                                <div className="flex">{chart.labels.map((label)=> <Badge>{label}</Badge>)}</div>
                                 <Separator className="my-2" />
                               </div>
                               )
@@ -234,32 +349,33 @@ const Nav = () => {
                       <DialogHeader>
                         <DialogTitle>{viewing === 'charts' ? 'Save Chart' : 'Save Data Set'}</DialogTitle>
                         <DialogDescription>
-                          { loadedDataMeta && loadedDataMeta.data_set_name && `You are currently connected to ${loadedDataMeta.data_set_name}`}
+                          { loadedDataMeta && `You are currently connected to ${loadedDataMeta.data_set_name}`}
+                          { loadedChartMeta && `You are currently connected to ${loadedDataMeta.chart_name}`}
                         </DialogDescription>
                       </DialogHeader>
                       {
                         viewing === "charts" 
                           ?<div className="grid gap-4 py-4">
                               {
-                                false && loadedDataMeta && loadedDataMeta.data_set_name &&
+                                loadedChartMeta && 
                                   <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="overwrite" className="text-right">
-                                      Overwrite {loadedDataMeta.data_set_name} ?
+                                      Overwrite {loadedDataMeta.chart_name} ?
                                     </Label>
                                     <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
                                   </div>
                               }
                               {
-                                false && loadedDataMeta && loadedDataMeta.data_set_name && !(overwrite) &&
+                                loadedChartMeta && !(overwrite) &&
                                   <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="name" className="text-right">
-                                      Data Sheet Name
+                                      Chart Name
                                     </Label>
                                     <Input
                                       id="name"
                                       defaultValue="Pied-Piper"
                                       className="col-span-3"
-                                      onChange={(e)=>setNewDataName(e.target.value)}
+                                      onChange={(e)=>setNewChartName(e.target.value)}
                                     />
                                   </div>
                               }

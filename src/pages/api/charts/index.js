@@ -15,7 +15,7 @@ export default async function handler(req, res) {
         case "GET":
             try {
                 const savedCharts = await Chart.find({ user_id: uid })
-                    .select('data_set_name created_date last_saved_date labels source user_id')
+                    .select('chart_name last_saved_date labels user_id data_set_id')
                     .exec();
 
                 if (!savedCharts || savedCharts.length === 0) {

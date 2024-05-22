@@ -30,7 +30,6 @@ export default async function handler(req, res) {
                         chart_properties: req.body.chart_properties,
                         last_saved_date: new Date(),
                         labels: req.body.labels,
-                        source: req.body.source,
                     },
                 };
                 const updatedChart = await Chart.findByIdAndUpdate(id, update, {

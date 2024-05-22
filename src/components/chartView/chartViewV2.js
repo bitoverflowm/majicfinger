@@ -3,6 +3,7 @@ import { AgChartsReact } from 'ag-charts-react';
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 import ChartDataModsV2 from './chartDataModsV2';
+import { useEffect } from 'react';
 
 
 const ChartViewV2 = () => {
@@ -16,6 +17,10 @@ const ChartViewV2 = () => {
     let textColor = contextStateV2?.textColor || '';
     let title = contextStateV2?.title || 'placeholder';
     let subTitle = contextStateV2?.subTitle || 'placeholder';
+
+    useEffect(()=> {
+        console.log('options: ', chartOptions)
+    }, [])
 
     return(
         <div className='h-full w-full flex gap-6 gradualEffect'>

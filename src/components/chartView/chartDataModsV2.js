@@ -49,7 +49,7 @@ const ChartDataModsV2 = () => {
     const setChartTheme = contextStateV2?.setChartTheme || {}
 
     //randomize color pallate
-    const [pause, setPause] = useState()
+    const [pause, setPause] = useState(true)
     const [selectedPalette, setSelectedPalette] = useState()
 
     //loading state
