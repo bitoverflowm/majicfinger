@@ -23,7 +23,6 @@ const DashBody = ({user}) => {
 
     useEffect(() => {
         if(user){
-            console.log("fetching users saved work")
             fetch(`/api/dataSets?uid=${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -48,7 +47,6 @@ const DashBody = ({user}) => {
 
     useEffect(() => {
         if(user){
-            console.log("fetching users saved work")
             fetch(`/api/charts?uid=${user.userId}`, {
                 method: 'GET',
                 headers: {
