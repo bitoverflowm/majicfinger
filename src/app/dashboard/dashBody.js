@@ -1,6 +1,8 @@
 import { useEffect  } from "react";
+import Link from "next/link";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
+
 
 import SideNav from './components/sideNav'
 import KatsuView from './components/katsuView';
