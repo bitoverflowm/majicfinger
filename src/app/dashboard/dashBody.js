@@ -13,6 +13,12 @@ import Login from "@/components/login";
 
 import { toast } from "sonner"
 
+import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+  } from "@/components/ui/alert"
+
 const DashBody = ({user}) => {
     const contextStateV2 = useMyStateV2()
 
@@ -77,6 +83,12 @@ const DashBody = ({user}) => {
                 <SideNav user={user}/>
             </div>
             <div className='w-full px-20'>
+                <Alert className="text-xs bg-lychee_black text-lychee_white border-none">
+                    <AlertTitle> 🚧 Heads up!</AlertTitle>
+                    <AlertDescription >
+                        Lychee V2.0 is coming! I am moving some things around. You can still use the platform, but things might break. - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
+                    </AlertDescription>
+                </Alert>
                 { viewing === 'dashboard' && <div className="py-28"><KatsuView user={user}/></div> }              
                 { viewing === 'dataStart' && <div className="py-16"><DataView user={user}/></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }

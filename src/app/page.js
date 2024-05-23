@@ -1,25 +1,12 @@
-//import React, { useState, useEffect } from 'react'
-
-//import { CsvToHtmlTable } from 'react-csv-to-table';
 import Script from 'next/script'
 import { GoogleAnalytics } from '@next/third-parties/google'
 
 import 'tailwindcss/tailwind.css';
 
-import Link from 'next/link';
-
 import { StateProvider } from '@/context/stateContext'
 
 import LandingPage from '@/components/landingPage'
-
-import FAQ from '@/components/faq'
 import Nav from '@/components/nav'
-
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
 
 export default function Home() {
 
@@ -30,32 +17,43 @@ export default function Home() {
                           y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
                       })(window, document, "clarity", "script", "l5zqf94lap"); `
 
+  const affiliateCode = `$(document).ready(function(){
+                          setTimeout(function() {
+                              $('a[href^="https://buy.stripe.com/"]').each(function(){
+                                  const oldBuyUrl = $(this).attr("href");
+                                  const referralId = window.promotekit_referral;
+                                  if (!oldBuyUrl.includes("client_reference_id")) {
+                                      const newBuyUrl = oldBuyUrl + "?client_reference_id=" + referralId;
+                                      $(this).attr("href", newBuyUrl);
+                                  }
+                              });
+                              $("[pricing-table-id]").each(function(){
+                                $(this).attr("client-reference-id", window.promotekit_referral);
+                              });
+                              $("[buy-button-id]").each(function(){
+                                $(this).attr("client-reference-id", window.promotekit_referral);
+                              });
+                          }, 2000);
+                      });`
+
   return (
     <>
-        <Script
-          id = "ms-clarity"
-          strategy="afterInteractive"
-        >{clairtyCode}</Script>
-        <Script async src="https://cdn.promotekit.com/promotekit.js" data-promotekit="03b8c588-8350-4a0c-97f0-0a839509e8e0" strategy="afterInteractive"/>
-        <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
-        <GoogleAnalytics gaId="G-G8X2NEPTEG" />
-        <StateProvider>
-          <Nav/>
-          <div className="flex flex-col place-items-center bg-white/20">
-            <div className='mx-auto mt-8 text-xs'>
-              <Alert>
-                <AlertTitle> 🚧 Heads up!</AlertTitle>
-                <AlertDescription className="text-xs">
-                  I am moving some things around. You can still use the platform, but things might break. - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
-                </AlertDescription>
-              </Alert>
-            </div>
-            <div className='text-center max-w-screen overflow-hidden'>
-              <LandingPage />
-            </div>
-              <FAQ />
-          </div>
-        </StateProvider>
+      <Script
+        id = "ms-clarity"
+        strategy="afterInteractive"
+      >{clairtyCode}</Script>
+      <Script async src="https://cdn.promotekit.com/promotekit.js" data-promotekit="03b8c588-8350-4a0c-97f0-0a839509e8e0" strategy="afterInteractive"/>
+      <Script>
+        {affiliateCode}
+      </Script>
+      <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"/>
+      <GoogleAnalytics gaId="G-G8X2NEPTEG" />
+      <StateProvider>
+        <Nav/>
+        <div className="bg-lychee_black">
+          <LandingPage />
+        </div>
+      </StateProvider>
     </>
   )
 }

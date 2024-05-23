@@ -18,6 +18,12 @@ module.exports = {
     },
     extend: {
       colors: {
+        lychee_black: "#151515",
+        lychee_red: "#A91D3A",
+        lychee_blue: "#4A5899",
+        lychee_white: "#EEEEEE",
+        lychee_green: "#C9F2C7",
+        lychee_go: "#28A745",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

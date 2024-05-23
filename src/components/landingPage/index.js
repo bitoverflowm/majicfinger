@@ -2,19 +2,16 @@
 
 import React from 'react';
 
-import { useUser  } from '@/lib/hooks';
 import { useMyState  } from '@/context/stateContext'
 
 
 import { Hero } from './hero';
 import { SocialProofTestimonials } from './testimonials';
-import { Flow } from './flow'
 
 import { UploadDataCard } from './uploadDataCard'
 import { ChartCard } from './chartCard';
 import { FeatureIntegrations } from './featureIntegrations';
 import { FeatureAICard } from './featureAICard';
-
 
 const companies = [
     "jpm",
@@ -27,7 +24,6 @@ const companies = [
  
 const LandingPage = () => {
     const { setWorking } = useMyState()
-    const user = useUser()
 
     const readAbout = () => {
         const yOffset = -60; // Adjust this value based on your fixed header size or desired spacing
@@ -39,35 +35,31 @@ const LandingPage = () => {
 
     return (
         <div className='font-body sm:pt-5 text-black' >
-            {
-                !(user) &&
-                    <>
-                        <Hero readAbout={readAbout}/>
-                        
-                        <section id="about">
-                            <div className="py-14">
-                                <div className="container mx-auto px-4 md:px-8">
-                                <h3 className="text-center text-sm font-semibold text-gray-500">
-                                    USED, TRUSTED and beta tested by people at
-                                </h3>
-                                <div className="relative mt-6">
-                                    <div className="grid grid-cols-2 place-items-center place-content-center gap-2 md:grid-cols-4 xl:grid-cols-6 xl:gap-4">
-                                        {companies.map((logo, idx) => (
-                                            <img
-                                            key={idx}
-                                            src={`./${logo}.svg`}
-                                            className="h-10 w-28 dark:brightness-0 dark:invert"
-                                            alt={logo}
-                                            />
-                                        ))}
-                                    </div>
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 h-full w-1/3 bg-gradient-to-r from-white dark:from-black"></div>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 h-full w-1/3 bg-gradient-to-l from-white dark:from-black"></div>
-                                </div>
-                                </div>
-                            </div>
-                        </section>
-                        <SocialProofTestimonials />
+            <Hero readAbout={readAbout}/>                        
+            <section id="about">
+                <div className="py-14">
+                    <div className="container mx-auto px-4 md:px-8">
+                    <h3 className="text-center text-sm font-semibold text-gray-500">
+                        USED, TRUSTED and beta tested by people at
+                    </h3>
+                    <div className="relative mt-6">
+                        <div className="grid grid-cols-2 place-items-center place-content-center gap-2 md:grid-cols-4 xl:grid-cols-6 xl:gap-4">
+                            {companies.map((logo, idx) => (
+                                <img
+                                key={idx}
+                                src={`./${logo}.svg`}
+                                className="h-10 w-28 dark:brightness-0 dark:invert"
+                                alt={logo}
+                                />
+                            ))}
+                        </div>
+                        <div className="pointer-events-none absolute inset-y-0 left-0 h-full w-1/3 bg-gradient-to-r from-white dark:from-black"></div>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 h-full w-1/3 bg-gradient-to-l from-white dark:from-black"></div>
+                    </div>
+                    </div>
+                </div>
+            </section>
+            <SocialProofTestimonials />
                         <div className='text-6xl sm:text-8xl font-title pt-10 pb-20'>
                             <span className='font-black'>How</span> It Works:
                         </div>                        
@@ -346,9 +338,8 @@ const LandingPage = () => {
                                     Get It
                                 </div>
                             </div>
-                        </div>
-                    </>                    
-            }
+                        </div>              
+
         </div>
     );
 };

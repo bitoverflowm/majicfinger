@@ -3,9 +3,11 @@
 import { useMyState  } from '@/context/stateContext'
 import { useUser  } from '@/lib/hooks';
 import Link from 'next/link'
+import Image from 'next/image';
 
 import { useRouter } from 'next/navigation'
 import { IoWarningOutline } from "react-icons/io5";
+import { Menu } from "lucide-react"
 
 import {
   Sheet,
@@ -52,18 +54,46 @@ const Nav = () => {
     };
 
     return (
-      <header className="top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
-            <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
-              <div className="w-28 sm:w-24">
-                <Link href="/"> <img src={"./logo.png"}/></Link>
-              </div>
-              <div className='cursor-pointer'><Link href="/affiliates">Make $ with Lychee</Link></div>
+      <header className="top-0 flex h-16 items-center gap-4 bg-lychee_black text-lychee_white px-4 md:px-6">
+            <nav className="hidden flex-col md:text-xs md:ml-auto md:flex md:flex-row md:items-center md:gap-12">
+              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Request Feature</Link></div>
+              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/roadmap"  rel="noopener noreferrer" target="_blank">Vote</Link></div>
+              <div className='cursor-pointer'><Link href="/affiliates">Affiliates</Link></div>
               <div className='cursor-pointer'><Link href="/dataUse">Data Use</Link></div>
               {/*<div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>*/}
               <div className='cursor-pointer'><Link href="/help">Contact</Link></div>
-              <div className='cursor-pointer'><Link href="/katsu">Katsu</Link></div>
-              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Request Feature</Link></div>
-              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/roadmap"  rel="noopener noreferrer" target="_blank">Vote</Link></div>
+              {
+                !(user) ?
+                  <>
+                      <div variant="">
+                        Sign Up
+                      </div>
+                      <div variant="secondary">
+                        <Link href="/login">Log In</Link>
+                      </div>
+                  </>
+                  :<>
+                    <div>
+                      <Link href="/dashboard">Log In</Link>
+                    </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="secondary" className="rounded-full shadow-2xl shadow-inner flex bg-white">
+                              <Image className="" src={'/avatar.png'} height={40} width={40} />
+                              <Menu/>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem>Settings</DropdownMenuItem>
+                            <DropdownMenuItem>Support</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={()=>handleLogout()}>Logout</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+              }
             </nav>
             <Sheet>
                 <SheetTrigger asChild>
@@ -82,40 +112,7 @@ const Nav = () => {
                     </Link>
                     </nav>
                 </SheetContent>
-            </Sheet> 
-            <div className="flex place-content-end w-1/2 items-center gap-4 ml-auto md:gap-2 lg:gap-4">
-                <DropdownMenu>
-                      {
-                        !(user) ?
-                          <>
-                              <Button variant="secondary">
-                                <Link href="/login">Log In</Link>
-                              </Button>
-                              <Button variant="" onClick={()=>setWorking('getLychee')}>
-                                Sign Up
-                              </Button>
-                          </>
-                          :<>
-                              <DropdownMenuTrigger asChild>
-                                <div className='p-2 px-3 rounded-2xl text-white bg-lychee-black capitalize'>
-                                    {user.name ? user.name : user.email.split('@')[0]}
-                                </div>
-                              </DropdownMenuTrigger>
-                              <Button variant="secondary" size="icon" className="rounded-full" onClick={()=>handleLogout()}>
-                                Log Out
-                              </Button>
-                          </>
-                      }
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>Settings</DropdownMenuItem>
-                      <DropdownMenuItem>Support</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>Logout</DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
+            </Sheet>
         </header>
     )
   }

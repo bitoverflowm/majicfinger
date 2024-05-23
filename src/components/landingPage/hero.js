@@ -1,18 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 import { motion, useInView } from "framer-motion";
 import { BarChart3, ChevronDown } from "lucide-react";
 import { useRef } from "react";
 
-import { useMyState  } from '@/context/stateContext'
-
 import { Flow } from "./flow";
+import { Separator } from "../ui/separator";
 
-export function Hero({readAbout}) {
-    const { setWorking } = useMyState()
+export function Hero() {
     const fadeInRef = useRef(null);
     const fadeInInView = useInView(fadeInRef, {
         once: true,
@@ -29,109 +28,106 @@ export function Hero({readAbout}) {
         },
     };
 
+    const revealVariants = {
+        initial: { opacity: 0, x: '-100%' },
+        animate: { opacity: 1, x: '0%' }
+    };
+
     return (
         <section id="hero">
-        <div className="relative h-full overflow-hidden py-14">
-            <div className="container z-10 flex flex-col">
-            <div className="grid grid-cols-1">
-                <div className="flex flex-col items-center gap-6 pb-8 text-center">
-                <motion.h1
-                    ref={fadeInRef}
-                    className="text-balance bg-gradient-to-br from-black from-30% to-black/60 bg-clip-text py-6 text-5xl font-medium leading-none tracking-tighter text-transparent sm:text-6xl md:text-7xl lg:text-8xl"
-                    animate={fadeInInView ? "animate" : "initial"}
-                    variants={fadeUpVariants}
-                    initial={false}
-                    transition={{
-                    duration: 0.6,
-                    delay: 0.1,
-                    ease: [0.21, 0.47, 0.32, 0.98],
-                    type: "spring",
-                    }}
-                >
-                    Analyze, Visualize and Present Your Data <br /> in 0.67 seconds. <br />
-                </motion.h1>
-
-                <motion.p
-                    className="text-balance text-lg tracking-tight text-gray-400 md:text-xl"
-                    animate={fadeInInView ? "animate" : "initial"}
-                    variants={fadeUpVariants}
-                    initial={false}
-                    transition={{
-                    duration: 0.6,
-                    delay: 0.2,
-                    ease: [0.21, 0.47, 0.32, 0.98],
-                    type: "spring",
-                    }}
-                >
-                    We'll save you from all the complex yabba-dabba-doos out there.
-                </motion.p>
-
-                <motion.div
-                    animate={fadeInInView ? "animate" : "initial"}
-                    variants={fadeUpVariants}
-                    className="flex gap-4 lg:flex-row pt-10"
-                    initial={false}
-                    transition={{
-                    duration: 0.6,
-                    delay: 0.3,
-                    ease: [0.21, 0.47, 0.32, 0.98],
-                    type: "spring",
-                    }}
-                >
-                    <div className="">
-                        <Link
-                        href={'/dashboard'}
-                        className={cn(
-                            // colors
-                            "bg-green-500 cursor-pointer text-white shadow hover:bg-black/90",
-
-                            // layout
-                            "group relative inline-flex h-9 w-full items-center justify-center gap-2 overflow-hidden whitespace-pre rounded-md px-4 py-2 text-base font-semibold tracking-tighter focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:flex",
-
-                            // animation
-                            "transform-gpu ring-offset-current transition-all duration-300 ease-out hover:ring-2 hover:ring-primary hover:ring-offset-2",
-                        )}
+            <div className="relative h-full pt-10">
+                <div className="container z-10 flex flex-col">
+                <div className="grid grid-cols-1">
+                    <div className="flex flex-col gap-6">
+                        <motion.h1
+                            ref={fadeInRef}
+                            className="text-balance bg-gradient-to-br from-lychee_red from-30% to-lychee_red/10 bg-clip-text font-black leading-none tracking-tighter text-transparent sm:text-6xl sm:pt-16 sm:pb-40 md:text-7xl lg:text-[300px]"
+                            animate={fadeInInView ? "animate" : "initial"}
+                            variants={fadeUpVariants}
+                            initial={false}
+                            transition={{
+                            duration: 0.6,
+                            delay: 0.1,
+                            ease: [0.21, 0.47, 0.32, 0.98],
+                            type: "spring",
+                            }}
                         >
-                            Try for Free
-                            <BarChart3 className="size-4 translate-x-0 transition-all duration-300 ease-out group-hover:translate-x-1" />
-                        </Link>
-                        <div className="text-xs pt-1">
-                            * No card required
+                            Lychee.
+                        </motion.h1>
+                        <div className="grid grid-cols-10 w-full">
+                            <div className="col-span-4">
+                                <Separator className="mb-8"/>
+                                <motion.p
+                                    className="text-lychee_white/30 text-4xl"
+                                    animate={fadeInInView ? "animate" : "initial"}
+                                    variants={fadeUpVariants}
+                                    initial={false}
+                                    transition={{
+                                        duration: 0.6,
+                                        delay: 0.2,
+                                        ease: [0.21, 0.47, 0.32, 0.98],
+                                        type: "spring",
+                                    }}
+                                >
+                                    <Image src="./headerText.svg"  width={1000} height={600}/>
+                                </motion.p>
+                                <motion.p
+                                    className="text-lychee_white text-md font-extralight pt-2"
+                                    animate={fadeInInView ? "animate" : "initial"}
+                                    variants={fadeUpVariants}
+                                    initial={false}
+                                    transition={{
+                                    duration: 0.6,
+                                    delay: 0.2,
+                                    ease: [0.21, 0.47, 0.32, 0.98],
+                                    type: "spring",
+                                    }}
+                                >
+                                    We'll save you from all the complex yabba-dabba-doos out there.
+                                </motion.p>
+
+                                <motion.div
+                                    animate={fadeInInView ? "animate" : "initial"}
+                                    variants={fadeUpVariants}
+                                    className="flex gap-4 lg:flex-row pt-8"
+                                    initial={false}
+                                    transition={{
+                                    duration: 0.6,
+                                    delay: 0.3,
+                                    ease: [0.21, 0.47, 0.32, 0.98],
+                                    type: "spring",
+                                    }}
+                                >
+                                    <div className="">
+                                        <Link
+                                        href={'/dashboard'}
+                                        className={cn(
+                                            // colors
+                                            "bg-lychee_go cursor-pointer hover:bg-black/90 hover:text-white hover:shadow-white hover:shadow-2xl",
+
+                                            // layout
+                                            "group relative inline-flex h-9 w-full items-center justify-center gap-2 overflow-hidden whitespace-pre rounded-md px-4 py-2 text-base font-semibold tracking-tighter focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:flex",
+
+                                            // animation
+                                            "transform-gpu ring-offset-current transition-all duration-300 ease-out hover:ring-2 hover:ring-primary hover:ring-offset-2",
+                                        )}
+                                        >
+                                            Try for Free
+                                        </Link>
+                                        <div className="text-xs pt-4 text-lychee_white">
+                                            * No card or registration required <br/> We hope you ❤️ it enough to stay
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            </div>
                         </div>
-                    </div>                    
-                    <div
-                    onClick={()=>readAbout()}
-                    className={cn(
-                        // colors
-                        "bg-white text-black cursor-pointer shadow",
-
-                        // layout
-                        "group relative inline-flex h-9 w-full items-center justify-center gap-2 overflow-hidden whitespace-pre rounded-md px-4 py-2 text-base font-semibold tracking-tighter focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:flex",
-
-                        // animation
-                        "transform-gpu ring-offset-current transition-all duration-300 ease-out hover:ring-2 hover:ring-primary hover:ring-offset-2",
-                    )}
-                    >
-                        Read about it first
-                        <ChevronDown className="size-4 translate-x-0 transition-all duration-300 ease-out group-hover:translate-x-1" />
                     </div>
-                </motion.div>
+                    
                 </div>
-            </div>
-            </div>
-            <div className=' px-5 text-xs text-center flex place-content-center'>
-                <Flow />
-            </div>
-            <div className="text-4xl text-left flex place-content-center">
-                <div className="p-20 w-1/2">
-                    Skip the noise, <br/>
-                    From AI to APIs <br/>
-                    From A to Z <br/>
-                    We've got you covered <br/>
-                    Unlock the most powerful, user-friendly data processing, analysis, and presentation tool on the market.
                 </div>
-            </div>
-                
+                <div className=' px-5 text-xs text-center flex place-content-center'>
+                    <Flow />
+                </div>       
             </div>
         </section>
     );
