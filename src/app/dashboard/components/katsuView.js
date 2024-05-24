@@ -4,6 +4,14 @@ import React, { useEffect, useState } from 'react';
 import { motion} from "framer-motion";
 import { useMyStateV2  } from '@/context/stateContextV2'
 
+import Link from "next/link";
+
+import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+  } from "@/components/ui/alert"
+
 /* Shadcn imports
  * 
  */
@@ -46,6 +54,12 @@ const KatsuView = () => {
                 variants={bentoVariants}
                 className='w-5/6'
             >
+                <Alert className="text-xs bg-lychee_white text-lychee_black border-none w-1/3 mx-auto">
+                    <AlertTitle> 🚧 Heads up!</AlertTitle>
+                    <AlertDescription >
+                        Lychee V2.0 is coming! I am moving some things around. <br/> You can still use the platform, but things might break. - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
+                    </AlertDescription>
+                </Alert>
                 <BentoBase data={dashData} dashView={true} bentoContainer={bentoContainer} setDashData={setDashData} setBentoContainer={setBentoContainer} viewing={viewing} setViewing={setViewing}/>
             </motion.div>
         </div>       
