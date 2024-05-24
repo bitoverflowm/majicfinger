@@ -109,7 +109,7 @@ const Card = (card) => {
 };
 
 export function IntegrationsView() {
-  const [playView, setPlayView] = useState('twitter')
+  const [playView, setPlayView] = useState()
 
   const [randomTiles1, setRandomTiles1] = useState([]);
   const [randomTiles2, setRandomTiles2] = useState([]);
@@ -177,7 +177,7 @@ export function IntegrationsView() {
                           </h1>
                           <p className="mt-2">
                           Just Pick a Data Source <br/>
-                          Twitter, Strava, QuickBooks, Stripe, you name it, we can do it. <br />If you don't see an integration you want, request it below
+                          Twitter, Strava, QuickBooks, Stripe, you name it, Lychee can do it. <br />
                           </p>
                           <a
                           href="/"
@@ -189,7 +189,7 @@ export function IntegrationsView() {
                               "group mt-4 rounded-[2rem] px-6",
                           )}
                           >
-                          Request
+                          Request a New Integration
                           <ChevronRight className="ml-1 size-4 transition-all duration-300 ease-out group-hover:translate-x-1" />
                           </a>
                       </div>

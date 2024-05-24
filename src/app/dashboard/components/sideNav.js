@@ -11,6 +11,7 @@ import {
   Gem,
   Bot,
   Camera,
+  FilePlus2,
 } from "lucide-react"
 
 import { useMyStateV2  } from '@/context/stateContextV2'
@@ -61,7 +62,7 @@ const SideNav = () => {
                 </div>
 
                 <div
-                  className={`flex items-center gap-4 px-2.5 ${viewing === 'upload' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'upload' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('upload')}
                 >
                   <HardDriveUpload className="h-5 w-5" />
@@ -69,7 +70,7 @@ const SideNav = () => {
                 </div>
 
                 <div
-                  className={`flex items-center gap-4 px-2.5 ${viewing === 'integrations' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'integrations' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('integrations')}
                 >
                   <Cable className="h-5 w-5" />
@@ -77,7 +78,7 @@ const SideNav = () => {
                 </div>
 
                 <div
-                  className={`flex items-center gap-4 px-2.5 ${viewing === 'scrape' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'scrape' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('scrape')}
                 >
                   <Shovel className="h-5 w-5" />
@@ -85,11 +86,18 @@ const SideNav = () => {
                 </div>
 
                 <div
-                  className={`flex items-center gap-4 px-2.5 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('generate')}
                 >
                   <BadgePlus className="h-5 w-5" />
                   Generate Data
+                </div>
+                <div
+                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  onClick={() => setViewing('generate')}
+                >
+                  <FilePlus2 className="h-5 w-5" />
+                  New Sheet
                 </div>
 
                 <div

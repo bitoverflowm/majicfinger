@@ -290,7 +290,7 @@ const Nav = () => {
 
 
   return (
-    <div className="absolute top-0 flex w-full items-center gap-4 border-b bg-lychee_black py-2 px-5">
+    <div className="absolute top-0 flex w-full items-center gap-4 border-b py-2 px-5">
           { user ?
               <div className="flex items-center gap-4 ml-auto md:gap-2 lg:gap-4">
                 {((savedDataSets && savedDataSets.length > 0) || (savedCharts && savedCharts.length > 0)) && 

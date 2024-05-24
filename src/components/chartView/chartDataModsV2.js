@@ -292,7 +292,7 @@ const ChartDataModsV2 = () => {
           console.error("Selected palette is not defined. Please run randomColorHandler first.");
           return;
       }
-  
+        
       // Chart themes:
       handleColorSelection(selectedPalette[getRandomIndex(selectedPalette)]);
       handleStrokeSelection(selectedPalette[getRandomIndex(selectedPalette)]);

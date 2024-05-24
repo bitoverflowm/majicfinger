@@ -1,6 +1,7 @@
+import { useState } from 'react'
 
 import { useMyStateV2  } from '@/context/stateContextV2'
-import { Circle, HardDriveUpload, MoveRight, Cable, Shovel } from 'lucide-react'
+import { Circle, HardDriveUpload, MoveRight, Cable, Shovel, FilePlus2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 
@@ -14,14 +15,16 @@ const DataView = ({user}) => {
     const connectedData = contextStateV2?.connectedData
     const setViewing = contextStateV2?.setViewing
 
+    const [startNew, setStartNew] = useState()
+
     return(
         <div className='w-full px-10'>
             <h1 className='text-4xl font-extrabold'>
                 Your Data
             </h1>
             {
-                connectedData ? <div className='min-h-screen'>
-                                    <GridView />
+                (connectedData || startNew) ? <div className='min-h-screen'>
+                                    <GridView startNew={startNew}/>
                                 </div>      
                 : <div className="py-20">
                     <div className='w-1/3 mx-auto py-8'>
@@ -36,7 +39,7 @@ const DataView = ({user}) => {
                                 </Alert>
                         }
                     </div>
-                    <div className="mx-auto w-7/12 grid grid-cols-2 rounded-xl gap-10 bg-muted/50 p-20">
+                    <div className="mx-auto w-9/12 grid grid-cols-3 rounded-xl gap-10 bg-muted/50 p-20">
                         <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('upload')}>
                             <div className='py-4'><HardDriveUpload /></div>
                             <h3 className="pb-1 font-medium leading-none">Upload</h3>
@@ -60,6 +63,11 @@ const DataView = ({user}) => {
                             <h3 className="pb-1 font-medium leading-none">Generate</h3>
                             <p className="text-xs text-muted-foreground">Use Athena (Lychee AI) to generate data to your specifications</p>
                         </div>                        
+                        <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setStartNew(true)}>
+                            <div className='py-4'><FilePlus2 /></div>
+                            <h3 className="pb-1 font-medium leading-none">New Sheet</h3>
+                            <p className="text-xs text-muted-foreground">Start with an empty sheet</p>
+                        </div>
                     </div>
                 </div>
 
