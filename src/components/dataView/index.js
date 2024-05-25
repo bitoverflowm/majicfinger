@@ -9,19 +9,21 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import GridView from '@/components/gridView'
 import { VscCircleFilled } from 'react-icons/vsc'
 
-const DataView = ({user}) => {
+const DataView = ({user, startNew, setStartNew}) => {
     const contextStateV2 = useMyStateV2()
 
     const connectedData = contextStateV2?.connectedData
+    const loadedDataMeta = contextStateV2?.loadedDataMeta
     const setViewing = contextStateV2?.setViewing
-
-    const [startNew, setStartNew] = useState()
 
     return(
         <div className='w-full px-10'>
+                       
             <h1 className='text-4xl font-extrabold'>
                 Your Data
             </h1>
+
+            {loadedDataMeta && <div className='pt-1'>{loadedDataMeta.data_set_name}</div>}
             {
                 (connectedData || startNew) ? <div className='min-h-screen'>
                                     <GridView startNew={startNew}/>

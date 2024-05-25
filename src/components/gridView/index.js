@@ -10,6 +10,8 @@ import "ag-grid-community/styles/ag-theme-quartz.css"; // Theme
 import { PlusIcon } from "@radix-ui/react-icons"
 import { toast } from "sonner"
 
+import { Menu } from './menu'
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -53,11 +55,12 @@ const GridView = ({startNew}) => {
     };
 
     const gridOptions = useMemo(()=> ({
-        onCellClicked: (e) => toast({description: 'Hit Enter to accept change'}),
+        onCellClicked: (e) => toast(`Hit Enter to accept change`, {
+            duration: 5000
+        }),
     }))
 
     const updateCellData = (rowIndex, field, newValue) => {
-        console.log('updating: ', rowIndex, field, newValue)
         setConnectedData(prevData => {
           // Create a new array with updated data
           const newData = prevData.map((item, index) => {
@@ -67,10 +70,11 @@ const GridView = ({startNew}) => {
             return item;
           });
           return newData;
-        });
-        toast({
-            description: `Data updated. Also reflected in Chart!`,
-        });  
+        })
+
+        toast(`Data updated. Chart updated!`, {
+            duration: 5000
+        })
     };
 
     const handleAddRow = () => {
@@ -78,10 +82,12 @@ const GridView = ({startNew}) => {
         connectedCols.forEach(colName => {
             newRow[colName] = ""; // Initialize each property to an empty string or any default value
         });
+        
         setConnectedData([...connectedData, newRow])
-        toast({
-            description: `New Row added!`,
-        });        
+
+        toast(`New Row added!`, {
+            duration: 5000
+        })   
     }
 
     const handleAddColumn = (name) => {
@@ -104,9 +110,10 @@ const GridView = ({startNew}) => {
               });
         }
         setColAddOpen(false)
-        toast({
-            description: `New Column added!`,
-        });        
+
+        toast(`New Column added!`, {
+            duration: 5000
+        })   
     }
 
     const handleInputChange = (event) => {
@@ -125,45 +132,54 @@ const GridView = ({startNew}) => {
 
     return (
         <div className="ag-theme-quartz" style={{ height: '100%', width: '100%' }}>           
-            <div className='w-full py-2 flex justify-end place-items-center gap-2' >
-                <Dialog open={colAddOpen} onOpenChange={setColAddOpen}>
-                    <Label className="text-black text-xs">Add Column</Label>
-                    <DialogTrigger asChild>    
-                        <Button variant="outline" size="icon">
-                            <PlusIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle>Add Column</DialogTitle>
-                            <DialogDescription>
-                                Name your column
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
-                                    Name
-                                </Label>
-                                <Input
-                                    id="name"
-                                    defaultValue="Placeholder"
-                                    value={columnName}
-                                    onChange={handleInputChange}
-                                    className="col-span-3"
-                                />
+            <div className='w-full pt-6 pb-2 flex place-items-center gap-2' >
+                <div className=''>
+                    <Menu />
+                </div>
+                <div className='ml-auto flex place-items-center gap-2'>
+                    <Dialog open={colAddOpen} onOpenChange={setColAddOpen}>
+                        <Label className="text-black text-xs">Add Column</Label>
+                        <DialogTrigger asChild>    
+                            <Button variant="outline" size="icon">
+                                <PlusIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Add Column</DialogTitle>
+                                <DialogDescription>
+                                    Name your column
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">
+                                        Name
+                                    </Label>
+                                    <Input
+                                        id="name"
+                                        defaultValue="Placeholder"
+                                        value={columnName}
+                                        onChange={handleInputChange}
+                                        className="col-span-3"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                            handleSubmit(columnName);
+                                            }
+                                        }}
+                                    />
+                                </div>
                             </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="submit" onClick={()=>handleSubmit(columnName)}>Save changes</Button>
-                        </DialogFooter>                        
-                    </DialogContent>
-                </Dialog>                
-                
-                <Label className="text-black text-xs">Add Row</Label>
-                <Button variant="outline" size="icon" onClick={()=>handleAddRow()}>
-                    <PlusIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                </Button>        
+                            <DialogFooter>
+                                <Button type="submit" onClick={()=>handleSubmit(columnName)}>Save changes</Button>
+                            </DialogFooter>                        
+                        </DialogContent>
+                    </Dialog>               
+                    <Label className="text-black text-xs">Add Row</Label>
+                    <Button variant="outline" size="icon" onClick={()=>handleAddRow()}>
+                        <PlusIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                    </Button>
+                </div>
             </div>
             <div className='h-[900px]'>
                 <AgGridReact 

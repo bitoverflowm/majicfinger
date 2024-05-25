@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import moment from "moment"
@@ -39,6 +39,11 @@ const Nav = () => {
   //saving charts
   const savedCharts = contextStateV2?.savedCharts
   const setSavedCharts = contextStateV2?.setSavedCharts
+
+  //let system know to conduct refetch
+  const setRefetchData = contextStateV2?.setRefetchData
+  const setRefetchChart = contextStateV2?.setRefetchData
+
   //current chart view properties
   const chartOptions = contextStateV2?.chartOptions
   const chartTheme = contextStateV2?.chartTheme
@@ -86,7 +91,7 @@ const Nav = () => {
     }
   };
 
-  const [overwrite, setOverwrite] = useState(true)
+  const [overwrite, setOverwrite] = useState()
 
   const handleSave = async () => {
       if(overwrite){
@@ -115,6 +120,7 @@ const Nav = () => {
           .then(response => response.json())
           .then(data => {
               toast(`Your Chart has been saved as ${loadedChartMeta.chart_name}`)
+              setRefetchChart(1)
           })
           .catch(error => {
               console.error('Error saving Data:', error);
@@ -137,6 +143,7 @@ const Nav = () => {
             .then(response => response.json())
             .then(data => {
                 toast(`Your Data has been saved as ${loadedDataMeta.data_set_name}`)
+                setRefetchData(1)
                 // Handle the response data here
             })
             .catch(error => {
@@ -174,6 +181,7 @@ const Nav = () => {
           .then(response => response.json())
           .then(data => {
               toast(`Your Chart has been saved as ${newChartName}`)
+              setRefetchChart(1)
               // Handle the response data here
           })
           .catch(error => {
@@ -195,12 +203,13 @@ const Nav = () => {
                 last_saved_date: new Date(),
                 labels: ['test'],
                 source: 'userUpload',
-                user_id: user.userId,           
+                user_id: user.userId,        
             }),
           })
           .then(response => response.json())
           .then(data => {
               toast(`Your Data has been saved as ${newDataName}`)
+              setRefetchData(1)
               // Handle the response data here
           })
           .catch(error => {
@@ -287,6 +296,10 @@ const Nav = () => {
         })
     }    
   }
+
+  useEffect(()=> {
+    loadedChartMeta || loadedDataMeta && setOverwrite(true)
+  }, [])
 
 
   return (
@@ -458,7 +471,7 @@ const Nav = () => {
               </DropdownMenu>
               </div>
             : <div className="flex ml-auto" >
-                {connectedData && <div className="flex">You have unsaved data register to save your progress</div>}
+                {connectedData && <div className="flex text-xs">Register to save your work</div>}
                 <div className="bg-black text-white px-3 py-2 rounded-md text-xs cursor-pointer" onClick={()=>setViewing('register')}> Log in/Register </div>
               </div>
           }

@@ -227,6 +227,8 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
     //data management
     const [dataSetName, setDataSetName] = useState()
+    const [refetchData, setRefetchData] = useState()
+    const [refetchChart, setRefetchChart] = useState()
     //all saved DataSets
     const [savedDataSets, setSavedDataSets] = useState()
     const [loadedDataMeta, setLoadedDataMeta] = useState()
@@ -432,7 +434,6 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [textColor, setTextColor] = useState()
     const [cardColor, setCardColor] = useState()
 
-
     useEffect(()=>{
         chartOptions &&
           setChartOptions(prevOptions => ({
@@ -440,11 +441,10 @@ export const StateProviderV2 = ({children, initialSettings}) => {
               theme: chartTheme
             }))
       }, [chartTheme])
-
-    
+ 
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart}}>
             {children}
         </StateContextV2.Provider>
     )
