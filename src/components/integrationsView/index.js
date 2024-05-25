@@ -1,236 +1,62 @@
 "use client";
 
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import Marquee from "@/components/magicui/marquee";
-import { motion, useAnimation, useInView } from "framer-motion";
-import {
-  BarChart,
-  ChevronRight,
-  File,
-  Globe,
-  HeartHandshake,
-  Rss,
-  Shield,
-} from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import IntegrationPlayground from "./integrationPlayground";
 
-const tiles = [
-  {
-    icon: <HeartHandshake className="size-full" />,
-    bg: (
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-1/2 w-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible rounded-full bg-gradient-to-r from-orange-600 via-rose-600 to-violet-600 opacity-70 blur-[20px] filter"></div>
-    ),
-  },
-  {
-    icon: <Globe className="size-full" />,
-    bg: (
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-1/2 w-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 opacity-70 blur-[20px] filter"></div>
-    ),
-  },
-  {
-    icon: <File className="size-full" />,
-    bg: (
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-1/2 w-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible rounded-full bg-gradient-to-r from-green-500 via-teal-500 to-emerald-600 opacity-70 blur-[20px] filter"></div>
-    ),
-  },
-  {
-    icon: <Shield className="size-full" />,
-    bg: (
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-1/2 w-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible rounded-full bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-600 opacity-70 blur-[20px] filter"></div>
-    ),
-  },
-  {
-    icon: <Rss className="size-full" />,
-    bg: (
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-1/2 w-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible rounded-full bg-gradient-to-r from-orange-600 via-rose-600 to-violet-600 opacity-70 blur-[20px] filter"></div>
-    ),
-  },
-  {
-    icon: <BarChart className="size-full" />,
-    bg: (
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-1/2 w-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible rounded-full bg-gradient-to-r from-gray-600 via-gray-500 to-gray-400 opacity-70 blur-[20px] filter"></div>
-    ),
-  },
-];
+import { FaXTwitter } from "react-icons/fa6";
+import { FaCat } from "react-icons/fa";
+import { Shrink } from "lucide-react";
 
-const shuffleArray = (array) => {
-  let currentIndex = array.length,
-    randomIndex;
-  // While there remain elements to shuffle.
-  while (currentIndex !== 0) {
-    // Pick a remaining element.
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex--;
-    // And swap it with the current element.
-    [array[currentIndex], array[randomIndex]] = [
-      array[randomIndex],
-      array[currentIndex],
-    ];
-  }
-  return array;
-};
 
-const Card = (card) => {
-  const id = useId();
-  const controls = useAnimation();
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true });
-
-  useEffect(() => {
-    if (inView) {
-      controls.start({
-        opacity: 1,
-        transition: { delay: Math.random() * 2, ease: "easeOut", duration: 1 },
-      });
-    }
-  }, [controls, inView]);
-
-  return (
-    <motion.div
-      key={id}
-      ref={ref}
-      initial={{ opacity: 0 }}
-      animate={controls}
-      className={cn(
-        "relative size-20 cursor-pointer overflow-hidden rounded-2xl border p-4",
-        // light styles
-        "bg-white [box-shadow:0_0_0_1px_rgba(0,0,0,.03),0_2px_4px_rgba(0,0,0,.05),0_12px_24px_rgba(0,0,0,.05)]",
-        // dark styles
-        "transform-gpu dark:bg-transparent dark:[border:1px_solid_rgba(255,255,255,.1)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
-      )}
-    >
-      {card.icon}
-      {card.bg}
-    </motion.div>
-  );
-};
 
 export function IntegrationsView() {
   const [playView, setPlayView] = useState()
 
-  const [randomTiles1, setRandomTiles1] = useState([]);
-  const [randomTiles2, setRandomTiles2] = useState([]);
-  const [randomTiles3, setRandomTiles3] = useState([]);
-  const [randomTiles4, setRandomTiles4] = useState([]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Ensures this runs client-side
-      setRandomTiles1(shuffleArray([...tiles]));
-      setRandomTiles2(shuffleArray([...tiles]));
-      setRandomTiles3(shuffleArray([...tiles]));
-      setRandomTiles4(shuffleArray([...tiles]));
-    }
-  }, []);
-
   return (
     <div>
       {
-        playView === 'twitter' 
-          ? <div>
-              <IntegrationPlayground />
+        playView ?
+          <div>
+              <IntegrationPlayground setPlayView={setPlayView} playView={playView}/>
             </div>
           :
           <>
-            <section id="cta">
-              <div className="py-14">
-                  <div className="container flex w-full flex-col items-center justify-center p-4">
-                  <div className="relative flex w-full max-w-[1000px] flex-col items-center justify-center overflow-hidden rounded-[2rem] border">
-                      <Marquee
-                      reverse
-                      className="-delay-[200ms] [--duration:20s]"
-                      repeat={4}
-                      >
-                      {randomTiles1.map((review, idx) => (
-                          <Card key={idx} {...review} />
-                      ))}
-                      </Marquee>
-                      <Marquee reverse className="[--duration:30s]" repeat={4}>
-                      {randomTiles2.map((review, idx) => (
-                          <Card key={idx} {...review} />
-                      ))}
-                      </Marquee>
-                      <Marquee
-                      reverse
-                      className="-delay-[200ms] [--duration:20s]"
-                      repeat={4}
-                      >
-                      {randomTiles3.map((review, idx) => (
-                          <Card key={idx} {...review} />
-                      ))}
-                      </Marquee>
-                      <Marquee reverse className="[--duration:30s]" repeat={4}>
-                      {randomTiles4.map((review, idx) => (
-                          <Card key={idx} {...review} />
-                      ))}
-                      </Marquee>
-                      <div className="absolute z-10">
-                      <div className="mx-auto size-24 rounded-[2rem] border bg-white/10 p-3 shadow-2xl backdrop-blur-md dark:bg-black/10 lg:size-32">
-                          <HeartHandshake className="mx-auto size-16 text-black dark:text-white lg:size-24" />
-                      </div>
-                      <div className="z-10 mt-4 flex flex-col items-center text-center text-primary">
-                          <h1 className="text-3xl font-bold lg:text-4xl">
-                          Connect to Anything
-                          </h1>
-                          <p className="mt-2">
-                          Just Pick a Data Source <br/>
-                          Twitter, Strava, QuickBooks, Stripe, you name it, Lychee can do it. <br />
-                          </p>
-                          <a
-                          href="/"
-                          className={cn(
-                              buttonVariants({
-                              size: "lg",
-                              variant: "outline",
-                              }),
-                              "group mt-4 rounded-[2rem] px-6",
-                          )}
-                          >
-                          Request a New Integration
-                          <ChevronRight className="ml-1 size-4 transition-all duration-300 ease-out group-hover:translate-x-1" />
-                          </a>
-                      </div>
-                      <div className="absolute inset-0 -z-10 rounded-full  bg-white opacity-40 blur-xl dark:bg-black" />
-                      </div>
-                      <div className="absolute inset-x-0 bottom-0 h-full bg-gradient-to-b from-transparent to-white to-70% dark:to-black" />
-                  </div>
-                  </div>
+            <div className="text-justify leading-loose">
+              <div className="text-4xl font-black text-center py-8">
+                On a mission to connect 100,000 + data sources by 2026
               </div>
-          </section>
-          <div className="text-justify leading-loose">
-            <div className="text-4xl font-strong text-center py-8">On a mission to connect 100,000 + data sources by 2026</div>
-            <div className="text-sm w-1/3 mx-auto grid grid-cols-2 gap-10">
-              <div>
-                <div className="pb-1">Hi everyone, </div>
-                <div className="pb-1">Misterrpink here. This section of Lychee is the apple of my eye. Yes AI is cool, and being able to do a full spectum analysis on data at the click of a button is otherworldly.</div>
-                <div>But if you have worked with data. You know, accessing valuable data, is a time-consuming if not difficult feat.</div>
-              </div>
-              <div>
-                <div className="pb-1">You need to code or do a lot of manual work and downloads for for each data set</div>
-                <div className="pb-1">Finally No more Coding Python Scripts, no more reading API docs, no more downloading csvs, no more figuring out what do do with xml files.</div>
-                <br/>
-              </div>            
             </div>
-          </div>
-          <div>
-              <div className="">Ready for You Now</div>
-              <div className="flex">
-                  <div>Twitter</div>
-              </div>
-          </div>
-          <div>
-              Some Example flows
-          </div>
-          <div>
-              Integrations coming soon
-          </div>
+            <div>
+                <div className="">Connect to any of the following:</div>
+                <div className="mx-auto w-9/12 grid grid-cols-3 rounded-xl gap-10 bg-muted/50 p-20">
+                        <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setPlayView('twitter')}>
+                            <div className='py-4'><FaXTwitter /></div>
+                            <h3 className="pb-1 font-medium leading-none">Twitter / X</h3>
+                            <p className="text-xs text-muted-foreground">Upload your own .csv, excel</p>
+                            <p className="pt-1 text-xs text-muted-foreground">.json, and more coming soon</p>
+                        </div>
+                        <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setPlayView('wallStreetBets')}>
+                            <div className='py-4'><FaCat /></div>
+                            <h3 className="pb-1 font-medium leading-none">Wall Street Bets</h3>
+                            <p className="text-xs text-muted-foreground">Get the sentiment of the to 50 stocks discussed on Reddit subreddit - wallStreetBets</p>
+                            <p className="pt-1 text-xs text-muted-foreground">Also view historical data</p>
+                        </div>
+                        <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setPlayView('shortSqueeze')}>
+                            <div className='py-4'><Shrink /></div>
+                            <h3 className="pb-1 font-medium leading-none">Short Squeeze Stock Scanner</h3>
+                            <p className="text-xs text-muted-foreground">Get a list of stocks that are in TTM Squeeze or out of squeeze</p>
+                        </div>
+                    </div>
+            </div>
+            <div>
+                Some Example flows
+            </div>
+            <div>
+                Integrations coming soon
+            </div>
           </>
       }
-        
-
     </div>
   );
 }
