@@ -7,7 +7,7 @@ import "ag-grid-community/styles/ag-grid.css"; // Core CSS
 import "ag-grid-community/styles/ag-theme-quartz.css"; // Theme
 
 
-const PreviewGrid = () => {
+const PreviewGrid = ({h, w}) => {
 
     const contextStateV2 = useMyStateV2()
     
@@ -26,7 +26,7 @@ const PreviewGrid = () => {
     }))
 
     return (
-        <div className="ag-theme-quartz px-4 h-[300px] w-[800px]">
+        <div className={`ag-theme-quartz px-4 ${h ? h: 'h-[300px]'} ${ w ? w: 'w-[800px]'}`}>
             <AgGridReact 
                 defaultColDef = {defaultColDef}
                 rowData={connectedData.slice(0,4)} 

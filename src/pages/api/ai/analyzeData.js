@@ -36,7 +36,7 @@ export default async (req, res) => {
         const assistant = await openai.beta.assistants.create({
             name: "Lychee0",
             instructions:
-                "You are a expert data analysis and you have access to data. You can conduct data analysis, infer logic from the data, and also provide advice on interesting patterns that the data reveals.",
+                "You are a expert data analysis and you have access to the json data attached. You can conduct data analysis, infer logic from the data, and also provide advice on interesting patterns that the data reveals.",
             model: "gpt-4o",
             tools: [{ type: "code_interpreter" }],
             tool_resources: {
@@ -51,7 +51,7 @@ export default async (req, res) => {
         const newdataRun = await openai.beta.threads.createAndRun({
             assistant_id: assistant.id,
             thread: {
-                messages: [{ role: "user", content: `Please give me a summary of the data in the file. Also list some interesting further exploration that can be done with this data. And how could a user use this data for their or society's benefit.` }]
+                messages: [{ role: "user", content: req.body.prompt }]
             }
         });
         
@@ -59,9 +59,11 @@ export default async (req, res) => {
         console.log("Polling to check data run")
         const completedRun = await pollRunStatus(newdataRun.thread_id, newdataRun.id);
         console.log("data poll complete")
-        
+        console.log("completed RUn log: ", completedRun)
         // Fetch the thread details to get the response
+
         const threadDetails = await openai.beta.threads.messages.list(newdataRun.thread_id);
+        console.log("pliminary thread details log: ", threadDetails)
         console.timeLog("thread details: ", threadDetails.data)
         const dataText = threadDetails.data.find(msg => msg.role === "assistant" && msg.run_id === newdataRun.id)?.content[0].text.value;
         console.log("data generated: ", dataText )

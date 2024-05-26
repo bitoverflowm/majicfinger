@@ -62,7 +62,7 @@ const SideNav = () => {
                 </div>
 
                 <div
-                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'upload' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-6 px-2.5 ${viewing === 'upload' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('upload')}
                 >
                   <HardDriveUpload className="h-5 w-5" />
@@ -70,7 +70,7 @@ const SideNav = () => {
                 </div>
 
                 <div
-                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'integrations' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-6 px-2.5 ${viewing === 'integrations' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('integrations')}
                 >
                   <Cable className="h-5 w-5" />
@@ -78,7 +78,7 @@ const SideNav = () => {
                 </div>
 
                 <div
-                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'scrape' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-6 px-2.5 ${viewing === 'scrape' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('scrape')}
                 >
                   <Shovel className="h-5 w-5" />
@@ -86,14 +86,14 @@ const SideNav = () => {
                 </div>
 
                 <div
-                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-6 px-2.5 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('generate')}
                 >
                   <BadgePlus className="h-5 w-5" />
                   Generate Data
                 </div>
                 <div
-                  className={`flex items-center gap-4 pl-8 px-2.5 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  className={`flex items-center gap-4 pl-6 px-2.5 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
                   onClick={() => setViewing('generate')}
                 >
                   <FilePlus2 className="h-5 w-5" />
@@ -132,18 +132,18 @@ const SideNav = () => {
                   Presentation
                 </div>
               </nav>
-              <div className="mt-auto mb-10 w-56">
+              <div className="mt-auto mb-10 w-40">
                 <Card>
                   <CardHeader className="p-4">
                     <CardTitle className="text-xl text-green-500 text-center">50% off</CardTitle>
                     <CardDescription>
                       <div className="text-sm text-center">$69.99</div>
-                      <div className="pb-1 text-center">One Time Payment for Life Time Access</div>
-                      <div className="line-through text-xs text-center">Normally $150</div>
+                      <div className="pb-1 text-xs text-center">One Time Payment <br /> Life Time Access</div>
+                      <div className="line-through text-xs text-center">$150</div>
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="w-full text-xs">
-                    <div className="p-3 bg-slate-100/80 rounded-md">BONUS: $100/month of Free AI credits, for life, on the house</div>
+                    <div className="p-3 bg-slate-100/80 rounded-md">Bonus: $100/month of Free AI credits, for life, on the house</div>
                     <div className="flex py-2 place-content-center">
                       <Button size="sm" className="text-xs">
                         See Pricing
