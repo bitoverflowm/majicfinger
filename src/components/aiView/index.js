@@ -112,15 +112,28 @@ const AiView = ({playView, setPlayView}) => {
         }    
       }
     
-    useEffect(() => {
-        const updateEditorContent = async () => {
-            if (response) {
-            const blocks = await editor.tryParseMarkdownToBlocks(response);
-            editor.replaceBlocks(editor.document, blocks);
+
+      useEffect(() => {
+        const appendToEditorContent = async () => {
+          if (response) {
+            // Convert the new response to blocks
+            const newBlocks = await editor.tryParseMarkdownToBlocks(response);
+    
+            // Get the current top-level blocks in the document
+            const currentBlocks = editor.document;
+            
+            if (currentBlocks.length === 0) {
+              // If no blocks exist, insert at the start
+              editor.insertBlocks(newBlocks, { id: editor.document.children[0].id }, "before");
+            } else {
+              // Insert the new blocks after the last block
+              const lastBlock = currentBlocks[currentBlocks.length - 1];
+              editor.insertBlocks(newBlocks, lastBlock.id, "after");
             }
+          }
         };
-        updateEditorContent();
-    }, [response, editor]);
+        appendToEditorContent();
+      }, [response, editor]);
 
     return (
         <main className="grid flex-1 gap-4 p-4 py-20 w-full md:grid-cols-2 lg:grid-cols-3">
