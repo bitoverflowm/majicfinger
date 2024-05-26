@@ -2,7 +2,7 @@
 import OpenAI from "openai"
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_SECRET,
+    apiKey: process.env.OPENAI_DEV_SECRET,
 })
 
 async function checkRunStatus(threadId, runId) {

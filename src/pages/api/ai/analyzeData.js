@@ -6,7 +6,7 @@ import OpenAI from "openai"
 import { pollRunStatus } from "./aiUtils";
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_SECRET,
+    apiKey: process.env.OPENAI_DEV_SECRET,
 })
 export default async (req, res) => {
     try {
@@ -18,7 +18,7 @@ export default async (req, res) => {
         console.log("setting file stream")
         const tempFilePath = path.join(os.tmpdir(), 'tempfile.json');
 
-        fs.writeFileSync(tempFilePath, JSON.stringify(req.body.data[0]));
+        fs.writeFileSync(tempFilePath, JSON.stringify(req.body.data));
 
         const fileStream = fs.createReadStream(tempFilePath);
 
@@ -34,12 +34,16 @@ export default async (req, res) => {
         console.log("Creating assistant")
         // create assistant
         const assistant = await openai.beta.assistants.create({
-            name: "MajicFinger",
+            name: "Lychee0",
             instructions:
-                "You are a data analysis expert and you have access to data files to answer user questions about the data. You can conduct data analysis, infer logic from the data, and also provide advice on interesting patterns that the data reveals.",
-            model: "gpt-4-turbo-preview",
-            tools: [{"type": "retrieval"}],
-            file_ids: [file.id],
+                "You are a expert data analysis and you have access to data. You can conduct data analysis, infer logic from the data, and also provide advice on interesting patterns that the data reveals.",
+            model: "gpt-4o",
+            tools: [{ type: "code_interpreter" }],
+            tool_resources: {
+                "code_interpreter": {
+                    "file_ids": [file.id]
+                }
+            }
         });
 
         console.log("added assistant: ", assistant.id)
@@ -47,7 +51,7 @@ export default async (req, res) => {
         const newdataRun = await openai.beta.threads.createAndRun({
             assistant_id: assistant.id,
             thread: {
-                messages: [{ role: "user", content: `As you are a data analyst, please give me a summary of the data in the file as a data analyst would do.` }]
+                messages: [{ role: "user", content: `Please give me a summary of the data in the file. Also list some interesting further exploration that can be done with this data. And how could a user use this data for their or society's benefit.` }]
             }
         });
         
@@ -58,7 +62,7 @@ export default async (req, res) => {
         
         // Fetch the thread details to get the response
         const threadDetails = await openai.beta.threads.messages.list(newdataRun.thread_id);
-        console.timeLog("thread details: ", threadDetails.data[0])
+        console.timeLog("thread details: ", threadDetails.data)
         const dataText = threadDetails.data.find(msg => msg.role === "assistant" && msg.run_id === newdataRun.id)?.content[0].text.value;
         console.log("data generated: ", dataText )
 

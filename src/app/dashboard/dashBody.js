@@ -13,6 +13,7 @@ import { IntegrationsView } from "@/components/integrationsView";
 import Login from "@/components/login";
 
 import { toast } from "sonner"
+import AiView from "@/components/aiView";
 
 
 
@@ -95,7 +96,7 @@ const DashBody = ({user}) => {
                 { viewing === 'charts' && <div className="py-16 h-screen"><ChartViewV2 user={user}/></div> }
                 { viewing === 'gallery' && <div className="py-16 min-h-screen"><ChartGallery/></div> }
                 { viewing === 'integrations' && <div className="py-16"><IntegrationsView/></div> }
-                { viewing === 'ai' && "AI" }
+                { viewing === 'ai' && <AiView/> }
                 { viewing === 'presentation' && "Start Writing a Report Here" }
                 { viewing === 'register' && <div className="py-16"><Login/></div>}
             </div>
