@@ -1,4 +1,5 @@
 import { useState, useEffect  } from "react"
+import { useUser } from '@/lib/hooks';
 
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
     Select,
     SelectContent,
@@ -36,6 +38,8 @@ import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
   
 const AiView = ({playView, setPlayView}) => {
+    const user = useUser()
+
     const contextStateV2 = useMyStateV2()
 
     const savedDataSets = contextStateV2?.savedDataSets
@@ -53,35 +57,55 @@ const AiView = ({playView, setPlayView}) => {
     // Creates a new editor instance.
     const editor = useCreateBlockNote();
 
+    // AI Assistant and threads management
+    const [threadId, setThreadId] = useState()
+    const [assistantId, setAssistantId] = useState()
+    const [usage, setUsage] = useState()
+    const [fileId, setFileid] = useState()
+    const [analyzedData, setAnalyzedData] = useState()
+    const [keepThread, setKeepThread] = useState(true)
+    const [backup, setBackup] = useState()
+
+    const handleSwitchChange = () => {
+        setKeepThread(!keepThread);
+    };
+
+
+    //this is actaully technically the assistant cretion step, where teh main data files are added
     const analyzeData = async () => {
+        //alert('hello')
         setLoading(true);
         setProgress(0); // Reset progress bar
 
-        if(connectedData){
+        if(connectedData){            
             try {
                 const timer = setInterval(() => {
                     setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
-                  }, 500);
+                  }, 3000);
 
                 let res = await fetch('/api/ai/analyzeData', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ data: connectedData, prompt: query}),
+                    body: JSON.stringify({ data: connectedData, prompt: query, assistant_id: assistantId && assistantId, thread_id: threadId && keepThread && threadId, user_id: user.userId, data_set_id: loadedDataMeta._id }),
                 });
     
                 if (res.status === 200) {
                     let resData = await res.json();
                     console.log(resData);
                     setResponse(resData.analysis)
+                    setFileid(resData.file_id)
+                    setAssistantId(resData.assistant_id)
+                    setThreadId(resData.thread_id)
+                    setUsage(resData.usage)
+                    setAnalyzedData(resData.data_set_id)
+                    setBackup(resData.backup)
                 } else {
                     console.error("Error analyzing data");
                 }
-
                 clearInterval(timer);
                 setProgress(100); // Complete progress
-                
             } catch (error) {
                 console.error("Fetch error:", error);
             } finally {
@@ -113,27 +137,27 @@ const AiView = ({playView, setPlayView}) => {
       }
     
 
-      useEffect(() => {
-        const appendToEditorContent = async () => {
-          if (response) {
-            // Convert the new response to blocks
-            const newBlocks = await editor.tryParseMarkdownToBlocks(response);
-    
-            // Get the current top-level blocks in the document
-            const currentBlocks = editor.document;
-            
-            if (currentBlocks.length === 0) {
-              // If no blocks exist, insert at the start
-              editor.insertBlocks(newBlocks, { id: editor.document.children[0].id }, "before");
-            } else {
-              // Insert the new blocks after the last block
-              const lastBlock = currentBlocks[currentBlocks.length - 1];
-              editor.insertBlocks(newBlocks, lastBlock.id, "after");
-            }
-          }
-        };
-        appendToEditorContent();
-      }, [response, editor]);
+    useEffect(() => {
+    const appendToEditorContent = async () => {
+        if (response) {
+        // Convert the new response to blocks
+        const newBlocks = await editor.tryParseMarkdownToBlocks(response);
+
+        // Get the current top-level blocks in the document
+        const currentBlocks = editor.document;
+        
+        if (currentBlocks.length === 0) {
+            // If no blocks exist, insert at the start
+            editor.insertBlocks(newBlocks, { id: editor.document.children[0].id }, "before");
+        } else {
+            // Insert the new blocks after the last block
+            const lastBlock = currentBlocks[currentBlocks.length - 1];
+            editor.insertBlocks(newBlocks, lastBlock.id, "after");
+        }
+        }
+    };
+    appendToEditorContent();
+    }, [response, editor]);
 
     return (
         <main className="grid flex-1 gap-4 p-4 py-20 w-full md:grid-cols-2 lg:grid-cols-3">
@@ -175,6 +199,11 @@ const AiView = ({playView, setPlayView}) => {
                                     )}
                                 </SelectContent>
                             </Select>
+                            { threadId && <div className="flex items-center space-x-2">
+                                            <Switch id="airplane-mode" checked={keepThread} onCheckedChange={handleSwitchChange}/>
+                                            <Label htmlFor="airplane-mode">Keep Current Thread?</Label>
+                                        </div>
+                            }
                             <div>What do you want to do?</div>
                             <div>
                                 <div className="text-xs py-1">General Data Actions</div>
@@ -185,10 +214,34 @@ const AiView = ({playView, setPlayView}) => {
                                         )
                                     }
                                 </div>
-                                <div className="py-1">Financial Data Specific Actions</div>
-                                <div className="flex flex-wrap gap-2">
+                                <div className="text-xs py-1">Modify Data</div>
+                                <div className="flex flex-wrap gap-2 place-content-center">
                                     {
-                                        prompts.analyzingFinancialData.map((p)=>
+                                        prompts && prompts.modifyData.map((p)=>
+                                            <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>
+                                        )
+                                    }
+                                </div>
+                                <div className="text-xs py-1">Special Actions</div>
+                                <div className="flex flex-wrap gap-2 place-content-center">
+                                    {
+                                        prompts && prompts.uniqueActions.map((p)=>
+                                            <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>
+                                        )
+                                    }
+                                </div>
+                                <div className="text-xs py-1">Financial Data Specific Action</div>
+                                <div className="flex flex-wrap gap-2 place-content-center">
+                                    {
+                                        prompts && prompts.analyzingFinancialData.map((p)=>
+                                            <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>
+                                        )
+                                    }
+                                </div>
+                                <div className="text-xs py-1">Visualizations</div>
+                                <div className="flex flex-wrap gap-2 place-content-center">
+                                    {
+                                        prompts && prompts.visualizations.map((p)=>
                                             <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>
                                         )
                                     }
