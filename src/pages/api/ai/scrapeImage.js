@@ -14,6 +14,55 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_DEV_SECRET,
 });
 
+
+export default async (req, res) => {
+    try {
+        if (!req.body.imageUrl) {
+            return res.status(400).json({ error: "No image provided" });
+        }
+        
+        console.log("file received hitting direct vision AI")
+        //
+
+        // create request
+        const scrapedResponse = await openai.chat.completions.create({
+            model : "gpt-4o",
+            messages:[
+                {
+                    role: "user",
+                    content: [
+                        {type: "text", text: `You are a data gatherer. Attached is an image of a website that contains information. Respond with a JSON object with columns indicated in this array:
+                        ${JSON.stringify(req.body.columns.reduce((acc, column) => ({ ...acc, [column]: 'float' }), {}), null, 4)}
+                        `},
+                        {
+                            type: "image_url",
+                            image_url: {
+                                "url": req.body.imageUrl,
+                            },
+                        }
+
+                    ]
+                }
+            ],
+        });
+
+        console.log('scrapedResponse: ', scrapedResponse)
+        console.log('scrapedResponse message: ', scrapedResponse.choices[0].message)
+
+        const messageContent = scrapedResponse.choices[0].message.content;
+        return res.status(200).json({ message: "API executed successfully", response: { role: "assistant", content: messageContent } });
+
+    } catch (error) {
+        console.log("an error occurred", error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
+
+
+
+/*
+
 const downloadImage = async (imageUrl, outputFilePath) => {
     const response = await fetch(imageUrl);
     if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
@@ -106,3 +155,4 @@ export default async (req, res) => {
         res.status(500).json({ message: 'Internal Server Error' });
     }
 };
+*/

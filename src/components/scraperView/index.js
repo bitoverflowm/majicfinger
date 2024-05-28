@@ -68,30 +68,28 @@ const ScraperView = ({playView, setPlayView}) => {
         try {
             const timer = setInterval(() => {
                 setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
-                }, 3000);
-            
-                console.log("hello")
-
+            }, 3000);
 
             let res = await fetch('/api/ai/scrapeImage', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ imageUrl: response.data.screenshot.url, columns: columns, user_id: user.userId}),
+                body: JSON.stringify({ imageUrl: response.data.screenshot.url, columns: columns, user_id: user.userId }),
             });
 
-            
             if (res.status === 200) {
                 let resData = await res.json();
-                console.log(resData);
-                setScrapedData(resData.analysis)
-                setFileid(resData.file_id)
-                setAssistantId(resData.assistant_id)
-                setThreadId(resData.thread_id)
-                setUsage(resData.usage)
-                setAnalyzedData(resData.data_set_id)
-                setBackup(resData.backup)
+                console.log("successful parsing");
+                console.log("extracting data: ", resData.response.content);
+
+                // Extract and convert JSON string from response content
+                const jsonString = resData.response.content.replace("```json\n", "").replace("\n```", "");
+                console.log("the json string: ", jsonString);
+
+                const data = JSON.parse(jsonString);
+                console.log(data);
+                setConnectedData(data);
             } else {
                 console.error("Error analyzing data");
             }
@@ -102,7 +100,6 @@ const ScraperView = ({playView, setPlayView}) => {
         } finally {
             setLoading(false);
         }
-
     }
 
     const scrapeUrl = async (url) => {
