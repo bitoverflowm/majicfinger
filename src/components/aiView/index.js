@@ -77,7 +77,7 @@ const AiView = ({playView, setPlayView}) => {
         setLoading(true);
         setProgress(0); // Reset progress bar
 
-        if(connectedData){            
+        if(connectedData){
             try {
                 const timer = setInterval(() => {
                     setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
@@ -88,7 +88,7 @@ const AiView = ({playView, setPlayView}) => {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ data: connectedData, prompt: query, assistant_id: assistantId && assistantId, thread_id: threadId && keepThread && threadId, user_id: user.userId, data_set_id: loadedDataMeta._id }),
+                    body: JSON.stringify({ data: !(keepThread) && connectedData, prompt: query, assistant_id: assistantId && assistantId, thread_id: threadId && keepThread && threadId, user_id: user.userId, data_set_id: loadedDataMeta._id }),
                 });
     
                 if (res.status === 200) {

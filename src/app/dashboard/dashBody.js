@@ -14,6 +14,7 @@ import Login from "@/components/login";
 
 import { toast } from "sonner"
 import AiView from "@/components/aiView";
+import ScraperView from "@/components/scraperView";
 
 
 
@@ -47,7 +48,7 @@ const DashBody = ({user}) => {
                     toast('Project History Loaded!', {
                         description: `We just pulled your saved project history.`,
                         closeButton: true,
-                        duration: 99999999
+                        duration: 3000
                       });
                 } else {
                     console.error('Failed to fetch saved projects:', data.message);
@@ -72,7 +73,7 @@ const DashBody = ({user}) => {
                     toast('Chart History Loaded!', {
                         description: `We just pulled your saved charts.`,
                         closeButton: true,
-                        duration: 99999999
+                        duration: 3000
                       });
                 } else {
                     console.error('Failed to fetch saved Charts:', data.message);
@@ -80,9 +81,7 @@ const DashBody = ({user}) => {
                 setRefetchChart(0)
             })
         }
-    }, [user, refetchChart])
-
-    
+    }, [user, refetchChart])    
 
     return(
         <div className="w-full flex">
@@ -98,6 +97,7 @@ const DashBody = ({user}) => {
                 { viewing === 'integrations' && <div className="py-16"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }
                 { viewing === 'presentation' && "Start Writing a Report Here" }
+                { viewing === 'scrape' && <ScraperView />}
                 { viewing === 'register' && <div className="py-16"><Login/></div>}
             </div>
         </div>
