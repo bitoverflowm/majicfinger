@@ -10,7 +10,7 @@ export const Highlight = ({
   return (
     <span
       className={cn(
-        "bg-cyan-600/20 p-1 py-0.5 font-bold text-cyan-600 dark:bg-cyan-600/20 dark:text-cyan-600",
+        "p-1 py-0.5 font-bold bg-cyan-600/20 text-cyan-600",
         className,
       )}
     >
@@ -32,17 +32,15 @@ export const TestimonialCard = ({
     href={src}
     className={cn(
       "mb-4 flex w-full cursor-pointer break-inside-avoid flex-col items-center justify-between gap-6 rounded-xl p-4 hover:border-indigo-300",
-      // light styles
-      " border border-neutral-200 bg-white",
       // dark styles
-      "dark:bg-black dark:[border:1px_solid_rgba(255,255,255,.1)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
+      "bg-black [border:1px_solid_rgba(255,255,255,.1)] [box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
       className,
     )}
     {...props} // Spread the rest of the props here
     rel="noopener noreferrer"
     target="_blank"
   >
-    <div className="select-none text-sm font-normal text-neutral-700 dark:text-neutral-400">
+    <div className="select-none text-sm font-normal text-neutral-400">
       {description}
       <div className="flex flex-row py-1 place-items-center place-content-center">
         <StarFilledIcon className="size-4 text-yellow-500" />
@@ -192,10 +190,10 @@ export function SocialProofTestimonials() {
     <section id="testimonials">
       <div className="py-14">
         <div className="container mx-auto px-4 md:px-8">
-          <h3 className="text-center text-4xl font-bold">
+          <h3 className="text-center text-white text-4xl font-bold">
             What Our Legendary Users Have to Say
           </h3>
-          <p className="text-xl text-slate-500 pt-3">pssst... you can <span className="underline text-blue-500 font-black">click</span> on each testimonial?</p>
+          <p className="text-xl text-slate-500 pt-3 text-center">pssst... you can <span className="underline text-blue-500 font-black">click</span> on each testimonial?</p>
           <div className="relative mt-6 max-h-[650px] overflow-hidden">
             <div className="gap-4 md:columns-3 w-4/5 mx-auto">
               {Array(Math.ceil(testimonials.length / 3))
@@ -216,8 +214,8 @@ export function SocialProofTestimonials() {
                   </Marquee>
                 ))}
             </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 w-full bg-gradient-to-t from-white from-20% dark:from-black"></div>
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-1/4 w-full bg-gradient-to-b from-white from-20% dark:from-black"></div>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 w-full bg-gradient-to-t from-0% from-lychee_black"></div>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1/4 w-full bg-gradient-to-b from-0% from-lychee_black"></div>
           </div>
         </div>
       </div>
