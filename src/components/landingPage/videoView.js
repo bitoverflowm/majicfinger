@@ -9,13 +9,15 @@ const VideoView = () => {
     threshold: 0.5,
     triggerOnce: true,
   });
-
-  const startOffset = window.innerHeight / 4;
+  const [startOffset, setStartOffset] = useState(0);
 
   useEffect(() => {
+    // Calculate startOffset after the component has mounted
+    setStartOffset(window.innerHeight / 4);
+
     const handleScroll = () => {
       // Only start changing scrollY after we've scrolled past 1/4 of the screen height
-      const scrolledY = Math.max(window.scrollY - startOffset, 0);
+      const scrolledY = Math.max(window.scrollY - window.innerHeight / 4, 0);
       setScrollY(scrolledY);
     };
 
@@ -24,7 +26,7 @@ const VideoView = () => {
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [startOffset]);
+  }, []);
 
   useEffect(() => {
     if (inView && videoRef.current) {
