@@ -57,19 +57,15 @@ const Nav = () => {
       <header className="top-0 flex h-16 items-center gap-4 bg-lychee_black text-lychee_white px-4 md:px-6">
             <nav className="hidden flex-col md:text-xs md:ml-auto md:flex md:flex-row md:items-center md:gap-12">
               <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Request Feature</Link></div>
-              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/roadmap"  rel="noopener noreferrer" target="_blank">Vote</Link></div>
+              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/roadmap"  rel="noopener noreferrer" target="_blank">Vote for a Request</Link></div>
               <div className='cursor-pointer'><Link href="/affiliates">Affiliates</Link></div>
               <div className='cursor-pointer'><Link href="/dataUse">Data Use</Link></div>
-              {/*<div className='cursor-pointer hover:text-lychee-green'><Link href="/roadmap">Roadmap</Link></div>*/}
               <div className='cursor-pointer'><Link href="/help">Contact</Link></div>
               {
                 !(user) ?
                   <>
-                      <div variant="">
-                        Sign Up
-                      </div>
                       <div variant="secondary">
-                        <Link href="/login">Log In</Link>
+                        <Link href="/login">Sign In</Link>
                       </div>
                   </>
                   :<>

@@ -18,22 +18,28 @@ const DataUse = () => {
                             I don't collect any personal info or data from you other than your email when you register.
                         </div>
                         <div>
-                            If data is collected I will make it explicitly clear. However I want to make it also even more clear I do not intend on ever profiting from the practice of data collection/ harvesting.
-                        </div>
-                        <div>
                             I care about data security and privacy, and I think all companies/ developers / projects should. 
                         </div>
                         <div>
                             And if the time comes where profits can be made on user data, I would like to be one of the first companies to enable user's to profit along side me in the profits made from their data.
                         </div>
                         <div>
-                            Addendum: May 8th 2024. Due to popular demand, you all have determined that saving data is 0crucial
+                            Addendum: May 8th 2024. Due to popular demand, you all have determined that saving data is crucial
                         </div>
                         <div>
                             When you save your data, the data is saved in Lychee databases.
                         </div>
                         <div>
-                            Howver this data is never shared. (unless indicated in certain AI features)
+                            However this data is never shared.
+                        </div>
+                        <div>
+                            When you run data through any AI engine, it will be used by the AI and shared with any APIs connecting to the AI. 
+                        </div>
+                        <div>
+                            I advise you not to use any AI for hypersensitive data. 
+                        </div>
+                        <div>
+                            If you have need for partitioned data, dedicated security and dedicated AI that is segregated from external shares, you will want to join Enterprise. Here I will custom build you something for your data needs. 
                         </div>
                         <Link href="https://www.twitter.com/misterrpink1">
                             MisterrPink (creator of Lychee)

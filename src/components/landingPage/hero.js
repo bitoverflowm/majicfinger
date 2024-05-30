@@ -183,7 +183,7 @@ export function Hero() {
                     <div className="grid grid-cols-10 gap-4 w-full pt-48">
                         <div className="col-span-5">
                             <div className=" pt-40">                                
-                                    <motion.h1
+                                    <motion.div
                                         ref={fadeInRef}
                                         animate={fadeInInView ? "animate" : "initial"}
                                         variants={fadeUpVariants}
@@ -231,7 +231,7 @@ export function Hero() {
                                             word="Build an Audience Right Here"
                                             className="text-2xl font-bold text-white pb-1"
                                         />                                    
-                                    </motion.h1>
+                                    </motion.div>
                             </div>
                         </div>
                         <div className="col-span-5 pl-32 ml-10 ">

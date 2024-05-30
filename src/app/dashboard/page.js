@@ -31,12 +31,14 @@ const Dashbaord = () => {
 
     useEffect(() => {
         if(!user){
-            //router.push('/login')
+            toast('Welcome to Lychee!', {
+                description: `I'm Mr Pink the inventor of this thing. Take a look around. Don't forget to signup to save your work.`,
+                duration: 4000
+              });
         }else{
             toast('Hey!', {
                 description: `Welcome ${user.email}`,
-                closeButton: true,
-                duration: 99999999
+                duration: 3000
               });
         }
     }, [user])

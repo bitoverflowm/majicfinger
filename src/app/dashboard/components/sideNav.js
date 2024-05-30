@@ -39,12 +39,11 @@ const SideNav = () => {
             <div className="px-2 min-h-screen flex flex-col">
               <nav className="grid gap-6 text-xs font-medium">
                 <div className="flex place-content-center pt-8">
-                  <Link
-                    href="/dashboard"
+                  <div
                     className="group flex h-9 w-9 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
                   >
                     <Image src={"/fruit.png"} width={15} height={6} alt={'logo'}/>
-                  </Link>
+                  </div>
                 </div>                
                 <div
                   className={`cursor-pointer flex items-center gap-4 px-2.5 ${viewing === 'dashboard' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'} `}
