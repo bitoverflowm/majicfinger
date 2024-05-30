@@ -14,6 +14,8 @@ import Meteors from "../magicui/meteors";
 import { VelocityScroll } from "../ui/scroll-based-velocity";
 import WordPullUp from "../magicui/word-pull-up";
 import BlurIn from "../magicui/blur-in";
+import { Circle } from "lucide-react";
+import { FaCircle } from "react-icons/fa";
 
 export function Hero() {
     const fadeInRef = useRef(null);
@@ -74,8 +76,9 @@ export function Hero() {
                 <div className="relative h-full container z-10 flex flex-col overflow-hidden">
                     <Meteors />
                     <div className="text-balance bg-gradient-to-br from-lychee_blue from-0% to-lychee_red/70 bg-clip-text font-black leading-none tracking-tighter text-transparent sm:text-6xl sm:py-20 md:text-7xl lg:text-[250px]">
-                        Lychee<span className="text-lychee_red hover:rounded-full pl-4" style={{ textShadow: '10px 10px 100px rgba  (169, 29, 58, 1)'}}>.</span>
+                        Lychee<span className="text-lychee_red pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                     </div>
+                    <div className="pl-6 text-2xl text-white">Bring Your Data To<span className="text-lychee_green font-black pl-2"  style={{ textShadow: '10px 10px 100px rgba(169, 29, 58, 1)'}}>Life</span><br/> <div className="flex gap-2 place-items-center">Effortless Analysis <FaCircle className="text-sm text-black"/> Powerful Results.</div> </div>
                     <div className="text-lychee_white font-[200] text-xl pl-6">
                         <div className="text-lychee_white w-2/5 py-1"><Separator /></div>
                     </div>
@@ -100,7 +103,7 @@ export function Hero() {
                         </div>
                     </div>
 
-                    <div className="pt-48 pr-20">
+                    <div className="pt-40 pr-20">
                             <WavyText
                                 word="Scrape ANY URL"
                                 className="text-4xl font-bold text-white py-1"
@@ -205,7 +208,7 @@ export function Hero() {
                                             className="text-2xl font-bold text-white py-1"
                                         />
                                         <WavyText
-                                            word="Beautiful Visualization"
+                                            word="Beautiful Visualizations"
                                             className="text-2xl font-bold text-white pb-1"
                                         />
                                         <WavyText
@@ -222,6 +225,10 @@ export function Hero() {
                                         />
                                         <WavyText
                                             word="Invite Your Team"
+                                            className="text-2xl font-bold text-white pb-1"
+                                        />
+                                        <WavyText
+                                            word="Build an Audience Right Here"
                                             className="text-2xl font-bold text-white pb-1"
                                         />                                    
                                     </motion.h1>
