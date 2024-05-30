@@ -15,6 +15,7 @@
     "@hapi/iron": "^7.0.1",
     "@headlessui/react": "^1.7.11",
     "@magic-sdk/admin": "^1.8.0",
+    "@motionone/utils": "^10.17.0",
     "@next/font": "13.1.6",
     "@next/third-parties": "^14.1.0",
     "@radix-ui/react-accordion": "^1.1.2",

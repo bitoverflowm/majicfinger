@@ -18,7 +18,7 @@ export default function Home() {
                           y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
                       })(window, document, "clarity", "script", "l5zqf94lap"); `
 
-  const affiliateCode = `$(document).ready(function(){
+  const affiliateCode = `(function(){
                           setTimeout(function() {
                               $('a[href^="https://buy.stripe.com/"]').each(function(){
                                   const oldBuyUrl = $(this).attr("href");
@@ -44,9 +44,7 @@ export default function Home() {
         strategy="afterInteractive"
       >{clairtyCode}</Script>
       <Script async src="https://cdn.promotekit.com/promotekit.js" data-promotekit="03b8c588-8350-4a0c-97f0-0a839509e8e0" strategy="afterInteractive"/>
-      <Script>
-        {affiliateCode}
-      </Script>
+      <Script>{affiliateCode}</Script>
       <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"/>
       <GoogleAnalytics gaId="G-G8X2NEPTEG" />
       <StateProvider>
