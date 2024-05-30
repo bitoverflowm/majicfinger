@@ -11,7 +11,6 @@ const LoginPage = () => {
     const user = useUser()
     const router = useRouter()
 
-
     useEffect(() => {
         if(user){
             router.push('/dashboard')
@@ -23,7 +22,7 @@ const LoginPage = () => {
             <div className="max-w-48 p-4">
                 <img src={"./logo.png"}/>
             </div>
-            <div className="h-full flex place-content-center place-items-center">
+            <div className="flex flex-col place-content-center place-items-center">
                 <Login noName={true}/>
             </div>
         </div>

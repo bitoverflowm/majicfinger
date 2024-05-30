@@ -1,21 +1,23 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
+import Link from "next/link"
 
-import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
-import { useRef, useEffect, useState } from "react";
+import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
+import { useRef, useEffect, useState } from "react"
+import { FaCircle } from "react-icons/fa";
 
-import { Separator } from "../ui/separator";
-import VideoView from "./videoView";
+import { Separator } from "../ui/separator"
+import { VelocityScroll } from "../ui/scroll-based-velocity";
+
 import WavyText from "../magicui/wavy-text";
 import Meteors from "../magicui/meteors";
-import { VelocityScroll } from "../ui/scroll-based-velocity";
 import WordPullUp from "../magicui/word-pull-up";
 import BlurIn from "../magicui/blur-in";
-import { Circle } from "lucide-react";
-import { FaCircle } from "react-icons/fa";
+
+
+import VideoView from "./videoView";
+
 
 export function Hero() {
     const fadeInRef = useRef(null);

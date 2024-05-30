@@ -70,7 +70,7 @@ const Nav = () => {
                   </>
                   :<>
                     <div>
-                      <Link href="/dashboard">Log In</Link>
+                      <Link href="/dashboard">Dashboard</Link>
                     </div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -91,24 +91,6 @@ const Nav = () => {
                   </>
               }
             </nav>
-            <Sheet>
-                <SheetTrigger asChild>
-                    <Button
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0 md:hidden"
-                    >
-                      <Link href="/"> <img src={"./fruit.png"} className='w-5 h-6 mx-auto'/></Link>
-                    </Button>
-                </SheetTrigger>
-                <SheetContent side="left">
-                    <nav className="grid gap-6 text-lg font-medium">
-                    <Link href="#" className="hover:text-foreground">
-                        Settings
-                    </Link>
-                    </nav>
-                </SheetContent>
-            </Sheet>
         </header>
     )
   }

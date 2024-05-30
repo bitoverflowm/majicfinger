@@ -470,8 +470,8 @@ const Nav = () => {
                   </DropdownMenuContent>
               </DropdownMenu>
               </div>
-            : <div className="flex ml-auto" >
-                {connectedData && <div className="flex text-xs">Register to save your work</div>}
+            : <div className="flex ml-auto place-items-center gap-6" >
+                {connectedData && <div className="flex text-xs">Register to Save Your Work</div>}
                 <div className="bg-black text-white px-3 py-2 rounded-md text-xs cursor-pointer" onClick={()=>setViewing('register')}> Log in/Register </div>
               </div>
           }

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 
-
 import SideNav from './components/sideNav'
 import KatsuView from './components/katsuView';
 import DataView from "@/components/dataView";
@@ -15,7 +14,6 @@ import Login from "@/components/login";
 import { toast } from "sonner"
 import AiView from "@/components/aiView";
 import ScraperView from "@/components/scraperView";
-
 
 
 const DashBody = ({user}) => {
