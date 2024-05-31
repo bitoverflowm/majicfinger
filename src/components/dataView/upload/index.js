@@ -97,7 +97,7 @@ const Upload = ({user}) => {
             <h1 className='text-4xl font-extrabold'>
                 Upload Your Data
             </h1>
-            <div className="grid gap-10 grid-cols-3 h-full place-content-center">
+            <div className="grid gap-10 xl:grid-cols-3 h-full place-content-center">
                 <div className='pt-24'>
                     <Card>
                         <CardHeader>
@@ -128,26 +128,6 @@ const Upload = ({user}) => {
                             </Accordion>
                         </CardContent>
                     </Card>
-                    <div className='py-10'>
-                        <div className='text-center text-lg pt-10 pb-10'>Don't have your own data? Don't Worry</div>
-                        <div className='grid grid-cols-3 gap-2 text-center'>
-                            <div className='p-8 bg-black text-white cursor-pointer hover:bg-blue-600 ' onClick={()=>setViewing('integrations')}>
-                                <Cable className='h-10 w-10 mx-auto'/>
-                                <div className='py-2'>Integrations</div>
-                                <div className='text-xs'>Connect directly to your favorite data sources</div>
-                            </div>
-                            <div className='p-8 cursor-pointer hover:bg-blue-600 hover:text-white' onClick={()=>setViewing('scrape')}>
-                                <Shovel className='h-10 w-10 mx-auto '/>
-                                <div className='py-2'>Scrape</div>
-                                <div className='text-xs'>Scrape a website</div>
-                            </div>
-                            <div className='p-8 bg-black text-white cursor-pointer hover:bg-blue-600' onClick={()=>setViewing('generate')}>
-                                <BadgePlus className='h-10 w-10 mx-auto'/>
-                                <div className='py-2'>Generate</div>
-                                <div className='text-xs'>Generate realistic sample or example data</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 <div className='col-span-2 flex flex-col h-screen pt-6 pb-20'>
                     <div className='px-20'>

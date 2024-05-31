@@ -31,7 +31,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         },
         "description": "Scrape, Upload, Integrate, Generate or Start With a fresh sheet ",
         "description_style": {
-            'fontWeight': 100,
+            'fontWeight': 500,
             'fontStyle': 'non-italic',
             'textAlign': 'left',
             'fontSize': '20px',
@@ -60,7 +60,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         },
         "description": "Play with Athena (Lychee's AI)",
         "description_style": {
-            'fontWeight': 100,
+            'fontWeight': 500,
             'fontStyle': 'non-italic',
             'textAlign': 'left',
             'fontSize': '20px',
@@ -89,7 +89,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         },
         "description": "Unleash the full power of your data with Lychee University",
         "description_style": {
-            'fontWeight': 100,
+            'fontWeight': 500,
             'fontStyle': 'non-italic',
             'textAlign': 'left',
             'fontSize': '20px',
@@ -118,7 +118,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         },
         "description": "Pull data from Twitter, WallSt Bets, Reddit, Stripe, SEC EDGAR...",
         "description_style": {
-            'fontWeight': 100,
+            'fontWeight': 500,
             'fontStyle': 'non-italic',
             'textAlign': 'left',
             'fontSize': '30px',
@@ -147,7 +147,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         },
         "description": "@misterrpink1",
         "description_style": {
-            'fontWeight': 100,
+            'fontWeight': 500,
             'fontStyle': 'non-italic',
             'textAlign': 'left',
             'fontSize': '20px',
@@ -175,7 +175,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         },
         "description": "Impress your boss with mind blowing presentations",
         "description_style": {
-            'fontWeight': 100,
+            'fontWeight': 500,
             'fontStyle': 'non-italic',
             'textAlign': 'left',
             'fontSize': '20px',
@@ -204,7 +204,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         },
         "description": "Beautiful charts and visualizations in action",
         "description_style": {
-            'fontWeight': 100,
+            'fontWeight': 500,
             'fontStyle': 'non-italic',
             'textAlign': 'left',
             'fontSize': '20px',

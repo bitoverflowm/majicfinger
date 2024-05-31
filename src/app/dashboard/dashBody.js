@@ -9,6 +9,7 @@ import Upload from '@/components/dataView/upload'
 import ChartViewV2 from "@/components/chartView/chartViewV2";
 import { ChartGallery } from "@/components/chartGallery";
 import { IntegrationsView } from "@/components/integrationsView";
+import NewSheetView from "@/components/newSheetView";
 
 import Login from "@/components/login";
 
@@ -88,9 +89,10 @@ const DashBody = ({user}) => {
             <div className="z-20 inset-y-0  flex-col border-r bg-background sm:flex">
                 <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
             </div>
-            <div className=''>
+            <div className='w-full'>
                 { viewing === 'dashboard' && <div className="py-28"><KatsuView user={user}/></div> }              
                 { viewing === 'dataStart' && <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div> }
+                { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'charts' && <div className="py-16 h-screen"><ChartViewV2 user={user}/></div> }
                 { viewing === 'gallery' && <div className="py-16 min-h-screen"><ChartGallery/></div> }
@@ -98,7 +100,7 @@ const DashBody = ({user}) => {
                 { viewing === 'ai' && <AiView/> }
                 { viewing === 'presentation' && "Start Writing a Report Here" }
                 { viewing === 'scrape' && <ScraperView />}
-                { viewing === 'register' && <div className="py-16"><Login/></div>}
+                { viewing === 'register' && <div className="py-16 w-[1500px] flex place-items-center place-content-center"><div><Login/></div></div>}
             </div>
         </div>
     )

@@ -92,8 +92,8 @@ const SideNav = () => {
                   Generate Data
                 </div>
                 <div
-                  className={`flex items-center gap-4 pl-6 px-2.5 py-2 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
-                  onClick={() => setViewing('generate')}
+                  className={`flex items-center gap-4 pl-6 px-2.5 py-2 ${viewing === 'newSheet' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'} `}
+                  onClick={() => setViewing('newSheet')}
                 >
                   <FilePlus2 className="h-5 w-5" />
                   New Sheet

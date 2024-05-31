@@ -1,15 +1,14 @@
 import { useState } from 'react'
 
 import { useMyStateV2  } from '@/context/stateContextV2'
-import { Circle, HardDriveUpload, MoveRight, Cable, Shovel, FilePlus2 } from 'lucide-react'
+import { HardDriveUpload, Cable, Shovel, FilePlus2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-
 
 //import Image from 'next/image'
 import GridView from '@/components/gridView'
 import { VscCircleFilled } from 'react-icons/vsc'
 
-const DataView = ({user, startNew, setStartNew}) => {
+const DataView = ({user}) => {
     const contextStateV2 = useMyStateV2()
 
     const connectedData = contextStateV2?.connectedData
@@ -17,31 +16,27 @@ const DataView = ({user, startNew, setStartNew}) => {
     const setViewing = contextStateV2?.setViewing
 
     return(
-        <div className='w-full px-10'>
-                       
+        <div className='w-full px-10'>                       
             <h1 className='text-4xl font-extrabold'>
                 Your Data
             </h1>
-
             {loadedDataMeta && <div className='pt-1'>{loadedDataMeta.data_set_name}</div>}
             {
-                (connectedData || startNew) ? <div className='min-h-screen'>
-                                    <GridView startNew={startNew}/>
-                                </div>      
-                : <div className="py-20">
-                    <div className='w-1/3 mx-auto py-8'>
+                (connectedData) ? <div className='min-h-screen'> <GridView/> </div>      
+                : <div className="">
+                    <div className='w-1/4 mx-auto py-8'>
                         {
                             !(user) && 
                                 <Alert onClick={()=>setViewing('register')} className="cursor-pointer">
                                     <VscCircleFilled className="h-5 w-5"/>
-                                    <AlertTitle>Heads up!</AlertTitle>
-                                    <AlertDescription >
-                                        Want to save your work? Click here to register.
+                                    <AlertTitle className="text-xs">Want to save your work?</AlertTitle>
+                                    <AlertDescription className="text-xs" >
+                                         Click here to register.
                                     </AlertDescription>
                                 </Alert>
                         }
                     </div>
-                    <div className="mx-auto w-9/12 grid grid-cols-3 rounded-xl gap-10 bg-muted/50 p-20">
+                    <div className="mx-auto w-9/12 grid grid-cols-3 rounded-xl gap-10 bg-muted/50 p-5">
                         <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('upload')}>
                             <div className='py-4'><HardDriveUpload /></div>
                             <h3 className="pb-1 font-medium leading-none">Upload</h3>
@@ -57,15 +52,14 @@ const DataView = ({user, startNew, setStartNew}) => {
                         <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('scrape')}>
                             <div className='py-4'><Shovel /></div>
                             <h3 className="pb-1 font-medium leading-none">Scrape</h3>
-                            <p className="text-xs text-muted-foreground">Assuming an APi isnot available, scrape a website</p>
-                            <p className="pt-1 text-xs text-muted-foreground">coming soon</p>
+                            <p className="text-xs text-muted-foreground">First: Make sure there is no Integration available for the website you want to scrape. <br/><br/> Then assuming an APi is not available, scrape any website at all. Just give the URL</p>
                         </div>
                         <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('generate')}>
                             <div className='py-4'><HardDriveUpload /></div>
                             <h3 className="pb-1 font-medium leading-none">Generate</h3>
-                            <p className="text-xs text-muted-foreground">Use Athena (Lychee AI) to generate data to your specifications</p>
+                            <p className="text-xs text-muted-foreground">Generate insanely realistic fake data to your specifications for your needs.</p>
                         </div>                        
-                        <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setStartNew(true)}>
+                        <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('newSheet')}>
                             <div className='py-4'><FilePlus2 /></div>
                             <h3 className="pb-1 font-medium leading-none">New Sheet</h3>
                             <p className="text-xs text-muted-foreground">Start with an empty sheet</p>
