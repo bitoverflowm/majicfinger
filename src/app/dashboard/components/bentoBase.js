@@ -56,7 +56,7 @@ export function BentoBase({data, dashView, demo, bentoContainer, setDashData, se
     if (!pause) {
       intervalId = setInterval(() => {
         ramdomColorHandler();
-      }, 2000); //2000 // Runs every 3 seconds
+      }, 3000); //2000 // Runs every 3 seconds
     }
 
     // Cleanup function to clear the interval when the component unmounts or the `demo` prop changes
@@ -103,6 +103,10 @@ export function BentoBase({data, dashView, demo, bentoContainer, setDashData, se
       return Math.floor(Math.random() * array.length);
     }
 
+    useEffect(()=>{
+      selectedPalette && console.log(selectedPalette)
+    }, [data])
+
   
   return (
     <>
@@ -113,7 +117,14 @@ export function BentoBase({data, dashView, demo, bentoContainer, setDashData, se
           <Button onClick={()=>ramdomColorHandler()} disable={!pause} variant="outline" id="color_wheel" size="icon">
             <RotateCw className="h-4 w-4"/></Button> 
           <Button onClick={()=>shufflePalette()} disable={!pause} variant="outline" id="color_wheel" size="icon">
-            <Shuffle className="h-4 w-4"/></Button> 
+            <Shuffle className="h-4 w-4"/></Button>
+          <div className="flex">
+            {
+              selectedPalette && selectedPalette.map((color)=>
+                <div className="p-2" style={{ backgroundColor: color}}> </div>
+              )
+            }
+          </div>
         </div>
         <div className={`gradualEffect relative flex w-full items-center justify-center p-10 overflow-hidden rounded-lg border shadow-sm`} style={{ backgroundColor: bentoContainer && bentoContainer.background_color && bentoContainer.background_color}}>  
             <BentoGrid>

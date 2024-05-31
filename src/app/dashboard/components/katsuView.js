@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion} from "framer-motion";
 import { useMyStateV2  } from '@/context/stateContextV2'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+
 
 import Link from "next/link";
 
@@ -32,36 +34,23 @@ const KatsuView = () => {
     const viewing = contextStateV2?.viewing
     const setViewing = contextStateV2?.setViewing
 
-    const [loading, setLoading] = useState()
-
-
-    useEffect(() => {
-        if(dashData){
-            setLoading(false)
-
-        }else{
-            setLoading(true)
-        }
-    }, [dashData])
-
-
-
     return (
-        <div className="w-full h-full flex place-items-center place-content-center">
-            <motion.div
-                animate={true}
-                viewport={{once: true}}
-                variants={bentoVariants}
-                className='w-5/6'
-            >
-                <Alert className="text-xs bg-lychee_white text-lychee_black border-none w-1/3 mx-auto">
-                    <AlertTitle> 🚧 Heads up!</AlertTitle>
+        <div className="w-full h-full flex flex-col place-items-center place-content-center px-10">
+            <Alert className="text-xs bg-lychee_white/50 text-lychee_black border-none w-2/5 mx-auto flex place-items-center gap-6">
+                <Link rel="noopener noreferrer" target="_blank" href={'https://twitter.com/misterrpink1'}>
+                    <Avatar>
+                        <AvatarImage src="/avatar1.png" />
+                        <AvatarFallback>MP</AvatarFallback>
+                    </Avatar> Mr. Pink  
+                </Link>
+                <div>
+                    <AlertTitle> 🚧 Heads up! Lychee V2.0 is coming!</AlertTitle>
                     <AlertDescription >
-                        Lychee V2.0 is coming! I am moving some things around. <br/> You can still use the platform, but things might break. - <Link href={'https://twitter.com/misterrpink1'}>@misterrpink</Link>
+                            I am moving some things around. Platform is functional, but things might break.
                     </AlertDescription>
-                </Alert>
-                <BentoBase data={dashData} dashView={true} bentoContainer={bentoContainer} setDashData={setDashData} setBentoContainer={setBentoContainer} viewing={viewing} setViewing={setViewing}/>
-            </motion.div>
+                </div>
+            </Alert>
+            <BentoBase data={dashData} dashView={true} bentoContainer={bentoContainer} setDashData={setDashData} setBentoContainer={setBentoContainer} viewing={viewing} setViewing={setViewing}/>            
         </div>       
     );
 };

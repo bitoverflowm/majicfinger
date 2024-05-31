@@ -9,9 +9,11 @@ import Upload from '@/components/dataView/upload'
 import ChartViewV2 from "@/components/chartView/chartViewV2";
 import { ChartGallery } from "@/components/chartGallery";
 import { IntegrationsView } from "@/components/integrationsView";
+
 import Login from "@/components/login";
 
 import { toast } from "sonner"
+
 import AiView from "@/components/aiView";
 import ScraperView from "@/components/scraperView";
 
@@ -86,7 +88,7 @@ const DashBody = ({user}) => {
             <div className="z-20 inset-y-0  flex-col border-r bg-background sm:flex">
                 <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
             </div>
-            <div className='w-full px-20'>
+            <div className=''>
                 { viewing === 'dashboard' && <div className="py-28"><KatsuView user={user}/></div> }              
                 { viewing === 'dataStart' && <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
