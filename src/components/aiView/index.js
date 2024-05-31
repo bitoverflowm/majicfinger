@@ -63,7 +63,7 @@ const AiView = ({playView, setPlayView}) => {
     const [usage, setUsage] = useState()
     const [fileId, setFileid] = useState()
     const [analyzedData, setAnalyzedData] = useState()
-    const [keepThread, setKeepThread] = useState(true)
+    const [keepThread, setKeepThread] = useState()
     const [backup, setBackup] = useState()
 
     const handleSwitchChange = () => {
@@ -210,7 +210,7 @@ const AiView = ({playView, setPlayView}) => {
                             <div>What do you want to do?</div>
                             <div>
                                 <div className="text-xs py-1">General Data Actions</div>
-                                <div className="flex flex-wrap gap-2 place-content-center">
+                                <div className="flex flex-wrap gap-2">
                                     {
                                         prompts && prompts.analyzingDatasets.map((p)=>
                                             <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>
@@ -218,7 +218,7 @@ const AiView = ({playView, setPlayView}) => {
                                     }
                                 </div>
                                 <div className="text-xs py-1">Modify Data</div>
-                                <div className="flex flex-wrap gap-2 place-content-center">
+                                <div className="flex flex-wrap gap-2">
                                     {
                                         prompts && prompts.modifyData.map((p)=>
                                             <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>
@@ -226,7 +226,7 @@ const AiView = ({playView, setPlayView}) => {
                                     }
                                 </div>
                                 <div className="text-xs py-1">Special Actions</div>
-                                <div className="flex flex-wrap gap-2 place-content-center">
+                                <div className="flex flex-wrap gap-2">
                                     {
                                         prompts && prompts.uniqueActions.map((p)=>
                                             <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>
@@ -234,15 +234,15 @@ const AiView = ({playView, setPlayView}) => {
                                     }
                                 </div>
                                 <div className="text-xs py-1">Financial Data Specific Action</div>
-                                <div className="flex flex-wrap gap-2 place-content-center">
+                                <div className="flex flex-wrap gap-2">
                                     {
                                         prompts && prompts.analyzingFinancialData.map((p)=>
                                             <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>
                                         )
                                     }
                                 </div>
-                                <div className="text-xs py-1">Visualizations</div>
-                                <div className="flex flex-wrap gap-2 place-content-center">
+                                <div className="hidden text-xs py-1">Visualizations</div>
+                                <div className="hidden flex flex-wrap gap-2">
                                     {
                                         prompts && prompts.visualizations.map((p)=>
                                             <Badge onClick={()=>setQuery(p.prompt)} className={`${query && query === p.prompt ? 'bg-lychee_black': 'bg-lychee_green text-black cursor-pointer hover:bg-lychee_black hover:text-lychee_green'}`}>{p.val}</Badge>

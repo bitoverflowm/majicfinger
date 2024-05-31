@@ -15,7 +15,7 @@ const openai = new OpenAI({
 
 export default async (req, res) => {
     try {
-        if (!req.body.data) {
+        if (!req.body.data && !req.body.thread_id) {
             return res.status(400).json({ error: "No data provided" });
         }
         if(req.body.thread_id){
