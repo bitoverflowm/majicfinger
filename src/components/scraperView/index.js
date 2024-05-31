@@ -65,73 +65,80 @@ const ScraperView = ({playView, setPlayView}) => {
     const scrapePage = async () => {
         setLoading(true);
         setProgress(0); // Reset progress bar
-        try {
-            const timer = setInterval(() => {
-                setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
-            }, 3000);
+        if(user){
+            try {
+                const timer = setInterval(() => {
+                    setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
+                }, 3000);
 
-            let res = await fetch('/api/ai/scrapeImage', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ imageUrl: response.data.screenshot.url, columns: columns, user_id: user.userId }),
-            });
+                let res = await fetch('/api/ai/scrapeImage', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ imageUrl: response.data.screenshot.url, columns: columns, user_id: user.userId }),
+                });
 
-            if (res.status === 200) {
-                let resData = await res.json();
-                console.log("successful parsing");
-                console.log("extracting data: ", resData.response.content);
+                if (res.status === 200) {
+                    let resData = await res.json();
+                    console.log("successful parsing");
+                    console.log("extracting data: ", resData.response.content);
 
-                // Extract and convert JSON string from response content
-                const jsonString = resData.response.content.replace("```json\n", "").replace("\n```", "");
-                console.log("the json string: ", jsonString);
+                    // Extract and convert JSON string from response content
+                    const jsonString = resData.response.content.replace("```json\n", "").replace("\n```", "");
+                    console.log("the json string: ", jsonString);
 
-                const data = JSON.parse(jsonString);
-                console.log(data);
-                setConnectedData(data);
-            } else {
-                console.error("Error analyzing data");
+                    const data = JSON.parse(jsonString);
+                    console.log(data);
+                    setConnectedData(data);
+                } else {
+                    console.error("Error analyzing data");
+                }
+                clearInterval(timer);
+                setProgress(100); // Complete progress
+            } catch (error) {
+                console.error("Fetch error:", error);
+            } finally {
+                setLoading(false);
             }
-            clearInterval(timer);
-            setProgress(100); // Complete progress
-        } catch (error) {
-            console.error("Fetch error:", error);
-        } finally {
-            setLoading(false);
+        }else{
+            alert("Sorry! We need to protect this platform against bots. Please register. You will get a bag of free tokens to play with.")
         }
     }
 
     const scrapeUrl = async (url) => {
         setLoading(true);
         setProgress(0); // Reset progress bar
+        if(user){
+            try {
+                const timer = setInterval(() => {
+                    setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
+                }, 3000);
 
-        try {
-            const timer = setInterval(() => {
-                setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
-            }, 3000);
+                let res = await fetch(`/api/scraper/fromUrl?target=${encodeURIComponent(url)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
 
-            let res = await fetch(`/api/scraper/fromUrl?target=${encodeURIComponent(url)}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (res.status === 200) {
-                let resData = await res.json();
-                console.log(resData);
-                setResponse(resData);
-                setStep(1)
-            } else {
-                console.error("Error scraping URL");
+                if (res.status === 200) {
+                    let resData = await res.json();
+                    console.log(resData);
+                    setResponse(resData);
+                    setStep(1)
+                } else {
+                    console.error("Error scraping URL");
+                }
+                clearInterval(timer);
+                setProgress(100); // Complete progress
+            } catch (error) {
+                console.error("Fetch error:", error);
+            } finally {
+                setLoading(false);
             }
-            clearInterval(timer);
-            setProgress(100); // Complete progress
-        } catch (error) {
-            console.error("Fetch error:", error);
-        } finally {
-            setLoading(false);
+        }else{
+            alert("Sorry! We need to protect this platform against bots. Please register. You will get a bag of free tokens to play with.")
         }
     };
 

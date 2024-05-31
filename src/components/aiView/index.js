@@ -76,43 +76,46 @@ const AiView = ({playView, setPlayView}) => {
         //alert('hello')
         setLoading(true);
         setProgress(0); // Reset progress bar
-
-        if(connectedData){
-            try {
-                const timer = setInterval(() => {
-                    setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
-                  }, 3000);
-
-                let res = await fetch('/api/ai/analyzeData', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ data: !(keepThread) && connectedData, prompt: query, assistant_id: assistantId && assistantId, thread_id: threadId && keepThread && threadId, user_id: user.userId, data_set_id: loadedDataMeta._id }),
-                });
+        if(user){
+            if(connectedData){
+                try {
+                    const timer = setInterval(() => {
+                        setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
+                      }, 3000);
     
-                if (res.status === 200) {
-                    let resData = await res.json();
-                    console.log(resData);
-                    setResponse(resData.analysis)
-                    setFileid(resData.file_id)
-                    setAssistantId(resData.assistant_id)
-                    setThreadId(resData.thread_id)
-                    setUsage(resData.usage)
-                    setAnalyzedData(resData.data_set_id)
-                    setBackup(resData.backup)
-                } else {
-                    console.error("Error analyzing data");
+                    let res = await fetch('/api/ai/analyzeData', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ data: !(keepThread) && connectedData, prompt: query, assistant_id: assistantId && assistantId, thread_id: threadId && keepThread && threadId, user_id: user.userId, data_set_id: loadedDataMeta._id }),
+                    });
+        
+                    if (res.status === 200) {
+                        let resData = await res.json();
+                        console.log(resData);
+                        setResponse(resData.analysis)
+                        setFileid(resData.file_id)
+                        setAssistantId(resData.assistant_id)
+                        setThreadId(resData.thread_id)
+                        setUsage(resData.usage)
+                        setAnalyzedData(resData.data_set_id)
+                        setBackup(resData.backup)
+                    } else {
+                        console.error("Error analyzing data");
+                    }
+                    clearInterval(timer);
+                    setProgress(100); // Complete progress
+                } catch (error) {
+                    console.error("Fetch error:", error);
+                } finally {
+                    setLoading(false);
                 }
-                clearInterval(timer);
-                setProgress(100); // Complete progress
-            } catch (error) {
-                console.error("Fetch error:", error);
-            } finally {
-                setLoading(false);
+            } else {
+                alert("no data connected. Connect some data first")
             }
-        } else {
-            alert("no data connected. Connect some data first")
+        }else{
+            alert("Sorry! We need to protect this platform against bots. Please register. You will get a bag of free tokens to play with.")
         }
     }
 

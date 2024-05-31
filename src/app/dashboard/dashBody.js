@@ -17,6 +17,7 @@ import { toast } from "sonner"
 
 import AiView from "@/components/aiView";
 import ScraperView from "@/components/scraperView";
+import ComingSoon from "./components/comingSoon";
 
 
 const DashBody = ({user}) => {
@@ -98,7 +99,8 @@ const DashBody = ({user}) => {
                 { viewing === 'gallery' && <div className="py-16 min-h-screen"><ChartGallery/></div> }
                 { viewing === 'integrations' && <div className="py-16"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }
-                { viewing === 'presentation' && "Start Writing a Report Here" }
+                { viewing === 'generate' && <ComingSoon /> }
+                { viewing === 'presentation' && <ComingSoon /> }
                 { viewing === 'scrape' && <ScraperView />}
                 { viewing === 'register' && <div className="py-16 w-[1500px] flex place-items-center place-content-center"><div><Login/></div></div>}
             </div>
