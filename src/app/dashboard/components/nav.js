@@ -463,7 +463,7 @@ const Nav = () => {
                   <DropdownMenuContent align="end">
                       <DropdownMenuLabel>My Account</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem>Settings</DropdownMenuItem>
+                      <DropdownMenuItem  onClick={()=>setViewing('manageAccount')}>Billing</DropdownMenuItem>
                       <DropdownMenuItem>Support</DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={()=>handleLogout()}>Logout</DropdownMenuItem>

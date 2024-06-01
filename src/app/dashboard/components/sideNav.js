@@ -131,20 +131,17 @@ const SideNav = () => {
                   Presentation
                 </div>
               </nav>
-              <div className="mt-auto mb-10 w-40">
-                <Card>
-                  <CardHeader className="p-4">
-                    <CardTitle className="text-xl text-green-500 text-center">50% off</CardTitle>
-                    <CardDescription>
-                      <div className="text-sm text-center">$75</div>
-                      <div className="pb-1 text-xs text-center">One Time Payment <br /> Life Time Access</div>
-                      <div className="line-through text-xs text-center">$150</div>
-                    </CardDescription>
+              <div className="mt-auto mb-10 w-44">
+                <Card onClick={()=>setViewing('pricing')}>
+                  <CardHeader className="pt-2 pb-1 bg-green-100">
+                    <CardTitle className="text-md text-green-600 font-black text-center">50% off</CardTitle>
                   </CardHeader>
-                  <CardContent className="w-full text-[10px]">
-                    <div className="p-3 bg-slate-100/80 rounded-md text-center">Bonus <br/> 100 credits /month, for life, on the house</div>
+                  <CardContent className="w-full text-[10px] pt-2">
+                    <div className="text-sm text-center flex place-items-center place-content-center gap-1"> $75 <div className="line-through text-[10px] text-center">$150</div></div>
+                    <div className="pb-1 text-[10px] text-center">One Time Payment <br /> Life Time Access</div>
+                    <div className="pt-1">Bonus: 100 credits/month for life, on the house</div>
                     <div className="flex py-2 place-content-center">
-                      <Button size="sm" className="text-xs">
+                      <Button size="xs" className="text-[10px]">
                         See Pricing
                       </Button>
                     </div>

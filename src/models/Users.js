@@ -12,10 +12,6 @@ const UserSchema = new mongoose.Schema({
         required: [true, "Email is required"],
         maxLength: [240, "Email cannot be more than 240 characters"],
     },
-    paymentTotal: {
-        type: Number,
-        default: 0,
-    },
     lifetimeMember: {
         type: Boolean,
         default: false,
