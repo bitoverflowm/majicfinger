@@ -137,7 +137,7 @@ const SideNav = () => {
                     <CardTitle className="text-md text-green-600 font-black text-center">50% off</CardTitle>
                   </CardHeader>
                   <CardContent className="w-full text-[10px] pt-2">
-                    <div className="text-sm text-center flex place-items-center place-content-center gap-1"> $75 <div className="line-through text-[10px] text-center">$150</div></div>
+                    <div className="text-sm text-center flex place-items-center place-content-center gap-1"> $99.99 <div className="line-through text-[10px] text-center">$199.99</div></div>
                     <div className="pb-1 text-[10px] text-center">One Time Payment <br /> Life Time Access</div>
                     <div className="pt-1">Bonus: 100 credits/month for life, on the house</div>
                     <div className="flex py-2 place-content-center">
