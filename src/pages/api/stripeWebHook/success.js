@@ -1,5 +1,5 @@
-import dbConnect from '../../lib/dbConnect'
-import User from '../../models/Users'
+import dbConnect from '@/lib/dbConnect'
+import User from '@/models/Users'
 import { buffer } from "micro";
 
 export const config = {
