@@ -15,7 +15,7 @@ export default async (req, res) => {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     let event
     const rawBody = await buffer(req)
-    const sig = String(req.headers.get('stripe-signature'));
+    const sig = req.headers['stripe-signature']; 
     try{
         event = stripe.webhooks.constructEvent(rawBody.toString(), sig, endpointSecret);
     } catch (err) {
