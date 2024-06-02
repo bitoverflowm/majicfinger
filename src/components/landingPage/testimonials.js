@@ -190,8 +190,8 @@ export function SocialProofTestimonials() {
     <section id="testimonials">
       <div className="py-14">
         <div className="container mx-auto px-4 md:px-8">
-          <h3 className="text-center text-white text-4xl font-bold">
-            What Our Legendary Users Have to Say
+          <h3 className="text-center text-lychee_green text-2xl sm:text-4xl font-bold">
+            WHAT OUR LEGENDARY USERS HAVE TO SAY
           </h3>
           <p className="text-xl text-slate-500 pt-3 text-center">pssst... you can <span className="underline text-blue-500 font-black">click</span> on each testimonial?</p>
           <div className="relative mt-6 max-h-[650px] overflow-hidden">

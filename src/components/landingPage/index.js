@@ -47,19 +47,15 @@ const LandingPage = () => {
                         <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
                     </div>
                 </div>
-            </div>            
-            <div className='hidden fixed flex-col bottom-3 right-3 flex place-items-center place-content-center'>
-                <Link className="text-xs bg-lychee_go text-lychee_black hover:bg-lychee_blue hover:text-lychee_white font-[600] p-2 rounded-sm" href={"/dashboard"}> Try For Free</Link>
-                <div className="text-center text-xs pt-1 text-lychee_white">
-                    No card or registration required <br/> Hope you ❤️ it enough to stay
-                </div>
             </div>
-            <Link className='sm:hidden text-center w-full fixed bottom-0 bg-lychee_go z-20 p-2' href={"/dashboard"}>
-                <div className="text-white text-sm rounded-sm"> Click to Start </div>
-                <div className="text-center text-xs pt-1 text-lychee_white">
-                    No card or registration required; Hope you ❤️ it enough to stay
-                </div>
-            </Link>
+            <div className='w-full flex fixed bottom-0 z-20 place-content-center'>
+                <Link className='text-center w-full sm:w-2/5 bg-green-600/70 p-2 rounded-t-xl hover:border hover:border-white' href={"/dashboard"}>
+                    <div className="text-white text-xs rounded-sm"> Click Here Launch Lychee </div>
+                    <div className="text-center text-[10px] pt-1 text-lychee_white">
+                        No card or registration required
+                    </div>
+                </Link>
+            </div>            
         </div>
     );
 };
