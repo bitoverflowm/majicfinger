@@ -62,6 +62,7 @@ export function Hero() {
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>
                 <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-2xl xl:text-6xl text-white">Easy <span className="text-lychee_green italic font-black ">Peasy</span> Data...</div>
+                <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-2xl xl:text-6xl text-white">Discover Something Great</div>
                 <div className="pt-10 sm:pt-20 sm:pr-20">
                     <div className="sm:text-4xl text-lychee_green">Automagically Analyze Anything With AI and Get Unprecedented Insights</div>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Examine multiple datasets at once (500MB per dataset) (and growing)</div>
