@@ -32,13 +32,13 @@ const Dashbaord = () => {
     useEffect(() => {
         if(!user){
             toast('Welcome to Lychee!', {
-                description: `I'm Mr Pink the inventor of this thing. Take a look around. Don't forget to signup to save your work.`,
-                duration: 4000
+                description: `I'm Mr Pink. Take a look around. Don't forget to signup to save your work.`,
+                duration: 10000
               });
         }else{
             toast('Hey!', {
                 description: `Welcome ${user.email}`,
-                duration: 3000
+                duration: 10000
               });
         }
     }, [user])
