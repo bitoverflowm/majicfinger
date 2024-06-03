@@ -103,3 +103,15 @@
           grid-column 0.3s ease, 
           border-radius 0.3s ease;
   }
+
+  /* Add these styles to your CSS file */
+  .fixed-bottom-center {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .transition-all {
+    transition: all 0.3s ease-in-out;
+  }

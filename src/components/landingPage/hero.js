@@ -91,7 +91,7 @@ export function Hero() {
                     <div className="sm:text-4xl text-lychee_green">Generate INSANE amounts of fake (realistic) Data</div>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">for analysis and testing</div>
                 </div>
-                <div className="sm:grid sm:grid-cols-10 gap-4 w-full sm:pt-48">
+                <div className="sm:grid sm:grid-cols-10 gap-4 w-full sm:pt-20">
                     <div className="pt-10 sm:pt-0 sm:col-span-5">
                             <BlurIn
                                 word="BRING YOUR DATA TO LIFE With"

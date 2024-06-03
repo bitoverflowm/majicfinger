@@ -5,9 +5,7 @@ import { SocialProofTestimonials } from './testimonials';
 import Link from 'next/link';
 
  
-const LandingPage = () => {
-
-    
+const LandingPage = () => {    
     const revealVariants = {
         initial: { opacity: 0, x: '-100%' },
         animate: { opacity: 1, x: '0%' }
