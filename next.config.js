@@ -2,7 +2,6 @@
 const nextConfig = {
   transpilePackages: ["@nivo"],
   experimental: {
-    serverActions: true,
     esmExternals: 'loose'
   },
   images: {
