@@ -46,9 +46,9 @@ const LandingPage = () => {
                     </div>
                 </div>
             </div>
-            <div className='w-full flex fixed bottom-0 z-20 place-content-center'>
-                <Link className='text-center w-full sm:w-2/5 bg-green-600/70 p-2 rounded-t-xl hover:border hover:border-white' href={"/dashboard"}>
-                    <div className="text-white text-xs rounded-sm"> Click Here Launch Lychee </div>
+            <div className='w-full flex fixed bottom-0 sm:bottom-5 sm:pr-5 z-20 place-content-center sm:place-content-end '>
+                <Link className='text-center w-full sm:w-32 bg-green-600 sm:bg-green-600 p-2 rounded-t-xl sm:rounded-md hover:border hover:border-white' href={"/dashboard"}>
+                    <div className="text-white text-xs rounded-sm"> Start </div>
                     <div className="text-center text-[10px] pt-1 text-lychee_white">
                         No card or registration required
                     </div>

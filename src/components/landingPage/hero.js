@@ -3,6 +3,8 @@
 import { motion } from "framer-motion"
 import { useRef, useEffect, useState } from "react"
 
+import Link from "next/link";
+
 import { VelocityScroll } from "../ui/scroll-based-velocity";
 
 import WavyText from "../magicui/wavy-text";
@@ -63,6 +65,12 @@ export function Hero() {
                 </div>
                 <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-2xl xl:text-6xl text-white">Easy <span className="text-lychee_green italic font-black ">Peasy</span> Data...</div>
                 <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-2xl xl:text-6xl text-white">Discover Something Great</div>
+                <Link className='mx-auto sm:ml-8 text-center w-32 bg-green-600 p-1 sm:p-2 mt-1 sm:mt-3 rounded-md hover:border hover:border-white' href={"/dashboard"}>
+                    <div className="text-white text-xs"> Start </div>
+                </Link>
+                <div className="text-center sm:text-left sm:ml-8 text-[10px] pt-1 text-lychee_white">
+                        No card or registration required
+                    </div>
                 <div className="pt-10 sm:pt-20 sm:pr-20">
                     <div className="sm:text-4xl text-lychee_green">Automagically Analyze Anything With AI and Get Unprecedented Insights</div>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Examine multiple datasets at once (500MB per dataset) (and growing)</div>
