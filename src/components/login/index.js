@@ -12,7 +12,8 @@ import { useMyStateV2  } from '@/context/stateContextV2'
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 
-const Login = ({noName}) => {
+const Login = ({fromHome}) => {
+    const router = useRouter()
     const contextStateV2 = useMyStateV2()
     const setViewing = contextStateV2?.setViewing
 
@@ -20,7 +21,6 @@ const Login = ({noName}) => {
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0); // Progress state
-
 
     const user = useUser()
 
@@ -49,7 +49,6 @@ const Login = ({noName}) => {
         if(res.status === 200){
             mutateUser()
             setLoading(false)
-            //setViewing('dataStart')
             clearInterval(timer);
             setProgress(100); // Complete progress
         } else {
@@ -71,7 +70,7 @@ const Login = ({noName}) => {
                             <div>
                                 <h1>Welcome to Lychee {user.email}</h1>
                                 <div>You have an account</div>
-                                <Button onClick={()=>setViewing('dashboard')} >Go to your dashboard</Button>
+                                <Button onClick={()=>fromHome ? router.push('/dashboard') : setViewing('dashboard')} >Go to your dashboard</Button>
                             </div>
                             :
                             <form onSubmit={handleSubmit} className='flex flex-col place-items-center'>

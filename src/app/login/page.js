@@ -23,7 +23,7 @@ const LoginPage = () => {
                 <img src={"./logo.png"}/>
             </div>
             <div className="flex flex-col place-content-center place-items-center">
-                <Login noName={true}/>
+                <Login fromHome={true}/>
             </div>
         </div>
     );
