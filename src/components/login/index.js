@@ -70,7 +70,7 @@ const Login = ({fromHome}) => {
                             <div>
                                 <h1>Welcome to Lychee {user.email}</h1>
                                 <div>You have an account</div>
-                                <Button onClick={()=>fromHome ? router.push('/dashboard') : setViewing('dashboard')} >Go to your dashboard</Button>
+                                <Button onClick={()=> fromHome ? router.push('/dashboard') : setViewing('dashboard')} >Go to your dashboard</Button>
                             </div>
                             :
                             <form onSubmit={handleSubmit} className='flex flex-col place-items-center'>

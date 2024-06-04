@@ -18,6 +18,9 @@ import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
+
 
 const Nav = () => {
   const user = useUser()
@@ -28,6 +31,7 @@ const Nav = () => {
   const viewing = contextStateV2?.viewing
   const setViewing = contextStateV2?.setViewing
 
+
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
   const setDataSetName = contextStateV2?.setDataSetName
@@ -35,6 +39,8 @@ const Nav = () => {
   const setConnectedData = contextStateV2?.setConnectedData
   const loadedDataMeta = contextStateV2?.loadedDataMeta
   const setLoadedDataMeta = contextStateV2?.setLoadedDataMeta
+  const loadedDataId = contextStateV2?.loadedDataId
+  const setLoadedDataId = contextStateV2?.setLoadedDataId
 
   //saving charts
   const savedCharts = contextStateV2?.savedCharts
@@ -65,6 +71,7 @@ const Nav = () => {
   const setCardColor = contextStateV2?.setCardColor
   const setTitle = contextStateV2?.setTitle
   const setSubTitle = contextStateV2?.setSubTitle
+
 
   const [isOpen, setIsOpen] = useState(false) 
   const [saveIsOpen, setSaveIsOpen] = useState(false)
@@ -190,7 +197,6 @@ const Nav = () => {
           });
         }else{
           // console.log("data to save: ", data)
-          // Here you can add code to save the projectName to a database or state management
           fetch('/api/dataSets', {
             method: 'POST',
             headers: {
@@ -210,6 +216,9 @@ const Nav = () => {
           .then(data => {
               toast(`Your Data has been saved as ${newDataName}`)
               setRefetchData(1)
+              console.log(data)
+              setConnectedData(data.data)
+              setLoadedDataId(data._id)
               // Handle the response data here
           })
           .catch(error => {
@@ -302,157 +311,188 @@ const Nav = () => {
   }, [])
 
 
+
+
   return (
-    <div className="absolute top-0 flex w-full items-center gap-4 border-b py-2 px-5">
+    <div className="absolute top-0 flex w-full items-center gap-4 border-b py-1 px-5">
           { user ?
-              <div className="flex items-center gap-4 ml-auto md:gap-2 lg:gap-4">
-                {((savedDataSets && savedDataSets.length > 0) || (savedCharts && savedCharts.length > 0)) && 
-                  <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                    <SheetTrigger asChild>
-                      <div className="cursor-pointer hover:bg-black hover:text-white py-1 px-2 rounded-md" onClick={()=>setIsOpen(true)}> 
-                        View Saved Data 
-                        <Badge className='ml-1'>{savedDataSets && savedDataSets.length}</Badge> 
-                      </div>
-                    </SheetTrigger>
-                    <SheetContent>
-                      <SheetHeader>
-                        <SheetTitle>Your Saved Data</SheetTitle>
-                        <SheetDescription>
-                          Chick on a project to load and begin work.
-                        </SheetDescription>
-                      </SheetHeader>
-                      <div>Your Data</div>
-                      <div className="pt-4">
-                        {
-                          savedDataSets && savedDataSets.length > 0 && savedDataSets.map(
-                            (dataSet)=> 
-                              <div key={dataSet._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadDataSheet(dataSet._id, dataSet)}>
-                                <div className="flex">{dataSet.data_set_name}<div className="ml-auto">{loadedDataMeta && loadedDataMeta._id === dataSet._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
-                                <div className="font-muted">Source: {dataSet.source}</div>
-                                <div className="py-1">Edited: {moment(dataSet.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                <div className="flex">{dataSet.labels.map((label)=> <Badge>{label}</Badge>)}</div>
-                                <Separator className="my-2" />
+              <div className="flex w-full items-center gap-4 pl-44 md:gap-2 lg:gap-4 ">
+                <div className="w-full flex gap-2">
+                  {((savedDataSets && savedDataSets.length > 0) || (savedCharts && savedCharts.length > 0)) && 
+                    <div>
+                      <Sheet open={isOpen} onOpenChange={setIsOpen} >
+                        <SheetTrigger asChild>
+                          <div className="ml-2 w-32 text-xs text-black cursor-pointer hover:bg-slate-100 py-1 pl-4 rounded-md" onClick={()=>setIsOpen(true)}> 
+                            Your Work 
+                            <Badge className='ml-2 text-[10px] w-8 bg-slate-600'>{savedDataSets && savedDataSets.length}</Badge> 
+                          </div>
+                        </SheetTrigger>
+                        <SheetContent side={'left'} className="w-[1000px]! sm:max-w-4xl flex flex-col">
+                          <SheetHeader>
+                            <SheetTitle>Your Saved Work</SheetTitle>
+                            <SheetDescription>
+                              Chick on a project to load and begin work.
+                            </SheetDescription>
+                          </SheetHeader>
+                          <Tabs defaultValue="data" className="h-5/6 overflow-y-auto h-screen">
+                            <TabsList className="">
+                              <TabsTrigger value="data">Data Sheets</TabsTrigger>
+                              <TabsTrigger value="charts">Charts</TabsTrigger>
+                              <TabsTrigger value="persentations">Presentations</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="data">
+                              <div className="flex flex-wrap gap-2">
+                                {
+                                    savedDataSets && savedDataSets.length > 0 && savedDataSets.map(
+                                      (dataSet)=> 
+                                        <Card key={dataSet._id} className="w-sm text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadDataSheet(dataSet._id, dataSet)}>
+                                          <CardHeader>
+                                            <div className="flex">{dataSet.data_set_name}<div className="ml-auto">{loadedDataMeta && loadedDataMeta._id === dataSet._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                          </CardHeader>
+                                          <CardContent>
+                                            <div className="font-muted">{dataSet.source}</div>
+                                            <div className="py-1">Edited: {moment(dataSet.last_saved_date).format('ddd MMM YY h:mm a')}</div>
+                                          </CardContent>
+                                          <CardFooter>
+                                            <div className="flex">{dataSet.labels.map((label)=> <Badge>{label}</Badge>)}</div>
+                                          </CardFooter>
+                                        </Card>
+                                        )
+                                  }                            
+                              </div>                                
+                            </TabsContent>
+                            <TabsContent value="charts">
+                              <div className="flex flex-wrap gap-2">
+                                { 
+                                  savedCharts && savedCharts.length > 0 && savedCharts.map(
+                                    (chart)=> 
+                                      <Card key={chart._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadChart(chart._id, chart)}>
+                                        <CardHeader>
+                                          <div className="flex">{chart.chart_name}<div className="ml-auto">{loadedChartMeta && loadedChartMeta._id === chart._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                        </CardHeader>
+                                        <CardContent>
+                                          <div className="py-1">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
+                                        </CardContent>
+                                        <CardFooter>
+                                          <div className="flex">{chart.labels.map((label)=> <Badge>{label}</Badge>)}</div>
+                                        </CardFooter>
+                                      </Card>
+                                      )
+                                }
                               </div>
-                              )
-                        }
-                      </div>
-                      <div>Your Charts</div>
-                      <div className="pt-4">
-                        { 
-                          savedCharts && savedCharts.length > 0 && savedCharts.map(
-                            (chart)=> 
-                              <div key={chart._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadChart(chart._id, chart)}>
-                                <div className="flex">{chart.chart_name}<div className="ml-auto">{loadedChartMeta && loadedChartMeta._id === chart._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
-                                <div className="py-1">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                <div className="flex">{chart.labels.map((label)=> <Badge>{label}</Badge>)}</div>
-                                <Separator className="my-2" />
-                              </div>
-                              )
-                        }
-                      </div>
-                    </SheetContent>
-                  </Sheet>                  
-                }
-                {connectedData && 
-                  <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
-                    <DialogTrigger asChild>
-                      <Button>Save {viewing === 'charts' ? 'Chart':  'Data'}</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>{viewing === 'charts' ? 'Save Chart' : 'Save Data Set'}</DialogTitle>
-                        <DialogDescription>
-                          { loadedDataMeta && `You are currently connected to ${loadedDataMeta.data_set_name}`}
-                          { loadedChartMeta && `You are currently connected to ${loadedDataMeta.chart_name}`}
-                        </DialogDescription>
-                      </DialogHeader>
-                      {
-                        viewing === "charts" 
-                          ?<div className="grid gap-4 py-4">
+                            </TabsContent>
+                            <TabsContent value="persentations">Your presentations will go here.</TabsContent>
+                          </Tabs>
+                        </SheetContent>
+                      </Sheet>
+                    </div>
+                  }
+
+                  {connectedData && 
+                    <div className="flex place-items-center">
+                      <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
+                        <DialogTrigger asChild>
+                          <div className="text-xs text-black cursor-pointer hover:bg-slate-100 py-2 px-2 rounded-md">Save {viewing === 'charts' ? 'Chart':  'Data'}</div>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                          <DialogHeader>
+                            <DialogTitle>{viewing === 'charts' ? 'Save Chart' : 'Save Data Set'}</DialogTitle>
+                            <DialogDescription>
+                              { loadedDataMeta && `You are currently connected to ${loadedDataMeta.data_set_name}`}
+                              { loadedChartMeta && `You are currently connected to ${loadedDataMeta.chart_name}`}
+                            </DialogDescription>
+                          </DialogHeader>
+                          {
+                            viewing === "charts" 
+                              ?<div className="grid gap-4 py-4">
+                                  {
+                                    loadedChartMeta && 
+                                      <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="overwrite" className="text-right">
+                                          Overwrite {loadedDataMeta.chart_name} ?
+                                        </Label>
+                                        <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
+                                      </div>
+                                  }
+                                  {
+                                    loadedChartMeta && !(overwrite) &&
+                                      <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="name" className="text-right">
+                                          Chart Name
+                                        </Label>
+                                        <Input
+                                          id="name"
+                                          defaultValue="Pied-Piper"
+                                          className="col-span-3"
+                                          onChange={(e)=>setNewChartName(e.target.value)}
+                                        />
+                                      </div>
+                                  }
+                                  {
+                                    !(loadedChartMeta) &&
+                                      <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="name" className="text-right">
+                                          Name your chart
+                                        </Label>
+                                        <Input
+                                          id="name"
+                                          defaultValue="Pied-Piper"
+                                          className="col-span-3"
+                                          onChange={(e)=>setNewChartName(e.target.value)}
+                                        />
+                                      </div>
+                                  }
+                                </div>
+                              : <div className="grid gap-4 py-4">
                               {
-                                loadedChartMeta && 
+                                loadedDataMeta && loadedDataMeta.data_set_name &&
                                   <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="overwrite" className="text-right">
-                                      Overwrite {loadedDataMeta.chart_name} ?
+                                      Overwrite {loadedDataMeta.data_set_name} ?
                                     </Label>
                                     <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
                                   </div>
                               }
                               {
-                                loadedChartMeta && !(overwrite) &&
+                                loadedDataMeta && loadedDataMeta.data_set_name && !(overwrite) &&
                                   <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="name" className="text-right">
-                                      Chart Name
+                                      Data Sheet Name
                                     </Label>
                                     <Input
                                       id="name"
                                       defaultValue="Pied-Piper"
                                       className="col-span-3"
-                                      onChange={(e)=>setNewChartName(e.target.value)}
+                                      onChange={(e)=>setNewDataName(e.target.value)}
                                     />
                                   </div>
                               }
                               {
-                                !(loadedChartMeta) &&
+                                !(loadedDataMeta) &&
                                   <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="name" className="text-right">
-                                      Name your chart
+                                      Name your data sheet
                                     </Label>
                                     <Input
                                       id="name"
                                       defaultValue="Pied-Piper"
                                       className="col-span-3"
-                                      onChange={(e)=>setNewChartName(e.target.value)}
+                                      onChange={(e)=>setNewDataName(e.target.value)}
                                     />
                                   </div>
                               }
-                            </div>
-                          : <div className="grid gap-4 py-4">
-                          {
-                            loadedDataMeta && loadedDataMeta.data_set_name &&
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="overwrite" className="text-right">
-                                  Overwrite {loadedDataMeta.data_set_name} ?
-                                </Label>
-                                <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
-                              </div>
-                          }
-                          {
-                            loadedDataMeta && loadedDataMeta.data_set_name && !(overwrite) &&
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
-                                  Data Sheet Name
-                                </Label>
-                                <Input
-                                  id="name"
-                                  defaultValue="Pied-Piper"
-                                  className="col-span-3"
-                                  onChange={(e)=>setNewDataName(e.target.value)}
-                                />
-                              </div>
-                          }
-                          {
-                            !(loadedDataMeta) &&
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
-                                  Name your data sheet
-                                </Label>
-                                <Input
-                                  id="name"
-                                  defaultValue="Pied-Piper"
-                                  className="col-span-3"
-                                  onChange={(e)=>setNewDataName(e.target.value)}
-                                />
-                              </div>
-                          }
-                        </div>                          
-                      }                      
-                      <DialogFooter>
-                        <Button type="submit" onClick={()=>handleSave()}>Save changes</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                  }
+                            </div>                          
+                          }                      
+                          <DialogFooter>
+                            <Button type="submit" onClick={()=>handleSave()}>Save changes</Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                    }
+                  
+                </div>
+                {loadedDataMeta && loadedDataMeta.data_set_name && <div className="flex text-xs gap-1"><div>Loaded:</div> <div>{loadedDataMeta.data_set_name}</div></div> }
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="secondary" className="rounded-full shadow-2xl shadow-inner flex bg-white">

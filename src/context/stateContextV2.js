@@ -233,6 +233,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     //all saved DataSets
     const [savedDataSets, setSavedDataSets] = useState()
     const [loadedDataMeta, setLoadedDataMeta] = useState()
+    const [loadedDataId, setLoadedDataId] = useState()
     //all saved Charts
     const [savedCharts, setSavedCharts] = useState()
     const [loadedChartMeta, setLoadedChartMeta ] = useState()
@@ -268,6 +269,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
             })
         }
     }, [connectedData])
+
+    //when we save we need to load meta; this is how we do it 
+    useEffect(() => {
+        savedDataSets && savedDataSets[loadedDataId] && setLoadedDataMeta(savedDataSets.loadedDataId) 
+    }, [loadedDataId, savedDataSets])
 
     //charts
     const extractData = (cols) => {
@@ -442,10 +448,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
               theme: chartTheme
             }))
       }, [chartTheme])
+
  
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart, loadedDataId ,setLoadedDataId}}>
             {children}
         </StateContextV2.Provider>
     )
