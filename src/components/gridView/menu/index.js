@@ -33,7 +33,7 @@ import {
   import { Button } from "@/components/ui/button"
   import { Input } from "@/components/ui/input"
   import { Label } from "@/components/ui/label"
-  import { Trash } from "lucide-react"
+  import { CheckCircle2, Pencil, Trash } from "lucide-react"
 
   import { useMyStateV2  } from '@/context/stateContextV2'
 
@@ -48,6 +48,9 @@ import {
 
     const [open, setOpen] = useState()
     const [content, setContent] = useState()
+    const [editingName, setEditingName] = useState()
+    const [newColName, setNewColName] = useState()
+
     
 
     const handleOpen = (param) => {
@@ -105,17 +108,40 @@ import {
       });
     };
 
+    const handleSaveColumnName = (index) => {
+      if (newColName.trim() === "") return;
+  
+      const oldColName = connectedCols[index].field;
+      let newCols = connectedCols.map((col, colIndex) =>
+        colIndex === index ? { ...col, field: newColName } : col
+      );
+      setConnectedCols(newCols);
+  
+      setConnectedData((prevData) => {
+        return prevData.map((item) => {
+          const newItem = { ...item };
+          newItem[newColName] = newItem[oldColName];
+          delete newItem[oldColName];
+          return newItem;
+        });
+      });
+  
+      setEditingName(null);
+      setNewColName("");
+      toast(`Column name updated to "${newColName}"`, {
+        duration: 5000,
+      });
+    };
+
     return (
       <Menubar className="rounded-xl border-slate-100 border px-2 lg:px-4">
         <MenubarMenu>
           <MenubarTrigger>Columns</MenubarTrigger>
           <MenubarContent>
             <MenubarItem onClick={()=>handleOpen('editColumns')}>
-                Edit Columns
+                Manage Columns
             </MenubarItem>
-            <MenubarItem>Delete Columns</MenubarItem>
             <MenubarSeparator />
-            <MenubarItem>Rearrange Column Sequence</MenubarItem>
             <MenubarItem>Hide Columns</MenubarItem>
           </MenubarContent>
         </MenubarMenu>
@@ -126,18 +152,29 @@ import {
               <DrawerContent>
                   <div className="mx-auto w-64">              
                       <DrawerHeader>
-                          <DrawerTitle className="text-center">Edit Columns</DrawerTitle>
+                          <DrawerTitle className="text-center">Manage Columns</DrawerTitle>
                       </DrawerHeader>
                       {connectedCols.map((col, index) => (
                         <div key={index} className="grid gap-4">
                           <div className="grid gap-2">
                             <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor={`col-${index}`}>{col.field}</Label>
-                              <Input
-                                id={`col-${index}`}
-                                defaultValue={col.field}
-                                className="col-span-2 h-8"
-                              />
+                              { index === editingName ? <Input id={`col-${index}`} defaultValue={col.field} className="col-span-2 h-8" onChange={(e) => setNewColName(e.target.value)}/> : <Label htmlFor={`col-${index}`}>{col.field} </Label> }
+                              {
+                                index === editingName ? 
+                                <div
+                                  className="bg-slate-200 w-6 h-6 rounded-sm flex place-items-center place-content-center text-white cursor-pointer hover:bg-white hover:text-slate-600 border-2 border-slate-800"
+                                  onClick={() => handleSaveColumnName(index)}
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                </div>
+                              : <div
+                                  className="bg-slate-200 w-6 h-6 rounded-sm flex place-items-center place-content-center text-white cursor-pointer hover:bg-white hover:text-slate-600 border-2 border-slate-800"
+                                  onClick={() => setEditingName(index)}
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </div>
+                              }                        
+                              
                               <div
                                 className="bg-red-600 w-6 h-6 rounded-sm flex place-items-center place-content-center text-white cursor-pointer hover:bg-white hover:text-red-600 border-2 border-red-600"
                                 onClick={() => handleDeleteColumn(index)}
