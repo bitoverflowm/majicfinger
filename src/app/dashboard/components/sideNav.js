@@ -136,19 +136,19 @@ const SideNav = () => {
         minimized ? <div className="bg-purple-600 flex place-items-center place-content-center p-2 rounded-sm text-white hover:bg-yellow-400 cursor-pointer hover:text-purple-600" onClick={()=>setViewing('pricing')}><PowerIcon /> </div>
                 : <Card onClick={() => setViewing('pricing')}>
                 <CardHeader className="pt-2 pb-1 bg-green-100">
-                  <CardTitle className="text-md text-green-600 font-black text-center">50% off</CardTitle>
+                  <CardTitle className="text-md text-green-600 font-black text-center">Support the project get 85% off + lifetime access</CardTitle>
                 </CardHeader>
                 <CardContent className="w-full text-[10px] pt-2">
                   <div className="text-sm text-center flex place-items-center place-content-center gap-1">
-                    $99.99 <div className="line-through text-[10px] text-center">$199.99</div>
+                    $29.99 <div className="line-through text-[10px] text-center">$199.99</div>
                   </div>
-                  <div className="pb-1 text-[10px] text-center">One Time Payment <br /> Life Time Access</div>
+                  <div className="pb-1 text-[10px] text-center">One Time Payment </div>
                   <div className="pt-1">Bonus: 100 credits/month for life, on the house</div>
                   <div className="flex py-2 place-content-center">
                     <Button size="xs" className="text-[10px]">See Pricing</Button>
                   </div>
                   <div className="text-[10px] flex gap-2 place-items-center">
-                    <FaCircle className="text-green-400 animate-pulse" /> 77 seats remaining before price increase
+                    <FaCircle className="text-green-400 animate-pulse" /> 27 seats remaining before price increase
                   </div>
                 </CardContent>
               </Card>

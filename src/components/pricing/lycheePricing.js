@@ -8,6 +8,8 @@ import { CheckIcon, Cross1Icon } from "@radix-ui/react-icons";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
+import { useMyStateV2 } from "@/context/stateContextV2";
+
 
 export const toHumanPrice = (price, decimals = 2) => {
   return Number(price / 100).toFixed(decimals);
@@ -62,7 +64,7 @@ const lycheePrices = [
   },
   {
     id: "price_2",
-    name: "LifeTime (50% off, original $199.99)",
+    name: "LifeTime (85% off, original $199.99)",
     description: "A single payment, own everything for life.",
     features: [
       "Includes everything in all plans",
@@ -72,17 +74,21 @@ const lycheePrices = [
       "Not a single penny more than what you pay today.",
       "Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else",
     ],
-    monthRef: 'https://buy.stripe.com/9AQ4iA3Cee1g3sc28s',
-    yearRef: 'https://buy.stripe.com/9AQ4iA3Cee1g3sc28s',
-    monthlyPrice: 9999,
-    yearlyPrice: 9999,
+    monthRef: 'https://buy.stripe.com/aEUaGYfkW9L04wgbJ3',
+    yearRef: 'https://buy.stripe.com/aEUaGYfkW9L04wgbJ3',
+    monthlyPrice: 2999,
+    yearlyPrice: 2999,
     singlePay: true,
     isMostPopular: true,
   },
 ];
 
 export function Pricing() {
-  const [interval, setInterval] = useState("month");
+  const [interval, setInterval] = useState("year");
+
+  const contextStateV2 = useMyStateV2()
+  let setViewing = contextStateV2?.setViewing || []
+
 
   return (
     <section id="pricing">
@@ -194,7 +200,7 @@ export function Pricing() {
               }
               {
                 price.id === 'price_0' ?
-                  <div className="py-3"/>
+                  <div className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm w-3/4 mx-auto" onClick={()=>setViewing('register')}> Register for Free </div>
                   :
                   <>
                     {

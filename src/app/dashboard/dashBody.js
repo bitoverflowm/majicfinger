@@ -101,8 +101,8 @@ const DashBody = ({user}) => {
                 { viewing === 'gallery' && <div className="py-16 min-h-screen"><ChartGallery/></div> }
                 { viewing === 'integrations' && <div className="py-16"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }
-                { viewing === 'generate' && <ComingSoon /> }
-                { viewing === 'presentation' && <ComingSoon /> }
+                { viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
+                { viewing === 'presentation' && <div className="py-20"><ComingSoon /></div> }
                 { viewing === 'scrape' && <ScraperView />}
                 { viewing === 'register' && <div className="py-16 w-[1500px] flex place-items-center place-content-center"><div><Login/></div></div>}
                 { viewing === 'pricing' && <div className="py-10"><Pricing /></div>}
