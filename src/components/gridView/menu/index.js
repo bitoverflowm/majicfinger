@@ -36,10 +36,11 @@ import { useMyStateV2 } from '@/context/stateContextV2';
 export function Menu() {
   const contextStateV2 = useMyStateV2();
 
-  let connectedCols = contextStateV2?.connectedCols || [];
-  let setConnectedCols = contextStateV2?.setConnectedCols || [];
-  let connectedData = contextStateV2?.connectedData || [];
-  let setConnectedData = contextStateV2?.setConnectedData || [];
+  let connectedCols = contextStateV2?.connectedCols || []
+  let setConnectedCols = contextStateV2?.setConnectedCols || []
+  let connectedData = contextStateV2?.connectedData || []
+  let setConnectedData = contextStateV2?.setConnectedData || []
+  let setViewing = contextStateV2?.setViewing
 
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
@@ -148,6 +149,7 @@ export function Menu() {
           <MenubarSeparator />
           <MenubarItem>Hide Columns</MenubarItem>
         </MenubarContent>
+        <div className="" onClick={()=>setViewing('presentation')}>Present</div>
       </MenubarMenu>
       {/* Universal Drawer */}
       <Drawer open={open} onOpenChange={setOpen}>

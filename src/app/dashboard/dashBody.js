@@ -20,6 +20,7 @@ import AiView from "@/components/aiView";
 import ScraperView from "@/components/scraperView";
 import ComingSoon from "./components/comingSoon";
 import { Pricing } from "@/components/pricing/lycheePricing";
+import PresentationView from "@/components/presentationView";
 
 
 const DashBody = ({user}) => {
@@ -102,15 +103,15 @@ const DashBody = ({user}) => {
                 { viewing === 'integrations' && <div className="py-16"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }
                 { viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
-                { viewing === 'presentation' && <div className="py-20"><ComingSoon /></div> }
+                { viewing === 'presentation' && <div className="py-20"><PresentationView /></div> }
                 { viewing === 'scrape' && <ScraperView />}
                 { viewing === 'register' && <div className="py-16 w-[1500px] flex place-items-center place-content-center"><div><Login/></div></div>}
                 { viewing === 'pricing' && <div className="py-10"><Pricing /></div>}
                 { viewing === 'manageAccount' && <div className="p-56 text-black">
-                        <div>Hi, I am working on making this page more useful</div>
-                        <div>For now I have enabled managed billing using Stripe click here: </div>
-                        <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
-                    </div>}
+                    <div>Hi, I am working on making this page more useful</div>
+                    <div>For now I have enabled managed billing using Stripe click here: </div>
+                    <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
+                </div>}
             </div>
         </div>
     )
