@@ -48,7 +48,9 @@ const WallStreetBets = ({setConnectedData}) => {
     }
 
     return (
-        <>            
+        <>
+            <div>Get top 50 stocks discussed on Reddit subeddit </div>
+            <div>To find stocks discussed by date, speficy data below. Otherwise, leave empty to get Todays data.</div>      
             <Popover>
                 <PopoverTrigger asChild>
                     <Button

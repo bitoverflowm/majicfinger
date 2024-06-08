@@ -31,6 +31,7 @@ import twitterDemoData from '@/components/integrations/twitter/twitterDemoData';
 import ParamToggles from "@/components/integrations/twitter/paramToggles"
 import PreviewGrid from "@/components/gridView/previewGrid"
 import WallStreetBets from "./integrations/wallStreetBets"
+import CoinGecko from "./integrations/coinGecko"
   
 const IntegrationPlayground = ({playView, setPlayView}) => {
     const contextStateV2 = useMyStateV2()
@@ -183,8 +184,6 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
                   <legend className="-ml-1 px-1 text-sm font-medium">
                     Settings
                   </legend>
-                  <div>Get top 50 stocks discussed on Reddit subeddit </div>
-                  <div>To find stocks discussed by date, speficy data below. Otherwise, leave empty to get Todays data.</div>
                   {
                     playView === "twitter" &&
                       <>
@@ -341,6 +340,12 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
                     playView === "wallStreetBets" &&
                       <>
                         <WallStreetBets setConnectedData={setConnectedData}/>
+                      </>
+                  }
+                  { 
+                    playView === "coinGecko" &&
+                      <>
+                        <CoinGecko setConnectedData={setConnectedData}/>
                       </>
                   }
                   

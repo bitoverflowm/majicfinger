@@ -56,17 +56,18 @@ export function IntegrationsView() {
                 <div className="w-28 mx-auto text-center bg-black rounded-md text-white text-xs py-2 cursor-pointer hover:bg-lychee_green hover:text-black" onClick={()=>setViewing('pricing')}>Get Full Access</div>
               </div>
             </div>
-            <Card className="bg-black text-white text-xl px-10 py-20 w-96">
-              Most Popular Data Sources 
-            </Card>
             <Card onClick={()=>clickHandler('twitter')} className="w-64 h-44 flex flex-col gap-2 place-items-center place-content-center cursor-pointer hover:bg-lychee_green">
               <div>Twitter</div> <div><FaXTwitter /></div>
+              <div></div>
             </Card>
             <Card onClick={()=>clickHandler('wallStreetBets')} className="w-64 h-44 flex flex-col gap-2 place-items-center place-content-center text-center cursor-pointer hover:bg-lychee_green">
               <div>Wall Street Bets</div> <div><FaCat /></div><p className="text-xs text-muted-foreground px-10">Sentiment analysis on the top 50 stocks discussed on Reddit sub- wallStreetBets</p>
             </Card>
             <Card onClick={()=>clickHandler('shortSqueeze')} className="w-64 h-44 flex flex-col gap-2 place-items-center place-content-center text-center cursor-pointer hover:bg-lychee_green">
               <div>Short Squeeze Stock Scanner</div> <div><Shrink /></div><p className="text-xs text-muted-foreground px-10">Get a list of stocks that are in TTM Squeeze or out of squeeze</p>
+            </Card>
+            <Card onClick={()=>clickHandler('coinGecko')} className="w-64 h-44 flex flex-col gap-2 place-items-center place-content-center text-center cursor-pointer hover:bg-lychee_green">
+              <div>CoinGecko </div> <div><Shrink /></div><p className="text-xs text-muted-foreground px-10">Connect to The most reliable and comprehensive cryptocurrency data API for traders and developers</p>
             </Card>
           </div>
       }
