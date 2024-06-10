@@ -1,20 +1,26 @@
 "use client";
 
-import { motion } from "framer-motion"
 import { useRef, useEffect, useState } from "react"
 
 import Link from "next/link";
 
 import { VelocityScroll } from "../ui/scroll-based-velocity";
 
-import WavyText from "../magicui/wavy-text";
-import Meteors from "../magicui/meteors";
-import WordPullUp from "../magicui/word-pull-up";
 import BlurIn from "../magicui/blur-in";
-
+import Particles from "../magicui/particles";
 
 import VideoView from "./videoView";
+import { Card } from "../ui/card";
 
+const companies = [
+    "jpm",
+    "goldman",
+    "meta",
+    "google",
+    "apple",
+    "mit",
+    "openai",
+  ];
 
 export function Hero() {
     const fadeInRef = useRef(null);
@@ -59,36 +65,69 @@ export function Hero() {
     return (
         <section id="hero" className="flex place-content-center w-11/12 mx-auto overflow-hidden">
             <div className="relative h-full container z-10 flex flex-col overflow-hidden">
-                <Meteors />
+                <Particles
+                    className="absolute inset-0"
+                    quantity={100}
+                    ease={80}
+                    color={'#ffffff'}
+                    refresh
+                />
                 <div className="text-balance bg-gradient-to-br from-lychee_blue from-0% to-lychee_red/70 bg-clip-text font-black leading-none tracking-tighter text-transparent pt-10 pb-3 sm:py-10 text-7xl sm:text-8xl xl:text-[250px] text-center sm:text-left">
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>
-                <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-2xl xl:text-6xl text-white">Easy <span className="text-lychee_green italic font-black ">Peasy</span> Data...</div>
-                <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-2xl xl:text-6xl text-white">Discover Something Great</div>
-                <Link className='mx-auto sm:ml-8 text-center w-32 bg-green-600 p-1 sm:p-2 mt-1 sm:mt-3 rounded-md hover:border hover:border-white' href={"/dashboard"}>
+                <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-4xl sm:font-black text-white">Discover Something Great</div>
+                <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-sm xl:text-6xl text-white">We'll save you from all the <span className="text-lychee_green italic font-black ">complex yabba-dabba-doos</span> out there.</div>
+                
+                <Link className='sm:ml-2 text-center w-32 bg-green-600 p-1 sm:p-2 mt-1 sm:mt-3 rounded-md hover:border hover:border-white' href={"/dashboard"}>
                     <div className="text-white text-xs"> Start </div>
                 </Link>
-                <div className="text-center sm:text-left sm:ml-8 text-[10px] pt-1 text-lychee_white">
-                        No card or registration required
+                <div className="text-center sm:text-left ml-2 text-[10px] pt-1 text-lychee_white">
+                    No card or registration required
+                </div>
+                <div className="w-full flex place-content-center">
+                    <div className="container mx-auto px-4 md:px-8 ">
+                        <h3 className="py-4 sm:pt-36 text-center text-[10px] font-semibold text-slate-400">
+                            ACTIVELY BETA TESTED BY FRIENDS AT
+                        </h3>
+                        <div className="mt-6 px-10">
+                            <div className="flex flex-wrap gap-8 place-items-center place-content-center">
+                                {companies.map((logo, idx) => (
+                                    <img
+                                        key={idx}
+                                        src={`./${logo}.svg`}
+                                        className="h-8 w-20 brightness-0 invert"
+                                        alt={logo}
+                                    />
+                                ))}
+                            </div>
+                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
+                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
+                        </div>
                     </div>
+                </div>
                 <div className="pt-10 sm:pt-20 sm:pr-20">
                     <div className="sm:text-4xl text-lychee_green">Automagically Analyze Anything With AI and Get Unprecedented Insights</div>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Examine multiple datasets at once (500MB per dataset) (and growing)</div>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">I am targeting 1GB/ dataset and 100 datasets at once by end of 2024</div>
-                    <div className="sm:text-center text-lychee_white sm:text-8xl sm:font-black pt-10">
+                    <div className="sm:text-4xl text-lychee_green pt-10">
                         Connect <span className="font-black text-lychee_red">Directly</span> to <span className="underline">ALL</span> The Data Sources of <span className="text-lychee_green">Your Dreams</span>
                     </div>
-                    <div className="py-2 sm:py-10">
-                        <VelocityScroll
-                            text="Twitter, Reddit, Instagram, Strava, Youtube, Meta, NASDAQ, US Treasuries, SEC Edgar Data, OpenWeather API,"
-                            default_velocity={0.3}
-                            className="text-lychee_blue font-display text-center text-4xl font-bold tracking-[-0.02em] drop-shadow-sm md:text-7xl md:leading-[5rem]"
-                            />
-                        <VelocityScroll
-                            text="Product Hunt, HackerNews, 4chan, The World Bank, weather data, earthquake data, NASA Data, Medium, NBAStats, Census.gov"
-                            default_velocity={0.3}
-                            className="text-lychee_blue font-display text-center text-4xl font-bold tracking-[-0.02em] drop-shadow-sm md:text-7xl md:leading-[5rem]"
-                            />
+                    <div className="p-10 flex flex-wrap gap-4 text-xs place-items-center place-content-center">
+                        <Card className="w-48 py-10 text-center">
+                            Twitter
+                        </Card>
+                        <Card className="w-48 py-10 text-center">
+                            CoinGecko
+                        </Card>
+                        <Card className="w-48 py-10 text-center">
+                            Reddit - WallStreetBets
+                        </Card>
+                        <Card className="w-48 py-10 text-center">
+                            Reddit - ShortSqueezes
+                        </Card>
+                        <Card className="w-48 py-10 text-center">
+                            Reddit, Instagram, Strava, Youtube, Meta, NASDAQ, US Treasuries, SEC Edgar Data, OpenWeather API, Product Hunt, HackerNews, 4chan, The World Bank, weather data, earthquake data, NASA Data, Medium, NBAStats, Census.gov
+                        </Card>
                     </div>
                     <div className="pt-4 text-center text-lychee_white text-sm sm:text-4xl">Not A Single Line of Code Required on Your End</div>
                     <div className="pt-4 text-center text-lychee_white text-sm sm:text-4xl">Data Cleaner Than a Nun's Browser History</div>
