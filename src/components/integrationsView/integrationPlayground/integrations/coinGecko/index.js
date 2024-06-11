@@ -1,22 +1,10 @@
 import {useState} from "react"
-import { format } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react"
- 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+
 
 const CoinGecko = ({setConnectedData}) => {
-    const [date, setDate] = useState()
-    const [trendingCache, setTrendingCache ] = useState()
     
-    const fetchHandler = async () => {
-        let res = await fetch('/api/integrations/coinGecko', {
+    const fetchHandler = async (query) => {
+        let res = await fetch(`/api/integrations/coinGecko?query=${query}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -26,21 +14,87 @@ const CoinGecko = ({setConnectedData}) => {
             let data = await res.json();
             setConnectedData(data);
         } else {
-            console.error("WallStreetBets User Data pull failed");
+            console.error(res.error);
         }        
     }
 
+    const trendingActions = [
+        { query: 'trendingCoins', name: 'Trending Coins', description: 'Get the trending coins' },
+        { query: 'trendingNFTs', name: 'Trending NFTs', description: 'Get the trending NFTs' },
+        { query: 'trendingCategories', name: 'Trending Categories', description: 'Get the trending categories' }
+    ];
+
+    const adminActions = [
+        { query: 'supportedCurrenciesList', name: 'Supported Currencies List', description: 'Get a list of all supported currencies on CoinGecko'},
+        { query: 'coinListId', name: 'Coins ID List', description: 'List of all supported coins on CoinGecko with Ethereum, polygon-pos address and symbol'},
+    ]
+
+    const marketData = [
+        { query: 'coinMarketData', name: 'Coin Market Data', description: 'All the supported coins with price, market cap, volume and market related data', broken: true},
+        { query: 'coinCategoriesMarketData', name: 'Coin Categories Market Data', description: "All the coins categories with market data (market cap, volume, etc.) on CoinGecko"},
+    ]
+
+    const exchangeData = [
+        { query: 'exchangesData', name: 'Exchanges Data', description: 'All the supported exchanges with exchanges’ data (id, name, country, .... etc) that have active trading volumes on CoinGecko'},
+    ]
+
+
+
     return (
-        <>  
-            <div>What do you want to pull?</div>
-            <div className="bg-black p-2 rounded-lg text-white" onClick={()=>fetchHandler()}>Trending</div>
-
-            <div className='flex place-content-end gap-4 text-xs'>
-                <div className='px-3 py-1 bg-white text-lychee-red border border-lychee-red cursor-pointer hover:bg-lychee-red hover:text-white rounded-md' onClick={()=>clearHandler()}>Clear</div>
-                <div className='shadow-sm px-3 py-1 bg-lychee-go text-lychee-black border border-lychee-go cursor-pointer hover:bg-lychee-green hover:text-white hover:border-lychee-green rounded-md hover:shadow-lychee-green hover:shadow-2xl' onClick={()=>fetchHandler(date)}>Connect</div>
+        <div>  
+            <div className="py-2 text-xs">Trending</div>
+            <div className='flex flex-wrap gap-1 text-xs'>
+                {trendingActions.map(action => (
+                    <div
+                        key={action.query}
+                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                        onClick={() => !action.broken && fetchHandler(action.query)}
+                        title={action.description}
+                    >
+                        {action.name}
+                    </div>
+                ))}
             </div>
-
-        </>
+            <div className="py-2 text-xs">CoinGecko Admin</div>
+            <div className='flex flex-wrap gap-1 text-xs'>
+                {adminActions.map(action => (
+                    <div
+                        key={action.query}
+                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                        onClick={() => !action.broken && fetchHandler(action.query)}
+                        title={action.description}
+                    >
+                        {action.name}
+                    </div>
+                ))}
+            </div>
+            <div className="py-2 text-xs">Market Data</div>
+            <div className='flex flex-wrap gap-1 text-xs'>
+                {marketData.map(action => (
+                    <div
+                        key={action.query}
+                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                        onClick={() => !action.broken && fetchHandler(action.query)}
+                        title={action.description}
+                    >
+                        {action.name}
+                    </div>
+                ))}
+            </div>
+            <div className="py-2 text-xs">Exchange Data</div>
+            <div className='flex flex-wrap gap-1 text-xs'>
+                {exchangeData.map(action => (
+                    <div
+                        key={action.query}
+                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                        onClick={() => !action.broken && fetchHandler(action.query)}
+                        title={action.description}
+                    >
+                        {action.name}
+                    </div>
+                ))}
+            </div>
+        </div>
     )
 }
 

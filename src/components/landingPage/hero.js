@@ -64,14 +64,15 @@ export function Hero() {
 
     return (
         <section id="hero" className="flex place-content-center w-11/12 mx-auto overflow-hidden">
-            <div className="relative h-full container z-10 flex flex-col overflow-hidden">
-                <Particles
+            <Particles
                     className="absolute inset-0"
                     quantity={100}
                     ease={80}
                     color={'#ffffff'}
                     refresh
                 />
+            <div className="relative h-full container z-10 flex flex-col overflow-hidden">
+                
                 <div className="text-balance bg-gradient-to-br from-lychee_blue from-0% to-lychee_red/70 bg-clip-text font-black leading-none tracking-tighter text-transparent pt-10 pb-3 sm:py-10 text-7xl sm:text-8xl xl:text-[250px] text-center sm:text-left">
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>

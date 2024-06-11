@@ -26,7 +26,7 @@ const PreviewGrid = ({h, w}) => {
     }))
 
     return (
-        <div className={`ag-theme-quartz px-4 ${h ? h: 'h-[300px]'} ${ w ? w: 'w-[800px]'}`}>
+        <div className={`ag-theme-quartz px-4 ${h ? h: 'h-[300px]'} ${ w ? w: 'w-[550px] xl:w-[800px]'}`}>
             <AgGridReact 
                 defaultColDef = {defaultColDef}
                 rowData={connectedData.slice(0,4)} 

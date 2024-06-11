@@ -100,7 +100,7 @@ const DashBody = ({user}) => {
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'charts' && <div className="py-16 h-screen"><ChartViewV2 user={user}/></div> }
                 { viewing === 'gallery' && <div className="py-16 min-h-screen"><ChartGallery/></div> }
-                { viewing === 'integrations' && <div className="py-16"><IntegrationsView/></div> }
+                { viewing === 'integrations' && <div className="py-10"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }
                 { viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
                 { viewing === 'presentation' && <div className="py-20"><PresentationView /></div> }

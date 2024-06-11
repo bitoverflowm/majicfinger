@@ -42,6 +42,11 @@ const SideNav = () => {
 
   const [minimized, setMinimized] = useState(false);
 
+  const viewHandler = e => {
+    setViewing(e)
+    setMinimized(true)
+  }
+
   return (
     <div className={`px-2 min-h-screen flex flex-col transition-all duration-300 ${minimized ? 'w-16' : 'w-48'}`}>
     <nav className="text-xs font-medium">
@@ -76,7 +81,7 @@ const SideNav = () => {
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'integrations' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('integrations')}
+        onClick={() => viewHandler('integrations')}
       >
         <Cable className="h-5 w-5" />
         {!minimized && 'Integrations'}
