@@ -38,6 +38,12 @@ const CoinGecko = ({setConnectedData}) => {
         { query: 'exchangesData', name: 'Exchanges Data', description: 'All the supported exchanges with exchanges’ data (id, name, country, .... etc) that have active trading volumes on CoinGecko'},
     ]
 
+    const derivativesData = [
+        { query: 'derivativesTickers', name: 'Derivatives Tickers', description: 'all the tickers from derivatives exchanges on CoinGecko'},
+        { query: 'derivativesExchanges', name: 'Derivatives Exchangess', description: 'all the derivatives exchanges with related data (id, name, open interest, .... etc) on CoinGecko'},
+        { query: 'derivativesExchangesList', name: 'Derivatives Exchanges List', description: 'all the derivatives exchanges with id and name on CoinGecko.'},
+    ]
+
 
 
     return (
@@ -84,6 +90,19 @@ const CoinGecko = ({setConnectedData}) => {
             <div className="py-2 text-xs">Exchange Data</div>
             <div className='flex flex-wrap gap-1 text-xs'>
                 {exchangeData.map(action => (
+                    <div
+                        key={action.query}
+                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                        onClick={() => !action.broken && fetchHandler(action.query)}
+                        title={action.description}
+                    >
+                        {action.name}
+                    </div>
+                ))}
+            </div>
+            <div className="py-2 text-xs">Derivatives Data</div>
+            <div className='flex flex-wrap gap-1 text-xs'>
+                {derivativesData.map(action => (
                     <div
                         key={action.query}
                         className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}

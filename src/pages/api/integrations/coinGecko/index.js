@@ -29,6 +29,15 @@ export default async (req, res) => {
         case 'exchangesData':
             url = `https://api.coingecko.com/api/v3/exchanges?x_cg_demo_api_key=${apiKey}`
             return await exchangesData(url, res)
+        case 'derivativesTickers':
+            url = `https://api.coingecko.com/api/v3/derivatives?x_cg_demo_api_key=${apiKey}`
+            return await derivativesTickers(url, res)
+        case 'derivativesExchanges':
+            url = ` https://api.coingecko.com/api/v3/derivatives/exchanges?x_cg_demo_api_key=${apiKey}`
+            return await derivativesExchanges(url, res)
+        case 'derivativesExchangesList':
+            url = `https://api.coingecko.com/api/v3/derivatives/exchanges/list?x_cg_demo_api_key=${apiKey}`
+            return await derivativesExchangesList(url, res)
         default:
             return res.status(400).json({ message: 'Invalid query' });
             break;
@@ -291,8 +300,6 @@ const coinMarketData = async (url, res) => {
             },
         });
 
-        console.log("response: ", response)
-
         if (response.status === 200) {
             console.log("success")
             const coins = await response.json()
@@ -368,7 +375,72 @@ const exchangesData = async (url, res) => {
             const exchanges = await response.json()
             return res.status(200).json(exchanges);
         } else {
-            return res.status(response.status).json({ message: 'Coin list data pull failed' });
+            return res.status(response.status).json({ message: 'Exchanges list data pull failed' });
+        }
+    } catch (error) {
+        console.log(error.message)
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
+
+
+const derivativesTickers = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const derivatives = await response.json()
+            return res.status(200).json(derivatives);
+        } else {
+            return res.status(response.status).json({ message: 'Derivatives list data pull failed' });
+        }
+    } catch (error) {
+        console.log(error.message)
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
+
+
+const derivativesExchanges = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const derivativesExchanges = await response.json()
+            return res.status(200).json(derivativesExchanges);
+        } else {
+            return res.status(response.status).json({ message: 'derivatives Exchanges list data pull failed' });
+        }
+    } catch (error) {
+        console.log(error.message)
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
+
+const derivativesExchangesList = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const derivativesExchangesList = await response.json()
+            return res.status(200).json(derivativesExchangesList);
+        } else {
+            return res.status(response.status).json({ message: 'derivatives Exchanges list data pull failed' });
         }
     } catch (error) {
         console.log(error.message)
