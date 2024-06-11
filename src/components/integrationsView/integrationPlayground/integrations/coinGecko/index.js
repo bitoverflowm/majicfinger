@@ -25,6 +25,7 @@ const CoinGecko = ({setConnectedData}) => {
     ];
 
     const adminActions = [
+        { query: 'ping', name: 'CoinGecko Server Status', description: 'Check the API server status', broken: true},
         { query: 'supportedCurrenciesList', name: 'Supported Currencies List', description: 'Get a list of all supported currencies on CoinGecko'},
         { query: 'coinListId', name: 'Coins ID List', description: 'List of all supported coins on CoinGecko with Ethereum, polygon-pos address and symbol'},
     ]
@@ -48,10 +49,24 @@ const CoinGecko = ({setConnectedData}) => {
 
     const nftsData = [
         { query: 'nftsList', name: 'NFTs', description: 'query all supported NFTs with id, contract address, name, asset platform id and symbol on CoinGecko'},
+        { query: 'nftsCollectionByID', name: 'NFTs Collection Data by ID', description: 'query all the NFT data (name, floor price, 24 hr volume....) based on the nft collection id', broken: true},
+        { query: 'nftsCollectionByAddy', name: 'NFTs Collection Data by Addy', description: 'query all the NFT data (name, floor price, 24 hr volume....) based on the nft collection addy', broken: true},
     ]
 
     const exchangeRatesData = [
         { query: 'exchangeRateBTC', name: 'BTC Exchange Rates', description: 'BTC exchange rates with other currencies.'},
+    ]
+
+    const coinData = [
+        { query: 'coinPriceById', name: 'Coin By CoinID', description: 'query the prices of one or more coins by using their unique Coin API IDs', broken: true},
+        { query: 'coinPriceByTokenAddy', name: 'Coin By Token Address', description: 'query a token price by using token contract address', broken: true},
+        { query: 'coinDataById', name: 'Coin Data By CoinID', description: 'query all the coin data of a coin (name, price, market .... including exchange tickers) on CoinGecko coin page based on a particular coin id', broken: true},
+        { query: 'coinTickersById', name: 'Coin Tickers By ID', description: 'query the coin tickers on both centralized exchange (cex) and decentralized exchange (dex) based on a particular coin id', broken: true},
+        { query: 'coinHistoricalChartDataById', name: 'Coin Historical Chart Data by ID', description: ' get the historical chart data of a coin including time in UNIX, price, market cap and 24hrs volume based on particular coin id', broken: true},
+        { query: 'coinHistoricalChartDataByAddy', name: 'Coin Historical Chart Data by Token Addy', description: '  all the coin data (name, price, market .... including exchange tickers) on CoinGecko coin page based on asset platform and particular token contract address.', broken: true},
+        { query: 'coinHistoricalDataById', name: 'Coin Historical Data by ID', description: 'query the historical data (price, market cap, 24hrs volume, etc) at a given date for a coin based on a particular coin id', broken: true},
+        { query: 'coinHistoricalChartDataWithinTimeRangeById', name: 'Coin Historical Chart Data within Time Range by ID', description: 'get the historical chart data of a coin within certain time range in UNIX along with price, market cap and 24hrs volume based on particular coin id', broken: true},
+        { query: 'coinOHLCById', name: 'Coin OHLC Chart by ID', description: 'get the OHLC chart (Open, High, Low, Close) of a coin based on particular coin id.', broken: true},
     ]
 
 
@@ -149,6 +164,21 @@ const CoinGecko = ({setConnectedData}) => {
                     </div>
                 ))}
             </div>
+            <div className="py-2 text-xs">Coin Data</div>
+            <div className='flex flex-wrap gap-1 text-xs'>
+                {coinData.map(action => (
+                    <div
+                        key={action.query}
+                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                        onClick={() => !action.broken && fetchHandler(action.query)}
+                        title={action.description}
+                    >
+                        {action.name}
+                    </div>
+                ))}
+            </div>
+            <div className="py-2 text-xs">Free Text Search Coming Soon</div>
+            
         </div>
     )
 }

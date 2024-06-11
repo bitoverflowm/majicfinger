@@ -175,8 +175,8 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
       <div className="grid h-screen w-full pl-[56px] sm:pl-0">
         <div className="flex flex-col">
           <div className="text-xs hover:text-lychee_blue cursor-pointer flex place-item-center gap-2" onClick={()=>setPlayView()}> <ArrowLeft className="h-4 w-4"/> View Other Integrations</div>
-          <main className="grid flex-1 gap-4 overflow-auto p-1 grid-cols-3">
-            <div className="relative hidden flex-col items-start gap-8 md:flex" x-chunk="dashboard-03-chunk-0">
+          <main className="p-1 md:grid md:grid-cols-3 md:gap-4">
+            <div className="relative flex-col items-start gap-8 md:flex" x-chunk="dashboard-03-chunk-0">
               <form className="grid w-full items-start gap-6">
                 <fieldset className="grid gap-6 rounded-lg border p-4">
                   <legend className="-ml-1 px-1 text-xs font-medium">Select an action</legend>
