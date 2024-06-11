@@ -196,7 +196,6 @@ const Nav = () => {
               // Handle the error here
           });
         }else{
-          // console.log("data to save: ", data)
           fetch('/api/dataSets', {
             method: 'POST',
             headers: {
@@ -216,8 +215,7 @@ const Nav = () => {
           .then(data => {
               toast(`Your Data has been saved as ${newDataName}`)
               setRefetchData(1)
-              console.log(data)
-              setConnectedData(data.data)
+              setConnectedData(data.data.data)
               setLoadedDataId(data._id)
               // Handle the response data here
           })

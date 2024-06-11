@@ -26,6 +26,12 @@ export default async (req, res) => {
         case 'coinCategoriesMarketData':
             url = `https://api.coingecko.com/api/v3/coins/categories?x_cg_demo_api_key=${apiKey}`
             return await coinCategoriesMarketData(url, res)
+        case 'globalMarketData':
+            url = `https://api.coingecko.com/api/v3/global?x_cg_demo_api_key=${apiKey}`
+            return await globalMarketData(url, res)
+        case 'globalDefiMarketData':
+            url = `https://api.coingecko.com/api/v3/global/decentralized_finance_defi?x_cg_demo_api_key=${apiKey}`
+            return await globalDefiMarketData(url, res)
         case 'exchangesData':
             url = `https://api.coingecko.com/api/v3/exchanges?x_cg_demo_api_key=${apiKey}`
             return await exchangesData(url, res)
@@ -38,6 +44,12 @@ export default async (req, res) => {
         case 'derivativesExchangesList':
             url = `https://api.coingecko.com/api/v3/derivatives/exchanges/list?x_cg_demo_api_key=${apiKey}`
             return await derivativesExchangesList(url, res)
+        case 'nftsList':
+            url = `https://api.coingecko.com/api/v3/nfts/list?x_cg_demo_api_key=${apiKey}`
+            return await nftsList(url, res)
+        case 'exchangeRateBTC':
+            url = `https://api.coingecko.com/api/v3/exchange_rates?x_cg_demo_api_key=${apiKey}`
+            return await exchangeRateBTC(url, res)
         default:
             return res.status(400).json({ message: 'Invalid query' });
             break;
@@ -362,6 +374,95 @@ const coinCategoriesMarketData = async (url, res) => {
     }
 };
 
+const globalMarketData = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { data } = await response.json();
+
+            // Flattening the total_market_cap and total_volume
+            const totalMarketCap = Object.entries(data.total_market_cap).map(([key, value]) => ({
+                [`total_market_cap_${key}`]: value,
+            }));
+
+            const totalVolume = Object.entries(data.total_volume).map(([key, value]) => ({
+                [`total_volume_${key}`]: value,
+            }));
+
+            // Combine totalMarketCap and totalVolume into single objects
+            const flattenedTotalMarketCap = Object.assign({}, ...totalMarketCap);
+            const flattenedTotalVolume = Object.assign({}, ...totalVolume);
+
+            // Flattening the market_cap_percentage
+            const marketCapPercentage = Object.entries(data.market_cap_percentage).map(([key, value]) => ({
+                [`market_cap_percentage_${key}`]: value,
+            }));
+            const flattenedMarketCapPercentage = Object.assign({}, ...marketCapPercentage);
+
+            // Combining all flattened data
+            const flattenedData = {
+                active_cryptocurrencies: data.active_cryptocurrencies,
+                upcoming_icos: data.upcoming_icos,
+                ongoing_icos: data.ongoing_icos,
+                ended_icos: data.ended_icos,
+                markets: data.markets,
+                ...flattenedTotalMarketCap,
+                ...flattenedTotalVolume,
+                ...flattenedMarketCapPercentage,
+                market_cap_change_percentage_24h_usd: data.market_cap_change_percentage_24h_usd,
+                updated_at: data.updated_at,
+            };
+
+            return res.status(200).json([flattenedData]);
+        } else {
+            return res.status(response.status).json({ message: 'Global market data pull failed' });
+        }
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
+
+
+const globalDefiMarketData = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { data } = await response.json();
+
+            const flattenedData = {
+                defi_market_cap: data.defi_market_cap,
+                eth_market_cap: data.eth_market_cap,
+                defi_to_eth_ratio: data.defi_to_eth_ratio,
+                trading_volume_24h: data.trading_volume_24h,
+                defi_dominance: data.defi_dominance,
+                top_coin_name: data.top_coin_name,
+                top_coin_defi_dominance: data.top_coin_defi_dominance,
+            };
+
+            return res.status(200).json([flattenedData]);
+        } else {
+            return res.status(response.status).json({ message: 'Global DeFi market data pull failed' });
+        }
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
+
+
 const exchangesData = async (url, res) => {
     try {
         const response = await fetch(url, {
@@ -416,8 +517,8 @@ const derivativesExchanges = async (url, res) => {
         });
 
         if (response.status === 200) {
-            const derivativesExchanges = await response.json()
-            return res.status(200).json(derivativesExchanges);
+            const data = await response.json()
+            return res.status(200).json(data);
         } else {
             return res.status(response.status).json({ message: 'derivatives Exchanges list data pull failed' });
         }
@@ -437,13 +538,66 @@ const derivativesExchangesList = async (url, res) => {
         });
 
         if (response.status === 200) {
-            const derivativesExchangesList = await response.json()
-            return res.status(200).json(derivativesExchangesList);
+            const data = await response.json()
+            return res.status(200).json(data);
         } else {
             return res.status(response.status).json({ message: 'derivatives Exchanges list data pull failed' });
         }
     } catch (error) {
         console.log(error.message)
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
+
+//nftsList
+const nftsList = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const data = await response.json()
+            return res.status(200).json(data);
+        } else {
+            return res.status(response.status).json({ message: 'nfts list data pull failed' });
+        }
+    } catch (error) {
+        console.log(error.message)
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
+
+const exchangeRateBTC = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const data = await response.json();
+            const rates = data.rates;
+
+            const formattedData = Object.entries(rates).map(([key, value]) => ({
+                id: key,
+                name: value.name,
+                unit: value.unit,
+                value: value.value,
+                type: value.type,
+            }));
+
+            return res.status(200).json(formattedData);
+        } else {
+            return res.status(response.status).json({ message: 'Exchange rate list data pull failed' });
+        }
+    } catch (error) {
+        console.log(error.message);
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 };
