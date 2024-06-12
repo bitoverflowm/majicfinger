@@ -19,7 +19,7 @@ import { Carrot, Citrus, Ghost, Hexagon, Pickaxe, Sprout } from "lucide-react"
 
 import { Alert } from '@/components/ui/alert'
 import { Progress } from "@/components/ui/progress"
-import { MdCleanHands } from "react-icons/md"
+
 
 const Upload = ({user}) => {
     const contextStateV2 = useMyStateV2()

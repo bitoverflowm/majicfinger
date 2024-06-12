@@ -138,8 +138,8 @@ const GridView = ({startNew}) => {
             <Alert className="mt-4 sm:hidden">
                 <div className="flex gap-2 place-items-center"><TrafficCone className="w-8 h-8"/>
                     <div className="">
-                        <p className="text-xs">Hey productivity superhero on-the-go!</p>
-                        <p className="text-xs text-muted-foreground">Lychee really flexes its muscles on bigger screens, but I tried to keep her mobile-friendly.</p>
+                        <p className="text-xs">Looks like you're on-the-go!</p>
+                        <p className="text-xs text-muted-foreground">I tried to keep it mobile-friendly, but Lychee really flexes its muscles on bigger screens.</p>
                     </div>
                 </div>
             </Alert>  

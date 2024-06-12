@@ -22,7 +22,7 @@ const DataView = ({user}) => {
             </h2>
             <code className="my-2 relative rounded bg-lychee_red/20 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">{loadedDataMeta ? loadedDataMeta.data_set_name :'Viewing unsaved data'}</code>
             {
-                (connectedData) ? <div className='min-h-screen w-4/6 sm:w-[500px] md:w-[650px] lg:w-[850px] xl:w-[1100px] 2xl:w-[1600px]'> <GridView/> </div>      
+                (connectedData) ? <div className='min-h-screen w-4/6 min-[300px]:w-[400px] sm:w-[500px] md:w-[650px] lg:w-[850px] xl:w-[1100px] 2xl:w-[1600px]'> <GridView/> </div>      
                 : <div className="">
                     <div className='w-1/4 mx-auto py-8'>
                         {
