@@ -1,4 +1,3 @@
-import { useState } from 'react'
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -9,9 +8,6 @@ import { VscCircleFilled } from 'react-icons/vsc'
 
 const NewSheetView = ({user, startNew}) => {
     const contextStateV2 = useMyStateV2()
-
-    const connectedData = contextStateV2?.connectedData
-    const loadedDataMeta = contextStateV2?.loadedDataMeta
     const setViewing = contextStateV2?.setViewing
 
     return(
@@ -26,7 +22,9 @@ const NewSheetView = ({user, startNew}) => {
                         </AlertDescription>
                     </Alert>
             }                     
-                <div className='min-h-screen'> <GridView startNew={startNew}/> </div>
+                <div className='min-h-screen'> 
+                    <GridView startNew={startNew}/> 
+                </div>
         </div>
     )
 

@@ -41,9 +41,14 @@ const Upload = ({user}) => {
     const dataConnected = contextStateV2?.dataConnected
     const setDataConnected = contextStateV2?.setDataConnected
 
+    const multiSheetFlag = contextStateV2?.multiSheetFlag
+    const setMultiSheetFlag = contextStateV2?.setMultiSheetFlag
+    const multiSheetData = contextStateV2?.multiSheetData
+    const setMultiSheetData = contextStateV2?.setMultiSheetData
+    const dataTypes = contextStateV2?.dataTypes
+    const setDataTypes = contextStateV2?.setDataTypes
 
     const handleFileUpload = (e) => {
-        console.log('starting')
         const file = e.target.files[0]
         
         if (!file) {
@@ -56,31 +61,55 @@ const Upload = ({user}) => {
 
         reader.onload = (e) => {
             let data = e.target.result;
-            //data = data.trim();
+            
+            const parseSheet = (worksheet) => {
+                const rows = XLSX.utils.sheet_to_json(worksheet, { raw: true });
+                const firstRow = rows[0];
+                const dataTypes = {};
+    
+                for (let key in firstRow) {
+                    dataTypes[key] = typeof firstRow[key];
+                }
+    
+                return { rows, dataTypes };
+            };
             
             if (fileType === 'csv') {
                 // If the file is a CSV, use this block to process it
-                const json = XLSX.utils.sheet_to_json(XLSX.read(data, { type: 'binary' }).Sheets.Sheet1);
-                if(connectedData){
-                    setTempData(connectedData)
-                    setConnectedData(json); // Now you have your JSON data
-                }else {
-                    setConnectedData(json)
-                }
-                setDataConnected(true)
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const { rows, dataTypes } = parseSheet(sheet);
+                setMultiSheetFlag(false);
+                setMultiSheetData(null); // No multi-sheet data
+                setConnectedData(rows);
+                setDataTypes(dataTypes);
+                setDataConnected(true);
             } else if (fileType === 'xlsx') {
                 const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet);
-                //const csv = XLSX.utils.sheet_to_csv(worksheet);
-                if(connectedData){
-                    setTempData(connectedData)
-                    setConnectedData(json); // Now you have your JSON data
-                }else {
-                    setConnectedData(json)
+                const allSheetsData = {};
+                const allSheetsDataTypes = {};
+
+                workbook.SheetNames.forEach(sheetName => {
+                    const worksheet = workbook.Sheets[sheetName];
+                    const { rows, dataTypes } = parseSheet(worksheet);
+                    allSheetsData[sheetName] = rows;
+                    allSheetsDataTypes[sheetName] = dataTypes;
+                });
+
+                const sheetNames = workbook.SheetNames;
+
+                if (sheetNames.length > 1) {
+                    setMultiSheetFlag(true);
+                    setMultiSheetData(allSheetsData);
+                    setConnectedData(allSheetsData[sheetNames[0]]);
+                    setDataTypes(allSheetsDataTypes[sheetNames[0]]);
+                } else {
+                    setMultiSheetFlag(false);
+                    setMultiSheetData(null);
+                    setConnectedData(allSheetsData[sheetNames[0]]);
+                    setDataTypes(allSheetsDataTypes[sheetNames[0]]);
                 }
-                setDataConnected(true)
+                setDataConnected(true);
             }
         };
         // Decide how to read the file based on its type

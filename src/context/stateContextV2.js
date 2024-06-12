@@ -225,7 +225,6 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     // Memoize the context value to optimize performance
     const providerValue = useMemo(() => ({ settings, setSettings }), [settings]);
 
-
     //data management
     const [dataSetName, setDataSetName] = useState()
     const [refetchData, setRefetchData] = useState()
@@ -239,25 +238,45 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [loadedChartMeta, setLoadedChartMeta ] = useState()
 
 
+    //multi sheet handler
+    const [multiSheetFlag, setMultiSheetFlag] = useState()
+    const [multiSheetData, setMultiSheetData] = useState()
+
     //Connected Data is active working data. 
     const [dataConnected, setDataConnected] = useState() //boolean, do we have connected data or not
     const [connectedData, setConnectedData] = useState()
     const [connectedCols, setConnectedCols] = useState() //cols of fresh data
     const [tempData, setTempData] = useState() //holder state; whenver new data comes, tempData holds the previous state incase an action was a mistake
 
+    //datatypes
+    const [dataTypes, setDataTypes] = useState({});
+
     const [previewChartOptions, setPreviewChartOptions] = useState()
 
-    useEffect(()=> {
-        if(connectedData && connectedData.length > 0){
-            const keys = Object.keys(connectedData[0])
+    useEffect(() => {
+        if (connectedData && connectedData.length > 0) {
+            const keys = Object.keys(connectedData[0]);
             const columnsLabels = keys.map(key => {
-                // Handle any price headings
-                /*if (key === 'price') {
-                    return { field: key, valueFormatter: params => '$' + params.value.toLocaleString() }
-                }*/
-                return { field: key }
-            })
-            setConnectedCols(columnsLabels)
+                let cellDataType;
+                switch (dataTypes[key]) {
+                    case 'number':
+                        cellDataType = 'number';
+                        break;
+                    case 'boolean':
+                        cellDataType = 'boolean';
+                        break;
+                    case 'object':
+                        cellDataType = 'object';
+                        break;
+                    case 'string':
+                    default:
+                        cellDataType = 'text';
+                        break;
+                }
+                return { field: key, cellDataType };
+            });
+    
+            setConnectedCols(columnsLabels);
             setPreviewChartOptions({
                 data: connectedData,
                 series: [{
@@ -266,9 +285,9 @@ export const StateProviderV2 = ({children, initialSettings}) => {
                     yKey: columnsLabels && columnsLabels[1] && columnsLabels[1].field,
                     direction: 'vertical'
                 }]
-            })
+            });
         }
-    }, [connectedData])
+    }, [connectedData, dataTypes]);
 
     //when we save we need to load meta; this is how we do it 
     useEffect(() => {
@@ -452,7 +471,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
  
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart, loadedDataId ,setLoadedDataId}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes}}>
             {children}
         </StateContextV2.Provider>
     )
