@@ -1,4 +1,12 @@
-import {useState} from "react"
+import { Alert } from "@/components/ui/alert"
+import { FlaskConical } from "lucide-react"
+
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
 
 
 const CoinGecko = ({setConnectedData}) => {
@@ -72,113 +80,148 @@ const CoinGecko = ({setConnectedData}) => {
 
 
     return (
-        <div>  
-            <div className="py-2 text-xs">Trending</div>
-            <div className='flex flex-wrap gap-1 text-xs'>
-                {trendingActions.map(action => (
-                    <div
-                        key={action.query}
-                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                        onClick={() => !action.broken && fetchHandler(action.query)}
-                        title={action.description}
-                    >
-                        {action.name}
-                    </div>
-                ))}
-            </div>
-            <div className="py-2 text-xs">CoinGecko Admin</div>
-            <div className='flex flex-wrap gap-1 text-xs'>
-                {adminActions.map(action => (
-                    <div
-                        key={action.query}
-                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                        onClick={() => !action.broken && fetchHandler(action.query)}
-                        title={action.description}
-                    >
-                        {action.name}
-                    </div>
-                ))}
-            </div>
-            <div className="py-2 text-xs">Market Data</div>
-            <div className='flex flex-wrap gap-1 text-xs'>
-                {marketData.map(action => (
-                    <div
-                        key={action.query}
-                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                        onClick={() => !action.broken && fetchHandler(action.query)}
-                        title={action.description}
-                    >
-                        {action.name}
-                    </div>
-                ))}
-            </div>
-            <div className="py-2 text-xs">Exchange Data</div>
-            <div className='flex flex-wrap gap-1 text-xs'>
-                {exchangeData.map(action => (
-                    <div
-                        key={action.query}
-                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                        onClick={() => !action.broken && fetchHandler(action.query)}
-                        title={action.description}
-                    >
-                        {action.name}
-                    </div>
-                ))}
-            </div>
-            <div className="py-2 text-xs">Derivatives Data</div>
-            <div className='flex flex-wrap gap-1 text-xs'>
-                {derivativesData.map(action => (
-                    <div
-                        key={action.query}
-                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                        onClick={() => !action.broken && fetchHandler(action.query)}
-                        title={action.description}
-                    >
-                        {action.name}
-                    </div>
-                ))}
-            </div>
-            <div className="py-2 text-xs">NFT Data</div>
-            <div className='flex flex-wrap gap-1 text-xs'>
-                {nftsData.map(action => (
-                    <div
-                        key={action.query}
-                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                        onClick={() => !action.broken && fetchHandler(action.query)}
-                        title={action.description}
-                    >
-                        {action.name}
-                    </div>
-                ))}
-            </div>
-            <div className="py-2 text-xs">Exchange Rate Data</div>
-            <div className='flex flex-wrap gap-1 text-xs'>
-                {exchangeRatesData.map(action => (
-                    <div
-                        key={action.query}
-                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                        onClick={() => !action.broken && fetchHandler(action.query)}
-                        title={action.description}
-                    >
-                        {action.name}
-                    </div>
-                ))}
-            </div>
-            <div className="py-2 text-xs">Coin Data</div>
-            <div className='flex flex-wrap gap-1 text-xs'>
-                {coinData.map(action => (
-                    <div
-                        key={action.query}
-                        className={`px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-200' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                        onClick={() => !action.broken && fetchHandler(action.query)}
-                        title={action.description}
-                    >
-                        {action.name}
-                    </div>
-                ))}
-            </div>
-            <div className="py-2 text-xs">Free Text Search Coming Soon</div>
-            
+        <div className="text-[12px]">
+            <Accordion defaultValue="marketData" type="single" collapsible className="w-full">
+                <AccordionItem value="trending">
+                    <AccordionTrigger className="pt-1 sm:pt-3">Trending</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {trendingActions.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="admin">
+                    <AccordionTrigger>CoinGecko Admin</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {adminActions.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="marketData">
+                    <AccordionTrigger>Market Data</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                        {marketData.map(action => (
+                            <div
+                                key={action.query}
+                                className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                onClick={() => !action.broken && fetchHandler(action.query)}
+                                title={action.description}
+                            >
+                                {action.name}
+                            </div>
+                        ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="exchangeData">
+                    <AccordionTrigger>Exchange Data</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {exchangeData.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="derivativesData">
+                    <AccordionTrigger>Derivatives Data</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {derivativesData.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="nftData">
+                    <AccordionTrigger>NFT Data</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {nftsData.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="exchangeRateData">
+                    <AccordionTrigger>Exchange Rate Data</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {exchangeRatesData.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="coinData">
+                    <AccordionTrigger>Coin Data</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {coinData.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+            <Alert className="mt-4">
+                <div className="flex gap-2 place-items-center"><FlaskConical className="w-8 h-8"/><div className="">You will soon be able to search by contractID, Token Name or any freeform search</div></div>
+            </Alert>            
         </div>
     )
 }

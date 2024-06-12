@@ -28,7 +28,7 @@ export function IntegrationsView() {
   }
 
   return (
-    <div className="p-5 ">
+    <div className="">
       {
         playView ?
           <div>

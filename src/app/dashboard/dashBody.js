@@ -89,11 +89,11 @@ const DashBody = ({user}) => {
     }, [user, refetchChart])    
 
     return(
-        <div className="w-full flex">
-            <div className="z-20 inset-y-0  flex-col border-r bg-background sm:flex">
+        <div className="flex">
+            <div className="z-20 inset-y-0 flex-col border-r bg-background sm:flex">
                 <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
             </div>
-            <div className='w-full'>
+            <div className=''>
                 { viewing === 'dashboard' && <div className="py-28"><KatsuView user={user}/></div> }              
                 { viewing === 'dataStart' && <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div> }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
