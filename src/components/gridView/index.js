@@ -24,6 +24,9 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert } from '@/components/ui/alert'
+import { TrafficCone } from 'lucide-react';
+
 
 const GridView = ({startNew}) => {
 
@@ -131,8 +134,16 @@ const GridView = ({startNew}) => {
     }, [startNew])
 
     return (
-        <div className="ag-theme-quartz" style={{ height: '100%', width: '100%' }}>           
-            <div className='w-full pt-6 pb-2 flex place-items-center gap-2' >
+        <div className="ag-theme-quartz" style={{ height: '100%', width: '100%' }}>
+            <Alert className="mt-4 sm:hidden">
+                <div className="flex gap-2 place-items-center"><TrafficCone className="w-8 h-8"/>
+                    <div className="">
+                        <p className="text-xs">Hey productivity superhero on-the-go!</p>
+                        <p className="text-xs text-muted-foreground">Lychee really flexes its muscles on bigger screens, but I tried to keep her mobile-friendly.</p>
+                    </div>
+                </div>
+            </Alert>  
+            <div className='pt-6 pb-2 flex place-items-center gap-2' >
                 <div className=''>
                     <Menu />
                 </div>

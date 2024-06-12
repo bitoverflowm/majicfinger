@@ -149,7 +149,7 @@ export function Menu() {
           <MenubarSeparator />
           <MenubarItem>Hide Columns</MenubarItem>
         </MenubarContent>
-        <div className="" onClick={()=>setViewing('presentation')}>Present</div>
+        <div className="hidden" onClick={()=>setViewing('presentation')}>Present</div>
       </MenubarMenu>
       {/* Universal Drawer */}
       <Drawer open={open} onOpenChange={setOpen}>

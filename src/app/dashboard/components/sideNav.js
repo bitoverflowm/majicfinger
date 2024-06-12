@@ -48,7 +48,7 @@ const SideNav = () => {
   }
 
   return (
-    <div className={`px-2 min-h-screen flex flex-col transition-all duration-300 ${minimized ? 'w-16' : 'w-48'}`}>
+    <div className={`px-2 h-screen flex flex-col transition-all duration-300 ${minimized ? 'w-16' : 'w-48'}`}>
     <nav className="text-xs font-medium">
       <div className="flex place-content-center pt-8">
         <div className="flex mb-6 h-9 w-9 items-center justify-center rounded-full bg-primary md:h-8 md:w-8">
@@ -60,21 +60,21 @@ const SideNav = () => {
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'dashboard' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('dashboard')}
+        onClick={() => viewHandler('dashboard')}
       >
         <LayoutDashboard className="h-5 w-5" />
         {!minimized && 'Dashboard'}
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'dataStart' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('dataStart')}
+        onClick={() => viewHandler('dataStart')}
       >
         <Database className="h-5 w-5" />
         {!minimized && 'Data Sheet'}
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'upload' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('upload')}
+        onClick={() => viewHandler('upload')}
       >
         <HardDriveUpload className="h-5 w-5" />
         {!minimized && 'Upload'}
@@ -88,49 +88,49 @@ const SideNav = () => {
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'scrape' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('scrape')}
+        onClick={() => viewHandler('scrape')}
       >
         <Shovel className="h-5 w-5" />
         {!minimized && 'Scrape'}
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'generate' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('generate')}
+        onClick={() => viewHandler('generate')}
       >
         <BadgePlus className="h-5 w-5" />
         {!minimized && 'Generate Data'}
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'newSheet' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('newSheet')}
+        onClick={() => viewHandler('newSheet')}
       >
         <FilePlus2 className="h-5 w-5" />
         {!minimized && 'New Sheet'}
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'charts' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('charts')}
+        onClick={() => viewHandler('charts')}
       >
         <BarChart3 className="h-5 w-5" />
         {!minimized && 'Charts'}
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'gallery' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('gallery')}
+        onClick={() => viewHandler('gallery')}
       >
         <Gem className="h-5 w-5" />
         {!minimized && 'Gallery'}
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'ai' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('ai')}
+        onClick={() => viewHandler('ai')}
       >
         <Bot className="h-5 w-5" />
         {!minimized && 'AI'}
       </div>
       <div
         className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'presentation' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setViewing('presentation')}
+        onClick={() => viewHandler('presentation')}
       >
         <Camera className="h-5 w-5" />
         {!minimized && 'Presentation'}
@@ -139,25 +139,25 @@ const SideNav = () => {
     <div className="mt-auto mb-5 w-full">
       {
         minimized ? <div className="bg-purple-600 flex place-items-center place-content-center p-2 rounded-sm text-white hover:bg-yellow-400 cursor-pointer hover:text-purple-600" onClick={()=>setViewing('pricing')}><PowerIcon /> </div>
-                : <Card onClick={() => setViewing('pricing')}>
-                <CardHeader className="pt-2 pb-1 bg-green-100">
-                  <CardTitle className="text-md text-green-600 font-black text-center">Support the project get 85% off + lifetime access</CardTitle>
-                </CardHeader>
-                <CardContent className="w-full text-[10px] pt-2">
-                  <div className="text-sm text-center flex place-items-center place-content-center gap-1">
-                    $29.99 <div className="line-through text-[10px] text-center">$199.99</div>
-                  </div>
-                  <div className="pb-1 text-[10px] text-center">One Time Payment </div>
-                  <div className="pt-1">Bonus: 100 credits/month for life, on the house</div>
-                  <div className="flex py-2 place-content-center">
-                    <Button size="xs" className="text-[10px]">See Pricing</Button>
-                  </div>
-                  <div className="text-[10px] flex gap-2 place-items-center">
-                    <FaCircle className="text-green-400 animate-pulse" /> 27 seats remaining before price increase
-                  </div>
-                </CardContent>
-              </Card>
-  }
+                : <Card onClick={() => viewHandler('pricing')}>
+                    <CardHeader className="pt-2 pb-1 bg-green-100">
+                      <CardTitle className="text-md text-green-600 font-black text-center">Support the project get 85% off + lifetime access</CardTitle>
+                    </CardHeader>
+                    <CardContent className="w-full text-[10px] pt-2">
+                      <div className="text-sm text-center flex place-items-center place-content-center gap-1">
+                        $29.99 <div className="line-through text-[10px] text-center">$199.99</div>
+                      </div>
+                      <div className="pb-1 text-[10px] text-center">One Time Payment </div>
+                      <div className="pt-1">Bonus: 100 credits/month for life, on the house</div>
+                      <div className="flex py-2 place-content-center">
+                        <Button size="xs" className="text-[10px]">See Pricing</Button>
+                      </div>
+                      <div className="text-[10px] flex gap-2 place-items-center">
+                        <FaCircle className="text-green-400 animate-pulse" /> 27 seats remaining before price increase
+                      </div>
+                    </CardContent>
+                  </Card>
+      }
     </div>
   </div>
         )
