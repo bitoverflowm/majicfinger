@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { HardDriveUpload, Cable, Shovel, FilePlus2 } from 'lucide-react'
@@ -11,16 +11,44 @@ import { VscCircleFilled } from 'react-icons/vsc'
 const DataView = ({user}) => {
     const contextStateV2 = useMyStateV2()
 
+    const [sheetId,setSheetId] = useState(0)
+
     const connectedData = contextStateV2?.connectedData
     const loadedDataMeta = contextStateV2?.loadedDataMeta
+    const setConnectedData = contextStateV2?.setConnectedData
     const setViewing = contextStateV2?.setViewing
+    const multiSheetFlag = contextStateV2?.multiSheetFlag
+    const multiSheetData = contextStateV2?.multiSheetData
+    const sheetNames = contextStateV2?.sheetNames
+
+    const sheetSwitchHandler = (sheetName, id) => {
+        console.log('sheet :', sheetName)
+        setConnectedData(multiSheetData[sheetName])
+        setSheetId(id)
+    }
+
+    
 
     return(
         <div className='px-10'>                       
             <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
                 Your Data
             </h2>
-            <code className="my-2 relative rounded bg-lychee_red/20 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">{loadedDataMeta ? loadedDataMeta.data_set_name :'Viewing unsaved data'}</code>
+            <div className='flex flex-wrap gap-1 mt-1'>
+                <code className="relative rounded bg-lychee_red/20 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
+                    {loadedDataMeta ? loadedDataMeta.data_set_name : 'Viewing unsaved data'}
+                </code>
+                {
+                    multiSheetFlag && Object.keys(multiSheetData).map((sheetName, index) => (
+                        <code key={index} className={`${sheetName === sheetNames[sheetId] ? 'bg-lychee_blue/30' : 'bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white'} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`} onClick={()=>sheetSwitchHandler(sheetName, index)}>
+                            {sheetName}
+                        </code>
+                    ))
+                }
+            </div>
+
+            
+
             {
                 (connectedData) ? <div className='min-h-screen w-4/6 min-[300px]:w-[400px] sm:w-[500px] md:w-[650px] lg:w-[850px] xl:w-[1100px] 2xl:w-[1600px]'> <GridView/> </div>      
                 : <div className="">

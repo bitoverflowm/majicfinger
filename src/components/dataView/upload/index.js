@@ -38,6 +38,7 @@ const Upload = ({user}) => {
     const setMultiSheetData = contextStateV2?.setMultiSheetData
     const dataTypes = contextStateV2?.dataTypes
     const setDataTypes = contextStateV2?.setDataTypes
+    const setSheetNames = contextStateV2?.setSheetNames
 
 
     const [loading, setLoading] = useState()
@@ -101,8 +102,10 @@ const Upload = ({user}) => {
                 });
 
                 const sheetNames = workbook.SheetNames;
+                setSheetNames(sheetNames)
 
                 if (sheetNames.length > 1) {
+                    console.log("we do have multiple sheets")
                     setMultiSheetFlag(true);
                     setMultiSheetData(allSheetsData);
                     setConnectedData(allSheetsData[sheetNames[0]]);
