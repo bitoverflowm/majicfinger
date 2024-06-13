@@ -48,8 +48,8 @@ export default function Home() {
       <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"/>
       <GoogleAnalytics gaId="G-G8X2NEPTEG" />
       <StateProvider>
-        <Nav/>
-        <div className="bg-lychee_black">
+        <div className='z-30'><Nav/></div>
+        <div className="bg-lychee_black z-10">
           <LandingPage />
         </div>
       </StateProvider>

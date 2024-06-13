@@ -144,12 +144,16 @@ const Upload = ({user}) => {
                     }
                     {
                         dataConnected && <div className="py-10">
-                            <h4 className="scroll-m-20 text-xl font-semibold tracking-tight">Data Successfully Uploaded. Click one of the options below:</h4>
-                            <div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('dataStart')}>View and work with your data using Data Sheet</div>
-                            <div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('charts')}>Start Charting right away</div>
-                            <div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('presentation')}>Present your work</div>
-                            <div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('ai')}>See what you can learn with Lyehee's AI Athena</div>
-                        </div>
+                                            <h4 className="scroll-m-20 text-xl font-semibold tracking-tight bg-lychee_green pl-1">Data Successfully Uploaded.</h4>
+                                            <p className="leading-7 [&:not(:first-child)]:mt-2">What's next? </p>
+                                            <p className="text-sm text-muted-foreground">Click one of the options below:</p>
+                                            <ul className="my-6 ml-6 list-disc [&>li]:mt-2 text-xs">
+                                                <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('dataStart')}>View and work with your data using Data Sheet</div></li>
+                                                <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('charts')}>Start Charting right away</div></li>
+                                                <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('presentation')}>Present your work</div></li>
+                                                <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('ai')}>See what you can learn with Lyehee's AI Athena</div></li>
+                                            </ul>
+                                        </div>
                     }
                 </CardContent>
             </Card>

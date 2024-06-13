@@ -255,10 +255,14 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
     useEffect(() => {
         if (connectedData && connectedData.length > 0) {
+            // Determine data types
+            const detectedDataTypes = determineDataTypes(connectedData);
+            setDataTypes(detectedDataTypes);
+    
             const keys = Object.keys(connectedData[0]);
             const columnsLabels = keys.map(key => {
                 let cellDataType;
-                switch (dataTypes[key]) {
+                switch (detectedDataTypes[key]) {
                     case 'number':
                         cellDataType = 'number';
                         break;
@@ -268,7 +272,10 @@ export const StateProviderV2 = ({children, initialSettings}) => {
                     case 'object':
                         cellDataType = 'object';
                         break;
-                    case 'string':
+                    case 'dateString':
+                        cellDataType = 'dateString';
+                        break;
+                    case 'text':
                     default:
                         cellDataType = 'text';
                         break;
@@ -287,7 +294,26 @@ export const StateProviderV2 = ({children, initialSettings}) => {
                 }]
             });
         }
-    }, [connectedData, dataTypes]);
+    }, [connectedData]);
+
+    const detectDataType = (value) => {
+        if (typeof value === 'boolean') return 'boolean';
+        if (!isNaN(Date.parse(value))) return 'dateString';
+        if (!isNaN(parseFloat(value)) && isFinite(value)) return 'number';
+        if (typeof value === 'object' && value !== null) return 'object';
+        return 'text';
+    };
+    
+    const determineDataTypes = (data) => {
+        const types = {};
+        if (data.length > 0) {
+            const sample = data[0];
+            Object.keys(sample).forEach(key => {
+                types[key] = detectDataType(sample[key]);
+            });
+        }
+        return types;
+    };
 
     //when we save we need to load meta; this is how we do it 
     useEffect(() => {

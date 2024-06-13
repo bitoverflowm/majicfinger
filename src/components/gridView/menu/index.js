@@ -41,6 +41,8 @@ export function Menu() {
   let connectedData = contextStateV2?.connectedData || []
   let setConnectedData = contextStateV2?.setConnectedData || []
   let setViewing = contextStateV2?.setViewing
+  let dataTypes = contextStateV2?.dataTypes
+  let setDataTypes = contextStateV2?.setDataTypes
 
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
@@ -73,6 +75,10 @@ export function Menu() {
         }).concat([{ [name]: "" }]);
       });
     }
+    setDataTypes(prevTypes => ({
+      ...prevTypes,
+      [name]: 'text' // Default to 'text' type for new columns
+    }));
 
     toast(`New Column added!`, {
       duration: 5000,
@@ -94,6 +100,12 @@ export function Menu() {
         delete newItem[colName]; // Remove the specific field
         return newItem;
       });
+    });
+    // Remove the column from data types
+    setDataTypes((prevTypes) => {
+      const newTypes = { ...prevTypes };
+      delete newTypes[colName];
+      return newTypes;
     });
 
     toast(`Column "${colName}" deleted!`, {
@@ -119,9 +131,33 @@ export function Menu() {
       });
     });
 
+    setDataTypes((prevTypes) => {
+      const newTypes = { ...prevTypes };
+      newTypes[newColName] = newTypes[oldColName];
+      delete newTypes[oldColName];
+      return newTypes;
+    });
+
     setEditingName(null);
     setNewColName("");
     toast(`Column name updated to "${newColName}"`, {
+      duration: 5000,
+    });
+  };
+
+  const handleTypeChange = (index, newType) => {
+    const colName = connectedCols[index].field;
+  
+    // Convert the data type of the column in connectedData
+    const updatedData = convertDataType(connectedData, colName, newType);
+    setConnectedData(updatedData);
+  
+    setDataTypes(prevTypes => ({
+      ...prevTypes,
+      [colName]: newType
+    }));
+  
+    toast(`Column "${colName}" type updated to "${newType}"`, {
       duration: 5000,
     });
   };
@@ -138,24 +174,47 @@ export function Menu() {
     setConnectedCols(reorderedCols);
   };
 
+  const convertDataType = (data, column, newType) => {
+    return data.map(row => {
+      let newValue = row[column];
+      switch (newType) {
+        case 'number':
+          newValue = parseFloat(newValue);
+          if (isNaN(newValue)) newValue = null;
+          break;
+        case 'boolean':
+          newValue = Boolean(newValue);
+          break;
+        case 'dateString':
+          newValue = new Date(newValue).toISOString();
+          break;
+        case 'object':
+          try {
+            newValue = JSON.parse(newValue);
+          } catch {
+            newValue = null;
+          }
+          break;
+        case 'text':
+        default:
+          newValue = String(newValue);
+          break;
+      }
+      return { ...row, [column]: newValue };
+    });
+  };
+
   return (
     <Menubar className="rounded-xl border-slate-100 border px-2 lg:px-4">
       <MenubarMenu>
-        <MenubarTrigger>Columns</MenubarTrigger>
-        <MenubarContent>
-          <MenubarItem onClick={() => handleOpen("editColumns")}>
-            Manage Columns
-          </MenubarItem>
-          <MenubarSeparator />
-          <MenubarItem>Hide Columns</MenubarItem>
-        </MenubarContent>
+        <div className="cursor-pointer hover:bg-lychee_green/20"  onClick={() => handleOpen("editColumns")}> Column Properties </div>
         <div className="hidden" onClick={()=>setViewing('presentation')}>Present</div>
       </MenubarMenu>
       {/* Universal Drawer */}
       <Drawer open={open} onOpenChange={setOpen}>
         {content === "editColumns" && (
           <DrawerContent>
-            <div className="mx-auto w-64">
+            <div className="mx-auto">
               <DrawerHeader>
                 <DrawerTitle className="text-center">Manage Columns</DrawerTitle>
               </DrawerHeader>
@@ -180,7 +239,7 @@ export function Menu() {
                               {...provided.dragHandleProps}
                               className="grid gap-2"
                             >
-                              <div className="grid grid-cols-4 items-center gap-4">
+                              <div className="grid grid-cols-12 items-center gap-4 px-20">
                                 {index === editingName ? (
                                   <Input
                                     id={`col-${index}`}
@@ -212,6 +271,19 @@ export function Menu() {
                                 >
                                   <Trash className="w-3 h-3" />
                                 </div>
+                                <select
+                                  id={`type-${index}`}
+                                  value={dataTypes[col.field] || 'text'}
+                                  onChange={(e) => handleTypeChange(index, e.target.value)}
+                                  className="col-span-3 h-8"
+                                >
+                                  <option value="text">Text</option>
+                                  <option value="number">Number</option>
+                                  <option value="boolean">Boolean</option>
+                                  <option value="date">Date</option>
+                                  <option value="dateString">DateString</option>
+                                  <option value="object">Object</option>
+                                </select>
                               </div>
                             </div>
                           )}

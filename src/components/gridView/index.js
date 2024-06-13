@@ -192,7 +192,7 @@ const GridView = ({startNew}) => {
                     </Button>
                 </div>
             </div>
-            <div className='h-[900px]'>
+            <div className='h-[750px]'>
                 <AgGridReact 
                     defaultColDef={defaultColDef} 
                     rowData={connectedData} 

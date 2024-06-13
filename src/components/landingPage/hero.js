@@ -63,23 +63,22 @@ export function Hero() {
 
 
     return (
-        <section id="hero" className="flex place-content-center w-11/12 mx-auto overflow-hidden">
-            <Particles
+        <section id="hero" className="flex place-content-center w-11/12 mx-auto overflow-hidden">            
+            <div className="relative h-full container flex flex-col overflow-hidden">
+                <Particles
                     className="absolute inset-0"
                     quantity={100}
                     ease={80}
                     color={'#ffffff'}
                     refresh
-                />
-            <div className="relative h-full container z-10 flex flex-col overflow-hidden">
-                
+                />         
                 <div className="text-balance bg-gradient-to-br from-lychee_blue from-0% to-lychee_red/70 bg-clip-text font-black leading-none tracking-tighter text-transparent pt-10 pb-3 sm:py-10 text-7xl sm:text-8xl xl:text-[250px] text-center sm:text-left">
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>
                 <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-4xl sm:font-black text-white">Discover Something Great</div>
                 <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-sm xl:text-6xl text-white">We'll save you from all the <span className="text-lychee_green italic font-black ">complex yabba-dabba-doos</span> out there.</div>
                 
-                <Link className='sm:ml-2 text-center w-32 bg-green-600 p-1 sm:p-2 mt-1 sm:mt-3 rounded-md hover:border hover:border-white' href={"/dashboard"}>
+                <Link className='z-10 sm:ml-2 text-center w-32 bg-green-600 p-1 sm:p-2 mt-1 sm:mt-3 rounded-md hover:border hover:border-white' href={"/dashboard"}>
                     <div className="text-white text-xs"> Start </div>
                 </Link>
                 <div className="text-center sm:text-left ml-2 text-[10px] pt-1 text-lychee_white">
