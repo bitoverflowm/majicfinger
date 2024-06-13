@@ -81,6 +81,8 @@ const Upload = ({user}) => {
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const { rows, dataTypes } = parseSheet(sheet);
+                console.log('rows', rows)
+                console.log('datatypes', dataTypes)
                 setMultiSheetFlag(false);
                 setMultiSheetData(null); // No multi-sheet data
                 setConnectedData(rows);

@@ -222,8 +222,6 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         'background_color': ''
       })
 
-    // Memoize the context value to optimize performance
-    const providerValue = useMemo(() => ({ settings, setSettings }), [settings]);
 
     //data management
     const [dataSetName, setDataSetName] = useState()
@@ -250,38 +248,35 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
     //datatypes
     const [dataTypes, setDataTypes] = useState({});
+    const [dataTypeMismatch, setDataTypeMismatch] = useState(false);
 
     const [previewChartOptions, setPreviewChartOptions] = useState()
 
+    // Memoize the context value to optimize performance
+    const providerValue = useMemo(() => ({
+        settings, setSettings, viewing, setViewing, connectedData, setConnectedData, connectedCols, setConnectedCols, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch
+    }), [settings, viewing, connectedData, connectedCols, dataTypes, dataTypeMismatch]);
+
     useEffect(() => {
         if (connectedData && connectedData.length > 0) {
-            // Determine data types
-            const detectedDataTypes = determineDataTypes(connectedData);
-            setDataTypes(detectedDataTypes);
-    
+            // Check if data types are already set
+            if (Object.keys(dataTypes).length === 0) {
+                // Determine data types
+                const detectedDataTypes = determineDataTypes(connectedData);
+                setDataTypes(detectedDataTypes);
+            } else {
+                // Check for data type mismatches
+                const detectedDataTypes = determineDataTypes(connectedData);
+                const hasMismatch = checkDataTypeMismatch(detectedDataTypes, dataTypes);
+                setDataTypeMismatch(hasMismatch);
+            }
+
+            // Update connectedCols based on detected or existing data types
             const keys = Object.keys(connectedData[0]);
-            const columnsLabels = keys.map(key => {
-                let cellDataType;
-                switch (detectedDataTypes[key]) {
-                    case 'number':
-                        cellDataType = 'number';
-                        break;
-                    case 'boolean':
-                        cellDataType = 'boolean';
-                        break;
-                    case 'object':
-                        cellDataType = 'object';
-                        break;
-                    case 'dateString':
-                        cellDataType = 'dateString';
-                        break;
-                    case 'text':
-                    default:
-                        cellDataType = 'text';
-                        break;
-                }
-                return { field: key, cellDataType };
-            });
+            const columnsLabels = keys.map(key => ({
+                field: key,
+                cellDataType: dataTypes[key] || 'text'
+            }));
     
             setConnectedCols(columnsLabels);
             setPreviewChartOptions({
@@ -294,7 +289,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
                 }]
             });
         }
-    }, [connectedData]);
+    }, [connectedData, dataTypes]);
 
     const detectDataType = (value) => {
         if (typeof value === 'boolean') return 'boolean';
@@ -303,7 +298,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         if (typeof value === 'object' && value !== null) return 'object';
         return 'text';
     };
-    
+
     const determineDataTypes = (data) => {
         const types = {};
         if (data.length > 0) {
@@ -313,6 +308,10 @@ export const StateProviderV2 = ({children, initialSettings}) => {
             });
         }
         return types;
+    };
+
+    const checkDataTypeMismatch = (detectedDataTypes, existingDataTypes) => {
+        return Object.keys(detectedDataTypes).some(key => detectedDataTypes[key] !== existingDataTypes[key]);
     };
 
     //when we save we need to load meta; this is how we do it 
@@ -497,7 +496,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
  
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch}}>
             {children}
         </StateContextV2.Provider>
     )
