@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GripVertical, Pencil, Trash } from "lucide-react";
+import { GripVertical, LineChart, Pencil, Trash } from "lucide-react";
 import { useMyStateV2 } from '@/context/stateContextV2';
 import { Card } from "@/components/ui/card";
 
@@ -206,11 +206,12 @@ export function Menu() {
   };
 
   return (
-    <Menubar className="rounded-xl border-slate-100 border px-2 lg:px-4">
-      <MenubarMenu>
-        <div className="cursor-pointer hover:bg-lychee_green/20"  onClick={() => handleOpen("editColumns")}> Column Properties </div>
-        <div className="hidden" onClick={()=>setViewing('presentation')}>Present</div>
-      </MenubarMenu>
+    <div className="px-2 lg:px-4">
+      <div className="flex gap-4 border border-slate-200 rounded-md py-2 px-3 place-items-center place-content-center">
+        <div className="bg-white cursor-pointer hover:bg-lychee_green/60 text-xs"  onClick={() => handleOpen("editColumns")}> Column Properties </div>  
+        <div className="flex cursor-pointer hover:bg-lychee_green/60 text-xs"  onClick={() => setViewing("charts")}> <LineChart className="w-4 h-4"/> Chart </div>
+        <div className="hidden" onClick={()=>setViewing('presentation')}>Present</div> 
+      </div>
       {/* Universal Drawer */}
       <Drawer open={open} onOpenChange={setOpen}>
         {content === "editColumns" && (
@@ -314,6 +315,6 @@ export function Menu() {
           </DrawerContent>
         )}
       </Drawer>
-    </Menubar>
+    </div>
   );
 }
