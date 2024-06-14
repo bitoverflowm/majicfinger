@@ -141,7 +141,7 @@ const SideNav = () => {
         minimized ? <div className="bg-purple-600 flex place-items-center place-content-center p-2 rounded-sm text-white hover:bg-yellow-400 cursor-pointer hover:text-purple-600" onClick={()=>setViewing('pricing')}><PowerIcon /> </div>
                 : <Card onClick={() => viewHandler('pricing')}>
                     <CardHeader className="pt-2 pb-1 bg-green-100">
-                      <CardTitle className="text-md text-green-600 font-black text-center">Support the project get 85% off + lifetime access</CardTitle>
+                      <CardTitle className="text-md text-green-600 font-black text-center">85% off lifetime access</CardTitle>
                     </CardHeader>
                     <CardContent className="w-full text-[10px] pt-2">
                       <div className="text-sm text-center flex place-items-center place-content-center gap-1">
