@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React from 'react';
 
 /*
  * title: goes in the header of the group. It is as is.
@@ -7,6 +8,7 @@ import React, { useState } from 'react';
  * val is the current value for this given option set
  * call is the set useState call to update val
 */
+
 
 const Group = ({ title, options, val, call }) => {
     return (

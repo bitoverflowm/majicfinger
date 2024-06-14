@@ -23,36 +23,8 @@ import KatsuColors from "../panels/katsu_colors"
 import FontSelector from "./utility/fontSelector"
 
 const ChartDataModsV2 = () => {
-    const contextStateV2 = useMyStateV2()
 
-    const titleHidden = contextStateV2?.titleHidden
-    const setTitleHidden = contextStateV2?.setTitleHidden
-    const title = contextStateV2?.setTitle || {};
-    const setTitle = contextStateV2?.setTitle || {};
-    const titleFont = contextStateV2?.titleFont
-    const setTitleFont = contextStateV2?.setTitleFont
-    const subTitle = contextStateV2?.subTitle || '';
-    const setSubTitle = contextStateV2?.setSubTitle || {};
-    const chartTypes = contextStateV2?.chartTypes || '';
-    const type = contextStateV2?.type || ''; 
-    const setType = contextStateV2?.setType || '';
-    const xKey = contextStateV2?.xKey || '';
-    const setXKey = contextStateV2?.setXKey || {};
-    const yKey = contextStateV2?.yKey || '';
-    const setYKey = contextStateV2?.setYKey || {};
-    const xOptions = contextStateV2?.xOptions || {};
-    const yOptions = contextStateV2?.yOptions || {};
-    const directions = contextStateV2?.directions || {};
-    const direction = contextStateV2?.direction || '';
-    const setDirection = contextStateV2?.setDirection || {};
-
-    //aesthetics
-    const setBgColor = contextStateV2?.setBgColor || {}
-    const setCardColor = contextStateV2?.setCardColor || {}
-    const setTextColor = contextStateV2?.setTextColor || {}
-    const setChartTheme = contextStateV2?.setChartTheme || {}
-
-    
+    const { titleHidden, setTitleHidden, title, setTitle, titleFont, setTitleFont, subTitle, setSubTitle, chartTypes, type, setType, xKey, setXKey, yKey, setYKey, xOptions, yOptions, directions, direction, setDirection, seriesConfigs, setSeriesConfigs, setBgColor, setCardColor, setTextColor, setChartTheme } = useMyStateV2();    
 
     //randomize color pallate
     const [pause, setPause] = useState(true)
@@ -60,8 +32,6 @@ const ChartDataModsV2 = () => {
 
     //loading state
     const [loading, setLoading] = useState()
-
-
 
     const handleColorSelection = (key) => {
       setChartTheme(prevTheme => ({
@@ -331,7 +301,23 @@ const ChartDataModsV2 = () => {
     //helper to get random index in color pallate
     const getRandomIndex = (array) => {
       return Math.floor(Math.random() * array.length);
-    }
+    }    
+
+    const addNewSeries = () => {
+        setSeriesConfigs(prevConfigs => [
+            ...prevConfigs,
+            { type: type, xKey: xKey, yKey: yKey, direction: direction }
+        ]);
+    };
+
+    const handleSeriesConfigChange = (index, key, value) => {
+        setSeriesConfigs(prevConfigs => {
+            const newConfigs = [...prevConfigs];
+            newConfigs[index] = { ...newConfigs[index], [key]: value };
+            console.log("new configs: ", newConfigs)
+            return newConfigs;
+        });
+    };
 
     return (
       <div
@@ -356,15 +342,23 @@ const ChartDataModsV2 = () => {
               <Label htmlFor="temperature">Desc</Label>
               <Input id="subTitle" type="text" placeholder="A brief description of your chart?" onChange={(e)=>setSubTitle(e.target.value)} />
             </div>
-            <div>            
-              {chartTypes && chartTypes.length > 1 && <Group title={'Chart type'} options={chartTypes} val={type} call={setType} opened={true}/>}
-            </div>
+            {seriesConfigs.map((config, index) => (
+                <div key={index}>
+                    <div>
+                        {chartTypes && chartTypes.length > 1 && <Group title={`Chart type ${index + 1}`} options={chartTypes} val={config.type} call={value => handleSeriesConfigChange(index, 'type', value)} opened={true} />}
+                    </div>
+                    <div>
+                        {xOptions && xOptions.length > 1 && <Group title={`Set X-axis ${index + 1}`} options={xOptions} val={config.xKey} call={value => handleSeriesConfigChange(index, 'xKey', value)} opened={false} />}
+                    </div>
+                    <div>
+                        {yOptions && yOptions.length > 1 && <Group title={`Set Y-axis ${index + 1}`} options={yOptions} val={config.yKey} call={value => handleSeriesConfigChange(index, 'yKey', value)} opened={false} />}
+                    </div>
+                </div>
+            ))}
             <div>
-              {xOptions && xOptions.length > 1 && <Group title={'Set X-axis'} options={xOptions} val={xKey} call={setXKey} opened={false}/>}
+                <button onClick={addNewSeries}>Add New Series</button>
             </div>
-            <div>
-              {yOptions && yOptions.length > 1 && <Group title={'Set Y-axis'} options={yOptions} val={yKey} call={setYKey} opened={false}/>}
-            </div>
+
             <div>
               {directions && directions.length > 1 && <Group title={'Direction'} options={directions} val={direction} call={setDirection} opened={false}/>}
             </div>

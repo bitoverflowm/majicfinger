@@ -10,7 +10,6 @@ const ChartViewV2 = () => {
 
     const contextStateV2 = useMyStateV2()
 
-    let previewChartOptions = contextStateV2?.previewChartOptions || {};
     let chartOptions = contextStateV2?.chartOptions || {}
     let bgColor = contextStateV2?.bgColor || '';
     let cardColor = contextStateV2?.cardColor || '';
@@ -31,7 +30,7 @@ const ChartViewV2 = () => {
                 <div className='w-full h-[700px] rounded-lg p-20 internalGradualEffect' style={{background: cardColor && cardColor}}>
                     { !titleHidden && <div className='text-center text-xl font-bold py-2' style={{color: textColor && textColor, fontFamily: titleFont}}>{title}</div>}                    
                     <div className='text-center text-sm font-bold py-2' style={{color: textColor && textColor}}>{subTitle}</div>
-                    <AgChartsReact options={chartOptions ? chartOptions : previewChartOptions} />
+                    <AgChartsReact options={chartOptions && chartOptions} />
                 </div>                
                 {/*<div className='text-center text-xxs'>Footnotes</div>*/}
             </div>
