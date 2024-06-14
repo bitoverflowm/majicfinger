@@ -7,7 +7,7 @@ import SideNav from './components/sideNav'
 import KatsuView from './components/katsuView';
 import DataView from "@/components/dataView";
 import Upload from '@/components/dataView/upload'
-import ChartViewV2 from "@/components/chartView/chartViewV2";
+import ChartView from "@/components/chartView";
 import { ChartGallery } from "@/components/chartGallery";
 import { IntegrationsView } from "@/components/integrationsView";
 import NewSheetView from "@/components/newSheetView";
@@ -98,7 +98,7 @@ const DashBody = ({user}) => {
                 { viewing === 'dataStart' && <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div> }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
-                { viewing === 'charts' && <div className="py-16"><ChartViewV2 user={user}/></div> }
+                { viewing === 'charts' && <div className="py-16"><ChartView user={user}/></div> }
                 { viewing === 'gallery' && <div className="py-16 min-h-screen"><ChartGallery/></div> }
                 { viewing === 'integrations' && <div className="py-10"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }

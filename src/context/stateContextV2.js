@@ -10,7 +10,6 @@ export function useMyStateV2(){
     return useContext(StateContextV2);
 }
 
-
 export const StateProviderV2 = ({children, initialSettings}) => {
     const [settings, setSettings] = useState(initialSettings)
     const [viewing, setViewing] = useState('dashboard')
@@ -235,7 +234,6 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [savedCharts, setSavedCharts] = useState()
     const [loadedChartMeta, setLoadedChartMeta ] = useState()
 
-
     //multi sheet handler
     const [multiSheetFlag, setMultiSheetFlag] = useState()
     const [multiSheetData, setMultiSheetData] = useState()
@@ -251,12 +249,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [dataTypes, setDataTypes] = useState({});
     const [dataTypeMismatch, setDataTypeMismatch] = useState(false);
 
-    const [previewChartOptions, setPreviewChartOptions] = useState()
-
     // Memoize the context value to optimize performance
     const providerValue = useMemo(() => ({
         settings, setSettings, viewing, setViewing, connectedData, setConnectedData, connectedCols, setConnectedCols, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch
-    }), [settings, viewing, connectedData, connectedCols, dataTypes, dataTypeMismatch]);
+    }), [settings, viewing, connectedCols, dataTypes, dataTypeMismatch]);
+    
 
     useEffect(() => {
         if (connectedData && connectedData.length > 0) {
@@ -280,21 +277,12 @@ export const StateProviderV2 = ({children, initialSettings}) => {
             }));
     
             setConnectedCols(columnsLabels);
-            setPreviewChartOptions({
-                data: connectedData,
-                series: [{
-                    type: 'bar',
-                    xKey: columnsLabels && columnsLabels[0].field,
-                    yKey: columnsLabels && columnsLabels[1] && columnsLabels[1].field,
-                    direction: 'vertical'
-                }]
-            });
         }
     }, [connectedData, dataTypes]);
 
     const detectDataType = (value) => {
         if (typeof value === 'boolean') return 'boolean';
-        if (!isNaN(Date.parse(value))) return 'dateString';
+        //if (!isNaN(Date.parse(value))) return 'dateString';
         if (!isNaN(parseFloat(value)) && isFinite(value)) return 'number';
         if (typeof value === 'object' && value !== null) return 'object';
         return 'text';
@@ -320,157 +308,9 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         savedDataSets && savedDataSets[loadedDataId] && setLoadedDataMeta(savedDataSets.loadedDataId) 
     }, [loadedDataId, savedDataSets])
 
-    //charts
-    const extractData = (cols) => {
-        let arr = cols.map(items => items.field)
-        setXOptions(arr)
-        setYOptions(arr)
-    }
-
-    //charts
-    useEffect(()=> {
-        connectedCols && extractData(connectedCols)
-    }, [connectedCols])
-
-    //chart specifics
-    const [titleHidden, setTitleHidden] = useState()
-    const [title, setTitle] = useState()
-    const [subTitle, setSubTitle] = useState()
-    const [titleFont, setTitleFont] = useState("inter")
-    const [chartTypes] = useState(['bar', 'line', 'area', 'scatter', 'bubble', 'pie'])
-    const [type, setType] = useState('bar')
-    const [xOptions, setXOptions] = useState()
-    const [yOptions, setYOptions] = useState()
-    
-    /* Themes and colors */
-    const [chartTheme, setChartTheme] = useState({
-        baseTheme: "ag-default",
-        palette: {
-            fills: ["#cdb4db"],
-            strokes: ["#000"],
-        },
-    })
-
-    const [chartOptions, setChartOptions] = useState({ // Data: Data to be displayed in the chart
-        theme: chartTheme,
-        data: connectedData,
-        // Series: Defines which chart type and data to use
-        series: [{ type: 'bar', xKey: '', yKey: '', direction: "vertical"}],
-        //animation TODO: fix not working
-        //animation: [{enabled: true, duration: 0.1}],
-        //labeling x, y, and even other axers
-        axes: [
-            {
-              type: "category",
-              position: "bottom",
-              title: {
-                text: '',
-              },
-            },
-            {
-              type: "number",
-              position: "left",
-              title: {
-                text: '',
-              },
-              label: {
-                formatter: ({ value }) => formatNumber(value),
-              },
-              gridLine: {
-                enabled: false
-              }
-            },
-    ]})
-
-    const [xKey, setXKey] = useState('')
-    const [yKey, setYKey] = useState('')
-    const [gridLinesEnabled, setGridLinesEnabled] = useState(false)
-    const [directions] = useState(['horizontal', 'vertical'])
-    const [direction, setDirection] = useState('vertical')
-    const [themeColor, setThemeColor] = useState()
-
-    const [seriesConfigs, setSeriesConfigs] = useState([{
-        type: 'bar',
-        xKey: '',
-        yKey: '',
-        direction: 'vertical'
-      }, {
-        type: 'bar',
-        xKey: '',
-        yKey: '',
-        direction: 'vertical'
-      }]);
-
-    useEffect(()=>{
-        const newSeries = seriesConfigs.map((config, index) => ({
-            type: config.type,
-            xKey: config.xKey,
-            yKey: config.yKey,
-            direction: direction,
-        }));
-
-        if(type === 'scatter'){
-            setChartOptions(prevOptions => ({
-                ...prevOptions,
-                series: [{
-                        type: 'scatter',
-                        data: connectedData,
-                        xKey: xKey ? xKey : chartOptions.series[0].xKey,
-                        yKey: yKey ? yKey : chartOptions.series[0].yKey,
-                    }],
-                background: {
-                  visible: false,
-                },
-                axes: [
-                  {
-                    type: "category",
-                    position: "bottom",
-                    title: {
-                      text: xKey,
-                    },
-                  },
-                  {
-                    type: "number",
-                    position: "left",
-                    title: {
-                      text: yKey,
-                    },
-                    label: {
-                      formatter: ({ value }) => formatNumber(value),
-                    },
-                    gridLine: {
-                      enabled: gridLinesEnabled
-                    }
-                  },
-            ]
-                }))
-        }else{
-            setChartOptions(prevOptions => ({
-                ...prevOptions,
-                data: connectedData,
-                series: newSeries,
-                background: { visible: false, },
-                }))
-            }
-    }, [connectedData, type, xKey, yKey, direction, themeColor, seriesConfigs])
-
-    
-    const [bgColor, setBgColor] = useState()
-    const [textColor, setTextColor] = useState()
-    const [cardColor, setCardColor] = useState()
-
-    useEffect(()=>{
-        chartOptions &&
-          setChartOptions(prevOptions => ({
-              ...prevOptions,
-              theme: chartTheme
-            }))
-      }, [chartTheme])
-
- 
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, previewChartOptions, title, setTitle, subTitle, setSubTitle, chartTypes, type, setType, chartOptions, setChartOptions, xKey, setXKey, yKey, setYKey, gridLinesEnabled, setGridLinesEnabled, directions, direction, setDirection, chartTheme, setChartTheme, xOptions, setXOptions, yOptions, setYOptions, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, bgColor, setBgColor, textColor, setTextColor, cardColor, setCardColor, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, sheetNames, setSheetNames, titleHidden, setTitleHidden, titleFont, setTitleFont, seriesConfigs, setSeriesConfigs}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, sheetNames, setSheetNames}}>
             {children}
         </StateContextV2.Provider>
     )

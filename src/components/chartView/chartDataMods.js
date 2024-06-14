@@ -22,9 +22,7 @@ import {
 import KatsuColors from "../panels/katsu_colors"
 import FontSelector from "./utility/fontSelector"
 
-const ChartDataModsV2 = ({seriesConfigs, setSeriesConfigs, direction, chartTypes, setChartTheme, setCardColor, setBgColor, setTextColor}) => {
-
-    const { titleHidden, setTitleHidden, setTitle, titleFont, setTitleFont, setSubTitle, chartTypes, type, xKey, yKey, xOptions, yOptions, directions, direction, setDirection } = useMyStateV2();    
+const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, setCardColor, setBgColor, setTextColor, xOptions, yOptions, directions, direction, setDirection }) => { 
 
     //randomize color pallate
     const [pause, setPause] = useState(true)
@@ -303,7 +301,8 @@ const ChartDataModsV2 = ({seriesConfigs, setSeriesConfigs, direction, chartTypes
       return Math.floor(Math.random() * array.length);
     }    
 
-    const addNewSeries = () => {
+    const addNewSeries = (event) => {
+        event.preventDefault();  // Prevent the default form submission behavior
         setSeriesConfigs(prevConfigs => [
             ...prevConfigs,
             { type: prevConfigs[0].type, xKey: prevConfigs[0].xKey, yKey: prevConfigs[0].yKey, direction: direction }
@@ -325,23 +324,6 @@ const ChartDataModsV2 = ({seriesConfigs, setSeriesConfigs, direction, chartTypes
       >
         <form className="grid w-full items-start gap-6">
           <fieldset className="grid gap-3 rounded-lg border p-4">
-            <div className="flex place-items-center gap-3 text-xs">
-              <Label htmlFor="title" className="text-xs">Title</Label>
-              <Input id="title" type="text" placeholder="Name your chart?" className="text-xs" onChange={(e)=>setTitle(e.target.value)} />
-              <div
-                className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                onClick={() => setTitleHidden(!titleHidden)}
-              >
-                {titleHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" /> }
-              </div>
-            </div>
-            <div>
-              <FontSelector titleFont={titleFont} setFont={setTitleFont}/>
-            </div>
-            <div className="flex gap-3 place-items-center">
-              <Label htmlFor="temperature">Desc</Label>
-              <Input id="subTitle" type="text" placeholder="A brief description of your chart?" onChange={(e)=>setSubTitle(e.target.value)} />
-            </div>
             {seriesConfigs.map((config, index) => (
                 <div key={index}>
                     <div>
@@ -442,4 +424,4 @@ const ChartDataModsV2 = ({seriesConfigs, setSeriesConfigs, direction, chartTypes
     )
   }
 
-export default ChartDataModsV2
+export default ChartDataMods
