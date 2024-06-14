@@ -30,8 +30,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pencil, Trash } from "lucide-react";
+import { GripVertical, Pencil, Trash } from "lucide-react";
 import { useMyStateV2 } from '@/context/stateContextV2';
+import { Card } from "@/components/ui/card";
 
 export function Menu() {
   const contextStateV2 = useMyStateV2();
@@ -216,84 +217,94 @@ export function Menu() {
           <DrawerContent>
             <div className="mx-auto">
               <DrawerHeader>
-                <DrawerTitle className="text-center">Manage Columns</DrawerTitle>
+                <DrawerTitle>Manage Columns</DrawerTitle>
+                <DrawerDescription >You can Drag and Drop the columns to rearrange</DrawerDescription>
               </DrawerHeader>
-              <DragDropContext onDragEnd={onDragEnd}>
-                <Droppable droppableId="columns">
-                  {(provided) => (
-                    <div
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}
-                      className="grid gap-4"
-                    >
-                      {connectedCols.map((col, index) => (
-                        <Draggable
-                          key={col.field}
-                          draggableId={col.field}
-                          index={index}
-                        >
-                          {(provided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className="grid gap-2"
-                            >
-                              <div className="grid grid-cols-12 items-center gap-4 px-20">
-                                {index === editingName ? (
-                                  <Input
-                                    id={`col-${index}`}
-                                    defaultValue={col.field}
-                                    className="col-span-2 h-8"
-                                    onChange={(e) => setNewColName(e.target.value)}
-                                  />
-                                ) : (
-                                  <Label htmlFor={`col-${index}`}>{col.field}</Label>
-                                )}
-                                {index === editingName ? (
-                                  <Button
-                                    onClick={() => handleSaveColumnName(index)}
-                                    className="col-span-2 h-8"
-                                  >
-                                    Save
-                                  </Button>
-                                ) : (
-                                  <div
-                                    className="bg-slate-200 w-6 h-6 rounded-sm flex place-items-center place-content-center text-white cursor-pointer hover:bg-white hover:text-slate-600 border-2 border-slate-800"
-                                    onClick={() => setEditingName(index)}
-                                  >
-                                    <Pencil className="w-3 h-3" />
+              <div className="grid grid-cols-2">
+                <div className="">
+                  <DragDropContext onDragEnd={onDragEnd}>
+                  <Droppable droppableId="columns">
+                    {(provided) => (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        className="grid gap-4"
+                      >
+                        {connectedCols.map((col, index) => (
+                          <Draggable
+                            key={col.field}
+                            draggableId={col.field}
+                            index={index}
+                          >
+                            {(provided) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                className="flex place-items-center text-xs gap-1"
+                              >
+                                <GripVertical className="text-slate-400 w-5 h-6"/>
+                                <div className="w-48">
+                                  {index === editingName ? (
+                                      <Input
+                                        id={`col-${index}`}
+                                        defaultValue={col.field}
+                                        className="w-40 text-xs"
+                                        onChange={(e) => setNewColName(e.target.value)}
+                                      />
+                                    ) : (
+                                      <div htmlFor={`col-${index}`}>{col.field}</div>
+                                    )}
                                   </div>
-                                )}
-                                <div
-                                  className="bg-red-600 w-6 h-6 rounded-sm flex place-items-center place-content-center text-white cursor-pointer hover:bg-white hover:text-red-600 border-2 border-red-600"
-                                  onClick={() => handleDeleteColumn(index)}
-                                >
-                                  <Trash className="w-3 h-3" />
-                                </div>
-                                <select
-                                  id={`type-${index}`}
-                                  value={dataTypes[col.field] || 'text'}
-                                  onChange={(e) => handleTypeChange(index, e.target.value)}
-                                  className="col-span-3 h-8"
-                                >
-                                  <option value="text">Text</option>
-                                  <option value="number">Number</option>
-                                  <option value="boolean">Boolean</option>
-                                  <option value="date">Date</option>
-                                  <option value="dateString">DateString</option>
-                                  <option value="object">Object</option>
-                                </select>
+                                  {index === editingName ? (
+                                    <div
+                                    className="bg-lychee_green/30 p-2 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                    onClick={() => handleSaveColumnName(index)}
+                                    >
+                                      Save
+                                    </div>
+                                    ) : (
+                                    <div
+                                      className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                      onClick={() => setEditingName(index)}
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </div>
+                                  )}
+                                  <div
+                                    className="bg-red-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                    onClick={() => handleDeleteColumn(index)}
+                                  >
+                                    <Trash className="w-3 h-3" />
+                                  </div>
+                                  <select
+                                    id={`type-${index}`}
+                                    value={dataTypes[col.field] || 'text'}
+                                    onChange={(e) => handleTypeChange(index, e.target.value)}
+                                    className="col-span-3 h-8"
+                                  >
+                                    <option value="text">Text</option>
+                                    <option value="number">Number</option>
+                                    <option value="boolean">Boolean</option>
+                                    <option value="date">Date</option>
+                                    <option value="dateString">DateString</option>
+                                    <option value="object">Object</option>
+                                  </select>
                               </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                  </DragDropContext>
+                </div>
+                <div>
+
+                </div>
+                
+              </div>
             </div>
             <DrawerFooter className={"mx-auto"}>
               <DrawerClose asChild className="w-32">

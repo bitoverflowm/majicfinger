@@ -25,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert } from '@/components/ui/alert'
-import { TrafficCone } from 'lucide-react';
+import { ArrowDownFromLine, ArrowUpFromLine, TrafficCone } from 'lucide-react';
 
 
 const GridView = ({startNew}) => {
@@ -40,6 +40,7 @@ const GridView = ({startNew}) => {
     
     const [columnName, setColumnName] = useState('');
     const [colAddOpen, setColAddOpen] = useState()
+    const [gridExpanded, setGridExpanded] = useState()
     
     //Apply settings across all columns
     const defaultColDef = useMemo(() => ({
@@ -64,20 +65,24 @@ const GridView = ({startNew}) => {
     }))
 
     const updateCellData = (rowIndex, field, newValue) => {
-        setConnectedData(prevData => {
-          // Create a new array with updated data
-          const newData = prevData.map((item, index) => {
-            if (index === rowIndex) {
-              return { ...item, [field]: newValue }; // Update the specific field value
-            }
-            return item;
-          });
-          return newData;
-        })
-
-        toast(`Data updated. Chart updated!`, {
-            duration: 5000
-        })
+        if (newValue === "PRETTY PLEASE DELETE ROW") {
+            handleDeleteRow(rowIndex);
+        } else {
+            setConnectedData(prevData => {
+                // Create a new array with updated data
+                const newData = prevData.map((item, index) => {
+                  if (index === rowIndex) {
+                    return { ...item, [field]: newValue }; // Update the specific field value
+                  }
+                  return item;
+                });
+                return newData;
+              })
+      
+              toast(`Data updated. Chart updated!`, {
+                  duration: 5000
+              })
+        }        
     };
 
     const handleAddRow = () => {
@@ -127,6 +132,13 @@ const GridView = ({startNew}) => {
         handleAddColumn(columnName);
         setColumnName(''); // Clear the input field
     };
+
+    const handleDeleteRow = (rowIndex) => {
+        setConnectedData(prevData => prevData.filter((_, index) => index !== rowIndex));
+        toast(`Row deleted!`, {
+            duration: 5000
+        });
+    }
     
 
     useEffect(()=>{
@@ -192,7 +204,7 @@ const GridView = ({startNew}) => {
                     </Button>
                 </div>
             </div>
-            <div className='h-[750px]'>
+            <div className={gridExpanded ? 'h-[750px]' :'h-[550px]'}>
                 <AgGridReact 
                     defaultColDef={defaultColDef} 
                     rowData={connectedData} 
@@ -208,6 +220,12 @@ const GridView = ({startNew}) => {
                     autoSizeStrategy={autoSizeStrategy}
                     //enableRangeSelection={true}
                     />
+            </div>
+            <div className='flex py-2 text-xs'><div className='w-full'>Calculate:</div> <div className='text-slate-400' onClick={()=>setGridExpanded(!gridExpanded)}> {gridExpanded ? <ArrowUpFromLine className='w-6 h-4 cursor-pointer'/> : <ArrowDownFromLine className='w-6 h-4 cursor-pointer'/>}</div></div>
+            <div>
+                <Alert>
+                    Aggregations, calculations, code operations coming soon
+                </Alert>
             </div>
         </div>
     )
