@@ -115,3 +115,19 @@
   .transition-all {
     transition: all 0.3s ease-in-out;
   }
+
+  @font-face {
+    font-family: 'SpaceGrotesk-Light';
+    src: url('/fonts/SpaceGrotesk-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+  }
+  
+  @font-face {
+    font-family: 'SpaceGrotesk-Medium';
+    src: url('/fonts/SpaceGrotesk-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Roboto:wght@400;700&family=Oswald:wght@400;700&family=Space+Grotesk:wght@300;500&display=swap');

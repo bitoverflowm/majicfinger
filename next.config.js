@@ -2,7 +2,8 @@
 const nextConfig = {
   transpilePackages: ["@nivo"],
   experimental: {
-    esmExternals: 'loose'
+    esmExternals: 'loose',
+    optimizeFonts: true,
   },
   images: {
     domains: ['pbs.twimg.com', 'abs.twimg.com'],

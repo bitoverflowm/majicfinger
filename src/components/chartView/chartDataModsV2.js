@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react"
 
-import { Paintbrush } from "lucide-react"
+import { Eye, EyeOff, Paintbrush } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-
 
 import { useMyStateV2 } from "@/context/stateContextV2"
 
@@ -21,12 +20,17 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer"
 import KatsuColors from "../panels/katsu_colors"
+import FontSelector from "./utility/fontSelector"
 
 const ChartDataModsV2 = () => {
     const contextStateV2 = useMyStateV2()
 
+    const titleHidden = contextStateV2?.titleHidden
+    const setTitleHidden = contextStateV2?.setTitleHidden
     const title = contextStateV2?.setTitle || {};
     const setTitle = contextStateV2?.setTitle || {};
+    const titleFont = contextStateV2?.titleFont
+    const setTitleFont = contextStateV2?.setTitleFont
     const subTitle = contextStateV2?.subTitle || '';
     const setSubTitle = contextStateV2?.setSubTitle || {};
     const chartTypes = contextStateV2?.chartTypes || '';
@@ -48,12 +52,15 @@ const ChartDataModsV2 = () => {
     const setTextColor = contextStateV2?.setTextColor || {}
     const setChartTheme = contextStateV2?.setChartTheme || {}
 
+    
+
     //randomize color pallate
     const [pause, setPause] = useState(true)
     const [selectedPalette, setSelectedPalette] = useState()
 
     //loading state
     const [loading, setLoading] = useState()
+
 
 
     const handleColorSelection = (key) => {
@@ -331,18 +338,26 @@ const ChartDataModsV2 = () => {
         className="relative hidden flex-col items-start gap-8 md:flex"
       >
         <form className="grid w-full items-start gap-6">
-          <fieldset className="grid gap-6 rounded-lg border p-4">
-            <legend className="-ml-1 px-1 text-sm font-medium">Text</legend>
-            <div className="flex place-items-center gap-3">
-              <Label htmlFor="temperature">Title</Label>
-              <Input id="title" type="text" placeholder="What do you want to call your chart?" onChange={(e)=>setTitle(e.target.value)} />
+          <fieldset className="grid gap-3 rounded-lg border p-4">
+            <div className="flex place-items-center gap-3 text-xs">
+              <Label htmlFor="title" className="text-xs">Title</Label>
+              <Input id="title" type="text" placeholder="Name your chart?" className="text-xs" onChange={(e)=>setTitle(e.target.value)} />
+              <div
+                className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                onClick={() => setTitleHidden(!titleHidden)}
+              >
+                {titleHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" /> }
+              </div>
+            </div>
+            <div>
+              <FontSelector titleFont={titleFont} setFont={setTitleFont}/>
             </div>
             <div className="flex gap-3 place-items-center">
               <Label htmlFor="temperature">Desc</Label>
               <Input id="subTitle" type="text" placeholder="A brief description of your chart?" onChange={(e)=>setSubTitle(e.target.value)} />
             </div>
             <div>            
-              {chartTypes && chartTypes.length > 1 && <Group title={'Select your chart type'} options={chartTypes} val={type} call={setType} opened={true}/>}
+              {chartTypes && chartTypes.length > 1 && <Group title={'Chart type'} options={chartTypes} val={type} call={setType} opened={true}/>}
             </div>
             <div>
               {xOptions && xOptions.length > 1 && <Group title={'Set X-axis'} options={xOptions} val={xKey} call={setXKey} opened={false}/>}

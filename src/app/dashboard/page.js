@@ -19,6 +19,7 @@ import { Toaster } from "@/components/ui/sonner"
 
 import { toast } from "sonner"
 
+
 const Dashbaord = () => {
     const user = useUser()    
 
@@ -58,7 +59,7 @@ const Dashbaord = () => {
                     <header>
                         <Nav/>
                     </header>
-                    <main className=''>
+                    <main >
                         <DashBody user={user}/>
                     </main>
                 </StateProviderV2>
