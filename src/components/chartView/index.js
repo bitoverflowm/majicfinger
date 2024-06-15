@@ -114,7 +114,6 @@ const ChartView = () => {
         axes: axesConfig})
 
     useEffect(()=>{
-        console.log('we updated the chart: ', chartOptions)
         setChartOptions(prevOptions => ({
             ...prevOptions,
             series: seriesConfigs,
@@ -214,7 +213,7 @@ const ChartView = () => {
                 {/*<div className='text-center text-xxs'>Footnotes</div>*/}
             </div>
             <div className='col-span-4 w-full pl-2 pr-6'>
-                <ChartDataMods seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} setCardColor={setCardColor} setBgColor={setBgColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes} axesConfig={axesConfig} setAxesConfig={setAxesConfig} normalize={normalize} setNormalize={setNormalize} normalizeValue={normalizeValue} setNormalizeValue={setNormalizeValue}/>
+                <ChartDataMods connectedData={connectedData} seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} setCardColor={setCardColor} setBgColor={setBgColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes} axesConfig={axesConfig} setAxesConfig={setAxesConfig} normalize={normalize} setNormalize={setNormalize} normalizeValue={normalizeValue} setNormalizeValue={setNormalizeValue}/>
             </div>
         </div>
     )
