@@ -14,6 +14,7 @@ const ChartView = () => {
     let dataTypeMismatch = contextStateV2.dataTypeMismatch
     let loadedDataMeta = contextStateV2.loadedDataMeta
     let connectedData = contextStateV2.connectedData
+    let setConnectedData = contextStateV2?.setConnectedData
 
     const [xOptions, setXOptions] = useState()
     const [yOptions, setYOptions] = useState()
@@ -113,6 +114,7 @@ const ChartView = () => {
         axes: axesConfig})
 
     useEffect(()=>{
+        console.log('we updated the chart: ', chartOptions)
         setChartOptions(prevOptions => ({
             ...prevOptions,
             series: seriesConfigs,
@@ -181,10 +183,25 @@ const ChartView = () => {
         setSeriesConfigs(prevConfigs => 
             prevConfigs.map(config => ({ 
                 ...config, 
-                direction: direction 
+                direction: direction,
+                normalizedTo: normalize ? normalizeValue : undefined
             }))
         );
     }, [direction]);
+
+    const [normalize, setNormalize] = useState(false);
+    const [normalizeValue, setNormalizeValue] = useState(100);
+
+    useEffect(() => {
+        console.log('setting new value: ', normalizeValue)
+        console.log('normalize> ', normalize)
+        setSeriesConfigs(prevConfigs => 
+            prevConfigs.map(config => ({ 
+                ...config,
+                normalizedTo: normalize ? normalizeValue : undefined
+            }))
+        );
+    }, [normalize, normalizeValue]);
 
 
     return(
@@ -197,7 +214,7 @@ const ChartView = () => {
                 {/*<div className='text-center text-xxs'>Footnotes</div>*/}
             </div>
             <div className='col-span-4 w-full pl-2 pr-6'>
-                <ChartDataMods seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} setCardColor={setCardColor} setBgColor={setBgColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes} axesConfig={axesConfig} setAxesConfig={setAxesConfig}/>
+                <ChartDataMods seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} setCardColor={setCardColor} setBgColor={setBgColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes} axesConfig={axesConfig} setAxesConfig={setAxesConfig} normalize={normalize} setNormalize={setNormalize} normalizeValue={normalizeValue} setNormalizeValue={setNormalizeValue}/>
             </div>
         </div>
     )

@@ -3,12 +3,17 @@ import { useState, useEffect } from "react"
 import Group from './ui/group'
 import { Input } from "@/components/ui/input"
 
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group"
+import { CircleDashed } from "lucide-react"
 
-
-const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, setCardColor, setBgColor, setTextColor, xOptions, yOptions, directions, direction, setDirection, axesConfig, setAxesConfig }) => {
+const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, setCardColor, setBgColor, setTextColor, xOptions, yOptions, directions, direction, setDirection, axesConfig, setAxesConfig, normalize, setNormalize, normalizeValue, setNormalizeValue }) => {
 
     //loading state
-    const [loading, setLoading] = useState()
+    const [loading, setLoading] = useState() 
 
     const addNewSeries = () => {
         setSeriesConfigs(prevConfigs => [
@@ -18,7 +23,6 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
     };
 
     const handleSeriesConfigChange = (index, key, value) => {
-      console.log("its changing")
         setSeriesConfigs(prevConfigs => {
             const newConfigs = [...prevConfigs];
             newConfigs[index] = { ...newConfigs[index], [key]: value };
@@ -26,12 +30,34 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
         });
     };
 
+    const handleRoundBarToggle = (val) => {
+      console.log("hello")
+      setSeriesConfigs(prevConfigs => {
+          const newConfigs = prevConfigs.map(config => ({
+              ...config,
+              cornerRadius: config.cornerRadius === 10 ? 0 : 10
+          }));
+          return newConfigs;
+      });
+    };
+
+
     const handleAxesConfigChange = (axisIndex, key, value) => {
       setAxesConfig(prevConfigs => {
           const newConfigs = [...prevConfigs];
           newConfigs[axisIndex] = { ...newConfigs[axisIndex], title: { ...newConfigs[axisIndex].title, [key]: value } };
           return newConfigs;
       });
+    };
+
+    const handleNormalizeChange = () => {
+      setNormalize(!normalize);
+    };
+
+    const handleNormalizeValueChange = (e) => {
+        const value = e.target.value;
+        console.log(value)
+        setNormalizeValue(value);
     };
 
     return (
@@ -51,6 +77,17 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
                 <div className="py-1">
                     {yOptions && yOptions.length > 1 && <Group title={`Y-axis`} options={yOptions} val={config.yKey} call={value => handleSeriesConfigChange(index, 'yKey', value)} opened={false} />}
                 </div>
+                {
+                  config.type === 'bar' && (
+                    <div>
+                      <ToggleGroup type="single" className={"flex place-items-left place-content-left"} onValueChange={handleRoundBarToggle}>
+                        <ToggleGroupItem value="roundBar" aria-label="Round Bar" pressed={config.cornerRadius === 10}>
+                          <CircleDashed className="h-4 w-4" />
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                    </div>
+                  )
+                }
             </div>
         ))}
         <div>
@@ -68,9 +105,18 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
             <Input value={axesConfig[1].title.text} onChange={(e) => handleAxesConfigChange(1, 'text', e.target.value)} className="w-full text-xs p-2 border rounded" />
           </div>
         </div>
-        <div className="">
-            
+        <div className="flex place-items-center gap-2">
+            <Checkbox id="normalize" checked={normalize} onCheckedChange={handleNormalizeChange} />
+            <label htmlFor="normalize" className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Normalize Values?
+            </label>
         </div>
+        {normalize && (
+            <div className="py-1">
+                <label className="text-xs">Normalize To</label>
+                <Input value={normalizeValue} onChange={handleNormalizeValueChange} className="w-full text-xs p-2 border rounded" />
+            </div>
+        )}
 
         <div>
           {directions && directions.length > 1 && <Group title={'Direction'} options={directions} val={direction} call={setDirection} opened={false}/>}
