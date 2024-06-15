@@ -8,14 +8,15 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
-import { CircleDashed, Trash } from "lucide-react"
+import { Label } from "@radix-ui/react-context-menu"
+import { CircleDashed, Trash, EyeOff } from "lucide-react"
 
 
 import { masterPalette } from '@/components/chartView/panels/masterPalette';
-import { Badge } from "../ui/badge"
+import { bgPalette } from '@/components/chartView/panels/bgPalette';
+import FontSelector from "./utility/fontSelector"
 
-
-const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, cardColor, setCardColor, bgColor, setBgColor, textColor, setTextColor, xOptions, yOptions, directions, direction, setDirection, axesConfig, setAxesConfig, normalize, setNormalize, normalizeValue, setNormalizeValue }) => {
+const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, cardColor, setCardColor, bgColor, setBgColor, textColor, setTextColor, xOptions, yOptions, directions, direction, setDirection, axesConfig, setAxesConfig, normalize, setNormalize, normalizeValue, setNormalizeValue, titleHidden, setTitleHidden, titleFont, setTitleFont, title, setTitle, subTitle, setSubTitle }) => {
 
     //loading state
     const [loading, setLoading] = useState() 
@@ -321,9 +322,59 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
     const [colorPick, setColorPick] = useState()
     const [strokePick, setStrokePick] = useState()
 
+    const shufflePalette = () => {
+        //chart themes:
+        let colorSel = selectedPalette[getRandomIndex(selectedPalette)]
+        handleColorSelection(colorSel)
+        setColorPick(colorSel)
+        let strokeSel = selectedPalette[getRandomIndex(selectedPalette)]
+        setStrokePick(strokeSel)
+        handleStrokeSelection(strokeSel)
+
+        // cards, and backgrounds
+        setCardColor(selectedPalette[getRandomIndex(selectedPalette)])
+        setBgColor(selectedPalette[getRandomIndex(selectedPalette)])
+        setTextColor(selectedPalette[getRandomIndex(selectedPalette)])
+      }
+    
+    const [granularColorsVisible, setGranularColorsVisible] = useState()
+    const [colorTarget, setColorTarget] = useState()
+    
+    const granularColorHandler = (target) => {
+        setGranularColorsVisible(true)
+        setColorTarget(target)
+    }
+
+    const updateGranularColorHandler = (key) => {
+        colorTarget === 'background' && setBgColor(key)
+        colorTarget === 'foreground' && setCardColor(key)
+        colorTarget === 'text' && setTextColor(key)
+        colorTarget === 'chart' && handleColorSelection(key)
+        colorTarget === 'stroke' && handleStrokeSelection(key)
+        setGranularColorsVisible(false)
+        setColorTarget()
+    }
+
     return (
     <div className="grid gap-2">
       <div className={`grid gap-1 rounded-lg border p-4 w-full ${colorVisible && 'hidden'}`}>
+        <div className="flex place-items-center gap-3 text-xs">
+            <Label htmlFor="title" className="text-xs">Title</Label>
+            <Input id="title" type="text" placeholder="Name your chart?" className="text-xs" onChange={(e)=>setTitle(e.target.value)} />
+            <div
+            className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+            onClick={() => setTitleHidden(!titleHidden)}
+            >
+            {titleHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" /> }
+            </div>
+        </div>
+        <div>
+            <FontSelector titleFont={titleFont} setFont={setTitleFont}/>
+        </div>
+        <div className="flex gap-3 place-items-center">
+            <Label htmlFor="temperature">Desc</Label>
+            <Input id="subTitle" type="text" placeholder="A brief description of your chart?" onChange={(e)=>setSubTitle(e.target.value)} />
+        </div>
         {seriesConfigs.map((config, index) => (
             <div key={index}>
                 <div className="flex place-items-center gap-3">
@@ -413,46 +464,58 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
                 <div className="flex flex-wrap gap-4 place-items-center place-content-center text-xs pt-1">
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Background</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: bgColor }}> </div>
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: bgColor }} onClick={()=>granularColorHandler('background')}> </div>
                     </div>
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Foregrond</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: cardColor }}> </div></div>
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: cardColor }} onClick={()=>granularColorHandler('foreground')}> </div></div>
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Text</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: textColor }}> </div></div>
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: textColor }} onClick={()=>granularColorHandler('text')}> </div></div>
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Stroke</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: strokePick }}> </div></div>
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: strokePick }} onClick={()=>granularColorHandler('stroke')}> </div></div>
                     <div className="grid place-content-center place-items-center gap-1">
-                        <div>Paletter color</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: colorPick}}> </div></div>
+                        <div>Chart</div> 
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: colorPick}} onClick={()=>granularColorHandler('chart')}> </div></div>
+                    <div onClick={()=>shufflePalette()}>Shuffle</div>
                 </div>
                 {
                 colorVisible && <div className="">
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         {categories.map((category, index) => (
-                                            <Badge
+                                            <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono cursor-pointer text-xs hover:bg-lychee_green"
                                                 key={index}
-                                                className="cursor-pointer text-xs"
                                                 onClick={() => setSelectedCategory(category)}
                                             >
                                                 {category}
-                                            </Badge>
+                                            </code>
                                         ))}
                                     </div>
                                     {selectedCategory && (
-                                        <div className="grid gap-2 grid-cols-4">
+                                        <div className="grid grid-cols-4">
                                             {masterPalette[selectedCategory].map((palette, index) => (
-                                                <div key={index} className="cursor-pointer" onClick={() => selectedPaletteHandler(index)}>
+                                                <div key={index} className="flex cursor-pointer rounded-full hover:shadow-inner hover:bg-slate-100 p-1" onClick={() => selectedPaletteHandler(index)}>
                                                     {palette.map((color, colorIndex) => (
-                                                        <div key={colorIndex} className="p-2" style={{ backgroundColor: color }}></div>
+                                                        <div key={colorIndex} className="p-3 rounded-full" style={{ backgroundColor: color }}></div>
                                                     ))}
                                                 </div>
                                             ))}
                                         </div>
                                     )}
                                     </div>
+                }{
+                    granularColorsVisible && <div className="flex flex-wrap gap-2 pr-2 pb-4 pl-2 py-6">
+                    {
+                        bgPalette && bgPalette.solids.map((solid, key) => (
+                            <div
+                                key={key}
+                                className={'flex rounded-md h-6 w-6 cursor-pointer hover:border hover:border-black'}
+                                onClick={()=>updateGranularColorHandler(solid)}
+                                style={{background: solid}}/>
+                        ))
+                    }
+                    </div>
                 }
             </fieldset>
         </form>
