@@ -5,7 +5,6 @@ import {
     SelectTrigger,
     SelectValue,
   } from "@/components/ui/select";
-  import { CheckIcon } from '@radix-ui/react-icons';
   
   const Group = ({ title, options, val, call }) => {
       return (

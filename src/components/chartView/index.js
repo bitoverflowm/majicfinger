@@ -79,83 +79,112 @@ const ChartView = () => {
         yKey: '',
         direction: direction
       }]);
+    
+    const [axesConfig, setAxesConfig] = useState([
+        {
+          type: "category",
+          position: "bottom",
+          title: {
+            text: '',
+          },
+        },
+        {
+          type: "number",
+          position: "left",
+          title: {
+            text: '',
+          },
+          label: {
+            formatter: ({ value }) => formatNumber(value),
+          },
+          gridLine: {
+            enabled: false
+          }
+        },
+    ])
 
-    const [chartOptions, setChartOptions] = useState({ 
+    //initializing chartOptions
+    const [chartOptions, setChartOptions] = useState({
         // Data: Data to be displayed in the chart
         theme: chartTheme,
         data: connectedData,
         series: seriesConfigs,
-        background: { visible: false, },
-        axes: [
-            {
-              type: "category",
-              position: "bottom",
-              title: {
-                text: '',
-              },
-            },
-            {
-              type: "number",
-              position: "left",
-              title: {
-                text: '',
-              },
-              label: {
-                formatter: ({ value }) => formatNumber(value),
-              },
-              gridLine: {
-                enabled: false
-              }
-            },
-    ]})
+        background: { visible: false, }, //this should always be false because we have our own backgrounds
+        axes: axesConfig})
 
     useEffect(()=>{
         setChartOptions(prevOptions => ({
             ...prevOptions,
             series: seriesConfigs,
-            axes: direction && direction === 'horizontal' ? [{
-                type: "category",
-                position: "left",
-                title: {
-                    text: seriesConfigs[0].xKey,
-                },
-            },
-            {
-                type: "number",
-                position: "bottom",
-                title: {
-                    text: seriesConfigs[0].yKey,
-                },
-                label: {
-                    formatter: ({ value }) => formatNumber(value),
-                },
-                gridLine: {
-                    enabled: false
-                }
-            }] : [
-                {
-                    type: "category",
-                    position: "bottom",
-                    title: {
-                        text: seriesConfigs[0].xKey,
-                    },
-                },
-                {
-                    type: "number",
-                    position: "left",
-                    title: {
-                        text: seriesConfigs[0].yKey,
-                    },
-                    label: {
-                        formatter: ({ value }) => formatNumber(value),
-                    },
-                    gridLine: {
-                        enabled: false
-                    }
-                },
-            ]
         }))
-    }, [direction, seriesConfigs])
+    }, [seriesConfigs])
+
+    useEffect(() => {
+        setChartOptions(prevOptions => ({
+            ...prevOptions,
+            axes: axesConfig
+        }));
+    }, [axesConfig]);
+
+    useEffect(() => {
+        setAxesConfig(prevConfigs => {
+            const xTitle = prevConfigs[0].title?.text || seriesConfigs[0]?.xKey || '';
+            const yTitle = prevConfigs[1].title?.text || seriesConfigs[0]?.yKey || '';
+    
+            return direction === 'horizontal'
+                ? [
+                    {
+                        type: "category",
+                        position: "left",
+                        title: {
+                            text: xTitle,
+                        },
+                    },
+                    {
+                        type: "number",
+                        position: "bottom",
+                        title: {
+                            text: yTitle,
+                        },
+                        label: {
+                            formatter: ({ value }) => formatNumber(value),
+                        },
+                        gridLine: {
+                            enabled: false
+                        }
+                    }
+                ]
+                : [
+                    {
+                        type: "category",
+                        position: "bottom",
+                        title: {
+                            text: xTitle,
+                        },
+                    },
+                    {
+                        type: "number",
+                        position: "left",
+                        title: {
+                            text: yTitle,
+                        },
+                        label: {
+                            formatter: ({ value }) => formatNumber(value),
+                        },
+                        gridLine: {
+                            enabled: false
+                        }
+                    }
+                ];
+        });
+    
+        setSeriesConfigs(prevConfigs => 
+            prevConfigs.map(config => ({ 
+                ...config, 
+                direction: direction 
+            }))
+        );
+    }, [direction]);
 
 
     return(
@@ -168,7 +197,7 @@ const ChartView = () => {
                 {/*<div className='text-center text-xxs'>Footnotes</div>*/}
             </div>
             <div className='col-span-4 w-full pl-2 pr-6'>
-                <ChartDataMods seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} setCardColor={setCardColor} setBgColor={setBgColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes}/>
+                <ChartDataMods seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} setCardColor={setCardColor} setBgColor={setBgColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes} axesConfig={axesConfig} setAxesConfig={setAxesConfig}/>
             </div>
         </div>
     )
