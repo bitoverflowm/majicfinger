@@ -55,7 +55,7 @@ const ChartView = () => {
         baseTheme: "ag-default",
         palette: {
             fills: ["#cdb4db"],
-            strokes: ["#000"],
+            strokes: ["#fff"],
         },
     })
 
@@ -74,11 +74,6 @@ const ChartView = () => {
     /* Charting */
 
     const [seriesConfigs, setSeriesConfigs] = useState([{
-        type: 'bar',
-        xKey: '',
-        yKey: '',
-        direction: direction
-      }, {
         type: 'bar',
         xKey: '',
         yKey: '',
@@ -172,7 +167,7 @@ const ChartView = () => {
                 </div>                
                 {/*<div className='text-center text-xxs'>Footnotes</div>*/}
             </div>
-            <div className='col-span-4'>
+            <div className='col-span-4 w-full pl-2 pr-6'>
                 <ChartDataMods seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} setCardColor={setCardColor} setBgColor={setBgColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes}/>
             </div>
         </div>

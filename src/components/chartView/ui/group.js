@@ -1,30 +1,33 @@
-
-
-import React from 'react';
-
-/*
- * title: goes in the header of the group. It is as is.
- * options is an array of available options to choose from
- * val is the current value for this given option set
- * call is the set useState call to update val
-*/
-
-
-const Group = ({ title, options, val, call }) => {
-    return (
-        <div className="flex place-items-center">
-            <div className="text-xs w-1/4">
-                {title}
-            </div>
-            <select value={val} onChange={(e) => call(e.target.value)} className="w-3/4 text-xs p-2 border rounded">
-                {options.map((option, index) => (
-                    <option key={index} value={option}>
-                        {option}
-                    </option>
-                ))}
-            </select>
-        </div>
-    );
-}
-
-export default Group;
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
+  import { CheckIcon } from '@radix-ui/react-icons';
+  
+  const Group = ({ title, options, val, call }) => {
+      return (
+          <div className="flex place-items-center">
+              <div className="text-xs w-1/4">
+                  {title}
+              </div>
+              <Select value={val} onValueChange={call}>
+                  <SelectTrigger className="w-3/4 text-xs p-2 border rounded">
+                      <SelectValue placeholder={`Select ${title}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {options.map((option, index) => (
+                          <SelectItem key={index} value={option}>
+                              <span>{option}</span>
+                          </SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+          </div>
+      );
+  };
+  
+  export default Group;
+  
