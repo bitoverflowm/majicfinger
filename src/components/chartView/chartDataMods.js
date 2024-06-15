@@ -8,13 +8,14 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
-import { BeanOff, CircleDashed, Trash } from "lucide-react"
-import { Alert } from "../ui/alert"
-
-import { colorPalettes } from '@/components/chartView/panels/colorPalette';
+import { CircleDashed, Trash } from "lucide-react"
 
 
-const ChartDataMods = ({connectedData, seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, setCardColor, setBgColor, setTextColor, xOptions, yOptions, directions, direction, setDirection, axesConfig, setAxesConfig, normalize, setNormalize, normalizeValue, setNormalizeValue }) => {
+import { masterPalette } from '@/components/chartView/panels/masterPalette';
+import { Badge } from "../ui/badge"
+
+
+const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, cardColor, setCardColor, bgColor, setBgColor, textColor, setTextColor, xOptions, yOptions, directions, direction, setDirection, axesConfig, setAxesConfig, normalize, setNormalize, normalizeValue, setNormalizeValue }) => {
 
     //loading state
     const [loading, setLoading] = useState() 
@@ -75,6 +76,8 @@ const ChartDataMods = ({connectedData, seriesConfigs, setSeriesConfigs, chartTyp
     //color management
     const [selectedPalette, setSelectedPalette] = useState()
     const [colorVisible, setColorVisible] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const categories = Object.keys(masterPalette);
 
     const handleColorSelection = (key) => {
       setChartTheme(prevTheme => ({
@@ -297,23 +300,30 @@ const ChartDataMods = ({connectedData, seriesConfigs, setSeriesConfigs, chartTyp
     }    
 
     const selectedPaletteHandler = (index) => {
-      let newPalette = colorPalettes[index]
+      let newPalette = masterPalette[selectedCategory][index]
       setSelectedPalette(newPalette)
       
       //chart themes:
-      handleColorSelection(newPalette[getRandomIndex(newPalette)])
-      handleStrokeSelection(newPalette[getRandomIndex(newPalette)])
+      let colorSel = newPalette[4]
+      handleColorSelection(colorSel)
+      setColorPick(colorSel)
+      let strokeSel = newPalette[3]
+      setStrokePick(strokeSel)
+      handleStrokeSelection(strokeSel)
 
       // cards, and backgrounds
-      setCardColor(newPalette[getRandomIndex(newPalette)])
-      setBgColor(newPalette[getRandomIndex(newPalette)])
-      setTextColor(newPalette[getRandomIndex(newPalette)])
+      setCardColor(newPalette[2])
+      setBgColor(newPalette[1])
+      setTextColor(newPalette[0])
+      setColorVisible(false)
     }
 
-    return (
-      <div className="grid gap-1 rounded-lg border p-4 w-full">
-        {!connectedData && <Alert className="mb-2"><div className="place-items-center flex gap-1 place-items-center"><BeanOff className="w-5 h-5"/><small className="text-xs font-medium leading-none">No Data ConnectedConnect a data set to start charting</small></div></Alert> }
+    const [colorPick, setColorPick] = useState()
+    const [strokePick, setStrokePick] = useState()
 
+    return (
+    <div className="grid gap-2">
+      <div className={`grid gap-1 rounded-lg border p-4 w-full ${colorVisible && 'hidden'}`}>
         {seriesConfigs.map((config, index) => (
             <div key={index}>
                 <div className="flex place-items-center gap-3">
@@ -354,14 +364,14 @@ const ChartDataMods = ({connectedData, seriesConfigs, setSeriesConfigs, chartTyp
             <Input value={axesConfig[1].title.text} onChange={(e) => handleAxesConfigChange(1, 'text', e.target.value)} className="w-full text-xs p-2 border rounded" />
           </div>
         </div>
-        <div className="flex place-items-center gap-2">
-            <Checkbox id="normalize" checked={normalize} onCheckedChange={handleNormalizeChange} />
+        <div className="flex place-items-center gap-2 py-2 pl-3">
+            <Checkbox id="normalize" checked={normalize} onCheckedChange={handleNormalizeChange} className="border-slate-400"/>
             <label htmlFor="normalize" className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Normalize Values?
+                Normalize
             </label>
         </div>
         {normalize && (
-            <div className="py-1">
+            <div className="">
                 <label className="text-xs">Normalize To</label>
                 <Input value={normalizeValue} onChange={handleNormalizeValueChange} className="w-full text-xs p-2 border rounded" />
             </div>
@@ -369,39 +379,85 @@ const ChartDataMods = ({connectedData, seriesConfigs, setSeriesConfigs, chartTyp
         {
             seriesConfigs[0].type === 'bar' && (
               <div>
-                <ToggleGroup type="single" className={"flex place-items-left place-content-left"} onValueChange={handleRoundBarToggle}>
+                <ToggleGroup type="single" className={""} onValueChange={handleRoundBarToggle}>
                   <ToggleGroupItem value="roundBar" aria-label="Round Bar" pressed={seriesConfigs[0].cornerRadius === 10}>
-                    <CircleDashed className="h-4 w-4" />
+                    <div className="flex place-items-center gap-2 text-xs">
+                        <CircleDashed className="h-4 w-4" />  Round Border
+                    </div>
                   </ToggleGroupItem>
                 </ToggleGroup>
               </div>
             )
-          }
+        }
 
         <div>
           {directions && directions.length > 1 && <Group title={'Direction'} options={directions} val={direction} call={setDirection} opened={false}/>}
         </div>
-        <div>Aesthetics</div>
-        <div className="flex" onClick={()=>setColorVisible(true)}>Pick a precreated Pallate <div className="flex">
-            {
-              selectedPalette && selectedPalette.map((color)=>
-                <div className="p-2" style={{ backgroundColor: color}}> </div>
-              )
-            }
-          </div>          
-        </div>
-        {
-          colorVisible && <div className="grid gap-2 grid-cols-4">
-              {colorPalettes.map((palette, index) => (
-                <div key={index} className="cursor-pointer" onClick={() => selectedPaletteHandler(index)}>
-                  {palette.map((color, colorIndex) => (
-                    <div key={colorIndex} className="p-2" style={{ backgroundColor: color }}></div>
-                  ))}
-                </div>
-              ))}
-            </div>
-        }
       </div>
+      <div>
+        <form className="grid w-full items-start gap-6">
+            <fieldset className="grid gap-2 rounded-lg border p-4">
+                <legend className="-ml-1 px-1 text-xs">
+                    Make your work stand out
+                </legend>
+                <div className="flex text-xs border border-slate-200 rounded-md p-2 cursor-pointer" onClick={()=>setColorVisible(true)}>
+                    <div className="w-3/4">Select one of world's most beautiful pallates</div>
+                    <div className="flex border border-slate-200 rounded-md w-1/4">
+                        {
+                            selectedPalette && selectedPalette.map((color)=>
+                                <div className="p-2" style={{ backgroundColor: color}}> </div>
+                            )
+                        }
+                    </div>          
+                </div>
+                <div className="flex flex-wrap gap-4 place-items-center place-content-center text-xs pt-1">
+                    <div className="grid place-content-center place-items-center gap-1">
+                        <div>Background</div> 
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: bgColor }}> </div>
+                    </div>
+                    <div className="grid place-content-center place-items-center gap-1">
+                        <div>Foregrond</div> 
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: cardColor }}> </div></div>
+                    <div className="grid place-content-center place-items-center gap-1">
+                        <div>Text</div> 
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: textColor }}> </div></div>
+                    <div className="grid place-content-center place-items-center gap-1">
+                        <div>Stroke</div> 
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: strokePick }}> </div></div>
+                    <div className="grid place-content-center place-items-center gap-1">
+                        <div>Paletter color</div> 
+                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: colorPick}}> </div></div>
+                </div>
+                {
+                colorVisible && <div className="">
+                                    <div className="flex flex-wrap gap-2 mb-4">
+                                        {categories.map((category, index) => (
+                                            <Badge
+                                                key={index}
+                                                className="cursor-pointer text-xs"
+                                                onClick={() => setSelectedCategory(category)}
+                                            >
+                                                {category}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    {selectedCategory && (
+                                        <div className="grid gap-2 grid-cols-4">
+                                            {masterPalette[selectedCategory].map((palette, index) => (
+                                                <div key={index} className="cursor-pointer" onClick={() => selectedPaletteHandler(index)}>
+                                                    {palette.map((color, colorIndex) => (
+                                                        <div key={colorIndex} className="p-2" style={{ backgroundColor: color }}></div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    </div>
+                }
+            </fieldset>
+        </form>
+      </div>
+    </div>
     )
   }
 
