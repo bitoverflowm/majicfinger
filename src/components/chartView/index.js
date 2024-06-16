@@ -69,6 +69,8 @@ const ChartView = () => {
     const [titleFont, setTitleFont] = useState()
     const [title, setTitle] = useState('Give Your Chart a Title')
     const [subTitle, setSubTitle] = useState('Add a Description')
+    const [subTitleHidden, setSubTitleHidden]  = useState()
+    const [subTitleFont, setSubTitleFont] = useState()
 
     useEffect(()=>{
         chartOptions &&
@@ -207,9 +209,7 @@ const ChartView = () => {
             }))
         );
     }, [normalize, normalizeValue]);
-
-
-    
+  
 
 
     return(
@@ -220,14 +220,14 @@ const ChartView = () => {
                 <div className='rounded-lg p-10' style={{background: bgColor && bgColor}}>
                     <div className='w-full h-[700px] rounded-lg p-20 internalGradualEffect' style={{background: cardColor && cardColor}}>
                         { !titleHidden && <div className='text-center text-xl font-bold py-2' style={{color: textColor && textColor, fontFamily: titleFont}}>{title}</div>}                    
-                        <div className='text-center text-sm font-bold py-2' style={{color: textColor && textColor}}>{subTitle}</div>
+                        { !subTitleHidden && <div className='text-center text-sm font-bold py-2' style={{color: textColor && textColor, fontFamily: subTitleFont}}>{subTitle}</div>}
                         <AgChartsReact options={chartOptions && chartOptions} />
                     </div>                
                     {/*<div className='text-center text-xxs'>Footnotes</div>*/}
                 </div>
             </div>
             <div className='col-span-4 w-full pl-2 pr-6'>
-                <ChartDataMods connectedData={connectedData} seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} cardColor={cardColor} setCardColor={setCardColor} bgColor={bgColor} setBgColor={setBgColor} textColor={textColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes} axesConfig={axesConfig} setAxesConfig={setAxesConfig} normalize={normalize} setNormalize={setNormalize} normalizeValue={normalizeValue} setNormalizeValue={setNormalizeValue} titleHidden={titleHidden} setTitleHidden={setTitleHidden} titleFont={titleFont} setTitleFont={setTitleFont} title={title} setTitle={setTitle} subTitle={subTitle} setSubTitle={setSubTitle}/>
+                <ChartDataMods connectedData={connectedData} seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} cardColor={cardColor} setCardColor={setCardColor} bgColor={bgColor} setBgColor={setBgColor} textColor={textColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes} axesConfig={axesConfig} setAxesConfig={setAxesConfig} normalize={normalize} setNormalize={setNormalize} normalizeValue={normalizeValue} setNormalizeValue={setNormalizeValue} titleHidden={titleHidden} setTitleHidden={setTitleHidden} titleFont={titleFont} setTitleFont={setTitleFont} title={title} setTitle={setTitle} subTitle={subTitle} setSubTitle={setSubTitle} subTitleHidden={subTitleHidden} setSubTitleHidden={setSubTitleHidden} subTitleFont={subTitleFont} setSubTitleFont={setSubTitleFont}/>
             </div>
         </div>
     )

@@ -335,8 +335,9 @@ const ChartDataModsV2 = ({seriesConfigs, setSeriesConfigs, direction, chartTypes
                 {titleHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" /> }
               </div>
             </div>
-            <div>
-              <FontSelector titleFont={titleFont} setFont={setTitleFont}/>
+            <div className="flex place-items-center gap-3 text-xs">
+              <Label htmlFor="font" className="text-xs">Font</Label>
+              <FontSelector id="font" titleFont={titleFont} setFont={setTitleFont}/>
             </div>
             <div className="flex gap-3 place-items-center">
               <Label htmlFor="temperature">Desc</Label>

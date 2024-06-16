@@ -9,14 +9,14 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
 import { Label } from "@radix-ui/react-context-menu"
-import { CircleDashed, Trash, EyeOff } from "lucide-react"
+import { CircleDashed, Trash, EyeOff, Eye, Shuffle } from "lucide-react"
 
 
 import { masterPalette } from '@/components/chartView/panels/masterPalette';
 import { bgPalette } from '@/components/chartView/panels/bgPalette';
 import FontSelector from "./utility/fontSelector"
 
-const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, cardColor, setCardColor, bgColor, setBgColor, textColor, setTextColor, xOptions, yOptions, directions, direction, setDirection, axesConfig, setAxesConfig, normalize, setNormalize, normalizeValue, setNormalizeValue, titleHidden, setTitleHidden, titleFont, setTitleFont, title, setTitle, subTitle, setSubTitle }) => {
+const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartTheme, cardColor, setCardColor, bgColor, setBgColor, textColor, setTextColor, xOptions, yOptions, directions, direction, setDirection, axesConfig, setAxesConfig, normalize, setNormalize, normalizeValue, setNormalizeValue, titleHidden, setTitleHidden, titleFont, setTitleFont, title, setTitle, subTitle, setSubTitle, subTitleHidden, setSubTitleHidden, subTitleFont, setSubTitleFont }) => {
 
     //loading state
     const [loading, setLoading] = useState() 
@@ -81,16 +81,18 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
     const categories = Object.keys(masterPalette);
 
     const handleColorSelection = (key) => {
-      setChartTheme(prevTheme => ({
-          ...prevTheme,
-          palette: {
-              fills: [key],
-              strokes: prevTheme.palette.strokes
-          }
-      }))
+        setColorPick(key)
+        setChartTheme(prevTheme => ({
+            ...prevTheme,
+            palette: {
+                fills: [key],
+                strokes: prevTheme.palette.strokes
+            }
+        }))
     }
 
     const handleStrokeSelection = (key) => {
+        setStrokePick(key)
         setChartTheme(prevTheme => ({
             ...prevTheme,
             palette: {
@@ -323,18 +325,22 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
     const [strokePick, setStrokePick] = useState()
 
     const shufflePalette = () => {
-        //chart themes:
-        let colorSel = selectedPalette[getRandomIndex(selectedPalette)]
-        handleColorSelection(colorSel)
-        setColorPick(colorSel)
-        let strokeSel = selectedPalette[getRandomIndex(selectedPalette)]
-        setStrokePick(strokeSel)
-        handleStrokeSelection(strokeSel)
+        if(selectedPalette){
+            //chart themes:
+            let colorSel = selectedPalette[getRandomIndex(selectedPalette)]
+            handleColorSelection(colorSel)
+            setColorPick(colorSel)
+            let strokeSel = selectedPalette[getRandomIndex(selectedPalette)]
+            setStrokePick(strokeSel)
+            handleStrokeSelection(strokeSel)
 
-        // cards, and backgrounds
-        setCardColor(selectedPalette[getRandomIndex(selectedPalette)])
-        setBgColor(selectedPalette[getRandomIndex(selectedPalette)])
-        setTextColor(selectedPalette[getRandomIndex(selectedPalette)])
+            // cards, and backgrounds
+            setCardColor(selectedPalette[getRandomIndex(selectedPalette)])
+            setBgColor(selectedPalette[getRandomIndex(selectedPalette)])
+            setTextColor(selectedPalette[getRandomIndex(selectedPalette)])
+        }else{
+            alert('Select a palette first')
+        }
       }
     
     const [granularColorsVisible, setGranularColorsVisible] = useState()
@@ -360,7 +366,7 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
       <div className={`grid gap-1 rounded-lg border p-4 w-full ${colorVisible && 'hidden'}`}>
         <div className="flex place-items-center gap-3 text-xs">
             <Label htmlFor="title" className="text-xs">Title</Label>
-            <Input id="title" type="text" placeholder="Name your chart?" className="text-xs" onChange={(e)=>setTitle(e.target.value)} />
+            <Input id="title" type="text" placeholder="Give Your Chart a Title" className="text-xs" onChange={(e)=>setTitle(e.target.value)} />
             <div
             className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
             onClick={() => setTitleHidden(!titleHidden)}
@@ -368,35 +374,41 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
             {titleHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" /> }
             </div>
         </div>
-        <div>
-            <FontSelector titleFont={titleFont} setFont={setTitleFont}/>
+        <div className="flex gap-2 place-items-center">
+            <Label htmlFor="subTitle" className="text-xs">Desc</Label>
+            <Input id="subTitle" type="text" className="text-xs" placeholder="Add a Description" onChange={(e)=>setSubTitle(e.target.value)} />
+            <div
+            className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+            onClick={() => setSubTitleHidden(!subTitleHidden)}
+            >
+                { subTitleHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" /> }
+            </div>
         </div>
-        <div className="flex gap-3 place-items-center">
-            <Label htmlFor="temperature">Desc</Label>
-            <Input id="subTitle" type="text" placeholder="A brief description of your chart?" onChange={(e)=>setSubTitle(e.target.value)} />
+        <div className="flex place-items-center gap-3 text-xs pb-2">
+            <Label htmlFor="font" className="text-xs">Font</Label>
+            <FontSelector id="font" titleFont={titleFont} setFont={setTitleFont}/>
         </div>
         {seriesConfigs.map((config, index) => (
-            <div key={index}>
-                <div className="flex place-items-center gap-3">
-                  <small className="text-xs font-medium leading-none">Chart {index + 1}</small>
-                  <div
-                    className="bg-red-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                    onClick={() => handleDeleteSeries(index)}
-                  >
-                    <Trash className="w-3 h-3" />
-                  </div>
-                </div>
+            <div key={index}>                
                 {chartTypes && chartTypes.length > 1 &&
-                <div className="py-1">
-                     <Group title={`Type`} options={chartTypes} val={config.type} call={value => handleSeriesConfigChange(index, 'type', value)} opened={true} />
+                <div className="flex place-items-center">
+                    <div className="w-full">
+                        <Group title={`Chart ${index + 1}`} options={chartTypes} val={config.type} call={value => handleSeriesConfigChange(index, 'type', value)} opened={true} />
+                    </div>
+                     <div
+                        className="bg-red-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                        onClick={() => handleDeleteSeries(index)}
+                    >
+                        <Trash className="w-3 h-3" />
+                    </div>
                 </div>}
                 {xOptions && xOptions.length > 1 &&
                 <div className="py-1">
-                     <Group title={`X-axis`} options={xOptions} val={config.xKey} call={value => handleSeriesConfigChange(index, 'xKey', value)} opened={false} />
+                     <Group title={`x-axis`} options={xOptions} val={config.xKey} call={value => handleSeriesConfigChange(index, 'xKey', value)} opened={false} />
                 </div>}
                 {yOptions && yOptions.length > 1 &&            
                 <div className="py-1">
-                     <Group title={`Y-axis`} options={yOptions} val={config.yKey} call={value => handleSeriesConfigChange(index, 'yKey', value)} opened={false} />
+                     <Group title={`y-axis`} options={yOptions} val={config.yKey} call={value => handleSeriesConfigChange(index, 'yKey', value)} opened={false} />
                 </div>}
             </div>
         ))}
@@ -451,37 +463,40 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
                 <legend className="-ml-1 px-1 text-xs">
                     Make your work stand out
                 </legend>
-                <div className="flex text-xs border border-slate-200 rounded-md p-2 cursor-pointer" onClick={()=>setColorVisible(true)}>
-                    <div className="w-3/4">Select one of world's most beautiful pallates</div>
-                    <div className="flex border border-slate-200 rounded-md w-1/4">
-                        {
-                            selectedPalette && selectedPalette.map((color)=>
-                                <div className="p-2" style={{ backgroundColor: color}}> </div>
-                            )
-                        }
-                    </div>          
+                <div className="flex w-full place-items-center gap-2">
+                    <div className="flex w-full text-xs border border-slate-200 rounded-md p-2 cursor-pointer" onClick={()=>setColorVisible(true)}>
+                        <div className="w-3/4">Select one of world's most beautiful pallates</div>
+                        <div className="flex border border-slate-200 rounded-md w-1/4">
+                            {
+                                selectedPalette && selectedPalette.map((color)=>
+                                    <div className="p-2" style={{ backgroundColor: color}}> </div>
+                                )
+                            }
+                        </div>
+                    </div>
+                    <div onClick={()=>shufflePalette()} className="border rounded-full bg-lychee_blue/20 cursor-pointer hover:bg-lychee_green/50"><Shuffle className="w-5 h-5"/></div>   
                 </div>
                 <div className="flex flex-wrap gap-4 place-items-center place-content-center text-xs pt-1">
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Background</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: bgColor }} onClick={()=>granularColorHandler('background')}> </div>
+                        <div className="w-6 h-5 rounded-md border border-slate-400 cursor-pointer" style={{ backgroundColor: bgColor }} onClick={()=>granularColorHandler('background')}> </div>
                     </div>
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Foregrond</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: cardColor }} onClick={()=>granularColorHandler('foreground')}> </div></div>
+                        <div className="w-6 h-5 rounded-md border border-slate-400 cursor-pointer" style={{ backgroundColor: cardColor }} onClick={()=>granularColorHandler('foreground')}> </div></div>
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Text</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: textColor }} onClick={()=>granularColorHandler('text')}> </div></div>
+                        <div className="w-6 h-5 rounded-md border border-slate-400 cursor-pointer" style={{ backgroundColor: textColor }} onClick={()=>granularColorHandler('text')}> </div></div>
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Stroke</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: strokePick }} onClick={()=>granularColorHandler('stroke')}> </div></div>
+                        <div className="w-6 h-5 rounded-md border border-slate-400 cursor-pointer" style={{ backgroundColor: strokePick }} onClick={()=>granularColorHandler('stroke')}> </div></div>
                     <div className="grid place-content-center place-items-center gap-1">
                         <div>Chart</div> 
-                        <div className="w-6 h-5 rounded-md" style={{ backgroundColor: colorPick}} onClick={()=>granularColorHandler('chart')}> </div></div>
-                    <div onClick={()=>shufflePalette()}>Shuffle</div>
+                        <div className="w-6 h-5 rounded-md border border-slate-400 cursor-pointer" style={{ backgroundColor: colorPick}} onClick={()=>granularColorHandler('chart')}> </div></div>
                 </div>
                 {
                 colorVisible && <div className="">
+                                    <div className="cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40  text-xs pl-1 my-2 float-right" onClick={()=>setColorVisible(false)}>close</div>
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         {categories.map((category, index) => (
                                             <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono cursor-pointer text-xs hover:bg-lychee_green"
@@ -493,7 +508,7 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
                                         ))}
                                     </div>
                                     {selectedCategory && (
-                                        <div className="grid grid-cols-4">
+                                        <div className="flex flex-wrap place-items-center place-content-center gap-3">
                                             {masterPalette[selectedCategory].map((palette, index) => (
                                                 <div key={index} className="flex cursor-pointer rounded-full hover:shadow-inner hover:bg-slate-100 p-1" onClick={() => selectedPaletteHandler(index)}>
                                                     {palette.map((color, colorIndex) => (
@@ -505,7 +520,9 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
                                     )}
                                     </div>
                 }{
-                    granularColorsVisible && <div className="flex flex-wrap gap-2 pr-2 pb-4 pl-2 py-6">
+                    granularColorsVisible && <>
+                    <div className="cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40  text-xs pl-1" onClick={()=>setGranularColorsVisible(false)}>close</div>
+                    <div className="flex flex-wrap gap-2 p-2">
                     {
                         bgPalette && bgPalette.solids.map((solid, key) => (
                             <div
@@ -515,7 +532,7 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
                                 style={{background: solid}}/>
                         ))
                     }
-                    </div>
+                    </div></>
                 }
             </fieldset>
         </form>
