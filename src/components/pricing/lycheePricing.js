@@ -17,31 +17,34 @@ export const toHumanPrice = (price, decimals = 2) => {
 const lycheePrices = [
   {
     id: "price_0",
-    name: "Free",
-    description: "What is included with free?",
+    name: "100 tokens",
+    description: "Get a single time bag of 100 tokens to do whatever you want with?",
     features: [
-      "Upload and Save up to 5 Datasets",
-      "Powerful Table",
-      "Free Tier Integrations",
+      "Take a look around",
+      "Use for charts",
+      "Upload and Save Datasets",
+      "Use the Powerful Table",
+      "Connect to any Integration",
       "1,000+ Charts (new charts added daily)",
       "796,000+ curated colors and pallates",
-      "3 AI Analysis requests",
-      "1 Scrape requests",
-      "5 Data Set generations",
+      "AI Analysis requests",
+      "Scrape requests",
+      "Data Set generations",
     ],
     missing: [
-        "Subscription prices might rise as new features are added and platform matures"
+        "This is a one time purchase. Based on usage metrics, should cover usage for 1 month of regular use."
     ],
-    monthRef: '',
-    yearRef: '',
-    monthlyPrice: 0,
-    yearlyPrice: 0,
+    monthRef: 'https://buy.stripe.com/aEUaGY3CebT85Ak00m',
+    yearRef: 'https://buy.stripe.com/aEUaGY3CebT85Ak00m',
+    monthlyPrice: 799,
+    yearlyPrice: 799,
     isMostPopular: false,
+    singlePay: true
   },
   {
     id: "price_1",
     name: "Pro",
-    description: "Everything in Free Tier But More.",
+    description: "Access Everything and More.",
     features: [
       "Access to everything",
       "Upload 0.85GB worth of Datasets",
@@ -56,10 +59,10 @@ const lycheePrices = [
     missing: [
         "Subscription prices might rise as new features are added and platform matures"
     ],
-    monthRef: 'https://buy.stripe.com/bIY16o5Km8GW4wgeV6',
-    yearRef: 'https://buy.stripe.com/9AQbL2b4GaP47Is8wP',
-    monthlyPrice: 999,
-    yearlyPrice: 8999,
+    monthRef: 'https://buy.stripe.com/aEU02k8Wy6yO6Eo5kH',
+    yearRef: 'https://buy.stripe.com/bIY8yQfkW0aq9QAeVi',
+    monthlyPrice: 499,
+    yearlyPrice: 399,
     isMostPopular: false,
   },
   {
@@ -109,11 +112,12 @@ export function Pricing() {
         <div className="flex w-full items-center justify-center space-x-2">
           <Switch
             id="interval"
+            checked={interval === 'year'}
             onCheckedChange={(checked) => {
               setInterval(checked ? "year" : "month");
             }}
           />
-          <span>{interval === 'year' ? "Remove Discount" : "Apply Discount"}</span>
+          <span>{interval && interval === 'year' ? "Remove Discount" : "Apply Discount"}</span>
         </div>
 
         <div className="mx-auto grid w-full justify-center gap-8 sm:grid-cols-2 lg:grid-cols-3">
@@ -194,28 +198,19 @@ export function Pricing() {
                             {interval === "year"
                                 ? toHumanPrice(price.yearlyPrice, 2)
                                 : toHumanPrice(price.monthlyPrice, 2)}
-                        <span className="text-xs"> / {interval} </span>
+                        <span className="text-xs">  /month  {interval === "year" && " charged annually"}</span>
                         </span>
                     </motion.div>
               }
               {
-                price.id === 'price_0' ?
-                  <div className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm w-3/4 mx-auto" onClick={()=>setViewing('register')}> Register for Free </div>
-                  :
-                  <>
-                    {
-                      price.singlePay ?
-                          <Link href={price && price.monthRef} className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm w-3/4 mx-auto">
-                              Go
-                          </Link>
-                          :<Link href={price && interval === "year" ? price.yearRef : price.monthRef} className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm rounded-sm w-3/4 mx-auto">
-                              Go
-                          </Link>
-                    }
-                  </>
-              }
-
-              
+                price.singlePay ?
+                    <Link href={price && price.monthRef} target="_blank" rel="noopener noreferrer" className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm w-3/4 mx-auto">
+                        Go
+                    </Link>
+                    :<Link href={price && interval === "year" ? price.yearRef : price.monthRef} className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm rounded-sm w-3/4 mx-auto" target="_blank" rel="noopener noreferrer">
+                        Go
+                    </Link>
+              }             
 
               <hr className="m-0 h-px w-full border-none bg-gradient-to-r from-neutral-200/0 via-neutral-500/30 to-neutral-200/0" />
               {price.features && price.features.length > 0 && (
