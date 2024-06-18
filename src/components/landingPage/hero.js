@@ -11,6 +11,7 @@ import Particles from "../magicui/particles";
 
 import VideoView from "./videoView";
 import { Card } from "../ui/card";
+import { MoveRight } from "lucide-react";
 
 const companies = [
     "jpm",
@@ -72,40 +73,29 @@ export function Hero() {
                     color={'#ffffff'}
                     refresh
                 />         
-                <div className="text-balance bg-gradient-to-br from-lychee_blue from-0% to-lychee_red/70 bg-clip-text font-black leading-none tracking-tighter text-transparent pt-10 pb-3 sm:py-10 text-7xl sm:text-8xl xl:text-[250px] text-center sm:text-left">
+                <div className="text-balance bg-gradient-to-br from-lychee_blue from-0% to-lychee_red/70 bg-clip-text font-black leading-none tracking-tighter text-transparent pt-10 pb-3 sm:py-10 text-7xl sm:text-[150px] xl:text-[250px] text-center">
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>
-                <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-4xl sm:font-black text-white">Discover Something Great</div>
-                <div className="text-center sm:text-left sm:pl-1 xl:pl-6 text-xl sm:text-sm xl:text-6xl text-white">We'll save you from all the <span className="text-lychee_green italic font-black ">complex yabba-dabba-doos</span> out there.</div>
-                
-                <Link className='z-10 sm:ml-2 text-center w-32 bg-green-600 p-1 sm:p-2 mt-1 sm:mt-3 rounded-md hover:border hover:border-white' href={"/dashboard"}>
-                    <div className="text-white text-xs"> Start </div>
-                </Link>
-                <div className="text-center sm:text-left ml-2 text-[10px] pt-1 text-lychee_white">
-                    No card or registration required
+                <h1 className="text-center scroll-m-20 text-xl sm:text-4xl font-extrabold tracking-tight lg:text-5xl text-white py-1 sm:pl-1 xl:pl-6">Discover Something Great</h1>
+                <div className="pt-2 sm:pl-1 xl:pl-6 text-center">
+                    <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold  text-white bg-purple-400/20 shadow-2xl shadow-purple-200">
+                        We'll save you from all the <span className="text-lychee_green italic font-black ">complex yabba-dabba-doos</span> out there.
+                    </code>
                 </div>
-                <div className="w-full flex place-content-center">
-                    <div className="container mx-auto px-4 md:px-8 ">
-                        <h3 className="py-4 sm:pt-36 text-center text-[10px] font-semibold text-slate-400">
-                            ACTIVELY BETA TESTED BY FRIENDS AT
-                        </h3>
-                        <div className="mt-6 px-10">
-                            <div className="flex flex-wrap gap-8 place-items-center place-content-center">
-                                {companies.map((logo, idx) => (
-                                    <img
-                                        key={idx}
-                                        src={`./${logo}.svg`}
-                                        className="h-8 w-20 brightness-0 invert"
-                                        alt={logo}
-                                    />
-                                ))}
-                            </div>
-                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
-                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
-                        </div>
-                    </div>
+                <div className="pt-4 sm:pl-1 xl:pl-6 flex place-content-center">
+                    <Link className='w-32 z-10 text-center text-black font-bold bg-green-400 p-1 sm:p-2 mt-1 sm:mt-3 rounded-md hover:bg-purple-400' href={"/dashboard"}>
+                        Go
+                    </Link>
                 </div>
-                <div className="pt-10 sm:pt-20 sm:pr-20">
+                <div className="pt-10 sm:pt-20 sm:pr-20 z-10">
+                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
+                        <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
+                            <span>Create Mind-Bendingly Beautiful</span>
+                            <span>Visualizations and </span>
+                            <span>Charts</span>
+                            <span className="pt-6"><MoveRight /></span>
+                        </h1>
+                    </Link>
                     <div className="sm:text-4xl text-lychee_green">Automagically Analyze Anything With AI and Get Unprecedented Insights</div>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Examine multiple datasets at once (500MB per dataset) (and growing)</div>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">I am targeting 1GB/ dataset and 100 datasets at once by end of 2024</div>
@@ -139,6 +129,27 @@ export function Hero() {
                     <div className="sm:text-4xl text-lychee_green">Generate INSANE amounts of fake (realistic) Data</div>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">for analysis and testing</div>
                 </div>
+                <div className="w-full flex place-content-center">
+                    <div className="container mx-auto px-4 md:px-8 ">
+                        <h3 className="py-4 pt-36 text-center text-[10px] font-semibold text-slate-400">
+                            ACTIVELY BETA TESTED BY FRIENDS AT
+                        </h3>
+                        <div className="sm:mt-6 sm:px-10">
+                            <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
+                                {companies.map((logo, idx) => (
+                                    <img
+                                        key={idx}
+                                        src={`./${logo}.svg`}
+                                        className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
+                                        alt={logo}
+                                    />
+                                ))}
+                            </div>
+                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
+                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
+                        </div>
+                    </div>
+                </div>
                 <div className="sm:grid sm:grid-cols-10 gap-4 w-full sm:pt-20">
                     <div className="pt-10 sm:pt-0 sm:col-span-5">
                             <BlurIn
@@ -146,7 +157,7 @@ export function Hero() {
                                 className="text-2xl sm:text-8xl text-lychee_green font-black py-10 pb-5"
                             />
                             <div className="pt-4 xl:text-center text-lychee_white text-xl sm:text-4xl">A Powerful Spreadsheet</div>
-                            <div className="pt-4 sm:pt-6 xl:text-center text-lychee_white text-xl sm:text-4xl">MindBendingly Beautiful Visualizations and Charts </div>
+                            <div className="pt-4 sm:pt-6 xl:text-center text-lychee_white text-xl sm:text-4xl"> </div>
                             <div className="pt-4 sm:pt-6 xl:text-center text-lychee_white text-xl sm:text-4xl">A Rich Text Editor </div>
                             <div className="pt-4 sm:pt-6 xl:text-center text-lychee_white text-xl sm:text-4xl">Generate Stunning presentations </div>
                             <div className="pt-4 sm:pt-6 xl:text-center text-lychee_white text-xl sm:text-4xl">Deploy an entire website right here </div>
