@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 import { AgChartsReact } from 'ag-charts-react';
 
@@ -7,7 +8,7 @@ import { useMyStateV2  } from '@/context/stateContextV2'
 import ChartDataMods from './chartDataMods';
 
 import { Alert } from "../ui/alert"
-import { BeanOff } from "lucide-react"
+import { BeanOff, Dumbbell } from "lucide-react"
 
 const ChartView = () => {
     const contextStateV2 = useMyStateV2()
@@ -213,10 +214,11 @@ const ChartView = () => {
 
 
     return(
-        <div className='grid grid-cols-12 pl-5 place-items-center place-content-center gap-6 gradualEffect'>
+        <div className='grid grid-cols-12 pl-5 place-items-center place-content-center gradualEffect'>
             <div className='col-span-12'>{!connectedData && <Alert className="mb-2"><div className="place-items-center flex gap-2 place-items-center"><BeanOff className="w-5 h-5"/><small className="text-xs font-medium leading-none">No Data Connected. <br/>Connect data set to start charting</small></div></Alert> }</div>
+            <div className='col-span-12'><Link rel="noopener noreferrer" target="_blank" href="https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"><Alert className="mb-2"><div className="place-items-center flex gap-2 place-items-center"><Dumbbell className="w-5 h-5"/><small className="text-xs font-medium leading-none">New? <br/>Click here to learn how to create Charts</small></div></Alert></Link></div>
             {/*Start of background card. WE need spacing, otherwise it looks bad */}
-            <div className={`col-span-8 h-full`}>
+            <div className={`col-span-8 h-full pt-4 `}>
                 <div className='rounded-lg p-10' style={{background: bgColor && bgColor}}>
                     <div className='w-full h-[700px] rounded-lg p-20 internalGradualEffect' style={{background: cardColor && cardColor}}>
                         { !titleHidden && <div className='text-center text-xl font-bold py-2' style={{color: textColor && textColor, fontFamily: titleFont}}>{title}</div>}                    
