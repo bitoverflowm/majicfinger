@@ -90,15 +90,19 @@ export function Hero() {
                 <div className="pt-10 sm:pt-20 sm:pr-20 z-10">
                     <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
                         <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
-                            <span>Create Mind-Bendingly Beautiful</span>
-                            <span>Visualizations and </span>
-                            <span>Charts</span>
-                            <span className="pt-6"><MoveRight /></span>
+                            <span>Create Mind-Bendingly Beautiful Visualizations and  Charts </span>
+                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
                         </h1>
                     </Link>
-                    <div className="sm:text-4xl text-lychee_green">Automagically Analyze Anything With AI and Get Unprecedented Insights</div>
+                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-analyze-data-with-lychee-ai"}>
+                        <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
+                            <span className=""><span className="bg-purple-400 text-black">Automagically</span> Analyze Anything 
+                            With Athena (Lychee's AI) Get Unprecedented Insights</span>
+                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
+                        </h1>
+                    </Link>
                     <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Examine multiple datasets at once (500MB per dataset) (and growing)</div>
-                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">I am targeting 1GB/ dataset and 100 datasets at once by end of 2024</div>
+                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Targeting 1GB/ dataset and 100 datasets at once by end of 2024</div>
                     <div className="sm:text-4xl text-lychee_green pt-10">
                         Connect <span className="font-black text-lychee_red">Directly</span> to <span className="underline">ALL</span> The Data Sources of <span className="text-lychee_green">Your Dreams</span>
                     </div>
