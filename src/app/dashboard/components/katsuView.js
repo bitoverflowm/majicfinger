@@ -1,13 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { motion} from "framer-motion";
+import React from 'react';
 import { useMyStateV2  } from '@/context/stateContextV2'
 
 
-/* Shadcn imports
- * 
- */
 import { BentoBase } from './bentoBase';
 import ComingSoon from './comingSoon';
 
@@ -29,6 +25,9 @@ const KatsuView = () => {
     return (
         <div className="w-full h-full flex flex-col place-items-center place-content-center px-10">
             <ComingSoon />
+            <div className='sm:w-1/2 pt-4'>
+                <blockquote className="mt-6 border-l-2 pl-6 italic text-xs">This is your dashboard. Soon you will be able to customize this view with any data, visualization or link. PS: Check out the beautiful color pallates. Customize this view, share with your friends, audience or team. Take your presentations to the next level.</blockquote> 
+            </div>
             <BentoBase data={dashData} dashView={true} bentoContainer={bentoContainer} setDashData={setDashData} setBentoContainer={setBentoContainer} viewing={viewing} setViewing={setViewing}/>            
         </div>       
     );

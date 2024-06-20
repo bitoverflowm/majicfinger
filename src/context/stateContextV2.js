@@ -93,7 +93,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
             'textAlign': 'left',
             'fontSize': '20px',
         },
-        "href": "/lychee_university",
+        "href": "https://misterrpink.beehiiv.com/",
         "cta": "Go",
         "navTo": "",
         "className": "col-span-1 lg:col-span-1",

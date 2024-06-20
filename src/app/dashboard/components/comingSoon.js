@@ -15,17 +15,17 @@ const ComingSoon = () => {
   return (
             <div className="px-2 flex flex-col w-full">
                     <Alert className="text-xs bg-lychee_white/50 text-lychee_black border-none w-2/5 mx-auto flex place-items-center gap-6">
-                        <Link rel="noopener noreferrer" target="_blank" href={'https://twitter.com/misterrpink1'}>
+                        <Link rel="noopener noreferrer" target="_blank" href={'https://twitter.com/misterrpink1'} className="text-center">
                             <Avatar>
                                 <AvatarImage src="/avatar1.png" />
                                 <AvatarFallback>MP</AvatarFallback>
-                            </Avatar> Mr. Pink  
+                            </Avatar> Mr.Pink  
                         </Link>
                         <div>
-                            <AlertTitle> 🚧 Heads up! Lychee V2.0 is coming!</AlertTitle>
+                            <AlertTitle> 🚧 Lychee V2.0 is coming!</AlertTitle>
                             <AlertDescription >
                                     I am moving some things around. Platform is functional, but things might break... <br />
-                                    Truth be told, I am actively pushing to production as we speak, so things will most likely break. <br /> Tutorials coming...
+                                    <Link href={'https://misterrpink.beehiiv.com/'} rel="noopener noreferrer" target="_blank" className="underline">Click Here for Tutorials and Guides (along with a healthy dose of my unhinged thoughts)</Link>
                             </AlertDescription>
                         </div>
                     </Alert>

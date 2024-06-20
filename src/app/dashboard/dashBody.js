@@ -105,7 +105,7 @@ const DashBody = ({user}) => {
                 { viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
                 { viewing === 'presentation' && <div className="py-20"><PresentationView /></div> }
                 { viewing === 'scrape' && <ScraperView />}
-                { viewing === 'register' && <div className="py-16 w-[1500px] flex place-items-center place-content-center"><div><Login/></div></div>}
+                { viewing === 'register' && <div className="flex place-items-center place-content-center"><div><Login/></div></div>}
                 { viewing === 'pricing' && <div className="py-10"><Pricing /></div>}
                 { viewing === 'manageAccount' && <div className="p-56 text-black">
                     <div>Hi, I am working on making this page more useful</div>
