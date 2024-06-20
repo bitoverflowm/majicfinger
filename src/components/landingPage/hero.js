@@ -4,13 +4,12 @@ import { useRef, useEffect, useState } from "react"
 
 import Link from "next/link";
 
-import { VelocityScroll } from "../ui/scroll-based-velocity";
+import { Twitter, Instagram, Youtube, Activity, Facebook, BarChart2, DollarSign, FileText, Cloud, ShoppingCart, Zap, Globe, Thermometer, AlertTriangle, Star, BarChart, Globe as Globe2 } from 'react-feather';
 
 import BlurIn from "../magicui/blur-in";
 import Particles from "../magicui/particles";
 
 import VideoView from "./videoView";
-import { Card } from "../ui/card";
 import { MoveRight } from "lucide-react";
 
 const companies = [
@@ -87,52 +86,6 @@ export function Hero() {
                         Go
                     </Link>
                 </div>
-                <div className="pt-10 sm:pt-20 sm:pr-20 z-10">
-                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
-                        <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
-                            <span>Create Mind-Bendingly Beautiful Visualizations and  Charts </span>
-                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
-                        </h1>
-                    </Link>
-                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-analyze-data-with-lychee-ai"}>
-                        <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
-                            <span className=""><span className="bg-purple-400 text-black">Automagically</span> Analyze Anything 
-                            With Athena (Lychee's AI) Get Unprecedented Insights</span>
-                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
-                        </h1>
-                    </Link>
-                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Examine multiple datasets at once (500MB per dataset) (and growing)</div>
-                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Targeting 1GB/ dataset and 100 datasets at once by end of 2024</div>
-                    <div className="sm:text-4xl text-lychee_green pt-10">
-                        Connect <span className="font-black text-lychee_red">Directly</span> to <span className="underline">ALL</span> The Data Sources of <span className="text-lychee_green">Your Dreams</span>
-                    </div>
-                    <div className="p-10 flex flex-wrap gap-4 text-xs place-items-center place-content-center">
-                        <Card className="w-48 py-10 text-center">
-                            Twitter
-                        </Card>
-                        <Card className="w-48 py-10 text-center">
-                            CoinGecko
-                        </Card>
-                        <Card className="w-48 py-10 text-center">
-                            Reddit - WallStreetBets
-                        </Card>
-                        <Card className="w-48 py-10 text-center">
-                            Reddit - ShortSqueezes
-                        </Card>
-                        <Card className="w-48 py-10 text-center">
-                            Reddit, Instagram, Strava, Youtube, Meta, NASDAQ, US Treasuries, SEC Edgar Data, OpenWeather API, Product Hunt, HackerNews, 4chan, The World Bank, weather data, earthquake data, NASA Data, Medium, NBAStats, Census.gov
-                        </Card>
-                    </div>
-                    <div className="pt-4 text-center text-lychee_white text-sm sm:text-4xl">Not A Single Line of Code Required on Your End</div>
-                    <div className="pt-4 text-center text-lychee_white text-sm sm:text-4xl">Data Cleaner Than a Nun's Browser History</div>
-
-                    <div className="sm:text-4xl text-lychee_green pt-10 pb-4">Scrape ANY URL</div>
-
-                    <div className="sm:text-4xl text-lychee_green pb-4">Extract Structured Data from PDF</div>
-
-                    <div className="sm:text-4xl text-lychee_green">Generate INSANE amounts of fake (realistic) Data</div>
-                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">for analysis and testing</div>
-                </div>
                 <div className="w-full flex place-content-center">
                     <div className="container mx-auto px-4 md:px-8 ">
                         <h3 className="py-4 pt-36 text-center text-[10px] font-semibold text-slate-400">
@@ -153,6 +106,130 @@ export function Hero() {
                             <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
                         </div>
                     </div>
+                </div>
+                <div className="pt-10 sm:pt-20 sm:pr-20 z-10">
+                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
+                        <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
+                            <span>Create <span className="bg-purple-400 text-black">Mind-Bendingly</span> Beautiful Visualizations and  Charts </span>
+                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
+                        </h1>
+                    </Link>
+                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-analyze-data-with-lychee-ai"}>
+                        <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
+                            <span className=""><span className="bg-purple-400 text-black">Automagically</span> Analyze Anything 
+                            With Athena (Lychee's AI) Get Unprecedented Insights</span>
+                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
+                        </h1>
+                    </Link>
+                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Examine multiple datasets at once (500MB per dataset) (and growing)</div>
+                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Targeting 1GB/ dataset and 100 datasets at once by end of 2024</div>
+
+                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-use-lychee-integrations-coingecko"}>
+                        <h1 className="pt-10 pb-6 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
+                            <span className="">Connect <span className="bg-purple-400 text-black">Directly</span> to ALL The Data Sources of Your Dreams</span>
+                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
+                        </h1>
+                    </Link>
+                    <div className="text-center text-lychee_white text-sm sm:text-4xl">Targeting 100,000 + Integrations by end of 2025</div>
+                    <div className="pt-4 text-center text-lychee_white text-sm sm:text-4xl">Not A Single Line of Code Required on Your End</div>
+                    <div className="pt-4 pb-8 text-center text-lychee_white text-sm sm:text-4xl">Data Cleaner Than a Nun's Browser History</div>
+                    <div className="grid grid-cols-6">
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Twitter className="inline-block mr-1" /> Twitter (X)
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Zap className="inline-block mr-1" /> CoinGecko
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Activity className="inline-block mr-1" /> WallStreetBets (sentiment analysis - Reddit)
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <AlertTriangle className="inline-block mr-1" /> ShortSqueezes (Reddit)
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Globe className="inline-block mr-1" /> Reddit 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Instagram className="inline-block mr-1" /> Instagram 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Activity className="inline-block mr-1" /> Strava 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Youtube className="inline-block mr-1" /> Youtube 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Facebook className="inline-block mr-1" /> Meta 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <BarChart2 className="inline-block mr-1" /> NASDAQ 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <DollarSign className="inline-block mr-1" /> US Treasuries 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <FileText className="inline-block mr-1" /> SEC Edgar Data 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Cloud className="inline-block mr-1" /> OpenWeather API 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <ShoppingCart className="inline-block mr-1" /> Product Hunt 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Zap className="inline-block mr-1" /> HackerNews 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Globe className="inline-block mr-1" /> 4chan 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Globe2 className="inline-block mr-1" /> The World Bank 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Thermometer className="inline-block mr-1" /> weather data 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <AlertTriangle className="inline-block mr-1" /> earthquake data 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Star className="inline-block mr-1" /> NASA Data 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <FileText className="inline-block mr-1" /> Medium 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <BarChart className="inline-block mr-1" /> NBAStats 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
+                            <Globe2 className="inline-block mr-1" /> Census.gov 
+                            <br /><span className="text-slate-400">(launching in July 24)</span>
+                        </div>
+                    </div>
+
+                    <div className="sm:text-4xl text-lychee_green pt-10 pb-4">Scrape ANY URL</div>
+
+                    <div className="sm:text-4xl text-lychee_green pb-4">Extract Structured Data from PDF</div>
+
+                    <div className="sm:text-4xl text-lychee_green">Generate INSANE amounts of fake (realistic) Data</div>
+                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">for analysis and testing</div>
                 </div>
                 <div className="sm:grid sm:grid-cols-10 gap-4 w-full sm:pt-20">
                     <div className="pt-10 sm:pt-0 sm:col-span-5">
