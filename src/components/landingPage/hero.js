@@ -19,7 +19,6 @@ const companies = [
     "google",
     "apple",
     "mit",
-    "openai",
   ];
 
 export function Hero() {
