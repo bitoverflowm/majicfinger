@@ -37,7 +37,6 @@ const ChartDataMods = ({seriesConfigs, setSeriesConfigs, chartTypes, setChartThe
     };
 
     const handleRoundBarToggle = (val) => {
-      console.log("hello")
       setSeriesConfigs(prevConfigs => {
           const newConfigs = prevConfigs.map(config => ({
               ...config,

@@ -18,7 +18,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
+import { bgPalette } from '@/components/chartView/panels/bgPalette';
+import { LineHeightIcon, TextAlignCenterIcon, TextAlignLeftIcon, TextAlignMiddleIcon, TextAlignRightIcon } from '@radix-ui/react-icons';
 
 const PresentationView = () => {
     const user = useUser()
@@ -29,8 +32,33 @@ const PresentationView = () => {
     let connectedData = contextStateV2?.connectedData
     let loadedDataMeta = contextStateV2?.loadedDataMeta
 
-    const [displayMap, setDisplayMap] = useState()
+    const [displayMap, setDisplayMap] = useState({})
     const [styles, setStyles] = useState({
+        'headerBox': {
+            paddingTop: '60px',
+            paddingBottom: '60px',
+            paddingLeft: '44px',
+            paddingRight: '44px',
+            backgroundColor: 'black',
+            display: 'flex',
+            flexDirection: 'column',
+            textAlign: 'center',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '2px',
+        },
+        'mainTitle': {
+            fontSize: '32px',
+            fontWeight: 'bold',
+            color: 'white',
+            textAlign: 'center',
+        },
+        'subTitle': {
+            fontSize: '16px',
+            fontWeight: 'normal',
+            color: 'white',
+            textAlign: 'center',
+        },
         'cardHeading': {
             backgroundColor: 'lightgrey',
             padding: '20px',
@@ -60,47 +88,154 @@ const PresentationView = () => {
             borderColor: 'darkblue',
             padding: '10px 20px',
             textAlign: 'center',
-        },
-        'mainTitle': {
-            fontSize: '32px',
-            fontWeight: 'bold',
-            color: 'white',
-            textAlign: 'center',
-        },
-        'subTitle': {
-            fontSize: '16px',
-            fontWeight: 'normal',
-            color: 'white',
-            textAlign: 'center',
-        },     
+        },  
     })
+
     const [projectName, setProjectName] = useState(`Wall St Bets and Sentiments`)
     const [presentationName, setPresentationName] = useState(`June 5th Bets`)
 
     const [edit, setEdit] = useState(true)
-    const [mainTitle, setMainTitle] = useState('Where to Launch Your AI Project')
-    const [subTitle, setSubTitle] = useState(`I spent 12 months and $14,327 to find which AI directories are the best, so you don't have to.... \n A curated list ranking my favorite directories based on: tangible traffic, project growth, MRR and SEO improvements`)
+    const [mainTitle, setMainTitle] = useState('Title Goes Here')
+    const [subTitle, setSubTitle] = useState(`Description goes here`)
 
+    const [granularColorsVisible, setGranularColorsVisible] = useState(false)
+    const [colorTarget, setColorTarget] = useState(null)
 
+    const granularColorHandler = (target) => {
+        setGranularColorsVisible(true)
+        setColorTarget(target)
+    }
+
+    const updateGranularColorHandler = (key) => {
+        switch (colorTarget) {
+            case 'headerBackground':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    headerBox: {
+                        ...prevStyles.headerBox,
+                        backgroundColor: key
+                    }
+                }));
+                break;
+            case 'mainTitleText':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    mainTitle: {
+                        ...prevStyles.mainTitle,
+                        color: key
+                    }
+                }));
+                break;
+            case 'subTitleText':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    subTitle: {
+                        ...prevStyles.subTitle,
+                        color: key
+                    }
+                }));
+                break;
+            case 'cardHeadingBackground':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    cardHeading: {
+                        ...prevStyles.cardHeading,
+                        backgroundColor: key
+                    }
+                }));
+                break;
+            case 'cardTitle':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    cardTitle: {
+                        ...prevStyles.cardTitle,
+                        color: key
+                    }
+                }));
+                break;
+            case 'cardSubTitle':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    cardSubTitle: {
+                        ...prevStyles.cardSubTitle,
+                        color: key
+                    }
+                }));
+                break;
+            case 'text0':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    text0: {
+                        ...prevStyles.text0,
+                        color: key
+                    }
+                }));
+                break;
+            case 'ctaBorder':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    cta: {
+                        ...prevStyles.cta,
+                        borderColor: key
+                    }
+                }));
+                break;
+            case 'ctaBackground':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    cta: {
+                        ...prevStyles.cta,
+                        backgroundColor: key
+                    }
+                }));
+                break;
+            case 'ctaText':
+                setStyles(prevStyles => ({
+                    ...prevStyles,
+                    cta: {
+                        ...prevStyles.cta,
+                        color: key
+                    }
+                }));
+                break;
+            default:
+                break;
+        }
+        setGranularColorsVisible(false)
+        setColorTarget(null)
+    }
+
+    const displayNames = {
+        cardTitle: 'Title',
+        cardSubTitle: 'Sub Title',
+        text0: 'Body Text',
+        cta: 'Call to Action'
+    }
+
+    const handleSelectChange = (key, value) => {
+        setDisplayMap(prevState => {
+            const newState = { ...prevState };
+            newState[key] = value;
+            return newState;
+        });
+    };
+
+    const generateDisplayMap = () => {
+        const colLen = connectedCols.length;
+        return {
+            cardTitle: colLen > 0 ? connectedCols[0].field : '',
+            cardSubTitle: colLen > 1 ? connectedCols[1].field : '',
+            text0: colLen > 2 ? connectedCols[2].field : '',
+            cta: colLen > 3 ? connectedCols[3].field : '',
+        };
+    };
 
     useEffect(() => {
         if (connectedCols && connectedData) {
-            let colLen = connectedCols.length
-            setDisplayMap({
-                'cardTitle': colLen > 0 ? connectedCols[0].field : '',
-                'cardSubTitle': colLen > 1 ? connectedCols[1].field : '',
-                'text0': colLen > 2 ? connectedCols[2].field : '',
-                'cta': colLen > 4 ? connectedCols[4].field : '',
-            })
+            setDisplayMap(generateDisplayMap());
         }
-    }, [connectedData, connectedCols])
+    }, [connectedCols, connectedData]);
 
-    const handleSelectChange = (key, value) => {
-        setDisplayMap(prevState => ({
-            ...prevState,
-            [key]: value
-        }))
-    }
 
     const handleStyleChange = (styleCategory, styleProperty, value) => {
         setStyles(prevStyles => ({
@@ -111,6 +246,33 @@ const PresentationView = () => {
             }
         }))
     }
+
+    const handleIncrement = (category, property) => {
+        setStyles(prevStyles => {
+            const newValue = Math.min(parseInt(prevStyles[category][property]) + 5, 56);
+            return {
+                ...prevStyles,
+                [category]: {
+                    ...prevStyles[category],
+                    [property]: newValue + 'px'
+                }
+            };
+        });
+    };
+    
+    const handleDecrement = (category, property) => {
+        setStyles(prevStyles => {
+            const newValue = Math.max(parseInt(prevStyles[category][property]) - 5, 0);
+            return {
+                ...prevStyles,
+                [category]: {
+                    ...prevStyles[category],
+                    [property]: newValue + 'px'
+                }
+            };
+        });
+    };
+
 
     const deployHandler = async () => {
         fetch(`/api/presentations/`, {
@@ -132,18 +294,17 @@ const PresentationView = () => {
 
     return (
         <div className='px-10 py-2'>
-            <div className='flex pb-6 gap-2'>
-                <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={() => setEdit(!edit)}> {edit ? 'Stop Editing' : 'Start Editing'}</div>
-                <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' >Preview</div>
+            <div className='flex pb-6 gap-2 text-xs'>
+                <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={() => setEdit(!edit)}> {edit ? 'Preview' : 'Continue Editing'}</div>
                 <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => deployHandler()}>Deploy</div>
             </div>
-            <div className='text-slate-400 text-sm'>Workspace</div>
-            <div className="flex">
+            <div className='text-slate-400 text-sm pb-1'>This is how your pressie will look (make sure to load and save your dataset)</div>
+            <div className="flex gap-10">
                 <div className={`border border-slate-100 rounded-xl ${edit ? 'w-3/4' : 'w-full'}`}>
-                    <div className='py-20 px-44 bg-black text-white flex flex-col text-center place-items-center place-content-center gap-2'>
+                    <div className='' style={styles.headerBox}>
                         {/* Heading */}
-                        <div className='text-8xl text-center font-[800]'>{mainTitle}</div>
-                        <div className='text-lychee_white'>{subTitle}</div>
+                        <div style={styles.mainTitle}>{mainTitle}</div>
+                        <div style={styles.subTitle}>{subTitle}</div>
                         <Avatar>
                             <AvatarImage src="/avatar1.png" />
                             <AvatarFallback>MP</AvatarFallback>
@@ -153,21 +314,20 @@ const PresentationView = () => {
                         <div className='grid grid-cols-3 gap-4 p-10'>
                             {
                                 connectedData.length > 0 ?
-                                    connectedData.map((row) => (
-                                        <Card key={row[displayMap.cardTitle]}>
+                                    connectedData.map((row, index) => (
+                                        <Card key={index}>
                                             <CardHeader style={styles.cardHeading}>
-                                                <CardTitle style={styles.cardTitle}>{row[displayMap.cardTitle] ? row[displayMap.cardTitle] : 'cardTitle'}</CardTitle>
-                                                <CardDescription style={styles.cardSubTitle}>{row[displayMap.cardSubTitle] ? row[displayMap.cardSubTitle] : 'cardSubTitle'}</CardDescription>
+                                                <CardTitle style={styles.cardTitle}>{row[displayMap.cardTitle] ? row[displayMap.cardTitle] : '-'}</CardTitle>
+                                                <CardDescription style={styles.cardSubTitle}>{row[displayMap.cardSubTitle] ? row[displayMap.cardSubTitle] : '-'}</CardDescription>
                                             </CardHeader>
                                             <CardContent>
-                                                <p style={styles.text0}>{row[displayMap.text0] ? row[displayMap.text0] : 'text 0'}</p>
+                                                <p style={styles.text0}>{row[displayMap.text0] ? row[displayMap.text0] : '-'}</p>
                                             </CardContent>
                                             <CardFooter>
                                                 {
                                                     displayMap.cta && <Button style={styles.cta} href={'https://x.com/misterrpink1'}>Go Now {row[displayMap.cta]}</Button>
                                                 }
-                                            </CardFooter>
-                                            
+                                            </CardFooter>                                            
                                         </Card>
                                     ))
                                     : <div>This dataset you have selected is currently empty. Add some data to create your presentations</div>
@@ -178,53 +338,112 @@ const PresentationView = () => {
                 </div>
                 {
                     edit &&
-                    <div className='w-1/4 border border-slate-200 rounded-xl flex flex-col gap-6'>
-                        <div className='p-2'>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="mainTitle">Main Title</Label>
-                                <Input id="mainTitle" type="text" placeholder="Title" onChange={(e)=>setMainTitle(e.target.value)} />
+                    <div className='w-1/4 border border-slate-200 rounded-xl flex flex-col'>
+                        <div className='px-4 pt-4'>
+                            <p className="text-xs text-muted-foreground">Header</p>                        
+                            <div className=''>
+                                <Label htmlFor="mainTitle" className="text-xs">Title</Label>
+                                <div className='flex gap-2'>
+                                    <Input id="mainTitle" type="text" placeholder="Title" onChange={(e)=>setMainTitle(e.target.value)} />
+                                    <Button variant="outline" onClick={() => granularColorHandler('mainTitleText')} className="w-10" style={{color : styles.mainTitle.color, backgroundColor: styles.headerBox.backgroundColor}}>A</Button></div>
                             </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="subTitle">Description</Label>
-                                <Textarea id="subTitle" type="text" placeholder="subTitle" onChange={(e)=>setSubTitle(e.target.value)} />
-                            </div>
-                        </div>
-
-                        <div className=''>
-                            <Label>Edit your card template</Label>
-                            {displayMap && Object.keys(displayMap).map((key) => (
-                                <div key={key} className='p-1 flex gap-2'>
-                                    <div>{key}:</div>
-                                    <select
-                                        value={displayMap[key]}
-                                        onChange={(e) => handleSelectChange(key, e.target.value)}
-                                    >
-                                        {connectedCols.map((col) => (
-                                            <option key={col.field} value={col.field}>
-                                                {col.field}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <div className='flex'>Hide</div>
+                            <div className=''>
+                                <Label htmlFor="subTitle" className="text-xs">Description</Label>
+                                <div className='flex gap-2'>
+                                    <Textarea id="subTitle" type="text" placeholder="Description" onChange={(e)=>setSubTitle(e.target.value)} />
+                                    <Button variant="outline" onClick={() => granularColorHandler('subTitleText')} className="w-10" style={{color : styles.subTitle.color, backgroundColor: styles.headerBox.backgroundColor}}>A</Button>
                                 </div>
-                            ))}
+                            </div>
                         </div>
-                        <div>
-                            <div>Card Heading Styles</div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardHeadingBgColor">Background Color</Label>
-                                <Input id="cardHeadingBgColor" type="text" placeholder="Background Color" onChange={(e) => handleStyleChange('cardHeading', 'backgroundColor', e.target.value)} />
+                        <div className='px-4 pt-2'>
+                            <p className="pb-1 text-xs text-muted-foreground">Header Container Styles</p>
+                            <div className='hidden grid grid-cols-4'>
+                                <div className=''>
+                                    <Label htmlFor="headerBoxPaddingTop" className="text-xs">Top</Label>
+                                    <Input id="headerBoxPaddingTop" type="number" placeholder="Padding Top" onChange={(e) => handleStyleChange('headerBox', 'paddingTop', e.target.value + 'px')} />
+                                </div>
+                                <div className='flex gap-2'>
+                                    <Label htmlFor="headerBoxPaddingBottom">Padding Bottom</Label>
+                                    <Input id="headerBoxPaddingBottom" type="number" placeholder="Padding Bottom" onChange={(e) => handleStyleChange('headerBox', 'paddingBottom', e.target.value + 'px')} />
+                                </div>
+                                <div className='flex gap-2'>
+                                    <Label htmlFor="headerBoxPaddingLeft">Padding Left</Label>
+                                    <Input id="headerBoxPaddingLeft" type="number" placeholder="Padding Left" onChange={(e) => handleStyleChange('headerBox', 'paddingLeft', e.target.value + 'px')} />
+                                </div>
+                                <div className='flex gap-2'>
+                                    <Label htmlFor="headerBoxPaddingRight">Padding Right</Label>
+                                    <Input id="headerBoxPaddingRight" type="number" placeholder="Padding Right" onChange={(e) => handleStyleChange('headerBox', 'paddingRight', e.target.value + 'px')} />
+                                </div>
                             </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardHeadingPadding">Padding</Label>
-                                <Input id="cardHeadingPadding" type="text" placeholder="Padding" onChange={(e) => handleStyleChange('cardHeading', 'padding', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardHeadingFontSize">Font Size</Label>
-                                <Input id="cardHeadingFontSize" type="text" placeholder="Font Size" onChange={(e) => handleStyleChange('cardHeading', 'fontSize', e.target.value)} />
+                            <div className='flex gap-5 place-items-center'>
+                                <Button variant="outline" size="icon" onClick={() => granularColorHandler('headerBackground')} style={{backgroundColor: styles.headerBox.backgroundColor}}></Button>
+                                <ToggleGroup
+                                    type="single"
+                                    value={styles.headerBox.alignItems}
+                                    onValueChange={(value) => handleStyleChange('headerBox', 'alignItems', value)}
+                                    aria-label="Align Items"
+                                    className=""
+                                >
+                                    <ToggleGroupItem value="flex-start" aria-label="Flex Start">
+                                        <TextAlignLeftIcon />
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem value="center" aria-label="Center">
+                                        <TextAlignCenterIcon />
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem value="flex-end" aria-label="Flex End">
+                                        <TextAlignRightIcon />
+                                    </ToggleGroupItem>
+                                </ToggleGroup>
+                                <div className='flex gap-1'>
+                                    <Button  variant="outline" size="icon" className="border-slate-100" onClick={() => handleDecrement('headerBox', 'gap')}><TextAlignMiddleIcon/></Button>
+                                    <Button  variant="outline" size="icon" className="border-slate-100" onClick={() => handleIncrement('headerBox', 'gap')}><LineHeightIcon /></Button>
+                                </div>
                             </div>
                         </div>
 
+                        <div className='px-4 pt-8'>
+                            <p className="text-xs font-bold text-muted-foreground">Card Management</p>
+                            <p className="text-xs text-muted-foreground">How would you like to present your data?</p>
+                            <div className="w-full overflow-y-auto text-xs pt-2">
+                                <table className="w-full">
+                                    <tbody>
+                                        {displayMap && Object.keys(displayMap).map((key) => (
+                                            <tr key={key} className="m-0 border-t p-0 even:bg-muted">
+                                            <td className="border pl-2 py-2 text-left">
+                                                {displayNames[key]}
+                                            </td>
+                                            <td className="border px-4 py-2 text-left">
+                                                <select
+                                                    value={displayMap[key]}
+                                                    onChange={(e) => handleSelectChange(key, e.target.value)}
+                                                >
+                                                {connectedCols.map((col) => (
+                                                    <option key={col.field} value={col.field}>
+                                                    {col.field}
+                                                    </option>
+                                                ))}
+                                                </select>
+                                            </td>
+                                            <td className="border px-4 py-2 text-left">
+                                                <div className='flex'>Hide</div>
+                                            </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className='px-4 py-2'>
+                            <p className="pb-1 text-xs text-muted-foreground">Card Header Styles</p>
+                            <div className='flex gap-5 place-items-center'>
+                                <Button variant="outline" className="p-3 w-5 h-5" onClick={() => granularColorHandler('cardHeadingBackground')} style={{backgroundColor: styles.cardHeading.backgroundColor}}></Button>
+                                <div className='flex gap-1 text-xs place-items-center'>
+                                    <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleDecrement('cardHeading', 'padding')}>-</Button>
+                                    <div className='text-xs px-1'>Padding</div>
+                                    <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleIncrement('cardHeading', 'padding')}>+</Button>
+                                </div>
+                            </div>
+                        </div>
                         <div>
                             <div>Title Styles</div>
                             <div className='flex gap-2'>
@@ -308,6 +527,23 @@ const PresentationView = () => {
                                 <Input id="handle" type="text" placeholder="Title" onChange={(e)=>setHandle(e.target.value)} />
                             </div>
                         </div>
+                        {
+                            granularColorsVisible &&
+                                <>
+                                    <div className="cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40  text-xs pl-1" onClick={()=>setGranularColorsVisible(false)}>close</div>
+                                    <div className="flex flex-wrap gap-2 p-2">
+                                        {
+                                            bgPalette && bgPalette.solids.map((solid, key) => (
+                                                <div
+                                                    key={key}
+                                                    className={'flex rounded-md h-6 w-6 cursor-pointer hover:border hover:border-black'}
+                                                    onClick={()=>updateGranularColorHandler(solid)}
+                                                    style={{background: solid}}/>
+                                            ))
+                                        }
+                                    </div>
+                                </>
+                        }
                     </div>
                 }
             </div>

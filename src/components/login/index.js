@@ -65,53 +65,41 @@ const Login = ({fromHome}) => {
                     <Progress value={progress} className="w-[60%]" />
                     :<>
                         <div className='bg-lychee_blue font-body shadow-2xl rounded-xl text-white p-4 mb-4 w-96 mx-auto'>
-                        {
-                        user ? 
-                            <div>
-                                <h1>Welcome to Lychee {user.email}</h1>
-                                <div>You have an account</div>
-                                <Button onClick={()=> fromHome ? router.push('/dashboard') : setViewing('dashboard')} >Go to your dashboard</Button>
-                            </div>
-                            :
-                            <form onSubmit={handleSubmit} className='flex flex-col place-items-center'>
-                                {
-                                    loading 
-                                    ?
-                                        <div>
-                                            <AiOutlineLoading3Quarters className='animate-spin'/>
-                                            Loading...
-                                        </div>
-                                        : <>
-                                            <div className='py-2 text-sm'>
-                                                Name
-                                                <input
-                                                    type="text"
-                                                    value={name}
-                                                    onChange={(e) => setName(e.target.value)}
-                        
-                                                    className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
-                                                    />
-                                            </div>
-                                            <div className='py-2 text-sm'>
-                                                Email
-                                                <input
-                                                    type="email"
-                                                    value={email}
-                                                    onChange={(e) => setEmail(e.target.value)}
-                                                    className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
-                                                />
-                                            </div>
-                                            <button type="submit" className='bg-lychee_black px-6 rounded-md py-2 text-sm mt-4'>Submit</button>
-                                        </>
-                                }                        
-                            </form>
-                        }
-                    </div>
+                            {   
+                            user ? 
+                                <div>
+                                    <h1>Welcome to Lychee {user.email}</h1>
+                                    <div>You have an account</div>
+                                    <Button onClick={()=> fromHome ? router.push('/dashboard') : setViewing('dashboard')} >Go to your dashboard</Button>
+                                </div>
+                                :
+                                <form onSubmit={handleSubmit} className='flex flex-col place-items-center'>
+                                    <div className='py-2 text-sm'>
+                                        Name
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                
+                                            className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
+                                            />
+                                    </div>
+                                    <div className='py-2 text-sm'>
+                                        Email
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
+                                        />
+                                    </div>
+                                    <button type="submit" className='bg-lychee_black px-6 rounded-md py-2 text-sm mt-4'>Submit</button>
+                                </form>
+                            }
+                        </div>
                     { !(user) && <div className='w-96 text-xs pl-4'>Fill out the form above, whether you have an account or not.<br/> You will receive a majic link in your email.</div>}
-                    
-                    </>
+                </>
             }
-            
         </div>
     );
 };

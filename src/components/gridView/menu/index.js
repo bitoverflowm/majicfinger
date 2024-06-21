@@ -16,6 +16,7 @@ import {
   MenubarSubTrigger,
   MenubarTrigger,
 } from "@/components/ui/menubar";
+
 import {
   Drawer,
   DrawerClose,
@@ -26,6 +27,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -210,7 +212,7 @@ export function Menu() {
       <div className="flex gap-4 border border-slate-200 rounded-md py-2 px-3 place-items-center place-content-center">
         <div className="bg-white cursor-pointer hover:bg-lychee_green/60 text-xs"  onClick={() => handleOpen("editColumns")}> Column Properties </div>  
         <div className="flex cursor-pointer hover:bg-lychee_green/60 text-xs"  onClick={() => setViewing("charts")}> <LineChart className="w-4 h-4"/> Chart </div>
-        <div className="hidden" onClick={()=>setViewing('presentation')}>Present</div> 
+        <div onClick={()=>setViewing('presentation')} className="cursor-pointer hover:bg-lychee_green/60 text-xs">Present</div> 
       </div>
       {/* Universal Drawer */}
       <Drawer open={open} onOpenChange={setOpen}>
@@ -224,87 +226,83 @@ export function Menu() {
               <div className="grid grid-cols-2">
                 <div className="">
                   <DragDropContext onDragEnd={onDragEnd}>
-                  <Droppable droppableId="columns">
-                    {(provided) => (
-                      <div
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                        className="grid gap-4"
-                      >
-                        {connectedCols.map((col, index) => (
-                          <Draggable
-                            key={col.field}
-                            draggableId={col.field}
-                            index={index}
-                          >
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className="flex place-items-center text-xs gap-1"
-                              >
-                                <GripVertical className="text-slate-400 w-5 h-6"/>
-                                <div className="w-48">
-                                  {index === editingName ? (
-                                      <Input
-                                        id={`col-${index}`}
-                                        defaultValue={col.field}
-                                        className="w-40 text-xs"
-                                        onChange={(e) => setNewColName(e.target.value)}
-                                      />
-                                    ) : (
-                                      <div htmlFor={`col-${index}`}>{col.field}</div>
+                    <Droppable droppableId="columns">
+                      {(provided) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="grid gap-4"
+                        >
+                          {connectedCols.map((col, index) => (
+                            <Draggable
+                              key={col.field}
+                              draggableId={col.field}
+                              index={index}
+                            >
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className="flex place-items-center text-xs gap-1"
+                                >
+                                  <GripVertical className="text-slate-400 w-5 h-6"/>
+                                  <div className="w-48">
+                                    {index === editingName ? (
+                                        <Input
+                                          id={`col-${index}`}
+                                          defaultValue={col.field}
+                                          className="w-40 text-xs"
+                                          onChange={(e) => setNewColName(e.target.value)}
+                                        />
+                                      ) : (
+                                        <div htmlFor={`col-${index}`}>{col.field}</div>
+                                      )}
+                                    </div>
+                                    {index === editingName ? (
+                                      <div
+                                      className="bg-lychee_green/30 p-2 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                      onClick={() => handleSaveColumnName(index)}
+                                      >
+                                        Save
+                                      </div>
+                                      ) : (
+                                      <div
+                                        className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                        onClick={() => setEditingName(index)}
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </div>
                                     )}
-                                  </div>
-                                  {index === editingName ? (
                                     <div
-                                    className="bg-lychee_green/30 p-2 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                                    onClick={() => handleSaveColumnName(index)}
+                                      className="bg-red-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                      onClick={() => handleDeleteColumn(index)}
                                     >
-                                      Save
+                                      <Trash className="w-3 h-3" />
                                     </div>
-                                    ) : (
-                                    <div
-                                      className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                                      onClick={() => setEditingName(index)}
+                                    <select
+                                      id={`type-${index}`}
+                                      value={dataTypes[col.field] || 'text'}
+                                      onChange={(e) => handleTypeChange(index, e.target.value)}
+                                      className="col-span-3 h-8"
                                     >
-                                      <Pencil className="w-3 h-3" />
-                                    </div>
-                                  )}
-                                  <div
-                                    className="bg-red-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                                    onClick={() => handleDeleteColumn(index)}
-                                  >
-                                    <Trash className="w-3 h-3" />
-                                  </div>
-                                  <select
-                                    id={`type-${index}`}
-                                    value={dataTypes[col.field] || 'text'}
-                                    onChange={(e) => handleTypeChange(index, e.target.value)}
-                                    className="col-span-3 h-8"
-                                  >
-                                    <option value="text">Text</option>
-                                    <option value="number">Number</option>
-                                    <option value="boolean">Boolean</option>
-                                    <option value="date">Date</option>
-                                    <option value="dateString">DateString</option>
-                                    <option value="object">Object</option>
-                                  </select>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
+                                      <option value="text">Text</option>
+                                      <option value="number">Number</option>
+                                      <option value="boolean">Boolean</option>
+                                      <option value="date">Date</option>
+                                      <option value="dateString">DateString</option>
+                                      <option value="object">Object</option>
+                                    </select>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
                   </DragDropContext>
-                </div>
-                <div>
-
-                </div>
-                
+                </div>                
               </div>
             </div>
             <DrawerFooter className={"mx-auto"}>

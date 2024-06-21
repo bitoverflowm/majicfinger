@@ -94,7 +94,7 @@ const DashBody = ({user}) => {
                 <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
             </div>
             <div className='w-full'>
-                { viewing === 'dashboard' && <div className="py-28"><KatsuView user={user}/></div> }              
+                { viewing === 'dashboard' && <div className="py-28"><KatsuView user={user}/></div> }             
                 { viewing === 'dataStart' && <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div> }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
