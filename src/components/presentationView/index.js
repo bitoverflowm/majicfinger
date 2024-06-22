@@ -12,6 +12,15 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
+
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
+  
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 
 import { Input } from "@/components/ui/input"
@@ -21,7 +30,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import { bgPalette } from '@/components/chartView/panels/bgPalette';
-import { LineHeightIcon, TextAlignCenterIcon, TextAlignLeftIcon, TextAlignMiddleIcon, TextAlignRightIcon } from '@radix-ui/react-icons';
+import { masterPalette } from '../chartView/panels/masterPalette';
+import { FontBoldIcon, FontSizeIcon, LineHeightIcon, TextAlignCenterIcon, TextAlignLeftIcon, TextAlignMiddleIcon, TextAlignRightIcon } from '@radix-ui/react-icons';
 
 const PresentationView = () => {
     const user = useUser()
@@ -34,6 +44,9 @@ const PresentationView = () => {
 
     const [displayMap, setDisplayMap] = useState({})
     const [styles, setStyles] = useState({
+        'page': {
+            backgroundColor: 'white'
+        },
         'headerBox': {
             paddingTop: '60px',
             paddingBottom: '60px',
@@ -49,36 +62,38 @@ const PresentationView = () => {
         },
         'mainTitle': {
             fontSize: '32px',
-            fontWeight: 'bold',
+            fontWeight: 700, // bold
             color: 'white',
             textAlign: 'center',
         },
         'subTitle': {
             fontSize: '16px',
-            fontWeight: 'normal',
+            fontWeight: 400, // normal
             color: 'white',
             textAlign: 'center',
         },
         'cardHeading': {
             backgroundColor: 'lightgrey',
             padding: '20px',
-            fontSize: '24px',
         },
         'cardTitle': {
             fontSize: '20px',
-            fontWeight: 'bold',
+            fontWeight: 700, // bold
             color: 'black',
             textAlign: 'center',
         },
+        'cardBody': {
+            backgroundColor: 'white'
+        },
         'cardSubTitle': {
             fontSize: '16px',
-            fontWeight: 'normal',
+            fontWeight: 400, // normal
             color: 'grey',
             textAlign: 'center',
         },
         'text0': {
             fontSize: '14px',
-            fontWeight: 'normal',
+            fontWeight: 400, // normal
             color: 'black',
             textAlign: 'left',
         },
@@ -88,8 +103,16 @@ const PresentationView = () => {
             borderColor: 'darkblue',
             padding: '10px 20px',
             textAlign: 'center',
-        },  
-    })
+            fontSize: '14px',
+            fontWeight: 400,
+        },
+        'cardFooter' : {
+            display: 'flex',
+            justifyContent: 'right',
+            backgroundColor: 'white'
+        }
+    });
+    
 
     const [projectName, setProjectName] = useState(`Wall St Bets and Sentiments`)
     const [presentationName, setPresentationName] = useState(`June 5th Bets`)
@@ -249,29 +272,55 @@ const PresentationView = () => {
 
     const handleIncrement = (category, property) => {
         setStyles(prevStyles => {
-            const newValue = Math.min(parseInt(prevStyles[category][property]) + 5, 56);
-            return {
-                ...prevStyles,
-                [category]: {
-                    ...prevStyles[category],
-                    [property]: newValue + 'px'
-                }
-            };
+            let newValue;
+    
+            if (property === 'fontWeight') {
+                newValue = Math.min(parseInt(prevStyles[category][property]) + 100, 900);
+                return {
+                    ...prevStyles,
+                    [category]: {
+                        ...prevStyles[category],
+                        [property]: newValue
+                    }
+                };
+            } else {
+                newValue = Math.min(parseInt(prevStyles[category][property]) + 5, 56);
+                return {
+                    ...prevStyles,
+                    [category]: {
+                        ...prevStyles[category],
+                        [property]: newValue + 'px'
+                    }
+                };
+            }
         });
     };
     
     const handleDecrement = (category, property) => {
         setStyles(prevStyles => {
-            const newValue = Math.max(parseInt(prevStyles[category][property]) - 5, 0);
-            return {
-                ...prevStyles,
-                [category]: {
-                    ...prevStyles[category],
-                    [property]: newValue + 'px'
-                }
-            };
+            let newValue;
+    
+            if (property === 'fontWeight') {
+                newValue = Math.max(parseInt(prevStyles[category][property]) - 100, 100);
+                return {
+                    ...prevStyles,
+                    [category]: {
+                        ...prevStyles[category],
+                        [property]: newValue
+                    }
+                };
+            } else {
+                newValue = Math.max(parseInt(prevStyles[category][property]) - 5, 0);
+                return {
+                    ...prevStyles,
+                    [category]: {
+                        ...prevStyles[category],
+                        [property]: newValue + 'px'
+                    }
+                };
+            }
         });
-    };
+    };    
 
 
     const deployHandler = async () => {
@@ -292,12 +341,94 @@ const PresentationView = () => {
             .then(data => { console.log("presentation saved: ", data) })
     }
 
+    const [paletteVisible, setPaletteVisible] = useState()
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const categories = Object.keys(masterPalette);
+
+    const selectedPaletteHandler = (index) => {
+        let newPalette = masterPalette[selectedCategory][index];
+        if (!newPalette || !newPalette.length) return; // Ensure newPalette is valid
+        // Update styles state with new colors
+        setStyles(prevStyles => ({
+            ...prevStyles,
+            page: {
+                ...prevStyles.page,
+                backgroundColor: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            headerBox: {
+                ...prevStyles.headerBox,
+                backgroundColor: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            mainTitle: {
+                ...prevStyles.mainTitle,
+                color: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            subTitle: {
+                ...prevStyles.subTitle,
+                color: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            cardHeading: {
+                ...prevStyles.cardHeading,
+                backgroundColor: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            cardTitle: {
+                ...prevStyles.cardTitle,
+                color: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            cardBody: {
+                ...prevStyles.cardBody,
+                bodyColor: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            cardSubTitle: {
+                ...prevStyles.cardSubTitle,
+                color: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            text0: {
+                ...prevStyles.text0,
+                color: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            cta: {
+                ...prevStyles.cta,
+                backgroundColor: newPalette[Math.floor(Math.random() * newPalette.length)]
+            },
+            // Add more properties as needed
+        }));
+    };
+    
+
     return (
         <div className='px-10 py-2'>
             <div className='flex pb-6 gap-2 text-xs'>
                 <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={() => setEdit(!edit)}> {edit ? 'Preview' : 'Continue Editing'}</div>
                 <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => deployHandler()}>Deploy</div>
+                <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={()=>setPaletteVisible(true)}>Pallate Picker</div>
             </div>
+            {
+            paletteVisible && <div className="">
+                                <div className="cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40  text-xs pl-1 my-2 float-right" onClick={()=>setPaletteVisible(false)}>close</div>
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {categories.map((category, index) => (
+                                        <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono cursor-pointer text-xs hover:bg-lychee_green"
+                                            key={index}
+                                            onClick={() => setSelectedCategory(category)}
+                                        >
+                                            {category}
+                                        </code>
+                                    ))}
+                                </div>
+                                {selectedCategory && (
+                                    <div className="flex flex-wrap place-items-center place-content-center gap-3">
+                                        {masterPalette[selectedCategory].map((palette, index) => (
+                                            <div key={index} className="flex cursor-pointer rounded-full hover:shadow-inner hover:bg-slate-100 p-1" onClick={() => selectedPaletteHandler(index)}>
+                                                {palette.map((color, colorIndex) => (
+                                                    <div key={colorIndex} className="p-3 rounded-full" style={{ backgroundColor: color }}></div>
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                </div>
+            }
             <div className='text-slate-400 text-sm pb-1'>This is how your pressie will look (make sure to load and save your dataset)</div>
             <div className="flex gap-10">
                 <div className={`border border-slate-100 rounded-xl ${edit ? 'w-3/4' : 'w-full'}`}>
@@ -311,21 +442,21 @@ const PresentationView = () => {
                         </Avatar> by Mr. Pink
                     </div>
                     {displayMap ?
-                        <div className='grid grid-cols-3 gap-4 p-10'>
+                        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-10' style={styles.page}>
                             {
                                 connectedData.length > 0 ?
                                     connectedData.map((row, index) => (
-                                        <Card key={index}>
+                                        <Card key={index} className="border-0 shadow-xl">
                                             <CardHeader style={styles.cardHeading}>
                                                 <CardTitle style={styles.cardTitle}>{row[displayMap.cardTitle] ? row[displayMap.cardTitle] : '-'}</CardTitle>
                                                 <CardDescription style={styles.cardSubTitle}>{row[displayMap.cardSubTitle] ? row[displayMap.cardSubTitle] : '-'}</CardDescription>
                                             </CardHeader>
-                                            <CardContent>
+                                            <CardContent className="pt-4" style={styles.cardBody}>
                                                 <p style={styles.text0}>{row[displayMap.text0] ? row[displayMap.text0] : '-'}</p>
                                             </CardContent>
-                                            <CardFooter>
+                                            <CardFooter style={styles.cardFooter}>
                                                 {
-                                                    displayMap.cta && <Button style={styles.cta} href={'https://x.com/misterrpink1'}>Go Now {row[displayMap.cta]}</Button>
+                                                    displayMap.cta && <Button style={styles.cta} href={'https://x.com/misterrpink1'}>{row[displayMap.cta]}</Button>
                                                 }
                                             </CardFooter>                                            
                                         </Card>
@@ -357,25 +488,7 @@ const PresentationView = () => {
                         </div>
                         <div className='px-4 pt-2'>
                             <p className="pb-1 text-xs text-muted-foreground">Header Container Styles</p>
-                            <div className='hidden grid grid-cols-4'>
-                                <div className=''>
-                                    <Label htmlFor="headerBoxPaddingTop" className="text-xs">Top</Label>
-                                    <Input id="headerBoxPaddingTop" type="number" placeholder="Padding Top" onChange={(e) => handleStyleChange('headerBox', 'paddingTop', e.target.value + 'px')} />
-                                </div>
-                                <div className='flex gap-2'>
-                                    <Label htmlFor="headerBoxPaddingBottom">Padding Bottom</Label>
-                                    <Input id="headerBoxPaddingBottom" type="number" placeholder="Padding Bottom" onChange={(e) => handleStyleChange('headerBox', 'paddingBottom', e.target.value + 'px')} />
-                                </div>
-                                <div className='flex gap-2'>
-                                    <Label htmlFor="headerBoxPaddingLeft">Padding Left</Label>
-                                    <Input id="headerBoxPaddingLeft" type="number" placeholder="Padding Left" onChange={(e) => handleStyleChange('headerBox', 'paddingLeft', e.target.value + 'px')} />
-                                </div>
-                                <div className='flex gap-2'>
-                                    <Label htmlFor="headerBoxPaddingRight">Padding Right</Label>
-                                    <Input id="headerBoxPaddingRight" type="number" placeholder="Padding Right" onChange={(e) => handleStyleChange('headerBox', 'paddingRight', e.target.value + 'px')} />
-                                </div>
-                            </div>
-                            <div className='flex gap-5 place-items-center'>
+                            <div className='flex flex-wrap gap-5 place-items-center'>
                                 <Button variant="outline" size="icon" onClick={() => granularColorHandler('headerBackground')} style={{backgroundColor: styles.headerBox.backgroundColor}}></Button>
                                 <ToggleGroup
                                     type="single"
@@ -404,33 +517,85 @@ const PresentationView = () => {
                         <div className='px-4 pt-8'>
                             <p className="text-xs font-bold text-muted-foreground">Card Management</p>
                             <p className="text-xs text-muted-foreground">How would you like to present your data?</p>
-                            <div className="w-full overflow-y-auto text-xs pt-2">
-                                <table className="w-full">
-                                    <tbody>
-                                        {displayMap && Object.keys(displayMap).map((key) => (
-                                            <tr key={key} className="m-0 border-t p-0 even:bg-muted">
-                                            <td className="border pl-2 py-2 text-left">
-                                                {displayNames[key]}
-                                            </td>
-                                            <td className="border px-4 py-2 text-left">
-                                                <select
-                                                    value={displayMap[key]}
-                                                    onChange={(e) => handleSelectChange(key, e.target.value)}
-                                                >
-                                                {connectedCols.map((col) => (
-                                                    <option key={col.field} value={col.field}>
-                                                    {col.field}
-                                                    </option>
-                                                ))}
-                                                </select>
-                                            </td>
-                                            <td className="border px-4 py-2 text-left">
-                                                <div className='flex'>Hide</div>
-                                            </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className=''>
+                                {displayMap && Object.keys(displayMap).map((key) => (
+                                    <div key={key} className="py-2">
+                                        <div className="text-left text-xs">
+                                            {displayNames[key]}
+                                        </div>
+                                        <div className='flex flex-wrap gap-2'>
+                                            <div className="w-2/5">
+                                                <Select value={displayMap[key]} onValueChange={(value) => handleSelectChange(key, value)}>
+                                                    <SelectTrigger >
+                                                        <SelectValue placeholder="Select column" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {connectedCols.map((col) => (
+                                                            <SelectItem key={col.field} value={col.field}>
+                                                                {col.field}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            {
+                                                key === 'cta' ? 
+                                                    <div>
+                                                        <Button variant="outline" onClick={() => granularColorHandler('ctaBorder')} className="w-10" style={{borderColor : styles.cta.borderColor}}>A</Button>
+                                                        <Button variant="outline" onClick={() => granularColorHandler('ctaBackground')} className="w-10" style={{backgroundColor : styles.cta.backgroundColor}}>A</Button>
+                                                        <Button variant="outline" onClick={() => granularColorHandler('ctaText')} className="w-10" style={{color : styles.cta.color}}>A</Button>
+                                                    </div> : 
+                                                    <Button variant="outline" onClick={() => granularColorHandler(key)} className="w-10" style={{color : styles[key].color}}>A</Button>
+                                            }
+                                            <div className='flex gap-1 text-xs place-items-center'>
+                                                <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleDecrement(key, 'fontSize')}>-</Button>
+                                                <div className='text-xs px-1'><FontSizeIcon /></div>
+                                                <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleIncrement(key, 'fontSize')}>+</Button>
+                                            </div>
+                                            <div className='flex gap-1 text-xs place-items-center'>
+                                                <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleDecrement(key, 'fontWeight')}>-</Button>
+                                                <div className='text-xs px-1'><FontBoldIcon /></div>
+                                                <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleIncrement(key, 'fontWeight')}>+</Button>
+                                            </div>
+                                            {
+                                                key === 'cta' ? <ToggleGroup
+                                                                    type="single"
+                                                                    value={styles.cardFooter.justifyContent}
+                                                                    onValueChange={(value) => handleStyleChange('cardFooter', 'justifyContent', value)}
+                                                                    aria-label="Align Items"
+                                                                    className=""
+                                                                >
+                                                                    <ToggleGroupItem value="left" aria-label="Left">
+                                                                        <TextAlignLeftIcon />
+                                                                    </ToggleGroupItem>
+                                                                    <ToggleGroupItem value="center" aria-label="Center">
+                                                                        <TextAlignCenterIcon />
+                                                                    </ToggleGroupItem>
+                                                                    <ToggleGroupItem value="right" aria-label="Right">
+                                                                        <TextAlignRightIcon />
+                                                                    </ToggleGroupItem>
+                                                                </ToggleGroup>
+                                                                : <ToggleGroup
+                                                                type="single"
+                                                                value={styles[key].textAlign}
+                                                                onValueChange={(value) => handleStyleChange(key, 'textAlign', value)}
+                                                                aria-label="Align Items"
+                                                                className=""
+                                                                 >
+                                                                    <ToggleGroupItem value="left" aria-label="Left">
+                                                                        <TextAlignLeftIcon />
+                                                                    </ToggleGroupItem>
+                                                                    <ToggleGroupItem value="center" aria-label="Center">
+                                                                        <TextAlignCenterIcon />
+                                                                    </ToggleGroupItem>
+                                                                    <ToggleGroupItem value="right" aria-label="Right">
+                                                                        <TextAlignRightIcon />
+                                                                    </ToggleGroupItem>
+                                                                </ToggleGroup>
+                                            }                                            
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <div className='px-4 py-2'>
@@ -442,81 +607,6 @@ const PresentationView = () => {
                                     <div className='text-xs px-1'>Padding</div>
                                     <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleIncrement('cardHeading', 'padding')}>+</Button>
                                 </div>
-                            </div>
-                        </div>
-                        <div>
-                            <div>Title Styles</div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardTitleFontSize">Font Size</Label>
-                                <Input id="cardTitleFontSize" type="text" placeholder="Font Size" onChange={(e) => handleStyleChange('cardTitle', 'fontSize', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardTitleFontWeight">Font Weight</Label>
-                                <Input id="cardTitleFontWeight" type="text" placeholder="Font Weight" onChange={(e) => handleStyleChange('cardTitle', 'fontWeight', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardTitleColor">Color</Label>
-                                <Input id="cardTitleColor" type="text" placeholder="Color" onChange={(e) => handleStyleChange('cardTitle', 'color', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardTitleTextAlign">Text Align</Label>
-                                <Input id="cardTitleTextAlign" type="text" placeholder="Text Align" onChange={(e) => handleStyleChange('cardTitle', 'textAlign', e.target.value)} />
-                            </div>
-                        </div>
-
-                        <div>
-                            <div>Subtitle Styles</div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardSubTitleFontSize">Font Size</Label>
-                                <Input id="cardSubTitleFontSize" type="text" placeholder="Font Size" onChange={(e) => handleStyleChange('cardSubTitle', 'fontSize', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardSubTitleFontWeight">Font Weight</Label>
-                                <Input id="cardSubTitleFontWeight" type="text" placeholder="Font Weight" onChange={(e) => handleStyleChange('cardSubTitle', 'fontWeight', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardSubTitleColor">Color</Label>
-                                <Input id="cardSubTitleColor" type="text" placeholder="Color" onChange={(e) => handleStyleChange('cardSubTitle', 'color', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="cardSubTitleTextAlign">Text Align</Label>
-                                <Input id="cardSubTitleTextAlign" type="text" placeholder="Text Align" onChange={(e) => handleStyleChange('cardSubTitle', 'textAlign', e.target.value)} />
-                            </div>
-                        </div>
-
-                        <div>
-                            <div>Text Styles</div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="text0FontSize">Font Size</Label>
-                                <Input id="text0FontSize" type="text" placeholder="Font Size" onChange={(e) => handleStyleChange('text0', 'fontSize', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="text0FontWeight">Font Weight</Label>
-                                <Input id="text0FontWeight" type="text" placeholder="Font Weight" onChange={(e) => handleStyleChange('text0', 'fontWeight', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="text0Color">Color</Label>
-                                <Input id="text0Color" type="text" placeholder="Color" onChange={(e) => handleStyleChange('text0', 'color', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="text0TextAlign">Text Align</Label>
-                                <Input id="text0TextAlign" type="text" placeholder="Text Align" onChange={(e) => handleStyleChange('text0', 'textAlign', e.target.value)} />
-                            </div>
-                        </div>
-
-                        <div>
-                            <div>CTA Button Styles</div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="ctaBgColor">Background Color</Label>
-                                <Input id="ctaBgColor" type="text" placeholder="Background Color" onChange={(e) => handleStyleChange('cta', 'backgroundColor', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="ctaTextColor">Text Color</Label>
-                                <Input id="ctaTextColor" type="text" placeholder="Text Color" onChange={(e) => handleStyleChange('cta', 'color', e.target.value)} />
-                            </div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="ctaBorderColor">Border Color</Label>
-                                <Input id="ctaBorderColor" type="text" placeholder="Border Color" onChange={(e) => handleStyleChange('cta', 'borderColor', e.target.value)} />
                             </div>
                         </div>
                         <div>

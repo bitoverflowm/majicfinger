@@ -148,7 +148,7 @@ const SideNav = () => {
                         $29.99 <div className="line-through text-[10px] text-center">$199.99</div>
                       </div>
                       <div className="pb-1 text-[10px] text-center">One Time Payment </div>
-                      <div className="pt-1">Bonus: 100 credits/month for life, on the house</div>
+                      <div className="pt-1">Bonus: 100 tokens/month for life, on the house</div>
                       <div className="flex py-2 place-content-center">
                         <Button size="xs" className="text-[10px]">See Pricing</Button>
                       </div>
