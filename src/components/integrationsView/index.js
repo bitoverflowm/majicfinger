@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import Image from "next/image";
 
 import IntegrationPlayground from "./integrationPlayground";
 
 import { FaXTwitter } from "react-icons/fa6";
-import { FaCat } from "react-icons/fa";
+import { FaCat, FaReddit } from "react-icons/fa";
 import { ExternalLink, Shrink } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader } from "../ui/card";
 import { buttonVariants } from "@/components/ui/button"
@@ -20,34 +21,89 @@ import { useUser } from "@/lib/hooks";
 
 const integrations_list = [
   {
-    color: "#1DA1F2",
-    icon: <FaXTwitter className='w-16 h-16 text-lychee_white' />,
+    color: "#35af00",
+    icon: <div className="p-1 rounded-full shadow-2xl"><Image src={'/coinGecko.png'} height={60} width={60} /></div>,
+    clickHandler: "coinGecko",
+    name: "CoinGecko",
+    description: "Connect to the most reliable and comprehensive cryptocurrency data API for traders and developers.",
+    tags: ['featured', 'crypto', 'finance', 'trading']
+  },
+  {
+    color: "#000",
+    icon: <Image src={'/coinGecko.png'} height={60} width={60} />,
+    clickHandler: "coinGeckoTerminal",
+    name: "GeckoTerminal from CoinGecko",
+    description: "GeckoTerminal is a DeFi and DEX aggregator. Explore the market data & prices of any tokens traded across 110+ blockchain networks across 900+ DEXes – brought to you by the same team behind CoinGecko.",
+    tags: ['featured', 'crypto', 'finance', 'trading']
+  },
+  {
+    color: "#AE82FE",
+    icon: <Image src={'/productHunt.png'} height={80} width={80} />,
+    clickHandler: "productHunt",
+    name: "Product Hunt",
+    description: "Discover the latest tech products, startups, and trends with real-time updates from Product Hunt.",
+    tags: ['indieHackers']
+  }, 
+  {
+    color: "#000",
+    icon: <Image src={'/x.png'} height={60} width={60} />,
     clickHandler: "twitter",
     name: "Twitter",
-    description: "Access and analyze a wealth of Twitter data, from tweets and user profiles to trends and hashtags."
+    description: "Access and analyze a wealth of Twitter data, from tweets and user profiles to trends and hashtags.",
+    tags: ['social', 'marketing']
+  },
+  {
+    color: "#3572EF",
+    icon: <Image src={'/wallStreetBets.png'} height={80} width={80} />,
+    clickHandler: "wallStreetBets",
+    name: "Wall Street Bets",
+    description: "Sentiment analysis on the top 50 stocks discussed on Reddit sub- wallStreetBets.",
+    tags: ['finance', 'trading']
   },
   {
     color: "#FF4500",
-    icon: <FaCat className='w-16 h-16 text-lychee_white' />,
-    clickHandler: "wallStreetBets",
-    name: "Wall Street Bets",
-    description: "Sentiment analysis on the top 50 stocks discussed on Reddit sub- wallStreetBets."
-  },
-  {
-    color: "#FFD700",
-    icon: <Shrink className='w-16 h-16 text-lychee_white' />,
+    icon: <Image src={'/shortSqueeze.png'} height={60} width={60} />,
     clickHandler: "shortSqueeze",
     name: "Short Squeeze Stock Scanner",
-    description: "Get a list of stocks that are in TTM Squeeze or out of squeeze."
+    description: "Get a list of stocks that are in TTM Squeeze or out of squeeze.",
+    tags: ['finance', 'trading']
   },
   {
-    color: "#8B4513",
-    icon: <Shrink className='w-16 h-16 text-lychee_white' />,
-    clickHandler: "coinGecko",
-    name: "CoinGecko",
-    description: "Connect to the most reliable and comprehensive cryptocurrency data API for traders and developers."
+    color: "#3AA6B9",
+    icon: <Image src={'/sec.png'} height={60} width={60} />,
+    clickHandler: "secEdgar",
+    name: "SEC EDGAR",
+    description: "Access comprehensive financial statements, filings, and disclosures from the SEC's EDGAR database.",
+    tags: ['finance', 'regulation', 'compliance']
+  },
+  {
+    color: "#004080",
+    icon: <Image src={'/censusGov.png'} height={60} width={60} />,
+    clickHandler: "censusGov",
+    name: "Census.gov",
+    description: "Retrieve detailed demographic, economic, and population data from the U.S. Census Bureau.",
+    tags: ['data', 'demographics', 'population']
+  },
+  {
+    color: "#0099CC",
+    icon: <Image src={'/crunchbase.png'} height={60} width={60} className="rounded-md shadow-2xl"/>,
+    clickHandler: "crunchbase",
+    name: "Crunchbase",
+    description: "Get access to comprehensive information about companies, startups, investments, and industry trends.",
+    tags: ['business', 'startups', 'investment']
+  },
+  {
+    color: "#FF6600",
+    icon: <div className="bg-white p-1 rounded-md shadow-2xl"><Image src={'/hackerNews.png'} height={50} width={50} /></div>,
+    clickHandler: "hackerNews",
+    name: "Hacker News",
+    description: "Stay updated with the latest tech news, discussions, and trends from the Hacker News community.",
+    tags: ['tech', 'news', 'community']
   }
 ];
+
+// Extract tags categories
+const tags_categories = [...new Set(integrations_list.flatMap(integration => integration.tags))];
 
 const IntegrationsView = () => {
   const contextStateV2 = useMyStateV2()
@@ -55,6 +111,7 @@ const IntegrationsView = () => {
 
   const [playView, setPlayView] = useState()
   const [view, setView] = useState()
+  const [selectedTag, setSelectedTag] = useState(null);
 
   const setViewing = contextStateV2?.setViewing 
 
@@ -62,6 +119,10 @@ const IntegrationsView = () => {
     !user && setViewing('pricing')
     setPlayView(val)
   }
+
+  const handleTagClick = (tag) => {
+    setSelectedTag(tag);
+  };
 
   return (
     <div className="">
@@ -71,8 +132,8 @@ const IntegrationsView = () => {
               <IntegrationPlayground setPlayView={setPlayView} playView={playView}/>
           </div>
           :
-          <div className="p-32">
-            <div className="mx-auto grid sm:w-5/6 sm:grid-cols-2 pb-16 gap-6 place-items-center place-content-center">
+          <div className="p-10 md:p-12 lg:p-16 xl:p-32">
+            <div className="mx-auto grid w-full lg:w-5/6 md:grid-cols-2 pb-16 gap-10 lg:gap-6 place-items-center place-content-center">
               <div className="max-w-xl"> 
                 <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
                   All your favorite data sources under one roof.
@@ -86,11 +147,20 @@ const IntegrationsView = () => {
                 <Link className="text-xs pt-1 pb-1 px-2 underline font-bold bg-lychee_green flex w-96 place-items-center gap-2" rel="noopener noreferrer" target="_blank" href="https://misterrpink.beehiiv.com/p/how-to-use-lychee-integrations-coingecko"><code> CoinGecko API: Pull Crypto Market Data </code> <ExternalLink className="w-4 h-4"/></Link>
               </div>
             </div>
-            <div className="">
-              <Badge variant="outline">Badge</Badge>
+            <div className="p-10 flex flex-wrap gap-1">
+              <Badge key={777} variant="outline" onClick={() => handleTagClick()} className="cursor-pointer hover:bg-lychee_green/30">
+                all
+              </Badge>
+              {tags_categories.map((tag, index) => (
+                <Badge key={index} variant="outline" onClick={() => handleTagClick(tag)} className="cursor-pointer hover:bg-lychee_green/30">
+                  {tag}
+                </Badge>
+              ))}
             </div>
-            <div className="grid grid-cols-4 gap-10">
-              {integrations_list.map((integration, index) => (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+              {integrations_list
+                .filter(integration => !selectedTag || integration.tags.includes(selectedTag))
+                .map((integration, index) => (
                 <Card key={index} className="">
                   <CardHeader className={`w-full items-center rounded-md py-20`} style={{backgroundColor: integration.color}}>
                     {integration.icon}
