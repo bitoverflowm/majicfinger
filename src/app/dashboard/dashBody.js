@@ -9,7 +9,7 @@ import DataView from "@/components/dataView";
 import Upload from '@/components/dataView/upload'
 import ChartView from "@/components/chartView";
 import { ChartGallery } from "@/components/chartGallery";
-import { IntegrationsView } from "@/components/integrationsView";
+import IntegrationsView from "@/components/integrationsView";
 import NewSheetView from "@/components/newSheetView";
 
 import Login from "@/components/login";

@@ -6,14 +6,50 @@ import IntegrationPlayground from "./integrationPlayground";
 
 import { FaXTwitter } from "react-icons/fa6";
 import { FaCat } from "react-icons/fa";
-import { Shrink } from "lucide-react";
-import { Card, CardContent, CardHeader } from "../ui/card";
+import { ExternalLink, Shrink } from "lucide-react";
+import { Card, CardContent, CardFooter, CardHeader } from "../ui/card";
+import { buttonVariants } from "@/components/ui/button"
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge"
+
+
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { useUser } from "@/lib/hooks";
 
+const integrations_list = [
+  {
+    color: "#1DA1F2",
+    icon: <FaXTwitter className='w-16 h-16 text-lychee_white' />,
+    clickHandler: "twitter",
+    name: "Twitter",
+    description: "Access and analyze a wealth of Twitter data, from tweets and user profiles to trends and hashtags."
+  },
+  {
+    color: "#FF4500",
+    icon: <FaCat className='w-16 h-16 text-lychee_white' />,
+    clickHandler: "wallStreetBets",
+    name: "Wall Street Bets",
+    description: "Sentiment analysis on the top 50 stocks discussed on Reddit sub- wallStreetBets."
+  },
+  {
+    color: "#FFD700",
+    icon: <Shrink className='w-16 h-16 text-lychee_white' />,
+    clickHandler: "shortSqueeze",
+    name: "Short Squeeze Stock Scanner",
+    description: "Get a list of stocks that are in TTM Squeeze or out of squeeze."
+  },
+  {
+    color: "#8B4513",
+    icon: <Shrink className='w-16 h-16 text-lychee_white' />,
+    clickHandler: "coinGecko",
+    name: "CoinGecko",
+    description: "Connect to the most reliable and comprehensive cryptocurrency data API for traders and developers."
+  }
+];
 
-export function IntegrationsView() {
+const IntegrationsView = () => {
   const contextStateV2 = useMyStateV2()
   const user = useUser()
 
@@ -35,42 +71,49 @@ export function IntegrationsView() {
               <IntegrationPlayground setPlayView={setPlayView} playView={playView}/>
           </div>
           :
-          <div className="text-sm flex flex-wrap gap-4 place-items-center place-content-center">
-            <Card className="w-full lg:w-1/3">
-              <CardHeader className="font-[600]">Why did I build Integrations by Lychee?</CardHeader>
-              <CardContent className="text-xs">
-                <p className="pb-1 text-muted-foreground">There are thousands of data sources out there that enrich data, and enable you to make better analysis, assessments, and models.</p>
-                <p className="pb-1 text-muted-foreground">While Lychee does have a <span className="underline cursor-pointer hover:text-blue-400" onClick={()=>setViewing('scrape')}>scraper</span>, the best, cleanest sources of data are via APIs - straight from the origin.</p>
-                <p className="pb-1 text-muted-foreground">Each  API has its own structure data format and networking protocols. Finding and connecting to the right one is difficult and time consiming</p>
-                <p className="pb-1 text-muted-foreground">That's where Lychee Integrations comes in</p>
-                <p className="pb-1 text-muted-foreground">Lychee will be the world's largest no-code API integrations platform </p>
-                <p className="pb-1 text-muted-foreground"> Now You can search for and connect directly to thousands of APIs </p>
-              </CardContent>
-            </Card>
-            <div className="w-full lg:w-3/5 text-center">
-              <div className="text-4xl font-black px-4">Pull Data Cleaner Than a Nun's Browser History</div>
-              <div className="text-justify leading-loose">
-                <div className="text-center py-4">
-                  On a mission to connect 100,000+ data sources (APIs) by 2026
-                </div>
-                <div className="w-28 mx-auto text-center bg-black rounded-md text-white text-xs py-2 cursor-pointer hover:bg-lychee_green hover:text-black" onClick={()=>setViewing('pricing')}>Get Full Access</div>
+          <div className="p-32">
+            <div className="mx-auto grid sm:w-5/6 sm:grid-cols-2 pb-16 gap-6 place-items-center place-content-center">
+              <div className="max-w-xl"> 
+                <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
+                  All your favorite data sources under one roof.
+                </h1> 
+              </div>
+              <div className="max-w-md">
+                <p className="text-sm text-muted-foreground pb-4">
+                  Lychee makes it easy by taking care of everything, end-to-end so you can you can focus on <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] mr-2 font-mono font-semibold"> discovering something great. </code> Instantly pull data cleaner than a nun's browser history.
+                </p>
+                <p className="text-xs text-muted-foreground pb-2">Want to see it in action?</p>
+                <Link className="text-xs pt-1 pb-1 px-2 underline font-bold bg-lychee_green flex w-96 place-items-center gap-2" rel="noopener noreferrer" target="_blank" href="https://misterrpink.beehiiv.com/p/how-to-use-lychee-integrations-coingecko"><code> CoinGecko API: Pull Crypto Market Data </code> <ExternalLink className="w-4 h-4"/></Link>
               </div>
             </div>
-            <Card onClick={()=>clickHandler('twitter')} className="w-64 h-44 flex flex-col gap-2 place-items-center place-content-center cursor-pointer hover:bg-lychee_green">
-              <div>Twitter</div> <div><FaXTwitter /></div>
-              <div></div>
-            </Card>
-            <Card onClick={()=>clickHandler('wallStreetBets')} className="w-64 h-44 flex flex-col gap-2 place-items-center place-content-center text-center cursor-pointer hover:bg-lychee_green">
-              <div>Wall Street Bets</div> <div><FaCat /></div><p className="text-xs text-muted-foreground px-10">Sentiment analysis on the top 50 stocks discussed on Reddit sub- wallStreetBets</p>
-            </Card>
-            <Card onClick={()=>clickHandler('shortSqueeze')} className="w-64 h-44 flex flex-col gap-2 place-items-center place-content-center text-center cursor-pointer hover:bg-lychee_green">
-              <div>Short Squeeze Stock Scanner</div> <div><Shrink /></div><p className="text-xs text-muted-foreground px-10">Get a list of stocks that are in TTM Squeeze or out of squeeze</p>
-            </Card>
-            <Card onClick={()=>clickHandler('coinGecko')} className="w-64 h-44 flex flex-col gap-2 place-items-center place-content-center text-center cursor-pointer hover:bg-lychee_green">
-              <div>CoinGecko </div> <div><Shrink /></div><p className="text-xs text-muted-foreground px-10">Connect to The most reliable and comprehensive cryptocurrency data API for traders and developers</p>
-            </Card>
+            <div className="">
+              <Badge variant="outline">Badge</Badge>
+            </div>
+            <div className="grid grid-cols-4 gap-10">
+              {integrations_list.map((integration, index) => (
+                <Card key={index} className="">
+                  <CardHeader className={`w-full items-center rounded-md py-20`} style={{backgroundColor: integration.color}}>
+                    {integration.icon}
+                  </CardHeader>
+                  <CardContent className="py-4">
+                    <small className="text-sm font-medium leading-none">{integration.name}</small>
+                    <p className="text-sm pt-1 text-muted-foreground pb-2">{integration.description}</p>
+                  </CardContent>
+                  <CardFooter className="flex place-content-end">
+                    <Button onClick={() => clickHandler(integration.clickHandler)}>Connect</Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+            <div className="mx-auto text-center py-20 w-1/2">
+              <div className="text-4xl font-black px-4"></div>
+              <div className="text-4xl font-black px-4">On a mission to connect 100,000+ data sources by the end of 2024</div>
+            </div>            
           </div>
       }
     </div>
   );
 }
+
+
+export default IntegrationsView
