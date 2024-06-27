@@ -10,6 +10,7 @@ import {
 
 const Twitter = ({ setConnectedData }) => {
   const [error, setError] = useState(null);
+  const [args, setArgs ] = useState()
 
   const fetchHandler = async (query, params) => {
     try {
@@ -37,15 +38,24 @@ const Twitter = ({ setConnectedData }) => {
   const tweetActions = [
     {
       query: 'fetchTweetById',
-      name: 'Fetch Tweet by ID',
+      name: 'Tweet by Tweet ID',
       description: 'Get a single tweet by its ID',
       params: { tweetId: '1805930417343598641', expansions: [], mediaFields: [], placeFields: [], pollFields: [], tweetFields: [], userFields: [] },
     },
     {
       query: 'fetchTweetsByIds',
-      name: 'Fetch Multiple Tweets',
+      name: 'Multiple Tweets by IDs',
       description: 'Get multiple tweets by their IDs',
       params: { tweetIds: ['1805957579526275302', '1805930417343598641'], expansions: [], mediaFields: [], placeFields: [], pollFields: [], tweetFields: [], userFields: [] },
+    },
+  ];
+
+  const timelines = [
+    {
+      query: 'fetchTweetsByUserIds',
+      name: "Fetch User's Tweets",
+      description: 'Returns Tweets composed by a single user, specified by the requested user ID',
+      params: { userId: '44196397', endTime: null, exclude: 'retweets', expansions: [], maxResults: 25, mediaFields: [], pagination_token: null, placeFields: ['country'], pollFields: [], sinceId: null, startTime: null, tweetFields: ['created_at', 'public_metrics'], untilId: null, userFields: ['name','username','verified'] },
     },
   ];
 
@@ -57,6 +67,23 @@ const Twitter = ({ setConnectedData }) => {
           <AccordionContent>
             <div className='flex flex-wrap gap-1'>
               {tweetActions.map(action => (
+                <div
+                  key={action.query}
+                  className={`text-[10px] px-3 py-1 border rounded-md hover:bg-lychee_red hover:text-white cursor-pointer`}
+                  onClick={() => fetchHandler(action.query, action.params)}
+                  title={action.description}
+                >
+                  {action.name}
+                </div>
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="timelines">
+          <AccordionTrigger>Tweet Actions</AccordionTrigger>
+          <AccordionContent>
+            <div className='flex flex-wrap gap-1'>
+              {timelines.map(action => (
                 <div
                   key={action.query}
                   className={`text-[10px] px-3 py-1 border rounded-md hover:bg-lychee_red hover:text-white cursor-pointer`}
