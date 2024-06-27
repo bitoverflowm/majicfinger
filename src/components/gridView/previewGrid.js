@@ -29,7 +29,7 @@ const PreviewGrid = ({h, w}) => {
         <div className={`ag-theme-quartz text-xs px-4 ${h ? h: 'h-[300px]'} ${ w ? w: 'w-[300px] min-[300px]:w-[370px] min-[510px]:w-[400px] min-[520px]:w-[480px] sm:w-[500px] min-[800px]:w-[520px] lg:w-[600px] xl:w-[800px] 2xl:w-[900px]'}`}>
             <AgGridReact 
                 defaultColDef={defaultColDef}
-                rowData={connectedData.slice(0,4)} 
+                rowData={connectedData.slice(0, Math.min(connectedData.length, 4))} 
                 columnDefs={connectedCols} 
                 pagination={false}
                 //enableRangeSelection={true}

@@ -32,6 +32,7 @@ import ParamToggles from "@/components/integrations/twitter/paramToggles"
 import PreviewGrid from "@/components/gridView/previewGrid"
 import WallStreetBets from "./integrations/wallStreetBets"
 import CoinGecko from "./integrations/coinGecko"
+import Twitter from "./integrations/twitter"
   
 const IntegrationPlayground = ({playView, setPlayView}) => {
     const contextStateV2 = useMyStateV2()
@@ -95,7 +96,6 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
                         }
                     }
                     setUserHandleIds(prevUserHandles => [...prevUserHandles, newHandle]);
-                    console.log(twitterDemoData[searchingUserName].userData)
                     setConnectedData([twitterDemoData[searchingUserName].userData])
                 }else{
                     const url = new URL('/api/integrations/twitter/userhandle', window.location.origin);
@@ -181,7 +181,7 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
                   <fieldset className="rounded-lg border px-4 py-2">
                     <legend className="-ml-1 px-1 text-xs font-medium">Select an action</legend>
                     {
-                      playView === "twitter" &&
+                      playView === "x" &&
                         <>
                           <div className="grid gap-3">
                             <Label htmlFor="temperature">Filter</Label>
@@ -331,6 +331,10 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
                             </div>
 
                         </>
+                    }
+                    {
+                      playView === 'twitter' && <Twitter setConnectedData={setConnectedData}/>
+                      
                     }
                     {
                       playView === "wallStreetBets" &&

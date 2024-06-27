@@ -1,23 +1,17 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
-
-import IntegrationPlayground from "./integrationPlayground";
-
-import { FaXTwitter } from "react-icons/fa6";
-import { FaCat, FaReddit } from "react-icons/fa";
-import { ExternalLink, Shrink } from "lucide-react";
-import { Card, CardContent, CardFooter, CardHeader } from "../ui/card";
-import { buttonVariants } from "@/components/ui/button"
 import Link from "next/link";
+
+import { ExternalLink } from "lucide-react";
+
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge"
 
+import IntegrationPlayground from "./integrationPlayground";
 
-
-import { useMyStateV2  } from '@/context/stateContextV2'
-import { useUser } from "@/lib/hooks";
 
 const integrations_list = [
   {
@@ -99,6 +93,14 @@ const integrations_list = [
     name: "Hacker News",
     description: "Stay updated with the latest tech news, discussions, and trends from the Hacker News community.",
     tags: ['tech', 'news', 'community']
+  },
+  {
+    color: "#000080",
+    icon: <div className="text-white">USTreasuries</div>,
+    clickHandler: "usTreasuries",
+    name: "US Treasuries",
+    description: "Access real-time and historical data on U.S. Treasury securities, yields, and auctions.",
+    tags: ['finance', 'government', 'coming soon']
   }
 ];
 
@@ -106,17 +108,11 @@ const integrations_list = [
 const tags_categories = [...new Set(integrations_list.flatMap(integration => integration.tags))];
 
 const IntegrationsView = () => {
-  const contextStateV2 = useMyStateV2()
-  const user = useUser()
 
   const [playView, setPlayView] = useState()
-  const [view, setView] = useState()
   const [selectedTag, setSelectedTag] = useState(null);
 
-  const setViewing = contextStateV2?.setViewing 
-
   const clickHandler = (val) =>{
-    !user && setViewing('pricing')
     setPlayView(val)
   }
 
@@ -161,11 +157,11 @@ const IntegrationsView = () => {
               {integrations_list
                 .filter(integration => !selectedTag || integration.tags.includes(selectedTag))
                 .map((integration, index) => (
-                <Card key={index} className="">
+                <Card key={index} className="flex flex-col h-full">
                   <CardHeader className={`w-full items-center rounded-md py-20`} style={{backgroundColor: integration.color}}>
                     {integration.icon}
                   </CardHeader>
-                  <CardContent className="py-4">
+                  <CardContent className="py-4 grow">
                     <small className="text-sm font-medium leading-none">{integration.name}</small>
                     <p className="text-sm pt-1 text-muted-foreground pb-2">{integration.description}</p>
                   </CardContent>

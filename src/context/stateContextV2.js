@@ -255,34 +255,63 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     }), [settings, viewing, connectedCols, dataTypes, dataTypeMismatch]);
     
 
-    useEffect(() => {
+    /*useEffect(() => {
         if (connectedData && connectedData.length > 0) {
             // Check if data types are already set
             if (Object.keys(dataTypes).length === 0) {
                 // Determine data types
                 const detectedDataTypes = determineDataTypes(connectedData);
                 setDataTypes(detectedDataTypes);
+                // Update connectedCols based on detected or existing data types
+                const keys = Object.keys(connectedData[0]);
+                const columnsLabels = keys.map(key => ({
+                    field: key,
+                    cellDataType: detectedDataTypes[key] || 'text'
+                }));
+        
+                setConnectedCols(columnsLabels);             
             } else {
                 // Check for data type mismatches
                 const detectedDataTypes = determineDataTypes(connectedData);
                 const hasMismatch = checkDataTypeMismatch(detectedDataTypes, dataTypes);
                 setDataTypeMismatch(hasMismatch);
+                // Update connectedCols based on detected or existing data types
+                const keys = Object.keys(connectedData[0]);
+                const columnsLabels = keys.map(key => ({
+                    field: key,
+                    cellDataType: dataTypes[key] || 'text'
+                }));
+        
+                setConnectedCols(columnsLabels);
+            }            
+        }
+    }, [connectedData, dataTypes]);*/
+
+    useEffect(() => {
+        if (connectedData && connectedData.length > 0) {
+            const detectedDataTypes = determineDataTypes(connectedData);
+            if (Object.keys(dataTypes).length === 0) {
+                setDataTypes(detectedDataTypes);
+            } else {
+                const hasMismatch = checkDataTypeMismatch(detectedDataTypes, dataTypes);
+                setDataTypeMismatch(hasMismatch);
             }
 
-            // Update connectedCols based on detected or existing data types
             const keys = Object.keys(connectedData[0]);
             const columnsLabels = keys.map(key => ({
                 field: key,
                 cellDataType: dataTypes[key] || 'text'
             }));
-    
+
             setConnectedCols(columnsLabels);
         }
     }, [connectedData, dataTypes]);
 
     const detectDataType = (value) => {
+        if (Array.isArray(value)) return 'array';
         if (typeof value === 'boolean') return 'boolean';
-        //if (!isNaN(Date.parse(value))) return 'dateString';
+        // If value is a long string representing a number, treat it as text
+        if (typeof value === 'string' && value.length > 15 && !isNaN(parseFloat(value))) return 'text';
         if (!isNaN(parseFloat(value)) && isFinite(value)) return 'number';
         if (typeof value === 'object' && value !== null) return 'object';
         return 'text';
@@ -291,13 +320,13 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const determineDataTypes = (data) => {
         const types = {};
         if (data.length > 0) {
-            const sample = data[0];
-            Object.keys(sample).forEach(key => {
-                types[key] = detectDataType(sample[key]);
-            });
+          const sample = data[0];
+          Object.keys(sample).forEach(key => {
+            types[key] = detectDataType(sample[key]);
+          });
         }
         return types;
-    };
+      };
 
     const checkDataTypeMismatch = (detectedDataTypes, existingDataTypes) => {
         return Object.keys(detectedDataTypes).some(key => detectedDataTypes[key] !== existingDataTypes[key]);
