@@ -46,30 +46,30 @@ export default async function handler(req, res) {
     let data;
     let filteredParams;
     switch (query) {
-      case 'fetchTweetById':
-        data = await twitterBearer.v2.singleTweet(tweetId, commonParams);
-        break;
-      case 'fetchTweetsByIds':
-        data = await twitterBearer.v2.tweets(tweetIds, commonParams);
-        break;
-      case 'fetchTimelineById':
-        filteredParams = filterParams({
-          end_time: endTime, exclude, max_results: maxResults, pagination_token,
-          since_id: sinceId, start_time: startTime, until_id: untilId, ...commonParams
-        });
-        data = await twitterBearer.v2.homeTimeline(userId, filteredParams);
-        //todo: is this something that can break? 
-        data = data.data
-        break;
-      case 'fetchTweetsByUserIds':
-        filteredParams = filterParams({
-            end_time: endTime, exclude, max_results: maxResults, pagination_token,
-            since_id: sinceId, start_time: startTime, until_id: untilId, ...commonParams
-        });
-        data = await twitterBearer.v2.userTimeline(userId, filteredParams);
-        //todo: is this something that can break? 
-        data = data.data
-        break;
+        case 'fetchTweetById':
+            data = await twitterBearer.v2.singleTweet(tweetId, commonParams);
+            break;
+        case 'fetchTweetsByIds':
+            data = await twitterBearer.v2.tweets(tweetIds, commonParams);
+            break;
+        case 'fetchTweetsByUserId':
+            filteredParams = filterParams({
+                end_time: endTime, exclude, max_results: maxResults, pagination_token,
+                since_id: sinceId, start_time: startTime, until_id: untilId, ...commonParams
+            });
+            data = await twitterBearer.v2.userTimeline(userId, filteredParams);
+            //todo: is this something that can break? 
+            data = data.data
+            break;
+        case 'fetchUserMentionsByUserId':
+            filteredParams = filterParams({
+                end_time: endTime, max_results: maxResults, pagination_token,
+                since_id: sinceId, start_time: startTime, until_id: untilId, ...commonParams
+            });
+            data = await twitterBearer.v2.userMentionTimeline(userId, filteredParams);
+            //todo: is this something that can break? 
+            data = data.data
+            break;
       default:
         res.status(400).json({ error: 'Invalid query parameter' });
         return;
