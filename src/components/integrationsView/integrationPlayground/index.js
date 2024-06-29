@@ -370,7 +370,7 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
                       <div><span className="underline cursor-pointer hover:bg-lychee_green" onClick={()=>setViewing('ai')}>AI</span> see what you can discover with AI analysis</div>
                       <div><span className="underline cursor-pointer hover:bg-lychee_green" onClick={()=>setViewing('charts')}>Charts</span> to start 
                       visualizing your data</div>
-                      <div><span className="underline cursor-pointer hover:bg-lychee_green" onClick={()=>setViewing('presentation')}>Presentation</span> to start creating your presentation and share with your audience</div></div>
+                      <div><span className="hidden underline cursor-pointer hover:bg-lychee_green" onClick={()=>setViewing('presentation')}>Presentation</span> to start creating your presentation and share with your audience</div></div>
                   </AlertDescription>                
                 </Alert>    
               </div>

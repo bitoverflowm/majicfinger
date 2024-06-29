@@ -99,32 +99,55 @@ export function BentoBase({data, dashView, demo, bentoContainer, setDashData, se
   }
 
   //helper to get random index in color pallate
-    const getRandomIndex = (array) => {
-      return Math.floor(Math.random() * array.length);
-    }
+  const getRandomIndex = (array) => {
+    return Math.floor(Math.random() * array.length);
+  }
 
-    useEffect(()=>{
-      selectedPalette && console.log(selectedPalette)
-    }, [data])
+  useEffect(()=>{
+    selectedPalette && console.log(selectedPalette)
+  }, [data])
+
+  const copyPaletteToClipboard = () => {
+    if (selectedPalette) {
+      const paletteString = selectedPalette.join(", ");
+      navigator.clipboard.writeText(paletteString)
+        .then(() => {
+          toast.success("Palette copied to clipboard!");
+        })
+        .catch(err => {
+          toast.error("Failed to copy palette to clipboard.");
+          console.error(err);
+        });
+    }
+  };
 
   
   return (
     <>
-        <div className="flex gap-2 place-items-center py-2 place-content-end w-full">
-          <Label htmlFor="color_wheel" className="text-xs">Color Wheel</Label>
-          <Button onClick={()=>setPause(!pause)} variant="outline" id="color_wheel" size="icon">
-            {pause ? <Play className="h-4 w-4"/> : <Pause className="h-4 w-4" />}</Button>
-          <Button onClick={()=>ramdomColorHandler()} disable={!pause} variant="outline" id="color_wheel" size="icon">
-            <RotateCw className="h-4 w-4"/></Button> 
-          <Button onClick={()=>shufflePalette()} disable={!pause} variant="outline" id="color_wheel" size="icon">
-            <Shuffle className="h-4 w-4"/></Button>
-          <div className="flex">
-            {
-              selectedPalette && selectedPalette.map((color)=>
-                <div className="p-2" style={{ backgroundColor: color}}> </div>
-              )
-            }
+        <div className="gap-2 place-items-center py-2 w-full">
+          <blockquote className="mx-auto text-center text-[10px] w-1/2">
+            <span className="font-bold">Welcome to your dashboard</span> <br/> 
+            Soon to be fully customizable.<br/>
+            Play around with our world class color wheel!
+          </blockquote>
+          <div className="flex gap-1 place-items-center place-content-center pt-2">
+            <Button onClick={()=>setPause(!pause)} variant="outline" id="color_wheel" size="xs">
+              {pause ? <Play className="h-3 w-3"/> : <Pause className="h-3 w-3" />}</Button>
+            <Button onClick={()=>ramdomColorHandler()} disable={!pause} variant="outline" id="color_wheel" size="xs">
+              <RotateCw className="h-3 w-3"/></Button> 
+            <Button onClick={()=>shufflePalette()} disable={!pause} variant="outline" id="color_wheel" size="xs">
+              <Shuffle className="h-3 w-3"/></Button>
           </div>
+          <div className="flex flex-col w-full place-items-center place-content-center pt-2 cursor-pointer">
+              <div className="flex gap-1 place-items-center p-1 bg-slate-200/30 rounded-md" onClick={()=>copyPaletteToClipboard()}>
+                {
+                  selectedPalette && selectedPalette.map((color)=>
+                    <div className="p-2 rounded" style={{ backgroundColor: color}}> </div>
+                  )
+                }
+              </div>
+              <p className="text-[8px] text-muted-foreground">click to copy</p>
+            </div>
         </div>
         <div className={`gradualEffect relative flex w-full items-center justify-center p-10 overflow-hidden rounded-lg border shadow-sm`} style={{ backgroundColor: bentoContainer && bentoContainer.background_color && bentoContainer.background_color}}>  
             <BentoGrid>

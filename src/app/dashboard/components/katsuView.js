@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import { useMyStateV2  } from '@/context/stateContextV2'
 
 
@@ -23,11 +24,13 @@ const KatsuView = () => {
     const setViewing = contextStateV2?.setViewing
 
     return (
-        <div className="w-full h-full flex flex-col place-items-center place-content-center px-10">
-            <ComingSoon />
-            <div className='sm:w-1/2 pt-4'>
-                <blockquote className="mt-6 border-l-2 pl-6 italic text-xs">This is your dashboard. Soon you will be able to customize this view with any data, visualization or link. PS: Check out the beautiful color pallates. Customize this view, share with your friends, audience or team. Take your presentations to the next level.</blockquote> 
-            </div>
+        <div className="w-full px-10 py-16">
+            <blockquote className="mb-2 border-l-2 pl-6 italic text-xs w-1/2">
+                <span className='font-bold'>Lychee V2.0.0 is coming!</span> <br/>
+                Get Instant Access For Life 29.99 (85% off). No monthly subs <br/>
+                (11 seats remaining) <br/>
+                <Link rel="noopener noreferrer" target="_blank" className="underline bg-lychee_green/30" href="https://buy.stripe.com/aEUaGYfkW9L04wgbJ3"> Get deal now! </Link>
+            </blockquote> 
             <BentoBase data={dashData} dashView={true} bentoContainer={bentoContainer} setDashData={setDashData} setBentoContainer={setBentoContainer} viewing={viewing} setViewing={setViewing}/>            
         </div>       
     );

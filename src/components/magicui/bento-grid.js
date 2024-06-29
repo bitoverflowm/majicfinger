@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useRouter } from 'next/navigation';
+
 
 import Link from "next/link";
 import { ArrowRightIcon, FontBoldIcon, FontItalicIcon, TextAlignLeftIcon, TextAlignCenterIcon, TextAlignRightIcon, DoubleArrowUpIcon, DoubleArrowDownIcon, ExitIcon } from "@radix-ui/react-icons";
@@ -90,6 +92,7 @@ const BentoCard = ({
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [option, setOption] = useState()
   const [textEditOpen, setTextEditOpen] = useState(false)
+  const router = useRouter();
 
   const updateCellData = (field, newValue) => {
     //console.log('updating: ', index, field, newValue)
@@ -237,6 +240,16 @@ const BentoCard = ({
       }
   }, [heading, heading_style, demo ])
 
+  const handleNav = (navTo) => {
+    if(refType && refType ==="internal"){
+      setViewing(navTo)
+    }else if(refType && refType === "external"){
+      window.open(href, '_blank');
+    }else{
+      toast.error("ref type is not valid")
+    }
+  }
+
   return(
     <div
       key={index}
@@ -249,7 +262,7 @@ const BentoCard = ({
         className,
       )}
       style={{ backgroundColor: background_color ? background_color: '' }}
-      onClick={()=>setViewing(navTo)}
+      onClick={()=>handleNav(navTo)}
     >
       <ContextMenu>
         <ContextMenuTrigger  className={`flex flex-col h-full place-content-end`}>

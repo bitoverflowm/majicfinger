@@ -28,7 +28,7 @@ const integrations_list = [
     clickHandler: "coinGeckoTerminal",
     name: "GeckoTerminal from CoinGecko",
     description: "GeckoTerminal is a DeFi and DEX aggregator. Explore the market data & prices of any tokens traded across 110+ blockchain networks across 900+ DEXes – brought to you by the same team behind CoinGecko.",
-    tags: ['featured', 'crypto', 'finance', 'trading']
+    tags: ['featured', 'crypto', 'finance', 'trading', 'coming July 24', 'coming soon']
   },
   {
     color: "#AE82FE",
@@ -36,7 +36,7 @@ const integrations_list = [
     clickHandler: "productHunt",
     name: "Product Hunt",
     description: "Discover the latest tech products, startups, and trends with real-time updates from Product Hunt.",
-    tags: ['indieHackers']
+    tags: ['indieHackers', 'coming July 24', 'coming soon']
   }, 
   {
     color: "#000",
@@ -68,7 +68,7 @@ const integrations_list = [
     clickHandler: "secEdgar",
     name: "SEC EDGAR",
     description: "Access comprehensive financial statements, filings, and disclosures from the SEC's EDGAR database.",
-    tags: ['finance', 'regulation', 'compliance']
+    tags: ['finance', 'regulation', 'compliance','coming soon', 'coming July 24']
   },
   {
     color: "#004080",
@@ -76,7 +76,7 @@ const integrations_list = [
     clickHandler: "censusGov",
     name: "Census.gov",
     description: "Retrieve detailed demographic, economic, and population data from the U.S. Census Bureau.",
-    tags: ['data', 'demographics', 'population']
+    tags: ['data', 'demographics', 'population', 'coming soon', 'coming July 24']
   },
   {
     color: "#0099CC",
@@ -84,7 +84,7 @@ const integrations_list = [
     clickHandler: "crunchbase",
     name: "Crunchbase",
     description: "Get access to comprehensive information about companies, startups, investments, and industry trends.",
-    tags: ['business', 'startups', 'investment']
+    tags: ['business', 'startups', 'investment', 'coming soon', 'coming July 24']
   },
   {
     color: "#FF6600",
@@ -92,7 +92,7 @@ const integrations_list = [
     clickHandler: "hackerNews",
     name: "Hacker News",
     description: "Stay updated with the latest tech news, discussions, and trends from the Hacker News community.",
-    tags: ['tech', 'news', 'community']
+    tags: ['tech', 'news', 'community', 'coming soon', 'coming July 24']
   },
   {
     color: "#000080",
@@ -100,7 +100,7 @@ const integrations_list = [
     clickHandler: "usTreasuries",
     name: "US Treasuries",
     description: "Access real-time and historical data on U.S. Treasury securities, yields, and auctions.",
-    tags: ['finance', 'government', 'coming soon']
+    tags: ['finance', 'government', 'coming soon', 'coming July 24']
   }
 ];
 
@@ -148,7 +148,7 @@ const IntegrationsView = () => {
                 all
               </Badge>
               {tags_categories.map((tag, index) => (
-                <Badge key={index} variant="outline" onClick={() => handleTagClick(tag)} className="cursor-pointer hover:bg-lychee_green/30">
+                <Badge key={index} variant="outline" onClick={() => handleTagClick(tag)} className={`cursor-pointer hover:bg-lychee_green/30 ${tag === 'coming July 24' && 'bg-lychee_blue text-white shadow-2xl hover:text-lychee_blue'}`}>
                   {tag}
                 </Badge>
               ))}
@@ -166,7 +166,9 @@ const IntegrationsView = () => {
                     <p className="text-sm pt-1 text-muted-foreground pb-2">{integration.description}</p>
                   </CardContent>
                   <CardFooter className="flex place-content-end">
-                    <Button onClick={() => clickHandler(integration.clickHandler)}>Connect</Button>
+                    {
+                      integration.tags.includes('coming soon') ? <Button disabled onClick={() => clickHandler(integration.clickHandler)}>Coming Soon</Button> :<Button onClick={() => clickHandler(integration.clickHandler)}>Connect</Button>
+                    }
                   </CardFooter>
                 </Card>
               ))}

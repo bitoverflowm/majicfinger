@@ -155,7 +155,7 @@ const Upload = ({user}) => {
                                             <ul className="my-6 ml-6 list-disc [&>li]:mt-2 text-xs">
                                                 <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('dataStart')}>View and work with your data using Data Sheet</div></li>
                                                 <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('charts')}>Start Charting right away</div></li>
-                                                <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('presentation')}>Present your work</div></li>
+                                                <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green hidden' onClick={()=>setViewing('presentation')}>Present your work</div></li>
                                                 <li><div className='underline text-muted-foreground cursor-pointer hover:bg-lychee_green' onClick={()=>setViewing('ai')}>See what you can learn with Lyehee's AI Athena</div></li>
                                             </ul>
                                         </div>
@@ -205,13 +205,7 @@ const Upload = ({user}) => {
                             </code><code className="relative rounded bg-orange-400/60 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                 reddit
                             </code>
-                            <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
-                                twitter
-                            </code> <code className="relative rounded bg-yellow-200/40 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
-                                coingecko
-                            </code><code className="relative rounded bg-orange-400/60 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
-                                reddit
-                            </code><code className="relative rounded bg-blue-200/40 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
+                            <code className="relative rounded bg-blue-200/40 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                 sec edgar data
                             </code><code className="relative rounded bg-gray-500/40 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                 wallstreet Bets
@@ -230,7 +224,7 @@ const Upload = ({user}) => {
                             </code><code className="relative rounded bg-red-500/60 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                 USGS Earthquake Hazard Data
                             </code><code className="relative rounded bg-green-400/40 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
-                                Nutritioniz
+                                Nutritionix
                             </code><code className="relative rounded bg-indigo-500/40 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                 Census.gov
                             </code><code className="relative rounded bg-blue-300/40 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">

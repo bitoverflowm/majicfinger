@@ -17,7 +17,7 @@ export function ChartGallery() {
     }
 
     return (
-        <div className="grid grid-cols-3 gap-4 p-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-20">
             {charts.map((chart, idx) => (
                 <GalleryCard key={idx} title={chart.title} description={chart.description} data ={chart.data} footnote={chart.footnote} series={chart.series} axes={chart.axes} theme={chart.theme}/>
             ))}
