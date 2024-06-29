@@ -119,6 +119,11 @@ module.exports = {
             backgroundPosition: "var(--bg-size) 0",
           },
         },
+        "border-beam": {
+          "100%": {
+            "offset-distance": "100%",
+          },
+        },
       },
       animation: {
         meteor: "meteor 5s linear infinite",
@@ -131,6 +136,7 @@ module.exports = {
         slide: "slide var(--speed) ease-in-out infinite alternate",
         shimmer: "shimmer 8s infinite",
         gradient: "gradient 8s linear infinite",
+        "border-beam": "border-beam calc(var(--duration)*1s) infinite linear",
       },
       slide: {
         to: {

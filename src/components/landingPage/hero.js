@@ -1,16 +1,23 @@
 "use client";
 
+import BackgroundVideo from 'next-video/background-video';
+import charts from '/videos/charts.mp4';
+
 import { useRef, useEffect, useState } from "react"
 
 import Link from "next/link";
+import Image from "next/image";
 
 import { Twitter, Instagram, Youtube, Activity, Facebook, BarChart2, DollarSign, FileText, Cloud, ShoppingCart, Zap, Globe, Thermometer, AlertTriangle, Star, BarChart, Globe as Globe2 } from 'react-feather';
 
 import BlurIn from "../magicui/blur-in";
 import Particles from "../magicui/particles";
+import { BorderBeam } from "../magicui/border-beam";
 
 import VideoView from "./videoView";
 import { MoveRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AnimatedList } from "@/components/magicui/animated-list";
 
 const companies = [
     "jpm",
@@ -20,6 +27,76 @@ const companies = [
     "apple",
     "mit",
   ];
+
+   
+let notifications = [
+    {
+        name: "Payment received",
+        description: "Magic UI",
+        time: "15m ago",
+
+        icon: "💸",
+        color: "#00C9A7",
+    },
+    {
+        name: "User signed up",
+        description: "Magic UI",
+        time: "10m ago",
+        icon: "👤",
+        color: "#FFB800",
+    },
+    {
+        name: "New message",
+        description: "Magic UI",
+        time: "5m ago",
+        icon: "💬",
+        color: "#FF3D71",
+    },
+    {
+        name: "New event",
+        description: "Magic UI",
+        time: "2m ago",
+        icon: "🗞️",
+        color: "#1E86FF",
+    },
+];
+
+notifications = Array.from({ length: 10 }, () => notifications).flat();
+
+const Notification = ({ name, description, icon, color, time }) => {
+    return (
+      <figure
+        className={cn(
+          "relative mx-auto min-h-fit w-full max-w-[400px] transform cursor-pointer overflow-hidden rounded-2xl p-4",
+          // animation styles
+          "transition-all duration-200 ease-in-out hover:scale-[103%]",
+          // dark styles
+          "transform-gpu bg-transparent backdrop-blur-md [border:1px_solid_rgba(255,255,255,.1)] [box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
+        )}
+      >
+        <div className="flex flex-row items-center gap-3">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor: color,
+            }}
+          >
+            <span className="text-lg">{icon}</span>
+          </div>
+          <div className="flex flex-col overflow-hidden">
+            <figcaption className="flex flex-row items-center whitespace-pre text-lg font-medium dark:text-white ">
+              <span className="text-sm sm:text-lg">{name}</span>
+              <span className="mx-1">·</span>
+              <span className="text-xs text-gray-500">{time}</span>
+            </figcaption>
+            <p className="text-sm font-normal dark:text-white/60">
+              {description}
+            </p>
+          </div>
+        </div>
+      </figure>
+    );
+  };
 
 export function Hero() {
     const fadeInRef = useRef(null);
@@ -85,52 +162,60 @@ export function Hero() {
                         Go
                     </Link>
                 </div>
-                <div className="w-full flex place-content-center">
-                    <div className="container mx-auto px-4 md:px-8 ">
-                        <h3 className="py-4 pt-36 text-center text-[10px] font-semibold text-slate-400">
-                            ACTIVELY BETA TESTED BY FRIENDS AT
-                        </h3>
-                        <div className="sm:mt-6 sm:px-10">
-                            <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
-                                {companies.map((logo, idx) => (
-                                    <img
-                                        key={idx}
-                                        src={`./${logo}.svg`}
-                                        className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
-                                        alt={logo}
-                                    />
-                                ))}
-                            </div>
-                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
-                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
+                <div className="pt-10 sm:pt-20 sm:pr-20 z-10 grid sm:grid-cols-2 gap-20">
+                    <div>
+                        <h1 className="scroll-m-20 text-xl sm:text-2xl text-lychee_green font-extrabold tracking-tight lg:text-2xl place-items-center text-center">
+                            <span><span className="text-purple-400">Instant</span> Graphs <br/> <span className="text-purple-400">Zero</span> Hassle </span>
+                        </h1>
+                        <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}><div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How it works <MoveRight /></div> </Link>
+                        
+                        <div
+                            className="relative mx-auto rounded-xl shadow-2xl w-5/6"
+                        >
+                            <BackgroundVideo  src={charts} />
+                            <BorderBeam />
                         </div>
                     </div>
-                </div>
-                <div className="pt-10 sm:pt-20 sm:pr-20 z-10">
-                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
-                        <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
-                            <span>Create <span className="bg-purple-400 text-black">Mind-Bendingly</span> Beautiful Visualizations and  Charts </span>
-                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
-                        </h1>
-                    </Link>
                     <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-analyze-data-with-lychee-ai"}>
-                        <h1 className="py-10 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
-                            <span className=""><span className="bg-purple-400 text-black">Automagically</span> Analyze Anything 
-                            With Athena (Lychee's AI) Get Unprecedented Insights</span>
-                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
+                        <h1 className="scroll-m-20 text-xl sm:text-2xl text-lychee_green font-extrabold tracking-tight lg:text-2xl place-items-center hover:underline cursor-pointer text-center"  href={"/dashboard"}>
+                            <span><span className="text-purple-400">Automagically</span> Analyze Anything. <br/>Let our <span className="text-purple-400">AI</span> do the heavy lifting for you.</span>
                         </h1>
+                        <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How it works <MoveRight /></div>
+                        <div
+                            className="relative mx-auto rounded-xl shadow-2xl w-5/6"
+                        >
+                            <div className="relative flex max-h-[400px] min-h-[400px] w-full max-w-[32rem] flex-col overflow-hidden rounded-lg border bg-background p-6 shadow-lg">
+                                <AnimatedList>
+                                    {notifications.map((item, idx) => (
+                                    <Notification {...item} key={idx} />
+                                    ))}
+                                </AnimatedList>
+                            </div>
+                            <BorderBeam />
+                        </div>
                     </Link>
-                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Examine multiple datasets at once (500MB per dataset) (and growing)</div>
-                    <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">Targeting 1GB/ dataset and 100 datasets at once by end of 2024</div>
-
                     <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-use-lychee-integrations-coingecko"}>
-                        <h1 className="pt-10 pb-6 scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight lg:text-5xl flex flex-wrap gap-2 place-items-center hover:underline cursor-pointer"  href={"/dashboard"}>
-                            <span className="">Connect <span className="bg-purple-400 text-black">Directly</span> to ALL The Data Sources of Your Dreams</span>
-                            <span className="text-xs text-slate-400 flex place-items-center gap-2">How it works <MoveRight /></span>
+                        <h1 className="scroll-m-20 text-xl sm:text-2xl text-lychee_green font-extrabold tracking-tight lg:text-2xl place-items-center hover:underline cursor-pointer text-center"  href={"/dashboard"}>
+                            <span>Connect<span className="text-purple-400"> Directly</span> to ALL <br/>The Data Sources  of Your  <span className="text-purple-400">Dreams</span> </span>
                         </h1>
+                        <div className="pt-4 text-center text-lychee_white text-sm sm:text-md">Not A Single Line of Code Required on Your End</div>
+                        <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How it works <MoveRight /></div>
+                        <div
+                            className="relative mx-auto rounded-xl shadow-2xl w-5/6"
+                        >
+                            <Image
+                                src="/dashboard.jpg"
+                                width={550}
+                                height={450}
+                                alt="Avatar"
+                                className="relative rounded-xl block"
+                            />
+                            <BorderBeam />
+                        </div>
                     </Link>
+
                     <div className="text-center text-lychee_white text-sm sm:text-4xl">Targeting 100,000 + Integrations by end of 2025</div>
-                    <div className="pt-4 text-center text-lychee_white text-sm sm:text-4xl">Not A Single Line of Code Required on Your End</div>
+                    
                     <div className="pt-4 pb-8 text-center text-lychee_white text-sm sm:text-4xl">Data Cleaner Than a Nun's Browser History</div>
                     <div className="grid grid-cols-6">
                         <div className="text-[10px] sm:text-xs font-[300] sm:font-bold text-slate-200 sm:text-white py-1">
@@ -248,6 +333,27 @@ export function Hero() {
                     </div>
                     <div className="hidden sm:block col-span-5 pl-32 ml-10 ">
                         <div><VideoView /></div>                               
+                    </div>
+                </div>
+                <div className="w-full flex place-content-center">
+                    <div className="container mx-auto px-4 md:px-8 ">
+                        <h3 className="py-4 pt-36 text-center text-[10px] font-semibold text-slate-400">
+                            ACTIVELY BETA TESTED BY FRIENDS AT
+                        </h3>
+                        <div className="sm:mt-6 sm:px-10">
+                            <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
+                                {companies.map((logo, idx) => (
+                                    <img
+                                        key={idx}
+                                        src={`./${logo}.svg`}
+                                        className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
+                                        alt={logo}
+                                    />
+                                ))}
+                            </div>
+                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
+                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
+                        </div>
                     </div>
                 </div>
             </div>
