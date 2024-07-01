@@ -152,7 +152,7 @@ const SideNav = () => {
                         <Button size="xs" className="text-[10px]">See Pricing</Button>
                       </div>
                       <div className="text-[10px] flex gap-2 place-items-center">
-                        <FaCircle className="text-green-400 animate-pulse" /> 27 seats remaining before price increase
+                        <FaCircle className="text-green-400 animate-pulse" /> 11 seats remaining before price increase
                       </div>
                     </CardContent>
                   </Card>
