@@ -52,17 +52,16 @@ const Nav = () => {
       <header className="top-0 flex h-16 items-center gap-4 bg-lychee_black text-lychee_white px-4 md:px-6">
             <nav className="hidden flex-col md:text-xs md:ml-auto md:flex md:flex-row md:items-center md:gap-12">
               <div className='cursor-pointer'><Link href="https://x.com/misterrpink1"  rel="noopener noreferrer" target="_blank"><TwitterLogoIcon /></Link></div>
-              <div className='cursor-pointer'><Link href="https://misterrpink.beehiiv.com/"  rel="noopener noreferrer" target="_blank">How It Works/Stay Up-To Date</Link></div>
-              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Request Feature</Link></div>
-              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/roadmap"  rel="noopener noreferrer" target="_blank">Vote</Link></div>
+              <div className='cursor-pointer'><Link href="https://misterrpink.beehiiv.com/"  rel="noopener noreferrer" target="_blank">Newsletter</Link></div>
+              <div className='cursor-pointer'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Feature Request</Link></div>
               <div className='cursor-pointer'><Link href="/affiliates">Affiliates</Link></div>
               <div className='cursor-pointer'><Link href="/dataUse">Data Use</Link></div>
               <div className='cursor-pointer'><Link href="/help">Contact</Link></div>
               {
                 !(user) ?
                   <>
-                      <div variant="secondary">
-                        <Link href="/login">Sign In</Link>
+                      <div className="bg-white text-lychee_black rounded-lg py-2 px-2">
+                        <Link href="/login">Sign Up/Log In</Link>
                       </div>
                   </>
                   :<>

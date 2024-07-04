@@ -4,11 +4,20 @@ import { Hero } from './hero';
 import { SocialProofTestimonials } from './testimonials';
 import Link from 'next/link';
 
+import Particles from "../magicui/particles";
+
  
 const LandingPage = () => {
 
     return (
         <div className='font-body sm:pt-5 text-black' >
+            <Particles
+                    className="absolute inset-0 z-0"
+                    quantity={100}
+                    ease={80}
+                    color={'#ffffff'}
+                    refresh
+                />         
             <Hero/>            
             <SocialProofTestimonials />
             <div className='w-full flex fixed bottom-0 sm:bottom-5 sm:pr-5 z-20 place-content-center sm:place-content-end '>

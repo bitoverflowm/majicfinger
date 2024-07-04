@@ -1,7 +1,7 @@
 "use client";
 
 import BackgroundVideo from 'next-video/background-video';
-import presenting_charts from '/videos/presenting_charts.mp4?thumbnailTime=100';
+import presenting_charts from '/videos/charts2.mp4?thumbnailTime=100';
 
 import { useRef, useEffect, useState } from "react"
 
@@ -11,7 +11,6 @@ import Image from "next/image";
 import { Twitter, Instagram, Youtube, Activity, Facebook, BarChart2, DollarSign, FileText, Cloud, ShoppingCart, Zap, Globe, Thermometer, AlertTriangle, Star, BarChart, Globe as Globe2 } from 'react-feather';
 
 import BlurIn from "../magicui/blur-in";
-import Particles from "../magicui/particles";
 import { BorderBeam } from "../magicui/border-beam";
 
 import VideoView from "./videoView";
@@ -145,67 +144,69 @@ export function Hero() {
 
 
     return (
-        <section id="hero" className="flex place-content-center w-11/12 mx-auto overflow-hidden">            
-            <div className="relative h-full container flex flex-col overflow-hidden">
-                <Particles
-                    className="absolute inset-0"
-                    quantity={100}
-                    ease={80}
-                    color={'#ffffff'}
-                    refresh
-                />         
+        <section id="hero" className="flex place-content-center w-full mx-auto overflow-hidden">            
+            <div className="relative h-full w-full container">
                 <div className="text-balance bg-gradient-to-br from-lychee_blue from-0% to-lychee_red/70 bg-clip-text font-black leading-none tracking-tighter text-transparent pt-10 pb-3 sm:py-10 text-7xl sm:text-[150px] xl:text-[250px] text-center">
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>
-                <Link rel="noopener noreferrer" target="_blank" href="https://buy.stripe.com/aEUaGYfkW9L04wgbJ3" className='z-20'>
-                    <h1 className="text-center scroll-m-20 text-4xl font-extrabold tracking-tight text-white py-1 sm:pl-1 xl:pl-6 hover:underline cursor-pointer">Countdown to V2.0.0 Promo Has Begun </h1>
-                    <h1 className="text-center scroll-m-20 text-sm font-extrabold tracking-tight text-white py-1 sm:pl-1 xl:pl-6 hover:underline cursor-pointer">Get 85% off LifeTime Access <br/> (11 seats remaining)</h1>
-                    <div className="pt-4 sm:pl-1 xl:pl-6 flex place-content-center">
-                        <div className='w-32 z-10 text-center text-black font-bold bg-green-400 p-1 sm:p-2 mt-1 sm:mt-3 rounded-md hover:bg-purple-400'>
-                            Go
+                <div className="w-full flex place-content-center">
+                    <div className="container mx-auto px-4 md:px-8 ">
+                        <h3 className="py-4 text-center text-[10px] font-semibold text-slate-400">
+                            ACTIVELY BETA TESTED BY FRIENDS AT
+                        </h3>
+                        <div className="sm:mt-6 sm:px-10">
+                            <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
+                                {companies.map((logo, idx) => (
+                                    <img
+                                        key={idx}
+                                        src={`./${logo}.svg`}
+                                        className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
+                                        alt={logo}
+                                    />
+                                ))}
+                            </div>
+                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
+                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
                         </div>
                     </div>
-                </Link>
-                <div className="pt-2 sm:pl-1 xl:pl-6 text-center">
-                    <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold  text-white bg-purple-400/20 shadow-2xl shadow-purple-200">
-                        We'll save you from all the <span className="text-lychee_green italic font-black ">complex yabba-dabba-doos</span> out there.
-                    </code>
                 </div>
-                <div className="z-10 grid sm:grid-cols-2 gap-10 p-20 pt-36">
-                    <div>
-                        <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
-                        <h1 className="scroll-m-20 text-xl sm:text-2xl text-lychee_green font-extrabold tracking-tight lg:text-2xl place-items-center text-center  hover:underline cursor-pointer ">
-                            <span><span className="text-purple-400">Instant</span> Graphs <br/> <span className="text-purple-400">Zero</span> Hassle </span>
-                        </h1>
-                        <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How it works <MoveRight /></div> </Link>
-                        <div class="relative max-w-2xl mx-auto mt-8 rounded-xl">
-                            <div class="w-full h-11 rounded-t-lg bg-gray-600/10 flex justify-start items-center space-x-1.5 px-3">
-                                <span class="w-3 h-3 rounded-full bg-red-400"></span>
-                                <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
-                                <span class="w-3 h-3 rounded-full bg-green-400"></span>
+                
+                <div className="z-10 p-20">
+                    <div className='pb-10'>
+                        <div className="relative max-w-4xl mx-auto rounded-xl">
+                            <div className="w-full h-11 rounded-t-lg bg-gray-600/10 flex justify-start items-center space-x-1.5 px-3">
+                                <span className="w-3 h-3 rounded-full bg-red-400"></span>
+                                <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
+                                <span className="w-3 h-3 rounded-full bg-green-400"></span>
                             </div>
-                            <div class=" bg-black border-t-0 w-full"><div className='px-3'><BackgroundVideo  src={presenting_charts} /></div>
+                            <div className=" bg-black border-t-0 w-full"><div className='px-3'><BackgroundVideo autoPlay loop muted playsInline src={presenting_charts} /></div>
                             </div>                                
                             <BorderBeam />                                
                         </div>
+                        <div className='py-10'>
+                            <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
+                                <h1 className="text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight  place-items-center text-center  hover:underline cursor-pointer ">
+                                    <span><span className="text-purple-400">Instant</span> Graphs <br/> <span className="text-purple-400">Zero</span> Hassle </span>
+                                </h1>
+                                <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How it works <MoveRight /></div> 
+                            </Link>
+                        </div>
                     </div>
-                    <div>
-                        <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-analyze-data-with-lychee-ai"}>
-                            <h1 className="scroll-m-20 text-xl sm:text-2xl text-lychee_green font-extrabold tracking-tight lg:text-2xl place-items-center hover:underline cursor-pointer text-center"  href={"/dashboard"}>
-                                <span><span className="text-purple-400">Automagically</span> Analyze Anything. <br/>Let our <span className="text-purple-400">AI</span> do the heavy lifting for you.</span>
-                            </h1>
-                            <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">
-                                How it works <MoveRight />
-                            </div>
+                    <div className='z-20 text-center py-4 bg-purple-400 rounded-tl-3xl rounded-tr-md rounded-br-3xl rounded-bl-md text-lychee_black hover:bg-lychee_black hover:text-white cursor-pointer'>                    
+                        <h1 className="text-center text-2xl font-extrabold tracking-tight py-1">Countdown to V2.0.1 Launch Promo</h1>
+                        <h1 className='text-sm'>Get 85% off LifeTime Access <br/> (3 seats remaining)</h1>
+                        <h1 className='pb-2'>No paying for monthly subscriptions.</h1>
+                        <Link rel="noopener noreferrer" target="_blank" href="https://buy.stripe.com/aEUaGYfkW9L04wgbJ3" className='text-center'>
+                            <code className="relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
+                                Click to Get Now
+                            </code>
                         </Link>
-                        <div className="relative mx-auto h-[520px] w-[250px] border-4 border-black rounded-2xl shadow-custom-shadow">
-                            {/* Dynamic Island notch */}
+                    </div>
+                    <div className='grid sm:grid-cols-2 place-items-center py-20'>
+                        <div className="relative mx-auto h-[520px] w-[350px] border-4 border-black rounded-2xl shadow-custom-shadow">
                             <div className='flex justify-center'>
                                 <span className="border border-black bg-black w-16 h-4 mt-2 rounded-full"></span>
-
-                                {/* right buttons */}
                                 <span className="absolute -right-1.5 top-20 border-2 border-black h-10 rounded-md"></span>
-
                                 {/* left buttons */}
                                 <span className="absolute -left-1.5 top-16 border-2 border-black h-6 rounded-md"></span>
                                 <span className="absolute -left-1.5 top-32 border-2 border-black h-12 rounded-md"></span>
@@ -219,12 +220,26 @@ export function Hero() {
                                 </AnimatedList>
                             </div>
                         </div>
+                        <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-analyze-data-with-lychee-ai"}>
+                            <h1 className="scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight place-items-center hover:underline cursor-pointer text-center"  href={"/dashboard"}>
+                                <span>Analyze <span className="text-purple-400">Anything.</span> <br/>Let our <span className="text-purple-400">AI</span> do the heavy lifting for you.</span>
+                            </h1>
+                            <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">
+                                How it works <MoveRight />
+                            </div>
+                        </Link>
+                    </div>
+                    
+                    <div className="pt-2 sm:pl-1 xl:pl-6 text-center">
+                        <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold  text-white bg-purple-400/20 shadow-2xl shadow-purple-200">
+                            We'll save you from all the <span className="text-lychee_green italic font-black ">complex yabba-dabba-doos</span> out there.
+                        </code>
                     </div>
                     <div className='sm:col-span-2 lg:col-span-2 flex place-content-center'>
                         <blockquote className="mb-2 border-l-2 pl-6 italic text-xs text-white w-1/2">
-                            <span className='font-bold'>Lychee V2.0.0 is coming!</span> <br/>
+                            <span className='font-bold'>Lychee V2.0.1 is coming!</span> <br/>
                             Get Instant Access For Life $29.99 (85% off). No monthly subs. All Future Updates Included<br/>
-                            <div className='flex py-1 gap-1 place-items-center'><FaCircle className="text-green-400 animate-pulse" />  11 seats remaining</div>
+                            <div className='flex py-1 gap-1 place-items-center'><FaCircle className="text-green-400 animate-pulse" />  3 seats remaining</div>
                             <Link rel="noopener noreferrer" target="_blank" className="underline bg-lychee_green/30" href="https://buy.stripe.com/aEUaGYfkW9L04wgbJ3"> Get deal now! </Link>
                         </blockquote> 
                     </div>                                    
@@ -271,27 +286,7 @@ export function Hero() {
                             <div className="pt-4 sm:pt-6 xl:text-center text-lychee_white text-xl sm:text-4xl">Invite Your Team</div>
                             <div className="pt-4 sm:pt-6 xl:text-center text-lychee_white text-xl sm:text-4xl">Build an Audience Right Here</div>                                  
                 </div>
-                <div className="w-full flex place-content-center">
-                    <div className="container mx-auto px-4 md:px-8 ">
-                        <h3 className="py-4 pt-36 text-center text-[10px] font-semibold text-slate-400">
-                            ACTIVELY BETA TESTED BY FRIENDS AT
-                        </h3>
-                        <div className="sm:mt-6 sm:px-10">
-                            <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
-                                {companies.map((logo, idx) => (
-                                    <img
-                                        key={idx}
-                                        src={`./${logo}.svg`}
-                                        className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
-                                        alt={logo}
-                                    />
-                                ))}
-                            </div>
-                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
-                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
-                        </div>
-                    </div>
-                </div>
+                
             </div>
         </section>
     );
