@@ -37,91 +37,39 @@ import { FontBoldIcon, FontSizeIcon, LineHeightIcon, TextAlignCenterIcon, TextAl
 const EasyLychee = () => {
     const user = useUser()
     const contextStateV2 = useMyStateV2()
-    
-    const [handle, setHandle] = useState()
-    const [template, setTemplate] = useState('classic')
-    const [selectedTag, setSelectedTag] = useState(null);
-
 
     let connectedCols = contextStateV2?.connectedCols
     let connectedData = contextStateV2?.connectedData
     let loadedDataMeta = contextStateV2?.loadedDataMeta
+    
 
+    //handle used for saving and publishing website
+    const [handle, setHandle] = useState()
+    const [template, setTemplate] = useState('classic')
+    
     const [displayMap, setDisplayMap] = useState({})
+
+    // styles will now only be used for color management
     const [styles, setStyles] = useState({
         'page': {
             backgroundColor: 'white'
         },
-        'headerBox': {
-            paddingTop: '60px',
-            paddingBottom: '60px',
-            paddingLeft: '44px',
-            paddingRight: '44px',
+        'hero': {
             backgroundColor: 'black',
-            display: 'flex',
-            flexDirection: 'column',
-            textAlign: 'center',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '2px',
         },
-        'mainTitle': {
-            fontSize: '32px',
-            fontWeight: 700, // bold
+        'name': {
             color: 'white',
-            textAlign: 'center',
         },
-        'subTitle': {
-            fontSize: '16px',
-            fontWeight: 400, // normal
+        'description': {
             color: 'white',
-            textAlign: 'center',
         },
-        'cardHeading': {
-            backgroundColor: 'lightgrey',
-            padding: '20px',
-        },
-        'cardTitle': {
-            fontSize: '20px',
-            fontWeight: 700, // bold
-            color: 'black',
-            textAlign: 'center',
-        },
-        'cardBody': {
-            backgroundColor: 'white'
-        },
-        'cardSubTitle': {
-            fontSize: '16px',
-            fontWeight: 400, // normal
-            color: 'grey',
-            textAlign: 'center',
-        },
-        'text0': {
-            fontSize: '14px',
-            fontWeight: 400, // normal
-            color: 'black',
-            textAlign: 'left',
-        },
-        'cta': {
+        'link': {
             backgroundColor: 'blue',
             color: 'white',
-            borderColor: 'darkblue',
-            padding: '10px 20px',
-            textAlign: 'center',
-            fontSize: '14px',
-            fontWeight: 400,
         },
-        'cardFooter' : {
-            display: 'flex',
-            justifyContent: 'right',
-            backgroundColor: 'white'
-        }
     });
     
-
-    const [projectName, setProjectName] = useState(`Wall St Bets and Sentiments`)
-    const [presentationName, setPresentationName] = useState(`June 5th Bets`)
-
+    //control panel
     const [edit, setEdit] = useState(true)
     const [mainTitle, setMainTitle] = useState('Title Goes Here')
     const [subTitle, setSubTitle] = useState(`Description goes here`)
@@ -129,118 +77,26 @@ const EasyLychee = () => {
     const [granularColorsVisible, setGranularColorsVisible] = useState(false)
     const [colorTarget, setColorTarget] = useState(null)
 
-    const displayNames = {
-        cardTitle: 'Title',
-        cardSubTitle: 'Sub Title',
-        text0: 'Body Text',
-        cta: 'Call to Action'
-    }
 
-    const displayNamesClassic = {
-        name: 'name',
-        description: 'description',
-        link: 'link'
-    }
+    const [displayNames, setDisplaNames] = useState()
 
-    const integrations_list = [
-        {
-            name: "CoinGecko",
-            clickHandler: "coinGecko",
-            description: "Connect to the most reliable and comprehensive cryptocurrency data API for traders and developers.",
-            color: "#35af00",
-            icon: <div className="p-1 rounded-full shadow-2xl"><Image src={'/coinGecko.png'} height={60} width={60} /></div>,
-            tags: ['featured', 'crypto', 'finance', 'trading']
-        },
-        {
-          color: "#000",
-          icon: <Image src={'/coinGecko.png'} height={60} width={60} />,
-          clickHandler: "coinGeckoTerminal",
-          name: "GeckoTerminal from CoinGecko",
-          description: "GeckoTerminal is a DeFi and DEX aggregator. Explore the market data & prices of any tokens traded across 110+ blockchain networks across 900+ DEXes – brought to you by the same team behind CoinGecko.",
-          tags: ['featured', 'crypto', 'finance', 'trading', 'coming July 24', 'coming soon']
-        },
-        {
-          color: "#AE82FE",
-          icon: <Image src={'/productHunt.png'} height={80} width={80} />,
-          clickHandler: "productHunt",
-          name: "Product Hunt",
-          description: "Discover the latest tech products, startups, and trends with real-time updates from Product Hunt.",
-          tags: ['indieHackers', 'coming July 24', 'coming soon']
-        }, 
-        {
-          color: "#000",
-          icon: <Image src={'/x.png'} height={60} width={60} />,
-          clickHandler: "twitter",
-          name: "Twitter",
-          description: "Access and analyze a wealth of Twitter data, from tweets and user profiles to trends and hashtags.",
-          tags: ['social', 'marketing']
-        },
-        {
-          color: "#3572EF",
-          icon: <Image src={'/wallStreetBets.png'} height={80} width={80} />,
-          clickHandler: "wallStreetBets",
-          name: "Wall Street Bets",
-          description: "Sentiment analysis on the top 50 stocks discussed on Reddit sub- wallStreetBets.",
-          tags: ['finance', 'trading']
-        },
-        {
-          color: "#FF4500",
-          icon: <Image src={'/shortSqueeze.png'} height={60} width={60} />,
-          clickHandler: "shortSqueeze",
-          name: "Short Squeeze Stock Scanner",
-          description: "Get a list of stocks that are in TTM Squeeze or out of squeeze.",
-          tags: ['finance', 'trading']
-        },
-        {
-          color: "#3AA6B9",
-          icon: <Image src={'/sec.png'} height={60} width={60} />,
-          clickHandler: "secEdgar",
-          name: "SEC EDGAR",
-          description: "Access comprehensive financial statements, filings, and disclosures from the SEC's EDGAR database.",
-          tags: ['finance', 'regulation', 'compliance','coming soon', 'coming July 24']
-        },
-        {
-          color: "#004080",
-          icon: <Image src={'/censusGov.png'} height={60} width={60} />,
-          clickHandler: "censusGov",
-          name: "Census.gov",
-          description: "Retrieve detailed demographic, economic, and population data from the U.S. Census Bureau.",
-          tags: ['data', 'demographics', 'population', 'coming soon', 'coming July 24']
-        },
-        {
-          color: "#0099CC",
-          icon: <Image src={'/crunchbase.png'} height={60} width={60} className="rounded-md shadow-2xl"/>,
-          clickHandler: "crunchbase",
-          name: "Crunchbase",
-          description: "Get access to comprehensive information about companies, startups, investments, and industry trends.",
-          tags: ['business', 'startups', 'investment', 'coming soon', 'coming July 24']
-        },
-        {
-          color: "#FF6600",
-          icon: <div className="bg-white p-1 rounded-md shadow-2xl"><Image src={'/hackerNews.png'} height={50} width={50} /></div>,
-          clickHandler: "hackerNews",
-          name: "Hacker News",
-          description: "Stay updated with the latest tech news, discussions, and trends from the Hacker News community.",
-          tags: ['tech', 'news', 'community', 'coming soon', 'coming July 24']
-        },
-        {
-          color: "#000080",
-          icon: <div className="text-white">USTreasuries</div>,
-          clickHandler: "usTreasuries",
-          name: "US Treasuries",
-          description: "Access real-time and historical data on U.S. Treasury securities, yields, and auctions.",
-          tags: ['finance', 'government', 'coming soon', 'coming July 24']
+    useEffect(() => {
+        if (connectedCols && connectedData) {
+            if(template === 'classic'){
+                setDisplaNames({name: 'name',
+                    description: 'description',
+                    link: 'link'})
+                setDisplayMap(generateDisplayMap());
+            }else{
+                setDisplaNames({cardTitle: 'Title',
+                    cardSubTitle: 'Sub Title',
+                    text0: 'Body Text',
+                    cta: 'Call to Action'})
+                setDisplayMap(generateDisplayMap());
+            }
+            
         }
-      ];
-    
-
-    const handleSelectChange = (key, value) => {
-        setDisplayMap(prevState => {
-            const newState = { ...prevState };
-            newState[key] = value;
-            return newState;
-        });
-    };
+    }, [template]);
 
     const generateDisplayMap = () => {
         const colLen = connectedCols.length;
@@ -258,6 +114,15 @@ const EasyLychee = () => {
                 cta: colLen > 3 ? connectedCols[3].field : '',
             };
         }
+    };
+
+    //Assign new column to presentation field
+    const handleSelectChange = (key, value) => {
+        setDisplayMap(prevState => {
+            const newState = { ...prevState };
+            newState[key] = value;
+            return newState;
+        });
     };
 
     useEffect(() => {
@@ -278,58 +143,6 @@ const EasyLychee = () => {
             }
         }))
     }
-
-    const handleIncrement = (category, property) => {
-        setStyles(prevStyles => {
-            let newValue;
-    
-            if (property === 'fontWeight') {
-                newValue = Math.min(parseInt(prevStyles[category][property]) + 100, 900);
-                return {
-                    ...prevStyles,
-                    [category]: {
-                        ...prevStyles[category],
-                        [property]: newValue
-                    }
-                };
-            } else {
-                newValue = Math.min(parseInt(prevStyles[category][property]) + 5, 56);
-                return {
-                    ...prevStyles,
-                    [category]: {
-                        ...prevStyles[category],
-                        [property]: newValue + 'px'
-                    }
-                };
-            }
-        });
-    };
-    
-    const handleDecrement = (category, property) => {
-        setStyles(prevStyles => {
-            let newValue;
-    
-            if (property === 'fontWeight') {
-                newValue = Math.max(parseInt(prevStyles[category][property]) - 100, 100);
-                return {
-                    ...prevStyles,
-                    [category]: {
-                        ...prevStyles[category],
-                        [property]: newValue
-                    }
-                };
-            } else {
-                newValue = Math.max(parseInt(prevStyles[category][property]) - 5, 0);
-                return {
-                    ...prevStyles,
-                    [category]: {
-                        ...prevStyles[category],
-                        [property]: newValue + 'px'
-                    }
-                };
-            }
-        });
-    };    
 
     /* Color management */
 
@@ -492,6 +305,8 @@ const EasyLychee = () => {
     }
 
     /* Deploy */
+    const [projectName, setProjectName] = useState(`Wall St Bets and Sentiments`)
+    const [presentationName, setPresentationName] = useState(`June 5th Bets`)
 
     const deployHandler = async () => {
         fetch(`/api/presentations/`, {
@@ -589,50 +404,6 @@ const EasyLychee = () => {
                 {
                     edit &&
                     <div className='w-1/4 border border-slate-200 rounded-xl flex flex-col'>
-                        <div className='px-4 pt-4'>
-                            <p className="text-xs text-muted-foreground">Header</p>                        
-                            <div className=''>
-                                <Label htmlFor="mainTitle" className="text-xs">Title</Label>
-                                <div className='flex gap-2'>
-                                    <Input id="mainTitle" type="text" placeholder="Title" onChange={(e)=>setMainTitle(e.target.value)} />
-                                    <Button variant="outline" onClick={() => granularColorHandler('mainTitleText')} className="w-10" style={{color : styles.mainTitle.color, backgroundColor: styles.headerBox.backgroundColor}}>A</Button></div>
-                            </div>
-                            <div className=''>
-                                <Label htmlFor="subTitle" className="text-xs">Description</Label>
-                                <div className='flex gap-2'>
-                                    <Textarea id="subTitle" type="text" placeholder="Description" onChange={(e)=>setSubTitle(e.target.value)} />
-                                    <Button variant="outline" onClick={() => granularColorHandler('subTitleText')} className="w-10" style={{color : styles.subTitle.color, backgroundColor: styles.headerBox.backgroundColor}}>A</Button>
-                                </div>
-                            </div>
-                        </div>
-                        <div className='px-4 pt-2'>
-                            <p className="pb-1 text-xs text-muted-foreground">Header Container Styles</p>
-                            <div className='flex flex-wrap gap-5 place-items-center'>
-                                <Button variant="outline" size="icon" onClick={() => granularColorHandler('headerBackground')} style={{backgroundColor: styles.headerBox.backgroundColor}}></Button>
-                                <ToggleGroup
-                                    type="single"
-                                    value={styles.headerBox.alignItems}
-                                    onValueChange={(value) => handleStyleChange('headerBox', 'alignItems', value)}
-                                    aria-label="Align Items"
-                                    className=""
-                                >
-                                    <ToggleGroupItem value="flex-start" aria-label="Flex Start">
-                                        <TextAlignLeftIcon />
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem value="center" aria-label="Center">
-                                        <TextAlignCenterIcon />
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem value="flex-end" aria-label="Flex End">
-                                        <TextAlignRightIcon />
-                                    </ToggleGroupItem>
-                                </ToggleGroup>
-                                <div className='flex gap-1'>
-                                    <Button  variant="outline" size="icon" className="border-slate-100" onClick={() => handleDecrement('headerBox', 'gap')}><TextAlignMiddleIcon/></Button>
-                                    <Button  variant="outline" size="icon" className="border-slate-100" onClick={() => handleIncrement('headerBox', 'gap')}><LineHeightIcon /></Button>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className='px-4 pt-8'>
                             <p className="text-xs font-bold text-muted-foreground">Card Management</p>
                             <p className="text-xs text-muted-foreground">How would you like to present your data?</p>
@@ -640,7 +411,7 @@ const EasyLychee = () => {
                                 {displayMap && Object.keys(displayMap).map((key) => (
                                     <div key={key} className="py-2">
                                         <div className="text-left text-xs">
-                                            {displayNamesClassic[key]}
+                                            {displayNames[key]}
                                         </div>
                                         <div className='flex flex-wrap gap-2'>
                                             <div className="w-2/5">
@@ -660,25 +431,6 @@ const EasyLychee = () => {
                                         </div>
                                     </div>
                                 ))}
-                            </div>
-                        </div>
-                        <div className='px-4 py-2 hidden'>
-                            <p className="pb-1 text-xs text-muted-foreground">Card Header Styles</p>
-                            <div className='flex gap-5 place-items-center'>
-                                <Button variant="outline" className="p-3 w-5 h-5" onClick={() => granularColorHandler('cardHeadingBackground')} style={{backgroundColor: styles.cardHeading.backgroundColor}}></Button>
-                                <div className='flex gap-1 text-xs place-items-center'>
-                                    <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleDecrement('cardHeading', 'padding')}>-</Button>
-                                    <div className='text-xs px-1'>Padding</div>
-                                    <Button  variant="outline" className="p-3 w-1 h-1 rounded-full border-slate-100" onClick={() => handleIncrement('cardHeading', 'padding')}>+</Button>
-                                </div>
-                            </div>
-                        </div>
-                        <div className='hidden'>
-                            <div>Publishing Meta</div>
-                            <div>This is your handle. You can change it here. This will impact all projects, urls, you may have shared</div>
-                            <div className='flex gap-2'>
-                                <Label htmlFor="handle">Yout Handle</Label>
-                                <Input id="handle" type="text" placeholder="Title" onChange={(e)=>setHandle(e.target.value)} />
                             </div>
                         </div>
                         {
