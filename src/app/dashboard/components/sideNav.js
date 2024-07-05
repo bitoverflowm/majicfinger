@@ -137,28 +137,29 @@ const SideNav = () => {
       </div>
     </nav>
     <div className="mt-auto mb-5 w-full">
-      {
-        minimized ? <div className="bg-purple-600 flex place-items-center place-content-center p-2 rounded-sm text-white hover:bg-yellow-400 cursor-pointer hover:text-purple-600" onClick={()=>setViewing('pricing')}><PowerIcon /> </div>
-                : <Card onClick={() => viewHandler('pricing')}>
-                    <CardHeader className="pt-2 pb-1 bg-green-100">
-                      <CardTitle className="text-md text-green-600 font-black text-center">85% off lifetime access</CardTitle>
-                    </CardHeader>
-                    <CardContent className="w-full text-[10px] pt-2">
-                      <div className="text-sm text-center flex place-items-center place-content-center gap-1">
-                        $29.99 <div className="line-through text-[10px] text-center">$199.99</div>
-                      </div>
-                      <div className="pb-1 text-[10px] text-center">One Time Payment </div>
-                      <div className="flex py-2 place-content-center">
-                        <Button size="xs" className="text-[10px]">See Pricing</Button>
-                      </div>
-                      <div className="text-[10px] flex gap-2 place-items-center">
-                        <FaCircle className="text-green-400 animate-pulse" /> 11 seats remaining before price increase
-                      </div>
-                    </CardContent>
-                  </Card>
-      }
+        {
+          minimized ? <Link href={'/#getIt'}><div className="bg-purple-600 flex place-items-center place-content-center p-2 rounded-sm text-white hover:bg-yellow-400 cursor-pointer hover:text-purple-600" onClick={()=>setViewing('pricing')}><PowerIcon /> </div></Link>
+                  : <Link href={'/#getIt'}><Card>
+                      <CardHeader className="pt-2 pb-1 bg-green-100">
+                        <CardTitle className="text-md text-green-600 font-black text-center">launch promo</CardTitle>
+                      </CardHeader>
+                      <CardContent className="w-full text-[10px] pt-2">
+                        <div className="text-sm text-center flex place-items-center place-content-center gap-1">
+                          $29.99 <div className="line-through text-[10px] text-center">$199.99/month</div>
+                        </div>
+                        <div className="pb-1 text-[10px] text-center">One Time Payment </div>
+                        <div className="flex py-2 place-content-center">
+                          <Button size="xs" className="text-[10px]">See Pricing</Button>
+                        </div>
+                        <div className="text-[10px] flex gap-2 place-items-center">
+                          <FaCircle className="text-green-400 animate-pulse" /> 3 seats remaining before price increase
+                        </div>
+                      </CardContent>
+                    </Card>
+                    </Link>
+        }
+      </div>
     </div>
-  </div>
         )
       }
 
