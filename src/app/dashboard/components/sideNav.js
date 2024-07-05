@@ -129,7 +129,7 @@ const SideNav = () => {
         {!minimized && 'AI'}
       </div>
       <div
-        className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'presentation' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hidden'}`}
+        className={`cursor-pointer flex items-center gap-4 px-2.5 py-2 ${viewing === 'presentation' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
         onClick={() => viewHandler('presentation')}
       >
         <Camera className="h-5 w-5" />

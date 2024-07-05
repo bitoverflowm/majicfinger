@@ -21,6 +21,7 @@ import ScraperView from "@/components/scraperView";
 import ComingSoon from "./components/comingSoon";
 import { Pricing } from "@/components/pricing/lycheePricing";
 import PresentationView from "@/components/presentationView";
+import EasyLychee from "@/components/easyLychee";
 
 
 const DashBody = ({user}) => {
@@ -103,7 +104,7 @@ const DashBody = ({user}) => {
                 { viewing === 'integrations' && <div className="py-10"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }
                 { viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
-                { viewing === 'presentation' && <div className="py-20"><PresentationView /></div> }
+                { viewing === 'presentation' && <div className="py-20"><EasyLychee /></div> }
                 { viewing === 'scrape' && <ScraperView />}
                 { viewing === 'register' && <div className="flex place-items-center place-content-center"><div><Login/></div></div>}
                 { viewing === 'pricing' && <div className="py-10"><Pricing /></div>}
