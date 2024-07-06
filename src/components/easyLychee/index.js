@@ -41,6 +41,8 @@ const EasyLychee = () => {
     let connectedCols = contextStateV2?.connectedCols
     let connectedData = contextStateV2?.connectedData
     let loadedDataMeta = contextStateV2?.loadedDataMeta
+    let loadedPresentationMeta = contextStateV2?.loadedPresentationMeta
+    let connectedPresentation = contextStateV2?.connectedPresentation
 
     //handle used for saving and publishing website
     const [handle, setHandle] = useState()
@@ -56,6 +58,22 @@ const EasyLychee = () => {
     const [selectedPalette, setSelectedPalette] = useState(['#000']);
 
     const [displayNames, setDisplaNames] = useState()
+    const [projectName, setProjectName] = useState(`Wall St Bets and Sentiments`)
+    const [presentationName, setPresentationName] = useState(`June 5th Bets`)
+
+    useEffect(()=> {
+        if(connectedPresentation){
+            console.log('connectedPresentation: ', connectedPresentation)
+            setTemplate(connectedPresentation.template)
+            setDisplayMap(connectedPresentation.display_map)
+            setEdit(false)
+            setMainTitle(connectedPresentation.main_title)
+            setSubTitle(connectedPresentation.sub_title)
+            setSelectedPalette(connectedPresentation.palette)
+            setProjectName(connectedPresentation.projectName)
+            setPresentationName(connectedPresentation.presentation_name)
+        }
+    },[connectedPresentation])
 
     useEffect(() => {
         if (connectedCols && connectedData) {
@@ -144,8 +162,6 @@ const EasyLychee = () => {
     };
 
     /* Deploy */
-    const [projectName, setProjectName] = useState(`Wall St Bets and Sentiments`)
-    const [presentationName, setPresentationName] = useState(`June 5th Bets`)
 
     const deployHandler = async () => {
         fetch(`/api/presentations/`, {
@@ -156,9 +172,11 @@ const EasyLychee = () => {
             body: JSON.stringify({
                 project_name: projectName,
                 page: pageName,
+
                 display_map: displayMap,
                 data_meta: loadedDataMeta,
                 data_snap_shot: connectedData,
+                
                 user_id: user.userId,
                 title: mainTitle,
                 subTitle: subTitle,
@@ -167,11 +185,36 @@ const EasyLychee = () => {
             .then(data => { console.log("presentation saved: ", data) })
     }
 
+    const saveHandler = async () => {
+        fetch(`/api/presentations/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                //user specified for their own reference. This will also be used for slug
+                project_name: 'project1',
+                //lychee/userhandle/projectname/pagename
+                presentation_name: 'page1',
+                template: template,
+                main_title: mainTitle,
+                sub_title: subTitle,
+                display_map: displayMap,
+                data_meta: loadedDataMeta,
+                data_snap_shot: connectedData,
+                palette: selectedPalette,
+                user_id: user.userId,
+            }),
+        }).then(response => response.json())
+            .then(data => { console.log("page saved: ", data) })
+    }
+
 
     return (
         <div className='px-10 py-2'>
             <div className='flex pb-6 gap-2 text-xs place-items-center'>
                 <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={() => setEdit(!edit)}> {edit ? 'Hide Edit' : 'Show Edit Panel'}</div>
+                <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => saveHandler()}>Save</div>
                 <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => deployHandler()}>Deploy</div>
                 <div className='bg-slate-100/80 px-1 h-10'></div>
                 <Label className="text-xs text-slate-600">Template</Label><div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={()=>setTemplate('classic')}>Classic</div>
@@ -236,51 +279,6 @@ const EasyLychee = () => {
                     edit &&
                     <div className="fixed top-20 right-10 w-1/4 border border-slate-200 rounded-xl flex flex-col bg-white shadow-lg"
                     style={{ zIndex: 20 }}>
-                        { !paletteVisible &&
-                            <div className='px-8 py-8'>
-                                <p className="text-xs font-bold text-muted-foreground">Card Management</p>
-                                <p className="text-xs text-muted-foreground">How would you like to present your data?</p>
-                                <div className=''>
-                                    {displayMap && Object.keys(displayMap).map((key) => (
-                                        <div key={key} className="py-2">
-                                            <div className="text-left text-xs">
-                                                {displayNames[key]}
-                                            </div>
-                                            <div className='flex flex-wrap gap-2'>
-                                                <div className="w-3/5 text-xs">
-                                                    <Select value={displayMap[key]} onValueChange={(value) => handleSelectChange(key, value)}>
-                                                        <SelectTrigger >
-                                                            <SelectValue placeholder="Select column" className='text-xs'/>
-                                                        </SelectTrigger>
-                                                        <SelectContent className='text-xs'>
-                                                            {connectedCols.map((col) => (
-                                                                <SelectItem key={col.field} value={col.field} className='text-xs'>
-                                                                    {col.field}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>                                 
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className='pt-4'>
-                                    <p className="text-xs text-muted-foreground">Hero Section</p>                        
-                                    <div className=''>
-                                        <Label htmlFor="mainTitle" className="text-xs">Title</Label>
-                                        <Input id="mainTitle" type="text" placeholder="Title" onChange={(e)=>setMainTitle(e.target.value)} />
-                                    </div>
-                                    <div className=''>
-                                        <Label htmlFor="subTitle" className="text-xs">Sub Title</Label>
-                                        <Textarea id="subTitle" type="text" placeholder="Description" onChange={(e)=>setSubTitle(e.target.value)} />
-                                    </div>
-                                </div>
-                                <div className='pt-4'>
-                                    <div className='bg-slate-100 text-xs w-32 text-black p-2 rounded-lg cursor-pointer' onClick={()=>setPaletteVisible(true)}>Pick a Pallate</div>
-                                </div>
-                            </div>
-                        }
                         {
                             paletteVisible && 
                                 <div className="">
@@ -307,8 +305,51 @@ const EasyLychee = () => {
                                             </div>
                                         )}
                                     
+                            </div>
+                        }
+                        <div className='px-8 py-8'>
+                            <p className="text-xs font-bold text-muted-foreground">Card Management</p>
+                            <p className="text-xs text-muted-foreground">How would you like to present your data?</p>
+                            <div className=''>
+                                {displayMap && Object.keys(displayMap).map((key) => (
+                                    <div key={key} className="py-2">
+                                        <div className="text-left text-xs">
+                                            {displayNames[key]}
+                                        </div>
+                                        <div className='flex flex-wrap gap-2'>
+                                            <div className="w-3/5 text-xs">
+                                                <Select value={displayMap[key]} onValueChange={(value) => handleSelectChange(key, value)}>
+                                                    <SelectTrigger >
+                                                        <SelectValue placeholder="Select column" className='text-xs'/>
+                                                    </SelectTrigger>
+                                                    <SelectContent className='text-xs'>
+                                                        {connectedCols.map((col) => (
+                                                            <SelectItem key={col.field} value={col.field} className='text-xs'>
+                                                                {col.field}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>                                 
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className='pt-4'>
+                                <p className="text-xs text-muted-foreground">Hero Section</p>                        
+                                <div className=''>
+                                    <Label htmlFor="mainTitle" className="text-xs">Title</Label>
+                                    <Input id="mainTitle" type="text" placeholder="Title" value={mainTitle} onChange={(e)=>setMainTitle(e.target.value)} />
                                 </div>
-                            }
+                                <div className=''>
+                                    <Label htmlFor="subTitle" className="text-xs">Sub Title</Label>
+                                    <Textarea id="subTitle" type="text" placeholder="Description" value={subTitle} onChange={(e)=>setSubTitle(e.target.value)} />
+                                </div>
+                            </div>
+                            <div className='pt-4'>
+                                <div className='bg-slate-100 text-xs w-32 text-black p-2 rounded-lg cursor-pointer' onClick={()=>setPaletteVisible(true)}>Pick a Pallate</div>
+                            </div>
+                        </div>
                     </div>
                 }
             </div>

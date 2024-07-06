@@ -233,6 +233,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [dataSetName, setDataSetName] = useState()
     const [refetchData, setRefetchData] = useState()
     const [refetchChart, setRefetchChart] = useState()
+    const [refetchPresentations, setRefetchPresentations] = useState()
     //all saved DataSets
     const [savedDataSets, setSavedDataSets] = useState()
     const [loadedDataMeta, setLoadedDataMeta] = useState()
@@ -240,6 +241,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     //all saved Charts
     const [savedCharts, setSavedCharts] = useState()
     const [loadedChartMeta, setLoadedChartMeta ] = useState()
+    //all saved presentations
+    const [savedPresentations, setSavedPresentations] = useState()
+    const [loadedPresentationMeta, setLoadedPresentationMeta] = useState()
+    const [connectedPresentation, setConnectedPresentation] = useState()
+
 
     //multi sheet handler
     const [multiSheetFlag, setMultiSheetFlag] = useState()
@@ -346,7 +352,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, refetchData, setRefetchData, refetchChart, setRefetchChart, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, sheetNames, setSheetNames}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, sheetNames, setSheetNames}}>
             {children}
         </StateContextV2.Provider>
     )

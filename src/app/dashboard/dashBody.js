@@ -31,11 +31,14 @@ const DashBody = ({user}) => {
     //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
     const setSavedCharts = contextStateV2?.setSavedCharts
+    const setSavedPresentations = contextStateV2?.setSavedPresentations
     
     const refetchData = contextStateV2?.refetchData
     const setRefetchData = contextStateV2?.setRefetchData
     const refetchChart = contextStateV2?.refetchData
     const setRefetchChart = contextStateV2?.setRefetchData
+    const refetchPresentations = contextStateV2?.refetchPresentations
+    const setRefetchPresentations = contextStateV2?.setRefetchPresentations
 
     const [startNew, setStartNew] = useState()
 
@@ -87,7 +90,35 @@ const DashBody = ({user}) => {
                 setRefetchChart(0)
             })
         }
-    }, [user, refetchChart])    
+    }, [user, refetchChart])
+
+    useEffect(() => {
+        if(user){
+            fetch(`/api/presentations?uid=${user.userId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    setSavedPresentations(data.data);
+                    console.log(data.data)
+                    toast('Saved Presentations Loaded!', {
+                        description: `We just pulled your saved charts.`,
+                        closeButton: true,
+                        duration: 3000
+                      });
+                } else {
+                    console.error('Failed to fetch saved Charts:', data.message);
+                }
+                setRefetchPresentations(0)
+            })
+        }
+    }, [user, refetchPresentations])
+
+
 
     return(
         <div className="flex">

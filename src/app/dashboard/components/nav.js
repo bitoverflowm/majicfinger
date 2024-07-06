@@ -35,12 +35,22 @@ const Nav = () => {
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
   const setDataSetName = contextStateV2?.setDataSetName
+  
   const savedDataSets = contextStateV2?.savedDataSets
   const setConnectedData = contextStateV2?.setConnectedData
+
   const loadedDataMeta = contextStateV2?.loadedDataMeta
   const setLoadedDataMeta = contextStateV2?.setLoadedDataMeta
   const loadedDataId = contextStateV2?.loadedDataId
   const setLoadedDataId = contextStateV2?.setLoadedDataId
+
+  const savedPresentations = contextStateV2?.savedPresentations
+  const loadedPresentationMeta = contextStateV2?.loadedPresentationMeta
+  const setLoadedPresentationMeta = contextStateV2?.setLoadedPresentationMeta
+  const connectedPresentation = contextStateV2?.connectedPresentation
+  const setConnectedPresentation = contextStateV2?.setConnectedPresentation
+
+
 
   //saving charts
   const savedCharts = contextStateV2?.savedCharts
@@ -49,6 +59,7 @@ const Nav = () => {
   //let system know to conduct refetch
   const setRefetchData = contextStateV2?.setRefetchData
   const setRefetchChart = contextStateV2?.setRefetchData
+  const setRefetchPresentations = contextStateV2?.setRefetchPresentations
 
   //current chart view properties
   const chartOptions = contextStateV2?.chartOptions
@@ -240,7 +251,6 @@ const Nav = () => {
         },
       }).then(response => response.json())
         .then(res =>{
-          console.log(res.data)
           setConnectedData(res.data.data)
           setLoadedDataMeta(dataSet)
           toast.success(`Data: ${res.data.data_set_name} loaded`, {
@@ -294,12 +304,42 @@ const Nav = () => {
             },
           }).then(response => response.json())
             .then(dataSheetRes =>{
-              console.log(dataSheetRes.data)
               setConnectedData(dataSheetRes.data.data)
               setLoadedDataMeta(savedDataSets.find(ds => ds._id === chartMeta.data_set_id))
           })
           setIsOpen(false)
           setViewing('charts')
+        })
+    }    
+  }
+
+  const loadPresentation = async (presentationId, presentationMeta) => {
+    if(loadedPresentationMeta && presentationId === loadedPresentationMeta._id){
+      //set the data
+      //set the presentation 
+      setViewing('presentation')
+      setIsOpen(false)
+    }else{
+      fetch(`/api/presentations/presentation/${presentationId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }).then(response => response.json())
+        .then(res =>{
+          console.log(res.data)
+          //letting system know that a new chart has been propogated
+          setLoadedPresentationMeta(presentationMeta)
+          setConnectedData(res.data.data_snap_shot)
+          setLoadedDataMeta(res.data.data_meta)
+          setConnectedPresentation(res.data)          
+
+          toast.success(`Presentation: ${res.data.data_meta.project_name} loaded`, {
+            duration: 99999999
+          })
+
+          setIsOpen(false)
+          setViewing('presentation')
         })
     }    
   }
@@ -329,7 +369,7 @@ const Nav = () => {
                           <SheetHeader>
                             <SheetTitle>Your Saved Work</SheetTitle>
                             <SheetDescription>
-                              Chick on a project to load and begin work.
+                              Click on a project to load and begin work.
                             </SheetDescription>
                           </SheetHeader>
                           <Tabs defaultValue="data" className="h-5/6 overflow-y-auto h-screen">
@@ -379,7 +419,27 @@ const Nav = () => {
                                 }
                               </div>
                             </TabsContent>
-                            <TabsContent value="persentations">Your presentations will go here.</TabsContent>
+                            <TabsContent value="persentations"><div className="flex flex-wrap gap-2">
+                                { 
+                                  savedPresentations && savedPresentations.length > 0 && savedPresentations.map(
+                                    (pressie)=> 
+                                      <Card key={pressie._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadPresentation(pressie._id, pressie)}>
+                                        <CardHeader>
+                                          <div className="flex">{pressie.presentation_name}<div className="ml-auto">{loadedPresentationMeta && loadedPresentationMeta._id === pressie._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                        </CardHeader>
+                                        <CardContent>
+                                          <div>{pressie.project_name}</div>
+                                          <div></div>
+                                          <div></div>
+                                          <div className="py-1">Edited: {moment(pressie.last_saved_date).format('ddd MMM YY h:mm a')}</div>
+                                        </CardContent>
+                                        <CardFooter>
+                                          <div className="flex">{pressie.deployed && <Badge>Deployed</Badge>}</div>
+                                        </CardFooter>
+                                      </Card>
+                                      )
+                                }
+                              </div></TabsContent>
                           </Tabs>
                         </SheetContent>
                       </Sheet>

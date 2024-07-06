@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     const {
         query: { uid },
         method,
-        body: { project_name, presentation_name, display_map, data_meta, data_snap_shot, user_id }, // Destructure these from req.body
+        body: { project_name, presentation_name, template, main_title, sub_title, display_map, data_meta, data_snap_shot, palette, user_id }, // Destructure these from req.body
     } = req;
 
     await dbConnect();
@@ -36,9 +36,13 @@ export default async function handler(req, res) {
                 const newPresentation = await Presentation.create({
                     project_name,
                     presentation_name,
+                    template,
+                    main_title,
+                    sub_title,
                     display_map,
                     data_meta,
                     data_snap_shot,
+                    palette,
                     created_date: new Date(),
                     last_saved_date: new Date(),
                     user_id: new mongoose.Types.ObjectId(user_id)  // Convert user_id string to ObjectId
