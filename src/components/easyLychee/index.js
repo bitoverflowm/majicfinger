@@ -38,6 +38,8 @@ const EasyLychee = () => {
     const user = useUser()
     const contextStateV2 = useMyStateV2()
 
+    let userHandle = contextStateV2?.userHandle
+
     let connectedCols = contextStateV2?.connectedCols
     let connectedData = contextStateV2?.connectedData
     let loadedDataMeta = contextStateV2?.loadedDataMeta
@@ -72,6 +74,21 @@ const EasyLychee = () => {
             setSelectedPalette(connectedPresentation.palette)
             setProjectName(connectedPresentation.projectName)
             setPresentationName(connectedPresentation.presentation_name)
+            if (connectedCols && connectedData) {
+                if(connectedPresentation.template === 'classic'){
+                    setDisplaNames({name: 'name',
+                        description: 'description',
+                        link: 'link'})
+                    setDisplayMap(generateDisplayMap());
+                }else{
+                    setDisplaNames({cardTitle: 'Title',
+                        cardSubTitle: 'Sub Title',
+                        text0: 'Body Text',
+                        cta: 'Call to Action'})
+                    setDisplayMap(generateDisplayMap());
+                }
+                
+            }
         }
     },[connectedPresentation])
 
@@ -186,27 +203,57 @@ const EasyLychee = () => {
     }
 
     const saveHandler = async () => {
-        fetch(`/api/presentations/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                //user specified for their own reference. This will also be used for slug
-                project_name: 'project1',
-                //lychee/userhandle/projectname/pagename
-                presentation_name: 'page1',
-                template: template,
-                main_title: mainTitle,
-                sub_title: subTitle,
-                display_map: displayMap,
-                data_meta: loadedDataMeta,
-                data_snap_shot: connectedData,
-                palette: selectedPalette,
-                user_id: user.userId,
-            }),
-        }).then(response => response.json())
-            .then(data => { console.log("page saved: ", data) })
+        if (loadedPresentationMeta) {
+            // Update existing presentation
+            fetch(`/api/presentations/presentation/${loadedPresentationMeta._id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    project_name: projectName,
+                    presentation_name: presentationName,
+                    template: template,
+                    main_title: mainTitle,
+                    sub_title: subTitle,
+                    display_map: displayMap,
+                    data_meta: loadedDataMeta,
+                    data_snap_shot: connectedData,
+                    palette: selectedPalette,
+                    last_saved_date: new Date(),
+                }),
+            }).then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log("Presentation updated: ", data);
+                    } else {
+                        console.error("Error updating presentation: ", data.message);
+                    }
+                });
+        }
+        else {
+            fetch(`/api/presentations/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    //user specified for their own reference. This will also be used for slug
+                    project_name: 'project1',
+                    //lychee/userhandle/projectname/pagename
+                    presentation_name: 'page1',
+                    template: template,
+                    main_title: mainTitle,
+                    sub_title: subTitle,
+                    display_map: displayMap,
+                    data_meta: loadedDataMeta,
+                    data_snap_shot: connectedData,
+                    palette: selectedPalette,
+                    user_id: user.userId,
+                }),
+            }).then(response => response.json())
+                .then(data => { console.log("page saved: ", data) })
+        }        
     }
 
 
@@ -232,7 +279,7 @@ const EasyLychee = () => {
                             Created by
                             <Link rel="noopener noreferrer" target="_blank" href={''}>
                                 <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
-                                    @misterrpink1
+                                    @{userHandle}
                                 </code></Link> 
                             using 
                             <Link rel="noopener noreferrer" target="_blank" href={'www.lych3e.com'}>
@@ -314,7 +361,7 @@ const EasyLychee = () => {
                                 {displayMap && Object.keys(displayMap).map((key) => (
                                     <div key={key} className="py-2">
                                         <div className="text-left text-xs">
-                                            {displayNames[key]}
+                                            {displayNames && displayNames[key]}
                                         </div>
                                         <div className='flex flex-wrap gap-2'>
                                             <div className="w-3/5 text-xs">

@@ -332,9 +332,8 @@ const Nav = () => {
           setLoadedPresentationMeta(presentationMeta)
           setConnectedData(res.data.data_snap_shot)
           setLoadedDataMeta(res.data.data_meta)
-          setConnectedPresentation(res.data)          
-
-          toast.success(`Presentation: ${res.data.data_meta.project_name} loaded`, {
+          setConnectedPresentation(res.data)
+          toast.success(`Presentation: ${res.data.project_name} loaded`, {
             duration: 99999999
           })
 
@@ -454,7 +453,7 @@ const Nav = () => {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
-                            <DialogTitle>{viewing === 'charts' ? 'Save Chart' : 'Save Data Set'}</DialogTitle>
+                            <DialogTitle>{viewing !== 'presentation' && (viewing === 'charts' ? 'Save Chart' : 'Save Data Set')}</DialogTitle>
                             <DialogDescription>
                               { loadedDataMeta && `You are currently connected to ${loadedDataMeta.data_set_name}`}
                               { loadedChartMeta && `You are currently connected to ${loadedDataMeta.chart_name}`}
@@ -559,7 +558,8 @@ const Nav = () => {
                       </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                      <DropdownMenuLabel>My Profile</DropdownMenuLabel>
+                      <DropdownMenuItem  onClick={()=>setViewing('profilePage')}>Manage</DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem  onClick={()=>setViewing('manageAccount')}>Billing</DropdownMenuItem>
                       <DropdownMenuItem>Support</DropdownMenuItem>

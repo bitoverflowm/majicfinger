@@ -23,13 +23,17 @@ export default async function handler(req, res){
             break;
         case "PUT":
             try {
-                // Prepare the update object
                 const update = {
                     $set: {
+                        project_name: req.body.project_name,
                         presentation_name: req.body.presentation_name,
+                        template: req.body.template,
+                        main_title: req.body.main_title,
+                        sub_title: req.body.sub_title,
                         display_map: req.body.display_map,
                         data_meta: req.body.data_meta,
                         data_snap_shot: req.body.data_snap_shot,
+                        palette: req.body.palette,
                         last_saved_date: new Date(),
                     },
                 };
