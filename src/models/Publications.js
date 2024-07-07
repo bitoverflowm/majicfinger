@@ -3,7 +3,7 @@ import mongoose from "mongoose"
 const { Schema } = mongoose;
 /* User in the db */
 
-const PresentationSchema = new mongoose.Schema({
+const PublicationSchema = new mongoose.Schema({
     project_name: {
         type: String,
         maxLength: [100, "Project name cannot be more than 100 characters"],
@@ -49,17 +49,14 @@ const PresentationSchema = new mongoose.Schema({
         default: Date.now, // Automatically set to the current date
         required: true,
     },
-    last_saved_date: {
+    deployed_date: {
         type: Date,
         default: Date.now, // Automatically set to the current date
         required: true,
     },
-    last_deployed_date: {
-        type: Date,
-    },
-    publication_id: {
+    presentation_id: {
         type: Schema.Types.ObjectId,
-        ref: 'Publication',
+        ref: 'Presentation',
     },
     user_id: {
         type: Schema.Types.ObjectId, // Defines the type as ObjectId
@@ -69,4 +66,4 @@ const PresentationSchema = new mongoose.Schema({
 })
 
 
-export default mongoose.models.Presentation || mongoose.model("Presentation", PresentationSchema)
+export default mongoose.models.Publication || mongoose.model("Publication", PublicationSchema)

@@ -28,11 +28,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-import { bgPalette } from '@/components/chartView/panels/bgPalette';
 import { masterPalette } from '../chartView/panels/masterPalette';
-import { FontBoldIcon, FontSizeIcon, LineHeightIcon, TextAlignCenterIcon, TextAlignLeftIcon, TextAlignMiddleIcon, TextAlignRightIcon } from '@radix-ui/react-icons';
+
 
 const EasyLychee = () => {
     const user = useUser()
@@ -180,27 +178,32 @@ const EasyLychee = () => {
 
     /* Deploy */
 
-    const deployHandler = async () => {
-        fetch(`/api/presentations/`, {
+    const handleDeploy = async (presentationId) => {
+        await saveHandler(true); // Ensure the presentation is saved before deploying
+    
+        fetch('/api/presentations/deploy', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                project_name: projectName,
-                page: pageName,
-
-                display_map: displayMap,
-                data_meta: loadedDataMeta,
-                data_snap_shot: connectedData,
-                
-                user_id: user.userId,
-                title: mainTitle,
-                subTitle: subTitle,
-            }),
-        }).then(response => response.json())
-            .then(data => { console.log("presentation saved: ", data) })
-    }
+            body: JSON.stringify({ presentationId }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                toast('Presentation deployed!', {
+                    description: 'Your presentation has been successfully deployed.',
+                    closeButton: true,
+                    duration: 3000,
+                });
+            } else {
+                console.error('Failed to deploy presentation:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error deploying presentation:', error);
+        });
+    };
 
     const saveHandler = async () => {
         if (loadedPresentationMeta) {
@@ -262,7 +265,7 @@ const EasyLychee = () => {
             <div className='flex pb-6 gap-2 text-xs place-items-center'>
                 <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={() => setEdit(!edit)}> {edit ? 'Hide Edit' : 'Show Edit Panel'}</div>
                 <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => saveHandler()}>Save</div>
-                <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => deployHandler()}>Deploy</div>
+                <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => handleDeploy(loadedPresentationMeta._id)}>Deploy</div>
                 <div className='bg-slate-100/80 px-1 h-10'></div>
                 <Label className="text-xs text-slate-600">Template</Label><div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={()=>setTemplate('classic')}>Classic</div>
             </div>
