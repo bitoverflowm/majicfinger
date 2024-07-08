@@ -31,8 +31,13 @@ import { Textarea } from "@/components/ui/textarea"
 
 import { masterPalette } from '../chartView/panels/masterPalette';
 
+import { toast } from 'sonner';
+
 
 const EasyLychee = () => {
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const baseUrl = isDevelopment ? 'http://localhost:3000/easy/' : 'https://www.lych3e.com/easy/';
+
     const user = useUser()
     const contextStateV2 = useMyStateV2()
 
@@ -58,8 +63,8 @@ const EasyLychee = () => {
     const [selectedPalette, setSelectedPalette] = useState(['#000']);
 
     const [displayNames, setDisplaNames] = useState()
-    const [projectName, setProjectName] = useState(`Wall St Bets and Sentiments`)
-    const [presentationName, setPresentationName] = useState(`June 5th Bets`)
+    const [projectName, setProjectName] = useState(`myProject`)
+    const [presentationName, setPresentationName] = useState(`page1`)
 
     useEffect(()=> {
         if(connectedPresentation){
@@ -70,7 +75,7 @@ const EasyLychee = () => {
             setMainTitle(connectedPresentation.main_title)
             setSubTitle(connectedPresentation.sub_title)
             setSelectedPalette(connectedPresentation.palette)
-            setProjectName(connectedPresentation.projectName)
+            setProjectName(connectedPresentation.project_name)
             setPresentationName(connectedPresentation.presentation_name)
             if (connectedCols && connectedData) {
                 if(connectedPresentation.template === 'classic'){
@@ -179,17 +184,26 @@ const EasyLychee = () => {
     /* Deploy */
 
     const handleDeploy = async (presentationId) => {
-        await saveHandler(true); // Ensure the presentation is saved before deploying
+        try{
+            if (!presentationId) {
+                presentationId = await saveHandler(); // Get the presentation ID from saveHandler if not provided
+            } else {
+                await saveHandler(); // Ensure the presentation is saved before deploying
+            }
     
-        fetch('/api/presentations/deploy', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ presentationId }),
-        })
-        .then(response => response.json())
-        .then(data => {
+            if (!presentationId) {
+                throw new Error('Failed to save presentation. No presentation ID returned.');
+            }
+        
+            const response = await fetch('/api/presentations/deploy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ presentationId }),
+            });
+
+            const data = await response.json();
             if (data.success) {
                 toast('Presentation deployed!', {
                     description: 'Your presentation has been successfully deployed.',
@@ -199,65 +213,72 @@ const EasyLychee = () => {
             } else {
                 console.error('Failed to deploy presentation:', data.message);
             }
-        })
-        .catch(error => {
+        } catch(error){
             console.error('Error deploying presentation:', error);
-        });
+        };
     };
 
     const saveHandler = async () => {
-        if (loadedPresentationMeta) {
-            // Update existing presentation
-            fetch(`/api/presentations/presentation/${loadedPresentationMeta._id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    project_name: projectName,
-                    presentation_name: presentationName,
-                    template: template,
-                    main_title: mainTitle,
-                    sub_title: subTitle,
-                    display_map: displayMap,
-                    data_meta: loadedDataMeta,
-                    data_snap_shot: connectedData,
-                    palette: selectedPalette,
-                    last_saved_date: new Date(),
-                }),
-            }).then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log("Presentation updated: ", data);
-                    } else {
-                        console.error("Error updating presentation: ", data.message);
-                    }
+        try {
+            let response;
+            if (loadedPresentationMeta) {
+                // Update existing presentation
+                response = await fetch(`/api/presentations/presentation/${loadedPresentationMeta._id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        project_name: projectName,
+                        presentation_name: presentationName,
+                        template: template,
+                        main_title: mainTitle,
+                        sub_title: subTitle,
+                        display_map: displayMap,
+                        data_meta: loadedDataMeta,
+                        data_snap_shot: connectedData,
+                        palette: selectedPalette,
+                        last_saved_date: new Date(),
+                    }),
                 });
+            } else {
+                // Create new presentation
+                response = await fetch(`/api/presentations/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        // user specified for their own reference. This will also be used for slug
+                        project_name: projectName,
+                        // lychee/userhandle/projectname/pagename
+                        presentation_name: presentationName,
+                        template: template,
+                        main_title: mainTitle,
+                        sub_title: subTitle,
+                        display_map: displayMap,
+                        data_meta: loadedDataMeta,
+                        data_snap_shot: connectedData,
+                        palette: selectedPalette,
+                        user_id: user.userId,
+                    }),
+                });
+            }
+            
+            const data = await response.json();
+            if (data.success) {
+                console.log("Presentation saved: ", data);
+                return data.presentation._id; // Return the presentation ID
+            } else {
+                console.error("Error saving presentation: ", data.message);
+                return null;
+            }
+        } catch (error) {
+            console.error('Error saving presentation:', error);
+            return null;
         }
-        else {
-            fetch(`/api/presentations/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    //user specified for their own reference. This will also be used for slug
-                    project_name: 'project1',
-                    //lychee/userhandle/projectname/pagename
-                    presentation_name: 'page1',
-                    template: template,
-                    main_title: mainTitle,
-                    sub_title: subTitle,
-                    display_map: displayMap,
-                    data_meta: loadedDataMeta,
-                    data_snap_shot: connectedData,
-                    palette: selectedPalette,
-                    user_id: user.userId,
-                }),
-            }).then(response => response.json())
-                .then(data => { console.log("page saved: ", data) })
-        }        
-    }
+    };
+    
 
 
     return (
@@ -265,7 +286,7 @@ const EasyLychee = () => {
             <div className='flex pb-6 gap-2 text-xs place-items-center'>
                 <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={() => setEdit(!edit)}> {edit ? 'Hide Edit' : 'Show Edit Panel'}</div>
                 <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => saveHandler()}>Save</div>
-                <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => handleDeploy(loadedPresentationMeta._id)}>Deploy</div>
+                <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => handleDeploy(loadedPresentationMeta && loadedPresentationMeta._id)}>Deploy</div>
                 <div className='bg-slate-100/80 px-1 h-10'></div>
                 <Label className="text-xs text-slate-600">Template</Label><div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={()=>setTemplate('classic')}>Classic</div>
             </div>
@@ -330,10 +351,10 @@ const EasyLychee = () => {
                     <div className="fixed top-20 right-10 w-1/4 border border-slate-200 rounded-xl flex flex-col bg-white shadow-lg"
                     style={{ zIndex: 20 }}>
                         {
-                            paletteVisible && 
+                            paletteVisible ? 
                                 <div className="">
-                                    <div className="cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40  text-xs pl-1 my-2 float-right" onClick={()=>setPaletteVisible(false)}>close</div>
-                                        <div className="flex flex-wrap gap-2 mb-4">
+                                        <div className="mt-2 ml-4 cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40  text-xs pl-1" onClick={()=>setPaletteVisible(false)}>Close</div>
+                                        <div className="p-4 flex flex-wrap gap-2 mb-4">
                                             {categories.map((category, index) => (
                                                 <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono cursor-pointer text-xs hover:bg-lychee_green"
                                                     key={index}
@@ -344,62 +365,94 @@ const EasyLychee = () => {
                                             ))}
                                         </div>
                                         {selectedCategory && (
-                                            <div className="flex flex-wrap place-items-center place-content-center gap-3">
+                                            <div className="pb-6 px-3 flex flex-wrap place-items-center place-content-center gap-1">
                                                 {masterPalette[selectedCategory].map((palette, index) => (
                                                     <div key={index} className="flex cursor-pointer rounded-full hover:shadow-inner hover:bg-slate-100 p-1" onClick={() => selectedPaletteHandler(index)}>
                                                         {palette.map((color, colorIndex) => (
-                                                            <div key={colorIndex} className="p-3 rounded-full" style={{ backgroundColor: color }}></div>
+                                                            <div key={colorIndex} className="p-2 rounded-full" style={{ backgroundColor: color }}></div>
                                                         ))}
                                                     </div>
                                                 ))}
                                             </div>
-                                        )}
-                                    
+                                        )}                                    
                             </div>
-                        }
-                        <div className='px-8 py-8'>
-                            <p className="text-xs font-bold text-muted-foreground">Card Management</p>
-                            <p className="text-xs text-muted-foreground">How would you like to present your data?</p>
-                            <div className=''>
-                                {displayMap && Object.keys(displayMap).map((key) => (
-                                    <div key={key} className="py-2">
-                                        <div className="text-left text-xs">
-                                            {displayNames && displayNames[key]}
+                            :
+                            <div className='px-8 py-8 w-full'>
+                                <p className="text-xs font-bold text-muted-foreground">Card Management</p>
+                                <p className="text-xs text-muted-foreground">How would you like to present your data?</p>
+                                <div className=''>
+                                    {displayMap && Object.keys(displayMap).map((key) => (
+                                        <div key={key} className="py-2">
+                                            <div className="text-left text-xs">
+                                                {displayNames && displayNames[key]}
+                                            </div>
+                                            <div className='flex flex-wrap gap-2'>
+                                                <div className="w-3/5 text-xs">
+                                                    <Select value={displayMap[key]} onValueChange={(value) => handleSelectChange(key, value)}>
+                                                        <SelectTrigger >
+                                                            <SelectValue placeholder="Select column" className='text-xs'/>
+                                                        </SelectTrigger>
+                                                        <SelectContent className='text-xs'>
+                                                            {connectedCols.map((col) => (
+                                                                <SelectItem key={col.field} value={col.field} className='text-xs'>
+                                                                    {col.field}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>                                 
+                                            </div>
                                         </div>
-                                        <div className='flex flex-wrap gap-2'>
-                                            <div className="w-3/5 text-xs">
-                                                <Select value={displayMap[key]} onValueChange={(value) => handleSelectChange(key, value)}>
-                                                    <SelectTrigger >
-                                                        <SelectValue placeholder="Select column" className='text-xs'/>
-                                                    </SelectTrigger>
-                                                    <SelectContent className='text-xs'>
-                                                        {connectedCols.map((col) => (
-                                                            <SelectItem key={col.field} value={col.field} className='text-xs'>
-                                                                {col.field}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>                                 
+                                    ))}
+                                </div>
+                                <div className='pt-4'>
+                                    <p className="text-xs text-muted-foreground">Hero Section</p>                        
+                                    <div className=''>
+                                        <Label htmlFor="mainTitle" className="text-xs">Title</Label>
+                                        <Input id="mainTitle" type="text" placeholder="Title" value={mainTitle} onChange={(e)=>setMainTitle(e.target.value)} />
+                                    </div>
+                                    <div className=''>
+                                        <Label htmlFor="subTitle" className="text-xs">Sub Title</Label>
+                                        <Textarea id="subTitle" type="text" placeholder="Description" value={subTitle} onChange={(e)=>setSubTitle(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className='pt-4'>
+                                    <div className='bg-slate-100 text-xs w-32 text-black p-2 rounded-lg cursor-pointer' onClick={()=>setPaletteVisible(true)}>Pick a Pallate</div>
+                                </div>
+                                <p className="text-xs font-bold text-muted-foreground pt-2">Admin Stuff</p>
+                                <p className="text-xs text-muted-foreground">When you deploy, your page will be accessible here:</p>
+                                <div className="max-w-full break-words px-2 py-4">
+                                    <Link rel="noopener noreferrer" target="_blank" href={`${baseUrl}${userHandle}/${projectName}/${presentationName}`}>
+                                        <small className="text-xs font-medium leading-none">www.lych3e.com/easy/{userHandle}/{projectName}/{presentationName}</small>
+                                    </Link>
+                                </div>
+                                <div>
+                                    <small className="text-xs font-medium leading-none">Deployment Checklist</small>
+                                    <div className='flex flex-col gap-2'>
+                                        <div className=''>
+                                            <Label htmlFor="projectName" className="text-xs">Project Name</Label>
+                                            <Input
+                                                id="projectName"
+                                                type="text"
+                                                placeholder="Project Name"
+                                                value={projectName}
+                                                onChange={(e) => setProjectName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className=''>
+                                            <Label htmlFor="presentationName" className="text-xs">Presentation Name</Label>
+                                            <Input
+                                                id="presentationName"
+                                                type="text"
+                                                placeholder="Presentation Name"
+                                                value={presentationName}
+                                                onChange={(e) => setPresentationName(e.target.value)}
+                                            />
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                            <div className='pt-4'>
-                                <p className="text-xs text-muted-foreground">Hero Section</p>                        
-                                <div className=''>
-                                    <Label htmlFor="mainTitle" className="text-xs">Title</Label>
-                                    <Input id="mainTitle" type="text" placeholder="Title" value={mainTitle} onChange={(e)=>setMainTitle(e.target.value)} />
-                                </div>
-                                <div className=''>
-                                    <Label htmlFor="subTitle" className="text-xs">Sub Title</Label>
-                                    <Textarea id="subTitle" type="text" placeholder="Description" value={subTitle} onChange={(e)=>setSubTitle(e.target.value)} />
                                 </div>
                             </div>
-                            <div className='pt-4'>
-                                <div className='bg-slate-100 text-xs w-32 text-black p-2 rounded-lg cursor-pointer' onClick={()=>setPaletteVisible(true)}>Pick a Pallate</div>
-                            </div>
-                        </div>
+                        }                        
                     </div>
                 }
             </div>
