@@ -268,7 +268,7 @@ const EasyLychee = () => {
             const data = await response.json();
             if (data.success) {
                 console.log("Presentation saved: ", data);
-                return data.presentation._id; // Return the presentation ID
+                return data.data._id; // Return the presentation ID
             } else {
                 console.error("Error saving presentation: ", data.message);
                 return null;
