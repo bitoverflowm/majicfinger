@@ -99,18 +99,28 @@ export default function PresentationPage({ params }) {
                     <p className="text-sm text-muted-foreground py-2 w-1/2">{subTitle}</p>
                     <p className="text-xs text-muted-foreground">
                         Created by
-                        <Link rel="noopener noreferrer" target="_blank" href={''}>
+                        <Link rel="noopener noreferrer" target="_blank" href={'https://x.com/misterrpink1'}>
                             <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                 @{userHandle}
                             </code>
                         </Link> 
-                        using 
-                        <Link rel="noopener noreferrer" target="_blank" href={'www.lych3e.com'}>
+                        using
+                        <Link rel="noopener noreferrer" target="_blank" href="https://www.lych3e.com/#easyLychee">
                             <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                 EasyLychee
                             </code>
                         </Link>
-                    </p>                        
+                    </p>
+                    <Link target="_blank" rel="noopener noreferrer" href="https://www.producthunt.com/posts/launchshortcut?embed=true&utm_source=badge-featured&utm_medium=badge&utm_souce=badge-launchshortcut" passHref>
+                            <img
+                                src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=470412&theme=dark"
+                                alt="LaunchShortcut - Where to launch your product for max revenue and traffic | Product Hunt"
+                                style={{ width: '150px', height: '30px' }}
+                                width="250"
+                                height="54"
+                                className='mt-4'
+                            />
+                    </Link>                                           
                 </div>
                 {
                     template === 'classic' && 

@@ -311,7 +311,7 @@ const EasyLychee = () => {
                                     EasyLychee
                                 </code>
                             </Link>
-                        </p>                        
+                        </p>       
                     </div>
                     {
                         template === 'classic' && 
