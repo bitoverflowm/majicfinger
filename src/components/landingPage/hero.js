@@ -469,12 +469,6 @@ export function Hero() {
                                 </Link>
                             </div>
                         </div>
-                    </div>                                  
-                    <div className='text-center py-10'>
-                        <BlurIn
-                            word="BRING YOUR DATA TO LIFE"
-                            className=" text-2xl sm:text-8xl text-lychee_green font-black py-10 pb-5"
-                        />
                     </div>
                     
                     <div className='sm:col-span-2 lg:col-span-2' id="presenting_integrations">
@@ -496,12 +490,30 @@ export function Hero() {
                         </div>                       
                     </div>
                     <div className='flex gap-2 place-content-center pt-10'>
-                        <Link href="#the_rest">
+                        <Link href="#easyLychee">
                             <div className='shadow-2xl shadow-lychee_red bg-black rounded-md text-slate-200 p-2 text-[10px]'>More.</div>
                         </Link>
                         <Link href="#getIt">
                             <div className='shadow-2xl shadow-lychee_red bg-green-400 rounded-md text-slate-800 p-2 text-[10px]'>I want it.</div>
                         </Link>
+                    </div>
+                    <div className='pt-56 sm:px-56' id="easyLychee">
+                        <Link rel="noopener noreferrer" target="_blank" href={"https://youtu.be/2nyOJJb9pwE?si=FPthG8eXFVTNZdQk"}>
+                            <h1 className="scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight place-items-center hover:underline cursor-pointer text-center"  href={"/dashboard"}>
+                                <span>Google Sheets, Excel, .csv to <span className="text-purple-400">Website</span> in 0.37 seconds.</span>
+                            </h1>
+                            <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">
+                                Watch a quick video about how it works? <MoveRight />
+                            </div>
+                        </Link>
+                        <div className='flex gap-2 place-content-center py-4'>
+                            <Link href="#the_rest">
+                                <div className='shadow-2xl shadow-lychee_red bg-black rounded-md text-slate-200 p-2 text-[10px]'>More.</div>
+                            </Link>
+                            <Link href="#getIt">
+                                <div className='shadow-2xl shadow-lychee_red bg-green-400 rounded-md text-slate-800 p-2 text-[10px]'>I want it.</div>
+                            </Link>
+                        </div>
                     </div>
                 </div>
                 <div className="w-full flex place-content-center pb-20">
