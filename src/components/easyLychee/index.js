@@ -306,10 +306,11 @@ const EasyLychee = () => {
                                     @{userHandle}
                                 </code></Link> 
                             using 
-                            <Link rel="noopener noreferrer" target="_blank" href={'www.lych3e.com/#easyLychee'}>
+                            <Link rel="noopener noreferrer" target="_blank" href="https://www.lych3e.com/#easyLychee">
                                 <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                     EasyLychee
-                                </code></Link>
+                                </code>
+                            </Link>
                         </p>                        
                     </div>
                     {
