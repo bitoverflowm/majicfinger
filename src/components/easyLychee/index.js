@@ -48,6 +48,7 @@ const EasyLychee = () => {
     let loadedDataMeta = contextStateV2?.loadedDataMeta
     let loadedPresentationMeta = contextStateV2?.loadedPresentationMeta
     let connectedPresentation = contextStateV2?.connectedPresentation
+    let setViewing = contextStateV2?.setViewing
 
     //handle used for saving and publishing website
     const [handle, setHandle] = useState()
@@ -286,7 +287,6 @@ const EasyLychee = () => {
             <div className='flex pb-6 gap-2 text-xs place-items-center'>
                 <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={() => setEdit(!edit)}> {edit ? 'Hide Edit' : 'Show Edit Panel'}</div>
                 <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => saveHandler()}>Save</div>
-                <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => handleDeploy(loadedPresentationMeta && loadedPresentationMeta._id)}>Deploy</div>
                 <div className='bg-slate-100/80 px-1 h-10'></div>
                 <Label className="text-xs text-slate-600">Template</Label><div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={()=>setTemplate('classic')}>Classic</div>
             </div>
@@ -450,7 +450,13 @@ const EasyLychee = () => {
                                                 onChange={(e) => setPresentationName(e.target.value)}
                                             />
                                         </div>
+                                        <div className='pt-2'>
+                                            <div>{userHandle ? <div className='flex place-items-center text-xs'><div className='rounded-full bg-green-400 h-2 w-2'></div>{userHandle}</div> :<div className='flex place-items-center text-xs'><div className='rounded-full bg-red-400 h-2 w-2 mr-1'></div> Must Have <span className='cursor-pointer hover:bg-lychee_green px-1 underline' onClick={()=>setViewing('profilePage')}>UserHandle</span> To Deploy</div>}</div>
+                                            <div className='text-xs cursor-pointer underline hover:bg-lychee_green pt-1' onClick={()=>setViewing('profilePage')}>Click Here to claim your unique userhandle</div>
+                                        </div>
+                                        <div className={`my-2 text-center w-32 text-xs ${userHandle ? 'bg-lychee_green cursor-pointer' : 'bg-gray-400 cursor-not-allowed'} text-black font-bold p-2 rounded-sm`} onClick={() => handleDeploy(loadedPresentationMeta && loadedPresentationMeta._id)}>Deploy</div>
                                     </div>
+                                    
                                 </div>
                             </div>
                         }                        
