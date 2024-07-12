@@ -41,10 +41,10 @@ const KatsuCard = ({
     <div>{background}</div>
     <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 p-6 transition-all duration-300 group-hover:-translate-y-10">
       {Icon}
-      <h3 className="text-xl font-semibold text-neutral-300">
+      <h3 className="text-sm md:text-xl font-semibold text-neutral-300">
         {name}
       </h3>
-      <p className="max-w-lg text-neutral-400">{description}</p>
+      <p className="text-sm md:text-md max-w-lg text-neutral-400">{description}</p>
     </div>
 
     <div

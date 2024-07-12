@@ -6,7 +6,7 @@ import { Boxes, BrainCircuit, BrainCog, BrickWall, Carrot, Cherry, Clapperboard,
   
   const features = [
     {
-      Icon: <Carrot className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />,
+      Icon: <Carrot className="md:h-12 md:w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />,
       name: "Scraper",
       description: "Scrape ANY URL.",
       href: "#getIt",
@@ -109,7 +109,7 @@ import { Boxes, BrainCircuit, BrainCog, BrickWall, Carrot, Cherry, Clapperboard,
   
   const LycheeFeatureGrid = ()=> {
     return (
-      <KatsuGrid className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-rows-4">
+      <KatsuGrid className="grid grid-cols-3 lg:grid-cols-4 lg:grid-rows-4">
         {features && features.map((feature) => (
           <KatsuCard key={feature.name} {...feature} />
         ))}

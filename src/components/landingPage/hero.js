@@ -20,6 +20,7 @@ import { AnimatedList } from "@/components/magicui/animated-list";
 import { FaCircle } from 'react-icons/fa';
 import Marquee from "@/components/magicui/marquee";
 import LycheeFeatureGrid from '../easyLychee/usage/lychee_feature_grid';
+import { Card, CardTitle } from '../ui/card';
 
 export const Highlight = ({
     children,
@@ -332,10 +333,10 @@ export function Hero() {
                 </h3>
                 <div className='flex gap-2 place-content-center py-4'>
                     <Link href="#about">
-                        <div className='shadow-2xl shadow-lychee_red bg-black rounded-md text-slate-200 p-2 text-[10px]'>Tell Me More</div>
+                        <div className='shadow-2xl bg-black hover:bg-white hover:text-black rounded-md text-slate-200 px-4 py-3 text-xs'> Tell Me More </div>
                     </Link>
                     <Link href="#getIt">
-                        <div className='shadow-2xl shadow-lychee_red bg-green-400 rounded-md text-slate-800 p-2 text-[10px]'>I want it.</div>
+                        <div className='shadow-2xl bg-green-500 text-black hover:bg-white hover:text-black rounded-md px-4 py-3 text-xs'>I want it.</div>
                     </Link>
                 </div>
                 <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-lychee_black py-20 md:shadow-xl">
@@ -354,45 +355,49 @@ export function Hero() {
                     <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-black from-lychee_black"></div>
                 </div>
                 <div className='pt-10 text-white' id="about">
-                    <h1 className="text-center scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
-                        Did you ever dream <br/> of becoming... <br/><br/> THE Michael Jordan of Excel?
+                    <h1 className="text-center scroll-m-20 text-xl font-extrabold tracking-tight lg:text-xl">
+                        Did you ever dream <br/> of becoming... <br/> THE Michael Jordan of Excel?
                     </h1>
                 </div>
-                <div className='py-2'>
-                    <p className="text-center text-xl text-slate-400">
-                        Lychee takes care of the grunt work
+                <div className='py-10'>
+                    <p className="text-center text-xl text-slate-400 md:w-1/2 mx-auto">
+                        Lychee is the all-in-one data platform that <span className='font-black'>helps you move faster and make more progress</span> than you ever imagined
                     </p>
-                    <p className="text-center text-xl text-slate-400">
-                        So you can focus on your actual passion
+                    <p className="pt-10 text-center text-xl text-slate-400 md:w-1/2 mx-auto">
+                        It's a struggle to juggle getting, cleaning, formatting, downloading, analyzing, visualizing, presenting all of your data, not to mention making sense of it, your main tasks at hand, presenting to your team and bosses, deadlines, and expectations --- especially when you need a whole army of tools at your disposal all with their own subscription model. That's why I build Lychee. 
                     </p>
-                </div>                
-                <div className='text-slate-200 text-xs flex place-content-center'>
-                    <div className='sm:w-1/2'>
-                        <div className='flex place-items-center gap-2'><CircleCheckBig className='w-4 h-4 text-green-400'/><p className="leading-7"> Charts in {'<'} 0.27 secs </p></div>
-                        <div className='flex place-items-center gap-2'><CircleCheckBig className='w-4 h-4 text-green-400'/><p className="leading-7"> Conduct complex analysis with AI</p></div>
-                        <div className='flex place-items-center gap-2'><CircleCheckBig className='w-4 h-4 text-green-400'/><p className="leading-7"> Scrape any website </p></div>
-                        <div className='flex place-items-center gap-2'>
-                            <CircleCheckBig className='w-10 h-10 text-green-400' />
-                            <p className="leading-7 flex-shrink-0 pr-2"> No-Code connect to </p>
-                            <div className='flex-grow flex flex-wrap gap-1'>
-                                <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold text-white bg-purple-400/20 shadow-2xl shadow-purple-200">Twitter</code>
-                                <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold text-white bg-purple-400/20 shadow-2xl shadow-purple-200">Coingecko</code>
-                                <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold text-white bg-purple-400/20 shadow-2xl shadow-purple-200">Reddit</code>
-                                <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold text-white bg-purple-400/20 shadow-2xl shadow-purple-200">Product Hunt</code>
-                                <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold text-white bg-purple-400/20 shadow-2xl shadow-purple-200">Wall St Bets</code>
-                                <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold text-white bg-purple-400/20 shadow-2xl shadow-purple-200">SEC Edgar</code>
-                                <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold text-white bg-purple-400/20 shadow-2xl shadow-purple-200">US Census Data</code>
-                                <code className="text-center relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm xl:text-lg font-semibold text-white bg-purple-400/20 shadow-2xl shadow-purple-200">...</code>
-                            </div>
-                        </div>
-                        <div className='flex place-items-center gap-2'><CircleCheckBig className='w-4 h-4 text-green-400'/><p className="leading-7"> Upload your own data</p></div>                        
-                        <div className='flex place-items-center gap-2'><CircleCheckBig className='w-4 h-4 text-green-400'/><p className="leading-7"> Aggregations, Stats, Functions and Operations.</p></div>
-                        <div className='flex place-items-center gap-2'><CircleCheckBig className='w-4 h-4 text-green-400'/><p className="leading-7"> Create an entire website using your spreadsheet.</p></div>
-                        <div className='flex place-items-center gap-2'><CircleCheckBig className='w-4 h-4 text-green-400'/><p className="leading-7"> Share to your socials. Or build and monitize your audience from right here</p></div>
-                        <div className='flex place-items-center gap-2'><CircleCheckBig className='w-4 h-4 text-green-400'/><p className="leading-7"> Pro members will be eligible for monitization</p></div>
+                    <p className="pt-10 text-center text-xl text-slate-400 md:w-1/2 mx-auto">
+                        With Lychee, every thing you need is within reach. Lychee encompasses your entire workflow, from getting data, to presenting and sharing your work. Not EVERYTHING under the sun. Just the stuff to get things finished.
+                    </p> 
+                </div>
+                
+                <div className="relative mx-auto rounded-xl">
+                    <div className="w-full h-11 rounded-t-lg bg-gray-600/10 flex justify-start items-center space-x-1.5 px-3">
+                        <span className="w-3 h-3 rounded-full bg-red-400"></span>
+                        <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
+                        <span className="w-3 h-3 rounded-full bg-green-400"></span>
+                    </div>
+                    <div className=" bg-black border-t-0 w-full"><div className='px-3'><BackgroundVideo autoPlay loop muted playsInline src={presenting_charts} /></div>
+                    </div>                                
+                    <BorderBeam />                                
+                </div>
+                <div className='py-10'>
+                    <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
+                        <h1 className="text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight  place-items-center text-center  hover:underline cursor-pointer ">
+                            <span><span className="text-purple-400">Instant</span> Graphs <br/> <span className="text-purple-400">Zero</span> Hassle </span>
+                        </h1>
+                        <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How-tos <MoveRight /></div> 
+                    </Link>
+                    <div className='flex gap-2 place-content-center py-4'>
+                        <Link href="#presenting_ai">
+                            <div className='shadow-2xl bg-black hover:bg-white hover:text-black rounded-md text-slate-200 px-4 py-3 text-xs'>More.</div>
+                        </Link>
+                        <Link href="#getIt">
+                            <div className='shadow-2xl shadow-lychee_red bg-green-400 rounded-md text-slate-800 p-2 text-[10px]'>I want it.</div>
+                        </Link>
                     </div>
                 </div>
-                <div className='flex gap-2 place-content-center py-4'>
+                <div className='flex gap-2 place-content-center py-4 hidden'>
                     <Link href="#charts">
                         <div className='shadow-2xl shadow-lychee_red bg-black rounded-md text-slate-200 p-2 text-[10px]'>Tell Me More</div>
                     </Link>
@@ -403,27 +408,24 @@ export function Hero() {
                 <div className="text-lychee_black font-black leading-none tracking-tighter pt-4 pb-6 text-8xl text-center" style={{ textShadow: '10px 10px 80px rgba(169, 29, 58, 1)'}}>
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" >.</span>
                 </div>
-                <div className="z-10 sm:p-20" id="charts">
-                    <div className='pb-10'>
-                        <div className="relative max-w-4xl mx-auto rounded-xl">
-                            <div className="w-full h-11 rounded-t-lg bg-gray-600/10 flex justify-start items-center space-x-1.5 px-3">
-                                <span className="w-3 h-3 rounded-full bg-red-400"></span>
-                                <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
-                                <span className="w-3 h-3 rounded-full bg-green-400"></span>
-                            </div>
-                            <div className=" bg-black border-t-0 w-full"><div className='px-3'><BackgroundVideo autoPlay loop muted playsInline src={presenting_charts} /></div>
-                            </div>                                
-                            <BorderBeam />                                
-                        </div>
-                        <div className='py-10'>
-                            <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
-                                <h1 className="text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight  place-items-center text-center  hover:underline cursor-pointer ">
-                                    <span><span className="text-purple-400">Instant</span> Graphs <br/> <span className="text-purple-400">Zero</span> Hassle </span>
+                <div className="z-10 sm:p-20" id="charts">                
+                    <div className='grid xl:grid-cols-2 place-items-center place-content-center py-44' id="presenting_ai">
+                        <div>
+                            <div className='pb-8'>
+                                <h1 className="scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight place-items-center text-center"  href={"/dashboard"}>
+                                    <span>Analyze <span className="text-purple-400">Anything.</span> <br/>Let our <span className="text-purple-400">AI</span> do the heavy lifting for you.</span>
                                 </h1>
-                                <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How it works <MoveRight /></div> 
-                            </Link>
-                            <div className='flex gap-2 place-content-center py-4'>
-                                <Link href="#presenting_ai">
+                            </div>
+                            <iframe
+                                width="480"
+                                height="315"
+                                src={`https://www.youtube.com/embed/Mhgk122WuFg?si=hRH4UxT8UbPv55MC`}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                title="Embedded YouTube Video"
+                            ></iframe>
+                            <div className='flex gap-2 place-content-center py-10'>
+                                <Link href="#presenting_integrations">
                                     <div className='shadow-2xl shadow-lychee_red bg-black rounded-md text-slate-200 p-2 text-[10px]'>More.</div>
                                 </Link>
                                 <Link href="#getIt">
@@ -431,9 +433,6 @@ export function Hero() {
                                 </Link>
                             </div>
                         </div>
-                    </div>                    
-
-                    <div className='grid sm:grid-cols-2 place-items-center py-20' id="presenting_ai">
                         <div className="relative mx-auto h-[520px] w-[350px] border-4 border-black rounded-2xl shadow-custom-shadow">
                             <div className='flex justify-center'>
                                 <span className="border border-black bg-black w-16 h-4 mt-2 rounded-full"></span>
@@ -451,43 +450,33 @@ export function Hero() {
                                 </AnimatedList>
                             </div>
                         </div>
+                    </div>                    
+                    <div className='grid xl:grid-cols-2 lg:gap-10 place-items-center py-20' id="presenting_integrations">                    
                         <div>
-                            <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-analyze-data-with-lychee-ai"}>
-                                <h1 className="scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight place-items-center hover:underline cursor-pointer text-center"  href={"/dashboard"}>
-                                    <span>Analyze <span className="text-purple-400">Anything.</span> <br/>Let our <span className="text-purple-400">AI</span> do the heavy lifting for you.</span>
-                                </h1>
-                                <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">
-                                    How it works <MoveRight />
-                                </div>
-                            </Link>
-                            <div className='flex gap-2 place-content-center py-4'>
-                                <Link href="#presenting_integrations">
-                                    <div className='shadow-2xl shadow-lychee_red bg-black rounded-md text-slate-200 p-2 text-[10px]'>More.</div>
-                                </Link>
-                                <Link href="#getIt">
-                                    <div className='shadow-2xl shadow-lychee_red bg-green-400 rounded-md text-slate-800 p-2 text-[10px]'>I want it.</div>
-                                </Link>
-                            </div>
+                            <h1 className="py-10 scroll-m-20 text-xl sm:text-2xl text-lychee_green font-extrabold tracking-tight lg:text-2xl place-items-center text-center">
+                                <span>Connect<span className="text-purple-400"> Directly</span> to ALL <br/>The Data Sources  of Your  <span className="text-purple-400">Dreams</span> </span>
+                            </h1>                            
+                            <iframe
+                            width="480"
+                            height="315"
+                            src={`https://www.youtube.com/embed/JCiZThTjsnw?si=qPMcz8ZKKRsqL2y4`}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            title="Embedded YouTube Video"
+                            ></iframe>
+                            
+                            <div className="pt-4 text-center text-lychee_white text-sm sm:text-md">Not A Single Line of Code Required on Your End</div>
                         </div>
-                    </div>
-                    
-                    <div className='sm:col-span-2 lg:col-span-2' id="presenting_integrations">
-                        <h1 className="scroll-m-20 text-xl sm:text-2xl text-lychee_green font-extrabold tracking-tight lg:text-2xl place-items-center hover:underline cursor-pointer text-center"  href={"/dashboard"}>
-                            <span>Connect<span className="text-purple-400"> Directly</span> to ALL <br/>The Data Sources  of Your  <span className="text-purple-400">Dreams</span> </span>
-                        </h1>
-                        <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-use-lychee-integrations-coingecko"}><div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How it works <MoveRight /></div> </Link>
-                        
-                        <div className="pt-4 text-center text-lychee_white text-sm sm:text-md">Not A Single Line of Code Required on Your End</div>
-                        <div className="relative max-w-2xl mx-auto mt-8 rounded-xl">
+                        <div className="relative mx-auto mt-8 rounded-xl">
                             <div className="w-full h-11 rounded-t-lg bg-gray-600/10 flex justify-start items-center space-x-1.5 px-3">
                                 <span className="w-3 h-3 rounded-full bg-red-400"></span>
                                 <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
                                 <span className="w-3 h-3 rounded-full bg-green-400"></span>
                             </div>
-                            <div className=" bg-black border-t-0 w-full"><div className=''><Image className="rounded-b-xl" src={'/integrationsPresent.png'} height={1000} width={750} /></div>
+                            <div className=" bg-black border-t-0 w-full"><div className=''><Image className="rounded-b-xl" src={'/integrationsPresent.png'} height={500} width={400} /></div>
                             </div>                                
                             <BorderBeam />                                
-                        </div>                       
+                        </div>        
                     </div>
                     <div className='flex gap-2 place-content-center pt-10'>
                         <Link href="#easyLychee">
@@ -497,15 +486,19 @@ export function Hero() {
                             <div className='shadow-2xl shadow-lychee_red bg-green-400 rounded-md text-slate-800 p-2 text-[10px]'>I want it.</div>
                         </Link>
                     </div>
-                    <div className='pt-56 sm:px-56' id="easyLychee">
-                        <Link rel="noopener noreferrer" target="_blank" href={"https://youtu.be/2nyOJJb9pwE?si=FPthG8eXFVTNZdQk"}>
-                            <h1 className="scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight place-items-center hover:underline cursor-pointer text-center"  href={"/dashboard"}>
-                                <span>Google Sheets, Excel, .csv to <span className="text-purple-400">Website</span> in 0.37 seconds.</span>
+                    <div className='pt-56 xl:px-56 flex flex-col place-items-center gap-10' id="easyLychee">
+                        <div>
+                            <h1 className="scroll-m-20 text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight place-items-center text-center"  href={"/dashboard"}>
+                                <span>Build an entire <span className="text-purple-400">Website</span> in 0.37 seconds from Google Sheets, Excel or .csv</span>
                             </h1>
-                            <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">
-                                Watch a quick video about how it works? <MoveRight />
-                            </div>
-                        </Link>
+                        </div>
+                        <iframe
+                            className="w-full h-96"
+                            src={`https://www.youtube.com/embed/2nyOJJb9pwE?si=mGtlo0SMHzI6Aanh`}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            title="Embedded YouTube Video"
+                            ></iframe>
                         <div className='flex gap-2 place-content-center py-4'>
                             <Link href="#the_rest">
                                 <div className='shadow-2xl shadow-lychee_red bg-black rounded-md text-slate-200 p-2 text-[10px]'>More.</div>
@@ -537,68 +530,70 @@ export function Hero() {
                         </div>
                     </div>
                 </div>
-                <div className='p-20' id="the_rest">
-                    <LycheeFeatureGrid />         
+                <div className='pt-20' id="the_rest">
+                    <LycheeFeatureGrid />   
                 </div>
-                <div className='' id='getIt'>
-                    <div><h1 className="scroll-m-20 text-6xl text-white font-extrabold tracking-tight lg:text-8xl text-center">
-                        Two Options
-                    </h1></div>
-                </div>
-                <div className='-mt-8 z-20 text-center py-32 px-10 bg-black/80 rounded-tl-3xl rounded-tr-md rounded-br-3xl rounded-bl-md text-lychee_black grid grid-cols-2 gap-10' >
-                    <div className='bg-lychee_black/90 rounded-lg text-white py-10 px-10 shadow-lychee_black shadow-2xl'>
-                        <h1 className="text-center text-2xl font-extrabold tracking-tight py-1">Join the Waitlist</h1>
-                        <div className="text-lg font-semibold py-10">
-                            Get Instant access to  <code className="mx-2 relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold text-black">
-                            Some </code> Experimental Features
-                            
-                        </div>
-                        <div className="text-lg font-semibold pt-4">
-                            Vote/ Request New Features to
-                        </div>
-                        <p className="text-xs text-slate-400 pb-4">
-                            make Lychee perfect platform for you 
+                <div className='pt-10 lg:w-2/3 mx-auto shadow-2xl' id='getIt'>
+                    <div className='text-white bg-black p-10'>
+                        <h3 className="scroll-m-20 text-xl font-semibold tracking-tight pb-6">
+                            Hate Subscriptions?
+                        </h3>
+                        <p className="text-sm text-slate-100 pb-4">
+                            Me too!
                         </p>
-                        <div className="text-lg font-semibold">
-                            Get <code className="mx-2 relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold text-black">
-                            10% off
-                            </code>
-                            12 months
-                        </div>
-                        <p className="text-xs text-slate-400 pt-2">
-                            Price On V2.0.1 Launch will be approximately $69/month
+                        <p className="text-sm text-slate-100 pb-4">
+                            The average household spends approximately <span className='text-purple-400 font-bold'>$196,560 on subscriptions</span> over their lifetime.* So I decided to try this crazy lifetime offer. Pay once and get full access for life! <span className='font-bold text-black bg-purple-400 px-2'> 99% cheaper than subscriptions. </span>
                         </p>
-                        <div className='pt-20'>
-                        <Link href={'/login'}><div className='bg-white w-32 mx-auto text-black py-2 rounded-md'>Free</div></Link>
+                        <p className="text-sm text-slate-100 pb-4">
+                            This also allows me to focus on building the best features fast. And, of course, you get access to all future features.
+                        </p>
+                        <p className="text-sm text-slate-100 pb-4">
+                            If you are interested, but don't want to pay now, that's cool too.
+                        </p>
+                        <p className="text-sm text-slate-100 pb-4">
+                            You can have access to basic features for free... for now. 
+                        </p>
+                        <p className='text-sm text-slate-100 pb-4'>
+                            Subscription pricess will go into effect <span className='font-black text-red-500'>VERY SOON</span>. If you wait until then, you will pay <span className='font-black text-red-500'>$69/month</span> + add-ons + rate charges.
+                        </p>
+                    </div>
+                    <div className='grid md:grid-cols-2 py-10 px-8 place-content-center'>
+                        <div className='text-white text-center py-10'>
+                            <h1 className="text-center scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-4xl">Free</h1>
+                            <div className='text-left py-4 pl-6 text-xs'>
+                                <p className="text-slate-200"><code className="text-black relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Limited</code> access to experimental features</p>
+                            </div>
+                            <div className='text-left md:py-10 pl-6 text-xs text-red-500'>
+                                <p>Warning:</p>
+                                <p>Anticipated basic tier price $69/month</p>
+                                <p>+ cost/website launched using EasyLychee</p>
+                                <p>+ AI and API usage costs</p>
+                                <p>+ adons</p>
+                            </div>
+                            <Link href={'/login'}><div className='bg-white w-20 mx-auto text-black text-xs py-2 rounded-md hover:bg-black hover:text-white'>Free</div></Link>
+                            <small className="text-center text-white text-xs font-medium leading-none">No card required</small>                        
+                        </div>
+                        <div className='text-black bg-white text-center py-10'>
+                            <h1 className="text-center scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-4xl">$39.99</h1>
+                            <small className="line-through text-black text-center text-xs font-medium leading-none">normally $199.99 </small> 
+                            <div className='text-left py-4 px-6 text-xs'>
+                                <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Instant</code> access to all experimental features</p>
+                                <p className="text-slate-800 py-1">Access <code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">All</code> future features</p>
+                                <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Unlimited</code> website launches forever</p>
+                                <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Unlimited</code> custom domains</p>
+                                <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Almost Unlimited</code> API and AI usage limits</p>
+                                <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">No</code> ad-on fees ever</p>
+                            </div>
+                            <Link href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"><div className='text-xs bg-green-400 w-24 mx-auto text-black font-black py-2 rounded-md'>$39.99</div></Link>
+                            <small className="text-center text-black text-xs font-medium leading-none">One time payment</small>                        
                         </div>
                     </div>
-                    <div className='p-4 bg-purple-400 rounded-md'>
-                    <div className='p-8 bg-gray-100/10 bg-blend-lighten rounded-md shadow-2xl'>
-                        <h1 className="text-center text-2xl font-extrabold tracking-tight py-1">Count Down to v2.0.1 Promo</h1>
-                            <code className="mx-2 relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xl font-semibold text-black">
-                                LifeTime Access $29.99</code>
-                            <div className="text-lg font-semibold pt-10">
-                                Get Instant access to  <code className="mx-2 relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold text-black">
-                                All </code> Experimental Features                                
-                            </div>
-                            <p className="text-xs text-slate-100 pb-4">
-                                Access all bonus updates rolling in the future
-                            </p>
-                            <div className="text-lg font-semibold pt-4">
-                                Not a single penny more than what you pay today
-                            </div>
-                            <div className="text-lg font-semibold pt-1">
-                                Vote/ Request New Features to
-                            </div>
-                            <p className="text-xs text-slate-100 pb-4">
-                                make Lychee perfect platform for you 
-                            </p>
-                            <div className='pt-16'>
-                            <Link href="https://buy.stripe.com/aEUaGYfkW9L04wgbJ3"><div className='bg-green-400 w-32 mx-auto text-black py-2 rounded-md'>$29.99</div></Link>
-                            <h1 className='text-sm pt-2'>(3 seats remaining) <br/>One Time Payment. Life Time Access</h1>
-                        </div>
-                    </div>
-                    </div>
+                    <div className='px-20'>
+                            <p className="py-1 text-sm text-muted-foreground">*Being a creator of a data platform I gotta cite my sources.</p>
+                            <p className="py-1 text-sm text-muted-foreground">West Monroe Partners Study (2021): This study highlighted that the average U.S. household spends about $273 per month on subscriptions, including streaming services, subscription boxes, software subscriptions, and other recurring payments.</p>
+                            <p className="py-1 text-sm text-muted-foreground">Typical Household Lifespan: The duration of 60 years is an estimated average based on a household's active years from young adulthood through retirement.</p>
+                            <p className="py-1 text-sm text-muted-foreground">60 X 12 X $273 = $196,560</p>
+                        </div>                
                 </div>
             </div>
         </section>
