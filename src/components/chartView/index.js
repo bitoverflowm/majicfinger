@@ -1,15 +1,52 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-import { AgChartsReact } from 'ag-charts-react';
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card"
+
+import {
+    ChartConfig,
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+} from "@/components/ui/chart"
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 
-import ChartDataMods from './chartDataMods';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
 
 import { Alert } from "../ui/alert"
-import { BeanOff, Dumbbell } from "lucide-react"
 import { CaretRightIcon } from '@radix-ui/react-icons';
+import { TrendingUp } from 'react-feather';
+
+const dfltChartData = [
+    { month: "January", desktop: 186 },
+    { month: "February", desktop: 305 },
+    { month: "March", desktop: 237 },
+    { month: "April", desktop: 73 },
+    { month: "May", desktop: 209 },
+    { month: "June", desktop: 214 },
+]
+
+const dfltChartConfig = {
+    desktop: {
+        label: "Desktop",
+        color: "hsl(347 77% 50%)",
+    },
+}
 
 const ChartView = () => {
     const contextStateV2 = useMyStateV2()
@@ -21,199 +58,44 @@ const ChartView = () => {
     let setConnectedData = contextStateV2?.setConnectedData
     let setViewing = contextStateV2?.setViewing
 
+    //chart is usable once data requirements are satisfied 
+    const [chartUsable, setChartUsable] = useState()
+
     const [xOptions, setXOptions] = useState()
     const [yOptions, setYOptions] = useState()
+    const [chartConfig, setChartConfig] = useState()
 
-    const chartTypes = ['bar', 'line', 'area', 'scatter', 'bubble', 'pie']
-    const directions = ['horizontal', 'vertical']
-    const [direction, setDirection] = useState('vertical')    
+    //const chartTypes = ['bar', 'line', 'area', 'scatter', 'bubble', 'pie']
+    const chartTypes = ['areaChart']
+
+    const [selX, setSelX] = useState()
+    const [selY, setSelY] = useState()
 
     //charts
     const extractData = (cols) => {
         let arr = cols.map(items => items.field)
         setXOptions(arr)
         setYOptions(arr)
+        setChartUsable(true)
     }
    
     //Extract column names
     useEffect(()=> {
-        connectedCols && extractData(connectedCols)
+        connectedCols ? extractData(connectedCols) : setChartUsable(false)
     }, [connectedCols])
 
-    const [titleProps, setTitleProps] = useState({
-        value: 'Name Your Chart',
-        hidden: false,
-        styling: {
-            fontFamily: 'inter'
-        }
-    })
-
-    const [subTitleProps, setSubTitleProps] = useState({
-        value: 'Give it a sub heading.',
-        hidden: false,
-        styling: {
-            fontFamily: 'inter'
-        }
-    })
-
-    /* Themes and colors */
-    const [chartTheme, setChartTheme] = useState({
-        baseTheme: "ag-default",
-        palette: {
-            fills: ["#cdb4db"],
-            strokes: ["#fff"],
-        },
-    })
-
-    const [bgColor, setBgColor] = useState()
-    const [textColor, setTextColor] = useState()
-    const [cardColor, setCardColor] = useState()
-    const [titleHidden, setTitleHidden] = useState()
-    const [titleFont, setTitleFont] = useState()
-    const [title, setTitle] = useState('Give Your Chart a Title')
-    const [subTitle, setSubTitle] = useState('Add a Description')
-    const [subTitleHidden, setSubTitleHidden]  = useState()
-    const [subTitleFont, setSubTitleFont] = useState()
-
     useEffect(()=>{
-        chartOptions &&
-          setChartOptions(prevOptions => ({
-              ...prevOptions,
-              theme: chartTheme
-            }))
-      }, [chartTheme])
-
-    /* Charting */
-
-    const [seriesConfigs, setSeriesConfigs] = useState([{
-        type: 'bar',
-        xKey: '',
-        yKey: '',
-        direction: direction
-      }]);
-    
-    const [axesConfig, setAxesConfig] = useState([
-        {
-          type: "category",
-          position: "bottom",
-          title: {
-            text: '',
-          },
-        },
-        {
-          type: "number",
-          position: "left",
-          title: {
-            text: '',
-          },
-          label: {
-            formatter: ({ value }) => formatNumber(value),
-          },
-          gridLine: {
-            enabled: false
-          }
-        },
-    ])
-
-    //initializing chartOptions
-    const [chartOptions, setChartOptions] = useState({
-        // Data: Data to be displayed in the chart
-        theme: chartTheme,
-        data: connectedData,
-        series: seriesConfigs,
-        background: { visible: false, }, //this should always be false because we have our own backgrounds
-        axes: axesConfig})
-
-    useEffect(()=>{
-        setChartOptions(prevOptions => ({
-            ...prevOptions,
-            series: seriesConfigs,
-        }))
-    }, [seriesConfigs])
-
-    useEffect(() => {
-        setChartOptions(prevOptions => ({
-            ...prevOptions,
-            axes: axesConfig
-        }));
-    }, [axesConfig]);
-
-    useEffect(() => {
-        setAxesConfig(prevConfigs => {
-            const xTitle = prevConfigs[0].title?.text || seriesConfigs[0]?.xKey || '';
-            const yTitle = prevConfigs[1].title?.text || seriesConfigs[0]?.yKey || '';
-    
-            return direction === 'horizontal'
-                ? [
-                    {
-                        type: "category",
-                        position: "left",
-                        title: {
-                            text: xTitle,
-                        },
-                    },
-                    {
-                        type: "number",
-                        position: "bottom",
-                        title: {
-                            text: yTitle,
-                        },
-                        label: {
-                            formatter: ({ value }) => formatNumber(value),
-                        },
-                        gridLine: {
-                            enabled: false
-                        }
-                    }
-                ]
-                : [
-                    {
-                        type: "category",
-                        position: "bottom",
-                        title: {
-                            text: xTitle,
-                        },
-                    },
-                    {
-                        type: "number",
-                        position: "left",
-                        title: {
-                            text: yTitle,
-                        },
-                        label: {
-                            formatter: ({ value }) => formatNumber(value),
-                        },
-                        gridLine: {
-                            enabled: false
-                        }
-                    }
-                ];
-        });
-    
-        setSeriesConfigs(prevConfigs => 
-            prevConfigs.map(config => ({ 
-                ...config, 
-                direction: direction,
-                normalizedTo: normalize ? normalizeValue : undefined
-            }))
-        );
-    }, [direction]);
-
-    const [normalize, setNormalize] = useState(false);
-    const [normalizeValue, setNormalizeValue] = useState(100);
-
-    useEffect(() => {
-        console.log('setting new value: ', normalizeValue)
-        console.log('normalize> ', normalize)
-        setSeriesConfigs(prevConfigs => 
-            prevConfigs.map(config => ({ 
-                ...config,
-                normalizedTo: normalize ? normalizeValue : undefined
-            }))
-        );
-    }, [normalize, normalizeValue]);
-  
-
+        if(chartUsable){            
+            setChartConfig({
+                [xOptions[0]]: {
+                    label: xOptions[0],
+                    color: "hsl(347 77% 50%)",
+                },
+            })
+            setSelX(xOptions[0])
+            setSelY(yOptions[1])
+        }
+    }, [chartUsable])
 
     return(
         <div className='grid grid-cols-12 pl-5 place-items-center place-content-center gradualEffect'>
@@ -237,20 +119,92 @@ const ChartView = () => {
                     </div>
                 </Alert>
             </div>
-            {/*Start of background card. WE need spacing, otherwise it looks bad */}
-            <div className={`col-span-8 h-full pt-4 `}>
-                <div className='rounded-lg p-10' style={{background: bgColor && bgColor}}>
-                    <div className='w-full h-[700px] rounded-lg p-20 internalGradualEffect' style={{background: cardColor && cardColor}}>
-                        { !titleHidden && <div className='text-center text-xl font-bold py-2' style={{color: textColor && textColor, fontFamily: titleFont}}>{title}</div>}                    
-                        { !subTitleHidden && <div className='text-center text-sm font-bold py-2' style={{color: textColor && textColor, fontFamily: subTitleFont}}>{subTitle}</div>}
-                        <AgChartsReact options={chartOptions && chartOptions} />
-                    </div>                
-                    {/*<div className='text-center text-xxs'>Footnotes</div>*/}
+            <div className='col-span-12 place-items-center place-content-center py-10'>
+                <Card className="">
+                    <CardHeader>
+                        <CardTitle>Area Chart</CardTitle>
+                        <CardDescription>
+                        Showing total visitors for the last 6 months
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={chartConfig ? chartConfig : dfltChartConfig} className="h-[300px] lg:h-[500px] w-full">
+                            <AreaChart
+                                accessibilityLayer
+                                data={chartUsable ? connectedData : dfltChartData }
+                                margin={{
+                                    left: 12,
+                                    right: 12,
+                                }}
+                            >
+                                <CartesianGrid vertical={false} />
+                                <XAxis
+                                    dataKey={selX ? selX : "month"}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                    //tickFormatter={(value) => value.slice(0, 3)}
+                                />
+                                <ChartTooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent indicator="line" />}
+                                />
+                                <Area
+                                    dataKey={selY ? selY : "desktop"}
+                                    type="natural"
+                                    fill="var(--color-desktop)"
+                                    fillOpacity={0.4}
+                                    stroke="var(--color-desktop)"
+                                />
+                            </AreaChart>
+                        </ChartContainer>
+                    </CardContent>
+                    <CardFooter>
+                        <div className="flex w-full items-start gap-2 text-sm">
+                        <div className="grid gap-2">
+                            <div className="flex items-center gap-2 font-medium leading-none">
+                            Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
+                            </div>
+                            <div className="flex items-center gap-2 leading-none text-muted-foreground">
+                            January - June 2024
+                            </div>
+                        </div>
+                        </div>
+                    </CardFooter>
+                </Card>
+            </div>
+            <div className="fixed top-20 right-10 w-1/4 border border-slate-200 rounded-xl flex flex-col bg-white shadow-lg p-10"  style={{ zIndex: 20 }}>
+                <p className="text-xs font-bold text-muted-foreground">Select </p>
+                <p className="text-xs text-muted-foreground">{selX} {selY}</p>
+                <div className="py-2">
+                    <Select value={selX} onValueChange={(value) => setSelX(value)}>
+                        <SelectTrigger >
+                            <SelectValue placeholder="x axis" className='text-xs'/>
+                        </SelectTrigger>
+                        <SelectContent className='text-xs'>
+                            {xOptions && xOptions.map((i) => (
+                                <SelectItem key={i} value={i} className='text-xs'>
+                                    {i}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>                             
                 </div>
-            </div>
-            <div className='col-span-4 w-full pl-2 pr-6'>
-                <ChartDataMods connectedData={connectedData} seriesConfigs={seriesConfigs} setSeriesConfigs={setSeriesConfigs} directions={directions} direction={direction} setDirection={setDirection} chartTheme={chartTheme} setChartTheme={setChartTheme} cardColor={cardColor} setCardColor={setCardColor} bgColor={bgColor} setBgColor={setBgColor} textColor={textColor} setTextColor={setTextColor} xOptions={xOptions} yOptions={yOptions} chartTypes={chartTypes} axesConfig={axesConfig} setAxesConfig={setAxesConfig} normalize={normalize} setNormalize={setNormalize} normalizeValue={normalizeValue} setNormalizeValue={setNormalizeValue} titleHidden={titleHidden} setTitleHidden={setTitleHidden} titleFont={titleFont} setTitleFont={setTitleFont} title={title} setTitle={setTitle} subTitle={subTitle} setSubTitle={setSubTitle} subTitleHidden={subTitleHidden} setSubTitleHidden={setSubTitleHidden} subTitleFont={subTitleFont} setSubTitleFont={setSubTitleFont}/>
-            </div>
+                <div className="py-2">
+                    <Select value={selY} onValueChange={(value) => setSelY(value)}>
+                        <SelectTrigger >
+                            <SelectValue placeholder="y axis" className='text-xs'/>
+                        </SelectTrigger>
+                        <SelectContent className='text-xs'>
+                            {yOptions && yOptions.map((i) => (
+                                <SelectItem key={i} value={i} className='text-xs'>
+                                    {i}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>                             
+                </div>
+            </div>            
         </div>
     )
 }

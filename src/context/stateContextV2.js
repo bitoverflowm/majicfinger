@@ -11,10 +11,14 @@ export function useMyStateV2(){
 }
 
 export const StateProviderV2 = ({children, initialSettings}) => {
+    /* Admin states */
     const [userHandle, setUserHandle] = useState()
     const [isLifeTimeMember, setIsLifeTimeMember] = useState()
     const [settings, setSettings] = useState(initialSettings)
     const [viewing, setViewing] = useState('dashboard')
+
+    
+    /* Dashboard and bento state */
     const [dashData, setDashData] = useState([{
         "Icon": 'CubeIcon',
         "icon_style": {
@@ -230,23 +234,25 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         'background_color': ''
     })
 
-    //data management
+    /*data management*/
     const [dataSetName, setDataSetName] = useState()
     const [refetchData, setRefetchData] = useState()
     const [refetchChart, setRefetchChart] = useState()
     const [refetchPresentations, setRefetchPresentations] = useState()
+
     //all saved DataSets
     const [savedDataSets, setSavedDataSets] = useState()
     const [loadedDataMeta, setLoadedDataMeta] = useState()
     const [loadedDataId, setLoadedDataId] = useState()
+    
     //all saved Charts
     const [savedCharts, setSavedCharts] = useState()
     const [loadedChartMeta, setLoadedChartMeta ] = useState()
+    
     //all saved presentations
     const [savedPresentations, setSavedPresentations] = useState()
     const [loadedPresentationMeta, setLoadedPresentationMeta] = useState()
     const [connectedPresentation, setConnectedPresentation] = useState()
-
 
     //multi sheet handler
     const [multiSheetFlag, setMultiSheetFlag] = useState()
@@ -268,38 +274,6 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         settings, setSettings, viewing, setViewing, connectedData, setConnectedData, connectedCols, setConnectedCols, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch
     }), [settings, viewing, connectedCols, dataTypes, dataTypeMismatch]);
     
-
-    /*useEffect(() => {
-        if (connectedData && connectedData.length > 0) {
-            // Check if data types are already set
-            if (Object.keys(dataTypes).length === 0) {
-                // Determine data types
-                const detectedDataTypes = determineDataTypes(connectedData);
-                setDataTypes(detectedDataTypes);
-                // Update connectedCols based on detected or existing data types
-                const keys = Object.keys(connectedData[0]);
-                const columnsLabels = keys.map(key => ({
-                    field: key,
-                    cellDataType: detectedDataTypes[key] || 'text'
-                }));
-        
-                setConnectedCols(columnsLabels);             
-            } else {
-                // Check for data type mismatches
-                const detectedDataTypes = determineDataTypes(connectedData);
-                const hasMismatch = checkDataTypeMismatch(detectedDataTypes, dataTypes);
-                setDataTypeMismatch(hasMismatch);
-                // Update connectedCols based on detected or existing data types
-                const keys = Object.keys(connectedData[0]);
-                const columnsLabels = keys.map(key => ({
-                    field: key,
-                    cellDataType: dataTypes[key] || 'text'
-                }));
-        
-                setConnectedCols(columnsLabels);
-            }            
-        }
-    }, [connectedData, dataTypes]);*/
 
     useEffect(() => {
         if (connectedData && connectedData.length > 0) {

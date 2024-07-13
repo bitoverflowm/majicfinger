@@ -23,7 +23,6 @@ import AiView from "@/components/aiView";
 import ScraperView from "@/components/scraperView";
 import ComingSoon from "./components/comingSoon";
 import { Pricing } from "@/components/pricing/lycheePricing";
-import PresentationView from "@/components/presentationView";
 import EasyLychee from "@/components/easyLychee";
 
 
