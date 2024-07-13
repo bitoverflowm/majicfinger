@@ -9,6 +9,7 @@ import ChartDataMods from './chartDataMods';
 
 import { Alert } from "../ui/alert"
 import { BeanOff, Dumbbell } from "lucide-react"
+import { CaretRightIcon } from '@radix-ui/react-icons';
 
 const ChartView = () => {
     const contextStateV2 = useMyStateV2()
@@ -18,6 +19,7 @@ const ChartView = () => {
     let loadedDataMeta = contextStateV2.loadedDataMeta
     let connectedData = contextStateV2.connectedData
     let setConnectedData = contextStateV2?.setConnectedData
+    let setViewing = contextStateV2?.setViewing
 
     const [xOptions, setXOptions] = useState()
     const [yOptions, setYOptions] = useState()
@@ -215,8 +217,26 @@ const ChartView = () => {
 
     return(
         <div className='grid grid-cols-12 pl-5 place-items-center place-content-center gradualEffect'>
-            <div className='col-span-12'>{!connectedData && <Alert className="mb-2"><div className="place-items-center flex gap-2 place-items-center"><BeanOff className="w-5 h-5"/><small className="text-xs font-medium leading-none">No Data Connected. <br/>Connect data set to start charting</small></div></Alert> }</div>
-            <div className='col-span-12'><Link rel="noopener noreferrer" target="_blank" href="https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"><Alert className="mb-2"><div className="place-items-center flex gap-2 place-items-center"><Dumbbell className="w-5 h-5"/><small className="text-xs font-medium leading-none">New? <br/>Click here to learn how to create Charts</small></div></Alert></Link></div>
+            <div className='col-span-12'>
+                <Alert className="pt-3 pb-1">
+                    {!connectedData && 
+                        <div className='flex place-items-center text-xs gap-2 place-items-center bg-red-500 rounded-lg px-4 py-2'>
+                            <div className='rounded-full bg-white h-2 w-2 mr-1'></div>
+                            <small className="text-xs text-white"> You haven't connected any data yet. 
+                            </small>
+                            <span className='flex place-items-center ml-2 text-[10px] rounded-md bg-white text-black cursor-pointer hover:bg-black hover:text-white px-2' onClick={()=>setViewing('dataStart')}>Fix<CaretRightIcon/></span>
+                        </div>
+                    }
+                    <div className='py-3 px-4 flex place-content-center'>
+                        <Link rel="noopener noreferrer" target="_blank" href="https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee">
+                            <div className="flex place-items-center gap-2 place-items-center">
+                                <small className="text-xs">New? Click to get up to speed on MajicCharts in no time.</small>
+                                <CaretRightIcon/>
+                            </div>
+                        </Link>
+                    </div>
+                </Alert>
+            </div>
             {/*Start of background card. WE need spacing, otherwise it looks bad */}
             <div className={`col-span-8 h-full pt-4 `}>
                 <div className='rounded-lg p-10' style={{background: bgColor && bgColor}}>
