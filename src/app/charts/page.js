@@ -209,17 +209,17 @@ const charts = () => {
           <Head>
             <title>Easy Charts - Refreshingly simple charts.</title>
             <meta name="description" content="Create stunning charts effortlessly with Easy Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
-            <meta property="og:url" content="https://www.lych3e.com/charts"/>
-            <meta property="og:type" content="website"/>
-            <meta property="og:title" content="Easy Charts - Refreshingly simple charts. 0Code shadcn/charts."/>
-            <meta property="og:description" content="Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
-            <meta property="og:image" content="https://www.lych3e.com/ogImage.png"/>
-            <meta name="twitter:card" content="summary_large_image"/>
-            <meta property="twitter:domain" content="lych3e.com"/>
-            <meta property="twitter:url" content="https://www.lych3e.com/charts"/>
-            <meta name="twitter:title" content="Easy Charts - Refreshingly simple charts. 0Code shadcn/charts."/>
-            <meta name="twitter:description" content="Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
-            <meta name="twitter:image" content="https://www.lych3e.com/ogImage.png"/>
+            <meta property="og:url" content="https://www.lych3e.com/charts" key="url"/>
+            <meta property="og:type" content="website" key="type"/>
+            <meta property="og:title" content="Easy Charts - Refreshingly simple charts. 0Code shadcn/charts." key="title"/>
+            <meta property="og:description" content="Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization." key="description"/>
+            <meta property="og:image" content="https://www.lych3e.com/ogImage.png" key="ogimage"/>
+            <meta name="twitter:card" content="summary_large_image" key="twittercard"/>
+            <meta property="twitter:domain" content="lych3e.com" key="twitterdomain"/>
+            <meta property="twitter:url" content="https://www.lych3e.com/charts" key="twitterurl"/>
+            <meta name="twitter:title" content="Easy Charts - Refreshingly simple charts. 0Code shadcn/charts." key="twittertitle"/>
+            <meta name="twitter:description" content="Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization." key="twitterdescription"/>
+            <meta name="twitter:image" content="https://www.lych3e.com/ogImage.png" key="twitterImage"/>
           </Head>
           <div className='bg-[#0064E6] text-white'>
               <Script
