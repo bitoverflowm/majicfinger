@@ -291,7 +291,7 @@ const charts = () => {
                           <iframe
                               className="w-full"
                               height="315"
-                              src={`https://www.youtube.com/embed/Mhgk122WuFg?si=hRH4UxT8UbPv55MC`}
+                              src={`https://www.youtube.com/embed/5qrVmJaE4_o?si=4ke8h_wnUD7sIiuZ`}
                               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                               allowFullScreen
                               title="Embedded YouTube Video"
