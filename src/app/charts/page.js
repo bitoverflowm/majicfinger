@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import Marquee from '@/components/magicui/marquee'
 import Image from 'next/image'
 import LycheeFeatureGrid from '@/components/easyLychee/usage/lychee_feature_grid'
+import Head from 'next/head'
 
 export const Highlight = ({
     children,
@@ -204,158 +205,165 @@ const charts = () => {
         });
 
     return (
-        <div className='bg-[#0064E6] text-white'>
-            <Script
-                id = "ms-clarity"
-                strategy="afterInteractive"
-            >{clairtyCode}</Script>
-            <Script async src="https://cdn.promotekit.com/promotekit.js" data-promotekit="03b8c588-8350-4a0c-97f0-0a839509e8e0" strategy="afterInteractive"/>
-            <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
-            <GoogleAnalytics gaId="G-G8X2NEPTEG" />
-            <header className='bg-black/10 px-2 py-1 sm:p-6 sm:h-20 flex w-full fixed top-0 sm:gap-10 place-items-center'>
-                <div className='flex w-full sm:w-56 text-xs place-items-center gap-2'><Image src="/easyChartsLogo.png" width="40" height="40" ></Image><Link href={"www.lych3e.com"}>Lychee</Link> / Easy Charts</div>
-                <div className='text-right text-xs float-right'><Link href="#testimonials">Testimonials</Link></div>
-            </header>
-            <main className=''>
-                <div className='px-4 sm:px-20 py-20 sm:py-32 md:w-4/6'>
-                    <div className='mx-auto sm:fixed sm:top-10 sm:right-10 sm:w-64 text-black pb-2 rounded-md'>
-                        <div className='p-3 flex border-b bg-white place-items-center rounded-t-lg'><div className='text-sm font-semibold w-1/2'>Lychee</div>
-                            <div className='w-1/2 text-right'> <div className='text-sm font-semibold'>$39.99/once</div> <div className='line-through text-xs'>$199.99/once</div></div>
-                        </div>
-                        <div className='px-5 py-4 bg-blue-100'>
-                            <h4 className="scroll-m-20 text-xl font-semibold tracking-tight text-xs">What's included?</h4>
-                            <div className='flex gap-2 pt-3 pb-1 place-items-center'><LineChart className='h-4 w-4'/><small className="text-xs font-medium leading-none">Unlimited Charts</small></div>
-                            <div className='flex gap-2 py-1 place-items-center'><Video className='h-4 w-4'/><small className="text-xs font-medium leading-none">Easy to start {`(1 minute video)`}</small></div>
-                            <div className='flex gap-2 py-1 place-items-center'><LineChart className='h-4 w-4'/><small className="text-xs font-medium leading-none">Instant Downloads, jpg, svg, png</small></div>
-                            <div className='flex gap-2 py-1 place-items-center'><Gift className='h-4 w-4'/><small className="text-xs font-medium leading-none">Free updates</small></div>
-                            <div className='flex gap-2 py-1 place-items-center'><ChatBubbleIcon className='h-4 w-4'/><small className="text-xs font-medium leading-none">Bare bones support included</small></div>
-                            <div className='flex gap-2 py-1 place-items-center'><MagicWandIcon className='h-4 w-4'/><small className="text-xs font-medium leading-none">Lychee Features (AI, Integrations, Spreadsheet, website builder etc)</small></div>
-                            <div className='pt-4 pb-1'>
-                                <h4 className="scroll-m-20 text-xl font-semibold tracking-tight text-xs">What's included?</h4>
-                                <p className="text-xs">After you purchase, you'll be able to log in with your email, instant unlimited access. Everything you need.</p>
-                            </div>                        
-                        </div>
-                        <div className='px-2 bg-blue-100 pb-2 rounded-b-md w-full'>
-                            <Link rel="noopener noreferrer" target="_blank" href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"> <div className='bg-[#01A823] hover:bg-[#01A823]/80 py-2 rounded-lg text-center text-white font-bold w-full'>Checkout</div> </Link>
-                        </div>
-                    </div>
-                    <div className='flex pt-10 sm:pt-0'>
-                        <h1 className="font-serif scroll-m-20 text-4xl sm:text-6xl font-extrabold tracking-tight py-6">
-                            Easy Charts 
-                        </h1>
-                        <div className='mt-3 h-4 sm:h-5 text-[4px] sm:text-[8px] font-thin font-mono rounded-xl border-white border px-1 sm:px-2 py-1'>0.7.7</div>
-                    </div>                    
-                    <h2 className="font-serif scroll-m-20 text-xl sm:text-3xl font-[500] tracking-tight first:mt-0 text-white">
-                        Super simple charts, without a <br/> subscription.
-                    </h2>
-                    <p className="font-serif text-sky-200 text-lg mt-4">If you've used Excel or Sheets, you will feel right at home... If you know how to press a button, you already know how to use Easy Charts. Pay once, no downloads necessary, own it for life. It's yours. You also get the rest of Lychee too.</p>
-                </div>
-                <div className='px-2 lg:px-20 pb-20 lg:w-9/12'>
-                    <div className='flex place-items-center place-content-center py-4'> <Badge variant="outline border-white">no-code: /shdcn/charts</Badge> </div>
-                    <ChartShow/>
-                </div>
-                <div className='px-4 md:px-20 md:w-4/6'>
-                    <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">What is it?</h1>
-                    <p className="font-serif text-sky-200 text-lg mt-4">
-                        Easy Charts, lets you make charts and data visualizations. <br/> No downloads needed, unlimited charts, export as jpg, png, svg. Easy and beautiful. The basics done right. You can customize your chart however you like. Plus, you own the assets and your data.
-                    </p>
-                </div>
-                <div className="px-10 py-10 md:columns-3 gap-4  ">
-                    {images.slice(0, 3).map((imageUrl, idx) => (
-                        <BlurFade key={imageUrl} delay={0.25 + idx * 0.05} inView>
-                            <img
-                                className="mb-4 size-full rounded-lg object-contain"
-                                src={imageUrl}
-                                alt={`Random stock image ${idx + 1}`}
-                            />
-                        </BlurFade>
-                    ))}
-                </div>
-                <div className='px-8 md:px-20 md:w-4/6'>
-                    <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">But we already have Excel, Google Sheets, etc</h1>
-                    <p className="font-serif text-sky-200 text-lg mt-4">
-                        Yes, but those products come with the worst features ever: recurring charges that never end. It shouldn’t cost tens, hundreds or thousands of dollars a month forever to make beautiful visualizations. That's obscene. Besides, Excel and Google Sheets have become unnecessarily complicated.  
-                    </p>
-                    <p className="font-serif text-sky-200 text-lg mt-4">
-                        People have already made the switch to from Excel, Google Sheets, and other chat services to Lychee - <Link className="cursor-pointer underline hover:text-blue-100" href="#testimonials"> here's what they're saying. </Link>
-                    </p>
-                </div>
-                <div className='px-4 md:px-20 md:w-4/6 py-10'>
-                    <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Besides, look how easy it is</h1>
-                    <p className="font-serif text-sky-200 text-lg mt-4">
-                        and how handsome the creator is... @misterrpink
-                    </p>
-                    <div className="md:px-4 py-4 flex flex-wrap justify-center gap-4">
-                        <iframe
-                            className="w-full"
-                            height="315"
-                            src={`https://www.youtube.com/embed/Mhgk122WuFg?si=hRH4UxT8UbPv55MC`}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                            title="Embedded YouTube Video"
-                        ></iframe>
-                    </div>              
-                </div>
-                <div className='md:px-20 w-full'>
-                    <h1 className="px-4 md:px-0 text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Take an even closer look</h1>
-                    <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-4">
-                       Step 1: Super simple data upload (or check out Lychee's other options)
-                    </p>
-                    <div className="md:px-10 ">
-                        <Image src={'/uploadMockup.png'} width={800} height={700}/>
-                    </div>
-                    <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-8">
-                       Step 2: Chart is autogenerated. Customization is up to you.
-                    </p>
-                    <div className="md:px-10 py-10">
-                        <Image src={'/chartGenerated.png'} width={800} height={800}/>
-                    </div>
-                    <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-4">
-                       Step 3: Customize anything and everything, always beautiful.
-                    </p>
-                    <div className="md:px-10 py-10">
-                        <Image src={'/customize.png'} width={800} height={800}/>
-                    </div>
-                    <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-0">
-                       Step 4: Download, png, jpg, svg or share to socials, up to you
-                    </p>
-                </div>
-                <div className='py-10 px-4 md:px-20 md:w-4/6'>
-                    <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Let's talk about Lychee</h1>
-                    <p className="font-serif text-sky-200 text-lg mt-4 pb-10">
-                        Lychee is the Easy Chart's parent (also created by @misterrpink). <br/>
-                        On a mission to make the whole data pipeline as seamless as possible. <br />
-                        When you get lifetime access to Easy Charts, you also get access to the full suite of tools that is Lychee:
-                    </p>
-                    <LycheeFeatureGrid from="charts"/>
-                </div>
-                <div className='px-20 py-56 w-full' id="testimonials">
-                    <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Lychee Testimonials</h1>
-                    <p className="font-serif text-sky-200 text-lg mt-4 pb-10">People really like Lychee - here's what they're saying. <br/> All reviews are clickable.                        
-                    </p>
-                    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-[#0064E6] py-20">
-                        <Marquee pauseOnHover className="[--duration:20s]">
-                            {firstRow.map((review) => (
-                            <ReviewCard key={review.username} {...review} />
-                            ))}
-                        </Marquee>
-                        <Marquee reverse pauseOnHover className="[--duration:20s]">
-                            {secondRow.map((review) => (
-                            <ReviewCard key={review.username} {...review} />
-                            ))}
-                        </Marquee>
-                        <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-[#0064E6] from-[#0064E6]"></div>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-[#0064E6] from-[#0064E6]"></div>
-                    </div>
-                </div>
-                <div className='px-20 py-56 w-full text-center flex flex-col place-items-center place-content-center' id="getIt">
-                    <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Only One Thing Left To Do</h1>
-                    <p className="font-serif text-sky-200 text-lg mt-4 pb-10">Get it.                      
-                    </p>
-                    <Link href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"> <div className='w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center font-bold'>Checkout</div> </Link>
-                </div>
-            </main>
-        </div>
+      <>
+          <Head>
+            <title>Easy Charts - Refreshingly simple charts.</title>
+            <meta name="description" content="Create stunning charts effortlessly with Easy Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
+
+          </Head>
+          <div className='bg-[#0064E6] text-white'>
+              <Script
+                  id = "ms-clarity"
+                  strategy="afterInteractive"
+              >{clairtyCode}</Script>
+              <Script async src="https://cdn.promotekit.com/promotekit.js" data-promotekit="03b8c588-8350-4a0c-97f0-0a839509e8e0" strategy="afterInteractive"/>
+              <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
+              <GoogleAnalytics gaId="G-G8X2NEPTEG" />
+              <header className='bg-black/10 px-2 py-1 sm:p-6 sm:h-20 flex w-full fixed top-0 sm:gap-10 place-items-center'>
+                  <div className='flex w-full sm:w-56 text-xs place-items-center gap-2'><Image src="/easyChartsLogo.png" width="40" height="40" ></Image><Link href={"www.lych3e.com"}>Lychee</Link> / Easy Charts</div>
+                  <div className='text-right text-xs float-right'><Link href="#testimonials">Testimonials</Link></div>
+              </header>
+              <main className=''>
+                  <div className='px-4 sm:px-20 py-20 sm:py-32 md:w-4/6'>
+                      <div className='mx-auto sm:fixed sm:top-10 sm:right-10 sm:w-64 text-black pb-2 rounded-md'>
+                          <div className='p-3 flex border-b bg-white place-items-center rounded-t-lg'><div className='text-sm font-semibold w-1/2'>Lychee</div>
+                              <div className='w-1/2 text-right'> <div className='text-sm font-semibold'>$39.99/once</div> <div className='line-through text-xs'>$199.99/once</div></div>
+                          </div>
+                          <div className='px-5 py-4 bg-blue-100'>
+                              <h4 className="scroll-m-20 text-xl font-semibold tracking-tight text-xs">What's included?</h4>
+                              <div className='flex gap-2 pt-3 pb-1 place-items-center'><LineChart className='h-4 w-4'/><small className="text-xs font-medium leading-none">Unlimited Charts</small></div>
+                              <div className='flex gap-2 py-1 place-items-center'><Video className='h-4 w-4'/><small className="text-xs font-medium leading-none">Easy to start {`(1 minute video)`}</small></div>
+                              <div className='flex gap-2 py-1 place-items-center'><LineChart className='h-4 w-4'/><small className="text-xs font-medium leading-none">Instant Downloads, jpg, svg, png</small></div>
+                              <div className='flex gap-2 py-1 place-items-center'><Gift className='h-4 w-4'/><small className="text-xs font-medium leading-none">Free updates</small></div>
+                              <div className='flex gap-2 py-1 place-items-center'><ChatBubbleIcon className='h-4 w-4'/><small className="text-xs font-medium leading-none">Bare bones support included</small></div>
+                              <div className='flex gap-2 py-1 place-items-center'><MagicWandIcon className='h-4 w-4'/><small className="text-xs font-medium leading-none">Lychee Features (AI, Integrations, Spreadsheet, website builder etc)</small></div>
+                              <div className='pt-4 pb-1'>
+                                  <h4 className="scroll-m-20 text-xl font-semibold tracking-tight text-xs">What's included?</h4>
+                                  <p className="text-xs">After you purchase, you'll be able to log in with your email, instant unlimited access. Everything you need.</p>
+                              </div>                        
+                          </div>
+                          <div className='px-2 bg-blue-100 pb-2 rounded-b-md w-full'>
+                              <Link rel="noopener noreferrer" target="_blank" href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"> <div className='bg-[#01A823] hover:bg-[#01A823]/80 py-2 rounded-lg text-center text-white font-bold w-full'>Checkout</div> </Link>
+                          </div>
+                      </div>
+                      <div className='flex pt-10 sm:pt-0'>
+                          <h1 className="font-serif scroll-m-20 text-4xl sm:text-6xl font-extrabold tracking-tight py-6">
+                              Easy Charts 
+                          </h1>
+                          <div className='mt-3 h-4 sm:h-5 text-[4px] sm:text-[8px] font-thin font-mono rounded-xl border-white border px-1 sm:px-2 py-1'>0.7.7</div>
+                      </div>                    
+                      <h2 className="font-serif scroll-m-20 text-xl sm:text-3xl font-[500] tracking-tight first:mt-0 text-white">
+                          Super simple charts, without a <br/> subscription.
+                      </h2>
+                      <p className="font-serif text-sky-200 text-lg mt-4">If you've used Excel or Sheets, you will feel right at home... If you know how to press a button, you already know how to use Easy Charts. Pay once, no downloads necessary, own it for life. It's yours. You also get the rest of Lychee too.</p>
+                  </div>
+                  <div className='px-2 lg:px-20 pb-20 lg:w-9/12'>
+                      <div className='flex place-items-center place-content-center py-4'> <Badge variant="outline border-white">no-code: /shdcn/charts</Badge> </div>
+                      <ChartShow/>
+                  </div>
+                  <div className='px-4 md:px-20 md:w-4/6'>
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">What is it?</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4">
+                          Easy Charts, lets you make charts and data visualizations. <br/> No downloads needed, unlimited charts, export as jpg, png, svg. Easy and beautiful. The basics done right. You can customize your chart however you like. Plus, you own the assets and your data.
+                      </p>
+                  </div>
+                  <div className="px-10 py-10 md:columns-3 gap-4  ">
+                      {images.slice(0, 3).map((imageUrl, idx) => (
+                          <BlurFade key={imageUrl} delay={0.25 + idx * 0.05} inView>
+                              <img
+                                  className="mb-4 size-full rounded-lg object-contain"
+                                  src={imageUrl}
+                                  alt={`Random stock image ${idx + 1}`}
+                              />
+                          </BlurFade>
+                      ))}
+                  </div>
+                  <div className='px-8 md:px-20 md:w-4/6'>
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">But we already have Excel, Google Sheets, etc</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4">
+                          Yes, but those products come with the worst features ever: recurring charges that never end. It shouldn’t cost tens, hundreds or thousands of dollars a month forever to make beautiful visualizations. That's obscene. Besides, Excel and Google Sheets have become unnecessarily complicated.  
+                      </p>
+                      <p className="font-serif text-sky-200 text-lg mt-4">
+                          People have already made the switch to from Excel, Google Sheets, and other chat services to Lychee - <Link className="cursor-pointer underline hover:text-blue-100" href="#testimonials"> here's what they're saying. </Link>
+                      </p>
+                  </div>
+                  <div className='px-4 md:px-20 md:w-4/6 py-10'>
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Besides, look how easy it is</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4">
+                          and how handsome the creator is... @misterrpink
+                      </p>
+                      <div className="md:px-4 py-4 flex flex-wrap justify-center gap-4">
+                          <iframe
+                              className="w-full"
+                              height="315"
+                              src={`https://www.youtube.com/embed/Mhgk122WuFg?si=hRH4UxT8UbPv55MC`}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              title="Embedded YouTube Video"
+                          ></iframe>
+                      </div>              
+                  </div>
+                  <div className='md:px-20 w-full'>
+                      <h1 className="px-4 md:px-0 text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Take an even closer look</h1>
+                      <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-4">
+                        Step 1: Super simple data upload (or check out Lychee's other options)
+                      </p>
+                      <div className="md:px-10 ">
+                          <Image src={'/uploadMockup.png'} width={800} height={700}/>
+                      </div>
+                      <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-8">
+                        Step 2: Chart is autogenerated. Customization is up to you.
+                      </p>
+                      <div className="md:px-10 py-10">
+                          <Image src={'/chartGenerated.png'} width={800} height={800}/>
+                      </div>
+                      <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-4">
+                        Step 3: Customize anything and everything, always beautiful.
+                      </p>
+                      <div className="md:px-10 py-10">
+                          <Image src={'/customize.png'} width={800} height={800}/>
+                      </div>
+                      <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-0">
+                        Step 4: Download, png, jpg, svg or share to socials, up to you
+                      </p>
+                  </div>
+                  <div className='py-10 px-4 md:px-20 md:w-4/6'>
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Let's talk about Lychee</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4 pb-10">
+                          Lychee is the Easy Chart's parent (also created by @misterrpink). <br/>
+                          On a mission to make the whole data pipeline as seamless as possible. <br />
+                          When you get lifetime access to Easy Charts, you also get access to the full suite of tools that is Lychee:
+                      </p>
+                      <LycheeFeatureGrid from="charts"/>
+                  </div>
+                  <div className='px-20 py-56 w-full' id="testimonials">
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Lychee Testimonials</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4 pb-10">People really like Lychee - here's what they're saying. <br/> All reviews are clickable.                        
+                      </p>
+                      <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-[#0064E6] py-20">
+                          <Marquee pauseOnHover className="[--duration:20s]">
+                              {firstRow.map((review) => (
+                              <ReviewCard key={review.username} {...review} />
+                              ))}
+                          </Marquee>
+                          <Marquee reverse pauseOnHover className="[--duration:20s]">
+                              {secondRow.map((review) => (
+                              <ReviewCard key={review.username} {...review} />
+                              ))}
+                          </Marquee>
+                          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-[#0064E6] from-[#0064E6]"></div>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-[#0064E6] from-[#0064E6]"></div>
+                      </div>
+                  </div>
+                  <div className='px-20 py-56 w-full text-center flex flex-col place-items-center place-content-center' id="getIt">
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Only One Thing Left To Do</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4 pb-10">Get it.                      
+                      </p>
+                      <Link href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"> <div className='w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center font-bold'>Checkout</div> </Link>
+                  </div>
+              </main>
+          </div>
+        </>
     )
 }
 
