@@ -2,9 +2,29 @@
 
   
 import { KatsuCard, KatsuGrid } from "@/components/easyLychee/katsu-grid";
-import { Boxes, BrainCircuit, BrainCog, BrickWall, Carrot, Cherry, Clapperboard, Gem, HandMetal, IceCreamCone, TreePalm } from "lucide-react";
+import { Bitcoin, Boxes, BrainCircuit, BrainCog, BrickWall, Carrot, Cherry, Clapperboard, Gem, HandMetal, IceCreamCone, TreePalm } from "lucide-react";
+import { Twitter } from "react-feather";
+import { FaRobot } from "react-icons/fa";
   
   const features = [
+    {
+      Icon: <FaRobot className="md:h-12 md:w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />,
+      name: "Athena",
+      description: "Lychee's AI, lets you analyze your data and discover thigs you would never imagine.",
+      href: "#getIt",
+      cta: "I want it.",
+      background: <img className="absolute -right-20 -top-20 opacity-60" />,
+      className: "col-span-1",
+    },
+    {
+      Icon: <Twitter className="md:h-12 md:w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />,
+      name: "Twitter Data",
+      description: "Pull data directly from Twitter no-code.",
+      href: "#getIt",
+      cta: "I want it.",
+      background: <img className="absolute -right-20 -top-20 opacity-60" />,
+      className: "col-span-1",
+    },
     {
       Icon: <Carrot className="md:h-12 md:w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />,
       name: "Scraper",
@@ -18,6 +38,15 @@ import { Boxes, BrainCircuit, BrainCog, BrickWall, Carrot, Cherry, Clapperboard,
       Icon: <BrickWall className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />,
       name: "PDFs Parsing",
       description: "Extract Structured Data from PDF.",
+      href: "#getIt",
+      cta: "I want it.",
+      background: <img className="absolute -right-20 -top-20 opacity-60" />,
+      className: "col-span-1",
+    },
+    {
+      Icon: <Bitcoin className="md:h-12 md:w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />,
+      name: "Crypto Data",
+      description: "Pull crypto data no-code.",
       href: "#getIt",
       cta: "I want it.",
       background: <img className="absolute -right-20 -top-20 opacity-60" />,
@@ -107,9 +136,9 @@ import { Boxes, BrainCircuit, BrainCog, BrickWall, Carrot, Cherry, Clapperboard,
   ];
   
   
-  const LycheeFeatureGrid = ()=> {
+  const LycheeFeatureGrid = ({from})=> {
     return (
-      <KatsuGrid className="grid grid-cols-3 lg:grid-cols-4 lg:grid-rows-4">
+      <KatsuGrid className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-rows-4">
         {features && features.map((feature) => (
           <KatsuCard key={feature.name} {...feature} />
         ))}

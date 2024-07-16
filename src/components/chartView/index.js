@@ -311,9 +311,9 @@ const ChartView = () => {
     };
     
     return(
-        <div className={`grid grid-cols-12 pl-5 place-items-center place-content-center gradualEffect ${dark ? 'bg-black': 'bg-white' }`}>
-            <div className='gradualEffect col-span-12 place-items-center place-content-center py-10'>
-                <div className='gradualEffect py-12 px-12 rounded-xl' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "'hsl(142 88% 28%)'"}}>
+        <div className={`gradualEffect ${dark ? 'bg-black': 'bg-white' }`}>
+            <div className={`gradualEffect py-10 px-10 ${editHidden ? 'w-full' : 'w-10/12'}`}>
+                <div className='gradualEffect py-12 px-12 rounded-xl xl:w-10/12' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "'hsl(142 88% 28%)'"}}>
                     <div className='py-4 px-4 rounded-xl shadow-xl' style={{backgroundColor: selectedPalette[3] ? selectedPalette[3] : "#fff"}}>
                         <Card className={`px-4 py-8 border-0 ${dark ? 'text-white bg-slate-800/80': ' text-black bg-white'}`}>
                             <CardHeader>
@@ -655,19 +655,27 @@ const ChartView = () => {
                     </div>
                 </div>
             </div>
-            <div className={`gradualEffect fixed top-14 right-10 border rounded-xl flex flex-col bg-white shadow-lg px-10 py-5 ${editHidden ? 'bg-opacity-20 w-1/12 border-0' : 'w-1/4 border-slate-200'}`}   style={{ zIndex: 20 }}>
-                <div className='flex place-items-center place-content-center'>
+            <div className={`gradualEffect fixed  right-10 border rounded-xl flex flex-col bg-white shadow-lg px-10 py-5 ${editHidden ? 'bg-opacity-20 w-1/12 border-0 top-14 md:top-14' : 'top-1/4 md:top-14 w-9/12 md:w-2/5 xl:w-1/4 border-slate-200'}`}   style={{ zIndex: 20 }}>
+                <div className='flex gap-1 place-items-center place-content-center py-2'>
                     {
-                        editHidden ? <div className='mx-auto cursor-pointer hover:text-slate-600 bg-opacity-40 py-4' onClick={()=>setEditHidden(false)}><EyeOpenIcon/></div> : <div className='mx-auto cursor-pointer hover:text-slate-600 pb-4' onClick={()=>setEditHidden(true)}><EyeClosedIcon /></div>
+                        editHidden ? 
+                        <Toggle area-label="Toggle edit close" onClick={()=>setEditHidden(false)} pressed={false} className="bg-slate-100/40 mr-10">
+                         <EyeOpenIcon/>
+                         </Toggle>                       
+                         : 
+                         <Toggle area-label="Toggle edit open"
+                         onClick={()=>setEditHidden(true)} pressed={false} className="bg-slate-100/40 mr-10">
+                            <EyeClosedIcon />
+                        </Toggle>                        
                     }
                     <Toggle area-label="Toggle png"
-                        onClick={()=>downloadChart('png')} pressed={false}>
+                        onClick={()=>downloadChart('png')} pressed={false} className="bg-slate-100/40">
                         <div className='text-[10px] text-slate-800'>png</div>
                     </Toggle>
-                    <Toggle area-label="Toggle svg" onClick={()=>downloadChart('svg')} pressed={false}>
+                    <Toggle area-label="Toggle svg" onClick={()=>downloadChart('svg')} pressed={false} className="bg-slate-100/40">
                         <div className='text-[10px] text-slate-800'>svg</div>
                     </Toggle>
-                    <Toggle area-label="Toggle jpg" onClick={()=>downloadChart('jpg')} pressed={false}>
+                    <Toggle area-label="Toggle jpg" onClick={()=>downloadChart('jpg')} pressed={false} className="bg-slate-100/40">
                         <div className='text-[10px] text-slate-800'>jpeg</div>
                     </Toggle>
                 </div>
@@ -887,7 +895,6 @@ const ChartView = () => {
                         }
                     </div>
                     <div className="flex place-items-center gap-3 text-xs">
-                        <p className="text-xs text-muted-foreground">Title</p>
                         <Input id="title" type="text" placeholder="Give Your Chart a Title" className="text-xs" onChange={(e)=>setTitle(e.target.value)} />
                         <div
                         className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
@@ -896,8 +903,7 @@ const ChartView = () => {
                         {titleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
                         </div>
                     </div>
-                    <div className="flex gap-2 place-items-center">
-                        <p className="text-xs text-muted-foreground">Des</p>
+                    <div className="flex gap-2 place-items-center py-1">
                         <Input id="subTitle" type="text" className="text-xs" placeholder="Add a Description" onChange={(e)=>setSubTitle(e.target.value)} />
                         <div
                         className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
@@ -906,8 +912,7 @@ const ChartView = () => {
                             { subTitleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
                         </div>
                     </div>
-                    <div className="flex gap-2 place-items-center">
-                        <p className="text-xs text-muted-foreground">Body Title</p>
+                    <div className="flex gap-2 place-items-center py-1">
                         <Input id="bodyHeading" type="text" className="text-xs" placeholder="Add a body Heading" onChange={(e)=>setBodyHeading(e.target.value)} />
                         <div
                         className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
