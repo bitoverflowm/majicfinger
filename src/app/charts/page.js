@@ -213,13 +213,13 @@ const charts = () => {
             <meta property="og:type" content="website"/>
             <meta property="og:title" content="Easy Charts - Refreshingly simple charts. 0Code shadcn/charts."/>
             <meta property="og:description" content="Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
-            <meta property="og:image" content="/ogImage.png"/>
+            <meta property="og:image" content="https://www.lych3e.com/ogImage.png"/>
             <meta name="twitter:card" content="summary_large_image"/>
             <meta property="twitter:domain" content="lych3e.com"/>
             <meta property="twitter:url" content="https://www.lych3e.com/charts"/>
             <meta name="twitter:title" content="Easy Charts - Refreshingly simple charts. 0Code shadcn/charts."/>
             <meta name="twitter:description" content="Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
-            <meta name="twitter:image" content="/ogImage.png"/>
+            <meta name="twitter:image" content="https://www.lych3e.com/ogImage.png"/>
           </Head>
           <div className='bg-[#0064E6] text-white'>
               <Script
