@@ -206,27 +206,6 @@ const charts = () => {
 
     return (
       <div>
-          <Head>
-            <title>Easy Charts - Refreshingly simple charts.</title>
-            <meta name="description" content="Create stunning charts effortlessly with Easy Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
-
-            <meta property="og:url" content="https://www.lych3e.com/charts" key="url"></meta>
-            <meta property="og:description" content="Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization." key="description" />
-            <meta property="og:title" content="Easy Charts - Refreshingly simple charts. 0Code shadcn/charts." key="title"></meta>
-            <meta property="og:site_name" content="Easy Charts"></meta>
-            <meta property="og:image" content="https://www.lych3e.com/ogImage.png" key="ogimage"></meta>
-
-            <meta property="og:type" content="website" key="type"/>
-            <meta property="twitter:domain" content="lych3e.com/charts" key="twitterdomain"/>
-            <meta property="twitter:url" content="https://www.lych3e.com/charts" key="twitterurl"/>            
-            
-
-            <meta property="twitter:image" content="https://www.lych3e.com/ogImage.png" key="twitterImage"></meta>
-            <meta property="twitter:card" content="summary_large_image" key="twittercard"></meta>
-            <meta property="twitter:title" content="Easy Charts - Refreshingly simple charts. 0Code shadcn/charts." key="twittertitle"></meta>
-            <meta property="twitter:description" content="Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization." key="twitterdescription"></meta>
-            
-          </Head>
           <div className='bg-[#0064E6] text-white'>
               <Script
                   id = "ms-clarity"
