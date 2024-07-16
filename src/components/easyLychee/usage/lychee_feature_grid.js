@@ -138,7 +138,7 @@ import { FaRobot } from "react-icons/fa";
   
   const LycheeFeatureGrid = ({from})=> {
     return (
-      <KatsuGrid className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-rows-4">
+      <KatsuGrid className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 lg:grid-rows-4">
         {features && features.map((feature) => (
           <KatsuCard key={feature.name} {...feature} />
         ))}

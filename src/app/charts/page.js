@@ -236,7 +236,7 @@ const charts = () => {
                             </div>                        
                         </div>
                         <div className='px-2 bg-blue-100 pb-2 rounded-b-md w-full'>
-                            <Link rel="noopener noreferrer" target="_blank" href="https://buy.stripe.com/aEUaGYfkW9L04wgbJ3"> <div className='bg-[#01A823] hover:bg-[#01A823]/80 py-2 rounded-lg text-center text-white font-bold w-full'>Checkout</div> </Link>
+                            <Link rel="noopener noreferrer" target="_blank" href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"> <div className='bg-[#01A823] hover:bg-[#01A823]/80 py-2 rounded-lg text-center text-white font-bold w-full'>Checkout</div> </Link>
                         </div>
                     </div>
                     <div className='flex pt-10 sm:pt-0'>
@@ -352,7 +352,7 @@ const charts = () => {
                     <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Only One Thing Left To Do</h1>
                     <p className="font-serif text-sky-200 text-lg mt-4 pb-10">Get it.                      
                     </p>
-                    <Link href="https://buy.stripe.com/aEUaGYfkW9L04wgbJ3"> <div className='w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center text-white font-bold'>Checkout</div> </Link>
+                    <Link href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"> <div className='w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center font-bold'>Checkout</div> </Link>
                 </div>
             </main>
         </div>
