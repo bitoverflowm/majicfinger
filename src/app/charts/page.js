@@ -205,7 +205,7 @@ const charts = () => {
         });
 
     return (
-      <>
+      <div>
           <Head>
             <title>Easy Charts - Refreshingly simple charts.</title>
             <meta name="description" content="Create stunning charts effortlessly with Easy Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
@@ -373,7 +373,7 @@ const charts = () => {
                   </div>
               </main>
           </div>
-        </>
+        </div>
     )
 }
 
