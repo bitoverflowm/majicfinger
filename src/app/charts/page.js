@@ -250,7 +250,7 @@ const charts = () => {
                       <h2 className="font-serif scroll-m-20 text-xl sm:text-3xl font-[500] tracking-tight first:mt-0 text-white">
                           Super simple charts, without a <br/> subscription.
                       </h2>
-                      <p className="font-serif text-sky-200 text-lg mt-4">If you've used Excel or Sheets, you will feel right at home... If you know how to press a button, you already know how to use Easy Charts. Pay once, no downloads necessary, own it for life. It's yours. You also get the rest of Lychee too.</p>
+                      <p className="font-serif text-sky-200 text-lg mt-4">If you've used Excel or Sheets, you will feel right at home... If you know how to press a button, you already know how visualize your data using Easy Charts. Pay once, no downloads necessary, own it for life. It's yours. You also get the rest of Lychee too.</p>
                   </div>
                   <div className='px-2 lg:px-20 pb-20 lg:w-9/12'>
                       <div className='flex place-items-center place-content-center py-4'> <Badge variant="outline border-white">no-code: /shdcn/charts</Badge> </div>
