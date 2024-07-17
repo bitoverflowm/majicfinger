@@ -37,8 +37,20 @@ import {
     ToggleGroupItem,
 } from "@/components/ui/toggle-group"
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+  } from "@/components/ui/alert-dialog"
+
 import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon, ShuffleIcon } from '@radix-ui/react-icons';
-import { MinusCircle, Moon, Sun, Tag, TrendingUp } from 'react-feather';
+import { Download, MinusCircle, Moon, Sun, Tag, TrendingUp, Upload } from 'react-feather';
 import { IoConstructOutline, IoPieChartOutline, IoShuffleOutline, IoStatsChart } from 'react-icons/io5';
 import { Toggle } from '@/components/ui/toggle';
 import { CameraIcon, Expand, Lightbulb } from 'lucide-react';
@@ -75,7 +87,6 @@ const dfltChartConfig = {
 }
 
 const Interactive = () => {
-    const contextStateV2 = useMyStateV2()
     const chartRef = useRef(null)
 
     //chart is usable once data requirements are satisfied 
@@ -92,7 +103,7 @@ const Interactive = () => {
     const [selColor, setSelColor] = useState('#0064E6')
     const [colorVisible, setColorVisible] = useState()
     const [lineStyle, setLineStyle] = useState('natural')
-    const [selectedPalette, setSelectedPalette] = useState(['#0064E6'])
+    const [selectedPalette, setSelectedPalette] = useState(['#0064E6', 'hsl(212 97% 87%)', 'hsl(142 88% 28%)'])
     const categories = Object.keys(masterPalette);
     const [selectedCategory, setSelectedCategory] = useState()
     const [expanded, setExpanded] = useState(false);
@@ -135,7 +146,6 @@ const Interactive = () => {
         }
         setSelectedPalette(newPalette);
     };
-
 
     //demo state
     useEffect(() => {
@@ -610,24 +620,47 @@ const Interactive = () => {
                         </Card>
                     </div>
                 </div>
-            </div>
-            <div className={`gradualEffect bg-white rounded-xl flex flex-col bg-[#0064E6] shadow-lg px-10 py-5`}   style={{ zIndex: 20 }}>
-                <div className='flex gap-1 place-items-center place-content-center py-2'>
+                <div className='flex gap-2 place-items-center place-content-center py-2'>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Toggle aria-label="Toggle png" className="bg-[#0064E6]/40 shadow-xl">
+                                <div className='text-[10px] text-white hover:text-black flex gap-2 place-items-center'>
+                                    <Upload className='h-3 w-3' /> Upload
+                                </div>
+                            </Toggle>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Need to register </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Please register to upload your own data. No card required.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction>
+                                    <Link href="#getIt">
+                                        Continue
+                                    </Link>
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
+                    <div className='pl-2'><Download className='text-white h-3 w-3'/></div>
                     <Toggle area-label="Toggle png"
-                        onClick={()=>alert('longin')} pressed={false} className="bg-slate-100/40">
-                        <div className='text-[10px] text-slate-800'>upload</div>
+                        onClick={()=>downloadChart('png')} pressed={false} className="bg-[#0064E6]/40 shadow-xl">
+                        <div className='text-[10px] text-white hover:text-black font-mono'>png</div>
                     </Toggle>
-                    <Toggle area-label="Toggle png"
-                        onClick={()=>downloadChart('png')} pressed={false} className="bg-slate-100/40">
-                        <div className='text-[10px] text-slate-800'>png</div>
+                    <Toggle area-label="Toggle svg" onClick={()=>downloadChart('svg')} pressed={false} className="bg-[#0064E6]/40 shadow-xl">
+                        <div className='text-[10px] text-white hover:text-black font-mono'>svg</div>
                     </Toggle>
-                    <Toggle area-label="Toggle svg" onClick={()=>downloadChart('svg')} pressed={false} className="bg-slate-100/40">
-                        <div className='text-[10px] text-slate-800'>svg</div>
-                    </Toggle>
-                    <Toggle area-label="Toggle jpg" onClick={()=>downloadChart('jpg')} pressed={false} className="bg-slate-100/40">
-                        <div className='text-[10px] text-slate-800'>jpeg</div>
+                    <Toggle area-label="Toggle jpg" onClick={()=>downloadChart('jpg')} pressed={false} className="bg-[#0064E6]/40 shadow-xl">
+                        <div className='text-[10px] text-white hover:text-black font-mono'>jpeg</div>
                     </Toggle>
                 </div>
+            </div>
+            <div className={`gradualEffect bg-white rounded-xl flex flex-col shadow-lg px-10 py-5 w-96`}   style={{ zIndex: 20 }}>
                     <>
                     {
                         !(colorVisible) &&
@@ -860,7 +893,7 @@ const Interactive = () => {
                             { bodyHeadingHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
                         </div>
                     </div>
-                    <div className="flex gap-2 place-items-center pb-10">
+                    <div className="flex gap-2 place-items-center">
                         <p className="text-xs text-muted-foreground">Content</p>
                         <Input id="BodyContent" type="text" className="text-xs" placeholder="Add a Description" onChange={(e)=>setBodyContent(e.target.value)} />
                         <div
