@@ -220,7 +220,7 @@ const charts = () => {
               </header>
               <main className=''>
                   <div className='px-4 sm:px-20 py-20 sm:py-32 md:w-4/6'>
-                      <div className='mx-auto sm:fixed sm:top-10 sm:right-10 sm:w-64 text-black pb-2 rounded-md'>
+                      <div className='mx-auto sm:absolute sm:top-10 sm:right-10 sm:w-64 text-black pb-2 rounded-md'>
                           <div className='p-3 flex border-b bg-white place-items-center rounded-t-lg'><div className='text-sm font-semibold w-1/2'>Lychee</div>
                               <div className='w-1/2 text-right'> <div className='text-sm font-semibold'>$39.99/once</div> <div className='line-through text-xs'>$199.99/once</div></div>
                           </div>
@@ -252,9 +252,11 @@ const charts = () => {
                       </h2>
                       <p className="font-serif text-sky-200 text-lg mt-4">If you've used Excel or Sheets, you will feel right at home... If you know how to press a button, you already know how visualize your data using Easy Charts. Pay once, no downloads necessary, own it for life. It's yours. You also get the rest of Lychee too.</p>
                   </div>
-                  <div className='px-2 lg:px-20 pb-20 lg:w-9/12'>
-                      <div className='flex place-items-center place-content-center py-4'> <Badge variant="outline border-white">no-code: /shdcn/charts</Badge> </div>
-                      <ChartShow/>
+                  <div className='px-2 pb-20'>
+                      <div className='flex place-items-center place-content-center py-4'> <Badge variant="outline border-white">Give it a try!</Badge> </div>
+                      <div className='flex place-items-center px-24'>
+                        <ChartShow/>
+                      </div>
                   </div>
                   <div className='px-4 md:px-20 md:w-4/6'>
                       <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">What is it?</h1>

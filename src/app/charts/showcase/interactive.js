@@ -40,7 +40,7 @@ import {
 import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon, ShuffleIcon } from '@radix-ui/react-icons';
 import { MinusCircle, Moon, Sun, Tag, TrendingUp } from 'react-feather';
 import { IoConstructOutline, IoPieChartOutline, IoShuffleOutline, IoStatsChart } from 'react-icons/io5';
-import { Toggle } from '../ui/toggle';
+import { Toggle } from '@/components/ui/toggle';
 import { CameraIcon, Expand, Lightbulb } from 'lucide-react';
 import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin } from 'react-icons/pi';
 import { MdOutlineAreaChart, MdStackedBarChart } from 'react-icons/md';
@@ -74,12 +74,9 @@ const dfltChartConfig = {
     },
 }
 
-const ChartView = ({demo}) => {
+const Interactive = () => {
     const contextStateV2 = useMyStateV2()
     const chartRef = useRef(null)
-    let connectedCols = contextStateV2 && contextStateV2.connectedCols
-    let connectedData = contextStateV2 && contextStateV2.connectedData
-    let setViewing = contextStateV2 && contextStateV2?.setViewing
 
     //chart is usable once data requirements are satisfied 
     const [chartUsable, setChartUsable] = useState()
@@ -88,17 +85,14 @@ const ChartView = ({demo}) => {
     const [yOptions, setYOptions] = useState()
     const [chartConfig, setChartConfig] = useState()
 
-    //const chartTypes = ['bar', 'line', 'area', 'scatter', 'bubble', 'pie']
-    //const chartTypes = ['area', 'bar', 'line', 'pie', 'radar'];
-
     const [selChartType, setSelChartType] = useState('area')
     const [selX, setSelX] = useState()
     const [availableYOptions, setAvailableYOptons] = useState(["desktop", "mobile", "other"])
     const [selY, setSelY] = useState(["desktop"])
-    const [selColor, setSelColor] = useState('hsl(142 88% 28%)')
+    const [selColor, setSelColor] = useState('#0064E6')
     const [colorVisible, setColorVisible] = useState()
     const [lineStyle, setLineStyle] = useState('natural')
-    const [selectedPalette, setSelectedPalette] = useState(['hsl(142 88% 28%)'])
+    const [selectedPalette, setSelectedPalette] = useState(['#0064E6'])
     const categories = Object.keys(masterPalette);
     const [selectedCategory, setSelectedCategory] = useState()
     const [expanded, setExpanded] = useState(false);
@@ -142,47 +136,18 @@ const ChartView = ({demo}) => {
         setSelectedPalette(newPalette);
     };
 
-    //charts
-    const extractData = (cols) => {
-        let arr = cols.map(items => items.field)
-        setXOptions(arr)
-        setYOptions(arr)
-        setChartUsable(true)
-    }
-   
-    //Extract column names
-    useEffect(()=> {
-        connectedCols ? extractData(connectedCols) : setChartUsable(false)
-    }, [connectedCols])
-
-    useEffect(() => {
-        connectedData && setFilteredData(connectedData)
-    }, [connectedData])
 
     //demo state
-    useEffect(()=>{
-        if(demo){
-            setFilteredData(dfltChartData)
-            setXOptions(['month'])
-            setYOptions(['desktop', 'mobile', 'other'])
-            setAvailableYOptons(['desktop', 'mobile', 'other'])
-        }
-    }, [demo])
+    useEffect(() => {
+        setFilteredData(dfltChartData);
+        setXOptions(['month']);
+        setYOptions(['desktop', 'mobile', 'other']);
+        setAvailableYOptons(['desktop', 'mobile', 'other']);
+    }, []);
 
-    useEffect(()=>{
-        if(chartUsable){            
-            setChartConfig({
-                [yOptions[1]]: {label: yOptions[1]},
-            })
-            setSelX(xOptions[0])
-            setSelY([yOptions[1]])
-            console.log(yOptions.filter(option => option !== xOptions[0] && option !== yOptions[1]))
-            setAvailableYOptons(yOptions.filter(option => option !== xOptions[0] && option !== yOptions[1]))
-        }
-    }, [chartUsable])
 
     useEffect(() => {
-        if (chartUsable && selChartType === 'pie' && selX && selY.length > 0 && filteredData) {
+        if (selChartType === 'pie' && selX && selY.length > 0 && filteredData) {
             const newChartConfig = {};
             const updatedFilteredData = filteredData.map((item, index) => {
                 const color = selectedPalette[index % selectedPalette.length];
@@ -198,12 +163,8 @@ const ChartView = ({demo}) => {
             setChartConfig(newChartConfig);
             setFilteredData(updatedFilteredData);
         }
-    }, [chartUsable, selChartType, selX, selY, selectedPalette]);
+    }, [selChartType, selX, selY, selectedPalette]);
 
-    const handleColorSel = (val) => {
-        setColorVisible(false)
-        setSelColor(val)
-    }
 
     const handleSelectY = (value, index = -1) => {
         let newSelY;
@@ -219,14 +180,6 @@ const ChartView = ({demo}) => {
             ...prevConfig,
             [value]: { label: value },
         }));
-    }
-
-    useEffect(()=> {
-        !demo && setAvailableYOptons(checkYOptions())
-    }, [selY, selX])
-
-    const checkYOptions = () =>{
-        return yOptions && yOptions.filter(option => !selY.includes(option))
     }
 
     const removeY = (val, index) => {
@@ -314,9 +267,9 @@ const ChartView = ({demo}) => {
     };
     
     return(
-        <div className={`gradualEffect ${dark ? 'bg-black': 'bg-white' } ${demo? 'flex' : ''}`}>
-            <div className={`gradualEffect py-10 px-10 ${editHidden ? 'w-full' : 'w-10/12'}`}>
-                <div className='gradualEffect py-12 px-12 rounded-xl xl:w-10/12' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "'hsl(142 88% 28%)'"}}>
+        <div className={`gradualEffect flex rounded-lg ${dark ? 'bg-black text-white': 'bg-[#0064E6] text-black' }`}>
+            <div className={`gradualEffect py-10 px-10`}>
+                <div className='gradualEffect py-12 px-12 rounded-xl' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "#0064E6"}}>
                     <div className='py-4 px-4 rounded-xl shadow-xl' style={{backgroundColor: selectedPalette[3] ? selectedPalette[3] : "#fff"}}>
                         <Card className={`px-4 py-8 border-0 ${dark ? 'text-white bg-slate-800/80': ' text-black bg-white'}`}>
                             <CardHeader>
@@ -329,11 +282,11 @@ const ChartView = ({demo}) => {
                                 }                                
                             </CardHeader>
                             <CardContent>
-                                <ChartContainer config={chartConfig ? chartConfig : dfltChartConfig} className={`h-[300px] lg:h-[500px] w-full ${dark && 'text-slate-200'}`}>
+                                <ChartContainer config={chartConfig ? chartConfig : dfltChartConfig} className={`h-[300px] w-[400px] ${dark && 'text-slate-200'}`}>
                                     { selChartType === 'area' &&
                                         <AreaChart
                                             accessibilityLayer
-                                            data={filteredData ? filteredData : dfltChartData }
+                                            data={dfltChartData }
                                             margin={{
                                                 left: 12,
                                                 right: 12,
@@ -658,19 +611,12 @@ const ChartView = ({demo}) => {
                     </div>
                 </div>
             </div>
-            <div className={`gradualEffect ${ demo ? '' : 'absolute right-10'} border rounded-xl flex flex-col bg-white shadow-lg px-10 py-5 ${editHidden ? 'bg-opacity-20 w-1/12 border-0 top-14 md:top-14' : 'top-1/4 md:top-14 w-9/12 md:w-2/5 xl:w-1/4 border-slate-200'}`}   style={{ zIndex: 20 }}>
+            <div className={`gradualEffect bg-white rounded-xl flex flex-col bg-[#0064E6] shadow-lg px-10 py-5`}   style={{ zIndex: 20 }}>
                 <div className='flex gap-1 place-items-center place-content-center py-2'>
-                    {
-                        editHidden ? 
-                        <Toggle area-label="Toggle edit close" onClick={()=>setEditHidden(false)} pressed={false} className="bg-slate-100/40 mr-10">
-                         <EyeOpenIcon/>
-                         </Toggle>                       
-                         : 
-                         <Toggle area-label="Toggle edit open"
-                         onClick={()=>setEditHidden(true)} pressed={false} className="bg-slate-100/40 mr-10">
-                            <EyeClosedIcon />
-                        </Toggle>                        
-                    }
+                    <Toggle area-label="Toggle png"
+                        onClick={()=>alert('longin')} pressed={false} className="bg-slate-100/40">
+                        <div className='text-[10px] text-slate-800'>upload</div>
+                    </Toggle>
                     <Toggle area-label="Toggle png"
                         onClick={()=>downloadChart('png')} pressed={false} className="bg-slate-100/40">
                         <div className='text-[10px] text-slate-800'>png</div>
@@ -682,17 +628,7 @@ const ChartView = ({demo}) => {
                         <div className='text-[10px] text-slate-800'>jpeg</div>
                     </Toggle>
                 </div>
-                { !(editHidden) &&
                     <>
-                    {!demo && !connectedData && 
-                        <div className='flex place-items-center text-xs gap-2 place-items-center bg-indigo-500/80 rounded-lg px-4 py-2 mx-8 mb-4'>
-                            <div className='rounded-full bg-white h-2 w-2 mr-1 animate-bounce'></div>
-                            <small className="text-xs text-white"> You haven't connected any data yet. 
-                            </small>
-                            <span className='flex place-items-center ml-2 text-[10px] rounded-md bg-white text-black cursor-pointer hover:bg-black hover:text-white px-2' onClick={()=>setViewing('dataStart')}>Fix<CaretRightIcon/></span>
-                        </div>
-                    }
-                    
                     {
                         !(colorVisible) &&
                             <>
@@ -934,19 +870,10 @@ const ChartView = ({demo}) => {
                             { bodyContentHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
                         </div>
                     </div>
-                    <Link rel="noopener noreferrer" target="_blank" href="https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee">
-                        <div className='bottom-0 flex place-items-center place-content-center w-5/6 py-3 bg-slate-200/40 rounded-t-md hover:bg-slate-300/30'>    
-                            <div className="flex place-content-center gap-2 place-items-center text-center w-full">
-                                <small className="text-xs">New? <span className='underline'>Click</span> to get up to speed on MajicCharts in no time.</small>
-                                <CaretRightIcon/>
-                            </div>
-                        </div>
-                    </Link>
                     </>
-                }
             </div>  
         </div>
     )
 }
 
-export default ChartView
+export default Interactive
