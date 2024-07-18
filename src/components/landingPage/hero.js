@@ -1,20 +1,16 @@
 "use client";
 
-import BackgroundVideo from 'next-video/background-video';
-import presenting_charts from '/videos/charts2.mp4?thumbnailTime=100';
-
 import { useRef, useEffect, useState } from "react"
 
 import Link from "next/link";
 import Image from "next/image";
 
-import { Twitter, Instagram, Youtube, Activity, Facebook, BarChart2, DollarSign, FileText, Cloud, ShoppingCart, Zap, Globe, Thermometer, AlertTriangle, Star, BarChart, Globe as Globe2 } from 'react-feather';
+import { ChartShow } from '@/app/charts/showcase/chart1';
+import { Badge } from '../ui/badge';
 
-import BlurIn from "../magicui/blur-in";
 import { BorderBeam } from "../magicui/border-beam";
 
-import VideoView from "./videoView";
-import { CircleCheckBig, MoveRight } from "lucide-react";
+import { MoveRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatedList } from "@/components/magicui/animated-list";
 import { FaCircle } from 'react-icons/fa';
@@ -371,15 +367,13 @@ export function Hero() {
                     </p> 
                 </div>
                 
-                <div className="relative mx-auto rounded-xl">
-                    <div className="w-full h-11 rounded-t-lg bg-gray-600/10 flex justify-start items-center space-x-1.5 px-3">
-                        <span className="w-3 h-3 rounded-full bg-red-400"></span>
-                        <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
-                        <span className="w-3 h-3 rounded-full bg-green-400"></span>
+                <div className="relative mx-auto rounded-xl z-30">
+                    <div className='flex place-items-center place-content-center py-4'> 
+                        <Badge variant="outline" className="border-white text-white">Give it a try!</Badge> 
                     </div>
-                    <div className=" bg-black border-t-0 w-full"><div className='px-3'><BackgroundVideo autoPlay loop muted playsInline src={presenting_charts} /></div>
-                    </div>                                
-                    <BorderBeam />                                
+                    <div className='flex place-items-center px-24'>
+                        <ChartShow demo={true}/>
+                    </div>
                 </div>
                 <div className='py-10'>
                     <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>

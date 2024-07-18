@@ -70,7 +70,7 @@ const dfltChartData = [
     { month: "April", desktop: 73, mobile: 190, other: 50 },
     { month: "May", desktop: 209, mobile: 130, other: 100 },
     { month: "June", desktop: 214, mobile: 140, other: 160 },
-  ]
+]
 
 const dfltChartConfig = {
     desktop: {
@@ -87,7 +87,7 @@ const dfltChartConfig = {
     },
 }
 
-const Interactive = () => {
+const Interactive = ({demo}) => {
     const chartRef = useRef(null)
 
     //chart is usable once data requirements are satisfied 
@@ -132,6 +132,12 @@ const Interactive = () => {
 
     //data filtering and management
     const [filteredData, setFilteredData] = useState()
+
+    const [uploadOpen, setUploadOpen] = useState(false);
+
+    const handleUploadClose = () => {
+        setUploadOpen(false);
+    };
 
     const selectedPaletteHandler = (index) => {
         let newPalette = masterPalette[selectedCategory][index]
@@ -623,7 +629,7 @@ const Interactive = () => {
                             </div>
                         </div>
                         <div className='flex gap-2 place-items-center place-content-center py-2'>
-                            <AlertDialog>
+                            <AlertDialog open={uploadOpen} onOpenChange={setUploadOpen}>
                                 <AlertDialogTrigger asChild>
                                     <Toggle aria-label="Toggle png" className="bg-[#0064E6] shadow-xl">
                                         <div className='text-[10px] text-white hover:text-black flex gap-2 place-items-center'>
@@ -640,10 +646,15 @@ const Interactive = () => {
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction>
-                                            <Link href="/login">
-                                                Continue
-                                            </Link>
+                                        <AlertDialogAction onClick={()=>handleUploadClose()}>
+                                            {
+                                                demo ? <Link href="#getIt">
+                                                            Continue
+                                                        </Link>
+                                                    : <Link href="/login">
+                                                        Continue
+                                                    </Link>
+                                            }
                                         </AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
