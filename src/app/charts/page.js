@@ -153,9 +153,20 @@ const reviews = [
     },
   ];
 
+  
+const companies = [
+  "jpm",
+  "goldman",
+  "meta",
+  "google",
+  "apple",
+  "mit",
+];
+
 
 const firstRow = reviews.slice(0, reviews.length / 2);
 const secondRow = reviews.slice(reviews.length / 2);
+
 
   
 const ReviewCard = ({
@@ -251,6 +262,27 @@ const charts = () => {
                           Super simple charts, without a <br/> subscription.
                       </h2>
                       <p className="font-serif text-sky-200 text-lg mt-4">If you've used Excel or Sheets, you will feel right at home... If you know how to press a button, you already know how visualize your data using Easy Charts. Pay once, no downloads necessary, own it for life. It's yours. You also get the rest of Lychee too.</p>
+                      <div className=" pt-10">
+                          <div className="container mx-auto px-4 md:px-8 ">
+                              <h3 className="py-4 text-center text-[10px] font-semibold text-slate-400">
+                                  ACTIVELY BETA TESTED BY FRIENDS AT
+                              </h3>
+                              <div className="sm:mt-6 sm:px-10">
+                                  <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
+                                      {companies.map((logo, idx) => (
+                                          <img
+                                              key={idx}
+                                              src={`./${logo}.svg`}
+                                              className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
+                                              alt={logo}
+                                          />
+                                      ))}
+                                  </div>
+                                  <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
+                                  <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
+                              </div>
+                          </div>
+                      </div>
                   </div>
                   <div className='px-2 pb-20'>
                       <div className='flex place-items-center place-content-center py-4'> <Badge variant="outline border-white">Give it a try!</Badge> </div>
