@@ -228,7 +228,10 @@ const charts = () => {
               <GoogleAnalytics gaId="G-G8X2NEPTEG" />
               <header className='bg-black/10 px-2 py-1 sm:p-6 sm:h-20 flex w-full fixed top-0 sm:gap-10 place-items-center'>
                   <div className='flex w-full sm:w-56 text-xs place-items-center gap-2'><Image src="/easyChartsLogo.png" width="40" height="40" ></Image><Link href={"www.lych3e.com"}>Lychee</Link> / Easy Charts</div>
-                  <div className='text-right text-xs float-right'><Link href="#testimonials">Testimonials</Link></div>
+                  <div className='text-right text-xs ml-auto'><Link href="#testimonials">Testimonials</Link></div>
+                  <div className='text-right text-xs'><Link href="#demo">Demo</Link></div>
+                  
+
               </header>
               <main className=''>
                   <div className='px-4 sm:px-20 py-20 sm:py-32 md:w-4/6'>
