@@ -16,6 +16,7 @@ import Marquee from '@/components/magicui/marquee'
 import Image from 'next/image'
 import LycheeFeatureGrid from '@/components/easyLychee/usage/lychee_feature_grid'
 import Head from 'next/head'
+import { BiDownArrow } from 'react-icons/bi'
 
 export const Highlight = ({
     children,
@@ -262,6 +263,7 @@ const charts = () => {
                           Super simple charts, without a <br/> subscription.
                       </h2>
                       <p className="font-serif text-sky-200 text-lg mt-4">If you've used Excel or Sheets, you will feel right at home... If you know how to press a button, you already know how visualize your data using Easy Charts. Pay once, no downloads necessary, own it for life. It's yours. You also get the rest of Lychee too.</p>
+                      <div className='flex place-items-center place-content-center py-4 underline text-xl gap-2 cursor-pointer'><Link href="#demo">Try the demo </Link><BiDownArrow/></div>
                       <div className=" pt-10">
                           <div className="container mx-auto px-4 md:px-8 ">
                               <h3 className="py-4 text-center text-[10px] font-semibold text-slate-400">
@@ -285,9 +287,9 @@ const charts = () => {
                       </div>
                   </div>
                   <div className='px-2 pb-20'>
-                      <div className='flex place-items-center place-content-center py-4'> <Badge variant="outline border-white">Give it a try!</Badge> </div>
-                      <div className='flex place-items-center px-24'>
-                        <ChartShow/>
+                      <div className='flex place-items-center place-content-center py-4 underline text-xl gap-2 cursor-pointer'><Link href="#demo">We made a live demo for you to play with below </Link><BiDownArrow/></div>
+                      <div className='flex place-items-center px-24' id="demo">
+                        <ChartShow />
                       </div>
                   </div>
                   <div className='px-4 md:px-20 md:w-4/6'>
