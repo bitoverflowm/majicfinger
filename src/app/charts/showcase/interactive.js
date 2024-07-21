@@ -64,12 +64,12 @@ import { toPng, toJpeg, toBlob, toPixelData, toSvg } from 'html-to-image';
 import { Input } from "@/components/ui/input"
 
 const dfltChartData = [
-    { month: "January", desktop: 186, mobile: 80, other: 45 },
-    { month: "February", desktop: 305, mobile: 200, other: 100 },
-    { month: "March", desktop: 237, mobile: 120, other: 150 },
-    { month: "April", desktop: 73, mobile: 190, other: 50 },
-    { month: "May", desktop: 209, mobile: 130, other: 100 },
-    { month: "June", desktop: 214, mobile: 140, other: 160 },
+    { month: "January", desktop: 186, mobile: 80, tv: 100, other: 45 },
+    { month: "February", desktop: 305, mobile: 200, tv: 20,  other: 100 },
+    { month: "March", desktop: 237, mobile: 120, tv: 20, other: 150 },
+    { month: "April", desktop: 73, mobile: 190, tv: 20, other: 50 },
+    { month: "May", desktop: 209, mobile: 130, tv: 10, other: 100 },
+    { month: "June", desktop: 214, mobile: 140, tv: 60,  other: 160 },
 ]
 
 const dfltChartConfig = {
@@ -79,6 +79,10 @@ const dfltChartConfig = {
     },
     mobile: {
         label: "Mobile",
+        color: "hsl(212 97% 87%)",
+    },
+    tablet: {
+        label: "TV",
         color: "hsl(212 97% 87%)",
     },
     other: {
@@ -100,7 +104,7 @@ const Interactive = ({demo}) => {
 
     const [selChartType, setSelChartType] = useState('area')
     const [selX, setSelX] = useState()
-    const [availableYOptions, setAvailableYOptons] = useState(["desktop", "mobile", "other"])
+    const [availableYOptions, setAvailableYOptons] = useState(["desktop", "mobile", "other", "TV"])
     const [selY, setSelY] = useState(["desktop"])
     const [selColor, setSelColor] = useState('#0064E6')
     const [colorVisible, setColorVisible] = useState()
@@ -159,8 +163,8 @@ const Interactive = ({demo}) => {
     useEffect(() => {
         setFilteredData(dfltChartData);
         setXOptions(['month']);
-        setYOptions(['desktop', 'mobile', 'other']);
-        setAvailableYOptons(['desktop', 'mobile', 'other']);
+        setYOptions(['desktop', 'mobile', 'tv', 'other']);
+        setAvailableYOptons(['desktop', 'mobile', 'tv', 'other']);
     }, []);
 
 
@@ -285,9 +289,9 @@ const Interactive = ({demo}) => {
     };
     
     return(
-        <BrowserFrame  url="www.lych3e.com/your_handle/chart_title">
-            <div className={`gradualEffect flex ${dark ? 'bg-black text-white': 'bg-slate-100 text-black' } p-10`}>
-                <div className={`gradualEffect py-10 px-10`}>                    
+        <BrowserFrame  url="/your_name/yout_title">
+            <div className={`gradualEffect xl:flex ${dark ? 'bg-black text-white': 'bg-slate-100 text-black' } p-10`}>
+                <div className={`gradualEffect lg:py-10 lg:px-10`}>                    
                         <div className='gradualEffect py-12 px-12 rounded-xl' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "#0064E6"}}>
                             <div className='py-4 px-4 rounded-xl shadow-xl backdrop-blur-xl bg-opacity-50' style={{backgroundColor: dark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)'}}>
                                 <Card className={`py-4 border-0 ${dark ? 'text-white bg-black': ' text-black bg-white'}`}>
@@ -618,10 +622,10 @@ const Interactive = ({demo}) => {
                                         <div className="flex w-full items-start gap-2 text-sm">
                                         <div className="grid gap-2">
                                             <div className="flex items-center gap-2 font-medium leading-none">
-                                            {bodyHeading}
+                                            {!bodyHeadingHidden && bodyHeading}
                                             </div>
                                             <div className={`flex items-center gap-2 leading-none  ${dark ? 'text-slate-300': 'text-muted-foreground' }`}>
-                                            {bodyContent}
+                                            {!bodyContentHidden && bodyContent}
                                             </div>
                                         </div>
                                         </div>
@@ -634,7 +638,7 @@ const Interactive = ({demo}) => {
                                 <AlertDialogTrigger asChild>
                                     <Toggle aria-label="Toggle png" className="bg-[#0064E6] shadow-xl">
                                         <div className='text-[10px] text-white hover:text-black flex gap-2 place-items-center'>
-                                            <Upload className='h-3 w-3' /> Upload
+                                            <Upload className='h-3 w-3' /> Upload your data
                                         </div>
                                     </Toggle>
                                 </AlertDialogTrigger>
@@ -674,11 +678,11 @@ const Interactive = ({demo}) => {
                             </Toggle>
                         </div>
                 </div>
-                <div className={`gradualEffect ${ dark ? 'bg-gray-500/40' : 'bg-white'} rounded-xl flex flex-col shadow-lg px-10 py-5 w-96`}   style={{ zIndex: 20 }}>
+                <div className={`gradualEffect ${ dark ? 'bg-gray-500/40' : 'bg-white'} rounded-xl  shadow-lg px-10 py-5 w-full gap-10 xl:w-96 grid grid-cols-2 xl:flex xl:flex-col`}   style={{ zIndex: 20 }}>
                         <>
                         {
                             !(colorVisible) &&
-                                <>
+                                <div>
                                     <ToggleGroup variant="outline" type="single" area-label="Chart Type"
                                         value={selChartType}
                                         onValueChange={(value) => {
@@ -700,20 +704,22 @@ const Interactive = ({demo}) => {
                                             <AiOutlineRadarChart className="h-4 w-4" />
                                         </ToggleGroupItem>
                                     </ToggleGroup>
-                                    <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Select your x-axis </p>
-                                    <div className="py-2 text-black">
-                                        <Select value={selX} onValueChange={(value) => setSelX(value)}>
-                                            <SelectTrigger >
-                                                <SelectValue placeholder="x axis" className='text-xs'/>
-                                            </SelectTrigger>
-                                            <SelectContent className='text-xs'>
-                                                {xOptions && xOptions.map((i) => (
-                                                    <SelectItem key={i} value={i} className='text-xs'>
-                                                        {i}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>                             
+                                    <div>
+                                        <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Select your x-axis </p>
+                                        <div className="py-2 text-black">
+                                            <Select value={selX} onValueChange={(value) => setSelX(value)}>
+                                                <SelectTrigger >
+                                                    <SelectValue placeholder="x axis" className='text-xs'/>
+                                                </SelectTrigger>
+                                                <SelectContent className='text-xs'>
+                                                    {xOptions && xOptions.map((i) => (
+                                                        <SelectItem key={i} value={i} className='text-xs'>
+                                                            {i}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>                             
+                                        </div>
                                     </div>
                                     <div className="py-2">
                                         <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Select your y-axis</p>
@@ -754,16 +760,18 @@ const Interactive = ({demo}) => {
                                             </div>
                                         )}
                                     </div>
-                                    { selChartType !== 'pie' &&
-                                        <button
-                                            className="p-2 bg-black text-white rounded-md text-xs"
-                                            onClick={() => handleSelectY(availableYOptions[0])}
-                                            disabled={availableYOptions && availableYOptions.length === 0}
-                                        >
-                                            {availableYOptions && availableYOptions.length === 0 ? 'You have no more columns': '+ Stack Another Value'}
-                                        </button>
-                                    }
-                                </>
+                                    <div>
+                                        { selChartType !== 'pie' &&
+                                            <button
+                                                className="p-2 bg-black text-white rounded-md text-xs"
+                                                onClick={() => handleSelectY(availableYOptions[0])}
+                                                disabled={availableYOptions && availableYOptions.length === 0}
+                                            >
+                                                {availableYOptions && availableYOptions.length === 0 ? 'You have no more columns': '+ Stack Chart on Top'}
+                                            </button>
+                                        }
+                                    </div>                                    
+                                </div>
                         }
                         <div className='pt-4 pb-2'>                    
                             <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Click To Change</p>
@@ -771,7 +779,7 @@ const Interactive = ({demo}) => {
                                 <div className="flex text-xs rounded-md py-2 cursor-pointer" onClick={()=>setColorVisible(true)}>
                                     {
                                         selectedPalette && selectedPalette.map((color)=>
-                                            <div className="p-3" style={{ backgroundColor: color}}> </div>
+                                            <div className="p-3" key={color} style={{ backgroundColor: color}}> </div>
                                         )
                                     }
                                 </div>
@@ -811,109 +819,113 @@ const Interactive = ({demo}) => {
                                 }
                             </div>
                         </div>
-                        { (selChartType === 'area' || selChartType === 'line') && <div className='py-2 text-black'>
-                            <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Line Style</p>
-                            <p className={`text-xs pb-1 ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-1`}>How do you want your line</p>
-                            <Select value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
-                                <SelectTrigger >
-                                    <SelectValue placeholder="y axis" className='text-xs'/>
-                                </SelectTrigger>
-                                <SelectContent className='text-xs'>
-                                    {['natural', 'linear', 'step'].map((i) => (
-                                        <SelectItem key={i} value={i} className='text-xs'>
-                                            {i}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>                             
-                        </div>}
-                        <div className='py-2 flex gap-2'>
-                            {selChartType === 'area' &&
-                                <Toggle area-label="Toggle Expand" pressed={expanded}
-                                    onPressedChange={handleToggleChange}>
-                                    <Expand className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
+                        <div>
+                            { (selChartType === 'area' || selChartType === 'line') && <div className='py-2 text-black'>
+                                <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Line Style</p>
+                                <p className={`text-xs pb-1 ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-1`}>How do you want your line</p>
+                                <Select value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
+                                    <SelectTrigger >
+                                        <SelectValue placeholder="y axis" className='text-xs'/>
+                                    </SelectTrigger>
+                                    <SelectContent className='text-xs'>
+                                        {['natural', 'linear', 'step'].map((i) => (
+                                            <SelectItem key={i} value={i} className='text-xs'>
+                                                {i}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>                             
+                            </div>}
+                            <div className='py-2 flex gap-2'>
+                                {selChartType === 'area' &&
+                                    <Toggle area-label="Toggle Expand" pressed={expanded}
+                                        onPressedChange={handleToggleChange}>
+                                        <Expand className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
+                                    </Toggle>
+                                }
+                                <Toggle area-label="Toggle Legend" pressed={legendVisible}
+                                    onPressedChange={handleToggleLegend}>
+                                    <IdCardIcon className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
                                 </Toggle>
-                            }
-                            <Toggle area-label="Toggle Legend" pressed={legendVisible}
-                                onPressedChange={handleToggleLegend}>
-                                <IdCardIcon className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
-                            </Toggle>
-                            {selChartType === 'bar' &&
-                                <>
-                                    <Toggle area-label="Toggle Horizontal" pressed={horizontal}
-                                        onPressedChange={handleToggleHorizontal}>
-                                        <PiChartBarHorizontalLight className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
-                                    </Toggle>
-                                    <Toggle area-label="Toggle Stack" pressed={stackedBar}
-                                        onPressedChange={handleToggleStack}>
-                                        <MdStackedBarChart className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
-                                    </Toggle>
-                                </>
-                            }
-                            {selChartType === 'line' &&
-                                <>
-                                    <Toggle area-label="Toggle Dots" pressed={dots}
-                                        onPressedChange={handleToggleDots}>
-                                        <GoDotFill className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
-                                    </Toggle>
-                                    <Toggle area-label="Toggle label line" pressed={labelLine}
-                                        onPressedChange={handleToggleLabelLine}>
-                                        <Tag className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
-                                    </Toggle>
-                                </>
-                            }
-                            {selChartType === 'line' || selChartType === 'pie' &&
-                                <>
-                                    <Toggle area-label="Toggle label line" pressed={labelLine}
-                                        onPressedChange={handleToggleLabelLine}>
-                                        <Tag className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
-                                    </Toggle>
-                                </>
-                            }
-                            {selChartType === 'pie' &&
-                                <>
-                                    <Toggle area-label="Toggle label line" pressed={donut}
-                                        onPressedChange={handleToggleDonut}>
-                                        <PiChartDonut className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
-                                    </Toggle>
-                                </>
-                            }
-                        </div>
-                        <div className="flex place-items-center gap-3 text-xs">
-                            <Input id="title" type="text" placeholder="Give Your Chart a Title" className="text-xs" onChange={(e)=>setTitle(e.target.value)} />
-                            <div
-                            className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                            onClick={() => setTitleHidden(!titleHidden)}
-                            >
-                            {titleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
+                                {selChartType === 'bar' &&
+                                    <>
+                                        <Toggle area-label="Toggle Horizontal" pressed={horizontal}
+                                            onPressedChange={handleToggleHorizontal}>
+                                            <PiChartBarHorizontalLight className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
+                                        </Toggle>
+                                        <Toggle area-label="Toggle Stack" pressed={stackedBar}
+                                            onPressedChange={handleToggleStack}>
+                                            <MdStackedBarChart className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
+                                        </Toggle>
+                                    </>
+                                }
+                                {selChartType === 'line' &&
+                                    <>
+                                        <Toggle area-label="Toggle Dots" pressed={dots}
+                                            onPressedChange={handleToggleDots}>
+                                            <GoDotFill className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
+                                        </Toggle>
+                                        <Toggle area-label="Toggle label line" pressed={labelLine}
+                                            onPressedChange={handleToggleLabelLine}>
+                                            <Tag className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
+                                        </Toggle>
+                                    </>
+                                }
+                                {selChartType === 'line' || selChartType === 'pie' &&
+                                    <>
+                                        <Toggle area-label="Toggle label line" pressed={labelLine}
+                                            onPressedChange={handleToggleLabelLine}>
+                                            <Tag className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
+                                        </Toggle>
+                                    </>
+                                }
+                                {selChartType === 'pie' &&
+                                    <>
+                                        <Toggle area-label="Toggle label line" pressed={donut}
+                                            onPressedChange={handleToggleDonut}>
+                                            <PiChartDonut className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
+                                        </Toggle>
+                                    </>
+                                }
                             </div>
                         </div>
-                        <div className="flex gap-2 place-items-center py-1">
-                            <Input id="subTitle" type="text" className="text-xs" placeholder="Add a Description" onChange={(e)=>setSubTitle(e.target.value)} />
-                            <div
-                            className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                            onClick={() => setSubTitleHidden(!subTitleHidden)}
-                            >
-                                { subTitleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
+                        <div>
+                            <div className="flex place-items-center gap-3 text-xs">
+                                <Input id="title" type="text" placeholder="Give Your Chart a Title" className="text-xs" onChange={(e)=>setTitle(e.target.value)} />
+                                <div
+                                className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                onClick={() => setTitleHidden(!titleHidden)}
+                                >
+                                {titleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex gap-2 place-items-center py-1">
-                            <Input id="bodyHeading" type="text" className="text-xs" placeholder="Add a body Heading" onChange={(e)=>setBodyHeading(e.target.value)} />
-                            <div
-                            className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                            onClick={() => setHeadingHidden(!bodyHeadingHidden)}
-                            >
-                                { bodyHeadingHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
+                            <div className="flex gap-2 place-items-center py-1">
+                                <Input id="subTitle" type="text" className="text-xs" placeholder="Add a Description" onChange={(e)=>setSubTitle(e.target.value)} />
+                                <div
+                                className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                onClick={() => setSubTitleHidden(!subTitleHidden)}
+                                >
+                                    { subTitleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex gap-2 place-items-center">
-                            <p className="text-xs text-muted-foreground">Content</p>
-                            <Input id="BodyContent" type="text" className="text-xs" placeholder="Add a Description" onChange={(e)=>setBodyContent(e.target.value)} />
-                            <div
-                            className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
-                            onClick={() => setBodyContentHidden(!bodyContentHidden)}
-                            >
-                                { bodyContentHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
+                            <div className="flex gap-2 place-items-center py-1">
+                                <Input id="bodyHeading" type="text" className="text-xs" placeholder="Add a body Heading" onChange={(e)=>setBodyHeading(e.target.value)} />
+                                <div
+                                className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                onClick={() => setHeadingHidden(!bodyHeadingHidden)}
+                                >
+                                    { bodyHeadingHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
+                                </div>
+                            </div>
+                            <div className="flex gap-2 place-items-center">
+                                <p className="text-xs text-muted-foreground">Content</p>
+                                <Input id="BodyContent" type="text" className="text-xs" placeholder="Add a Description" onChange={(e)=>setBodyContent(e.target.value)} />
+                                <div
+                                className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                onClick={() => setBodyContentHidden(!bodyContentHidden)}
+                                >
+                                    { bodyContentHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" /> }
+                                </div>
                             </div>
                         </div>
                         </>

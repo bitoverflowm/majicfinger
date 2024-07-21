@@ -97,7 +97,7 @@ const Login = ({fromHome}) => {
                                 </form>
                             }
                         </div>
-                    { !(user) && <div className='w-96 text-xs pl-4'>Fill out the form above, whether you have an account or not.<br/> You will receive a majic link in your email.</div>}
+                    { !(user) && <div className='w-96 text-xs pl-4'>Fill out the form above.<br/> You will receive a majic link in your email.</div>}
                 </>
             }
         </div>
