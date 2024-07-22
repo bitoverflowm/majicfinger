@@ -88,10 +88,11 @@ const GeckoDex = ({setConnectedData}) => {
     ];
 
     const tokens = [
-        { query: 'tokenPools', name: 'Token Pools', description: 'Get top pools for a token', columns: ['name', 'address', "base_token_price_usd", "quote_token_price_usd", "base_token_price_native_currency", "quote_token_price_native_currency", "base_token_price_quote_token", "quote_token_price_base_token", "pool_created_at", "reserve_in_usd", "fdv_usd", "market_cap_usd", "price_change_percentage", "transactions", "volume_usd"], requires : ['network', 'token_address'] },
-        { query: 'specificToken', name: 'Specific Token', description: 'Get specific token on a network', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'], requires : ['network', 'address'] },
-        { query: 'multipleTokens', name: 'Multiple Tokens', description: 'Get multiple tokens on a network', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'], requires : ['network', 'addresses'] },
-        { query: 'tokenInfo', name: 'Token Info', description: 'Get specific token info on a network', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'], requires : ['network', 'address'] },
+        { query: 'topPoolsByToken', name: 'Top Pools By Token', description: 'Get top pools for a token', columns: ['name', 'address', "base_token_price_usd", "quote_token_price_usd", "base_token_price_native_currency", "quote_token_price_native_currency", "base_token_price_quote_token", "quote_token_price_base_token", "pool_created_at", "reserve_in_usd", "fdv_usd", "market_cap_usd", "price_change_percentage", "transactions", "volume_usd"], requires : [{'network': 'network id eg: eth. Use *Supported Networks* action to more newtworks'},{ 'addresses': 'address of token eg: 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'}] },
+        { query: 'specificToken', name: 'Specific Token', description: 'Get specific token on a network', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'],  requires : [{'network': 'network id eg: eth. Use Supported Networks action to more newtworks'},{ 'addresses': 'Single token address eg: 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'}] },
+        { query: 'multipleTokens', name: 'Multiple Tokens', description: 'Get multiple tokens on a network', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'], requires : [{'network': 'network id eg: eth. Use *Supported Networks* action to more newtworks'},{ 'addresses': 'address of token eg: 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2,0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'}] },
+        { query: 'singleTokenInfo', name: 'Single Token Info', description: 'Get specific token info on a network', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'],  requires : [{'network': 'network id eg: eth. Use *Supported Networks* action to more newtworks'},{ 'addresses': 'Single token address eg: 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'}] },
+        { query: 'poolsTokenInfo', name: 'Pool Token Info', description: 'Get pool token info on a network', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'],  requires : [{'network': 'network id eg: eth. Use *Supported Networks* action to more newtworks'},{ 'addresses': 'pool address eg: 0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852'}] },
         { query: 'recentlyUpdatedTokens', name: 'Recently Updated Tokens', description: 'Get most recently updated 100 tokens info across all networks', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'], requires : [] },
     ];
 
@@ -244,6 +245,23 @@ const GeckoDex = ({setConnectedData}) => {
                     <AccordionContent>
                         <div className='flex flex-wrap gap-1'>
                             {pools.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="tokens">
+                    <AccordionTrigger className="pt-1 sm:pt-3">Tokens</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {tokens.map(action => (
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}

@@ -68,8 +68,37 @@ export default async (req, res) => {
                 return res.status(400).json({ message: 'Missing network parameter' });
             }
             url = `https://api.geckoterminal.com/api/v2/networks/${network}/new_pools`;
-            return await multiplePools(url, res);       
-        
+            return await multiplePools(url, res);        
+        case 'topPoolsByToken':
+            if (!network || !addresses) {
+                return res.status(400).json({ message: 'Missing network or addresses parameter' });
+            }
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/tokens/${addresses}/pools`;
+            return await multiplePools(url, res);
+        case 'specificToken':
+            if (!network || !addresses) {
+                return res.status(400).json({ message: 'Missing network or addresses parameter' });
+            }
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/tokens/${addresses}`;
+            return await specificPool(url, res);
+        case 'multipleTokens':
+            if (!network || !addresses) {
+                return res.status(400).json({ message: 'Missing network or addresses parameter' });
+            }
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/tokens/multi/${addresses}`;
+            return await multiplePools(url, res);
+        case 'singleTokenInfo':
+            if (!network || !addresses) {
+                return res.status(400).json({ message: 'Missing network or addresses parameter' });
+            }
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/tokens/${addresses}/info`;
+            return await singleTokenInfo(url, res);
+        case 'poolsTokenInfo':
+            if (!network || !addresses) {
+                return res.status(400).json({ message: 'Missing network or addresses parameter' });
+            }
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${addresses}/info`;
+            return await poolTokenInfo(url, res);      
         default:
             return res.status(400).json({ message: 'Invalid query parameter' });
     }
@@ -496,8 +525,6 @@ const genericPools = async (url, res) => {
         if (response.status === 200) {
             const { data } = await response.json();
 
-            console.log(data)
-
             const flattenedData = data.map((val) => {
                 const {
                     id,
@@ -659,7 +686,6 @@ const specificPool = async (url, res) => {
 
 const multiplePools = async (url, res) => {
     try {
-        console.log(url)
         const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -669,9 +695,6 @@ const multiplePools = async (url, res) => {
 
         if (response.status === 200) {
             const { data } = await response.json();
-
-            console.log(data)
-
             const flattenedData = data.map((pool) => {
                 const {
                     id,
@@ -758,6 +781,122 @@ const multiplePools = async (url, res) => {
     }
 };
 
+//tokenIngo
+
+const singleTokenInfo = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { data } = await response.json();
+            const {
+                id,
+                type,
+                attributes: {
+                    address,
+                    name,
+                    symbol,
+                    decimals,
+                    image_url,
+                    coingecko_coin_id,
+                    websites,
+                    description,
+                    gt_score,
+                    discord_url,
+                    telegram_handle,
+                    twitter_handle
+                }
+            } = data;
+
+            const flattenedData = {
+                id,
+                type,
+                address,
+                name,
+                symbol,
+                decimals,
+                image_url,
+                coingecko_coin_id,
+                websites,
+                description,
+                gt_score,
+                discord_url,
+                telegram_handle,
+                twitter_handle
+            };
+
+            return res.status(200).json([flattenedData]);
+        } else {
+            return res.status(response.status).json({ message: 'Single Token Info CoinGecko Data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
+const poolTokenInfo = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { data } = await response.json();
+
+            const flattenedData = data.map(token => {
+                const {
+                    id,
+                    type,
+                    attributes: {
+                        address,
+                        name,
+                        symbol,
+                        decimals,
+                        image_url,
+                        coingecko_coin_id,
+                        websites,
+                        description,
+                        gt_score,
+                        discord_url,
+                        telegram_handle,
+                        twitter_handle
+                    }
+                } = token;
+
+                return {
+                    id,
+                    type,
+                    address,
+                    name,
+                    symbol,
+                    decimals,
+                    image_url,
+                    coingecko_coin_id,
+                    websites,
+                    description,
+                    gt_score,
+                    discord_url,
+                    telegram_handle,
+                    twitter_handle
+                };
+            });
+
+            return res.status(200).json(flattenedData);
+        } else {
+            return res.status(response.status).json({ message: 'Single Token Info CoinGecko Data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
 
 
 
