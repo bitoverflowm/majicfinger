@@ -14,9 +14,9 @@ import { PiUserSwitch } from "react-icons/pi";
 
 import { useUser } from '@/lib/hooks';
 
-import ParamToggles from './paramToggles';
-import { params } from './params';
-import twitterDemoData from './twitterDemoData';
+import ParamToggles from '../../integrationsView/integrationPlayground/integrations/twitter/paramToggles';
+import { params } from '../../integrationsView/integrationPlayground/integrations/twitter/params';
+import twitterDemoData from '../../integrationsView/integrationPlayground/integrations/twitter/twitterDemoData';
 
 const TwitterIntegration = ({ setData, setDflt, connecting, stepName, setStepName, setHelperOpen, setWorking}) => {
     const user = useUser();

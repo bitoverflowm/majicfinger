@@ -15,7 +15,7 @@ import IntegrationPlayground from "./integrationPlayground";
 
 const integrations_list = [
   {
-    color: "#35af00",
+    color: "#E7F0DC",
     icon: <div className="p-1 rounded-full shadow-2xl"><Image src={'/coinGecko.png'} height={60} width={60} /></div>,
     clickHandler: "coinGecko",
     name: "CoinGecko",
@@ -24,11 +24,11 @@ const integrations_list = [
   },
   {
     color: "#000",
-    icon: <Image src={'/coinGecko.png'} height={60} width={60} />,
-    clickHandler: "coinGeckoTerminal",
+    icon: <Image src={'/geckoDex1.png'} height={75} width={75} />,
+    clickHandler: "geckoDex",
     name: "GeckoTerminal from CoinGecko",
     description: "GeckoTerminal is a DeFi and DEX aggregator. Explore the market data & prices of any tokens traded across 110+ blockchain networks across 900+ DEXes – brought to you by the same team behind CoinGecko.",
-    tags: ['featured', 'crypto', 'finance', 'trading', 'coming July 24', 'coming soon']
+    tags: ['featured', 'crypto', 'finance', 'trading']
   },
   {
     color: "#AE82FE",
@@ -139,7 +139,7 @@ const IntegrationsView = () => {
                 <p className="text-sm text-muted-foreground pb-4">
                   Lychee makes it easy by taking care of everything, end-to-end so you can you can focus on <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] mr-2 font-mono font-semibold"> discovering something great. </code> Instantly pull data cleaner than a nun's browser history.
                 </p>
-                <p className="text-xs text-muted-foreground pb-2">Want to see it in action?</p>
+                <p className="text-xs text-muted-foreground pb-2">Want to see how to use Lychee Integrations?</p>
                 <Link className="text-xs pt-1 pb-1 px-2 underline font-bold bg-lychee_green flex w-96 place-items-center gap-2" rel="noopener noreferrer" target="_blank" href="https://misterrpink.beehiiv.com/p/how-to-use-lychee-integrations-coingecko"><code> CoinGecko API: Pull Crypto Market Data </code> <ExternalLink className="w-4 h-4"/></Link>
               </div>
             </div>
