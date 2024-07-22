@@ -17,6 +17,7 @@ import { FaCircle } from 'react-icons/fa';
 import Marquee from "@/components/magicui/marquee";
 import LycheeFeatureGrid from '../easyLychee/usage/lychee_feature_grid';
 import { Card, CardTitle } from '../ui/card';
+import { PiCircleFill } from "react-icons/pi";
 
 export const Highlight = ({
     children,
@@ -553,19 +554,15 @@ export function Hero() {
                     </div>
                     <div className='grid md:grid-cols-2 py-10 px-8 place-content-center'>
                         <div className='text-white text-center py-10'>
-                            <h1 className="text-center scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-4xl">Free</h1>
+                            <h1 className="text-center scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-4xl">Free </h1>
                             <div className='text-left py-4 pl-6 text-xs'>
-                                <p className="text-slate-200"><code className="text-black relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Limited</code> access to experimental features</p>
+                                <p className="text-slate-200"><code className="text-black relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">2 day Trial</code> then $19.99/month </p>
                             </div>
                             <div className='text-left md:py-10 pl-6 text-xs text-red-500'>
-                                <p>Warning:</p>
-                                <p>Anticipated basic tier price $69/month</p>
-                                <p>+ cost/website launched using EasyLychee</p>
-                                <p>+ AI and API usage costs</p>
-                                <p>+ adons</p>
+                                <p className="text-slate-100 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Instant</code> access to all stable and some experimental features</p>
                             </div>
-                            <Link href={'/login'}><div className='bg-white w-20 mx-auto text-black text-xs py-2 rounded-md hover:bg-black hover:text-white'>Free</div></Link>
-                            <small className="text-center text-white text-xs font-medium leading-none">No card required</small>                        
+                            <Link href={'/https://buy.stripe.com/3csbL2c8K2iye6QcNg'}><div className='bg-white w-20 mx-auto text-black text-xs py-2 rounded-md hover:bg-black hover:text-white'>Go</div></Link>
+                            <small className="text-center text-white text-xs font-medium leading-none">Managed By Stripe</small>                        
                         </div>
                         <div className='text-black bg-white text-center py-10'>
                             <h1 className="text-center scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-4xl">$39.99</h1>
@@ -579,7 +576,8 @@ export function Hero() {
                                 <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">No</code> ad-on fees ever</p>
                             </div>
                             <Link href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"><div className='text-xs bg-green-400 w-24 mx-auto text-black font-black py-2 rounded-md'>$39.99</div></Link>
-                            <small className="text-center text-black text-xs font-medium leading-none">One time payment</small>                        
+                            <small className="text-center text-black text-xs font-medium leading-none">One time payment</small>
+                            <div className='flex gap-2 place-content-center place-items-center text-xs'><PiCircleFill className='animate-ping text-green-400 h-3 w-3'/><p className="text-black text-xs">11 seats left at this price</p></div>           
                         </div>
                     </div>
                     <div className='px-20'>
