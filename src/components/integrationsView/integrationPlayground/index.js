@@ -1,5 +1,7 @@
 
 import {
+  ArrowDown,
+  ArrowDownNarrowWide,
   ArrowLeft,
     Rabbit,
   } from "lucide-react"
@@ -59,26 +61,29 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
                 </form>
               </div>
               <div className="relative flex flex-col min-h-[90vh] rounded-xl bg-muted/30 p-2 sm:p-4 sm:col-span-2">
-                <Badge variant="outline" className="mx-auto sm:absolute sm:right-3 sm:top-3">
-                  Here is your data preview; Go to Grid to view the full dataset
-                </Badge>
-                <div className="flex-1 pt-2 sm:pt-10">
+                <div className="flex place-items-center place-content-center gap-2">
+                  <div className="text-xs"> Click to do something: </div>
+                  <Badge className="text-xs bg-[#402E7A] text-white cursor-pointer" onClick={()=>setViewing('dataStart')}>
+                    View full data set 
+                  </Badge>
+                  <Badge className="text-xs bg-[#4C3BCF] text-white cursor-pointer" onClick={()=>setViewing('charts')}>
+                    Start charting
+                  </Badge>
+                  <Badge className="text-xs bg-[#4B70F5] text-white cursor-pointer" onClick={()=>setViewing('ai')}>
+                    Analyze/create a report with AI
+                  </Badge>
+                  <Badge className="text-xs bg-[#3DC2EC] text-slate-800 cursor-pointer" onClick={()=>setViewing('presentation')}>
+                    Generate a full website
+                  </Badge>
+                </div>
+                <div variant="outline" className="mx-auto text-xs flex place-items-center gap-1 pt-3 py-1">
+                    <div className="text-xs">Below is a Data preview of the first 10 rows</div>
+                </div>
+                <div className="flex-1 pt-2">
                   {
                       connectedData && <PreviewGrid h="h-[650px]" w="w-full"/>
                   }
-                </div>
-                <Alert className="text-xs sm:mt-auto bg-lychee_green">
-                  <Rabbit className=""/>
-                  <AlertTitle>A snippet of your query will appear above. You can then head over to</AlertTitle>
-                  <AlertDescription>
-                    <div className="text-xs">
-                      <div><span className="underline cursor-pointer hover:bg-lychee_green" onClick={()=>setViewing('dataStart')}>Data Sheets</span> to view and work with the full dataset</div>
-                      <div><span className="underline cursor-pointer hover:bg-lychee_green" onClick={()=>setViewing('ai')}>AI</span> see what you can discover with AI analysis</div>
-                      <div><span className="underline cursor-pointer hover:bg-lychee_green" onClick={()=>setViewing('charts')}>Charts</span> to start 
-                      visualizing your data</div>
-                      <div><span className="hidden underline cursor-pointer hover:bg-lychee_green" onClick={()=>setViewing('presentation')}>Presentation</span> to start creating your presentation and share with your audience</div></div>
-                  </AlertDescription>                
-                </Alert>    
+                </div> 
               </div>
           </main>
       </div>
