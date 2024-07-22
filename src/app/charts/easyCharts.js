@@ -230,7 +230,7 @@ const EasyCharts = () => {
                   <div className='px-2 pb-20'>
                       <div className='flex place-items-center place-content-center py-4 text-md gap-2 cursor-pointer'><Link href="#demo">Interactive demo for you to play with below </Link><BiDownArrow className='animate-bounce'/></div>
                       <div className='flex place-items-center px-8 xl:px-24' id="demo">
-                        <ChartShow />
+                        <ChartShow demo={true}/>
                       </div>
                   </div>
                   <div className="py-10">
