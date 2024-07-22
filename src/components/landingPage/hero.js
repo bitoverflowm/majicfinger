@@ -326,7 +326,7 @@ export function Hero() {
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>
                 <h3 className="text-slate-200 text-center scroll-m-20 text-2xl font-semibold tracking-tight">
-                    You deserve a break from spreadsheets...
+                    Did you ever dream of becoming the Micheal Jordan of Spreadsheets?
                 </h3>
                 <div className='flex gap-2 place-content-center py-4'>
                     <Link href="#about">
@@ -336,45 +336,19 @@ export function Hero() {
                         <div className='shadow-2xl bg-green-500 text-black hover:bg-white hover:text-black rounded-md px-4 py-3 text-xs'>I want it.</div>
                     </Link>
                 </div>
-                <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-lychee_black py-20 md:shadow-xl">
-                    <p className="text-sm text-muted-foreground pb-2"> All testimonials are clickable.</p>
-                    <Marquee pauseOnHover className="[--duration:20s]">
-                        {firstRow.map((review) => (
-                        <ReviewCard key={review.username} {...review} />
-                        ))}
-                    </Marquee>
-                    <Marquee reverse pauseOnHover className="[--duration:20s]">
-                        {secondRow.map((review) => (
-                        <ReviewCard key={review.username} {...review} />
-                        ))}
-                    </Marquee>
-                    <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-black from-lychee_black"></div>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-black from-lychee_black"></div>
-                </div>
-                <div className='pt-10 text-white' id="about">
-                    <h1 className="text-center scroll-m-20 text-xl font-extrabold tracking-tight lg:text-xl">
-                        Did you ever dream <br/> of becoming... <br/> THE Michael Jordan of Excel?
-                    </h1>
-                </div>
-                <div className='py-10'>
-                    <p className="text-center text-xl text-slate-400 md:w-1/2 mx-auto">
-                        Lychee is the all-in-one data platform that <span className='font-black'>helps you move faster and make more progress</span> than you ever imagined
+                <div className='py-10' id="about">
+                    <p className="text-center text-xl text-slate-300 md:w-1/2 mx-auto">
+                        Let's face it. We're all doing <span className='font-black'> too many jobs.</span> And its <span className='font-black'> burning us out.</span> 
                     </p>
-                    <p className="pt-10 text-center text-xl text-slate-400 md:w-1/2 mx-auto">
-                        It's a struggle to juggle getting, cleaning, formatting, downloading, analyzing, visualizing, presenting all of your data, not to mention making sense of it, your main tasks at hand, presenting to your team and bosses, deadlines, and expectations --- especially when you need a whole army of tools at your disposal all with their own subscription model. That's why I build Lychee. 
+                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">                        
+                        Find data, download it, (or learn to code Python or R), clean it, format it, download, analyze, visuale, present. Then you still have to do your actual job. That's why we built Lychee. 
                     </p>
-                    <p className="pt-10 text-center text-xl text-slate-400 md:w-1/2 mx-auto">
-                        With Lychee, every thing you need is within reach. Lychee encompasses your entire workflow, from getting data, to presenting and sharing your work. Not EVERYTHING under the sun. Just the stuff to get things finished.
+                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">
+                        The all-in-one data platform that <span className='font-black'>helps you move faster and make more progress</span> than you ever imagined
+                    </p>
+                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">
+                        With Lychee, every thing is within reach. Lychee encompasses your entire workflow, from getting data, to presenting and sharing your work. Not EVERYTHING under the sun. Just the stuff that MATTERS to get things finished.
                     </p> 
-                </div>
-                
-                <div className="relative mx-auto rounded-xl z-30">
-                    <div className='flex place-items-center place-content-center py-4'> 
-                        <Badge variant="outline" className="border-white text-white">Give it a try!</Badge> 
-                    </div>
-                    <div className='flex place-items-center px-24'>
-                        <ChartShow demo={true}/>
-                    </div>
                 </div>
                 <div className='py-10'>
                     <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
@@ -383,6 +357,14 @@ export function Hero() {
                         </h1>
                         <div className="text-xs text-slate-400 flex place-items-center place-content-center gap-2 py-2">How-tos <MoveRight /></div> 
                     </Link>
+                    <div className="relative mx-auto rounded-xl z-30">
+                        <div className='flex place-items-center place-content-center py-4'> 
+                            <Badge variant="outline" className="border-white text-white">Give it a try!</Badge> 
+                        </div>
+                        <div className='flex place-items-center px-24'>
+                            <ChartShow demo={true}/>
+                        </div>
+                    </div>
                     <div className='flex gap-2 place-content-center py-4'>
                         <Link href="#presenting_ai">
                             <div className='shadow-2xl bg-black hover:bg-white hover:text-black rounded-md text-slate-200 px-4 py-3 text-xs'>More.</div>
@@ -402,6 +384,27 @@ export function Hero() {
                 </div>
                 <div className="text-lychee_black font-black leading-none tracking-tighter pt-4 pb-6 text-8xl text-center" style={{ textShadow: '10px 10px 80px rgba(169, 29, 58, 1)'}}>
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" >.</span>
+                </div>
+                <div className="w-full flex place-content-center pb-20">
+                    <div className="container mx-auto px-4 md:px-8 ">
+                        <h3 className="py-4 text-center text-[10px] font-semibold text-slate-400">
+                            ACTIVELY BETA TESTED BY FRIENDS AT
+                        </h3>
+                        <div className="sm:mt-6 sm:px-10">
+                            <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
+                                {companies.map((logo, idx) => (
+                                    <img
+                                        key={idx}
+                                        src={`./${logo}.svg`}
+                                        className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
+                                        alt={logo}
+                                    />
+                                ))}
+                            </div>
+                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
+                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
+                        </div>
+                    </div>
                 </div>
                 <div className="z-10 sm:p-20" id="charts">                
                     <div className='grid xl:grid-cols-2 place-items-center place-content-center py-44' id="presenting_ai">
@@ -504,29 +507,27 @@ export function Hero() {
                         </div>
                     </div>
                 </div>
-                <div className="w-full flex place-content-center pb-20">
-                    <div className="container mx-auto px-4 md:px-8 ">
-                        <h3 className="py-4 text-center text-[10px] font-semibold text-slate-400">
-                            ACTIVELY BETA TESTED BY FRIENDS AT
-                        </h3>
-                        <div className="sm:mt-6 sm:px-10">
-                            <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
-                                {companies.map((logo, idx) => (
-                                    <img
-                                        key={idx}
-                                        src={`./${logo}.svg`}
-                                        className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
-                                        alt={logo}
-                                    />
-                                ))}
-                            </div>
-                            <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
-                            <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
-                        </div>
-                    </div>
-                </div>
+                
                 <div className='pt-20' id="the_rest">
                     <LycheeFeatureGrid />   
+                </div>
+                <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-lychee_black py-20 md:shadow-xl">
+                    <h3 className="py-4 text-center text-[10px] font-semibold text-slate-400">
+                        Don't just take our word for it. See what our awesome users are saying:
+                    </h3>
+                    <p className="text-sm text-muted-foreground pb-2"> All testimonials are clickable.</p>
+                    <Marquee pauseOnHover className="[--duration:20s]">
+                        {firstRow.map((review) => (
+                        <ReviewCard key={review.username} {...review} />
+                        ))}
+                    </Marquee>
+                    <Marquee reverse pauseOnHover className="[--duration:20s]">
+                        {secondRow.map((review) => (
+                        <ReviewCard key={review.username} {...review} />
+                        ))}
+                    </Marquee>
+                    <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-black from-lychee_black"></div>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-black from-lychee_black"></div>
                 </div>
                 <div className='pt-10 lg:w-2/3 mx-auto shadow-2xl' id='getIt'>
                     <div className='text-white bg-black p-10'>
@@ -560,6 +561,7 @@ export function Hero() {
                             </div>
                             <div className='text-left md:py-10 pl-6 text-xs text-red-500'>
                                 <p className="text-slate-100 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Instant</code> access to all stable and some experimental features</p>
+                                <p className="text-slate-100 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Instant</code> access Easy Charts, Scraper, AI, website builder, Integrations (twitter, instagram, coingecko, etc) </p>
                             </div>
                             <Link href={'https://buy.stripe.com/3csbL2c8K2iye6QcNg'}><div className='bg-white w-20 mx-auto text-black text-xs py-2 rounded-md hover:bg-black hover:text-white'>Go</div></Link>
                             <small className="text-center text-white text-xs font-medium leading-none">Managed By Stripe</small>                        
@@ -568,6 +570,7 @@ export function Hero() {
                             <h1 className="text-center scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-4xl">$39.99</h1>
                             <small className="line-through text-black text-center text-xs font-medium leading-none">normally $199.99 </small> 
                             <div className='text-left py-4 px-6 text-xs'>
+                                <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Everything</code> in free tier</p>
                                 <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Instant</code> access to all experimental features</p>
                                 <p className="text-slate-800 py-1">Access <code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">All</code> future features</p>
                                 <p className="text-slate-800 py-1"><code className="text-black relative rounded bg-lychee_green px-[0.3rem] py-[0.2rem] font-mono text-xs font-semibold mr-1">Unlimited</code> website launches forever</p>
