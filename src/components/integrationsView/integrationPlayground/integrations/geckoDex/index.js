@@ -72,7 +72,7 @@ const GeckoDex = ({setConnectedData}) => {
     ]
 
     const dexes = [
-        { query: 'dexes', name: 'Supported Dexes', description: 'Get list of supported dexes on a network', columns: ['name'], requires : ['network'] },
+        { query: 'dexes', name: 'Supported Dexes', description: 'Get list of supported dexes on a network', columns: ['name'], requires : [{'network': 'network id eg: eth. Use *Supported Networks* action to find newtworks'}] },
     ]
 
     const pools = [
@@ -168,7 +168,7 @@ const GeckoDex = ({setConnectedData}) => {
                     </div>
                 </div>
             )}
-            <Accordion defaultValue="marketData" type="single" collapsible className="w-full">
+            <Accordion defaultValue="exploratory" type="single" collapsible className="w-full">
                 <AccordionItem value="exploratory">
                     <AccordionTrigger className="pt-1 sm:pt-3">Exploratory</AccordionTrigger>
                     <AccordionContent>
@@ -191,6 +191,40 @@ const GeckoDex = ({setConnectedData}) => {
                     <AccordionContent>
                         <div className='flex flex-wrap gap-1'>
                             {simple.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="network">
+                    <AccordionTrigger className="pt-1 sm:pt-3">Network Query</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {network.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="dexes">
+                    <AccordionTrigger className="pt-1 sm:pt-3">Dexes</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {dexes.map(action => (
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}

@@ -27,6 +27,13 @@ export default async (req, res) => {
             }
             url = `https://api.geckoterminal.com/api/v2/simple/networks/${network}/token_price/${addresses}`;
             return await tokenPriceUSD(url, res);
+        case 'dexes':
+            if (!network) {
+                return res.status(400).json({ message: 'Missing network parameter' });
+            }
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/dexes`;
+            console.log(url)
+            return await dexes(url, res);
         default:
             return res.status(400).json({ message: 'Invalid query parameter' });
     }
@@ -402,6 +409,42 @@ const tokenPriceUSD = async (url, res) => {
         res.status(500).json({ message: 'Internal Server Error' });
     }
 };
+
+const dexes = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { data } = await response.json();
+            const flattenedData = data.map((val) => {
+                const {
+                    id,
+                    type,
+                    attributes: {
+                        name,
+                    }
+                } = val;
+
+                return {
+                    id,
+                    type,
+                    name,
+                };
+            });
+            return res.status(200).json(flattenedData);
+        } else {
+            return res.status(response.status).json({ message: 'Supported Dexes CoinGecko Data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
 
 
 
