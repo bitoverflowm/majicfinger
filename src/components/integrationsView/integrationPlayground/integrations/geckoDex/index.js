@@ -98,7 +98,7 @@ const GeckoDex = ({setConnectedData}) => {
 
 
     const ohlcvs = [
-        { query: 'poolOHLCV', name: 'Pool OHLCV Data', description: 'Get OHLCV (open, high, low, close, volume) data of a pool, up to 6 months ago. Empty response if there is no earlier data available.', columns: ['open', 'high', 'low', 'close', 'volume'], requires : ['network', 'pool_address', 'timeframe'] },
+        { query: 'ohlcvs', name: 'Pool OHLCV Data', description: 'Get OHLCV (open, high, low, close, volume) data of a pool, up to 6 months ago. Empty response if there is no earlier data available.', columns: ['open', 'high', 'low', 'close', 'volume'], requires : [{ 'network': 'network id eg: eth. Use *Supported Networks* action to more newtworks (eg: eth)'}, { 'addresses': 'Comma-Separated list of pool address eg:0x60594a405d53811d3bc4766596efd80fd545a270)'}, { 'timeframe': 'One of: day, hour, minutes (eg: day)'}] },
     ];
 
     const trades = [
@@ -262,6 +262,23 @@ const GeckoDex = ({setConnectedData}) => {
                     <AccordionContent>
                         <div className='flex flex-wrap gap-1'>
                             {tokens.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="ohlcvs">
+                    <AccordionTrigger className="pt-1 sm:pt-3">ohlcvs: open, high, low, close, volume</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {ohlcvs.map(action => (
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}

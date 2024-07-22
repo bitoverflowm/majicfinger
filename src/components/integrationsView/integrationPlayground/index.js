@@ -60,11 +60,11 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
               </div>
               <div className="relative flex flex-col min-h-[90vh] rounded-xl bg-muted/30 p-2 sm:p-4 sm:col-span-2">
                 <Badge variant="outline" className="mx-auto sm:absolute sm:right-3 sm:top-3">
-                  Here is your data preview
+                  Here is your data preview; Go to Grid to view the full dataset
                 </Badge>
                 <div className="flex-1 pt-2 sm:pt-10">
                   {
-                      connectedData && <PreviewGrid />
+                      connectedData && <PreviewGrid h="h-[650px]" w="w-full"/>
                   }
                 </div>
                 <Alert className="text-xs sm:mt-auto bg-lychee_green">
