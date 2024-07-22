@@ -1,6 +1,6 @@
 
 export default async (req, res) => {
-    const { query, search, network, addresses, dex, timeframe } = req.query
+    const { query, search, network, addresses, dex, timeframe, minVolume } = req.query
     let url
     switch(query){        
         case 'networks':
@@ -105,6 +105,13 @@ export default async (req, res) => {
             }
             url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${addresses}/ohlcv/${timeframe}`;
             return await ohlcvs(url, res);
+        case 'trades':
+            if(!network || !addresses) {
+                return res.status(400).json({ message: 'Missing network, addresses, or timeframe paramete' });
+            }
+            let minVolumeParam = minVolume ? `trade_volume_in_usd_greater_than=${minVolume}` : 'trade_volume_in_usd_greater_than=0';
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${addresses}/trades?${minVolumeParam}`;
+            return await trades(url, res);
         default:
             return res.status(400).json({ message: 'Invalid query parameter' });
     }
@@ -943,6 +950,69 @@ const ohlcvs = async (url, res) => {
         res.status(500).json({ message: 'Internal Server Error' });
     }
 }
+
+
+const trades = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { data } = await response.json();
+
+            const flattenedData = data.map(trade => {
+                const {
+                    id,
+                    attributes: {
+                        block_number,
+                        tx_hash,
+                        tx_from_address,
+                        from_token_amount,
+                        to_token_amount,
+                        price_from_in_currency_token,
+                        price_to_in_currency_token,
+                        price_from_in_usd,
+                        price_to_in_usd,
+                        block_timestamp,
+                        kind,
+                        volume_in_usd,
+                        from_token_address,
+                        to_token_address
+                    }
+                } = trade;
+
+                return {
+                    id,
+                    block_number,
+                    tx_hash,
+                    tx_from_address,
+                    from_token_amount: parseFloat(from_token_amount),
+                    to_token_amount: parseFloat(to_token_amount),
+                    price_from_in_currency_token: parseFloat(price_from_in_currency_token),
+                    price_to_in_currency_token: parseFloat(price_to_in_currency_token),
+                    price_from_in_usd: parseFloat(price_from_in_usd),
+                    price_to_in_usd: parseFloat(price_to_in_usd),
+                    block_timestamp,
+                    kind,
+                    volume_in_usd: parseFloat(volume_in_usd),
+                    from_token_address,
+                    to_token_address
+                };
+            });
+
+            return res.status(200).json(flattenedData);
+        } else {
+            return res.status(response.status).json({ message: 'Trades data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+}
+
 
 
 
