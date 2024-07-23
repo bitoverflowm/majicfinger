@@ -326,7 +326,7 @@ export function Hero() {
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>
                 <h3 className="text-slate-200 text-center scroll-m-20 text-2xl font-semibold tracking-tight">
-                    Did you ever dream of becoming the Micheal Jordan of Spreadsheets?
+                    Because no-one dreams of becoming the Micheal Jordan of Spreadsheets?
                 </h3>
                 <div className='flex gap-2 place-content-center py-4'>
                     <Link href="#about">

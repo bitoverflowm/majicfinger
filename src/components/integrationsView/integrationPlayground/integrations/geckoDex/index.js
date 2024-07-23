@@ -10,7 +10,6 @@ import {
 import { useState } from "react"
 
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 
 const GeckoDex = ({setConnectedData}) => {
@@ -314,10 +313,6 @@ const GeckoDex = ({setConnectedData}) => {
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
-
-            <Alert className="mt-4">
-                <div className="flex gap-2 place-items-center"><FlaskConical className="w-8 h-8"/><div className="">You will soon be able to search by contractID, Token Name or any freeform search</div></div>
-            </Alert>            
         </div>
     )
 }

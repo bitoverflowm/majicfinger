@@ -1,6 +1,8 @@
 import { Alert } from "@/components/ui/alert"
 import { FlaskConical } from "lucide-react"
 
+import { useState } from "react";
+
 import {
     Accordion,
     AccordionContent,
@@ -8,23 +10,87 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 
+import { format } from "date-fns"
+import { Calendar as CalendarIcon } from "lucide-react"
+
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
 const CoinGecko = ({setConnectedData}) => {
     
-    const fetchHandler = async (query) => {
-        let res = await fetch(`/api/integrations/coinGecko?query=${query}`, {
+    const [args, setArgs] = useState()
+    const [query, setQuery] = useState()
+    const [inputValues, setInputValues] = useState({});
+    const [date, setDate] = useState()
+
+
+    const fetchHandler = async (query, args) => {
+        let queryString = `query=${query}`;
+        if (args) {
+            args.forEach((arg) => {
+                const key = Object.keys(arg)[0];
+                if (key === 'date') {
+                    queryString += `&${key}=${encodeURIComponent(format(date, 'dd-MM-yyyy'))}`;
+                } else {
+                    queryString += `&${key}=${encodeURIComponent(inputValues[key] || "")}`;
+                }
+            });
+        }
+
+        let res = await fetch(`/api/integrations/coinGecko?${queryString}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
             },
         });
+
         if (res.status === 200) {
+            setArgs()
+            setQuery()
+            setInputValues({})
             let data = await res.json();
             setConnectedData(data);
         } else {
+            setArgs()
+            setQuery()
+            setInputValues({})
             console.error(res.error);
         }        
     }
+
+    const handleInputChange = (key, value) => {
+        setInputValues((prevValues) => ({
+          ...prevValues,
+          [key]: value,
+        }));
+    };
+
+    const coinData = [
+        { query: 'coinListId', name: 'Coins ID List', description: 'Query all the supported coins on CoinGecko with coins id, name and symbol.'},
+        { query: 'coinListMarketData', name: 'Coin List with Market Data', description: 'Query all the supported coins with price, market cap, volume and market related data.', requires : [{'vs_currency': 'target currency of coins and market dat eg: usd'}] },
+        { query: 'coinDataById', name: 'Coin Data By CoinID', description: 'query all the coin data of a coin (name, price, market .... including exchange tickers) on CoinGecko coin page based on a particular coin id', requires : [{'coin': 'user Coin ID List to see supported Coin Ids (example: bitcoin)'}]},
+        { query: 'coinTickersById', name: 'Coin Tickers By ID', description: 'query the coin tickers on both centralized exchange (cex) and decentralized exchange (dex) based on a particular coin id',  requires : [{'coin': 'user Coin ID List to see supported Coin Ids (example: bitcoin)'}]},
+
+        { query: 'coinHistoricalDataById', name: 'Coin Historical Chart Data by ID', description: 'query the historical data (price, market cap, 24hrs volume, etc) at a given date for a coin based on a particular coin id ', requires : [{'coin': 'user Coin ID List to see supported Coin Ids (example: bitcoin)'}, {'date': 'the date of data snapshot'}]},
+
+
+        
+        { query: 'coinPriceById', name: 'Coin By CoinID', description: 'query the prices of one or more coins by using their unique Coin API IDs', broken: true},
+        { query: 'coinPriceByTokenAddy', name: 'Coin By Token Address', description: 'query a token price by using token contract address', broken: true},     
+        
+        
+        { query: 'coinHistoricalChartDataByAddy', name: 'Coin Historical Chart Data by Token Addy', description: '  all the coin data (name, price, market .... including exchange tickers) on CoinGecko coin page based on asset platform and particular token contract address.', broken: true},
+
+        { query: 'coinHistoricalChartDataWithinTimeRangeById', name: 'Coin Historical Chart Data within Time Range by ID', description: 'get the historical chart data of a coin within certain time range in UNIX along with price, market cap and 24hrs volume based on particular coin id', broken: true},
+        { query: 'coinOHLCById', name: 'Coin OHLC Chart by ID', description: 'get the OHLC chart (Open, High, Low, Close) of a coin based on particular coin id.', broken: true},
+    ]
 
     const trendingActions = [
         { query: 'trendingCoins', name: 'Trending Coins', description: 'Get the trending coins' },
@@ -65,23 +131,110 @@ const CoinGecko = ({setConnectedData}) => {
         { query: 'exchangeRateBTC', name: 'BTC Exchange Rates', description: 'BTC exchange rates with other currencies.'},
     ]
 
-    const coinData = [
-        { query: 'coinPriceById', name: 'Coin By CoinID', description: 'query the prices of one or more coins by using their unique Coin API IDs', broken: true},
-        { query: 'coinPriceByTokenAddy', name: 'Coin By Token Address', description: 'query a token price by using token contract address', broken: true},
-        { query: 'coinDataById', name: 'Coin Data By CoinID', description: 'query all the coin data of a coin (name, price, market .... including exchange tickers) on CoinGecko coin page based on a particular coin id', broken: true},
-        { query: 'coinTickersById', name: 'Coin Tickers By ID', description: 'query the coin tickers on both centralized exchange (cex) and decentralized exchange (dex) based on a particular coin id', broken: true},
-        { query: 'coinHistoricalChartDataById', name: 'Coin Historical Chart Data by ID', description: ' get the historical chart data of a coin including time in UNIX, price, market cap and 24hrs volume based on particular coin id', broken: true},
-        { query: 'coinHistoricalChartDataByAddy', name: 'Coin Historical Chart Data by Token Addy', description: '  all the coin data (name, price, market .... including exchange tickers) on CoinGecko coin page based on asset platform and particular token contract address.', broken: true},
-        { query: 'coinHistoricalDataById', name: 'Coin Historical Data by ID', description: 'query the historical data (price, market cap, 24hrs volume, etc) at a given date for a coin based on a particular coin id', broken: true},
-        { query: 'coinHistoricalChartDataWithinTimeRangeById', name: 'Coin Historical Chart Data within Time Range by ID', description: 'get the historical chart data of a coin within certain time range in UNIX along with price, market cap and 24hrs volume based on particular coin id', broken: true},
-        { query: 'coinOHLCById', name: 'Coin OHLC Chart by ID', description: 'get the OHLC chart (Open, High, Low, Close) of a coin based on particular coin id.', broken: true},
-    ]
+    
+
+    const clickHandler = (query, requirements, broken) => {
+        if(broken){
+            alert('Action coming soon, please try another one for now.')
+            return
+        }else if(requirements && requirements.length > 0){
+            setArgs(requirements)
+            setQuery(query)
+        }else{
+            fetchHandler(query)
+        }
+    }
+
+    const cancelHandler = () => {
+        setArgs()
+        setQuery()
+    }
 
 
 
     return (
         <div className="text-[12px]">
-            <Accordion defaultValue="marketData" type="single" collapsible className="w-full">
+            {args && (
+                <div className="bg-black/90 px-6 py-4 rounded-md">
+                    {args.map((arg, index) => {
+                        const key = Object.keys(arg)[0];
+                        const description = arg[key];
+                        return (
+                            <div key={index}>
+                                {key === "date" ? (
+                                    <div>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant={"outline"}
+                                                    className={cn(
+                                                        "w-[280px] justify-start text-left font-normal",
+                                                        !date && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {date ? format(date, "dd-MM-yyyy") : <span>Pick a date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={date}
+                                                    onSelect={(selectedDate) => {
+                                                        setDate(selectedDate);
+                                                        handleInputChange(key, format(selectedDate, "dd-MM-yyyy"));
+                                                    }}
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                        <p className="pt-2 pb-3 text-xs text-slate-400">{description}</p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <Input
+                                            type="text"
+                                            placeholder={`Enter ${key}`}
+                                            className="text-xs"
+                                            value={inputValues[key] || ""}
+                                            onChange={(e) => handleInputChange(key, e.target.value)}
+                                        />
+                                        <p className="pt-2 pb-3 text-xs text-slate-400">{description}</p>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                    <div className="flex gap-2">
+                        <div
+                            onClick={() => cancelHandler()}
+                            className="text-xs border-slate-500 border border-1 text-white mt-2 w-32 py-2 rounded-md text-center cursor-pointer hover:bg-slate-800"
+                        >  cancel </div>
+                        <div
+                            onClick={() => fetchHandler(query, args)}
+                            className="text-xs bg-purple-400/80 hover:bg-purple-400 font-bold mt-2 w-32 py-2 rounded-md text-center cursor-pointer"
+                        >  Search </div>
+                    </div>
+                </div>
+            )}
+            <Accordion defaultValue="coins" type="single" collapsible className="w-full">
+                <AccordionItem value="coinData">
+                    <AccordionTrigger>Coin Data</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {coinData.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
                 <AccordionItem value="trending">
                     <AccordionTrigger className="pt-1 sm:pt-3">Trending</AccordionTrigger>
                     <AccordionContent>
@@ -90,7 +243,7 @@ const CoinGecko = ({setConnectedData}) => {
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
                                     {action.name}
@@ -107,7 +260,7 @@ const CoinGecko = ({setConnectedData}) => {
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
                                     {action.name}
@@ -124,7 +277,7 @@ const CoinGecko = ({setConnectedData}) => {
                             <div
                                 key={action.query}
                                 className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                                onClick={() => !action.broken && fetchHandler(action.query)}
+                                onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                 title={action.description}
                             >
                                 {action.name}
@@ -141,7 +294,7 @@ const CoinGecko = ({setConnectedData}) => {
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
                                     {action.name}
@@ -158,7 +311,7 @@ const CoinGecko = ({setConnectedData}) => {
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
                                     {action.name}
@@ -175,7 +328,7 @@ const CoinGecko = ({setConnectedData}) => {
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
                                     {action.name}
@@ -192,7 +345,7 @@ const CoinGecko = ({setConnectedData}) => {
                                 <div
                                     key={action.query}
                                     className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                                    onClick={() => !action.broken && fetchHandler(action.query)}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
                                     {action.name}
@@ -201,27 +354,7 @@ const CoinGecko = ({setConnectedData}) => {
                         </div>
                     </AccordionContent>
                 </AccordionItem>
-                <AccordionItem value="coinData">
-                    <AccordionTrigger>Coin Data</AccordionTrigger>
-                    <AccordionContent>
-                        <div className='flex flex-wrap gap-1'>
-                            {coinData.map(action => (
-                                <div
-                                    key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
-                                    onClick={() => !action.broken && fetchHandler(action.query)}
-                                    title={action.description}
-                                >
-                                    {action.name}
-                                </div>
-                            ))}
-                        </div>
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
-            <Alert className="mt-4">
-                <div className="flex gap-2 place-items-center"><FlaskConical className="w-8 h-8"/><div className="">You will soon be able to search by contractID, Token Name or any freeform search</div></div>
-            </Alert>            
+            </Accordion>        
         </div>
     )
 }

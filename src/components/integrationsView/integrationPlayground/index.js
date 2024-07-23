@@ -1,15 +1,10 @@
 
 import {
-  ArrowDown,
-  ArrowDownNarrowWide,
   ArrowLeft,
-    Rabbit,
   } from "lucide-react"
   
 import { Badge } from "@/components/ui/badge"
 
-
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 
@@ -62,18 +57,18 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
               </div>
               <div className="relative flex flex-col min-h-[90vh] rounded-xl bg-muted/30 p-2 sm:p-4 sm:col-span-2">
                 <div className="flex place-items-center place-content-center gap-2">
-                  <div className="text-xs"> Click to do something: </div>
-                  <Badge className="text-xs bg-[#402E7A] text-white cursor-pointer" onClick={()=>setViewing('dataStart')}>
-                    View full data set 
+                  <div className="text-[10px] xl:text-xs">Next steps: </div>
+                  <Badge className="text-[8px] xl:text-xs bg-[#402E7A] text-white cursor-pointer" onClick={()=>setViewing('dataStart')}>
+                    View Full Data Set 
                   </Badge>
-                  <Badge className="text-xs bg-[#4C3BCF] text-white cursor-pointer" onClick={()=>setViewing('charts')}>
-                    Start charting
+                  <Badge className="text-[8px] xl:text-xs bg-[#4C3BCF] text-white cursor-pointer" onClick={()=>setViewing('charts')}>
+                    Start Charting
                   </Badge>
-                  <Badge className="text-xs bg-[#4B70F5] text-white cursor-pointer" onClick={()=>setViewing('ai')}>
-                    Analyze/create a report with AI
+                  <Badge className="text-[8px] xl:text-xs bg-[#4B70F5] text-white cursor-pointer" onClick={()=>setViewing('ai')}>
+                    Analyze/Create a report with AI
                   </Badge>
-                  <Badge className="text-xs bg-[#3DC2EC] text-slate-800 cursor-pointer" onClick={()=>setViewing('presentation')}>
-                    Generate a full website
+                  <Badge className="text-[8px] xl:text-xs bg-[#3DC2EC] text-slate-800 cursor-pointer" onClick={()=>setViewing('presentation')}>
+                    Generate a Full Website
                   </Badge>
                 </div>
                 <div variant="outline" className="mx-auto text-xs flex place-items-center gap-1 pt-3 py-1">

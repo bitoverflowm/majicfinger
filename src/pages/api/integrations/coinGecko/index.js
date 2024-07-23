@@ -1,10 +1,36 @@
 
 export default async (req, res) => {
-    const { query } = req.query
+    const { query, vs_currency, coin, date } = req.query
     const apiKey = process.env.GECKO_KEY
     let url
 
     switch(query){
+        case 'coinListMarketData':
+            if (!vs_currency) {
+                return res.status(400).json({ message: 'Missing vs_currency parameter' });
+            }
+            url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs_currency}&x_cg_demo_api_key=${apiKey}`;
+            return await flatFormat(url, res);
+        case 'coinDataById':
+            if (!coin) {
+                return res.status(400).json({ message: 'Missing coin id parameter' });
+            }
+            url = `https://api.coingecko.com/api/v3/coins/${coin}?x_cg_demo_api_key=${apiKey}`;
+            return await singleResponse(url, res);
+        case 'coinTickersById':
+            if (!coin) {
+                return res.status(400).json({ message: 'Missing coin id parameter' });
+            }
+            url = `https://api.coingecko.com/api/v3/coins/${coin}/tickers?x_cg_demo_api_key=${apiKey}`;
+            return await coinTickersFormat(url, res);
+        case 'coinHistoricalDataById':
+            if (!coin || !date) {
+                return res.status(400).json({ message: 'Missing coin id parameter' });
+            }
+            url = `https://api.coingecko.com/api/v3/coins/${coin}/history?date=${date}&localization=false&x_cg_demo_api_key=${apiKey}`;
+            return await singleCoinHistoryFormat(url, res);
+
+
         case 'trendingCoins':
             url = `https://api.coingecko.com/api/v3/search/trending?x_cg_demo_api_key=${apiKey}`
             return await trendingCoins(url, res)
@@ -55,6 +81,166 @@ export default async (req, res) => {
             break;
     }
 };
+
+//v2
+const flatFormat = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const data  = await response.json();
+            return res.status(200).json(data);
+        } else {
+            return res.status(response.status).json({ message: 'Trades data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+}
+
+const singleResponse = async (url, res) => {
+    console.log(url)
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const data  = await response.json();
+
+            console.log(data)
+
+            return res.status(200).json([data]);
+        } else {
+            return res.status(response.status).json({ message: 'Trades data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+}
+
+const coinTickersFormat = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { tickers } = await response.json();
+
+            const flattenedData = tickers.map(ticker => {
+                const {
+                    base,
+                    target,
+                    market: { name, identifier, has_trading_incentive },
+                    last,
+                    volume,
+                    converted_last: { btc, eth, usd },
+                    converted_volume: { btc: vol_btc, eth: vol_eth, usd: vol_usd },
+                    trust_score,
+                    bid_ask_spread_percentage,
+                    timestamp,
+                    last_traded_at,
+                    last_fetch_at,
+                    is_anomaly,
+                    is_stale,
+                    trade_url,
+                    token_info_url,
+                    coin_id,
+                    target_coin_id
+                } = ticker;
+
+                return {
+                    base,
+                    target,
+                    market_name: name,
+                    market_identifier: identifier,
+                    market_has_trading_incentive: has_trading_incentive,
+                    last: parseFloat(last),
+                    volume: parseFloat(volume),
+                    converted_last_btc: parseFloat(btc),
+                    converted_last_eth: parseFloat(eth),
+                    converted_last_usd: parseFloat(usd),
+                    converted_volume_btc: parseFloat(vol_btc),
+                    converted_volume_eth: parseFloat(vol_eth),
+                    converted_volume_usd: parseFloat(vol_usd),
+                    trust_score,
+                    bid_ask_spread_percentage: parseFloat(bid_ask_spread_percentage),
+                    timestamp,
+                    last_traded_at,
+                    last_fetch_at,
+                    is_anomaly,
+                    is_stale,
+                    trade_url,
+                    token_info_url,
+                    coin_id,
+                    target_coin_id
+                };
+            });
+
+            return res.status(200).json(flattenedData);
+        } else {
+            return res.status(response.status).json({ message: 'Tickers data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+}
+
+const singleCoinHistoryFormat = async (url, res) => {
+    console.log(url)
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const data = await response.json();
+            
+            const flattenedData = {
+                id: data.id,
+                symbol: data.symbol,
+                name: data.name,
+                thumb_image: data.image.thumb,
+                small_image: data.image.small,
+                ...Object.fromEntries(Object.entries(data.market_data.current_price).map(([key, value]) => [`current_price_${key}`, value])),
+                ...Object.fromEntries(Object.entries(data.market_data.market_cap).map(([key, value]) => [`market_cap_${key}`, value])),
+                ...Object.fromEntries(Object.entries(data.market_data.total_volume).map(([key, value]) => [`total_volume_${key}`, value])),
+                ...Object.fromEntries(Object.entries(data.community_data || {}).map(([key, value]) => [`community_${key}`, value])),
+                ...Object.fromEntries(Object.entries(data.developer_data || {}).map(([key, value]) => [`developer_${key}`, value])),
+                ...Object.fromEntries(Object.entries(data.developer_data.code_additions_deletions_4_weeks || {}).map(([key, value]) => [`code_additions_deletions_4_weeks_${key}`, value])),
+                ...Object.fromEntries(Object.entries(data.public_interest_stats || {}).map(([key, value]) => [`public_interest_${key}`, value])),
+            };
+
+            console.log(flattenedData);
+
+            return res.status(200).json([flattenedData]);
+        } else {
+            return res.status(response.status).json({ message: 'Data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+}
+
+
+
+
+//v1
 
 
 const trendingCoins = async (url, res) => {
