@@ -10,7 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 
-import { format } from "date-fns"
+import { format, getTime } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { DateRange } from "react-day-picker"
 
 const CoinGecko = ({setConnectedData}) => {
     
@@ -29,6 +30,7 @@ const CoinGecko = ({setConnectedData}) => {
     const [query, setQuery] = useState()
     const [inputValues, setInputValues] = useState({});
     const [date, setDate] = useState()
+    const [dateRange, setDateRange] = useState({ from: undefined, to: undefined });
 
 
     const fetchHandler = async (query, args) => {
@@ -38,6 +40,10 @@ const CoinGecko = ({setConnectedData}) => {
                 const key = Object.keys(arg)[0];
                 if (key === 'date') {
                     queryString += `&${key}=${encodeURIComponent(format(date, 'dd-MM-yyyy'))}`;
+                } else if (key === 'date_from' && dateRange.from) {
+                    queryString += `&${key}=${Math.floor(getTime(dateRange.from) / 1000)}`;
+                } else if (key === 'date_to' && dateRange.to) {
+                    queryString += `&${key}=${Math.floor(getTime(dateRange.to) / 1000)}`;
                 } else {
                     queryString += `&${key}=${encodeURIComponent(inputValues[key] || "")}`;
                 }
@@ -77,18 +83,12 @@ const CoinGecko = ({setConnectedData}) => {
         { query: 'coinListMarketData', name: 'Coin List with Market Data', description: 'Query all the supported coins with price, market cap, volume and market related data.', requires : [{'vs_currency': 'target currency of coins and market dat eg: usd'}] },
         { query: 'coinDataById', name: 'Coin Data By CoinID', description: 'query all the coin data of a coin (name, price, market .... including exchange tickers) on CoinGecko coin page based on a particular coin id', requires : [{'coin': 'user Coin ID List to see supported Coin Ids (example: bitcoin)'}]},
         { query: 'coinTickersById', name: 'Coin Tickers By ID', description: 'query the coin tickers on both centralized exchange (cex) and decentralized exchange (dex) based on a particular coin id',  requires : [{'coin': 'user Coin ID List to see supported Coin Ids (example: bitcoin)'}]},
+        { query: 'coinHistoricalDataById', name: 'Coin Historical Chart Data by ID', description: 'query the historical data (price, market cap, 24hrs volume, etc) at a given date for a coin based on a particular coin id ', requires : [{'coin': 'user Coin ID List to see supported Coin Ids (example: bitcoin)'}, {'date': 'the date of data snapshot'}]},      
 
-        { query: 'coinHistoricalDataById', name: 'Coin Historical Chart Data by ID', description: 'query the historical data (price, market cap, 24hrs volume, etc) at a given date for a coin based on a particular coin id ', requires : [{'coin': 'user Coin ID List to see supported Coin Ids (example: bitcoin)'}, {'date': 'the date of data snapshot'}]},
+        { query: 'coinHistoricalTimeRange', name: 'Coin Chart Data Within Time Range', description: 'historical chart data of a coin within certain time range in UNIX along with price, market cap and 24hrs volume based on particular coin id ', requires : [{'coin': 'user Coin ID List to see supported Coin Ids (example: bitcoin)'}, {'vs_currency': 'target currency of coins and market dat eg: usd'}, {'date_from': 'the date of data snapshot'}, {'date_to': 'the date of data snapshot'} ]},   
 
 
-        
-        { query: 'coinPriceById', name: 'Coin By CoinID', description: 'query the prices of one or more coins by using their unique Coin API IDs', broken: true},
-        { query: 'coinPriceByTokenAddy', name: 'Coin By Token Address', description: 'query a token price by using token contract address', broken: true},     
-        
-        
-        { query: 'coinHistoricalChartDataByAddy', name: 'Coin Historical Chart Data by Token Addy', description: '  all the coin data (name, price, market .... including exchange tickers) on CoinGecko coin page based on asset platform and particular token contract address.', broken: true},
 
-        { query: 'coinHistoricalChartDataWithinTimeRangeById', name: 'Coin Historical Chart Data within Time Range by ID', description: 'get the historical chart data of a coin within certain time range in UNIX along with price, market cap and 24hrs volume based on particular coin id', broken: true},
         { query: 'coinOHLCById', name: 'Coin OHLC Chart by ID', description: 'get the OHLC chart (Open, High, Low, Close) of a coin based on particular coin id.', broken: true},
     ]
 
@@ -190,7 +190,51 @@ const CoinGecko = ({setConnectedData}) => {
                                         </Popover>
                                         <p className="pt-2 pb-3 text-xs text-slate-400">{description}</p>
                                     </div>
-                                ) : (
+                                ) : key === "date_from" ? (
+                                    <div>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    id="date-range"
+                                                    variant={"outline"}
+                                                    className={cn(
+                                                        "w-[300px] justify-start text-left font-normal",
+                                                        !dateRange.from && !dateRange.to && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {dateRange.from ? (
+                                                        dateRange.to ? (
+                                                            <>
+                                                                {format(dateRange.from, "dd-MM-yyyy")} -{" "}
+                                                                {format(dateRange.to, "dd-MM-yyyy")}
+                                                            </>
+                                                        ) : (
+                                                            format(dateRange.from, "dd-MM-yyyy")
+                                                        )
+                                                    ) : (
+                                                        <span>Pick a date range</span>
+                                                    )}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    initialFocus
+                                                    mode="range"
+                                                    defaultMonth={dateRange.from}
+                                                    selected={dateRange}
+                                                    onSelect={(range) => {
+                                                        setDateRange(range);
+                                                        handleInputChange('date_from', range.from);
+                                                        handleInputChange('date_to', range.to);
+                                                    }}
+                                                    numberOfMonths={2}
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                        <p className="pt-2 pb-3 text-xs text-slate-400">{description}</p>
+                                    </div>
+                                ) :  key !== "date_from" && key !== "date_to" ? (
                                     <div>
                                         <Input
                                             type="text"
@@ -201,7 +245,7 @@ const CoinGecko = ({setConnectedData}) => {
                                         />
                                         <p className="pt-2 pb-3 text-xs text-slate-400">{description}</p>
                                     </div>
-                                )}
+                                ) : null }
                             </div>
                         );
                     })}

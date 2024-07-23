@@ -1,6 +1,6 @@
 
 export default async (req, res) => {
-    const { query, vs_currency, coin, date } = req.query
+    const { query, vs_currency, coin, date, date_from, date_to } = req.query
     const apiKey = process.env.GECKO_KEY
     let url
 
@@ -29,6 +29,12 @@ export default async (req, res) => {
             }
             url = `https://api.coingecko.com/api/v3/coins/${coin}/history?date=${date}&localization=false&x_cg_demo_api_key=${apiKey}`;
             return await singleCoinHistoryFormat(url, res);
+        case 'coinHistoricalTimeRange':
+            if (!coin || !date_from || !date_to) {
+                return res.status(400).json({ message: 'Missing coin id parameter' });
+            }
+            url = `https://api.coingecko.com/api/v3/coins/${coin}/market_chart/range?vs_currency=${vs_currency}&from=${date_from}&to=${date_to}precision=4&x_cg_demo_api_key=${apiKey}`;
+            return await coinHistoricalDateRangeFormat(url, res);
 
 
         case 'trendingCoins':
@@ -237,6 +243,44 @@ const singleCoinHistoryFormat = async (url, res) => {
     }
 }
 
+const coinHistoricalDateRangeFormat = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { prices, market_caps, total_volumes } = await response.json();
+
+            // Make sure all three arrays are of the same length and their timestamps align
+            const length = Math.min(prices.length, market_caps.length, total_volumes.length);
+
+            const flattenedData = [];
+            for (let i = 0; i < length; i++) {
+                if (
+                    prices[i][0] === market_caps[i][0] &&
+                    market_caps[i][0] === total_volumes[i][0]
+                ) {
+                    flattenedData.push({
+                        timestamp: prices[i][0],
+                        price: prices[i][1],
+                        market_cap: market_caps[i][1],
+                        total_volume: total_volumes[i][1]
+                    });
+                }
+            }
+
+            return res.status(200).json(flattenedData);
+        } else {
+            return res.status(response.status).json({ message: 'Data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+}
 
 
 
