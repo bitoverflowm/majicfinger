@@ -17,7 +17,7 @@ import { BiDownArrow } from 'react-icons/bi'
 import { PiCircleFill } from 'react-icons/pi'
 
 import BackgroundVideo from 'next-video/background-video';
-import ethVideo from '/videos/ethVideo.mp4';
+import ethVideo from '/videos/ethvideo.mp4';
 import sushiVid from '/videos/sushi.mp4';
 import sushiVid0 from '/videos/sushi0.mp4';
 import sushiVid1 from '/videos/sushi1.mp4';
