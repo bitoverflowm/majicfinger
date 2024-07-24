@@ -23,6 +23,7 @@ import sushiVid0 from '/videos/sushi0.mp4';
 import sushiVid1 from '/videos/sushi1.mp4';
 import sushiVid2 from '/videos/sushi2.mp4';
 import sushiVidAI from '/videos/sushiAI.mp4';
+import DotPattern from "@/components/magicui/dot-pattern";
 
 export const Highlight = ({
     children,
@@ -216,14 +217,12 @@ const EasySushi = () => {
 
     return (
         <>
-            <header className='bg-black/10 px-2 py-1 sm:p-6 sm:h-20 flex w-full fixed top-0 gap-4 sm:gap-10 place-items-center'>
-                  <div className='flex w-full sm:w-56 text-xs place-items-center gap-2'><Image src="/sushi.png" width="60" height="60" ></Image><Link href={"www.lych3e.com"}>Lychee</Link> / Easy Sushi</div>
-                  <div className='text-right text-xs ml-auto'><Link href="#testimonials">Testimonials</Link></div>
-                  <div className='text-right text-xs'><Link href="#tellMeMore">Learn More</Link></div>
-                  <Link href="#getIt"><div className='text-center text-xs bg-[#01A823] px-2 py-3 rounded-md w-32 lg:w-28 cursor-pointer'>Get It</div></Link>
+            <header className='bg-black/10 px-2 py-1 sm:p-6 sm:h-20 flex sm:w-full fixed top-0 gap-4 sm:gap-10 place-items-center'>
+                  <div className='flex sm:w-56 text-xs place-items-center sm:gap-2'><Image src="/sushi.png" width="60" height="60" ></Image> Lychee / Easy Sushi</div>
+                  <Link href="#getIt"><div className='text-center text-xs bg-[#01A823] py-1 px-3 sm:py-3 rounded-md sm:w-32 lg:w-28 cursor-pointer'>Get It</div></Link>
               </header>
-              <main className=''>
-                  <div className='px-4 sm:px-20 py-20 sm:pt-48 md:w-5/6 mx-auto text-center'>
+              <main className='pt-20 '>         
+                  <div className='px-4 sm:px-20 py-20 sm:pt-48 md:w-5/6 mx-auto text-center bg-opacity-80'>                      
                       <div className='flex place-content-center text-[10px] place-items-center gap-2'>
                         <div className='text-[10px] font-thin font-mono rounded-xl border-white border px-3 py-1'>v 1.1.1</div> powered by CoinGecko
                       </div>
@@ -271,7 +270,7 @@ const EasySushi = () => {
                   <div className='' id={'tellMeMore'}>
                     <BackgroundVideo src={ethVideo} />
                   </div>
-                  <div className='grid grid-cols-2 gap-10 py-10 px-8 lg:px-36 xl:px-56'>
+                  <div className='grid sm:grid-cols-2 gap-10 py-10 px-8 lg:px-36 xl:px-56'>
                     <div>
                       <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">CoinGecko</h1>
                       <p className="font-serif text-sky-200 text-lg mt-4">
@@ -322,7 +321,7 @@ const EasySushi = () => {
                       </p>
                     </div>
                     <div>
-                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Automates AI Reports</h1>
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Automated AI Reports</h1>
                       <p className="font-serif text-sky-200 text-lg mt-4">
                         Automate your analysis with AI and generate rich text reports.
                       </p>

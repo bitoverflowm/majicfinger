@@ -19,6 +19,7 @@ import LycheeFeatureGrid from '../easyLychee/usage/lychee_feature_grid';
 import { Card, CardTitle } from '../ui/card';
 import { PiCircleFill } from "react-icons/pi";
 
+
 export const Highlight = ({
     children,
     className,
@@ -330,7 +331,7 @@ export function Hero() {
                 </h3>
                 <div className='py-10' id="about">
                     <p className="text-center text-xl text-slate-300 md:w-1/2 mx-auto">
-                        Let's face it. You're doing <span className='font-black'> too many jobs.</span> And its <span className='font-black'> burning us out.</span> 
+                        Let's face it. You're doing <span className='font-black'> too many jobs.</span> And its <span className='font-black'> burning you out.</span> 
                     </p>
                     <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">                        
                         Find data, download it, clean it, format it, analyze, visualize, present. Repeat. Almost none of this is reliably covered by your current spreadshet tool. So, we built Lychee. 
