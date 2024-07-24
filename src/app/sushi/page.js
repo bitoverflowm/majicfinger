@@ -2,20 +2,20 @@
 import Script from 'next/script'
 
 import { GoogleAnalytics } from '@next/third-parties/google'
-import EasyCharts from './easyCharts';
+import EasySushi from './easySushi';
 
 export const metadata = {
-  title: 'Easy Charts - Refreshingly simple charts.',
-  description: 'Create stunning charts effortlessly with Easy Charts. Unlimited exports, and fully customizable. Get started today and simplify your data visualization.',
+  title: 'Live Crypto Insights No Coding.',
+  description: 'Access what the whales have, without the coding.',
   verification: {
     other: { _foundr: ['973f2a49e12fad2ad799756c823a6d3b'] },
   },
   openGraph: {
-    url: 'https://www.lych3e.com/charts',
+    url: 'https://www.lych3e.com/sushi',
     type: 'website',
-    title: 'Easy Charts - Refreshingly simple charts. 0Code shadcn/charts.',
-    description: 'Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization.',
-    siteName: 'Easy Charts',
+    title: 'Live Crypto Insights No Coding.',
+    description: 'Access what the whales have, without the coding.',
+    siteName: 'Easy Sushi',
     images: [
       {
         url: 'https://www.lych3e.com/ogImage.png',
@@ -27,15 +27,15 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    domain: 'lych3e.com/charts',
+    domain: 'lych3e.com/sushi',
     url: 'https://www.lych3e.com/charts',
-    title: 'Easy Charts - Refreshingly simple charts. 0Code shadcn/charts.',
-    description: 'Create stunning charts effortlessly with Easy Charts. No Code Shdcn Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization.',
+    title: 'Live Crypto Insights No Coding.',
+    description: 'Access what the whales have, without the coding.',
     image: 'https://www.lych3e.com/ogImage.png'
   }
 };
 
-const charts = () => {  
+const Sushi = () => {  
     const clairtyCode = `
         (function (c,l,a,r,i,t,y){
             c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
@@ -45,7 +45,7 @@ const charts = () => {
 
     return (
       <div>
-          <div className='bg-[#0064E6] text-white'>
+          <div className='bg-black text-white'>
               <Script
                   id = "ms-clarity"
                   strategy="afterInteractive"
@@ -53,10 +53,10 @@ const charts = () => {
               <Script async src="https://cdn.promotekit.com/promotekit.js" data-promotekit="03b8c588-8350-4a0c-97f0-0a839509e8e0" strategy="afterInteractive"/>
               <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
               <GoogleAnalytics gaId="G-G8X2NEPTEG" />
-            <EasyCharts />              
+              <EasySushi />              
           </div>
         </div>
     )
 }
 
-export default charts
+export default Sushi

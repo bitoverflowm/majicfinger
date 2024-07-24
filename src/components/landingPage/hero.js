@@ -326,8 +326,22 @@ export function Hero() {
                     Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
                 </div>
                 <h3 className="text-slate-200 text-center scroll-m-20 text-2xl font-semibold tracking-tight">
-                    Because no-one dreams of becoming the Micheal Jordan of Spreadsheets?
+                    Spreadsheets were invented in the 20th century, it's time for a change.
                 </h3>
+                <div className='py-10' id="about">
+                    <p className="text-center text-xl text-slate-300 md:w-1/2 mx-auto">
+                        Let's face it. You're doing <span className='font-black'> too many jobs.</span> And its <span className='font-black'> burning us out.</span> 
+                    </p>
+                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">                        
+                        Find data, download it, clean it, format it, analyze, visualize, present. Repeat. Almost none of this is reliably covered by your current spreadshet tool. So, we built Lychee. 
+                    </p>
+                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">
+                        The all-in-one data platform that <span className='font-black'>helps you move faster and make more progress</span> than you ever imagined
+                    </p>
+                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">
+                        Lychee encompasses your entire workflow, from getting data, to analyzing, presenting and sharing your work. Not EVERYTHING under the sun. Just the stuff that MATTERS to get things finished.
+                    </p> 
+                </div>
                 <div className='flex gap-2 place-content-center py-4'>
                     <Link href="#about">
                         <div className='shadow-2xl bg-black hover:bg-white hover:text-black rounded-md text-slate-200 px-4 py-3 text-xs'> Tell Me More </div>
@@ -335,20 +349,6 @@ export function Hero() {
                     <Link href="#getIt">
                         <div className='shadow-2xl bg-green-500 text-black hover:bg-white hover:text-black rounded-md px-4 py-3 text-xs'>I want it.</div>
                     </Link>
-                </div>
-                <div className='py-10' id="about">
-                    <p className="text-center text-xl text-slate-300 md:w-1/2 mx-auto">
-                        Let's face it. We're all doing <span className='font-black'> too many jobs.</span> And its <span className='font-black'> burning us out.</span> 
-                    </p>
-                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">                        
-                        Find data, download it, (or learn to code Python or R), clean it, format it, download, analyze, visuale, present. Then you still have to do your actual job. That's why we built Lychee. 
-                    </p>
-                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">
-                        The all-in-one data platform that <span className='font-black'>helps you move faster and make more progress</span> than you ever imagined
-                    </p>
-                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">
-                        With Lychee, every thing is within reach. Lychee encompasses your entire workflow, from getting data, to presenting and sharing your work. Not EVERYTHING under the sun. Just the stuff that MATTERS to get things finished.
-                    </p> 
                 </div>
                 <div className='py-10'>
                     <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
