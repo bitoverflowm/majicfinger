@@ -348,8 +348,6 @@ const Nav = () => {
   }, [])
 
 
-
-
   return (
     <div className="absolute top-0 flex w-full items-center gap-4 border-b py-1 px-5">
           { user ?

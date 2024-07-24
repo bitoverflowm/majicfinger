@@ -10,7 +10,6 @@ import {
 import { useState } from "react"
 
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 
 const GeckoDex = ({setConnectedData}) => {
@@ -95,14 +94,12 @@ const GeckoDex = ({setConnectedData}) => {
         { query: 'poolsTokenInfo', name: 'Pool Token Info', description: 'Get pool token info on a network', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'],  requires : [{'network': 'network id eg: eth. Use *Supported Networks* action to more newtworks'},{ 'addresses': 'pool address eg: 0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852'}] },
         { query: 'recentlyUpdatedTokens', name: 'Recently Updated Tokens', description: 'Get most recently updated 100 tokens info across all networks', columns: ['token_name', 'token_symbol', 'decimals', 'total_supply', 'circulating_supply', 'market_cap', 'price_usd'], requires : [] },
     ];
-
-
     const ohlcvs = [
-        { query: 'poolOHLCV', name: 'Pool OHLCV Data', description: 'Get OHLCV (open, high, low, close, volume) data of a pool, up to 6 months ago. Empty response if there is no earlier data available.', columns: ['open', 'high', 'low', 'close', 'volume'], requires : ['network', 'pool_address', 'timeframe'] },
+        { query: 'ohlcvs', name: 'Pool OHLCV Data', description: 'Get OHLCV (open, high, low, close, volume) data of a pool, up to 6 months ago. Empty response if there is no earlier data available.', columns: ['open', 'high', 'low', 'close', 'volume'], requires : [{ 'network': 'network id eg: eth. Use *Supported Networks* action to more newtworks (eg: eth)'}, { 'addresses': 'single pool address eg:0x60594a405d53811d3bc4766596efd80fd545a270)'}, { 'timeframe': 'One of: day, hour, minute (eg: day)'}] },
     ];
 
     const trades = [
-        { query: 'poolTrades', name: 'Pool Trades', description: 'Get last 300 trades in past 24 hours from a pool', columns: [
+        { query: 'trades', name: 'Pool Trades', description: 'Get last 300 trades in past 24 hours from a pool', columns: [
             "block_number",
             "block_timestamp",
             "tx_hash",
@@ -117,7 +114,14 @@ const GeckoDex = ({setConnectedData}) => {
             "volume_in_usd",
             "from_token_address",
             "to_token_address"
-        ], requires : ['network', 'pool_address'] },
+        ],
+        requires : [
+           {'network': 'network id eg: eth. Use *Supported Networks* action to more newtworks'},
+           { 'addresses': 'Single pool address eg: 0x60594a405d53811d3bc4766596efd80fd545a270'},
+           { 'minVolume': 'Optional: return trades with volume greater than this value in USD (default: 0), (eg 100000)'}
+        ] 
+       }
+       ,
     ];
 
     const clickHandler = (query, requirements, broken) => {
@@ -274,11 +278,41 @@ const GeckoDex = ({setConnectedData}) => {
                         </div>
                     </AccordionContent>
                 </AccordionItem>
+                <AccordionItem value="ohlcvs">
+                    <AccordionTrigger className="pt-1 sm:pt-3">ohlcvs: open, high, low, close, volume</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {ohlcvs.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="trades">
+                    <AccordionTrigger className="pt-1 sm:pt-3">trades: last 300 trades in past 24hrs</AccordionTrigger>
+                    <AccordionContent>
+                        <div className='flex flex-wrap gap-1'>
+                            {trades.map(action => (
+                                <div
+                                    key={action.query}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    onClick={() => clickHandler(action.query, action.requires, action.broken)}
+                                    title={action.description}
+                                >
+                                    {action.name}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
             </Accordion>
-
-            <Alert className="mt-4">
-                <div className="flex gap-2 place-items-center"><FlaskConical className="w-8 h-8"/><div className="">You will soon be able to search by contractID, Token Name or any freeform search</div></div>
-            </Alert>            
         </div>
     )
 }

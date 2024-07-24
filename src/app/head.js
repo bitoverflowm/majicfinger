@@ -12,7 +12,7 @@ export default function Head() {
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Orelega+One&display=swap" rel="stylesheet" />
       <meta name="_foundr" content="1e04ca29b3242af44ee799e756cfafce"></meta>
       
-      <title>Easy Charts - Refreshingly simple charts.</title>
+      <title>Lychee - Because noone dreamed of becoming Michael Jordan of Spreadsheets</title>
       <meta name="description" content="Create stunning charts effortlessly with Easy Charts. No subscriptions, unlimited exports, and fully customizable. Get started today and simplify your data visualization."/>
 
       <meta property="og:url" content="https://www.lych3e.com/charts" key="url"></meta>

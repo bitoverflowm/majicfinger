@@ -16,6 +16,14 @@ import Head from 'next/head'
 import { BiDownArrow } from 'react-icons/bi'
 import { PiCircleFill } from 'react-icons/pi'
 
+import BackgroundVideo from 'next-video/background-video';
+import ethVideo from '/videos/ethvideo.mp4';
+import sushiVid from '/videos/sushi.mp4';
+import sushiVid0 from '/videos/sushi0.mp4';
+import sushiVid1 from '/videos/sushi1.mp4';
+import sushiVid2 from '/videos/sushi2.mp4';
+import sushiVidAI from '/videos/sushiAI.mp4';
+import DotPattern from "@/components/magicui/dot-pattern";
 
 export const Highlight = ({
     children,
@@ -201,7 +209,7 @@ const ReviewCard = ({
     );
 };
 
-const EasyCharts = () => {
+const EasySushi = () => {
     const images = Array.from({ length: 4 }, (_, i) => {
         return `/chart${i}.png`;
     });
@@ -209,62 +217,82 @@ const EasyCharts = () => {
 
     return (
         <>
-            <header className='bg-black/10 px-2 py-1 sm:p-6 sm:h-20 flex w-full fixed top-0 gap-4 sm:gap-10 place-items-center'>
-                  <div className='flex w-full sm:w-56 text-xs place-items-center gap-2'><Image src="/easyChartsLogo.png" width="40" height="40" ></Image><Link href={"www.lych3e.com"}>Lychee</Link> / Easy Charts</div>
-                  <div className='text-right text-xs ml-auto'><Link href="#testimonials">Testimonials</Link></div>
-                  <div className='text-right text-xs'><Link href="#demo">Demo</Link></div>
-                  <Link href="#getIt"><div className='text-center text-xs bg-[#01A823] px-2 py-3 rounded-md w-32 lg:w-28 cursor-pointer'>Get It</div></Link>
+            <header className='bg-black/10 px-2 py-1 sm:p-6 sm:h-20 flex sm:w-full fixed top-0 gap-4 sm:gap-10 place-items-center'>
+                  <div className='flex sm:w-56 text-xs place-items-center sm:gap-2'><Image src="/sushi.png" width="60" height="60" ></Image> Lychee / Easy Sushi</div>
+                  <Link href="#getIt"><div className='text-center text-xs bg-[#01A823] py-1 px-3 sm:py-3 rounded-md sm:w-32 lg:w-28 cursor-pointer'>Get It</div></Link>
               </header>
-              <main className=''>
-                  <div className='px-4 sm:px-20 py-20 sm:pt-48 md:w-5/6 mx-auto text-center'>
-                      <div className='flex place-content-center'>
-                        <div className='text-[10px] font-thin font-mono rounded-xl border-white border px-3 py-1'>We'll save you from all the complex yabba-dabba-doos out there</div>
-                      </div>                      
-                      <h1 className="font-serif scroll-m-20 text-4xl sm:text-6xl font-extrabold tracking-tight py-6">
-                          Instant Charts <br/> Zero Hassle
+              <main className='pt-20 '>         
+                  <div className='px-4 sm:px-20 py-20 sm:pt-48 md:w-5/6 mx-auto text-center bg-opacity-80'>                      
+                      <div className='flex place-content-center text-[10px] place-items-center gap-2'>
+                        <div className='text-[10px] font-thin font-mono rounded-xl border-white border px-3 py-1'>v 1.1.1</div> powered by CoinGecko
+                      </div>
+                      <h1 className="font-serif scroll-m-20 text-4xl sm:text-5xl font-extrabold py-2">
+                          Live Crypto Insights
                       </h1>
-                      <p className="font-serif text-sky-200 text-lg mt-4 xl:w-1/3 mx-auto">Create animated, sharable, data visualizations from all your existing spreadsheet tools -- no coding needed.</p>
-                      <div className='w-32 font-[400] mx-auto rounded-md mt-4 py-1 text-sm cursor-pointer bg-[#01A823] hover:bg-[#01A823]/80'><Link href="#demo">Try it </Link></div>
-                      <div className='text-[10px] pt-2'>*no card or registration</div>
-                  </div>
-                  <div className='px-2 pb-20'>
-                      <div className='flex place-items-center place-content-center py-4 text-md gap-2 cursor-pointer'><Link href="#demo">Interactive demo for you to play with below </Link><BiDownArrow className='animate-bounce'/></div>
-                      <div className='flex place-items-center px-8 xl:px-24' id="demo">
-                        <ChartShow />
+                      <h1 className="font-serif scroll-m-20 text-4xl sm:text-5xl font-extrabold py-2">
+                          Only <span className='px-4 bg-teal-500 '>The Whales</span> Get to See.
+                      </h1>
+                      <div className='md:px-28 lg:px-56'>
+                        <p className="font-sans text-white text-md pt-16">You either don't have <span className='underline'>a billion dollars</span> lying around <br/> Or you  <span className='underline'>don’t know how to code</span> <br/>So, The Whales know things you don't.<br/> And you are always left to play catchup...</p>
                       </div>
-                  </div>
-                  <div className="py-10">
-                      <div className="container mx-auto px-4">
-                          <h3 className="py-4 text-center text-[10px] font-semibold text-slate-400">
-                              ACTIVELY BETA TESTED BY FRIENDS AT
-                          </h3>
-                          <div className="sm:mt-6">
-                              <div className="flex flex-wrap gap-4 sm:gap-8 place-items-center place-content-center">
-                                  {companies.map((logo, idx) => (
-                                      <img
-                                          key={idx}
-                                          src={`./${logo}.svg`}
-                                          className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert"
-                                          alt={logo}
-                                      />
-                                  ))}
-                              </div>
-                              <div className="pointer-events-none inset-y-0 left-0 w-1/6 bg-gradient-to-r from-lychee_black"></div>
-                              <div className="pointer-events-none inset-y-0 right-0 w-1/6 bg-gradient-to-l from-lychee_black"></div>
+                      <p className="font-black font-sans text-white text-md py-8">
+                        Not anymore
+                      </p>
+                      <div className="lg:px-28">
+                        <div className="font-mono text-white text-md pt-2">
+                          <div className="inline-block px-2">EasySushi Lets You Instantly</div>
+                          access:
+                          <div className="flex flex-wrap place-content-center py-1">
+                            <div className="text-teal-200 text-black px-2 py-1 mr-2 mb-2">10 years+ of historical data,</div>
+                            <div className="text-teal-200 text-black px-2 py-1 mr-2 mb-2">110+ blockchain networks,</div>
+                            <div className="text-teal-200 text-black px-2 py-1 mr-2 mb-2">900+ DEXes,</div>
+                            <div className="text-teal-200 text-black px-2 py-1 mr-2 mb-2">Coin Prices,</div>
+                            <div className="text-teal-200 text-black px-2 py-1 mr-2 mb-2">Unlimited Charting,</div>
+                            <div className="text-teal-200 text-black px-2 py-1 mr-2 mb-2">AI analysis,</div>
+                            <div className="text-teal-200 text-black px-2 py-1 mr-2 mb-2">Automated reports</div>
+                            <div className="text-purple-300 text-black px-2 py-1 mr-2 mb-2">10 billion+ calls per month,</div>
+                            <div className="text-fuchsia-400 text-black px-2 py-1 mr-2 mb-2">70+ endpoints,</div>
+                            <div className="text-teal-200 text-black px-2 py-1 mr-2 mb-2">Powerful analytics capabilities</div>
+                            {/* Add more bullets here */}
                           </div>
+                        </div>
                       </div>
-                  </div>                  
-                  <div className='grid grid-cols-2 gap-10 py-10 px-8 lg:px-36 xl:px-56'>
+                      <div className='font-serif text-white text-xl py-10'>
+                        Not a Single Line of Code
+                      </div>
+                      <div className='flex place-items-center place-content-center gap-6'>
+                        <div className='w-32 font-[400] rounded-md mt-4 py-2 text-sm cursor-pointer border border-white hover:bg-slate-900'>
+                          <Link href="#tellMeMore">Tell Me More</Link>
+                        </div>
+                        <div className='w-32 font-[600] rounded-md mt-4 py-2 text-sm cursor-pointer bg-indigo-600 hover:bg-[#01A823]/80'><Link href="#getIt">Get it </Link></div>
+                      </div>                      
+                  </div>
+                  <div className='' id={'tellMeMore'}>
+                    <BackgroundVideo src={ethVideo} />
+                  </div>
+                  <div className='grid sm:grid-cols-2 gap-10 py-10 px-8 lg:px-36 xl:px-56'>
+                    <div>
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">CoinGecko</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4">
+                        Started in 2014, CoinGecko is the world's largest independent crypto data aggregator that is integrated with more than 900 crypto exchanges and lists more than 12,000 coins. CoinGecko API offers the most comprehensive and reliable crypto market data. <br/>Thousands of forward-thinking projects, Web3 developers, researchers, institutions, and enterprises use our CoinGecko to obtain price feeds, market data, metadata, and historical data of crypto assets, NFTs, and exchanges.
+                      </p>
+                    </div>
                     <div>
                       <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Maximal Data Protection</h1>
                       <p className="font-serif text-sky-200 text-lg mt-4">
-                        You can actually make a whole chart without saving any data into our db! Which means we never touch your data. However ofcourse if you want to save your work, we will need to save your work. Nevertheless, we peomise to never backdoor data broker, use, sell, trade your data. 
+                        You can actually make a whole chart without saving any data into our db! Which means we never touch your data. Even if you do decide to save your work in our db, we never backdoor data broker, use, sell, trade your data. Your data is your data.
                       </p>
                     </div>
                     <div>
                       <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">"Blink Of An Eye" Level Instant</h1>
                       <p className="font-serif text-sky-200 text-lg mt-4">
-                        See it for yourself in the demo above! We "graphify" your spreadsheets before you open your eyes so that you never waste a single second waiting again.
+                        See it for yourself in the demo above! You can "graphify" any data before you open your eyes. Trends, OHLCVs, Dexes, Trending Coins, BTC Historical Price...
+                      </p>
+                    </div>
+                    <div>
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">GeckoTerminal</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4">
+                        GeckoTerminal is a DeFi and DEX aggregator. Explore the market data & prices of any tokens traded across 110+ blockchain networks across 900+ DEXes – brought to you by the same team behind CoinGecko.
                       </p>
                     </div>
                     <div>
@@ -293,9 +321,9 @@ const EasyCharts = () => {
                       </p>
                     </div>
                     <div>
-                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Your Favorite Sources</h1>
+                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Automated AI Reports</h1>
                       <p className="font-serif text-sky-200 text-lg mt-4">
-                        Excel, Notion, Google Sheets, any .csv or .xlsx file will do. json coming soon. We even went as far as to allow you to source data directly from: Twitter, CoinGecko, Instagram, Meta, Reddit, you name it, we got it.
+                        Automate your analysis with AI and generate rich text reports.
                       </p>
                     </div>
                     <div>
@@ -311,45 +339,44 @@ const EasyCharts = () => {
                       </p>
                     </div>
                   </div>                      
-                  <div className='px-4 md:px-20 py-10'>
-                      <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Look how easy it is</h1>
-                      <div className="md:px-4 py-4 flex flex-wrap justify-center gap-4">
-                          <iframe
-                              className="w-full"
-                              height="450"
-                              src={`https://www.youtube.com/embed/5qrVmJaE4_o?si=4ke8h_wnUD7sIiuZ`}
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                              title="Embedded YouTube Video"
-                          ></iframe>
-                      </div>              
-                  </div>
                   <div className='md:px-20 lg:px-96 w-full'>
                       <h1 className="px-4 md:px-0 text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">3 Simple Steps</h1>
                       <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-4">
-                        Step 1: Easily import your data. However you collect your data, Easy Charts can chart it. Build charts from spreadsheet, databases, type it directly or connect to a live data source, like Twitter, Instagram, Youtube, CoinGecko, Yahoo Finance, etc.
+                        Step 0: Pick CoinGecko or GeckoTerminal.
                       </p>
-                      <div className="md:px-10 ">
-                          <Image src={'/uploadMockup.png'} width={800} height={700}/>
+                      <div className="p-4">
+                        <BackgroundVideo src={sushiVid} />
                       </div>
                       <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-8">
-                        Step2: Customize and controle absolutely every aspect of your chart.
+                        Step 1: Select an option to explore
                       </p>
-                      <div className="md:px-10 py-10">
-                          <Image src={'/chartGenerated.png'} width={800} height={800}/>
+                      <div  className="p-4">
+                        <BackgroundVideo src={sushiVid0} />
                       </div>
-                      <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-4">
-                        Step 3: Share your insights however you like.
+                      <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-8">
+                        Step 2: Input your search queries and filters
                       </p>
-                      <div className="md:px-10 py-10">
-                          <Image src={'/customize.png'} width={800} height={800}/>
+                      <div  className="p-4">
+                        <BackgroundVideo src={sushiVid1}/>
+                      </div>
+                      <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-8">
+                        Step 3: Unlimited charts and visualizations to gain the deepest insights
+                      </p>
+                      <div  className="p-4">
+                        <BackgroundVideo src={sushiVid2} />
+                      </div>
+                      <p className="px-4 md:px-0 font-serif text-sky-200 text-lg mt-8">
+                        BONUS Step: Go even further and have AI generate a full report your you which you can edit and publish
+                      </p>
+                      <div  className="p-4">
+                        <BackgroundVideo src={sushiVidAI} />
                       </div>
                   </div>                  
                   <div className='px-20 py-36 lg:px-32 w-full' id="testimonials">
                       <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">What Our Legendary Users Have To Say:</h1>
-                      <p className="font-serif text-sky-200 text-lg mt-4 pb-10">People really like is - <br/> All reviews are clickable.                        
+                      <p className="font-serif text-sky-200 text-lg mt-4 pb-10">People really like us - <br/> All reviews are clickable.                        
                       </p>
-                      <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-[#0064E6] py-20">
+                      <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-black py-20">
                           <Marquee pauseOnHover className="[--duration:20s]">
                               {firstRow.map((review) => (
                               <ReviewCard key={review.username} {...review} />
@@ -360,34 +387,37 @@ const EasyCharts = () => {
                               <ReviewCard key={review.username} {...review} />
                               ))}
                           </Marquee>
-                          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-[#0064E6] from-[#0064E6]"></div>
-                          <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-[#0064E6] from-[#0064E6]"></div>
+                          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-black"></div>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-black"></div>
                       </div>
                   </div>
                   <div className='py-56 px-2 lg:px-10 xl:px-42 w-full text-center grid sm:grid-cols-3 gap-2 place-content-center' id="getIt">
                     <div className='border border-1 border-white rounded-lg py-10 px-6'>
                       <h1 className="text-white scroll-m-20 text-xl font-extrabold tracking-tight lg:text-5xl">Trial</h1>
                       <p className="font-serif text-sky-200 text-lg mt-4">48 hrs free</p>
-                      <p className="font-serif text-sky-200 text-sm">then $6.99/month</p>
+                      <p className="font-serif text-sky-200 text-sm">then $11.99/month</p>
                       <div className='text-left py-4'>
-                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Instant Graphs</p></div>
-                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Wide Variety of Graphs</p></div>
+                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">10 years+ of historical data</p></div>
+                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">110+ blockchain networks</p></div>
+                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">900+ DEXes</p></div>
+                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Unlimited, instant, whide variety of Charts</p></div>
                         <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Simplified User Interface</p></div>
                         <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Unlimited Exports</p></div>
+                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">AI Insights</p></div>
                       </div>                      
-                      <Link href="https://buy.stripe.com/4gw5mE4Gie1g5Ak14v"> <div className='mx-auto my-4 w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center font-bold'>Try</div> </Link>
+                      <Link href="https://buy.stripe.com/cN2eXegp01eu4wgbJe"> <div className='mx-auto my-4 w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center font-bold'>Try</div> </Link>
                     </div>
                     <div className='border border-1 border-white rounded-lg py-10 px-6'>
-                      <h1 className="text-white scroll-m-20 text-xl font-extrabold tracking-tight lg:text-5xl">Easy Charts LifeTime</h1>
-                      <p className="font-serif text-sky-200 text-lg mt-4">$13.99/once</p>
+                      <h1 className="text-white scroll-m-20 text-xl font-extrabold tracking-tight lg:text-5xl">EasySushi LifeTime</h1>
+                      <p className="font-serif text-sky-200 text-lg mt-4">$19.99/once</p>
                       <p className="font-serif text-sky-200 text-sm">Limited Time Promo <span className='line-through'>69.99</span></p>
                       <div className='text-left py-4'>
                         <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm"> Includes everything in Trial</p></div>
                         <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">No paying for monthly subscriptions.</p></div>
                         <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">All Future Updates</p></div>
-                        <div className='flex gap-2 place-items-center'><PiCircleFill className='animate-ping text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">11 seats left at this price</p></div>
+                        <div className='flex gap-2 place-items-center'><PiCircleFill className='animate-ping text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">7 seats left at this price</p></div>
                       </div>                      
-                      <Link href="https://buy.stripe.com/3cscP62ya7CS1k414w"> <div className='mx-auto my-4 w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center font-bold'>Checkout</div> </Link>
+                      <Link href="https://buy.stripe.com/14k3ewgp04qG8MwbJd"> <div className='mx-auto my-4 w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center font-bold'>Checkout</div> </Link>
                     </div>
                     <div className='border border-1 border-white rounded-lg py-10 px-6'>
                       <Badge className='bg-purple-400'>Most Popular</Badge>
@@ -395,13 +425,13 @@ const EasyCharts = () => {
                       <p className="font-serif text-sky-200 text-lg mt-4">$69.99/once</p>
                       <p className="font-serif text-sky-200 text-sm">Limited Time Promo <span className='line-through pl'>$199.99</span></p>
                       <div className='text-left py-4'>
-                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm"> Includes everything in Easy Charts LifeTime</p></div>
+                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm"> Includes everything in EasySushi LifeTime</p></div>
                         <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Includes all current and future Lychee features.</p></div>
                         <Link href="#learnLychee"><p className="underline text-sky-200 text-sm py-4">Click to Learn about lychee</p></Link>
-                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Lychee Scrape any website</p></div>
+                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Scrape any website</p></div>
                         <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Connect to Twitter, Instagran, Yelp, etc</p></div>
-                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">Easy Lychee: convert spreadsheet to website in 0.46 secs</p></div>
-                        <div className='flex gap-2 place-items-center'><PiCircleFill className='animate-ping text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">77 seats left at this price</p></div>
+                        <div className='flex gap-2 place-items-center'><CheckCircle className='text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">EasyLychee: convert spreadsheet to website in 0.46 secs</p></div>
+                        <div className='flex gap-2 place-items-center'><PiCircleFill className='animate-ping text-green-400 h-3 w-3'/><p className="text-sky-200 text-sm">36 seats left at this price</p></div>
                       </div>                      
                       <Link href="https://buy.stripe.com/6oE16o3Ce4qG2o828B"> <div className='mx-auto my-4 w-32 text-[#0064E6] bg-white hover:bg-white/80 py-2 rounded-lg text-center font-bold'>Checkout</div> </Link>
                     </div>
@@ -409,9 +439,9 @@ const EasyCharts = () => {
                   <div className='py-10 px-4 md:px-20 lg:px-64 2xl:px-96' id="learnLychee">
                       <h1 className="text-white scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Let's talk about Lychee</h1>
                       <p className="font-serif text-sky-200 text-lg mt-4 pb-10">
-                          Lychee is the Easy Chart's parent (also created by @misterrpink). <br/>
+                          Lychee is team behind EasySushi (also created by @misterrpink). <br/>
                           On a mission to make the whole data pipeline as seamless as possible. <br />
-                          When you get lifetime access to Easy Charts, you also get access to the full suite of tools that is Lychee:
+                          When you get lifetime access to Lychee, you also get access to the full suite of tools that is Lychee:
                       </p>
                       <LycheeFeatureGrid/>                     
                   </div>
@@ -420,4 +450,4 @@ const EasyCharts = () => {
     )
 }
 
-export default EasyCharts
+export default EasySushi

@@ -1,6 +1,6 @@
 
 export default async (req, res) => {
-    const { query, search, network, addresses, dex } = req.query
+    const { query, search, network, addresses, dex, timeframe, minVolume } = req.query
     let url
     switch(query){        
         case 'networks':
@@ -98,7 +98,20 @@ export default async (req, res) => {
                 return res.status(400).json({ message: 'Missing network or addresses parameter' });
             }
             url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${addresses}/info`;
-            return await poolTokenInfo(url, res);      
+            return await poolTokenInfo(url, res);
+        case 'ohlcvs':
+            if(!network || !addresses || !timeframe) {
+                return res.status(400).json({ message: 'Missing network, addresses, or timeframe paramete' });
+            }
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${addresses}/ohlcv/${timeframe}`;
+            return await ohlcvs(url, res);
+        case 'trades':
+            if(!network || !addresses) {
+                return res.status(400).json({ message: 'Missing network, addresses, or timeframe paramete' });
+            }
+            let minVolumeParam = minVolume ? `trade_volume_in_usd_greater_than=${minVolume}` : 'trade_volume_in_usd_greater_than=0';
+            url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${addresses}/trades?${minVolumeParam}`;
+            return await trades(url, res);
         default:
             return res.status(400).json({ message: 'Invalid query parameter' });
     }
@@ -897,6 +910,109 @@ const poolTokenInfo = async (url, res) => {
         res.status(500).json({ message: 'Internal Server Error' });
     }
 };
+
+//ohlcv
+
+const ohlcvs = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { data, meta } = await response.json();
+
+            const { ohlcv_list } = data.attributes;
+            const { base, quote } = meta;
+
+            const flattenedData = ohlcv_list.map(ohlcv => ({
+                id: data.id,
+                datetime: ohlcv[0],
+                open: ohlcv[1],
+                high: ohlcv[2],
+                low: ohlcv[3],
+                close: ohlcv[4],
+                volume: ohlcv[5],
+                base_symbol: base.symbol,
+                base_coingecko_id: base.coingecko_coin_id,
+                quote_symbol: quote.symbol,
+                quote_coingecko_id: quote.coingecko_coin_id
+            }));
+
+            return res.status(200).json(flattenedData);
+        } else {
+            return res.status(response.status).json({ message: 'Pool Token Info CoinGecko Data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+}
+
+
+const trades = async (url, res) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.status === 200) {
+            const { data } = await response.json();
+
+            const flattenedData = data.map(trade => {
+                const {
+                    id,
+                    attributes: {
+                        block_number,
+                        tx_hash,
+                        tx_from_address,
+                        from_token_amount,
+                        to_token_amount,
+                        price_from_in_currency_token,
+                        price_to_in_currency_token,
+                        price_from_in_usd,
+                        price_to_in_usd,
+                        block_timestamp,
+                        kind,
+                        volume_in_usd,
+                        from_token_address,
+                        to_token_address
+                    }
+                } = trade;
+
+                return {
+                    id,
+                    block_number,
+                    tx_hash,
+                    tx_from_address,
+                    from_token_amount: parseFloat(from_token_amount),
+                    to_token_amount: parseFloat(to_token_amount),
+                    price_from_in_currency_token: parseFloat(price_from_in_currency_token),
+                    price_to_in_currency_token: parseFloat(price_to_in_currency_token),
+                    price_from_in_usd: parseFloat(price_from_in_usd),
+                    price_to_in_usd: parseFloat(price_to_in_usd),
+                    block_timestamp,
+                    kind,
+                    volume_in_usd: parseFloat(volume_in_usd),
+                    from_token_address,
+                    to_token_address
+                };
+            });
+
+            return res.status(200).json(flattenedData);
+        } else {
+            return res.status(response.status).json({ message: 'Trades data pull failed' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+}
+
 
 
 
