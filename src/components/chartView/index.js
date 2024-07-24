@@ -314,11 +314,11 @@ const ChartView = ({demo}) => {
     };
     
     return(
-        <div className={`gradualEffect ${dark ? 'bg-black': 'bg-white' } ${demo? 'flex' : ''}`}>
-            <div className={`gradualEffect py-10 px-10 ${editHidden ? 'w-full' : 'w-10/12'}`}>
-                <div className='gradualEffect py-12 px-12 rounded-xl xl:w-10/12' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "'hsl(142 88% 28%)'"}}>
-                    <div className='py-4 px-4 rounded-xl shadow-xl' style={{backgroundColor: selectedPalette[3] ? selectedPalette[3] : "#fff"}}>
-                        <Card className={`px-4 py-8 border-0 ${dark ? 'text-white bg-slate-800/80': ' text-black bg-white'}`}>
+        <div className={`gradualEffect xl:flex ${dark ? 'bg-black text-white': 'bg-slate-100 text-black' } p-10`}>
+            <div className={`gradualEffect lg:py-10 lg:px-10`}>                    
+                    <div className='gradualEffect py-12 px-12 rounded-xl' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "#0064E6"}}>
+                        <div className='py-4 px-4 rounded-xl shadow-xl backdrop-blur-xl bg-opacity-50' style={{backgroundColor: dark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)'}}>
+                            <Card className={`py-4 border-0 ${dark ? 'text-white bg-black': ' text-black bg-white'}`}>
                             <CardHeader>
                                 {
                                     titleHidden && <CardTitle>{title}</CardTitle>
@@ -658,7 +658,7 @@ const ChartView = ({demo}) => {
                     </div>
                 </div>
             </div>
-            <div className={`gradualEffect ${ demo ? '' : 'absolute right-10'} border rounded-xl flex flex-col bg-white shadow-lg px-10 py-5 ${editHidden ? 'bg-opacity-20 w-1/12 border-0 top-14 md:top-14' : 'top-1/4 md:top-14 w-9/12 md:w-2/5 xl:w-1/4 border-slate-200'}`}   style={{ zIndex: 20 }}>
+            <div className={`gradualEffect absolute right-10 rounded-xl flex flex-col ${ dark ? 'bg-slate-900/60' : 'bg-white'} shadow-lg px-10 py-5 ${editHidden ? 'bg-opacity-20 w-1/12 border-0 top-14 md:top-14' : 'top-1/4 md:top-14 w-9/12 md:w-2/5 xl:w-1/4'}`}   style={{ zIndex: 20 }}>
                 <div className='flex gap-1 place-items-center place-content-center py-2'>
                     {
                         editHidden ? 
@@ -717,9 +717,9 @@ const ChartView = ({demo}) => {
                                         <AiOutlineRadarChart className="h-4 w-4" />
                                     </ToggleGroupItem>
                                 </ToggleGroup>
-                                <p className="text-xs font-bold text-muted-foreground pt-2">Select your x-axis </p>
+                                <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Select your x-axis </p>
                                 <p className="text-xs text-muted-foreground"></p>
-                                <div className="py-2">
+                                <div className="py-2 text-black">
                                     <Select value={selX} onValueChange={(value) => setSelX(value)}>
                                         <SelectTrigger >
                                             <SelectValue placeholder="x axis" className='text-xs'/>
@@ -734,10 +734,10 @@ const ChartView = ({demo}) => {
                                     </Select>                             
                                 </div>
                                 <div className="py-2">
-                                    <p className="text-xs font-bold text-muted-foreground">Select your y-axis</p>
-                                    <p className="text-xs text-muted-foreground pb-1">Typically this should be something quantifiable {`(numerical)`}</p>
+                                    <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Select your y-axis</p>
+                                    <p className={`text-xs ${dark ? 'text-slate-300' : 'text-muted-foreground'} pt-2`}>Typically this should be something quantifiable {`(numerical)`}</p>
                                     {selY.length > 0 && selY.map((yValue, index) => (
-                                        <div className='py-1 flex place-items-center gap-2' key={index}>
+                                        <div className='py-1 flex place-items-center gap-2 text-black' key={index}>
                                             <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
                                                 <SelectTrigger>
                                                     <SelectValue className='text-xs'>{yValue}</SelectValue>
@@ -784,7 +784,7 @@ const ChartView = ({demo}) => {
                             </>
                     }
                     <div className='py-2'>                    
-                        <p className="text-xs font-bold text-muted-foreground">Paletter</p>
+                        <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Paletter</p>
                         <div className='flex gap-3 place-items-center'>
                             <div className="flex text-xs rounded-md py-2 cursor-pointer" onClick={()=>setColorVisible(true)}>
                                 {
@@ -830,13 +830,13 @@ const ChartView = ({demo}) => {
                         </div>
                     </div>
                     { (selChartType === 'area' || selChartType === 'line') && <div className='py-2'>
-                        <p className="text-xs font-bold text-muted-foreground">Line Style</p>
-                        <p className="text-xs text-muted-foreground">How do you want your line</p>
-                        <Select value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
-                            <SelectTrigger >
+                        <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Line Style</p>
+                        <p className={`text-xs ${dark ? 'text-slate-300' : 'text-muted-foreground'} pt-2`}>How do you want your line</p>
+                        <Select className="text-black" value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
+                            <SelectTrigger className="text-black">
                                 <SelectValue placeholder="y axis" className='text-xs'/>
                             </SelectTrigger>
-                            <SelectContent className='text-xs'>
+                            <SelectContent className='text-xs text-black'>
                                 {['natural', 'linear', 'step'].map((i) => (
                                     <SelectItem key={i} value={i} className='text-xs'>
                                         {i}
@@ -849,7 +849,7 @@ const ChartView = ({demo}) => {
                         {selChartType === 'area' &&
                             <Toggle area-label="Toggle Expand" pressed={expanded}
                                 onPressedChange={handleToggleChange}>
-                                <Expand className='h-4 w-4 text-slate-800'/>
+                                <Expand className={`h-4 w-4 font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}/>
                             </Toggle>
                         }
                         <Toggle area-label="Toggle Legend" pressed={legendVisible}
@@ -925,7 +925,7 @@ const ChartView = ({demo}) => {
                         </div>
                     </div>
                     <div className="flex gap-2 place-items-center pb-10">
-                        <p className="text-xs text-muted-foreground">Content</p>
+                        <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Content</p>
                         <Input id="BodyContent" type="text" className="text-xs" placeholder="Add a Description" onChange={(e)=>setBodyContent(e.target.value)} />
                         <div
                         className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"

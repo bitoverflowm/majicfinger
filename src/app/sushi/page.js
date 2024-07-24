@@ -18,24 +18,24 @@ export const metadata = {
     siteName: 'Easy Sushi',
     images: [
       {
-        url: 'https://www.lych3e.com/ogImage.png',
+        url: 'https://www.lych3e.com/whatTheWhalesSee.png',
         width: 1200,
         height: 630,
-        alt: 'Easy Charts OG Image'
+        alt: 'What the Whales See'
       }
     ]
   },
   twitter: {
     card: 'summary_large_image',
     domain: 'lych3e.com/sushi',
-    url: 'https://www.lych3e.com/charts',
+    url: 'https://www.lych3e.com/sushi',
     title: 'Live Crypto Insights No Coding.',
     description: 'Access what the whales have, without the coding.',
-    image: 'https://www.lych3e.com/ogImage.png'
+    image: 'https://www.lych3e.com/whatTheWhalesSee.png'
   }
 };
 
-const Sushi = () => {  
+const sushi = () => {  
     const clairtyCode = `
         (function (c,l,a,r,i,t,y){
             c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
@@ -59,4 +59,4 @@ const Sushi = () => {
     )
 }
 
-export default Sushi
+export default sushi
