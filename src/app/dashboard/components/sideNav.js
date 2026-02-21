@@ -67,14 +67,14 @@ const SideNav = () => {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border">
+      <SidebarHeader className=" border-sidebar-border">
         <div
           className={`flex items-center gap-2 transition-[width,padding] duration-200 ease-linear ${
             isExpanded ? "w-full justify-between" : "w-full justify-center"
           }`}
         >
           <div className="flex min-w-0 shrink-0 items-center gap-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white overflow-hidden">
+            <div className="flex h-10 w-10 shrink-0 pl-2 items-center justify-center rounded-md bg-white overflow-hidden">
               <Image src="/fruit.png" width={24} height={24} alt="Lychee" />
             </div>
             <span
@@ -103,9 +103,9 @@ const SideNav = () => {
           )}
         </div>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="gap-0 pt-3">
         {/* Data */}
-        <SidebarGroup>
+        <SidebarGroup className="py-0.5">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -152,7 +152,7 @@ const SideNav = () => {
         </SidebarGroup>
 
         {/* Chart */}
-        <SidebarGroup>
+        <SidebarGroup className="py-0.5">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -181,7 +181,7 @@ const SideNav = () => {
         </SidebarGroup>
 
         {/* Dashboard */}
-        <SidebarGroup>
+        <SidebarGroup className="py-0.5">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -210,7 +210,7 @@ const SideNav = () => {
         </SidebarGroup>
 
         {/* Under construction */}
-        <SidebarGroup>
+        <SidebarGroup className="py-0.5">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
