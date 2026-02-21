@@ -15,7 +15,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [userHandle, setUserHandle] = useState()
     const [isLifeTimeMember, setIsLifeTimeMember] = useState()
     const [settings, setSettings] = useState(initialSettings)
-    const [viewing, setViewing] = useState('dashboard')
+    const [viewing, setViewing] = useState('dataStart')
 
     
     /* Dashboard and bento state */

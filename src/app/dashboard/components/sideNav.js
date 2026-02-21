@@ -15,6 +15,7 @@ import {
   Camera,
   FilePlus2,
   PanelLeftClose,
+  Construction,
 } from "lucide-react";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -24,10 +25,14 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -38,19 +43,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const navItems = [
-  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "dataStart", label: "Data Sheet", icon: Database },
-  { key: "upload", label: "Upload", icon: HardDriveUpload },
-  { key: "integrations", label: "Integrations", icon: Cable },
-  { key: "scrape", label: "Scrape", icon: Shovel },
-  { key: "generate", label: "Generate Data", icon: BadgePlus },
-  { key: "newSheet", label: "New Sheet", icon: FilePlus2 },
-  { key: "charts", label: "Charts", icon: BarChart3 },
-  { key: "gallery", label: "Gallery", icon: Gem },
-  { key: "ai", label: "AI", icon: Bot },
-  { key: "presentation", label: "Presentation", icon: Camera },
-];
+const dataViewKeys = ["dataStart", "newSheet", "upload", "integrations"];
+const chartViewKeys = ["charts", "gallery"];
+const dashboardViewKeys = ["dashboard", "presentation"];
+const underConstructionKeys = ["scrape", "generate", "ai"];
 
 const SideNav = () => {
   const contextStateV2 = useMyStateV2();
@@ -63,6 +59,11 @@ const SideNav = () => {
   };
 
   const isExpanded = sidebarState === "expanded";
+
+  const isDataActive = dataViewKeys.includes(viewing);
+  const isChartActive = chartViewKeys.includes(viewing);
+  const isDashboardActive = dashboardViewKeys.includes(viewing);
+  const isUnderConstructionActive = underConstructionKeys.includes(viewing);
 
   return (
     <Sidebar collapsible="icon">
@@ -103,21 +104,169 @@ const SideNav = () => {
         </div>
       </SidebarHeader>
       <SidebarContent>
+        {/* Data */}
         <SidebarGroup>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
+            Data
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map(({ key, label, icon: Icon }) => (
-                <SidebarMenuItem key={key}>
-                  <SidebarMenuButton
-                    isActive={viewing === key}
-                    onClick={() => viewHandler(key)}
-                    tooltip={label}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isDataActive}
+                  onClick={() => viewHandler("dataStart")}
+                  tooltip="Data"
+                >
+                  <Database className="h-5 w-5" />
+                  <span>Data</span>
+                </SidebarMenuButton>
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      isActive={viewing === "newSheet"}
+                      onClick={() => viewHandler("newSheet")}
+                    >
+                      <FilePlus2 className="h-4 w-4" />
+                      <span>New Sheet</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      isActive={viewing === "upload"}
+                      onClick={() => viewHandler("upload")}
+                    >
+                      <HardDriveUpload className="h-4 w-4" />
+                      <span>Upload</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      isActive={viewing === "integrations"}
+                      onClick={() => viewHandler("integrations")}
+                    >
+                      <Cable className="h-4 w-4" />
+                      <span>Integrations</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Chart */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
+            Chart
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isChartActive}
+                  onClick={() => viewHandler("charts")}
+                  tooltip="Chart"
+                >
+                  <BarChart3 className="h-5 w-5" />
+                  <span>Chart</span>
+                </SidebarMenuButton>
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      isActive={viewing === "gallery"}
+                      onClick={() => viewHandler("gallery")}
+                    >
+                      <Gem className="h-4 w-4" />
+                      <span>Gallery</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Dashboard */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
+            Dashboard
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isDashboardActive}
+                  onClick={() => viewHandler("dashboard")}
+                  tooltip="Dashboard"
+                >
+                  <LayoutDashboard className="h-5 w-5" />
+                  <span>Dashboard</span>
+                </SidebarMenuButton>
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      isActive={viewing === "presentation"}
+                      onClick={() => viewHandler("presentation")}
+                    >
+                      <Camera className="h-4 w-4" />
+                      <span>Presentation</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Under construction */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
+            Under construction
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <p className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+              These features are currently under construction.
+            </p>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isUnderConstructionActive}
+                  tooltip="Under construction"
+                  className="pointer-events-none opacity-70"
+                >
+                  <Construction className="h-5 w-5" />
+                  <span>Under construction</span>
+                </SidebarMenuButton>
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      isActive={viewing === "scrape"}
+                      onClick={() => viewHandler("scrape")}
+                    >
+                      <Shovel className="h-4 w-4" />
+                      <span>Scrape</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      isActive={viewing === "generate"}
+                      onClick={() => viewHandler("generate")}
+                    >
+                      <BadgePlus className="h-4 w-4" />
+                      <span>Generate Data</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton
+                      isActive={viewing === "ai"}
+                      onClick={() => viewHandler("ai")}
+                    >
+                      <Bot className="h-4 w-4" />
+                      <span>AI</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
