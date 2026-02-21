@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
 
 const INTEGRATION_OPTIONS = [
   { value: "polymarket", label: "Polymarket" },
@@ -52,53 +52,53 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew }
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full pt-4">
-      {/* Center: datasheet — flex-1, scrolls internally */}
-      <main className="flex-1 min-w-0 overflow-auto py-4 px-2 sm:py-6 sm:px-4">
-        <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
-      </main>
+    <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-4 px-2 py-2 sm:gap-6 sm:px-4">
+      <div className="flex min-h-0 w-full max-w-full flex-1 flex-row gap-4 sm:gap-6">
+        {/* Main: datasheet — shrinks, scrolls, never overflows */}
+        <main className="min-w-0 flex-1 overflow-auto">
+          <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
+        </main>
 
-      {/* Right: API panel — fixed width, responsive, scrolls internally */}
-      <aside className="w-[14rem] shrink-0 border-l border-border bg-muted/30 flex flex-col min-h-0 sm:w-[16rem] md:w-[18rem]">
-        <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-border">
-          <span className="text-xs font-medium text-muted-foreground hidden sm:inline">
-            Actions
-          </span>
-          <Select
-            value={integrationSidebar}
-            onValueChange={(value) => setIntegrationSidebar(value)}
-          >
-            <SelectTrigger className="h-8 flex-1 min-w-0 text-xs">
-              <SelectValue placeholder="API" />
-            </SelectTrigger>
-            <SelectContent>
-              {INTEGRATION_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={() => setIntegrationSidebar(null)}
-            aria-label="Close panel"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-        <Separator className="shrink-0" />
-        <div className="flex-1 min-h-0 overflow-auto px-3 py-3">
-          <fieldset className="rounded-lg border border-border px-2 py-2 sm:px-3 sm:py-3">
-            <legend className="px-1 text-[10px] sm:text-xs font-medium text-muted-foreground">
-              API pull
-            </legend>
-            {renderIntegration()}
-          </fieldset>
-        </div>
-      </aside>
+        {/* Right: API panel — always visible, fixed width */}
+        <aside className="flex w-[12rem] min-w-[12rem] shrink-0 flex-col gap-4 sm:w-[200px] sm:min-w-[200px] sm:gap-6">
+          <div className="grid gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                API
+              </Label>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => setIntegrationSidebar(null)}
+                aria-label="Close panel"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <Select
+              value={integrationSidebar}
+              onValueChange={(value) => setIntegrationSidebar(value)}
+            >
+              <SelectTrigger className="h-9 w-full text-sm">
+                <SelectValue placeholder="Select API" />
+              </SelectTrigger>
+              <SelectContent>
+                {INTEGRATION_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid min-h-0 gap-3">
+            <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30 p-3">
+              {renderIntegration()}
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

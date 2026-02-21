@@ -3,7 +3,6 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import moment from "moment"
 
-import { Menu } from "lucide-react"
 
 //Shdcn
 import { Button } from "@/components/ui/button"
@@ -349,19 +348,19 @@ const Nav = () => {
 
 
   return (
-    <div className="absolute top-0 flex w-full items-center gap-4 border-b py-1 px-5">
-          { user ?
-              <div className="flex w-full items-center gap-4 pl-44 md:gap-2 lg:gap-4 ">
-                <div className="w-full flex gap-2">
-                  {((savedDataSets && savedDataSets.length > 0) || (savedCharts && savedCharts.length > 0)) && 
-                    <div>
-                      <Sheet open={isOpen} onOpenChange={setIsOpen} >
-                        <SheetTrigger asChild>
-                          <div className="ml-2 w-32 text-xs text-black cursor-pointer hover:bg-slate-100 py-1 pl-4 rounded-md" onClick={()=>setIsOpen(true)}> 
-                            Your Work 
-                            <Badge className='ml-2 text-[10px] w-8 bg-slate-600'>{savedDataSets && savedDataSets.length}</Badge> 
-                          </div>
-                        </SheetTrigger>
+    <div className="container flex flex-col items-start justify-between gap-2 py-4 sm:flex-row sm:items-center sm:gap-0 md:h-16">
+          <h2 className="pl-0.5 text-lg font-semibold">Lychee</h2>
+          { user ? (
+              <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:justify-end">
+                  <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1.5">
+                        Your Work
+                        <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-[10px]">
+                          {(savedDataSets?.length ?? 0) + (savedCharts?.length ?? 0) + (savedPresentations?.length ?? 0)}
+                        </Badge>
+                      </Button>
+                    </SheetTrigger>
                         <SheetContent side={'left'} className="w-[1000px]! sm:max-w-4xl flex flex-col">
                           <SheetHeader>
                             <SheetTitle>Your Saved Work</SheetTitle>
@@ -439,15 +438,12 @@ const Nav = () => {
                               </div></TabsContent>
                           </Tabs>
                         </SheetContent>
-                      </Sheet>
-                    </div>
-                  }
+                  </Sheet>
 
-                  {connectedData && 
-                    <div className="flex place-items-center">
+                  {connectedData && (
                       <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
                         <DialogTrigger asChild>
-                          <div className="text-xs text-black cursor-pointer hover:bg-slate-100 py-2 px-2 rounded-md">Save {viewing === 'charts' ? 'Chart':  'Data'}</div>
+                          <Button variant="outline" size="sm">Save {viewing === 'charts' ? 'Chart' : 'Data'}</Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
@@ -543,16 +539,15 @@ const Nav = () => {
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
-                    </div>
-                    }
-                  
-                </div>
-                {loadedDataMeta && loadedDataMeta.data_set_name && <div className="flex text-xs gap-1"><div>Loaded:</div> <div>{loadedDataMeta.data_set_name}</div></div> }
+                  )}
+
+                {loadedDataMeta && loadedDataMeta.data_set_name && (
+                  <span className="text-xs text-muted-foreground hidden sm:inline">Loaded: {loadedDataMeta.data_set_name}</span>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                      <Button variant="secondary" className="rounded-full shadow-2xl shadow-inner flex bg-white">
-                        <Image className="" src={'/avatar.png'} height={40} width={40} />
-                        <Menu/>
+                      <Button variant="secondary" size="icon" className="rounded-full h-9 w-9 overflow-hidden">
+                        <Image src={'/avatar.png'} height={36} width={36} alt="Profile" />
                       </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -566,11 +561,12 @@ const Nav = () => {
                   </DropdownMenuContent>
               </DropdownMenu>
               </div>
-            : <div className="flex ml-auto place-items-center gap-6" >
-                {connectedData && <div className="flex text-xs">Register to Save Your Work</div>}
-                <div className="bg-black text-white px-3 py-2 rounded-md text-xs cursor-pointer" onClick={()=>setViewing('register')}>Member Log In </div>
+            ) : (
+              <div className="ml-auto flex items-center gap-2">
+                {connectedData && <span className="text-xs text-muted-foreground hidden sm:inline">Register to save your work</span>}
+                <Button variant="default" size="sm" onClick={()=>setViewing('register')}>Member Log In</Button>
               </div>
-          }
+            )}
     </div>
   )
 }

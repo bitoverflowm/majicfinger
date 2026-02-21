@@ -27,6 +27,7 @@ import ScraperView from "@/components/scraperView";
 import ComingSoon from "./components/comingSoon";
 import { Pricing } from "@/components/pricing/lycheePricing";
 import EasyLychee from "@/components/easyLychee";
+import { Separator } from "@/components/ui/separator";
 
 
 import { debounce } from "@/lib/debounce";
@@ -228,13 +229,14 @@ const DashBody = ({user}) => {
                 <header className="sticky top-0 z-30 w-full shrink-0 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none">
                     <Nav />
                 </header>
+                {integrationSidebar && <Separator className="shrink-0" />}
                 <div className="relative z-0 flex min-h-0 flex-1 flex-col">
                 { viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
                 { viewing === 'dataStart' && (integrationSidebar ? (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-8">
                     <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} />
                   </div>
-                ) : <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
+                ) : <div className="py-4"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'charts' && <div className="py-16"><ChartView user={user}/></div> }

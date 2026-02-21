@@ -30,8 +30,8 @@ const DataView = ({user}) => {
     
 
     return(
-        <div className='px-10'>                       
-            <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+        <div className='min-w-0 max-w-full px-2 sm:px-4 md:px-6'>                       
+            <h2 className="border-b pb-2 text-xl font-semibold tracking-tight first:mt-0 sm:text-2xl md:text-3xl">
                 Your Data
             </h2>
             <div className='flex flex-wrap gap-1 mt-1'>
@@ -50,7 +50,7 @@ const DataView = ({user}) => {
             
 
             {
-                (connectedData) ? <div className='min-h-screen w-4/6 min-[300px]:w-[400px] sm:w-[500px] md:w-[650px] lg:w-[850px] xl:w-[1100px] 2xl:w-[1600px]'> <GridView/> </div>      
+                (connectedData) ? <div className='min-h-0 w-full max-w-full overflow-auto'> <GridView/> </div>      
                 : <div className="">
                     <div className='w-1/4 mx-auto py-8'>
                         {
