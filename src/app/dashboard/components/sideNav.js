@@ -106,9 +106,6 @@ const SideNav = () => {
       <SidebarContent>
         {/* Data */}
         <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
-            Data
-          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -156,9 +153,6 @@ const SideNav = () => {
 
         {/* Chart */}
         <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
-            Chart
-          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -188,9 +182,6 @@ const SideNav = () => {
 
         {/* Dashboard */}
         <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
-            Dashboard
-          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -220,13 +211,7 @@ const SideNav = () => {
 
         {/* Under construction */}
         <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
-            Under construction
-          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <p className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-              These features are currently under construction.
-            </p>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
