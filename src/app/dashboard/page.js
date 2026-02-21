@@ -9,7 +9,6 @@ import { useEffect } from "react"
 import { useUser } from '@/lib/hooks';
 import { StateProvider } from '@/context/stateContext'
 import { StateProviderV2 } from '@/context/stateContextV2';
-import { useMyStateV2  } from '@/context/stateContextV2'
 
 import DashBody from './dashBody';
 import Nav from "./components/nav";
