@@ -11,6 +11,7 @@ import { useMyStateV2  } from '@/context/stateContextV2'
 import PreviewGrid from "@/components/gridView/previewGrid"
 import WallStreetBets from "./integrations/wallStreetBets"
 import CoinGecko from "./integrations/coinGecko"
+import Polymarket from "./integrations/polymarket"
 import Twitter from "./integrations/twitter"
 import GeckoDex from "./integrations/geckoDex"
   
@@ -31,7 +32,11 @@ const IntegrationPlayground = ({playView, setPlayView}) => {
                     <legend className="-ml-1 px-1 text-xs font-medium">Select an action</legend>
                     {
                       playView === 'twitter' && <Twitter setConnectedData={setConnectedData}/>
-                      
+                    }
+                    {
+                      playView === "polymarket" && (
+                        <Polymarket setConnectedData={setConnectedData}/>
+                      )
                     }
                     {
                       playView === "wallStreetBets" &&
