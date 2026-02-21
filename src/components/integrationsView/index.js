@@ -119,11 +119,16 @@ const tags_categories = [...new Set(integrations_list.flatMap(integration => int
 
 const IntegrationsView = () => {
   const [selectedTag, setSelectedTag] = useState(null);
-  const setViewing = useMyStateV2()?.setViewing;
-  const setIntegrationSidebar = useMyStateV2()?.setIntegrationSidebar;
+  const context = useMyStateV2();
+  const setViewing = context?.setViewing;
+  const setIntegrationSidebar = context?.setIntegrationSidebar;
+  const setConnectedData = context?.setConnectedData;
+  const setConnectedCols = context?.setConnectedCols;
 
   const clickHandler = (clickHandlerId) => {
     if (API_INTEGRATIONS.includes(clickHandlerId)) {
+      setConnectedData?.([]);
+      setConnectedCols?.([]);
       setViewing?.("dataStart");
       setIntegrationSidebar?.(clickHandlerId);
     }

@@ -8,16 +8,23 @@ import Twitter from "@/components/integrationsView/integrationPlayground/integra
 import WallStreetBets from "@/components/integrationsView/integrationPlayground/integrations/wallStreetBets";
 import GeckoDex from "@/components/integrationsView/integrationPlayground/integrations/geckoDex";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { X } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
-const INTEGRATION_LABELS = {
-  polymarket: "Polymarket",
-  coinGecko: "CoinGecko",
-  twitter: "Twitter",
-  wallStreetBets: "Wall Street Bets",
-  geckoDex: "GeckoTerminal",
-};
+const INTEGRATION_OPTIONS = [
+  { value: "polymarket", label: "Polymarket" },
+  { value: "coinGecko", label: "CoinGecko" },
+  { value: "twitter", label: "Twitter" },
+  { value: "wallStreetBets", label: "Wall Street Bets" },
+  { value: "geckoDex", label: "GeckoTerminal" },
+];
 
 export default function DataSheetWithIntegration({ user, startNew, setStartNew }) {
   const contextStateV2 = useMyStateV2();
@@ -26,8 +33,6 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew }
   const setConnectedData = contextStateV2?.setConnectedData;
 
   if (!integrationSidebar) return null;
-
-  const label = INTEGRATION_LABELS[integrationSidebar] || integrationSidebar;
 
   const renderIntegration = () => {
     switch (integrationSidebar) {
@@ -47,33 +52,47 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew }
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full">
-      {/* Center: datasheet (playground main content) */}
-      <main className="flex-1 min-w-0 overflow-auto py-16">
+    <div className="flex h-full min-h-0 w-full pt-4">
+      {/* Center: datasheet — flex-1, scrolls internally */}
+      <main className="flex-1 min-w-0 overflow-auto py-4 px-2 sm:py-6 sm:px-4">
         <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
       </main>
 
-      {/* Right: API pull panel (shadcn playground style) */}
-      <aside className="w-[20rem] shrink-0 border-l border-border bg-muted/30 flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="text-sm font-medium">Actions</span>
+      {/* Right: API panel — fixed width, responsive, scrolls internally */}
+      <aside className="w-[14rem] shrink-0 border-l border-border bg-muted/30 flex flex-col min-h-0 sm:w-[16rem] md:w-[18rem]">
+        <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-border">
+          <span className="text-xs font-medium text-muted-foreground hidden sm:inline">
+            Actions
+          </span>
+          <Select
+            value={integrationSidebar}
+            onValueChange={(value) => setIntegrationSidebar(value)}
+          >
+            <SelectTrigger className="h-8 flex-1 min-w-0 text-xs">
+              <SelectValue placeholder="API" />
+            </SelectTrigger>
+            <SelectContent>
+              {INTEGRATION_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-8 w-8 shrink-0"
             onClick={() => setIntegrationSidebar(null)}
             aria-label="Close panel"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="px-4 py-2">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        </div>
-        <Separator />
-        <div className="flex-1 overflow-auto px-4 py-4">
-          <fieldset className="rounded-lg border border-border px-3 py-3">
-            <legend className="-ml-1 px-1 text-xs font-medium text-muted-foreground">
+        <Separator className="shrink-0" />
+        <div className="flex-1 min-h-0 overflow-auto px-3 py-3">
+          <fieldset className="rounded-lg border border-border px-2 py-2 sm:px-3 sm:py-3">
+            <legend className="px-1 text-[10px] sm:text-xs font-medium text-muted-foreground">
               API pull
             </legend>
             {renderIntegration()}

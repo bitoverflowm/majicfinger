@@ -225,12 +225,16 @@ const DashBody = ({user}) => {
         <SidebarProvider>
             <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
             <SidebarInset>
-                <header className="border-b border-border shrink-0">
+                <header className="sticky top-0 z-30 w-full shrink-0 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none">
                     <Nav />
                 </header>
-                <div className="flex flex-1 flex-col">
+                <div className="relative z-0 flex min-h-0 flex-1 flex-col">
                 { viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
-                { viewing === 'dataStart' && (integrationSidebar ? <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} /> : <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
+                { viewing === 'dataStart' && (integrationSidebar ? (
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-8">
+                    <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} />
+                  </div>
+                ) : <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'charts' && <div className="py-16"><ChartView user={user}/></div> }
