@@ -8,10 +8,12 @@ import { ExternalLink } from "lucide-react";
 
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge";
 
-import IntegrationPlayground from "./integrationPlayground";
+import { useMyStateV2 } from "@/context/stateContextV2";
 
+/** Integrations that open the datasheet with a right-side API pull panel */
+const API_INTEGRATIONS = ["polymarket", "coinGecko", "twitter", "wallStreetBets", "geckoDex"];
 
 const integrations_list = [
   {
@@ -116,13 +118,16 @@ const integrations_list = [
 const tags_categories = [...new Set(integrations_list.flatMap(integration => integration.tags))];
 
 const IntegrationsView = () => {
-
-  const [playView, setPlayView] = useState()
   const [selectedTag, setSelectedTag] = useState(null);
+  const setViewing = useMyStateV2()?.setViewing;
+  const setIntegrationSidebar = useMyStateV2()?.setIntegrationSidebar;
 
-  const clickHandler = (val) =>{
-    setPlayView(val)
-  }
+  const clickHandler = (clickHandlerId) => {
+    if (API_INTEGRATIONS.includes(clickHandlerId)) {
+      setViewing?.("dataStart");
+      setIntegrationSidebar?.(clickHandlerId);
+    }
+  };
 
   const handleTagClick = (tag) => {
     setSelectedTag(tag);
@@ -130,13 +135,7 @@ const IntegrationsView = () => {
 
   return (
     <div className="">
-      {
-        playView ?
-          <div>
-              <IntegrationPlayground setPlayView={setPlayView} playView={playView}/>
-          </div>
-          :
-          <div className="p-10 md:p-12 lg:p-16 xl:p-32">
+      <div className="p-10 md:p-12 lg:p-16 xl:p-32">
             <div className="mx-auto grid w-full lg:w-5/6 md:grid-cols-2 pb-16 gap-10 lg:gap-6 place-items-center place-content-center">
               <div className="max-w-xl"> 
                 <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
@@ -175,7 +174,7 @@ const IntegrationsView = () => {
                   </CardContent>
                   <CardFooter className="flex place-content-end">
                     {
-                      integration.tags.includes('coming soon') ? <Button disabled onClick={() => clickHandler(integration.clickHandler)}>Coming Soon</Button> :<Button onClick={() => clickHandler(integration.clickHandler)}>Connect</Button>
+                      integration.tags.includes('coming soon') ? <Button disabled>Coming Soon</Button> : <Button onClick={() => clickHandler(integration.clickHandler)}>Connect</Button>
                     }
                   </CardFooter>
                 </Card>
@@ -184,9 +183,8 @@ const IntegrationsView = () => {
             <div className="mx-auto text-center py-20 w-1/2">
               <div className="text-4xl font-black px-4"></div>
               <div className="text-4xl font-black px-4">On a mission to connect 100,000+ data sources by the end of 2024</div>
-            </div>            
-          </div>
-      }
+            </div>
+      </div>
     </div>
   );
 }

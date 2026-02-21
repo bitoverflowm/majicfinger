@@ -8,6 +8,7 @@ import Nav from './components/nav'
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import KatsuView from './components/katsuView';
 import DataView from "@/components/dataView";
+import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
 import Upload from '@/components/dataView/upload'
 import ChartView from "@/components/chartView";
 import { ChartGallery } from "@/components/chartGallery";
@@ -34,6 +35,7 @@ const DashBody = ({user}) => {
     const contextStateV2 = useMyStateV2()
 
     const viewing = contextStateV2?.viewing
+    const integrationSidebar = contextStateV2?.integrationSidebar
     //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
     const setSavedCharts = contextStateV2?.setSavedCharts
@@ -228,7 +230,7 @@ const DashBody = ({user}) => {
                 </header>
                 <div className="flex flex-1 flex-col">
                 { viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
-                { viewing === 'dataStart' && <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div> }
+                { viewing === 'dataStart' && (integrationSidebar ? <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} /> : <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'charts' && <div className="py-16"><ChartView user={user}/></div> }
