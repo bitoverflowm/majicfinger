@@ -11,8 +11,6 @@ import { StateProvider } from '@/context/stateContext'
 import { StateProviderV2 } from '@/context/stateContextV2';
 
 import DashBody from './dashBody';
-import Nav from "./components/nav";
-
 
 import { Toaster } from "@/components/ui/sonner"
 
@@ -57,10 +55,7 @@ const Dashbaord = () => {
             <StateProvider>
                 <StateProviderV2>
                     <Toaster />
-                    <header>
-                        <Nav/>
-                    </header>
-                    <main >
+                    <main>
                         <DashBody user={user}/>
                     </main>
                 </StateProviderV2>

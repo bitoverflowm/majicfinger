@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useMyStateV2  } from '@/context/stateContextV2'
 
 import SideNav from './components/sideNav'
+import Nav from './components/nav'
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import KatsuView from './components/katsuView';
 import DataView from "@/components/dataView";
 import Upload from '@/components/dataView/upload'
@@ -218,11 +220,13 @@ const DashBody = ({user}) => {
 
 
     return(
-        <div className="flex">
-            <div className="z-20 inset-y-0 flex-col border-r bg-background sm:flex">
-                <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
-            </div>
-            <div className='w-full'>
+        <SidebarProvider>
+            <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
+            <SidebarInset>
+                <header className="border-b border-border shrink-0">
+                    <Nav />
+                </header>
+                <div className="flex flex-1 flex-col">
                 { viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
                 { viewing === 'dataStart' && <div className="py-16"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div> }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
@@ -268,8 +272,9 @@ const DashBody = ({user}) => {
                     <div>For now I have enabled managed billing using Stripe click here: </div>
                     <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
                 </div>}
-            </div>
-        </div>
+                </div>
+            </SidebarInset>
+        </SidebarProvider>
     )
 
 }
