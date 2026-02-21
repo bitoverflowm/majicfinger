@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { motion, useInView } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 
-import BrowserFrame from "react-browser-frame";
 import { Progress } from "@/components/ui/progress";
 import { BentoBase } from "@/components/bentoView/bentoBase";
 
@@ -130,13 +129,13 @@ export function Hero({data, progress, setStarted, background_color, width }) {
                         ? <div className='flex justify-items-center'>
                               {data ? <BentoBase data={data} demo={true} mobile={true}/> : <Progress value={progress} className="w-[60%]" />}
                           </div>                  
-                        : <BrowserFrame url="http://www.yourname.lych3e.com" className="hidden">
+                        : <div className="hidden">
                               <div className='flex justify-items-center'>
                                 <div className="overflow-hidden w-5/6 mx-auto px-5 overflow-hidden py-6 place-items-center place-content-center">                          
                                     {data ? <BentoBase data={data} demo={true}/> : <Progress value={progress} className="w-[60%]" />}
                                 </div>
                             </div>                       
-                          </BrowserFrame>
+                          </div>
                    }
                 </BrowserView>
                 <MobileView>

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { bgPalette } from '@/components/chartView/panels/bgPalette';
-import BrowserFrame from 'react-browser-frame'
 
 import { masterPalette } from '@/components/chartView/panels/masterPalette';
 import { Area, AreaChart, Bar, BarChart, Line, LineChart, Pie, PieChart, LabelList, Label, CartesianGrid, Cell, XAxis, YAxis, Radar, RadarChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis } from "recharts"
@@ -289,7 +288,7 @@ const Interactive = ({demo}) => {
     };
     
     return(
-        <BrowserFrame  url="/your_name/yout_title">
+        <>
             <div className={`gradualEffect xl:flex ${dark ? 'bg-black text-white': 'bg-slate-100 text-black' } p-10`}>
                 <div className={`gradualEffect lg:py-10 lg:px-10`}>                    
                         <div className='gradualEffect py-12 px-12 rounded-xl' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "#0064E6"}}>
@@ -931,7 +930,7 @@ const Interactive = ({demo}) => {
                         </>
                 </div>  
             </div>
-        </BrowserFrame>
+        </>
     )
 }
 
