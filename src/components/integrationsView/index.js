@@ -15,6 +15,14 @@ import IntegrationPlayground from "./integrationPlayground";
 
 const integrations_list = [
   {
+    color: "#2E5CFF",
+    icon: <div className="p-1 rounded-full shadow-2xl"><Image src={'/polymarket.png'} height={60} width={60} /></div>,
+    clickHandler: "polymarket",
+    name: "Polymarket",
+    description: "All the data you could want on the world’s largest prediction market.",
+    tags: ['featured', 'crypto', 'finance', 'trading', 'prediction']
+  },
+  {
     color: "#E7F0DC",
     icon: <div className="p-1 rounded-full shadow-2xl"><Image src={'/coinGecko.png'} height={60} width={60} /></div>,
     clickHandler: "coinGecko",

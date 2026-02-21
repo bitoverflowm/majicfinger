@@ -68,25 +68,15 @@ const DataView = ({user}) => {
                         <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('upload')}>
                             <div className='py-4'><HardDriveUpload /></div>
                             <h3 className="pb-1 font-medium leading-none">Upload</h3>
-                            <p className="text-xs text-muted-foreground">Upload your own .csv, excel</p>
-                            <p className="pt-1 text-xs text-muted-foreground">.json, and more coming soon</p>
+                            <p className="text-xs text-muted-foreground">Upload your own .csv or excel</p>
+                            <p className="pt-2 text-xs text-muted-foreground">json, pdf, more coming soon</p>
                         </div>
                         <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('integrations')}>
                             <div className='py-4'><Cable /></div>
                             <h3 className="pb-1 font-medium leading-none">Integrate</h3>
                             <p className="text-xs text-muted-foreground">Connect directly to your favorite data sources</p>
-                            <p className="pt-1 text-xs text-muted-foreground">Kaggle, Twitter, Youtube, Instagram, Strava, etc</p>
-                        </div>
-                        <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('scrape')}>
-                            <div className='py-4'><Shovel /></div>
-                            <h3 className="pb-1 font-medium leading-none">Scrape</h3>
-                            <p className="text-xs text-muted-foreground">First: Make sure there is no Integration available for the website you want to scrape. <br/><br/> Then assuming an APi is not available, scrape any website at all. Just give the URL</p>
-                        </div>
-                        <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('generate')}>
-                            <div className='py-4'><HardDriveUpload /></div>
-                            <h3 className="pb-1 font-medium leading-none">Generate</h3>
-                            <p className="text-xs text-muted-foreground">Generate insanely realistic fake data to your specifications for your needs.</p>
-                        </div>                        
+                            <p className="pt-1 text-xs text-muted-foreground">Polymarket, Kaggle, Twitter, Youtube, Instagram, Strava, etc</p>
+                        </div>                       
                         <div className="p-10 text-sm object-cover transition-all hover:scale-105 cursor-pointer" onClick={()=>setViewing('newSheet')}>
                             <div className='py-4'><FilePlus2 /></div>
                             <h3 className="pb-1 font-medium leading-none">New Sheet</h3>
