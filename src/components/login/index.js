@@ -31,21 +31,37 @@ const Login = ({fromHome}) => {
         const timer = setInterval(() => {
             setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
         }, 3000);
-        const magic = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY)
-        const didToken = await magic.auth.loginWithMagicLink({ email: email })
 
         const body = {
             email: email,
             name: name,
         }
-        let res = await fetch('/api/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: 'Bearer ' + didToken,
-            },
-            body: JSON.stringify( body ),
-        })
+
+        // Dev-only: bypass Magic link for testing with specific email
+        const isDevBypass = process.env.NODE_ENV === 'development' && email === 'rikesh@bitoverflow.org'
+        if (isDevBypass) {
+            body.devBypass = true
+        }
+
+        let res
+        if (isDevBypass) {
+            res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            })
+        } else {
+            const magic = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY)
+            const didToken = await magic.auth.loginWithMagicLink({ email: email })
+            res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + didToken,
+                },
+                body: JSON.stringify(body),
+            })
+        }
         if(res.status === 200){
             mutateUser()
             setLoading(false)

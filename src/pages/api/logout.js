@@ -7,7 +7,10 @@ export default async function logout(req, res) {
     const session = await getLoginSession(req)
 
     if (session && session.issuer) {
-      await magic.users.logoutByIssuer(session.issuer);
+      // Dev bypass sessions don't have a Magic issuer to log out
+      if (!session.issuer.startsWith('dev-bypass-')) {
+        await magic.users.logoutByIssuer(session.issuer);
+      }
       removeTokenCookie(res);
       res.writeHead(302, { Location: '/' });
       res.end();
