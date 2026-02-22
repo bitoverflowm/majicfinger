@@ -32,13 +32,11 @@ const Polymarket = ({ setConnectedData }) => {
 
   return (
     <div className="text-[12px] space-y-3">
-      <p className="text-muted-foreground">
-        Pull prediction market events (and their markets) from the Polymarket Gamma API.
-      </p>
       <Button
         onClick={fetchEvents}
         disabled={loading}
-        className="bg-lychee_red hover:bg-lychee_red/90"
+        className="bg-primary hover:bg-secondary "
+        size="xs"
       >
         {loading ? (
           <>
