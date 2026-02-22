@@ -59,8 +59,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew }
           <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
         </main>
 
-        {/* Right: API panel — always visible, fixed width */}
-        <aside className="flex w-[12rem] min-w-[12rem] shrink-0 flex-col gap-4 sm:w-[200px] sm:min-w-[200px] sm:gap-6">
+        {/* Right: API playground — ~50% wider than before (was 200px) */}
+        <aside className="flex w-[18rem] min-w-[18rem] shrink-0 flex-col gap-4 sm:w-[300px] sm:min-w-[300px] sm:gap-6">
           <div className="grid gap-3">
             <div className="flex items-center justify-between gap-2">
               <Label className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70">

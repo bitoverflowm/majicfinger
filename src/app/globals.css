@@ -152,7 +152,7 @@ body {
     font-weight: 300;
     font-style: normal;
   }
-  
+
   @font-face {
     font-family: 'SpaceGrotesk-Medium';
     src: url('/fonts/SpaceGrotesk-Medium.ttf') format('truetype');
@@ -161,3 +161,8 @@ body {
   }
 
   @import url('https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&family=Inter:wght@400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Roboto:wght@400;700&family=Oswald:wght@400;700&family=Space+Grotesk:wght@300;500&display=swap');
+
+  ::view-transition-old(root), ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}

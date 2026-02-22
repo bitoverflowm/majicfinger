@@ -223,7 +223,7 @@ const DashBody = ({user}) => {
 
 
     return(
-        <SidebarProvider>
+        <SidebarProvider defaultOpen={false}>
             <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
             <SidebarInset>
                 <header className="sticky top-0 z-30 w-full shrink-0 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none">

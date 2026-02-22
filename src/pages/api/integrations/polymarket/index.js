@@ -1,92 +1,201 @@
-const POLYMARKET_GAMMA_BASE = "https://gamma-api.polymarket.com";
+const GAMMA_BASE = "https://gamma-api.polymarket.com";
+const DATA_API_BASE = "https://data-api.polymarket.com";
 
-/** Allowed query params for GET /events per Polymarket API */
 const EVENTS_PARAMS = [
-  "limit",
-  "offset",
-  "order",
-  "ascending",
-  "tag_id",
-  "tag_slug",
-  "related_tags",
-  "active",
-  "archived",
-  "featured",
-  "cyom",
-  "include_chat",
-  "include_template",
-  "recurrence",
-  "closed",
-  "liquidity_min",
-  "liquidity_max",
-  "volume_min",
-  "volume_max",
-  "start_date_min",
-  "start_date_max",
-  "end_date_min",
-  "end_date_max",
+  "limit", "offset", "order", "ascending", "tag_id", "tag_slug", "related_tags",
+  "active", "archived", "featured", "cyom", "include_chat", "include_template",
+  "recurrence", "closed", "liquidity_min", "liquidity_max", "volume_min", "volume_max",
+  "start_date_min", "start_date_max", "end_date_min", "end_date_max",
 ];
+
+const MARKETS_PARAMS = [
+  "limit", "offset", "order", "ascending", "slug", "clob_token_ids", "condition_ids",
+  "market_maker_address", "liquidity_num_min", "liquidity_num_max", "volume_num_min", "volume_num_max",
+  "start_date_min", "start_date_max", "end_date_min", "end_date_max",
+  "tag_id", "related_tags", "cyom", "uma_resolution_status", "game_id", "sports_market_types",
+  "rewards_min_size", "question_ids", "include_tag", "closed",
+];
+
+/** Flatten nested objects for ag-grid; stringify arrays of objects */
+function flattenForSheet(obj, prefix = "") {
+  if (obj === null || obj === undefined) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}_${k}` : k;
+    if (Array.isArray(v)) {
+      if (v.length === 0) out[key] = "";
+      else if (typeof v[0] === "object" && v[0] !== null && !(v[0] instanceof Date)) {
+        out[key] = JSON.stringify(v);
+      } else {
+        out[key] = v.join(", ");
+      }
+    } else if (v !== null && typeof v === "object" && !(v instanceof Date) && typeof v !== "function") {
+      Object.assign(out, flattenForSheet(v, key));
+    } else {
+      out[key] = v === null || v === undefined ? "" : v;
+    }
+  }
+  return out;
+}
+
+/** Sort rows by first available date column (chronological for charting) */
+function sortByDate(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+  const sample = rows[0];
+  const dateKey = Object.keys(sample).find((k) => {
+    const v = sample[k];
+    if (typeof v !== "string") return false;
+    return /^\d{4}-\d{2}-\d{2}/.test(v) || /^\d+$/.test(v);
+  });
+  if (!dateKey) return rows;
+  return [...rows].sort((a, b) => {
+    const va = a[dateKey];
+    const vb = b[dateKey];
+    if (va == null || va === "") return 1;
+    if (vb == null || vb === "") return -1;
+    const ta = /^\d+$/.test(va) ? parseInt(va, 10) : new Date(va).getTime();
+    const tb = /^\d+$/.test(vb) ? parseInt(vb, 10) : new Date(vb).getTime();
+    return ta - tb;
+  });
+}
+
+function normalizeResponse(data, fieldsFilter) {
+  const arr = Array.isArray(data) ? data : data != null ? [data] : [];
+  let flattened = arr.map((item) => flattenForSheet(item));
+  if (fieldsFilter && fieldsFilter.length > 0) {
+    const set = new Set(fieldsFilter.map((f) => f.trim()).filter(Boolean));
+    if (set.size > 0) {
+      flattened = flattened.map((row) => {
+        const out = {};
+        for (const k of Object.keys(row)) {
+          if (set.has(k)) out[k] = row[k];
+        }
+        return out;
+      });
+    }
+  }
+  return sortByDate(flattened);
+}
+
+function buildSearchParams(allowed, query) {
+  const p = new URLSearchParams();
+  allowed.forEach((param) => {
+    const v = query[param];
+    if (v !== undefined && v !== "") p.set(param, String(v));
+  });
+  return p;
+}
+
+async function fetchJson(url, opts = {}) {
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(20000),
+    ...opts,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+  return res.json();
+}
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ message: "Method not allowed" });
   }
-
   const { query } = req.query;
-
-  if (!query) {
-    return res.status(400).json({ message: "Missing query parameter (e.g. query=listEvents)" });
-  }
-
-  switch (query) {
-    case "listEvents":
-      return listEvents(req, res);
-    default:
-      return res.status(400).json({ message: "Invalid query. Supported: listEvents" });
-  }
-}
-
-async function listEvents(req, res) {
-  const searchParams = new URLSearchParams();
-
-  EVENTS_PARAMS.forEach((param) => {
-    const value = req.query[param];
-    if (value !== undefined && value !== "") {
-      searchParams.set(param, value);
-    }
-  });
-
-  const url = `${POLYMARKET_GAMMA_BASE}/events?${searchParams.toString()}`;
+  if (!query) return res.status(400).json({ message: "Missing query parameter" });
 
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      return res.status(response.status).json({
-        message: "Polymarket events fetch failed",
-        status: response.status,
-        detail: text || response.statusText,
-      });
+    let data;
+    switch (query) {
+      case "listEvents": {
+        const sp = buildSearchParams(EVENTS_PARAMS, req.query);
+        data = await fetchJson(`${GAMMA_BASE}/events?${sp}`);
+        break;
+      }
+      case "getEvent": {
+        const id = req.query.id;
+        if (!id) return res.status(400).json({ message: "Missing required parameter: id" });
+        const eventParams = new URLSearchParams();
+        const incChat = req.query.include_chat;
+        const incTpl = req.query.include_template;
+        if (incChat === "true" || incChat === "false") eventParams.set("include_chat", incChat);
+        if (incTpl === "true" || incTpl === "false") eventParams.set("include_template", incTpl);
+        const eventQs = eventParams.toString();
+        data = await fetchJson(`${GAMMA_BASE}/events/${encodeURIComponent(id)}${eventQs ? `?${eventQs}` : ""}`);
+        break;
+      }
+      case "getEventBySlug": {
+        const slug = req.query.slug;
+        if (!slug) return res.status(400).json({ message: "Missing required parameter: slug" });
+        data = await fetchJson(`${GAMMA_BASE}/events/slug/${encodeURIComponent(slug)}`);
+        break;
+      }
+      case "getEventTags": {
+        const id = req.query.id;
+        if (!id) return res.status(400).json({ message: "Missing required parameter: id" });
+        data = await fetchJson(`${GAMMA_BASE}/events/${encodeURIComponent(id)}/tags`);
+        break;
+      }
+      case "listMarkets": {
+        const sp = buildSearchParams(MARKETS_PARAMS, req.query);
+        data = await fetchJson(`${GAMMA_BASE}/markets?${sp}`);
+        break;
+      }
+      case "getMarket": {
+        const id = req.query.id;
+        if (!id) return res.status(400).json({ message: "Missing required parameter: id" });
+        data = await fetchJson(`${GAMMA_BASE}/markets/${encodeURIComponent(id)}`);
+        break;
+      }
+      case "getMarketBySlug": {
+        const slug = req.query.slug;
+        if (!slug) return res.status(400).json({ message: "Missing required parameter: slug" });
+        data = await fetchJson(`${GAMMA_BASE}/markets/slug/${encodeURIComponent(slug)}`);
+        break;
+      }
+      case "getMarketTags": {
+        const id = req.query.id;
+        if (!id) return res.status(400).json({ message: "Missing required parameter: id" });
+        data = await fetchJson(`${GAMMA_BASE}/markets/${encodeURIComponent(id)}/tags`);
+        break;
+      }
+      case "getTopHolders": {
+        const market = req.query.market; // comma-separated condition IDs
+        if (!market) return res.status(400).json({ message: "Missing required parameter: market (condition IDs from list markets)" });
+        const limit = req.query.limit || "20";
+        const minBalance = req.query.minBalance || "1";
+        data = await fetchJson(`${DATA_API_BASE}/holders?market=${encodeURIComponent(market)}&limit=${limit}&minBalance=${minBalance}`);
+        break;
+      }
+      case "getOpenInterest": {
+        const market = req.query.market || "";
+        data = await fetchJson(`${DATA_API_BASE}/oi${market ? `?market=${encodeURIComponent(market)}` : ""}`);
+        break;
+      }
+      case "getLiveVolume": {
+        const id = req.query.id;
+        if (!id) return res.status(400).json({ message: "Missing required parameter: id (event id from list events)" });
+        data = await fetchJson(`${DATA_API_BASE}/live-volume?id=${encodeURIComponent(id)}`);
+        break;
+      }
+      default:
+        return res.status(400).json({ message: "Invalid query" });
     }
 
-    const data = await response.json();
-    return res.status(200).json(Array.isArray(data) ? data : [data]);
-  } catch (error) {
-    if (error.name === "AbortError") {
-      return res.status(504).json({ message: "Polymarket API request timed out" });
-    }
-    console.error("[polymarket] listEvents error:", error.message);
+    const fieldsParam = req.query.fields;
+    const fieldsFilter = fieldsParam
+      ? String(fieldsParam).split(",").map((f) => f.trim()).filter(Boolean)
+      : null;
+    const normalized = normalizeResponse(data, fieldsFilter);
+    return res.status(200).json(normalized);
+  } catch (err) {
+    console.error("[polymarket]", query, err.message);
     return res.status(500).json({
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: err.message || "Request failed",
     });
   }
 }

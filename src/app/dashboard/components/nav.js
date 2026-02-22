@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 
 
 const Nav = () => {
@@ -560,11 +561,13 @@ const Nav = () => {
                       <DropdownMenuItem onClick={()=>handleLogout()}>Logout</DropdownMenuItem>
                   </DropdownMenuContent>
               </DropdownMenu>
+                <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
               </div>
             ) : (
               <div className="ml-auto flex items-center gap-2">
                 {connectedData && <span className="text-xs text-muted-foreground hidden sm:inline">Register to save your work</span>}
                 <Button variant="default" size="sm" onClick={()=>setViewing('register')}>Member Log In</Button>
+                <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
               </div>
             )}
     </div>
