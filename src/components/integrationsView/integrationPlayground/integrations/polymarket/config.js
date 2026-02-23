@@ -5,8 +5,6 @@
 export const POLYMARKET_GROUPS = {
   events: "Events",
   markets: "Markets",
-  core: "Core",
-  misc: "Misc",
 };
 
 export const ENDPOINTS = [
@@ -90,24 +88,22 @@ export const ENDPOINTS = [
       { key: "id", label: "Market ID", required: true, type: "text", listQuery: "listMarkets", listLabelKey: "question", listValueKey: "id" },
     ],
   },
-  // Core (Data API)
   {
     query: "getTopHolders",
     name: "Get top holders for markets",
     description: "Top holders per market. Requires condition IDs from List markets (conditionId).",
-    group: "core",
+    group: "markets",
     params: [
       { key: "market", label: "Condition ID(s)", required: true, type: "text", hint: "Comma-separated condition IDs from List markets" },
       { key: "limit", label: "Limit per token", required: false, type: "number", default: 20 },
       { key: "minBalance", label: "Min balance", required: false, type: "number", default: 1 },
     ],
   },
-  // Misc (Data API)
   {
     query: "getOpenInterest",
     name: "Get open interest",
     description: "Open interest; optional market condition IDs.",
-    group: "misc",
+    group: "markets",
     params: [
       { key: "market", label: "Condition ID(s)", required: false, type: "text", hint: "Comma-separated; omit for all" },
     ],
@@ -116,7 +112,7 @@ export const ENDPOINTS = [
     query: "getLiveVolume",
     name: "Get live volume for an event",
     description: "Live volume for an event. Requires event ID (from List events).",
-    group: "misc",
+    group: "markets",
     params: [
       { key: "id", label: "Event ID", required: true, type: "text", listQuery: "listEvents", listLabelKey: "title", listValueKey: "id" },
     ],
