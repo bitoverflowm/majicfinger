@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { bgPalette } from '@/components/chartView/panels/bgPalette';
 
 import { masterPalette } from '@/components/chartView/panels/masterPalette';
-import { Area, AreaChart, Bar, BarChart, Line, LineChart, Pie, PieChart, LabelList, Label, CartesianGrid, Cell, XAxis, YAxis, Radar, RadarChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis } from "recharts"
+import { Area, AreaChart, Bar, BarChart, Line, LineChart, Pie, PieChart, LabelList, Label, CartesianGrid, Cell, XAxis, YAxis, ZAxis, Radar, RadarChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, ScatterChart, Scatter } from "recharts"
 import {
     Card,
     CardContent,
@@ -41,14 +41,21 @@ import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon, ShuffleIcon } f
 import { MinusCircle, Moon, Sun, Tag, TrendingUp } from 'react-feather';
 import { IoConstructOutline, IoPieChartOutline, IoShuffleOutline, IoStatsChart } from 'react-icons/io5';
 import { Toggle } from '../ui/toggle';
-import { CameraIcon, Expand, Lightbulb } from 'lucide-react';
+import { CameraIcon, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn } from 'lucide-react';
 import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin } from 'react-icons/pi';
 import { MdOutlineAreaChart, MdStackedBarChart } from 'react-icons/md';
 import { GoDotFill } from 'react-icons/go';
 import { AiOutlineRadarChart } from 'react-icons/ai';
+import { CircleDot } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { toPng, toJpeg, toBlob, toPixelData, toSvg } from 'html-to-image';
-import { Input } from "@/components/ui/input"
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 const dfltChartData = [
     { month: "January", desktop: 186, mobile: 80, other: 45 },
@@ -74,12 +81,52 @@ const dfltChartConfig = {
     },
 }
 
+/** Infer axis type from dataTypes or by sampling values. Returns 'number' | 'date' | 'string'. */
+function getAxisType(key, dataTypes, data) {
+  if (dataTypes && dataTypes[key]) {
+    const t = dataTypes[key];
+    if (t === 'number' || t === 'date') return t;
+    return 'string';
+  }
+  if (!data || !data.length) return 'string';
+  const v = data[0][key];
+  if (v instanceof Date) return 'date';
+  if (typeof v === 'number' && Number.isFinite(v)) return 'number';
+  if (typeof v === 'string' && /^\d{4}-\d{2}/.test(v)) return 'date';
+  const n = Number(v);
+  if (v != null && v !== '' && !Number.isNaN(n) && Number.isFinite(n)) return 'number';
+  return 'string';
+}
+
+/** Compare two values for sorting by axis type. Returns negative, zero, or positive. */
+function compareAxis(a, b, type) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (type === 'number') {
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isNaN(na)) return 1;
+    if (Number.isNaN(nb)) return -1;
+    return na - nb;
+  }
+  if (type === 'date') {
+    const ta = a instanceof Date ? a.getTime() : new Date(a).getTime();
+    const tb = b instanceof Date ? b.getTime() : new Date(b).getTime();
+    if (Number.isNaN(ta)) return 1;
+    if (Number.isNaN(tb)) return -1;
+    return ta - tb;
+  }
+  return String(a).localeCompare(String(b));
+}
+
 const ChartView = ({demo}) => {
     const contextStateV2 = useMyStateV2()
     const chartRef = useRef(null)
     let connectedCols = contextStateV2 && contextStateV2.connectedCols
     let connectedData = contextStateV2 && contextStateV2.connectedData
     let setViewing = contextStateV2 && contextStateV2?.setViewing
+    let dataTypes = contextStateV2 && contextStateV2.dataTypes
 
     //chart is usable once data requirements are satisfied 
     const [chartUsable, setChartUsable] = useState()
@@ -126,6 +173,17 @@ const ChartView = ({demo}) => {
 
     //data filtering and management
     const [filteredData, setFilteredData] = useState()
+    // Axis sort: 'asc' | 'desc' | null for X and Y
+    const [sortXDir, setSortXDir] = useState(null)
+    const [sortYDir, setSortYDir] = useState(null)
+    // Numeric axis scale: 'linear' | 'log'
+    const [scaleX, setScaleX] = useState('linear')
+    const [scaleY, setScaleY] = useState('linear')
+    const [scaleZ, setScaleZ] = useState('linear')
+    // Bubble (scatter) chart: Z = bubble size, color = fill
+    const [selZ, setSelZ] = useState(null)
+    const [selColorCol, setSelColorCol] = useState(null)
+    const BUBBLE_RADIUS_RANGE = [50, 400]
 
     const selectedPaletteHandler = (index) => {
         let newPalette = masterPalette[selectedCategory][index]
@@ -158,6 +216,104 @@ const ChartView = ({demo}) => {
     useEffect(() => {
         connectedData && setFilteredData(connectedData)
     }, [connectedData])
+
+    // Sorted data by X and/or Y axis (asc/desc by type: number, date, string)
+    const sortedData = useMemo(() => {
+        if (!filteredData || !filteredData.length) return filteredData;
+        const xKey = selX;
+        const yKey = Array.isArray(selY) && selY.length ? selY[0] : null;
+        const xType = getAxisType(xKey, dataTypes, filteredData);
+        const yType = yKey ? getAxisType(yKey, dataTypes, filteredData) : 'string';
+        let out = [...filteredData];
+        if (sortYDir && yKey) {
+            out.sort((a, b) => {
+                const c = compareAxis(a[yKey], b[yKey], yType);
+                return sortYDir === 'asc' ? c : -c;
+            });
+        }
+        if (sortXDir && xKey) {
+            out.sort((a, b) => {
+                const c = compareAxis(a[xKey], b[xKey], xType);
+                return sortXDir === 'asc' ? c : -c;
+            });
+        }
+        return out;
+    }, [filteredData, selX, selY, sortXDir, sortYDir, dataTypes])
+
+    // Chart-ready data: ensure numeric/date axes are proper types for Recharts (numbers; dates as timestamps or kept for category)
+    const chartData = useMemo(() => {
+        if (!sortedData || !sortedData.length) return sortedData;
+        const xKey = selX;
+        const yKeys = Array.isArray(selY) ? selY : [];
+        const xType = getAxisType(xKey, dataTypes, sortedData);
+        return sortedData.map((row) => {
+            const r = { ...row };
+            if (xKey && xType === 'number' && (typeof r[xKey] !== 'number' || Number.isNaN(r[xKey]))) {
+                const n = Number(r[xKey]);
+                r[xKey] = Number.isFinite(n) ? n : 0;
+            }
+            if (xKey && xType === 'date' && r[xKey] != null) {
+                const d = r[xKey] instanceof Date ? r[xKey] : new Date(r[xKey]);
+                r[xKey] = Number.isNaN(d.getTime()) ? r[xKey] : d.getTime();
+            }
+            yKeys.forEach((k) => {
+                const yType = getAxisType(k, dataTypes, sortedData);
+                if (yType === 'number' && (typeof r[k] !== 'number' || Number.isNaN(r[k]))) {
+                    const n = Number(r[k]);
+                    r[k] = Number.isFinite(n) ? n : 0;
+                }
+            });
+            return r;
+        });
+    }, [sortedData, selX, selY, dataTypes])
+
+    // Scatter/bubble chart: X, Y, Z (size), optional color column; nulls default to 0 for Z; optional log scale for Z
+    const scatterChartData = useMemo(() => {
+        if (!sortedData || !sortedData.length || !selX || !selY || !selY.length || !selZ) return [];
+        const xKey = selX;
+        const yKey = selY[0];
+        const zKey = selZ;
+        const xType = getAxisType(xKey, dataTypes, sortedData);
+        const yType = getAxisType(yKey, dataTypes, sortedData);
+        const out = [];
+        for (const row of sortedData) {
+            let xVal = row[xKey];
+            let yVal = row[yKey];
+            let zVal = row[zKey];
+            if (xVal != null && xType === 'date') {
+                const d = xVal instanceof Date ? xVal : new Date(xVal);
+                xVal = Number.isNaN(d.getTime()) ? 0 : d.getTime();
+            } else if (xVal != null && xType === 'number') {
+                const n = Number(xVal);
+                xVal = Number.isFinite(n) ? n : 0;
+            } else if (xVal == null || xVal === '') xVal = 0;
+            if (yVal != null && yType === 'date') {
+                const d = yVal instanceof Date ? yVal : new Date(yVal);
+                yVal = Number.isNaN(d.getTime()) ? 0 : d.getTime();
+            } else if (yVal != null && yType === 'number') {
+                const n = Number(yVal);
+                yVal = Number.isFinite(n) ? n : 0;
+            } else if (yVal == null || yVal === '') yVal = 0;
+            let zNum = 0;
+            if (zVal != null && zVal !== '') {
+                zNum = Number(zVal);
+                if (!Number.isFinite(zNum) || zNum < 0) zNum = 0;
+                if (scaleZ === 'log') zNum = Math.log10(zNum + 1);
+            }
+            out.push({ ...row, [xKey]: xVal, [yKey]: yVal, [zKey]: zNum });
+        }
+        return out;
+    }, [sortedData, selX, selY, selZ, dataTypes, scaleZ])
+
+    // Color map for scatter: unique values of selColorCol -> palette color
+    const scatterColorMap = useMemo(() => {
+        if (!selColorCol || !scatterChartData.length) return {};
+        const palette = selectedPalette && selectedPalette.length ? selectedPalette : ['hsl(142 88% 28%)', 'hsl(212 97% 87%)', 'hsl(347 77% 50%)'];
+        const uniq = [...new Set(scatterChartData.map((d) => String(d[selColorCol] ?? '')))];
+        const map = {};
+        uniq.forEach((v, i) => { map[v] = palette[i % palette.length]; });
+        return map;
+    }, [scatterChartData, selColorCol, selectedPalette])
 
     //demo state
     useEffect(()=>{
@@ -333,7 +489,7 @@ const ChartView = ({demo}) => {
                                     { selChartType === 'area' &&
                                         <AreaChart
                                             accessibilityLayer
-                                            data={filteredData ? filteredData : dfltChartData }
+                                            data={chartData && chartData.length ? chartData : dfltChartData }
                                             margin={{
                                                 left: 12,
                                                 right: 12,
@@ -345,19 +501,21 @@ const ChartView = ({demo}) => {
                                             <CartesianGrid vertical={false} />
                                             <XAxis
                                                 dataKey={selX ? selX : "month"}
+                                                type={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? 'number' : getAxisType(selX, dataTypes, chartData) === 'date' ? 'number' : 'category'}
+                                                scale={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? scaleX : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
-                                                //tick={{ fill: dark ? '#fff' : '#000' }}
+                                                tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => (v != null ? new Date(v).toLocaleDateString() : '') : undefined}
                                                 label={{ fill: dark ? '#fff' : '#000' }}
-                                                //tickFormatter={(value) => value.slice(0, 3)}
                                             />
                                             <YAxis
+                                                type={scaleY === 'log' || (selY && selY[0] && getAxisType(selY[0], dataTypes, chartData) === 'number') ? 'number' : 'category'}
+                                                scale={scaleY === 'log' ? 'log' : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
                                                 tickCount={3}
-                                                //tick={{ fill: dark ? 'white' : 'black' }}
                                                 tick={{ fill: dark ? '#fff' : '#000' }}
                                                 label={{ fill: dark ? '#fff' : '#000' }}
                                             />
@@ -389,7 +547,7 @@ const ChartView = ({demo}) => {
                                         selChartType === 'bar' && 
                                             <BarChart
                                                 accessibilityLayer
-                                                data={filteredData ? filteredData : dfltChartData }
+                                                data={chartData && chartData.length ? chartData : dfltChartData }
                                                 margin={{
                                                     left: 12,
                                                     right: 12,
@@ -407,37 +565,40 @@ const ChartView = ({demo}) => {
                                                         tickCount={3}
                                                         dataKey={selY[0]}
                                                         type="number"
+                                                        scale={scaleY === 'log' ? 'log' : undefined}
                                                         hide
                                                         tick={{ fill: dark ? 'white' : 'black' }}
-                                                    //tickFormatter={(value) => value.slice(0, 3)}
                                                     />
                                                     <YAxis
                                                         dataKey={selX ? selX : "month"}
-                                                        type="category"
+                                                        type={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? 'number' : 'category'}
+                                                        scale={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? scaleX : undefined}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         tickMargin={8}
                                                         tick={{ fill: dark ? 'white' : 'black' }}
-                                                        //type="number"
                                                     />
                                                     </>
                                                     :
                                                     <>
                                                     <XAxis
                                                         dataKey={selX ? selX : "month"}
+                                                        type={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? 'number' : getAxisType(selX, dataTypes, chartData) === 'date' ? 'number' : 'category'}
+                                                        scale={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? scaleX : undefined}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         tickMargin={8}
+                                                        tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => (v != null ? new Date(v).toLocaleDateString() : '') : undefined}
                                                         tick={{ fill: dark ? 'white' : 'black' }}
-                                                        //tickFormatter={(value) => value.slice(0, 3)}
                                                     />
                                                     <YAxis
+                                                        type={scaleY === 'log' || (selY && selY[0] && getAxisType(selY[0], dataTypes, chartData) === 'number') ? 'number' : 'category'}
+                                                        scale={scaleY === 'log' ? 'log' : undefined}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         tickMargin={8}
                                                         tickCount={3}
                                                         tick={{ fill: dark ? 'white' : 'black' }}
-                                                        //type="number"
                                                     /></>
                                             }
                                             <ChartTooltip
@@ -454,7 +615,7 @@ const ChartView = ({demo}) => {
                                                     radius={4}
                                                     stackId={stackedBar ? 'a': index}
                                                 >
-                                                    {filteredData.map((item, idx) => (
+                                                    {(chartData || []).map((item, idx) => (
                                                         <Cell
                                                         key={`cell-${idx}`}
                                                         fill={
@@ -480,7 +641,7 @@ const ChartView = ({demo}) => {
                                         selChartType === 'line' && 
                                         <LineChart
                                             accessibilityLayer
-                                            data={filteredData ? filteredData : dfltChartData }
+                                            data={chartData && chartData.length ? chartData : dfltChartData }
                                             margin={{
                                                 left: 12,
                                                 right: 12,
@@ -492,13 +653,17 @@ const ChartView = ({demo}) => {
                                             <CartesianGrid vertical={false} />
                                             <XAxis
                                                 dataKey={selX ? selX : "month"}
+                                                type={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? 'number' : getAxisType(selX, dataTypes, chartData) === 'date' ? 'number' : 'category'}
+                                                scale={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? scaleX : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
+                                                tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => (v != null ? new Date(v).toLocaleDateString() : '') : undefined}
                                                 tick={{ fill: dark ? 'white' : 'black' }}
-                                                //tickFormatter={(value) => value.slice(0, 3)}
                                             />
                                             <YAxis
+                                                type={scaleY === 'log' || (selY && selY[0] && getAxisType(selY[0], dataTypes, chartData) === 'number') ? 'number' : 'category'}
+                                                scale={scaleY === 'log' ? 'log' : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
@@ -554,7 +719,7 @@ const ChartView = ({demo}) => {
                                             content={<ChartTooltipContent indicator="line" />}
                                         />
                                         <Pie
-                                            data={filteredData ? filteredData : dfltChartData }
+                                            data={chartData && chartData.length ? chartData : dfltChartData }
                                             dataKey={selY ? selY[0] : "visitor"}
                                             nameKey={selX}
                                             innerRadius={donut && 120}
@@ -588,7 +753,7 @@ const ChartView = ({demo}) => {
                                                                         y={viewBox.cy}
                                                                         className="fill-foreground text-3xl font-bold"
                                                                     >
-                                                                        {filteredData.reduce((acc, item) => acc + item[selY[0]], 0)}
+                                                                        {(chartData || []).reduce((acc, item) => acc + (item[selY[0]] ?? 0), 0)}
                                                                     </tspan>
                                                                     <tspan
                                                                         x={viewBox.cx}
@@ -610,7 +775,7 @@ const ChartView = ({demo}) => {
                                     {
                                         selChartType === 'radar' &&
                                         <RadarChart
-                                            data={filteredData ? filteredData : dfltChartData}
+                                            data={chartData && chartData.length ? chartData : dfltChartData}
                                         >
                                             <ChartTooltip
                                                 cursor={false}
@@ -639,6 +804,83 @@ const ChartView = ({demo}) => {
                                             />}
                                             {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
                                         </RadarChart>
+                                    }
+                                    {
+                                        selChartType === 'scatter' && (
+                                        scatterChartData.length > 0 && selX && selY && selY[0] && selZ ? (
+                                        <ScatterChart
+                                            margin={{ left: 12, right: 12, top: 12, bottom: 12 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis
+                                                dataKey={selX}
+                                                type="number"
+                                                scale={getAxisType(selX, dataTypes, scatterChartData) === 'number' ? scaleX : undefined}
+                                                name={selX}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickFormatter={getAxisType(selX, dataTypes, scatterChartData) === 'date' ? (v) => (v != null ? new Date(v).toLocaleDateString() : '') : undefined}
+                                                tick={{ fill: dark ? '#fff' : '#000' }}
+                                            />
+                                            <YAxis
+                                                type="number"
+                                                dataKey={selY[0]}
+                                                name={selY[0]}
+                                                scale={scaleY === 'log' ? 'log' : undefined}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tick={{ fill: dark ? '#fff' : '#000' }}
+                                            />
+                                            <ZAxis
+                                                type="number"
+                                                dataKey={selZ}
+                                                range={BUBBLE_RADIUS_RANGE}
+                                                name={selZ}
+                                            />
+                                            <ChartTooltip
+                                                cursor={{ strokeDasharray: '3 3' }}
+                                                content={({ active, payload }) => {
+                                                    if (!active || !payload?.length) return null;
+                                                    const p = payload[0].payload;
+                                                    const keys = [selX, selY[0], selZ].filter(Boolean).concat(selColorCol ? [selColorCol] : []);
+                                                    return (
+                                                        <div className="grid min-w-[8rem] gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                            {keys.map((key) => (
+                                                                <div key={key} className="flex justify-between gap-4">
+                                                                    <span className="text-muted-foreground">{key}</span>
+                                                                    <span className="font-medium">
+                                                                        {p[key] != null && typeof p[key] === 'object' && typeof p[key].getTime === 'function'
+                                                                            ? new Date(p[key]).toLocaleString()
+                                                                            : typeof p[key] === 'number' ? p[key].toLocaleString() : String(p[key] ?? '')}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                }}
+                                            />
+                                            <Scatter
+                                                name="Data Points"
+                                                data={scatterChartData}
+                                                shape="circle"
+                                                fill={(entry) => (selColorCol && scatterColorMap[String(entry[selColorCol] ?? '')]) || (selectedPalette && selectedPalette[0]) || 'hsl(142 88% 28%)'}
+                                                fillOpacity={0.7}
+                                                stroke={(entry) => (selColorCol && scatterColorMap[String(entry[selColorCol] ?? '')]) || (selectedPalette && selectedPalette[0]) || 'hsl(142 88% 28%)'}
+                                                strokeWidth={1}
+                                                isAnimationActive
+                                                animationDuration={400}
+                                                animationEasing="ease-out"
+                                            />
+                                            {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
+                                        </ScatterChart>
+                                        ) : (
+                                        <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-muted-foreground">
+                                            Select X, Y, and Bubble size (Z) to see the chart.
+                                        </div>
+                                        )
+                                    )
                                     }
                                 </ChartContainer>
                             </CardContent>
@@ -716,6 +958,9 @@ const ChartView = ({demo}) => {
                                     <ToggleGroupItem value="radar" aria-label="Toggle radar">
                                         <AiOutlineRadarChart className="h-4 w-4" />
                                     </ToggleGroupItem>
+                                    <ToggleGroupItem value="scatter" aria-label="Toggle bubble (scatter)">
+                                        <CircleDot className="h-4 w-4" />
+                                    </ToggleGroupItem>
                                 </ToggleGroup>
                                 <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Select your x-axis </p>
                                 <p className="text-xs text-muted-foreground"></p>
@@ -772,7 +1017,64 @@ const ChartView = ({demo}) => {
                                         </div>
                                     )}
                                 </div>
-                                { selChartType !== 'pie' &&
+                                {/* Scatter/bubble: Z (bubble size) and Color column */}
+                                { selChartType === 'scatter' && (
+                                    <>
+                                        <div className="py-2">
+                                            <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Bubble size (Z)</p>
+                                            <p className={`text-xs ${dark ? 'text-slate-300' : 'text-muted-foreground'}`}>Numeric column for bubble radius</p>
+                                            <Select value={selZ || ''} onValueChange={(v) => setSelZ(v || null)}>
+                                                <SelectTrigger className="mt-1">
+                                                    <SelectValue placeholder="Select Z column" className="text-xs" />
+                                                </SelectTrigger>
+                                                <SelectContent className="text-xs">
+                                                    {xOptions && xOptions.filter((k) => k !== selX).map((i) => (
+                                                        <SelectItem key={i} value={i} className="text-xs">{i}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="py-2">
+                                            <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Color by</p>
+                                            <p className={`text-xs ${dark ? 'text-slate-300' : 'text-muted-foreground'}`}>Optional column for point color</p>
+                                            <Select value={selColorCol ?? '__none__'} onValueChange={(v) => setSelColorCol(v === '__none__' ? null : v)}>
+                                                <SelectTrigger className="mt-1">
+                                                    <SelectValue placeholder="None or select column" className="text-xs" />
+                                                </SelectTrigger>
+                                                <SelectContent className="text-xs">
+                                                    <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                                                    {xOptions && xOptions.map((i) => (
+                                                        <SelectItem key={i} value={i} className="text-xs">{i}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        {/* Z scale: linear / log */}
+                                        { selZ && (
+                                            <div className="py-2 flex items-center gap-2">
+                                                <span className={`text-xs ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}>Z scale:</span>
+                                                <TooltipProvider delayDuration={300}>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                className={`p-1.5 rounded border ${scaleZ === 'log' ? 'bg-muted' : 'bg-background'} border-border flex items-center gap-1`}
+                                                                onClick={() => setScaleZ((s) => (s === 'log' ? 'linear' : 'log'))}
+                                                            >
+                                                                <LogIn className="h-4 w-4" />
+                                                                <span className="text-[10px]">Z</span>
+                                                            </button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                                                            {scaleZ === 'linear' ? 'Z: Linear scale.' : 'Z: Log scale (for large value ranges).'}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                { selChartType !== 'pie' && selChartType !== 'scatter' &&
                                     <button
                                         className="p-2 bg-black text-white rounded-md text-xs"
                                         onClick={() => handleSelectY(availableYOptions[0])}
@@ -781,6 +1083,93 @@ const ChartView = ({demo}) => {
                                         {availableYOptions && availableYOptions.length === 0 ? 'You have no more columns': '+ Stack Another Value'}
                                     </button>
                                 }
+                                {/* Axis sort: X and Y ascending/descending by type (number, date, string) */}
+                                <div className="py-2 space-y-2">
+                                    <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}>Sort axis</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <span className={`text-[10px] ${dark ? 'text-slate-400' : 'text-muted-foreground'}`}>X:</span>
+                                        <button
+                                            type="button"
+                                            className={`text-xs px-2 py-1 rounded border ${sortXDir === 'asc' ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
+                                            onClick={() => setSortXDir((d) => (d === 'asc' ? null : 'asc'))}
+                                            title="X ascending (chronological / alphabetical / low→high)"
+                                        >
+                                            <ArrowUp className="h-3 w-3 inline mr-0.5" /> Asc
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`text-xs px-2 py-1 rounded border ${sortXDir === 'desc' ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
+                                            onClick={() => setSortXDir((d) => (d === 'desc' ? null : 'desc'))}
+                                            title="X descending (reverse chronological / Z→A / high→low)"
+                                        >
+                                            <ArrowDown className="h-3 w-3 inline mr-0.5" /> Desc
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <span className={`text-[10px] ${dark ? 'text-slate-400' : 'text-muted-foreground'}`}>Y:</span>
+                                        <button
+                                            type="button"
+                                            className={`text-xs px-2 py-1 rounded border ${sortYDir === 'asc' ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
+                                            onClick={() => setSortYDir((d) => (d === 'asc' ? null : 'asc'))}
+                                            title="Y ascending"
+                                        >
+                                            <ArrowUp className="h-3 w-3 inline mr-0.5" /> Asc
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`text-xs px-2 py-1 rounded border ${sortYDir === 'desc' ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
+                                            onClick={() => setSortYDir((d) => (d === 'desc' ? null : 'desc'))}
+                                            title="Y descending"
+                                        >
+                                            <ArrowDown className="h-3 w-3 inline mr-0.5" /> Desc
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Numeric axis scale: Linear vs Log (only when axis is numeric) */}
+                                {(selX && chartData && chartData.length && getAxisType(selX, dataTypes, chartData) === 'number') || (selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === 'number') ? (
+                                    <div className="py-2 space-y-2">
+                                        <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}>Axis scale</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selX && chartData && chartData.length && getAxisType(selX, dataTypes, chartData) === 'number' && (
+                                                <TooltipProvider delayDuration={300}>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                className={`p-1.5 rounded border ${scaleX === 'log' ? 'bg-muted' : 'bg-background'} border-border`}
+                                                                onClick={() => setScaleX((s) => (s === 'log' ? 'linear' : 'log'))}
+                                                            >
+                                                                <LogIn className="h-4 w-4" />
+                                                            </button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                                                            {scaleX === 'linear' ? 'Linear scale: values map proportionally (equal spacing per unit).' : 'Log scale: for values spanning orders of magnitude (e.g. 1 → 1000).'}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )}
+                                            {selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === 'number' && (
+                                                <TooltipProvider delayDuration={300}>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                className={`p-1.5 rounded border ${scaleY === 'log' ? 'bg-muted' : 'bg-background'} border-border flex items-center gap-1`}
+                                                                onClick={() => setScaleY((s) => (s === 'log' ? 'linear' : 'log'))}
+                                                            >
+                                                                <LogIn className="h-4 w-4" />
+                                                                <span className="text-[10px]">Y</span>
+                                                            </button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                                                            {scaleY === 'linear' ? 'Y: Linear scale.' : 'Y: Log scale (for large ranges).'}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : null}
                             </>
                     }
                     <div className='py-2'>                    

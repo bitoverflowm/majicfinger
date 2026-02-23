@@ -2,7 +2,8 @@ const GAMMA_BASE = "https://gamma-api.polymarket.com";
 const DATA_API_BASE = "https://data-api.polymarket.com";
 
 const EVENTS_PARAMS = [
-  "limit", "offset", "order", "ascending", "tag_id", "tag_slug", "related_tags",
+  "limit", "offset", "order", "ascending",
+  "id", "tag_id", "exclude_tag_id", "slug", "tag_slug", "related_tags",
   "active", "archived", "featured", "cyom", "include_chat", "include_template",
   "recurrence", "closed", "liquidity_min", "liquidity_max", "volume_min", "volume_max",
   "start_date_min", "start_date_max", "end_date_min", "end_date_max",
@@ -180,6 +181,38 @@ export default async function handler(req, res) {
         const id = req.query.id;
         if (!id) return res.status(400).json({ message: "Missing required parameter: id (event id from list events)" });
         data = await fetchJson(`${DATA_API_BASE}/live-volume?id=${encodeURIComponent(id)}`);
+        break;
+      }
+      case "getTradesByMarket": {
+        const market = req.query.market;
+        if (!market) return res.status(400).json({ message: "Missing required parameter: market (condition ID from List markets)" });
+        const tradesParams = new URLSearchParams();
+        tradesParams.set("market", String(market));
+        const limit = req.query.limit;
+        const offset = req.query.offset;
+        const side = req.query.side;
+        const takerOnly = req.query.takerOnly;
+        if (limit !== undefined && limit !== "") tradesParams.set("limit", String(limit));
+        if (offset !== undefined && offset !== "") tradesParams.set("offset", String(offset));
+        if (side === "BUY" || side === "SELL") tradesParams.set("side", side);
+        if (takerOnly === "true" || takerOnly === "false") tradesParams.set("takerOnly", takerOnly);
+        data = await fetchJson(`${DATA_API_BASE}/trades?${tradesParams.toString()}`);
+        break;
+      }
+      case "getTradesByUser": {
+        const user = req.query.user;
+        if (!user) return res.status(400).json({ message: "Missing required parameter: user (wallet address, 0x...)" });
+        const tradesParams = new URLSearchParams();
+        tradesParams.set("user", String(user));
+        const limit = req.query.limit;
+        const offset = req.query.offset;
+        const side = req.query.side;
+        const takerOnly = req.query.takerOnly;
+        if (limit !== undefined && limit !== "") tradesParams.set("limit", String(limit));
+        if (offset !== undefined && offset !== "") tradesParams.set("offset", String(offset));
+        if (side === "BUY" || side === "SELL") tradesParams.set("side", side);
+        if (takerOnly === "true" || takerOnly === "false") tradesParams.set("takerOnly", takerOnly);
+        data = await fetchJson(`${DATA_API_BASE}/trades?${tradesParams.toString()}`);
         break;
       }
       default:

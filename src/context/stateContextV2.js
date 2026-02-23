@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
+import { coerceDataTypes } from '@/lib/coerceDataTypes';
 
 // Create the state context
 export const StateContextV2 = createContext();
@@ -262,7 +263,15 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
     //Connected Data is active working data. 
     const [dataConnected, setDataConnected] = useState() //boolean, do we have connected data or not
-    const [connectedData, setConnectedData] = useState()
+    const [connectedData, _setConnectedData] = useState()
+    const setConnectedData = useCallback((value) => {
+      _setConnectedData((prev) => {
+        const raw = typeof value === 'function' ? value(prev) : value;
+        if (Array.isArray(raw)) return coerceDataTypes(raw);
+        if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) return coerceDataTypes([raw]);
+        return raw;
+      });
+    }, []);
     const [connectedCols, setConnectedCols] = useState() //cols of fresh data
     const [tempData, setTempData] = useState() //holder state; whenver new data comes, tempData holds the previous state incase an action was a mistake
 
@@ -299,9 +308,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const detectDataType = (value) => {
         if (Array.isArray(value)) return 'array';
         if (typeof value === 'boolean') return 'boolean';
+        if (value instanceof Date) return 'date';
         // If value is a long string representing a number, treat it as text
         if (typeof value === 'string' && value.length > 15 && !isNaN(parseFloat(value))) return 'text';
-        if (!isNaN(parseFloat(value)) && isFinite(value)) return 'number';
+        if (typeof value === 'number' && !isNaN(value) && isFinite(value)) return 'number';
+        if (typeof value === 'string' && value !== '' && !isNaN(parseFloat(value)) && isFinite(Number(value))) return 'number';
         if (typeof value === 'object' && value !== null) return 'object';
         return 'text';
     };

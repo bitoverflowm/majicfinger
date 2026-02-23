@@ -40,13 +40,11 @@ import {
   Check,
   Square,
 } from "lucide-react";
-import { ENDPOINTS, POLYMARKET_GROUPS } from "./config";
+import { ENDPOINTS, POLYMARKET_GROUPS, TRADES_RESPONSE_FIELDS } from "./config";
 
 const COOLDOWN_MS = 1500;
-const DEFAULT_FIELD_OPTIONS = [
-  "id", "title", "slug", "volume", "liquidity", "startDate", "endDate",
-  "question", "outcomePrices", "active", "closed", "conditionId", "description",
-];
+// Fallback when no endpoint responseFields and no prior pull – use Trade schema (docs: get-trades-for-a-user-or-markets)
+const DEFAULT_FIELD_OPTIONS = TRADES_RESPONSE_FIELDS;
 const PROGRESS_STAGES = ["Sending request…", "Receiving data…", "Processing…", "Done"];
 
 const Polymarket = ({ setConnectedData }) => {
@@ -191,7 +189,11 @@ const Polymarket = ({ setConnectedData }) => {
     setError(null);
   };
 
-  const propertyOptions = lastResultKeys.length > 0 ? lastResultKeys : DEFAULT_FIELD_OPTIONS;
+  const propertyOptions = selectedAction?.responseFields?.length
+    ? selectedAction.responseFields
+    : lastResultKeys.length > 0
+      ? lastResultKeys
+      : DEFAULT_FIELD_OPTIONS;
   const selectedFields = (paramValues.selectedFields && typeof paramValues.selectedFields === "object")
     ? paramValues.selectedFields
     : {};
@@ -459,13 +461,18 @@ const Polymarket = ({ setConnectedData }) => {
                   <button
                     key={action.query}
                     type="button"
-                    className="text-xs px-2.5 py-1.5 rounded-md border bg-background hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer text-left truncate max-w-full"
-                    onClick={() =>
+                    className={`text-xs px-2.5 py-1.5 rounded-md border text-left truncate max-w-full transition-colors ${
+                      action.broken
+                        ? "bg-muted cursor-not-allowed opacity-70"
+                        : "bg-background hover:bg-primary hover:text-primary-foreground cursor-pointer"
+                    }`}
+                    onClick={() => {
+                      if (action.broken) return;
                       action.params?.length
                         ? openForm(action)
-                        : runRequest(action.query, {})
-                    }
-                    title={action.description}
+                        : runRequest(action.query, {});
+                    }}
+                    title={action.broken ? "Under construction" : action.description}
                   >
                     {action.name}
                   </button>
