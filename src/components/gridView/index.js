@@ -38,6 +38,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuSeparator,
@@ -47,7 +48,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { ArrowDownFromLine, ArrowUpFromLine, TrafficCone, Filter, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Calendar, X } from 'lucide-react';
+import { ArrowDownFromLine, ArrowUpFromLine, TrafficCone, Filter, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Calendar, X, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 
 const DATE_LIKE = /^\d{4}-\d{2}-\d{2}/;
@@ -175,6 +177,63 @@ const GridView = ({startNew}) => {
       }));
     }, []);
 
+    // Export: data to download (displayData without internal _origIndex)
+    const exportData = useMemo(() => {
+      if (!displayData || !displayData.length) return [];
+      return displayData.map(({ _origIndex, ...row }) => row);
+    }, [displayData]);
+
+    const downloadFile = useCallback((blob, filename) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, []);
+
+    const downloadCSV = useCallback(() => {
+      if (!exportData.length) {
+        toast.error('No data to export');
+        return;
+      }
+      const cols = colKeys.length ? colKeys : Object.keys(exportData[0] || {});
+      const escape = (v) => {
+        const s = v == null ? '' : String(v);
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+      };
+      const header = cols.map(escape).join(',');
+      const rows = exportData.map((row) => cols.map((c) => escape(row[c])).join(','));
+      const csv = [header, ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      downloadFile(blob, `export-${Date.now()}.csv`);
+      toast.success('CSV downloaded');
+    }, [exportData, colKeys, downloadFile]);
+
+    const downloadJSON = useCallback(() => {
+      if (!exportData.length) {
+        toast.error('No data to export');
+        return;
+      }
+      const json = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+      downloadFile(blob, `export-${Date.now()}.json`);
+      toast.success('JSON downloaded');
+    }, [exportData, downloadFile]);
+
+    const downloadXLSX = useCallback(() => {
+      if (!exportData.length) {
+        toast.error('No data to export');
+        return;
+      }
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      XLSX.writeFile(wb, `export-${Date.now()}.xlsx`);
+      toast.success('Excel file downloaded');
+    }, [exportData]);
+
     //Apply settings across all columns
     const defaultColDef = useMemo(() => ({
         filter: true, // Enable filtering on all columns
@@ -297,6 +356,19 @@ const GridView = ({startNew}) => {
                   <RotateCcw className="h-3.5 w-3.5" />
                   Reset
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                      <Download className="h-3.5 w-3.5" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={downloadCSV}>Download CSV</DropdownMenuItem>
+                    <DropdownMenuItem onClick={downloadJSON}>Download JSON</DropdownMenuItem>
+                    <DropdownMenuItem onClick={downloadXLSX}>Download XLSX</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <TabsContent value="sort-filter" className="mt-3">
                 <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-muted/30">
