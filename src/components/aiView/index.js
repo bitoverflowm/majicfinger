@@ -292,7 +292,10 @@ const AiView = ({playView, setPlayView}) => {
                                 )
                             }
                         </div>
-                        <div onClick={() => analyzeData()} className="bg-lychee_black text-white w-20 text-center rounded-md text-sm py-1 cursor-pointer hover:bg-lychee_blue">Go</div>
+                        <div className="relative group">
+                            <div className="bg-lychee_black/50 text-white w-20 text-center rounded-md text-sm py-1 cursor-not-allowed opacity-70">Go</div>
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs bg-slate-800 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Coming soon</span>
+                        </div>
                     </fieldset>
                 </form>
             </div>

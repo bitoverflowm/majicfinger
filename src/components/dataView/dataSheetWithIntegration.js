@@ -32,8 +32,6 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew }
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const setConnectedData = contextStateV2?.setConnectedData;
 
-  if (!integrationSidebar) return null;
-
   const renderIntegration = () => {
     switch (integrationSidebar) {
       case "polymarket":

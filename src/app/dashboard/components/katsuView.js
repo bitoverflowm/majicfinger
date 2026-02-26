@@ -24,14 +24,16 @@ const KatsuView = () => {
     const setViewing = contextStateV2?.setViewing
 
     return (
-        <div className="w-full px-10 py-16">
-            <blockquote className="mb-2 border-l-2 pl-6 italic text-xs w-1/2">
-                <span className='font-bold'>Lychee V2.0.0 is coming!</span> <br/>
-                Get Instant Access For Life 39.99 (85% off). No monthly subs <br/>
-                (11 seats remaining) <br/>
-                <Link rel="noopener noreferrer" target="_blank" className="underline bg-lychee_green/30" href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"> Get deal now! </Link>
-            </blockquote> 
+        <div className="w-full px-10 py-16 relative">
             <BentoBase data={dashData} dashView={true} bentoContainer={bentoContainer} setDashData={setDashData} setBentoContainer={setBentoContainer} viewing={viewing} setViewing={setViewing}/>
+            <Link
+                href="https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4"
+                rel="noopener noreferrer"
+                target="_blank"
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-border shadow-lg hover:shadow-xl transition-shadow text-sm font-medium"
+            >
+                Deal for you
+            </Link>
         </div>       
     );
 };

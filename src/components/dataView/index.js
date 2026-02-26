@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { useMyStateV2  } from '@/context/stateContextV2'
-import { HardDriveUpload, Cable, Shovel, FilePlus2 } from 'lucide-react'
+import { HardDriveUpload, Cable, Shovel, FilePlus2, PanelRightOpen } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 //import Image from 'next/image'
@@ -17,6 +17,8 @@ const DataView = ({user}) => {
     const loadedDataMeta = contextStateV2?.loadedDataMeta
     const setConnectedData = contextStateV2?.setConnectedData
     const setViewing = contextStateV2?.setViewing
+    const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar
+    const integrationSidebar = contextStateV2?.integrationSidebar
     const multiSheetFlag = contextStateV2?.multiSheetFlag
     const multiSheetData = contextStateV2?.multiSheetData
     const sheetNames = contextStateV2?.sheetNames
@@ -31,27 +33,32 @@ const DataView = ({user}) => {
 
     return(
         <div className='min-w-0 max-w-full px-2 sm:px-4 md:px-6'>                       
-            <h2 className="border-b pb-2 text-xl font-semibold tracking-tight first:mt-0 sm:text-2xl md:text-3xl">
-                Your Data
-            </h2>
-            <div className='flex flex-wrap gap-1 mt-1'>
-                <code className="relative rounded bg-lychee_red/20 px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
-                    {loadedDataMeta ? loadedDataMeta.data_set_name : 'Viewing unsaved data'}
-                </code>
-                {
-                    multiSheetFlag && Object.keys(multiSheetData).map((sheetName, index) => (
+            {multiSheetFlag && (
+                <div className='flex flex-wrap gap-1 mb-2'>
+                    {Object.keys(multiSheetData).map((sheetName, index) => (
                         <code key={index} className={`${sheetName === sheetNames[sheetId] ? 'bg-lychee_blue/30' : 'bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white'} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`} onClick={()=>sheetSwitchHandler(sheetName, index)}>
                             {sheetName}
                         </code>
-                    ))
-                }
-            </div>
-
-            
-
+                    ))}
+                </div>
+            )}
             {
-                (connectedData) ? <div className='min-h-0 w-full max-w-full overflow-auto'> <GridView/> </div>      
-                : <div className="">
+                (connectedData) ? (
+                <div className="relative">
+                    {!integrationSidebar && setIntegrationSidebar && (
+                        <button
+                            type="button"
+                            onClick={() => setIntegrationSidebar('polymarket')}
+                            className="absolute top-0 right-0 z-10 flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-muted"
+                        >
+                            <PanelRightOpen className="h-3.5 w-3.5" />
+                            Open API panel
+                        </button>
+                    )}
+                    <div className='min-h-0 w-full max-w-full overflow-auto'> <GridView/> </div>
+                </div>
+                )
+                : <div className="relative">
                     <div className='w-1/4 mx-auto py-8'>
                         {
                             !(user) && 

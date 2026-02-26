@@ -1,123 +1,110 @@
 'use client'
 
-import React, { useEffect, useState } from 'react';
-
+import React, { useState } from 'react';
+import Link from 'next/link';
 import { useUser, mutateUser } from '@/lib/hooks';
 import { Magic } from 'magic-sdk';
-import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { useRouter } from 'next/navigation';
-
-import { useMyStateV2  } from '@/context/stateContextV2'
-
+import { useMyStateV2 } from '@/context/stateContextV2';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Progress } from '../ui/progress';
 
-const Login = ({fromHome}) => {
-    const router = useRouter()
-    const contextStateV2 = useMyStateV2()
-    const setViewing = contextStateV2?.setViewing
+const Login = ({ fromHome }) => {
+  const router = useRouter();
+  const contextStateV2 = useMyStateV2();
+  const setViewing = contextStateV2?.setViewing;
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const user = useUser();
 
-    const [email, setEmail] = useState('');
-    const [name, setName] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [progress, setProgress] = useState(0); // Progress state
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setProgress(0);
+    const timer = setInterval(() => setProgress((prev) => Math.min(prev + 10, 90)), 3000);
+    const body = { email, name };
+    const isDevBypass = process.env.NODE_ENV === 'development' && email === 'rikesh@bitoverflow.org';
+    if (isDevBypass) body.devBypass = true;
 
-    const user = useUser()
+    let res;
+    if (isDevBypass) {
+      res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } else {
+      const magic = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY);
+      const didToken = await magic.auth.loginWithMagicLink({ email });
+      res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + didToken },
+        body: JSON.stringify(body),
+      });
+    }
+    if (res.status === 200) {
+      mutateUser();
+      setLoading(false);
+      clearInterval(timer);
+      setProgress(100);
+    } else {
+      console.error('Magic Login Failed', await res.text());
+      alert('There was an issue with login. Please message @misterrpink1 on Twitter.');
+      setLoading(false);
+    }
+  };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setProgress(0); // Reset progress bar
-        const timer = setInterval(() => {
-            setProgress((prev) => Math.min(prev + 10, 90)); // Increment progress
-        }, 3000);
-
-        const body = {
-            email: email,
-            name: name,
-        }
-
-        // Dev-only: bypass Magic link for testing with specific email
-        const isDevBypass = process.env.NODE_ENV === 'development' && email === 'rikesh@bitoverflow.org'
-        if (isDevBypass) {
-            body.devBypass = true
-        }
-
-        let res
-        if (isDevBypass) {
-            res = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            })
-        } else {
-            const magic = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY)
-            const didToken = await magic.auth.loginWithMagicLink({ email: email })
-            res = await fetch('/api/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: 'Bearer ' + didToken,
-                },
-                body: JSON.stringify(body),
-            })
-        }
-        if(res.status === 200){
-            mutateUser()
-            setLoading(false)
-            clearInterval(timer);
-            setProgress(100); // Complete progress
-        } else {
-            console.error("Magic Login Failed", await res.text())
-            alert("There was an issue with login and sub, please message @misterrpink1 on twitter.")
-            setLoading(false)
-        }            
-    };
-
-    return (
-        <div className='flex flex-col place-items-center place-content-center h-dvh w-full'>
-            {
-                loading ?
-                    <Progress value={progress} className="w-[60%]" />
-                    :<>
-                        <div className='bg-lychee_blue font-body shadow-2xl rounded-xl text-white p-4 mb-4 w-96 mx-auto'>
-                            {   
-                            user ? 
-                                <div>
-                                    <h1>Welcome to Lychee {user.email}</h1>
-                                    <div>You have an account</div>
-                                    <Button onClick={()=> fromHome ? router.push('/dashboard') : setViewing('dashboard')} >Go to your dashboard</Button>
-                                </div>
-                                :
-                                <form onSubmit={handleSubmit} className='flex flex-col place-items-center'>
-                                    <div className='py-2 text-sm'>
-                                        Name
-                                        <input
-                                            type="text"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                
-                                            className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
-                                            />
-                                    </div>
-                                    <div className='py-2 text-sm'>
-                                        Email
-                                        <input
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            className='rounded px-2 mx-2 py-2 text-black text-xs w-64'
-                                        />
-                                    </div>
-                                    <button type="submit" className='bg-lychee_black px-6 rounded-md py-2 text-sm mt-4'>Submit</button>
-                                </form>
-                            }
-                        </div>
-                    { !(user) && <div className='w-96 text-xs pl-4'>Fill out the form above.<br/> You will receive a majic link in your email.</div>}
-                </>
-            }
+  return (
+    <div className="relative flex min-h-dvh flex-1 flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
+      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
+        <div className="absolute inset-0 bg-lychee_blue/90" />
+        <div className="relative z-20 flex items-center text-lg font-medium">
+          <span className="mr-2 text-2xl">🍋</span>
+          Lychee
         </div>
-    );
+        <div className="relative z-20 mt-auto">
+          <blockquote className="leading-normal text-balance">
+            &ldquo;All your favorite data sources under one roof. Discover something great.&rdquo;
+          </blockquote>
+        </div>
+      </div>
+      <div className="flex flex-col items-center justify-center p-8 lg:p-8">
+        <div className="mx-auto flex w-full flex-col justify-center gap-6 sm:w-[350px]">
+          <div className="flex flex-col gap-2 text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+            <p className="text-sm text-muted-foreground">Enter your email below to receive a magic link</p>
+          </div>
+          {loading ? (
+            <Progress value={progress} className="w-full" />
+          ) : user ? (
+            <div className="space-y-4 rounded-lg border p-4">
+              <p className="text-sm">Welcome, {user.email}</p>
+              <Button onClick={() => (fromHome ? router.push('/dashboard') : setViewing?.('dashboard'))} className="w-full">
+                Go to dashboard
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" type="text" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} className="h-10" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-10" />
+              </div>
+              <Button type="submit" className="w-full">
+                Continue with Email
+              </Button>
+            </form>
+          )}
+          <p className="px-6 text-center text-xs text-muted-foreground">
+            By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary">Terms of Service</Link> and <Link href="/privacy" className="underline hover:text-primary">Privacy Policy</Link>.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default Login;

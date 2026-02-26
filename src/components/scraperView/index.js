@@ -168,9 +168,12 @@ const ScraperView = ({playView, setPlayView}) => {
                                     onChange={(e) => setQuery(e.target.value)}
                                 />
                             </div>
-                            <Button type="submit" size="sm" className="px-3">
-                                Scrape
-                            </Button>
+                            <div className="relative group">
+                                <Button type="button" size="sm" className="px-3 cursor-not-allowed opacity-70" disabled>
+                                    Scrape
+                                </Button>
+                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs bg-slate-800 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">Coming soon</span>
+                            </div>
                         </div>
                         {step === 1 && <div className="">Does the screenshot to the right look correct? <Button onClick={()=>setStep(2)}>Yes</Button> </div>}
                         {step === 2 && <div>
@@ -185,7 +188,10 @@ const ScraperView = ({playView, setPlayView}) => {
                             </div>
                             <div>Target Column Names: {JSON.stringify(columns)}</div>
 
-                            <div onClick={()=>scrapePage()} className="bg-black py-1 px-1 hover:bg-slate-800 cursor-pointer text-white">Harvest</div>
+                            <div className="relative group">
+                                <div className="bg-black/50 py-1 px-1 cursor-not-allowed opacity-70 text-white">Harvest</div>
+                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs bg-slate-800 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">Coming soon</span>
+                            </div>
                             </div>}
                         
                     </fieldset>

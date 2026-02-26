@@ -315,8 +315,9 @@ const GridView = ({startNew}) => {
       };
     
     const handleSubmit = () => {
-        handleAddColumn(columnName);
-        setColumnName(''); // Clear the input field
+        if (!columnName?.trim()) return;
+        handleAddColumn(columnName.trim());
+        setColumnName('');
     };
 
     const handleDeleteRow = (displayRowIndex) => {
@@ -369,6 +370,41 @@ const GridView = ({startNew}) => {
                     <DropdownMenuItem onClick={downloadXLSX}>Download XLSX</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <div className="h-4 w-px bg-border shrink-0" />
+                <Menu compact />
+                <Dialog open={colAddOpen} onOpenChange={setColAddOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                      <PlusIcon className="h-3.5 w-3.5" />
+                      Add Column
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Add Column</DialogTitle>
+                      <DialogDescription>Name your column</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">Name</Label>
+                        <Input
+                          id="name"
+                          value={columnName}
+                          onChange={handleInputChange}
+                          className="col-span-3"
+                          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" onClick={() => handleSubmit()}>Save changes</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleAddRow}>
+                  <PlusIcon className="h-3.5 w-3.5" />
+                  Add Row
+                </Button>
               </div>
               <TabsContent value="sort-filter" className="mt-3">
                 <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-muted/30">
@@ -504,55 +540,6 @@ const GridView = ({startNew}) => {
               <TabsContent value="table" className="mt-0" />
             </Tabs>
             )}
-            <div className='pt-2 pb-2 flex place-items-center gap-2' >
-                <div className=''>
-                    <Menu />
-                </div>
-                <div className='ml-auto flex place-items-center gap-2'>
-                    <Dialog open={colAddOpen} onOpenChange={setColAddOpen}>
-                        <Label className="text-black text-xs">Add Column</Label>
-                        <DialogTrigger asChild>    
-                            <Button variant="outline" size="icon">
-                                <PlusIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                            <DialogHeader>
-                                <DialogTitle>Add Column</DialogTitle>
-                                <DialogDescription>
-                                    Name your column
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="name" className="text-right">
-                                        Name
-                                    </Label>
-                                    <Input
-                                        id="name"
-                                        defaultValue="Placeholder"
-                                        value={columnName}
-                                        onChange={handleInputChange}
-                                        className="col-span-3"
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                            handleSubmit(columnName);
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button type="submit" onClick={()=>handleSubmit(columnName)}>Save changes</Button>
-                            </DialogFooter>                        
-                        </DialogContent>
-                    </Dialog>               
-                    <Label className="text-black text-xs">Add Row</Label>
-                    <Button variant="outline" size="icon" onClick={()=>handleAddRow()}>
-                        <PlusIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    </Button>
-                </div>
-            </div>
             <div className={gridExpanded ? 'h-[750px]' :'h-[550px]'}>
                 <AgGridReact 
                     defaultColDef={defaultColDef} 
@@ -568,12 +555,6 @@ const GridView = ({startNew}) => {
                     gridOptions={gridOptions}
                     autoSizeStrategy={autoSizeStrategy}
                     />
-            </div>
-            <div className='flex py-2 text-xs'><div className='w-full'>Calculate:</div> <div className='text-slate-400' onClick={()=>setGridExpanded(!gridExpanded)}> {gridExpanded ? <ArrowUpFromLine className='w-6 h-4 cursor-pointer'/> : <ArrowDownFromLine className='w-6 h-4 cursor-pointer'/>}</div></div>
-            <div>
-                <Alert>
-                    Aggregations, calculations, code operations coming soon
-                </Alert>
             </div>
         </div>
     )

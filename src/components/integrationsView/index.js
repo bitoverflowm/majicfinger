@@ -9,6 +9,7 @@ import { ExternalLink } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BorderBeam } from "@/components/magicui/border-beam";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 
@@ -22,7 +23,8 @@ const integrations_list = [
     clickHandler: "polymarket",
     name: "Polymarket",
     description: "All the data you could want on the world’s largest prediction market.",
-    tags: ['featured', 'crypto', 'finance', 'trading', 'prediction']
+    tags: ['featured', 'crypto', 'finance', 'trading', 'prediction'],
+    live: true,
   },
   {
     color: "#E7F0DC",
@@ -30,7 +32,8 @@ const integrations_list = [
     clickHandler: "coinGecko",
     name: "CoinGecko",
     description: "Connect to the most reliable and comprehensive cryptocurrency data API for traders and developers.",
-    tags: ['featured', 'crypto', 'finance', 'trading']
+    tags: ['featured', 'crypto', 'finance', 'trading', 'coming soon'],
+    live: false,
   },
   {
     color: "#000",
@@ -38,7 +41,8 @@ const integrations_list = [
     clickHandler: "geckoDex",
     name: "GeckoTerminal from CoinGecko",
     description: "GeckoTerminal is a DeFi and DEX aggregator. Explore the market data & prices of any tokens traded across 110+ blockchain networks across 900+ DEXes – brought to you by the same team behind CoinGecko.",
-    tags: ['featured', 'crypto', 'finance', 'trading']
+    tags: ['featured', 'crypto', 'finance', 'trading', 'coming soon'],
+    live: false,
   },
   {
     color: "#AE82FE",
@@ -54,7 +58,8 @@ const integrations_list = [
     clickHandler: "twitter",
     name: "Twitter",
     description: "Access and analyze a wealth of Twitter data, from tweets and user profiles to trends and hashtags.",
-    tags: ['social', 'marketing']
+    tags: ['social', 'marketing', 'coming soon'],
+    live: false,
   },
   {
     color: "#3572EF",
@@ -62,7 +67,8 @@ const integrations_list = [
     clickHandler: "wallStreetBets",
     name: "Wall Street Bets",
     description: "Sentiment analysis on the top 50 stocks discussed on Reddit sub- wallStreetBets.",
-    tags: ['finance', 'trading']
+    tags: ['finance', 'trading', 'coming soon'],
+    live: false,
   },
   {
     color: "#FF4500",
@@ -70,7 +76,8 @@ const integrations_list = [
     clickHandler: "shortSqueeze",
     name: "Short Squeeze Stock Scanner",
     description: "Get a list of stocks that are in TTM Squeeze or out of squeeze.",
-    tags: ['finance', 'trading']
+    tags: ['finance', 'trading', 'coming soon'],
+    live: false,
   },
   {
     color: "#3AA6B9",
@@ -165,6 +172,27 @@ const IntegrationsView = () => {
                 </Badge>
               ))}
             </div>
+            {/* Featured Polymarket card - full width, image left, text right */}
+            <div className="w-full mb-10">
+              <Card className="relative overflow-hidden flex flex-row w-full">
+                <BorderBeam size={250} duration={12} colorFrom="#2E5CFF" colorTo="#60a5fa" />
+                <div className="flex w-full min-h-[180px]">
+                  <div className="w-48 sm:w-64 shrink-0 flex items-center justify-center bg-[#2E5CFF] p-6">
+                    <Image src="/polymarket.png" height={80} width={80} alt="Polymarket" className="rounded-full" />
+                  </div>
+                  <div className="flex flex-1 flex-col justify-between p-6">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-2xl font-bold">Polymarket</h3>
+                        <Badge className="bg-amber-500 text-white shrink-0">New</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">All the data you could want on the world&apos;s largest prediction market.</p>
+                    </div>
+                    <Button onClick={() => clickHandler("polymarket")} className="w-fit mt-4">Connect</Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
               {integrations_list
                 .filter(integration => !selectedTag || integration.tags.includes(selectedTag))
@@ -179,7 +207,7 @@ const IntegrationsView = () => {
                   </CardContent>
                   <CardFooter className="flex place-content-end">
                     {
-                      integration.tags.includes('coming soon') ? <Button disabled>Coming Soon</Button> : <Button onClick={() => clickHandler(integration.clickHandler)}>Connect</Button>
+                      !integration.live || integration.tags.includes('coming soon') ? <Button disabled>Coming soon</Button> : <Button onClick={() => clickHandler(integration.clickHandler)}>Connect</Button>
                     }
                   </CardFooter>
                 </Card>
@@ -187,7 +215,7 @@ const IntegrationsView = () => {
             </div>
             <div className="mx-auto text-center py-20 w-1/2">
               <div className="text-4xl font-black px-4"></div>
-              <div className="text-4xl font-black px-4">On a mission to connect 100,000+ data sources by the end of 2024</div>
+              <div className="text-4xl font-black px-4">On a mission to connect 100,000+ data sources by the end of 2026</div>
             </div>
       </div>
     </div>

@@ -30,6 +30,8 @@ const Nav = () => {
   //what component are we viewing
   const viewing = contextStateV2?.viewing
   const setViewing = contextStateV2?.setViewing
+  const integrationSidebar = contextStateV2?.integrationSidebar
+  const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar
 
 
   const connectedData = contextStateV2?.connectedData
@@ -348,99 +350,26 @@ const Nav = () => {
   }, [])
 
 
+  const breadcrumb = viewing === 'dashboard' ? 'Lychee / Dashboard' :
+    viewing === 'charts' || viewing === 'gallery' ? 'Lychee / Charts' :
+    (viewing === 'dataStart' && integrationSidebar) ? 'Lychee / Data' :
+    (viewing === 'dataStart' || viewing === 'upload' || viewing === 'newSheet' || viewing === 'integrations') ? 'Lychee / Data' :
+    viewing === 'ai' ? 'Lychee / AI' :
+    viewing === 'scrape' ? 'Lychee / Scrape' :
+    viewing ? `Lychee / ${viewing}` : 'Lychee';
+
+  const showUnsavedFlag = connectedData && connectedData.length > 0 && !loadedDataMeta?.data_set_name && !loadedChartMeta?.chart_name;
+
   return (
     <div className="container flex flex-col items-start justify-between gap-2 py-4 sm:flex-row sm:items-center sm:gap-0 md:h-16">
-          <h2 className="pl-0.5 text-lg font-semibold">Lychee</h2>
+          <div className="w-full flex items-center gap-2 min-w-0">
+            <div className="w-full pl-0.5 text-sm font-semibold">{breadcrumb}</div>
+          </div>
           { user ? (
               <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:justify-end">
-                  <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-1.5">
-                        Your Work
-                        <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-[10px]">
-                          {(savedDataSets?.length ?? 0) + (savedCharts?.length ?? 0) + (savedPresentations?.length ?? 0)}
-                        </Badge>
-                      </Button>
-                    </SheetTrigger>
-                        <SheetContent side={'left'} className="w-[1000px]! sm:max-w-4xl flex flex-col">
-                          <SheetHeader>
-                            <SheetTitle>Your Saved Work</SheetTitle>
-                            <SheetDescription>
-                              Click on a project to load and begin work.
-                            </SheetDescription>
-                          </SheetHeader>
-                          <Tabs defaultValue="data" className="h-5/6 overflow-y-auto h-screen">
-                            <TabsList className="">
-                              <TabsTrigger value="data">Data Sheets</TabsTrigger>
-                              <TabsTrigger value="charts">Charts</TabsTrigger>
-                              <TabsTrigger value="persentations">Presentations</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="data">
-                              <div className="flex flex-wrap gap-2">
-                                {
-                                    savedDataSets && savedDataSets.length > 0 && savedDataSets.map(
-                                      (dataSet)=> 
-                                        <Card key={dataSet._id} className="w-sm text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadDataSheet(dataSet._id, dataSet)}>
-                                          <CardHeader>
-                                            <div className="flex">{dataSet.data_set_name}<div className="ml-auto">{loadedDataMeta && loadedDataMeta._id === dataSet._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
-                                          </CardHeader>
-                                          <CardContent>
-                                            <div className="font-muted">{dataSet.source}</div>
-                                            <div className="py-1">Edited: {moment(dataSet.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                          </CardContent>
-                                          <CardFooter>
-                                            <div className="flex">{dataSet.labels.map((label)=> <Badge>{label}</Badge>)}</div>
-                                          </CardFooter>
-                                        </Card>
-                                        )
-                                  }                            
-                              </div>                                
-                            </TabsContent>
-                            <TabsContent value="charts">
-                              <div className="flex flex-wrap gap-2">
-                                { 
-                                  savedCharts && savedCharts.length > 0 && savedCharts.map(
-                                    (chart)=> 
-                                      <Card key={chart._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadChart(chart._id, chart)}>
-                                        <CardHeader>
-                                          <div className="flex">{chart.chart_name}<div className="ml-auto">{loadedChartMeta && loadedChartMeta._id === chart._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
-                                        </CardHeader>
-                                        <CardContent>
-                                          <div className="py-1">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                        </CardContent>
-                                        <CardFooter>
-                                          <div className="flex">{chart.labels.map((label)=> <Badge>{label}</Badge>)}</div>
-                                        </CardFooter>
-                                      </Card>
-                                      )
-                                }
-                              </div>
-                            </TabsContent>
-                            <TabsContent value="persentations"><div className="flex flex-wrap gap-2">
-                                { 
-                                  savedPresentations && savedPresentations.length > 0 && savedPresentations.map(
-                                    (pressie)=> 
-                                      <Card key={pressie._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadPresentation(pressie._id, pressie)}>
-                                        <CardHeader>
-                                          <div className="flex">{pressie.presentation_name}<div className="ml-auto">{loadedPresentationMeta && loadedPresentationMeta._id === pressie._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
-                                        </CardHeader>
-                                        <CardContent>
-                                          <div>{pressie.project_name}</div>
-                                          <div></div>
-                                          <div></div>
-                                          <div className="py-1">Edited: {moment(pressie.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                        </CardContent>
-                                        <CardFooter>
-                                          <div className="flex">{pressie.deployed && <Badge>Deployed</Badge>}</div>
-                                        </CardFooter>
-                                      </Card>
-                                      )
-                                }
-                              </div></TabsContent>
-                          </Tabs>
-                        </SheetContent>
-                  </Sheet>
-
+                  {showUnsavedFlag && (
+                    <span className="text-[7pt] px-2 py-1 rounded-sm bg-rose-100 text-rose-500  dark:text-amber-400 font-bold shrink-0">Viewing Unsaved Data</span>
+                  )}
                   {connectedData && (
                       <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
                         <DialogTrigger asChild>
@@ -541,6 +470,94 @@ const Nav = () => {
                         </DialogContent>
                       </Dialog>
                   )}
+                  <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1.5">
+                        Your Work
+                        <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-[10px]">
+                          {(savedDataSets?.length ?? 0) + (savedCharts?.length ?? 0) + (savedPresentations?.length ?? 0)}
+                        </Badge>
+                      </Button>
+                    </SheetTrigger>
+                        <SheetContent side={'left'} className="w-[1000px]! sm:max-w-4xl flex flex-col">
+                          <SheetHeader>
+                            <SheetTitle>Your Saved Work</SheetTitle>
+                            <SheetDescription>
+                              Click on a project to load and begin work.
+                            </SheetDescription>
+                          </SheetHeader>
+                          <Tabs defaultValue="data" className="h-5/6 overflow-y-auto h-screen">
+                            <TabsList className="">
+                              <TabsTrigger value="data">Data Sheets</TabsTrigger>
+                              <TabsTrigger value="charts">Charts</TabsTrigger>
+                              <TabsTrigger value="persentations">Presentations</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="data">
+                              <div className="flex flex-wrap gap-2">
+                                {
+                                    savedDataSets && savedDataSets.length > 0 && savedDataSets.map(
+                                      (dataSet)=> 
+                                        <Card key={dataSet._id} className="w-sm text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadDataSheet(dataSet._id, dataSet)}>
+                                          <CardHeader>
+                                            <div className="flex">{dataSet.data_set_name}<div className="ml-auto">{loadedDataMeta && loadedDataMeta._id === dataSet._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                          </CardHeader>
+                                          <CardContent>
+                                            <div className="font-muted">{dataSet.source}</div>
+                                            <div className="py-1">Edited: {moment(dataSet.last_saved_date).format('ddd MMM YY h:mm a')}</div>
+                                          </CardContent>
+                                          <CardFooter>
+                                            <div className="flex">{dataSet.labels.map((label)=> <Badge>{label}</Badge>)}</div>
+                                          </CardFooter>
+                                        </Card>
+                                        )
+                                  }                            
+                              </div>                                
+                            </TabsContent>
+                            <TabsContent value="charts">
+                              <div className="flex flex-wrap gap-2">
+                                { 
+                                  savedCharts && savedCharts.length > 0 && savedCharts.map(
+                                    (chart)=> 
+                                      <Card key={chart._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadChart(chart._id, chart)}>
+                                        <CardHeader>
+                                          <div className="flex">{chart.chart_name}<div className="ml-auto">{loadedChartMeta && loadedChartMeta._id === chart._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                        </CardHeader>
+                                        <CardContent>
+                                          <div className="py-1">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
+                                        </CardContent>
+                                        <CardFooter>
+                                          <div className="flex">{chart.labels.map((label)=> <Badge>{label}</Badge>)}</div>
+                                        </CardFooter>
+                                      </Card>
+                                      )
+                                }
+                              </div>
+                            </TabsContent>
+                            <TabsContent value="persentations"><div className="flex flex-wrap gap-2">
+                                { 
+                                  savedPresentations && savedPresentations.length > 0 && savedPresentations.map(
+                                    (pressie)=> 
+                                      <Card key={pressie._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadPresentation(pressie._id, pressie)}>
+                                        <CardHeader>
+                                          <div className="flex">{pressie.presentation_name}<div className="ml-auto">{loadedPresentationMeta && loadedPresentationMeta._id === pressie._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                        </CardHeader>
+                                        <CardContent>
+                                          <div>{pressie.project_name}</div>
+                                          <div></div>
+                                          <div></div>
+                                          <div className="py-1">Edited: {moment(pressie.last_saved_date).format('ddd MMM YY h:mm a')}</div>
+                                        </CardContent>
+                                        <CardFooter>
+                                          <div className="flex">{pressie.deployed && <Badge>Deployed</Badge>}</div>
+                                        </CardFooter>
+                                      </Card>
+                                      )
+                                }
+                              </div></TabsContent>
+                          </Tabs>
+                        </SheetContent>
+                  </Sheet>
+
 
                 {loadedDataMeta && loadedDataMeta.data_set_name && (
                   <span className="text-xs text-muted-foreground hidden sm:inline">Loaded: {loadedDataMeta.data_set_name}</span>

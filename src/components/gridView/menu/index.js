@@ -36,7 +36,7 @@ import { GripVertical, LineChart, Pencil, Trash } from "lucide-react";
 import { useMyStateV2 } from '@/context/stateContextV2';
 import { Card } from "@/components/ui/card";
 
-export function Menu() {
+export function Menu({ compact }) {
   const contextStateV2 = useMyStateV2();
 
   let connectedCols = contextStateV2?.connectedCols || []
@@ -208,11 +208,18 @@ export function Menu() {
   };
 
   return (
-    <div className="px-2 lg:px-4">
-      <div className="flex gap-4 border border-slate-200 rounded-md py-2 px-3 place-items-center place-content-center">
-        <div className="bg-white cursor-pointer hover:bg-lychee_green/60 text-xs"  onClick={() => handleOpen("editColumns")}> Column Properties </div>  
-        <div className="flex cursor-pointer hover:bg-lychee_green/60 text-xs"  onClick={() => setViewing("charts")}> <LineChart className="w-4 h-4"/> Chart </div>
-        <div onClick={()=>setViewing('presentation')} className="cursor-pointer hover:bg-lychee_green/60 text-xs">Present </div> 
+    <div className={compact ? "" : "px-2 lg:px-4"}>
+      <div className={`flex gap-2 place-items-center ${!compact ? "border border-slate-200 rounded-md py-2 px-3 place-content-center" : ""}`}>
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => handleOpen("editColumns")}>
+          Column Properties
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setViewing("charts")}>
+          <LineChart className="h-3.5 w-3.5" />
+          Chart
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setViewing('presentation')}>
+          Present
+        </Button>
       </div>
       {/* Universal Drawer */}
       <Drawer open={open} onOpenChange={setOpen}>

@@ -310,7 +310,7 @@ const Polymarket = ({ setConnectedData }) => {
                   <Input
                     type="text"
                     placeholder={param.hint || `Enter ${param.key}`}
-                    className="h-8 text-xs w-full max-w-[180px] min-w-0"
+                    className="h-8 text-xs placeholder:text-[10px] w-full max-w-[180px] min-w-0"
                     value={paramValues[param.key] || ""}
                     onChange={(e) => setParamValues((prev) => ({ ...prev, [param.key]: e.target.value }))}
                   />
@@ -319,7 +319,7 @@ const Polymarket = ({ setConnectedData }) => {
                 <Input
                   type="number"
                   placeholder={param.default !== undefined ? String(param.default) : param.key}
-                  className="h-8 text-xs w-full max-w-[140px] min-w-0"
+                  className="h-8 text-xs placeholder:text-[10px] w-full max-w-[140px] min-w-0"
                   value={paramValues[param.key] ?? (param.default !== undefined ? String(param.default) : "")}
                   onChange={(e) => setParamValues((prev) => ({ ...prev, [param.key]: e.target.value }))}
                 />
@@ -337,7 +337,7 @@ const Polymarket = ({ setConnectedData }) => {
                 <Input
                   type="text"
                   placeholder={param.hint || (param.default !== undefined ? String(param.default) : param.key)}
-                  className="h-8 text-xs w-full max-w-sm min-w-0"
+                  className="h-8 text-xs placeholder:text-[10px] w-full max-w-sm min-w-0"
                   value={paramValues[param.key] ?? (param.default !== undefined ? String(param.default) : "")}
                   onChange={(e) => setParamValues((prev) => ({ ...prev, [param.key]: e.target.value }))}
                 />
