@@ -147,7 +147,27 @@ const IntegrationsView = () => {
 
   return (
     <div className="">
-      <div className="p-10 md:p-12 lg:p-16 xl:p-32">
+      <div className="pt-4 p-10 md:p-12 lg:p-16 xl:p-32">
+            <div className="w-full pb-20">
+              <Card className="relative overflow-hidden flex flex-row w-full">
+                <BorderBeam size={250} duration={12} colorFrom="#2E5CFF" colorTo="#60a5fa" />
+                <div className="flex w-full min-h-[180px]">
+                  <div className="w-48 sm:w-64 shrink-0 flex items-center justify-center bg-[#2E5CFF] p-6">
+                    <Image src="/polymarket.png" height={80} width={80} alt="Polymarket" className="rounded-full" />
+                  </div>
+                  <div className="flex flex-1 flex-col justify-between p-6">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-2xl font-bold">Polymarket</h3>
+                        <Badge className="bg-amber-500 text-white shrink-0">New</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">All the data you could want on the world&apos;s largest prediction market.</p>
+                    </div>
+                    <Button onClick={() => clickHandler("polymarket")} className="w-fit mt-4">Connect</Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
             <div className="mx-auto grid w-full lg:w-5/6 md:grid-cols-2 pb-16 gap-10 lg:gap-6 place-items-center place-content-center">
               <div className="max-w-xl"> 
                 <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
@@ -173,26 +193,7 @@ const IntegrationsView = () => {
               ))}
             </div>
             {/* Featured Polymarket card - full width, image left, text right */}
-            <div className="w-full mb-10">
-              <Card className="relative overflow-hidden flex flex-row w-full">
-                <BorderBeam size={250} duration={12} colorFrom="#2E5CFF" colorTo="#60a5fa" />
-                <div className="flex w-full min-h-[180px]">
-                  <div className="w-48 sm:w-64 shrink-0 flex items-center justify-center bg-[#2E5CFF] p-6">
-                    <Image src="/polymarket.png" height={80} width={80} alt="Polymarket" className="rounded-full" />
-                  </div>
-                  <div className="flex flex-1 flex-col justify-between p-6">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-2xl font-bold">Polymarket</h3>
-                        <Badge className="bg-amber-500 text-white shrink-0">New</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">All the data you could want on the world&apos;s largest prediction market.</p>
-                    </div>
-                    <Button onClick={() => clickHandler("polymarket")} className="w-fit mt-4">Connect</Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
+            
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
               {integrations_list
                 .filter(integration => !selectedTag || integration.tags.includes(selectedTag))
