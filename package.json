@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/build-search-index.js && next dev",
+    "build": "node scripts/build-search-index.js && next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -45,6 +45,7 @@
     "@stripe/react-stripe-js": "^1.16.5",
     "@stripe/stripe-js": "^1.47.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
+    "@tailwindcss/typography": "^0.5.19",
     "ag-charts-community": "^9.0.2",
     "ag-charts-react": "^9.0.2",
     "ag-grid-react": "^31.0.3",
@@ -56,6 +57,8 @@
     "cookie": "^0.5.0",
     "date-fns": "^3.6.0",
     "debug": "^4.3.4",
+    "fuse.js": "^7.1.0",
+    "gray-matter": "^4.0.3",
     "html-react-parser": "^5.1.0",
     "html-to-image": "^1.11.11",
     "lucide-react": "^0.365.0",
@@ -67,6 +70,7 @@
     "mongodb-client-encryption": "^2.9.1",
     "mongoose": "^7.0.3",
     "next": "^14.1.0",
+    "next-mdx-remote": "^6.0.0",
     "next-themes": "^0.3.0",
     "next-video": "^1.1.1",
     "node-twitter-api": "^1.8.0",
@@ -86,6 +90,8 @@
     "react-shepherd": "^4.3.0",
     "react-type-animation": "^3.2.0",
     "recharts": "^2.12.7",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-slug": "^6.0.0",
     "sonner": "^1.4.41",
     "stream": "^0.0.2",
     "stripe": "^11.11.0",
@@ -100,12 +106,15 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/node": "^25.3.1",
+    "@types/react": "^19.2.14",
     "clsx": "^2.1.0",
     "cobe": "^0.6.3",
     "daisyui": "^4.9.0",
     "framer-motion": "^11.0.25",
     "react-spring": "^9.7.3",
     "tailwind-merge": "^2.2.2",
-    "tailwindcss": "^3.4.3"
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.9.3"
   }
 }

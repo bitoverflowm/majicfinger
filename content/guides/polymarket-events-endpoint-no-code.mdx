@@ -1,0 +1,230 @@
+---
+title: "How to Pull and Analyze Polymarket Event Data (No-Code) Using the Events Endpoint"
+description: "Learn how to connect Polymarket’s Events endpoint to Lychee, filter and analyze structured event data, and export datasets — no code required."
+publishedAt: "2025-02-26"
+author: "Lychee Team"
+topics: ["polymarket", "prediction markets", "market structure", "no-code"]
+integration: ["Polymarket"]
+coverImage: "/ogImage.png"
+featured: true
+---
+
+Lychee acts as your quant in a box — letting you interact with structured market data as if it were a spreadsheet, not raw JSON.
+
+## What Is the Polymarket Events Endpoint?
+
+The Events endpoint returns high-level metadata about every event listed on Polymarket.
+
+Each event includes:
+
+- Title  
+- Description  
+- Category (Crypto, Politics, Sports, etc.)  
+- Status (Open or Closed)  
+- Tags  
+- Liquidity and volume fields  
+- A nested list of associated markets  
+
+Polymarket structures its data hierarchically:
+
+**Event → Markets → Outcomes**
+
+An event represents a broader question.
+
+For example:
+
+> “Which crypto company will ZachXBT expose for insider trading?”
+
+That single event may contain multiple markets, such as:
+
+- Axiom  
+- Metaroa  
+- Pump.fun  
+- Robinhood  
+
+Each market represents an outcome within that event.
+
+Understanding this structure is critical if you want to filter, aggregate, or export meaningful data.
+
+---
+
+## Why Event-Level Data Matters
+
+Most users look at Polymarket through the front-end interface.
+
+But once you access the Events endpoint directly, you can:
+
+### 1. Analyze Market Structure
+
+- How many events are currently open?  
+- Which categories are growing?  
+- What types of events generate the most volume?  
+
+### 2. Identify Narrative Trends
+
+By grouping events by tag or category, you can track:
+
+- Emerging political narratives  
+- Crypto ecosystem speculation  
+- Recurring event themes  
+
+### 3. Compare Liquidity Across Categories
+
+You can sort events by:
+
+- Total volume  
+- Liquidity  
+- Status (open vs closed)  
+
+This helps you identify where capital is concentrating.
+
+### 4. Export Structured Data
+
+Instead of manually browsing the UI, you can export event-level data to:
+
+- CSV  
+- Excel  
+- BI tools  
+- Python environments  
+
+This makes systematic research possible.
+
+And with Lychee, this entire workflow is no-code.
+
+---
+
+## Who This Is For
+
+This workflow is especially useful for:
+
+- Quantitative traders analyzing prediction market structure  
+- Researchers studying crowd forecasting behavior  
+- Crypto analysts tracking narrative shifts  
+- Journalists monitoring high-signal events  
+- Builders creating dashboards or reports  
+
+If you want structured insight — not screenshots — this endpoint is foundational.
+
+---
+
+## Why Use Lychee Instead of Raw API Calls?
+
+Working directly with APIs requires:
+
+- Authentication handling  
+- Parsing nested JSON  
+- Writing scripts  
+- Managing data storage  
+
+Lychee removes that complexity.
+
+You can:
+
+- Connect directly to the Polymarket Events endpoint  
+- Automatically parse nested fields  
+- Filter and sort visually  
+- Transform data  
+- Export clean datasets  
+
+No scripts.  
+No backend setup.  
+No JSON wrangling.  
+
+Just structured analysis.
+
+This is where “quant in a box” becomes real.
+
+---
+
+## What You Can Do After Connecting the Events Endpoint
+
+Once the data is inside Lychee, you can:
+
+- Filter events by category (e.g., Crypto only)  
+- Filter by status (open vs closed)  
+- Sort by volume or liquidity  
+- Search by keyword  
+- Expand nested markets  
+- Export structured event data  
+
+This is the foundation for more advanced workflows, including:
+
+- Joining event data with trades endpoint data  
+- Charting volume by category  
+- Tracking open interest trends  
+- Building recurring market structure reports  
+
+Each of those will be covered in future guides.
+
+---
+
+## Step-by-Step: Connecting the Polymarket Events Endpoint in Lychee
+
+_Add screenshots and detailed UI instructions in this section._
+
+Structure this clearly:
+
+1. Create a new API connection  
+2. Enter the Events endpoint URL  
+3. Fetch the dataset  
+4. Expand nested markets  
+5. Apply filters  
+6. Sort by volume  
+7. Export data  
+
+Keep this section practical and visual.
+
+---
+
+## How This Fits Into the Larger Polymarket API Series
+
+This article is part of a structured walkthrough of Polymarket’s API inside Lychee.
+
+Upcoming guides will cover:
+
+- Markets endpoint  
+- Trades endpoint  
+- Orderbook data  
+- Charting event-level metrics  
+- Joining datasets for advanced analysis  
+
+The goal is to move from:
+
+**Raw endpoint → Structured dataset → Visualization → Insight**
+
+By the end of this series, you’ll be able to analyze prediction markets without writing a single line of code.
+
+---
+
+## Final Thoughts
+
+The Polymarket Events endpoint provides the structural backbone of the platform.
+
+By connecting it to Lychee, you turn static API responses into interactive datasets.
+
+Filter them.  
+Sort them.  
+Export them.  
+Build on them.  
+
+This is the first layer of prediction market intelligence — and the foundation for deeper quantitative analysis.
+
+---
+
+## Why This Structure Works Long-Term
+
+This article:
+
+- Targets durable search intent (Polymarket Events endpoint)  
+- Positions Lychee as infrastructure  
+- Builds a repeatable template for other endpoints  
+- Creates internal linking opportunities  
+- Sets up future charting and analysis content  
+
+And most importantly:
+
+It builds trust.
+
+No hype.  
+No trend-chasing.  
+Just real utility.
