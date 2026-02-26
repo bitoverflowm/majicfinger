@@ -150,12 +150,12 @@ const IntegrationsView = () => {
       <div className="pt-4 p-10 md:p-12 lg:p-16 xl:p-32">
             <div className="w-full pb-20">
               <Card className="relative overflow-hidden flex flex-row w-full">
-                <BorderBeam size={250} duration={12} colorFrom="#2E5CFF" colorTo="#60a5fa" />
+                <BorderBeam size={250} duration={12} colorFrom="#2E5CFF" colorTo="#60a5fa" className="pointer-events-none" />
                 <div className="flex w-full min-h-[180px]">
                   <div className="w-48 sm:w-64 shrink-0 flex items-center justify-center bg-[#2E5CFF] p-6">
                     <Image src="/polymarket.png" height={80} width={80} alt="Polymarket" className="rounded-full" />
                   </div>
-                  <div className="flex flex-1 flex-col justify-between p-6">
+                  <div className="flex flex-1 flex-col justify-between p-6 relative z-10">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="text-2xl font-bold">Polymarket</h3>
@@ -163,7 +163,13 @@ const IntegrationsView = () => {
                       </div>
                       <p className="text-sm text-muted-foreground">All the data you could want on the world&apos;s largest prediction market.</p>
                     </div>
-                    <Button onClick={() => clickHandler("polymarket")} className="w-fit mt-4">Connect</Button>
+                    <div className="flex flex-wrap items-center gap-2 mt-4">
+                      <Button onClick={() => clickHandler("polymarket")} className="w-fit">Connect</Button>
+                      <Button variant="outline" className="w-fit bg-white rounded-md border border-input">Guide</Button>
+                      <Button variant="outline" className="w-fit bg-white rounded-md border border-input" asChild>
+                        <a href="https://docs.polymarket.com/" target="_blank" rel="noopener noreferrer">View Official Docs</a>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>

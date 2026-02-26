@@ -34,6 +34,7 @@ import { debounce } from "@/lib/debounce";
 
 const DashBody = ({user}) => {
     const contextStateV2 = useMyStateV2()
+    const setViewing = contextStateV2?.setViewing
 
     const viewing = contextStateV2?.viewing
     const integrationSidebar = contextStateV2?.integrationSidebar
@@ -280,6 +281,13 @@ const DashBody = ({user}) => {
                     <div>For now I have enabled managed billing using Stripe click here: </div>
                     <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
                 </div>}
+                <button
+                    type="button"
+                    onClick={() => setViewing?.('pricing')}
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-border shadow-lg hover:shadow-xl transition-shadow text-xs font-medium opacity-70 hover:opacity-100"
+                >
+                    Deal for you
+                </button>
                 </div>
             </SidebarInset>
         </SidebarProvider>
