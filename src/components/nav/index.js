@@ -51,20 +51,22 @@ const Nav = () => {
     };
 
     return (
-      <header className="absolute w-full z-30 top-0 flex h-16 items-center gap-4 bg-lychee_black text-lychee_white px-4 md:px-6">
+      <header className="absolute w-full z-30 top-0 flex h-16 items-center gap-4 px-4 md:px-6">
             {isLandingPage && (
-              <div className="flex place-items-end gap-2 mr-4 shrink-0 text-sm">
-                <Link href="/" className="flex gap-1 place-items-end pr-3">
+              <div className="flex items-center gap-6 mr-4 shrink-0 text-sm font-semibold">
+                <Link href="/" className="flex gap-1.5 items-center pr-3">
                   {!logoError && (
-                    <Image src="/fruit.png" alt="Lychee" width={20} height={20} className="grayscale object-contain" onError={() => setLogoError(true)} />
+                    <span className="flex shrink-0 items-center justify-center">
+                      <Image src="/fruit.png" alt="Lychee" width={24} height={24} className="grayscale object-contain block" onError={() => setLogoError(true)} />
+                    </span>
                   )}
-                  <span className="font-black text-xl place-self-end">Lychee</span>
+                  <span className="pt-2 font-black text-xl leading-none">Lychee</span>
                 </Link>
-                <div className='cursor-pointer'><Link href="https://misterrpink.beehiiv.com/"  rel="noopener noreferrer" target="_blank">Newsletter</Link></div>
+                <div className='cursor-pointer pl-6 pt-2'><Link href="https://misterrpink.beehiiv.com/"  rel="noopener noreferrer" target="_blank">Newsletter</Link></div>
                 <div className='cursor-pointer hidden'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Request a Feature</Link></div>
-                <div className='cursor-pointer'><Link href="/affiliates">Affiliates</Link></div>
+                <div className='cursor-pointer pt-2'><Link href="/affiliates">Affiliates</Link></div>
                 <div className='cursor-pointer hidden'><Link href="/dataUse">Data Use</Link></div>
-                <div className='cursor-pointer'><Link href="/help">Questions?</Link></div>
+                <div className='cursor-pointer pt-2'><Link href="/help">Questions?</Link></div>
               </div>
             )}
             <nav className="hidden flex-col place-items-center place-content-center md:text-xs md:ml-auto md:flex md:flex-row md:items-center md:gap-4">
@@ -73,10 +75,10 @@ const Nav = () => {
               {
                 !(user) ?
                   <>
-                      <Link href="#getIt" className="bg-green-600 hover:bg-green-500 text-white rounded-lg py-2 px-4 transition-colors">
+                      <Link href="#getIt" className="bg-foreground hover:bg-secondary text-white dark:text-black font-bold hover:text-foreground dark:hover:text-white rounded-md py-2 px-4 transition-colors">
                         Sign Up
                       </Link>
-                      <div className="bg-white text-lychee_black rounded-lg py-2 px-2">
+                      <div className="py-2 px-2 rounded-md hover:bg-background hover:text-foreground">
                         <Link href="/login">Log In</Link>
                       </div>
                       <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-white/30 bg-transparent hover:bg-white/10 text-lychee_white inline-flex items-center justify-center" />

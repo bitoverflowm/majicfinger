@@ -48,7 +48,7 @@ export default function Home() {
       <GoogleAnalytics gaId="G-G8X2NEPTEG" />
       <StateProvider>
         <Nav/>
-        <div className="bg-lychee_black z-10 pt-32 pb-20">
+        <div className="z-10 pt-32 pb-20">
           <LandingPage />
         </div>
       </StateProvider>

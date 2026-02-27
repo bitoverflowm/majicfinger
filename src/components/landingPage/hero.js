@@ -329,9 +329,6 @@ export function Hero() {
     return (
         <section id="hero" className="flex place-content-center w-full mx-auto overflow-hidden">            
             <div className="relative h-full w-full container">
-                <div className="text-balance bg-gradient-to-br from-lychee_blue from-0% to-lychee_red/70 bg-clip-text font-black leading-none tracking-tighter text-transparent pt-10 pb-3 sm:py-10 text-7xl sm:text-[150px] xl:text-[250px] text-center">
-                    Lychee<span className="text-lychee_red pl-1 sm:pl-4" style={{ textShadow: '0px 0px 50px rgba(169, 29, 58, 1)'}}>.</span>
-                </div>
                 <h3 className="text-slate-200 text-center scroll-m-20 text-2xl font-semibold tracking-tight">
                     Spreadsheets were invented in the 20th century, it's time for a change.
                 </h3>
