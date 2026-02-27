@@ -92,6 +92,9 @@
     --shadow-2xl: 0 1px 3px 0 hsl(0 0% 0% / 0.25);
     --sidebar-background: 240 5.9% 10%;
   }
+  .theme {
+    --animate-gradient: gradient 8s linear infinite;
+  }
 }
 
 @layer base {
@@ -165,4 +168,12 @@ body {
   ::view-transition-old(root), ::view-transition-new(root) {
     animation: none;
     mix-blend-mode: normal;
+}
+
+  @theme inline {
+  @keyframes gradient {
+  to {
+    background-position: var(--bg-size, 300%) 0;
+    }
+  }
 }

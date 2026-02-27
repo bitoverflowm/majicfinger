@@ -5,12 +5,14 @@ import { useRef, useEffect, useState } from "react"
 import Link from "next/link";
 import Image from "next/image";
 
+import { ChevronRight } from "lucide-react"
+
 import { ChartShow } from '@/app/charts/showcase/chart1';
 import { Badge } from '../ui/badge';
 
 import { BorderBeam } from "../magicui/border-beam";
 
-import { MoveRight } from "lucide-react";
+import { MoveRight, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatedList } from "@/components/magicui/animated-list";
 import { FaCircle } from 'react-icons/fa';
@@ -18,6 +20,10 @@ import Marquee from "@/components/magicui/marquee";
 import LycheeFeatureGrid from '../easyLychee/usage/lychee_feature_grid';
 import { Card, CardTitle } from '../ui/card';
 import { PiCircleFill } from "react-icons/pi";
+import { Button } from '@/components/ui/button'
+import { WavyBackground } from "../ui/wavy-background";
+
+
 
 
 export const Highlight = ({
@@ -329,26 +335,41 @@ export function Hero() {
     return (
         <section id="hero" className="flex place-content-center w-full mx-auto overflow-hidden">            
             <div className="relative h-full w-full container">
-                <h3 className="text-slate-200 text-center scroll-m-20 text-2xl font-semibold tracking-tight">
-                    Spreadsheets were invented in the 20th century, it's time for a change.
-                </h3>
-                <div className='py-10' id="about">
-                    <p className="text-center text-xl text-slate-300 md:w-1/2 mx-auto">
-                        Let's face it. You're doing <span className='font-black'> too many jobs.</span> And its <span className='font-black'> burning you out.</span> 
-                    </p>
-                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">                        
-                        Find data, download it, clean it, format it, analyze, visualize, present. Repeat. Almost none of this is reliably covered by your current spreadshet tool. So, we built Lychee. 
-                    </p>
-                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">
-                        The all-in-one data platform that <span className='font-black'>helps you move faster and make more progress</span> than you ever imagined
-                    </p>
-                    <p className="pt-10 text-center text-xl text-slate-300 md:w-1/2 mx-auto">
-                        Lychee encompasses your entire workflow, from getting data, to analyzing, presenting and sharing your work. Not EVERYTHING under the sun. Just the stuff that MATTERS to get things finished.
-                    </p> 
+                <WavyBackground className="w-full" backgroundFill="none">
+                <div className="relative flex flex-col items-center justify-center mx-auto w-2/3 px-4 pt-12 pb-2 md:pt-24 md:pb-6">
+                    <Link href="/guides/polymarket-events-endpoint-no-code">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="mb-5 h-7 rounded-full px-3 gap-1.5 shadow-xs bg-card hover:bg-accent text-sm font-medium w-fit"
+                        >
+                            <span className="size-1.5 rounded-full bg-green-500" />
+                            <span>No-Code Polymarket integration is live</span>
+                            <ArrowUpRight className="size-4 shrink-0" />
+                        </Button>
+                    </Link>
+                    <h1 className="text-6xl font-black">
+                        Your Quant in a Box
+                    </h1>
+                    <h2 className="pt-2 text-lg font-light">
+                        Built for Polymarket <span className="text-black/40 text-xs">•</span> Powerful for anyone who works with data.
+                    </h2>
+                    <div className="text-sm">
+                        <p className="pt-16">Lychee is workflow collapse</p>
+                        <p className="">No CSVs, No Python, No copy-pasting.</p>
+                        <p className="">Just raw data to analysis, charts and actionable insights in seconds. Real quantitative edge. 0 lines of code.</p>
+                    </div>
                 </div>
-                <div className='flex gap-2 place-content-center py-4'>
+                </WavyBackground>
+                <div className='flex gap-2 place-content-center'>
                     <Link href="#about">
-                        <div className='shadow-2xl bg-black hover:bg-white hover:text-black rounded-md text-slate-200 px-4 py-3 text-xs'> Tell Me More </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="m"
+                        >
+                            <div className='shadow-2xl'> Tell Me More </div>
+                        </Button>
                     </Link>
                     <Link href="#getIt">
                         <div className='shadow-2xl bg-green-500 text-black hover:bg-white hover:text-black rounded-md px-4 py-3 text-xs'>I want it.</div>
@@ -586,13 +607,7 @@ export function Hero() {
                             <small className="text-center text-black text-xs font-medium leading-none">One time payment</small>
                             <div className='flex gap-2 place-content-center place-items-center text-xs'><PiCircleFill className='animate-ping text-green-400 h-3 w-3'/><p className="text-black text-xs">11 seats left at this price</p></div>           
                         </div>
-                    </div>
-                    <div className='px-20'>
-                            <p className="py-1 text-sm text-muted-foreground">*Being a creator of a data platform I gotta cite my sources.</p>
-                            <p className="py-1 text-sm text-muted-foreground">West Monroe Partners Study (2021): This study highlighted that the average U.S. household spends about $273 per month on subscriptions, including streaming services, subscription boxes, software subscriptions, and other recurring payments.</p>
-                            <p className="py-1 text-sm text-muted-foreground">Typical Household Lifespan: The duration of 60 years is an estimated average based on a household's active years from young adulthood through retirement.</p>
-                            <p className="py-1 text-sm text-muted-foreground">60 X 12 X $273 = $196,560</p>
-                        </div>                
+                    </div>              
                 </div>
             </div>
         </section>
