@@ -10,14 +10,7 @@ import Particles from "../magicui/particles";
 const LandingPage = () => {
 
     return (
-        <div className='font-body sm:pt-5 text-black' >
-            <Particles
-                    className="absolute inset-0 z-0"
-                    quantity={100}
-                    ease={80}
-                    color={'#ffffff'}
-                    refresh
-                />         
+        <div className='font-body sm:pt-5 text-black' >    
             <Hero/>
             <div className='w-full flex fixed bottom-0 sm:bottom-5 sm:pr-5 z-20 place-content-center sm:place-content-end '>
                 <Link className='text-center w-full sm:w-32 bg-green-600 sm:bg-green-600 p-2 rounded-t-xl sm:rounded-md hover:border hover:border-white' href={"#getIt"}>

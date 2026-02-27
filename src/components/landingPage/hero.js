@@ -319,6 +319,12 @@ export function Hero() {
         },
     };
 
+    //Your Quant in a Box
+    //Built for prediction markets, powerful for anyone who works with data.
+    //Lychee collapses the workflow: 0 lines of code. No CSVs, no Python, no copy-pasting. Just raw data to analysis, charts, actionable insights in seconds. Real quantitative edge.
+    //
+ 
+
 
     return (
         <section id="hero" className="flex place-content-center w-full mx-auto overflow-hidden">            
