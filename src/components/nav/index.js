@@ -1,10 +1,11 @@
 'use client'
+import { useState } from 'react';
 import { useUser  } from '@/lib/hooks';
 import Link from 'next/link'
 import Image from 'next/image';
 
-import { useRouter } from 'next/navigation'
-import { Menu } from "lucide-react"
+import { useRouter, usePathname } from 'next/navigation'
+import { Menu, Citrus } from "lucide-react"
 
 
 import { Button } from "@/components/ui/button"
@@ -18,10 +19,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { TwitterLogoIcon } from '@radix-ui/react-icons';
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 
 
 const Nav = () => {
     const user = useUser()
+    const pathname = usePathname();
+    const isLandingPage = pathname === '/';
+    const [logoError, setLogoError] = useState(false);
 
     const router = useRouter();
 
@@ -47,24 +52,40 @@ const Nav = () => {
 
     return (
       <header className="absolute w-full z-30 top-0 flex h-16 items-center gap-4 bg-lychee_black text-lychee_white px-4 md:px-6">
-            <nav className="hidden flex-col md:text-xs md:ml-auto md:flex md:flex-row md:items-center md:gap-12">
-              <div className='cursor-pointer hidden'><Link href="https://x.com/misterrpink1"  rel="noopener noreferrer" target="_blank"><TwitterLogoIcon /></Link></div>
-              <div className='cursor-pointer'><Link href="https://misterrpink.beehiiv.com/"  rel="noopener noreferrer" target="_blank">Newsletter</Link></div>
-              <div className='cursor-pointer hidden'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Request a Feature</Link></div>
-              <div className='cursor-pointer'><Link href="/affiliates">Affiliates</Link></div>
-              <div className='cursor-pointer hidden'><Link href="/dataUse">Data Use</Link></div>
-              <div className='cursor-pointer'><Link href="/help">Questions?</Link></div>
+            {isLandingPage && (
+              <div className="flex place-items-end gap-2 mr-4 shrink-0 text-sm">
+                <Link href="/" className="flex gap-1 place-items-end pr-3">
+                  {!logoError && (
+                    <Image src="/fruit.png" alt="Lychee" width={20} height={20} className="grayscale object-contain" onError={() => setLogoError(true)} />
+                  )}
+                  <span className="font-black text-xl place-self-end">Lychee</span>
+                </Link>
+                <div className='cursor-pointer'><Link href="https://misterrpink.beehiiv.com/"  rel="noopener noreferrer" target="_blank">Newsletter</Link></div>
+                <div className='cursor-pointer hidden'><Link href="https://lychee.featurebase.app/"  rel="noopener noreferrer" target="_blank">Request a Feature</Link></div>
+                <div className='cursor-pointer'><Link href="/affiliates">Affiliates</Link></div>
+                <div className='cursor-pointer hidden'><Link href="/dataUse">Data Use</Link></div>
+                <div className='cursor-pointer'><Link href="/help">Questions?</Link></div>
+              </div>
+            )}
+            <nav className="hidden flex-col place-items-center place-content-center md:text-xs md:ml-auto md:flex md:flex-row md:items-center md:gap-4">
+              <div className='cursor-pointer'><Link href="https://x.com/misterrpink1"  rel="noopener noreferrer" target="_blank"><TwitterLogoIcon /></Link></div>
+              
               {
                 !(user) ?
                   <>
+                      <Link href="#getIt" className="bg-green-600 hover:bg-green-500 text-white rounded-lg py-2 px-4 transition-colors">
+                        Sign Up
+                      </Link>
                       <div className="bg-white text-lychee_black rounded-lg py-2 px-2">
-                        <Link href="/login">Member Log In</Link>
+                        <Link href="/login">Log In</Link>
                       </div>
+                      <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-white/30 bg-transparent hover:bg-white/10 text-lychee_white inline-flex items-center justify-center" />
                   </>
                   :<>
                     <div>
                       <Link href="/dashboard">Dashboard</Link>
                     </div>
+                    <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-white/30 bg-transparent hover:bg-white/10 text-lychee_white inline-flex items-center justify-center" />
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="secondary" className="rounded-full shadow-2xl shadow-inner flex bg-white">
