@@ -3,6 +3,14 @@ import { cn } from "@/lib/utils";
 import React, { useEffect, useRef, useState } from "react";
 import { createNoise3D } from "simplex-noise";
 
+const LIGHT_BG = "#ffffff";
+const DARK_BG = "#151515";
+
+const getThemeBackground = () => {
+  if (typeof document === "undefined") return DARK_BG;
+  return document.documentElement.classList.contains("dark") ? DARK_BG : LIGHT_BG;
+};
+
 export const WavyBackground = ({
   children,
   className,
@@ -24,6 +32,7 @@ export const WavyBackground = ({
     ctx,
     canvas;
   const canvasRef = useRef(null);
+  const resolvedBgRef = useRef(getThemeBackground());
   const getSpeed = () => {
     switch (speed) {
       case "slow":
@@ -74,12 +83,27 @@ export const WavyBackground = ({
 
   let animationId;
   const render = () => {
-    ctx.fillStyle = backgroundFill || "black";
+    const fill = backgroundFill != null && backgroundFill !== "inherit"
+      ? backgroundFill
+      : resolvedBgRef.current;
+    ctx.fillStyle = fill || resolvedBgRef.current;
     ctx.globalAlpha = waveOpacity || 0.5;
     ctx.fillRect(0, 0, w, h);
     drawWave(5);
     animationId = requestAnimationFrame(render);
   };
+
+  useEffect(() => {
+    resolvedBgRef.current = getThemeBackground();
+    const observer = new MutationObserver(() => {
+      resolvedBgRef.current = getThemeBackground();
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     init();

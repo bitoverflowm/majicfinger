@@ -335,8 +335,8 @@ export function Hero() {
     return (
         <section id="hero" className="flex place-content-center w-full mx-auto overflow-hidden">            
             <div className="relative h-full w-full container">
-                <WavyBackground className="w-full" backgroundFill="none">
-                <div className="relative flex flex-col items-center justify-center mx-auto w-2/3 px-4 pt-12 pb-2 md:pt-24 md:pb-6">
+                <WavyBackground className="w-full">
+                <div className="relative flex flex-col items-center justify-center mx-auto w-2/3 px-4 pt-12 pb-2 md:pt-4 md:pb-6">
                     <Link href="/guides/polymarket-events-endpoint-no-code">
                         <Button
                             variant="outline"
@@ -360,7 +360,6 @@ export function Hero() {
                         <p className="">Just raw data to analysis, charts and actionable insights in seconds. Real quantitative edge. 0 lines of code.</p>
                     </div>
                 </div>
-                </WavyBackground>
                 <div className='flex gap-2 place-content-center'>
                     <Link href="#about">
                         <Button
@@ -375,6 +374,7 @@ export function Hero() {
                         <div className='shadow-2xl bg-green-500 text-black hover:bg-white hover:text-black rounded-md px-4 py-3 text-xs'>I want it.</div>
                     </Link>
                 </div>
+                </WavyBackground>
                 <div className='py-10'>
                     <Link rel="noopener noreferrer" target="_blank" href={"https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee"}>
                         <h1 className="text-xl sm:text-4xl text-lychee_green font-extrabold tracking-tight  place-items-center text-center  hover:underline cursor-pointer ">
