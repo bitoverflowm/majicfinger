@@ -19,10 +19,10 @@ function HeroPill() {
       transition={{ duration: 0.8, ease }}
     >
       <div className="w-fit rounded-full bg-accent px-2 py-0.5 text-center text-xs font-medium text-primary sm:text-sm">
-        📣 Announcement
+        🎉 New
       </div>
       <p className="text-xs font-medium text-primary sm:text-sm">
-        New chart types available
+        Get Polymarket data in 0.67 seconds
       </p>
       <svg
         width="12"
@@ -50,7 +50,7 @@ function HeroTitles() {
         animate={{ filter: "blur(0px)", opacity: 1, y: 0 }}
         transition={{ duration: 1, ease, staggerChildren: 0.2 }}
       >
-        {["Create", "stunning", "charts", "effortlessly"].map((text, index) => (
+        {["Your", "Quant", "in", "a", "box"].map((text, index) => (
           <motion.span
             key={index}
             className="inline-block px-1 md:px-2 text-balance font-semibold"
@@ -72,7 +72,7 @@ function HeroTitles() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6, duration: 0.8, ease }}
       >
-        No matter what data you have, Easy Charts helps you visualize it beautifully. No subscriptions, unlimited exports.
+        Built for Polymarket • Powerful for anyone who works with data.
       </motion.p>
     </div>
   );
@@ -88,7 +88,7 @@ function HeroCTA() {
         transition={{ delay: 0.8, duration: 0.8, ease }}
       >
         <Link
-          href="/login"
+          href="https://buy.stripe.com/3csbL2c8K2iye6QcNg"
           className={cn(
             buttonVariants({ variant: "default" }),
             "w-full sm:w-auto text-background flex gap-2"
@@ -99,12 +99,12 @@ function HeroCTA() {
         </Link>
       </motion.div>
       <motion.p
-        className="mt-5 text-sm text-muted-foreground"
+        className="mt-5 text-sm text-muted-foreground w-1/2"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.0, duration: 0.8 }}
       >
-        Free tier available. No credit card required.
+        No CSVs, No Python, No copy-pasting. Just raw data to analysis and actionable insights. Real quantitative edge. 0 lines of code.
       </motion.p>
     </>
   );

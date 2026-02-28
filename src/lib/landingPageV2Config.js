@@ -1,12 +1,12 @@
 // Config for landing page v2 (MagicUI template)
 export const landingPageV2Config = {
-  name: "Easy Charts",
-  description: "Create stunning charts effortlessly with Easy Charts. No subscriptions, unlimited exports, and fully customizable.",
+  name: "Lychee",
+  description: "Your Quant in a Box. Built for Polymarket • Powerful for anyone who works with data. No CSVs, No Python, No copy-pasting. Just raw data to analysis and actionable insights. Real quantitative edge. 0 lines of code.",
   url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-  keywords: ["Charts", "Data Visualization", "Next.js", "React", "Tailwind CSS"],
+  keywords: ["PolyMarket", "quant", "Data Analysis", "Prediction Markets", "No-Code API", "Charts", "Data Visualization"],
   links: {
-    email: "support@lych3e.com",
-    twitter: "https://twitter.com/lych3e",
+    email: "support@bitoverflow.org",
+    twitter: "https://twitter.com/misterrpink1",
     discord: "#",
     github: "https://github.com",
     instagram: "#",
