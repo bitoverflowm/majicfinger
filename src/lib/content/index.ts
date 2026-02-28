@@ -4,7 +4,7 @@ import matter from "gray-matter";
 import type { BaseContent, ContentType, ContentItem } from "./types";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
-const CONTENT_TYPES: ContentType[] = ["guides", "integrations", "concepts", "playbooks"];
+const CONTENT_TYPES: ContentType[] = ["guides", "integrations", "concepts", "playbooks", "blog"];
 
 function normalizeFrontmatter(data: Record<string, unknown>): BaseContent {
   const d = data as Record<string, unknown>;

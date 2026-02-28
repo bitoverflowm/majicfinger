@@ -18,7 +18,7 @@ export type BaseContent = {
   featured?: boolean;
 };
 
-export type ContentType = "guides" | "integrations" | "concepts" | "playbooks";
+export type ContentType = "guides" | "integrations" | "concepts" | "playbooks" | "blog";
 
 export type GuideContent = BaseContent & {
   integration: string[];
