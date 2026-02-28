@@ -7,28 +7,28 @@ import { Brain, Shield, Zap } from "lucide-react";
 
 const problems = [
   {
-    title: "CSVs, Python, Copy-Pasting",
+    title: "Data is everywhere—and it’s a mess",
     description:
-      "The old workflow: export data, write Python scripts, copy-paste between tools. Hours wasted on plumbing instead of insights.",
-    icon: Brain,
+      "Polymarket, Twitter, CoinGecko… each source speaks a different language. Piecing it together manually costs hours, sanity, and missed opportunities.",
+    icon: Shield,
   },
   {
-    title: "Slow Data to Insights",
+    title: "Your edge is lost in the workflow",
     description:
-      "Traditional data pipelines are too slow. By the time you've analyzed the data, the opportunity has passed.",
+      "Downloading CSVs, cleaning data, plotting charts, copy-pasting into slides… by the time you’re done, the opportunity has passed. Most traders never act fast enough. Don’t be most traders.",
     icon: Zap,
   },
   {
-    title: "Scattered Data Sources",
+    title: "Excel won’t make you a quant",
     description:
-      "Polymarket, Twitter, CoinGecko—each has its own API, its own format. Connecting them used to require code.",
-    icon: Shield,
+      "Rows and columns can’t predict markets, they can’t automate insights, and they certainly can’t let one person beat a whole team of quants. Lychee can.",
+    icon: Brain,
   },
 ];
 
 export default function Problem() {
   return (
-    <Section title="Problem" subtitle="The old way of working with data is a hassle.">
+    <Section title="Problem" subtitle="You have no edge.">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
         {problems.map((problem, index) => (
           <BlurFade key={index} delay={0.2 + index * 0.2} inView>

@@ -40,17 +40,18 @@ export default function HeroVideoDialog({
   const selectedAnimation = animationVariants[animationStyle] || animationVariants["from-center"];
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative w-full", className)}>
       <div
-        className="relative cursor-pointer group rounded-md p-2 ring-1 ring-slate-200/50 dark:bg-gray-900/70 dark:ring-white/10 backdrop-blur-md"
+        className="relative cursor-pointer group rounded-md p-2 ring-1 ring-slate-200/50 dark:bg-gray-900/70 dark:ring-white/10 backdrop-blur-md w-full"
         onClick={() => setIsVideoOpen(true)}
       >
-        <div className="relative w-full aspect-video max-w-4xl rounded-md border bg-muted overflow-hidden">
+        <div className="relative w-full aspect-video min-h-[200px] rounded-md border bg-muted overflow-hidden">
           <Image
             src={thumbnailSrc || "/ogImage.png"}
             alt={thumbnailAlt}
             fill
-            className="object-cover transition-all duration-200 group-hover:brightness-[0.8] ease-out"
+            sizes="(max-width: 1024px) 100vw, 1024px"
+            className="object-cover transition-all duration-200 group-hover:brightness-[0.8] ease-out rounded-md"
           />
         </div>
         <div className="absolute inset-0 flex items-center justify-center group-hover:scale-100 scale-[0.9] transition-all duration-200 ease-out rounded-2xl">
@@ -73,7 +74,8 @@ export default function HeroVideoDialog({
             <motion.div
               {...selectedAnimation}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="relative w-full max-w-4xl aspect-video mx-4 md:mx-0"
+              className="relative w-full max-w-4xl aspect-video min-w-[280px] mx-4 md:mx-0"
+              onClick={(e) => e.stopPropagation()}
             >
               <motion.button
                 onClick={(e) => {

@@ -7,30 +7,30 @@ import { motion } from "framer-motion";
 const data = [
   {
     id: 1,
-    title: "1. Connect Your Data",
+    title: "1. Connect Your Data Instantly",
     content:
-      "Connect directly to Polymarket, Twitter, CoinGecko, and more. No code required. Not a single line.",
+      "Pull data directly from Polymarket, Twitter, CoinGecko, and more—no code required. Or upload your own CSV, JSON, or XLSX. Zero setup. Zero headaches. Just data ready to use.",
     icon: <Upload className="w-6 h-6 text-primary" />,
   },
   {
     id: 2,
-    title: "2. Let AI Analyze",
+    title: "2. Run Reliable Models or Ask AI",
     content:
-      "Ask in plain English: 'Turn my dataset into an article', 'Identify the main takeaways', 'Create a presentation for me.'",
+      "Choose from our most trusted, battle-tested models to uncover deep insights in seconds—or let the AI handle it. No Python, no debugging, just actionable results at the click of a button.",
     icon: <Zap className="w-6 h-6 text-primary" />,
   },
   {
     id: 3,
-    title: "3. Get Insights & Charts",
+    title: "3. Present & Share Like a Pro",
     content:
-      "Instant graphs, zero hassle. Raw data to analysis, charts and actionable insights in seconds.",
+      "Build live dashboards or hosted reports that update in real-time. Invite your team, share with the world, or keep it private. Say goodbye to PowerPoint and Canva—Lychee makes your analysis look as smart as it actually is.",
     icon: <Sparkles className="w-6 h-6 text-primary" />,
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <Section title="How it works" subtitle="0 lines of code. 3 steps.">
+    <Section title="How it works" subtitle="Absolutely No-brainer No-Code">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
         {data.map((item, index) => (
           <motion.div

@@ -74,7 +74,7 @@ function HeroTitles() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6, duration: 0.8, ease }}
       >
-        Built for Polymarket • Powerful for anyone who works with data.
+          One operator. Full pipeline. Real edge.
       </motion.p>
     </div>
   );
@@ -97,7 +97,7 @@ function HeroCTA() {
           )}
         >
           <Icons.logo width={20} height={20} className="h-4 w-4 brightness-0 invert dark:brightness-0 dark:invert" />
-          Get started for free
+          Get Your Edge Now Free
         </Link>
       </motion.div>
       <motion.div
@@ -106,9 +106,9 @@ function HeroCTA() {
         animate={{ opacity: 1 }}
         transition={{ delay: 1.0, duration: 0.8 }}
       >
-        <p>No CSVs, No Python, No copy-pasting.</p>
-        <p>Just raw data to analysis and actionable insights.</p>
-        <p>Real quantitative edge. <Highlighter action="highlight" color="#87CEFA">0 lines of code</Highlighter>.</p>
+        <p>Stop juggling CSVs, Python scripts, and messy charts.</p>
+        <p>Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser.</p>
+        <p>Zero coding. Zero friction. <Highlighter action="highlight" color="#87CEFA">Real results</Highlighter>.</p>
       </motion.div>
     </>
   );
@@ -124,10 +124,10 @@ function HeroImage() {
     >
       <HeroVideoDialog
         animationStyle="from-center"
-        videoSrc="https://www.youtube.com/embed/dQw4w9WgXcQ"
+        videoSrc="https://www.youtube.com/embed/Mhgk122WuFg?si=hRH4UxT8UbPv55MC"
         thumbnailSrc="/ogImage.png"
-        thumbnailAlt="Hero Video"
-        className="border rounded-lg shadow-lg max-w-screen-lg mt-16"
+        thumbnailAlt="Lychee - Analyze Anything"
+        className="border rounded-lg shadow-lg w-full max-w-4xl mt-16 px-4"
       />
     </motion.div>
   );

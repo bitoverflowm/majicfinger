@@ -7,23 +7,23 @@ import Image from "next/image";
 
 const features = [
   {
-    title: "Instant Graphs",
-    description: "Analyze anything. Let our AI do the heavy lifting. 0 lines of code.",
+    title: "Instant Charts & Insights",
+    description: "Turn raw data into beautiful, actionable charts in seconds. No Excel stress. No Python headaches. Just results that impress.",
     icon: BarChart3,
   },
   {
     title: "Direct Data Connections",
-    description: "Connect directly to Polymarket, Twitter, CoinGecko, and more. No code required.",
+    description: "Connect instantly to Polymarket, Twitter, CoinGecko, and more. One click, zero code, full control.",
     icon: LineChart,
   },
   {
-    title: "Website in 0.37 Seconds",
-    description: "Build an entire website from Google Sheets, Excel or .csv. Instantly.",
+    title: "Hosted Dashboards & Reports",
+    description: "Share insights instantly with your team—or the world. Live-updating dashboards and downloadable reports that make you look like a data wizard.",
     icon: Brain,
   },
   {
-    title: "Workflow Collapse",
-    description: "Raw data to analysis, charts and actionable insights in seconds. Real quantitative edge.",
+    title: "Full Pipeline, One Operator",
+    description: "From raw data to analysis, charts, and actionable insights—Lychee collapses the workflow so you can capture real edge faster than anyone else.",
     icon: FileText,
   },
 ];
@@ -33,7 +33,7 @@ export default function Solution() {
     <Section
       title="Solution"
       subtitle="Lychee is workflow collapse"
-      description="No CSVs, No Python, No copy-pasting. Just raw data to analysis, charts and actionable insights in seconds. Real quantitative edge. 0 lines of code."
+      description="Forget messy CSVs, scattered APIs, and endless code. With Lychee, one operator can do what used to take a full team. Connect, analyze, visualize, and share in seconds—real quantitative edge, zero lines of code."
       className="bg-muted/50"
     >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">

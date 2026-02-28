@@ -29,7 +29,6 @@ export default function LandingPageV2() {
       <Solution />
       <HowItWorks />
       <TestimonialsCarousel />
-      <Features />
       <Testimonials />
       <Pricing />
       <FAQ />
