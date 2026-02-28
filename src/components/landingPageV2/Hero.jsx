@@ -6,6 +6,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Icons } from "./Icons";
 import HeroVideoDialog from "./HeroVideoDialog";
+import { Highlighter } from "@/components/ui/highlighter"
+
 
 const ease = [0.16, 1, 0.3, 1];
 
@@ -88,24 +90,26 @@ function HeroCTA() {
         transition={{ delay: 0.8, duration: 0.8, ease }}
       >
         <Link
-          href="/login"
+          href="/landingpage_v2#pricing"
           className={cn(
             buttonVariants({ variant: "default" }),
             "w-full sm:w-auto text-background flex gap-2"
           )}
         >
-          <Icons.logo width={24} height={24} className="h-6 w-6" />
+          <Icons.logo width={20} height={20} className="h-4 w-4 brightness-0 invert dark:brightness-0 dark:invert" />
           Get started for free
         </Link>
       </motion.div>
-      <motion.p
-        className="mt-5 text-sm text-muted-foreground w-1/2"
+      <motion.div
+        className="text-center mt-5 text-md text-muted-foreground w-1/2"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.0, duration: 0.8 }}
       >
-        No CSVs, No Python, No copy-pasting. Just raw data to analysis and actionable insights. Real quantitative edge. 0 lines of code.
-      </motion.p>
+        <p>No CSVs, No Python, No copy-pasting.</p>
+        <p>Just raw data to analysis and actionable insights.</p>
+        <p>Real quantitative edge. <Highlighter action="highlight" color="#87CEFA">0 lines of code</Highlighter>.</p>
+      </motion.div>
     </>
   );
 }

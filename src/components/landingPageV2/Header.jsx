@@ -42,13 +42,12 @@ export default function Header() {
                 Login
               </Link>
               <Link
-                href="/login"
+                href="/landingpage_v2#pricing"
                 className={cn(
                   buttonVariants({ variant: "default" }),
                   "w-full sm:w-auto text-background flex gap-2"
                 )}
               >
-                <Icons.logo width={24} height={24} className="h-6 w-6" />
                 Get Started for Free
               </Link>
             </div>

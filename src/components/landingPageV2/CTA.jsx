@@ -22,7 +22,6 @@ export default function CTA() {
             "w-full sm:w-auto text-primary-foreground flex gap-2"
           )}
         >
-          <Icons.logo className="h-6 w-6" />
           Get started for free
         </Link>
       </div>

@@ -20,7 +20,7 @@ export default function Logos() {
                 width={80}
                 height={32}
                 src={`/${logo}.svg`}
-                className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 invert opacity-70"
+                className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 opacity-70"
                 alt={logo}
               />
             ))}
