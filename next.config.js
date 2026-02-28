@@ -8,7 +8,7 @@ const nextConfig = {
     optimizeFonts: true,
   },
   images: {
-    domains: ['pbs.twimg.com', 'abs.twimg.com', 'randomuser.me', 'cdn.magicui.design'],
+    domains: ['pbs.twimg.com', 'abs.twimg.com', 'randomuser.me', 'cdn.magicui.design', 'ph-avatars.imgix.net', 'media.theresanaiforthat.com'],
   },
 }
 

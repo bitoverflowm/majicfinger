@@ -12,17 +12,17 @@ const ease = [0.16, 1, 0.3, 1];
 function HeroPill() {
   return (
     <motion.a
-      href="/landingpage_v2#blog"
+      href="/guides/polymarket-events-endpoint-no-code"
       className="flex w-auto items-center space-x-2 rounded-full bg-primary/20 px-2 py-1 ring-1 ring-accent whitespace-pre"
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, ease }}
     >
       <div className="w-fit rounded-full bg-accent px-2 py-0.5 text-center text-xs font-medium text-primary sm:text-sm">
-        🎉 New
+        📣 New
       </div>
       <p className="text-xs font-medium text-primary sm:text-sm">
-        Get Polymarket data in 0.67 seconds
+        No-Code Polymarket integration is live
       </p>
       <svg
         width="12"
@@ -88,13 +88,13 @@ function HeroCTA() {
         transition={{ delay: 0.8, duration: 0.8, ease }}
       >
         <Link
-          href="https://buy.stripe.com/3csbL2c8K2iye6QcNg"
+          href="/login"
           className={cn(
             buttonVariants({ variant: "default" }),
             "w-full sm:w-auto text-background flex gap-2"
           )}
         >
-          <Icons.logo className="h-6 w-6" />
+          <Icons.logo width={24} height={24} className="h-6 w-6" />
           Get started for free
         </Link>
       </motion.div>

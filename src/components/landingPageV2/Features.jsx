@@ -9,29 +9,29 @@ import Image from "next/image";
 const data = [
   {
     id: 1,
-    title: "AI-Powered Dashboard",
-    content: "Visualize trends and gain insights at a glance.",
+    title: "Instant Graphs, Zero Hassle",
+    content: "Analyze anything. Let our AI do the heavy lifting. Create charts in seconds.",
     image: "/chart1.png",
     icon: <BarChart3 className="h-6 w-6 text-primary" />,
   },
   {
     id: 2,
-    title: "Multiple Chart Types",
-    content: "Bar, line, pie, area charts and more.",
-    image: "/chart0.png",
+    title: "Connect to All Data Sources",
+    content: "Polymarket, Twitter, Instagram, CoinGecko. Direct connections. No code.",
+    image: "/integrationsPresent.png",
     icon: <Brain className="h-6 w-6 text-primary" />,
   },
   {
     id: 3,
-    title: "Predictive Analytics",
-    content: "Forecast trends and make data-driven decisions.",
+    title: "AI That Understands Your Data",
+    content: "Turn datasets into articles. Create presentations. Identify takeaways. In plain English.",
     image: "/chart1.png",
     icon: <LineChart className="h-6 w-6 text-primary" />,
   },
   {
     id: 4,
-    title: "Export & Share",
-    content: "Export to PNG, SVG and share with your team.",
+    title: "Build Websites in 0.37 Seconds",
+    content: "From Google Sheets, Excel or .csv to a full website. Instantly.",
     image: "/chart0.png",
     icon: <FileText className="h-6 w-6 text-primary" />,
   },
@@ -44,7 +44,7 @@ export default function Features() {
     <Section
       id="features"
       title="Features"
-      subtitle="Everything you need for data visualization"
+      subtitle="Your quant in a box. Built for Polymarket, powerful for anyone who works with data."
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
         <div className="space-y-4">

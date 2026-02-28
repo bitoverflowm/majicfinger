@@ -7,28 +7,28 @@ import { Brain, Shield, Zap } from "lucide-react";
 
 const problems = [
   {
-    title: "Data Overload",
+    title: "CSVs, Python, Copy-Pasting",
     description:
-      "Businesses struggle to make sense of vast amounts of complex data, missing out on valuable insights that could drive growth and innovation.",
+      "The old workflow: export data, write Python scripts, copy-paste between tools. Hours wasted on plumbing instead of insights.",
     icon: Brain,
   },
   {
-    title: "Slow Decision-Making",
+    title: "Slow Data to Insights",
     description:
-      "Traditional data processing methods are too slow, causing businesses to lag behind market changes and miss crucial opportunities.",
+      "Traditional data pipelines are too slow. By the time you've analyzed the data, the opportunity has passed.",
     icon: Zap,
   },
   {
-    title: "Data Security Concerns",
+    title: "Scattered Data Sources",
     description:
-      "With increasing cyber threats, businesses worry about the safety of their sensitive information when adopting new technologies.",
+      "Polymarket, Twitter, CoinGecko—each has its own API, its own format. Connecting them used to require code.",
     icon: Shield,
   },
 ];
 
 export default function Problem() {
   return (
-    <Section title="Problem" subtitle="Manually creating charts is a hassle.">
+    <Section title="Problem" subtitle="The old way of working with data is a hassle.">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
         {problems.map((problem, index) => (
           <BlurFade key={index} delay={0.2 + index * 0.2} inView>

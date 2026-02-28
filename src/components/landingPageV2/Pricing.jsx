@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Section from "./Section";
 import { buttonVariants } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { landingPageV2Config } from "@/lib/landingPageV2Config";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -13,20 +10,9 @@ import Link from "next/link";
 import { FaStar } from "react-icons/fa";
 
 export default function Pricing() {
-  const [isMonthly, setIsMonthly] = useState(true);
-
   return (
     <Section id="pricing" title="Pricing" subtitle="Choose the plan that's right for you">
-      <div className="flex justify-center mb-10">
-        <span className="mr-2 font-semibold">Monthly</span>
-        <label className="relative inline-flex items-center cursor-pointer">
-          <Label>
-            <Switch checked={!isMonthly} onCheckedChange={() => setIsMonthly(!isMonthly)} />
-          </Label>
-        </label>
-        <span className="ml-2 font-semibold">Yearly</span>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
         {landingPageV2Config.pricing.map((plan, index) => (
           <motion.div
             key={index}
@@ -36,7 +22,8 @@ export default function Pricing() {
             transition={{ duration: 0.5, delay: index * 0.1 }}
             className={cn(
               "rounded-2xl border p-6 bg-background text-center lg:flex lg:flex-col lg:justify-center relative",
-              plan.isPopular ? "border-primary border-2" : "border-border"
+              plan.isPopular ? "border-primary border-2" : "border-border",
+              "md:max-w-md mx-auto"
             )}
           >
             {plan.isPopular && (
@@ -49,17 +36,17 @@ export default function Pricing() {
               <p className="text-base font-semibold text-muted-foreground">{plan.name}</p>
               <p className="mt-6 flex items-center justify-center gap-x-2">
                 <span className="text-5xl font-bold tracking-tight text-foreground">
-                  {isMonthly ? plan.price : plan.yearlyPrice}
+                  {plan.price}
                 </span>
-                {plan.period !== "forever" && (
+                {plan.period !== "forever" && plan.period !== "one-time" && plan.period !== "trial" && (
                   <span className="text-sm font-semibold leading-6 tracking-wide text-muted-foreground">
                     / {plan.period}
                   </span>
                 )}
               </p>
-              {plan.period !== "forever" && (
+              {(plan.period === "trial" || plan.period === "one-time") && (
                 <p className="text-xs leading-5 text-muted-foreground">
-                  {isMonthly ? "billed monthly" : "billed annually"}
+                  {plan.period === "one-time" ? "One time payment" : "2 day trial"}
                 </p>
               )}
               <ul className="mt-5 gap-2 flex flex-col">

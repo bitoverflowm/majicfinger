@@ -7,23 +7,23 @@ import Image from "next/image";
 
 const features = [
   {
-    title: "AI-Powered Dashboard",
-    description: "Visualize trends and gain insights at a glance.",
+    title: "Instant Graphs",
+    description: "Analyze anything. Let our AI do the heavy lifting. 0 lines of code.",
     icon: BarChart3,
   },
   {
-    title: "Multiple Chart Types",
-    description: "Bar, line, pie, area - choose the right visualization.",
+    title: "Direct Data Connections",
+    description: "Connect directly to Polymarket, Twitter, CoinGecko, and more. No code required.",
     icon: LineChart,
   },
   {
-    title: "Easy Customization",
-    description: "Customize colors, labels, and styles to match your brand.",
+    title: "Website in 0.37 Seconds",
+    description: "Build an entire website from Google Sheets, Excel or .csv. Instantly.",
     icon: Brain,
   },
   {
-    title: "Export Anywhere",
-    description: "Export to PNG, SVG, and embed in your projects.",
+    title: "Workflow Collapse",
+    description: "Raw data to analysis, charts and actionable insights in seconds. Real quantitative edge.",
     icon: FileText,
   },
 ];
@@ -32,8 +32,8 @@ export default function Solution() {
   return (
     <Section
       title="Solution"
-      subtitle="Empower Your Data with Beautiful Charts"
-      description="Generic chart tools won't suffice. Easy Charts is purpose-built to provide exceptional, accessible visualizations for your unique needs."
+      subtitle="Lychee is workflow collapse"
+      description="No CSVs, No Python, No copy-pasting. Just raw data to analysis, charts and actionable insights in seconds. Real quantitative edge. 0 lines of code."
       className="bg-muted/50"
     >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">

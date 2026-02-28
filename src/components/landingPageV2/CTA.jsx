@@ -16,7 +16,7 @@ export default function CTA() {
     >
       <div className="flex flex-col w-full sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 pt-4">
         <Link
-          href="/login"
+          href="/landingpage_v2#pricing"
           className={cn(
             buttonVariants({ variant: "default" }),
             "w-full sm:w-auto text-primary-foreground flex gap-2"

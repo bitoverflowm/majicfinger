@@ -7,30 +7,30 @@ import { motion } from "framer-motion";
 const data = [
   {
     id: 1,
-    title: "1. Add Your Data",
+    title: "1. Connect Your Data",
     content:
-      "Simply add your data to our platform. We support various formats to ensure a seamless integration with your workflow.",
+      "Connect directly to Polymarket, Twitter, CoinGecko, and more. No code required. Not a single line.",
     icon: <Upload className="w-6 h-6 text-primary" />,
   },
   {
     id: 2,
-    title: "2. Choose Chart Type",
+    title: "2. Let AI Analyze",
     content:
-      "Select from bar, line, pie, area charts and more. Our intuitive interface makes it easy to pick the right visualization.",
+      "Ask in plain English: 'Turn my dataset into an article', 'Identify the main takeaways', 'Create a presentation for me.'",
     icon: <Zap className="w-6 h-6 text-primary" />,
   },
   {
     id: 3,
-    title: "3. Export & Share",
+    title: "3. Get Insights & Charts",
     content:
-      "Export your charts in PNG, SVG, or other formats. Share with your team or embed in presentations and reports.",
+      "Instant graphs, zero hassle. Raw data to analysis, charts and actionable insights in seconds.",
     icon: <Sparkles className="w-6 h-6 text-primary" />,
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <Section title="How it works" subtitle="Just 3 steps to get started">
+    <Section title="How it works" subtitle="0 lines of code. 3 steps.">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
         {data.map((item, index) => (
           <motion.div

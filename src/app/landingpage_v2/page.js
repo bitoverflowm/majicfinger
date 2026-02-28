@@ -14,9 +14,9 @@ import CTA from "@/components/landingPageV2/CTA";
 import Footer from "@/components/landingPageV2/Footer";
 
 export const metadata = {
-  title: "Easy Charts - Refreshingly simple charts | Landing V2",
+  title: "Lychee - Your Quant in a Box",
   description:
-    "Create stunning charts effortlessly with Easy Charts. No subscriptions, unlimited exports, and fully customizable. Get started today.",
+    "Built for Polymarket • Powerful for anyone who works with data. No CSVs, No Python, No copy-pasting. Just raw data to analysis and actionable insights. Real quantitative edge. 0 lines of code.",
 };
 
 export default function LandingPageV2() {
