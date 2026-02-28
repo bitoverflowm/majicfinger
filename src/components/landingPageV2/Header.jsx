@@ -8,6 +8,7 @@ import { landingPageV2Config } from "@/lib/landingPageV2Config";
 import Drawer from "./Drawer";
 import Menu from "./Menu";
 import { Icons } from "./Icons";
+import { TwitterLogoIcon } from "@radix-ui/react-icons";
 
 export default function Header() {
   const [addBorder, setAddBorder] = useState(false);
@@ -34,8 +35,16 @@ export default function Header() {
 
         <div className="hidden lg:block">
           <div className="flex items-center">
-            <nav className="mr-10">
+            <nav className="mr-10 flex items-center gap-4">
               <Menu />
+              <Link
+                href={landingPageV2Config.links.twitter}
+                rel="noopener noreferrer"
+                target="_blank"
+                className="cursor-pointer text-foreground hover:text-primary transition-colors"
+              >
+                <TwitterLogoIcon className="w-5 h-5" />
+              </Link>
             </nav>
             <div className="gap-2 flex">
               <Link href="/login" className={buttonVariants({ variant: "outline" })}>

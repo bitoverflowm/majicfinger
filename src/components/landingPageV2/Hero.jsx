@@ -5,7 +5,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Icons } from "./Icons";
-import HeroVideoDialog from "./HeroVideoDialog";
+import ChartShowHero from "./ChartShowHero";
 import { Highlighter } from "@/components/ui/highlighter"
 
 
@@ -122,13 +122,7 @@ function HeroImage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1.2, duration: 1, ease }}
     >
-      <HeroVideoDialog
-        animationStyle="from-center"
-        videoSrc="https://www.youtube.com/embed/Mhgk122WuFg?si=hRH4UxT8UbPv55MC"
-        thumbnailSrc="/ogImage.png"
-        thumbnailAlt="Lychee - Analyze Anything"
-        className="border rounded-lg shadow-lg w-full max-w-4xl mt-16 px-4"
-      />
+      <ChartShowHero className="border rounded-lg shadow-lg w-full max-w-4xl mt-16 px-4" />
     </motion.div>
   );
 }

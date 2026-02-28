@@ -21,7 +21,7 @@ export const metadata = {
 
 export default function LandingPageV2() {
   return (
-    <main className="min-h-screen bg-background antialiased w-full mx-auto scroll-smooth">
+    <main className="min-h-screen bg-background antialiased w-full mx-auto scroll-smooth" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}>
       <Header />
       <Hero />
       <Logos />

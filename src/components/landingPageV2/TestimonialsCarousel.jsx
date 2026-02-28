@@ -1,6 +1,5 @@
 "use client";
 
-import BlurFade from "./BlurFade";
 import Section from "./Section";
 import {
   Carousel,
@@ -12,6 +11,8 @@ import {
 import Image from "next/image";
 import { MdOutlineFormatQuote } from "react-icons/md";
 import Link from "next/link";
+import { Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const carouselTestimonials = [
   {
@@ -37,6 +38,37 @@ const carouselTestimonials = [
   },
 ];
 
+const TestimonialCard = ({ quote, name, role, img, src }) => (
+  <Link href={src} target="_blank" rel="noopener noreferrer" className="block">
+    <div
+      className={cn(
+        "rounded-xl p-4 border border-neutral-200 bg-white",
+        "dark:bg-black dark:[border:1px_solid_rgba(255,255,255,.1)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]"
+      )}
+    >
+      <div className="flex flex-row py-1 mb-2">
+        {[...Array(5)].map((_, i) => (
+          <Star key={i} className="size-4 text-yellow-500 fill-yellow-500" />
+        ))}
+      </div>
+      <p className="text-sm text-neutral-700 dark:text-neutral-400">{quote}</p>
+      <div className="flex items-center gap-3 mt-4">
+        <Image
+          width={40}
+          height={40}
+          src={img}
+          alt={name}
+          className="rounded-full ring-1 ring-border"
+        />
+        <div>
+          <p className="font-medium text-neutral-500">{name}</p>
+          <p className="text-xs text-neutral-400">{role}</p>
+        </div>
+      </div>
+    </div>
+  </Link>
+);
+
 export default function TestimonialsCarousel() {
   return (
     <Section
@@ -49,41 +81,13 @@ export default function TestimonialsCarousel() {
             {carouselTestimonials.map((item, index) => (
               <CarouselItem key={index}>
                 <div className="p-2 pb-5">
-                  <Link href={item.src} target="_blank" rel="noopener noreferrer" className="block">
-                    <div className="text-center">
-                      <MdOutlineFormatQuote className="text-4xl text-muted-foreground my-4 mx-auto" />
-                      <BlurFade delay={0.25} inView>
-                        <h4 className="text-xl font-semibold max-w-lg mx-auto px-10">
-                          {item.quote}
-                        </h4>
-                      </BlurFade>
-                      <BlurFade delay={0.25 * 2} inView>
-                        <div className="mt-8 flex justify-center">
-                          <Image
-                            width={40}
-                            height={40}
-                            src={item.img}
-                            alt={item.name}
-                            className="rounded-full ring-1 ring-border"
-                          />
-                        </div>
-                      </BlurFade>
-                      <BlurFade delay={0.25 * 3} inView>
-                        <h4 className="text-xl font-semibold my-2">{item.name}</h4>
-                      </BlurFade>
-                      <BlurFade delay={0.25 * 4} inView>
-                        <div className="mb-3">
-                          <span className="text-sm text-muted-foreground">{item.role}</span>
-                        </div>
-                      </BlurFade>
-                    </div>
-                  </Link>
+                  <TestimonialCard {...item} />
                 </div>
               </CarouselItem>
             ))}
           </CarouselContent>
-          <div className="pointer-events-none absolute inset-y-0 left-0 h-full w-2/12 bg-gradient-to-r from-background"></div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/12 bg-gradient-to-l from-background"></div>
+          <div className="pointer-events-none absolute inset-y-0 left-0 h-full w-2/12 bg-gradient-to-r from-background" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/12 bg-gradient-to-l from-background" />
         </div>
         <div className="md:block hidden absolute bottom-0 left-1/2 -translate-x-1/2">
           <CarouselPrevious />

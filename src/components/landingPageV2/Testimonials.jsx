@@ -140,20 +140,22 @@ const TestimonialCard = ({ description, name, img, role, src, className, ...prop
     href={src}
     className={cn(
       "mb-4 flex w-full cursor-pointer break-inside-avoid flex-col items-center justify-between gap-6 rounded-xl p-4",
-      "border border-border bg-card hover:border-primary/30 transition-colors",
-      "dark:bg-card dark:border-border",
+      "border border-neutral-200 bg-white",
+      "dark:bg-black dark:[border:1px_solid_rgba(255,255,255,.1)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
       className
     )}
     rel="noopener noreferrer"
     target="_blank"
     {...props}
   >
-    <div className="select-none text-sm font-normal text-muted-foreground">
+    <div className="select-none text-sm font-normal text-neutral-700 dark:text-neutral-400">
       {description}
       <div className="flex flex-row py-1">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className="size-4 text-yellow-500 fill-yellow-500" />
-        ))}
+        <Star className="size-4 text-yellow-500 fill-yellow-500" />
+        <Star className="size-4 text-yellow-500 fill-yellow-500" />
+        <Star className="size-4 text-yellow-500 fill-yellow-500" />
+        <Star className="size-4 text-yellow-500 fill-yellow-500" />
+        <Star className="size-4 text-yellow-500 fill-yellow-500" />
       </div>
     </div>
     <div className="flex w-full select-none items-center justify-start gap-5">
@@ -165,16 +167,16 @@ const TestimonialCard = ({ description, name, img, role, src, className, ...prop
         className="h-10 w-10 rounded-full ring-1 ring-border ring-offset-4"
       />
       <div>
-        <p className="font-medium text-muted-foreground">{name}</p>
-        <p className="text-xs font-normal text-muted-foreground">{role}</p>
+        <p className="font-medium text-neutral-500">{name}</p>
+        <p className="text-xs font-normal text-neutral-400">{role}</p>
       </div>
     </div>
   </Link>
 );
 
 export default function Testimonials() {
-  const firstRow = testimonials.slice(0, Math.ceil(testimonials.length / 2));
-  const secondRow = testimonials.slice(Math.ceil(testimonials.length / 2));
+  const cols = 3;
+  const perCol = Math.ceil(testimonials.length / cols);
 
   return (
     <Section
@@ -183,35 +185,39 @@ export default function Testimonials() {
       className="max-w-8xl"
     >
       <p className="text-sm text-muted-foreground pb-4 text-center">All testimonials are clickable.</p>
-      <div className="relative mt-6 max-h-[650px] overflow-hidden">
-        <Marquee pauseOnHover className="[--duration:20s]">
-          {firstRow.map((card, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="mx-2"
-            >
-              <TestimonialCard {...card} />
-            </motion.div>
-          ))}
-        </Marquee>
-        <Marquee reverse pauseOnHover className="[--duration:20s]">
-          {secondRow.map((card, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="mx-2"
-            >
-              <TestimonialCard {...card} />
-            </motion.div>
-          ))}
-        </Marquee>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 w-full bg-gradient-to-t from-background from-20%"></div>
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1/4 w-full bg-gradient-to-b from-background from-20%"></div>
+      <div className="relative mt-6 max-h-screen overflow-hidden">
+        <div className="gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
+          {Array(cols)
+            .fill(0)
+            .map((_, i) => (
+              <Marquee
+                vertical
+                key={i}
+                className={cn({
+                  "[--duration:60s]": i === 1,
+                  "[--duration:30s]": i === 2,
+                  "[--duration:70s]": i === 3,
+                })}
+              >
+                {testimonials.slice(i * perCol, (i + 1) * perCol).map((card, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{
+                      delay: Math.random() * 0.8,
+                      duration: 1.2,
+                    }}
+                  >
+                    <TestimonialCard {...card} />
+                  </motion.div>
+                ))}
+              </Marquee>
+            ))}
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 w-full bg-gradient-to-t from-background from-20%" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1/4 w-full bg-gradient-to-b from-background from-20%" />
       </div>
     </Section>
   );

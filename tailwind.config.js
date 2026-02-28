@@ -191,6 +191,14 @@ module.exports = {
   				'100%': {
   					'offset-distance': '100%'
   				}
+  			},
+  			ripple: {
+  				'0%, 100%': {
+  					transform: 'translate(-50%, -50%) scale(1)'
+  				},
+  				'50%': {
+  					transform: 'translate(-50%, -50%) scale(0.9)'
+  				}
   			}
   		},
   		animation: {
@@ -204,7 +212,8 @@ module.exports = {
   			slide: 'slide var(--speed) ease-in-out infinite alternate',
   			shimmer: 'shimmer 8s infinite',
   			gradient: 'gradient 8s linear infinite',
-  			'border-beam': 'border-beam calc(var(--duration)*1s) infinite linear'
+  			'border-beam': 'border-beam calc(var(--duration)*1s) infinite linear',
+  			ripple: 'ripple var(--duration,2s) ease calc(var(--i, 0)*.2s) infinite'
   		},
   		slide: {
   			to: {

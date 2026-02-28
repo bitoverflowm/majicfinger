@@ -6,38 +6,12 @@ export const landingPageV2Config = {
   keywords: ["PolyMarket", "quant", "Data Analysis", "Prediction Markets", "No-Code API", "Charts", "Data Visualization"],
   links: {
     email: "support@bitoverflow.org",
-    twitter: "https://twitter.com/misterrpink1",
+    twitter: "https://x.com/misterrpink1",
     discord: "#",
     github: "https://github.com",
     instagram: "#",
   },
   header: [
-    {
-      trigger: "Features",
-      content: {
-        main: {
-          icon: null,
-          title: "Chart Features",
-          description: "Powerful chart creation and customization.",
-          href: "#features",
-        },
-        items: [
-          { href: "#features", title: "Multiple Chart Types", description: "Bar, line, pie, and more." },
-          { href: "#features", title: "Easy Customization", description: "Customize colors, labels, and styles." },
-          { href: "#features", title: "Export Options", description: "Export to PNG, SVG, and more." },
-        ],
-      },
-    },
-    {
-      trigger: "Solutions",
-      content: {
-        items: [
-          { title: "For Presentations", href: "#", description: "Create charts for your slides." },
-          { title: "For Reports", href: "#", description: "Visualize data in reports." },
-          { title: "For Dashboards", href: "#", description: "Build data dashboards." },
-        ],
-      },
-    },
     { href: "/landingpage_v2#blog", label: "Blog" },
   ],
   pricing: [

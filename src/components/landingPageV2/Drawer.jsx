@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Icons } from "./Icons";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { IoMenuSharp } from "react-icons/io5";
+import { TwitterLogoIcon } from "@radix-ui/react-icons";
 
 export default function DrawerDemo() {
   return (
@@ -54,6 +55,17 @@ export default function DrawerDemo() {
                   )}
                 </li>
               ))}
+              <li className="my-3">
+                <Link
+                  href={landingPageV2Config.links.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold flex items-center gap-2"
+                >
+                  <TwitterLogoIcon className="w-5 h-5" />
+                  Twitter
+                </Link>
+              </li>
             </ul>
           </nav>
         </DrawerHeader>
