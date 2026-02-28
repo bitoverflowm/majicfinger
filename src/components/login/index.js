@@ -55,15 +55,15 @@ const Login = ({ fromHome }) => {
   };
 
   return (
-    <div className="relative flex min-h-dvh flex-1 flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
-        <div className="absolute inset-0 bg-lychee_blue/90" />
+    <div className="relative flex min-h-dvh w-full flex-1 flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
+      <div className="relative hidden h-full min-h-screen flex-col p-10 text-white lg:flex dark:border-r">
+        <div className="absolute inset-0 bg-black" />
         <div className="relative z-20 flex items-center text-lg font-medium">
-          <span className="mr-2 text-2xl">🍋</span>
-          Lychee
+          <img src="/fruit.png" alt="Lychee" className="mr-2 h-8 w-8 invert" />
+          <span className="text-white">Lychee</span>
         </div>
         <div className="relative z-20 mt-auto">
-          <blockquote className="leading-normal text-balance">
+          <blockquote className="leading-normal text-balance text-white/90">
             &ldquo;All your favorite data sources under one roof. Discover something great.&rdquo;
           </blockquote>
         </div>

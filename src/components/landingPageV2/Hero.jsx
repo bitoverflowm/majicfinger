@@ -90,7 +90,7 @@ function HeroCTA() {
         transition={{ delay: 0.8, duration: 0.8, ease }}
       >
         <Link
-          href="/landingpage_v2#pricing"
+          href="/#pricing"
           className={cn(
             buttonVariants({ variant: "default" }),
             "w-full sm:w-auto text-background flex gap-2"
@@ -122,7 +122,7 @@ function HeroImage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1.2, duration: 1, ease }}
     >
-      <ChartShowHero className="border rounded-lg shadow-lg w-full max-w-4xl mt-16 px-4" />
+      <ChartShowHero className="border rounded-lg shadow-lg w-full max-w-[calc(100vw-1rem)] mt-16 px-2 sm:px-3" />
     </motion.div>
   );
 }

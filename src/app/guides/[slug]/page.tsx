@@ -10,8 +10,9 @@ import {
 } from "@/lib/content/metadata";
 
 export async function generateStaticParams() {
-  const slugs = getAllSlugs("guides");
-  return slugs.map((slug) => ({ slug }));
+  const guideSlugs = getAllSlugs("guides");
+  const blogSlugs = getAllSlugs("blog");
+  return [...guideSlugs, ...blogSlugs].map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -20,7 +21,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const data = getContentBySlug("guides", slug);
+  let data = getContentBySlug("guides", slug);
+  if (!data) data = getContentBySlug("blog", slug);
   if (!data) return {};
   return buildContentMetadata(data.frontmatter, "guides", slug);
 }
@@ -31,7 +33,12 @@ export default async function GuidePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const data = getContentBySlug("guides", slug);
+  let data = getContentBySlug("guides", slug);
+  let contentType: "guides" | "blog" = "guides";
+  if (!data) {
+    data = getContentBySlug("blog", slug);
+    contentType = "blog";
+  }
   if (!data) notFound();
 
   const { frontmatter, content } = data;
@@ -68,7 +75,7 @@ export default async function GuidePage({
           __html: JSON.stringify(organizationJsonLd),
         }}
       />
-      <GuideLayout slug={slug} frontmatter={frontmatter}>
+      <GuideLayout slug={slug} frontmatter={frontmatter} contentType={contentType}>
         <MDXContent source={content} />
       </GuideLayout>
     </>

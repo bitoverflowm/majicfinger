@@ -86,7 +86,7 @@ export default function Pricing() {
               <p className="text-base font-semibold text-muted-foreground">
                 {plan.name}
               </p>
-              <p className="mt-6 flex items-center justify-center gap-x-2">
+              <p className="mt-6 flex items-center justify-center gap-x-2 flex-wrap">
                 <span className="text-5xl font-bold tracking-tight text-foreground">
                   {isMonthly ? plan.price : plan.yearlyPrice}
                 </span>
@@ -96,13 +96,13 @@ export default function Pricing() {
                   </span>
                 )}
               </p>
-              <p className="text-xs leading-5 text-muted-foreground">
+              <p className="text-xs leading-5 text-muted-foreground text-center">
                 {plan.period === "one-time" ? "One time payment" : plan.period === "trial" ? "2 day trial" : isMonthly ? "billed monthly" : "billed annually"}
               </p>
-              <ul className="mt-5 gap-2 flex flex-col">
+              <ul className="mt-5 gap-2 flex flex-col items-start">
                 {plan.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-center">
-                    <Check className="mr-2 h-4 w-4 text-primary shrink-0" />
+                  <li key={idx} className="flex items-start gap-2 text-left">
+                    <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
                     <span>{feature}</span>
                   </li>
                 ))}

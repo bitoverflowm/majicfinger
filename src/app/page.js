@@ -5,8 +5,7 @@ import 'tailwindcss/tailwind.css';
 
 import { StateProvider } from '@/context/stateContext'
 
-import LandingPage from '@/components/landingPage'
-import Nav from '@/components/nav'
+import LandingPageV2 from '@/app/landingpage_v2/page'
 
 export default function Home() {
 
@@ -47,10 +46,7 @@ export default function Home() {
       <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"/>
       <GoogleAnalytics gaId="G-G8X2NEPTEG" />
       <StateProvider>
-        <Nav/>
-        <div className="z-10 pt-32 pb-20">
-          <LandingPage />
-        </div>
+        <LandingPageV2 />
       </StateProvider>
     </>
   )

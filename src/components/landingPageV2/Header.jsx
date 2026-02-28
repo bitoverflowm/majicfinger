@@ -51,7 +51,7 @@ export default function Header() {
                 Login
               </Link>
               <Link
-                href="/landingpage_v2#pricing"
+                href="/#pricing"
                 className={cn(
                   buttonVariants({ variant: "default" }),
                   "w-full sm:w-auto text-background flex gap-2"

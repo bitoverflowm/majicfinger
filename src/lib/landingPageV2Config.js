@@ -12,7 +12,7 @@ export const landingPageV2Config = {
     instagram: "#",
   },
   header: [
-    { href: "/landingpage_v2#blog", label: "Blog" },
+    { href: "/#guides", label: "Guides" },
   ],
   pricing: [
     {
@@ -37,6 +37,17 @@ export const landingPageV2Config = {
       buttonText: "$39.99",
       isPopular: true,
     },
+    {
+      name: "PRO",
+      href: "#",
+      price: "$19.99",
+      period: "month",
+      yearlyPrice: "$199/year",
+      features: ["Everything in free tier", "Priority support", "Advanced analytics", "Custom integrations"],
+      description: "For power users who need more.",
+      buttonText: "Coming Soon",
+      isPopular: false,
+    },
   ],
   faqs: [
     { question: "What is Lychee?", answer: "Lychee is your quant in a box. Built for Polymarket, powerful for anyone who works with data. No CSVs, no Python, no copy-pasting. Just raw data to analysis, charts and actionable insights in seconds. Real quantitative edge. 0 lines of code." },
@@ -57,7 +68,7 @@ export const landingPageV2Config = {
       title: "Company",
       links: [
         { href: "#", text: "About", icon: null },
-        { href: "/landingpage_v2#blog", text: "Blog", icon: null },
+        { href: "/#guides", text: "Guides", icon: null },
         { href: "/help", text: "Help", icon: null },
       ],
     },

@@ -139,7 +139,7 @@ const TestimonialCard = ({ description, name, img, role, src, className, ...prop
   <Link
     href={src}
     className={cn(
-      "mb-4 flex w-full cursor-pointer break-inside-avoid flex-col items-center justify-between gap-6 rounded-xl p-4",
+      "mb-4 flex w-full max-w-[280px] cursor-pointer break-inside-avoid flex-col items-start justify-between gap-6 rounded-xl p-4 shrink-0",
       "border border-neutral-200 bg-white",
       "dark:bg-black dark:[border:1px_solid_rgba(255,255,255,.1)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
       className
@@ -148,7 +148,7 @@ const TestimonialCard = ({ description, name, img, role, src, className, ...prop
     target="_blank"
     {...props}
   >
-    <div className="select-none text-sm font-normal text-neutral-700 dark:text-neutral-400">
+    <div className="select-none text-sm font-normal text-neutral-700 dark:text-neutral-400 text-left">
       {description}
       <div className="flex flex-row py-1">
         <Star className="size-4 text-yellow-500 fill-yellow-500" />
@@ -164,30 +164,25 @@ const TestimonialCard = ({ description, name, img, role, src, className, ...prop
         height={40}
         src={img || ""}
         alt={name}
-        className="h-10 w-10 rounded-full ring-1 ring-border ring-offset-4"
+        className="h-10 w-10 rounded-full ring-1 ring-border ring-offset-4 shrink-0"
       />
-      <div>
-        <p className="font-medium text-neutral-500">{name}</p>
-        <p className="text-xs font-normal text-neutral-400">{role}</p>
+      <div className="min-w-0">
+        <p className="font-medium text-neutral-500 truncate">{name}</p>
+        <p className="text-xs font-normal text-neutral-400 truncate">{role}</p>
       </div>
     </div>
   </Link>
 );
 
 export default function Testimonials() {
-  const cols = 3;
-  const perCol = Math.ceil(testimonials.length / cols);
-
   return (
     <Section
-      title="What our legendary users have to say"
-      subtitle="Don't just take our word for it. See what our awesome users are saying:"
-      className="max-w-8xl"
+      title="Testimonials"
+      subtitle="What our legendary users have to say"
     >
-      <p className="text-sm text-muted-foreground pb-4 text-center">All testimonials are clickable.</p>
       <div className="relative mt-6 max-h-screen overflow-hidden">
         <div className="gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
-          {Array(cols)
+          {Array(Math.ceil(testimonials.length / 3))
             .fill(0)
             .map((_, i) => (
               <Marquee
@@ -199,7 +194,7 @@ export default function Testimonials() {
                   "[--duration:70s]": i === 3,
                 })}
               >
-                {testimonials.slice(i * perCol, (i + 1) * perCol).map((card, idx) => (
+                {testimonials.slice(i * 3, (i + 1) * 3).map((card, idx) => (
                   <motion.div
                     key={idx}
                     initial={{ opacity: 0 }}
@@ -209,6 +204,7 @@ export default function Testimonials() {
                       delay: Math.random() * 0.8,
                       duration: 1.2,
                     }}
+                    className="flex justify-center"
                   >
                     <TestimonialCard {...card} />
                   </motion.div>

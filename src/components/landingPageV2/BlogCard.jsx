@@ -15,8 +15,8 @@ function formatDate(dateStr) {
 
 export default function BlogCard({ data, priority = false }) {
   return (
-    <Link href={`/landingpage_v2/blog/${data.slug}`} className="block" prefetch={false}>
-      <div className="bg-background rounded-lg p-4 mb-4 border hover:shadow-sm transition-shadow duration-200">
+    <Link href={`/guides/${data.slug}`} className="block" prefetch={false}>
+      <div className="bg-background rounded-xl p-4 mb-4 border border-neutral-200 dark:border-neutral-800 hover:shadow-md hover:border-primary/30 transition-all duration-200">
         {data.image && (
           <Image
             className="rounded-t-lg object-cover border"

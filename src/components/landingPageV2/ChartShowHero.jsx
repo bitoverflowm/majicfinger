@@ -17,8 +17,15 @@ export default function ChartShowHero({ className }) {
           !isInteractive && "cursor-pointer group"
         )}
       >
-        <div className="relative w-full min-h-[400px] rounded-md border bg-muted overflow-hidden">
-          <ChartShow demo={!isInteractive} />
+        <div
+          className={cn(
+            "relative w-full rounded-md border bg-muted overflow-hidden transition-[filter] duration-300",
+            !isInteractive && "max-h-[70vh] [filter:blur(12px)]"
+          )}
+        >
+          <div className={cn(!isInteractive && "max-h-[70vh] overflow-hidden")}>
+            <ChartShow demo={!isInteractive} />
+          </div>
         </div>
         <AnimatePresence>
           {!isInteractive && (
