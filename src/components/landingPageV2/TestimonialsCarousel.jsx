@@ -8,10 +8,8 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import Image from "next/image";
-import { MdOutlineFormatQuote } from "react-icons/md";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
-import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const carouselTestimonials = [
@@ -42,28 +40,21 @@ const TestimonialCard = ({ quote, name, role, img, src }) => (
   <Link href={src} target="_blank" rel="noopener noreferrer" className="block">
     <div
       className={cn(
-        "rounded-xl p-4 border border-neutral-200 bg-white",
-        "dark:bg-black dark:[border:1px_solid_rgba(255,255,255,.1)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]"
+        "rounded-xl p-8 bg-white text-center flex flex-col items-center gap-4",
+        "dark:bg-black dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]"
       )}
     >
-      <div className="flex flex-row py-1 mb-2">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className="size-4 text-yellow-500 fill-yellow-500" />
-        ))}
-      </div>
-      <p className="text-sm text-neutral-700 dark:text-neutral-400">{quote}</p>
-      <div className="flex items-center gap-3 mt-4">
-        <Image
-          width={40}
-          height={40}
-          src={img}
-          alt={name}
-          className="rounded-full ring-1 ring-border"
-        />
-        <div>
-          <p className="font-medium text-neutral-500">{name}</p>
-          <p className="text-xs text-neutral-400">{role}</p>
-        </div>
+      <span className="text-5xl text-primary/60 leading-none select-none">"</span>
+      <p className="text-base text-neutral-700 dark:text-neutral-400 text-center max-w-xl">
+        {quote}
+      </p>
+      <p className="text-sm font-medium text-muted-foreground">{role}</p>
+      <div className="flex flex-col items-center gap-2">
+        <Avatar className="h-12 w-12 ring-1 ring-border">
+          <AvatarImage src={img} alt={name} />
+          <AvatarFallback>{name?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
+        </Avatar>
+        <p className="font-medium text-neutral-700 dark:text-neutral-300">{name}</p>
       </div>
     </div>
   </Link>
@@ -75,25 +66,21 @@ export default function TestimonialsCarousel() {
       title="Testimonial Highlight"
       subtitle="What our customers are saying"
     >
-      <Carousel>
-        <div className="max-w-2xl mx-auto relative">
+      <div className="relative max-w-3xl mx-auto px-12">
+        <Carousel className="w-full" opts={{ loop: true }}>
           <CarouselContent>
             {carouselTestimonials.map((item, index) => (
               <CarouselItem key={index}>
-                <div className="p-2 pb-5">
+                <div className="p-2">
                   <TestimonialCard {...item} />
                 </div>
               </CarouselItem>
             ))}
           </CarouselContent>
-          <div className="pointer-events-none absolute inset-y-0 left-0 h-full w-2/12 bg-gradient-to-r from-background" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/12 bg-gradient-to-l from-background" />
-        </div>
-        <div className="md:block hidden absolute bottom-0 left-1/2 -translate-x-1/2">
-          <CarouselPrevious />
-          <CarouselNext />
-        </div>
-      </Carousel>
+          <CarouselPrevious className="left-0" />
+          <CarouselNext className="right-0" />
+        </Carousel>
+      </div>
     </Section>
   );
 }

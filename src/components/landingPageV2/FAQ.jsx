@@ -27,9 +27,9 @@ export default function FAQ() {
         </Accordion>
       </div>
       <h4 className="mb-12 text-center text-sm font-medium tracking-tight text-foreground/80">
-        Still have questions? Email us at{" "}
-        <a href={`mailto:${landingPageV2Config.links.email}`} className="underline">
-          {landingPageV2Config.links.email}
+        Still have questions?{" "}
+        <a href="https://twitter.com/misterrpink1" target="_blank" rel="noopener noreferrer" className="underline">
+          DM us at misterrpink1 on Twitter
         </a>
       </h4>
     </Section>

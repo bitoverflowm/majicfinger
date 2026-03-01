@@ -4,9 +4,8 @@ import Marquee from "@/components/magicui/marquee";
 import Section from "./Section";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Star } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Highlight = ({ children, className }) => (
   <span
@@ -139,37 +138,26 @@ const TestimonialCard = ({ description, name, img, role, src, className, ...prop
   <Link
     href={src}
     className={cn(
-      "mb-4 flex w-full max-w-[280px] cursor-pointer break-inside-avoid flex-col items-start justify-between gap-6 rounded-xl p-4 shrink-0",
-      "border border-neutral-200 bg-white",
-      "dark:bg-black dark:[border:1px_solid_rgba(255,255,255,.1)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
+      "mb-4 flex w-full max-w-[240px] cursor-pointer break-inside-avoid flex-col items-center justify-between gap-4 rounded-xl p-4 shrink-0 text-center",
+      "bg-white",
+      "dark:bg-black dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
       className
     )}
     rel="noopener noreferrer"
     target="_blank"
     {...props}
   >
-    <div className="select-none text-sm font-normal text-neutral-700 dark:text-neutral-400 text-left">
+    <span className="text-4xl text-primary/60 leading-none select-none">"</span>
+    <div className="select-none text-sm font-normal text-neutral-700 dark:text-neutral-400 text-center -mt-2">
       {description}
-      <div className="flex flex-row py-1">
-        <Star className="size-4 text-yellow-500 fill-yellow-500" />
-        <Star className="size-4 text-yellow-500 fill-yellow-500" />
-        <Star className="size-4 text-yellow-500 fill-yellow-500" />
-        <Star className="size-4 text-yellow-500 fill-yellow-500" />
-        <Star className="size-4 text-yellow-500 fill-yellow-500" />
-      </div>
     </div>
-    <div className="flex w-full select-none items-center justify-start gap-5">
-      <Image
-        width={40}
-        height={40}
-        src={img || ""}
-        alt={name}
-        className="h-10 w-10 rounded-full ring-1 ring-border ring-offset-4 shrink-0"
-      />
-      <div className="min-w-0">
-        <p className="font-medium text-neutral-500 truncate">{name}</p>
-        <p className="text-xs font-normal text-neutral-400 truncate">{role}</p>
-      </div>
+    <p className="text-xs font-medium text-muted-foreground">{role}</p>
+    <div className="flex flex-col items-center gap-2">
+      <Avatar className="h-10 w-10 ring-1 ring-border">
+        <AvatarImage src={img} alt={name} />
+        <AvatarFallback>{name?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <p className="font-medium text-neutral-700 dark:text-neutral-300 text-sm">{name}</p>
     </div>
   </Link>
 );
@@ -181,7 +169,7 @@ export default function Testimonials() {
       subtitle="What our legendary users have to say"
     >
       <div className="relative mt-6 max-h-screen overflow-hidden">
-        <div className="gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
+        <div className="columns-3 gap-x-4 gap-y-4">
           {Array(Math.ceil(testimonials.length / 3))
             .fill(0)
             .map((_, i) => (

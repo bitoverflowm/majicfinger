@@ -20,7 +20,7 @@ export async function generateMetadata({ params }) {
   const data = getContentBySlug("blog", slug);
   if (!data) return { title: "Post Not Found" };
   return {
-    title: `${data.frontmatter.title} | Easy Charts Blog`,
+    title: `${data.frontmatter.title} | Lychee`,
     description: data.frontmatter.description || data.frontmatter.summary,
   };
 }

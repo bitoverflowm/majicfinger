@@ -59,7 +59,7 @@ const Login = ({ fromHome }) => {
       <div className="relative hidden h-full min-h-screen flex-col p-10 text-white lg:flex dark:border-r">
         <div className="absolute inset-0 bg-black" />
         <div className="relative z-20 flex items-center text-lg font-medium">
-          <img src="/fruit.png" alt="Lychee" className="mr-2 h-8 w-8 invert" />
+          <img src="/fruit.png" alt="Lychee" className="mr-2 h-8 w-8 brightness-0 invert" />
           <span className="text-white">Lychee</span>
         </div>
         <div className="relative z-20 mt-auto">

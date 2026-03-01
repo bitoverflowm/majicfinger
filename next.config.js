@@ -5,10 +5,16 @@ const nextConfig = {
   transpilePackages: ["@nivo"],
   experimental: {
     esmExternals: 'loose',
-    optimizeFonts: true,
   },
   images: {
-    domains: ['pbs.twimg.com', 'abs.twimg.com', 'randomuser.me', 'cdn.magicui.design', 'ph-avatars.imgix.net', 'media.theresanaiforthat.com'],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'pbs.twimg.com' },
+      { protocol: 'https', hostname: 'abs.twimg.com' },
+      { protocol: 'https', hostname: 'randomuser.me' },
+      { protocol: 'https', hostname: 'cdn.magicui.design' },
+      { protocol: 'https', hostname: 'ph-avatars.imgix.net' },
+      { protocol: 'https', hostname: 'media.theresanaiforthat.com' },
+    ],
   },
 }
 

@@ -15,9 +15,9 @@ import Footer from "@/components/landingPageV2/Footer";
 import { getAllContent } from "@/lib/content";
 
 export const metadata = {
-  title: "Lychee - Your Quant in a Box",
+  title: "Lychee: Your Quant in a Box",
   description:
-    "Built for Polymarket • Powerful for anyone who works with data. No CSVs, No Python, No copy-pasting. Just raw data to analysis and actionable insights. Real quantitative edge. 0 lines of code.",
+    "Stop juggling CSVs, Python scripts, and messy charts. Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser. Zero coding. Zero friction. Real results.",
 };
 
 export default function LandingPageV2() {

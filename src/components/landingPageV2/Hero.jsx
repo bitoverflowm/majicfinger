@@ -1,12 +1,21 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Icons } from "./Icons";
-import ChartShowHero from "./ChartShowHero";
-import { Highlighter } from "@/components/ui/highlighter"
+import { Highlighter } from "@/components/ui/highlighter";
+
+const ChartShowHero = dynamic(() => import("./ChartShowHero"), {
+  ssr: false,
+  loading: () => (
+    <div className="border rounded-lg shadow-lg w-full max-w-[calc(100vw-1rem)] mt-16 px-2 sm:px-3 aspect-video bg-muted/50 animate-pulse flex items-center justify-center">
+      <span className="text-muted-foreground text-sm">Loading chart...</span>
+    </div>
+  ),
+});
 
 
 const ease = [0.16, 1, 0.3, 1];
@@ -48,24 +57,17 @@ function HeroTitles() {
     <div className="flex w-full max-w-2xl flex-col space-y-4 overflow-hidden pt-8">
       <motion.h1
         className="text-center text-4xl font-medium leading-tight text-foreground sm:text-5xl md:text-6xl"
-        initial={{ filter: "blur(10px)", opacity: 0, y: 50 }}
-        animate={{ filter: "blur(0px)", opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease, staggerChildren: 0.2 }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease }}
       >
         {["Your", "Quant", "in", "a", "box"].map((text, index) => (
-          <motion.span
+          <span
             key={index}
             className="inline-block px-1 md:px-2 text-balance font-semibold"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              duration: 0.8,
-              delay: index * 0.2,
-              ease,
-            }}
           >
             {text}
-          </motion.span>
+          </span>
         ))}
       </motion.h1>
       <motion.p
@@ -135,7 +137,6 @@ export default function Hero() {
         <HeroTitles />
         <HeroCTA />
         <HeroImage />
-        <div className="pointer-events-none absolute inset-x-0 -bottom-12 h-1/3 bg-gradient-to-t from-background via-background to-transparent lg:h-1/4"></div>
       </div>
     </section>
   );

@@ -10,17 +10,31 @@ export default function ChartShowHero({ className }) {
   const [isInteractive, setIsInteractive] = useState(false);
 
   return (
-    <div className={cn("relative w-full", className)}>
+    <div className={cn("relative w-full flex flex-col items-center gap-4", className)}>
+      <AnimatePresence>
+        {!isInteractive && (
+          <motion.h3
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-center text-lg font-medium text-foreground/90"
+          >
+            Click to see how easy charting is with us
+          </motion.h3>
+        )}
+      </AnimatePresence>
       <div
         className={cn(
-          "relative rounded-md p-2 ring-1 ring-slate-200/50 dark:bg-gray-900/70 dark:ring-white/10 backdrop-blur-md w-full overflow-hidden",
-          !isInteractive && "cursor-pointer group"
+          "relative rounded-md p-2 ring-1 ring-slate-200/50 dark:bg-gray-900/70 dark:ring-white/10 w-full overflow-hidden",
+          !isInteractive && "cursor-pointer group backdrop-blur-md",
+          isInteractive && "backdrop-blur-none"
         )}
       >
         <div
           className={cn(
             "relative w-full rounded-md border bg-muted overflow-hidden transition-[filter] duration-300",
-            !isInteractive && "max-h-[70vh] [filter:blur(12px)]"
+            !isInteractive && "max-h-[70vh] [filter:blur(12px)]",
+            isInteractive && "[filter:none]"
           )}
         >
           <div className={cn(!isInteractive && "max-h-[70vh] overflow-hidden")}>
@@ -33,7 +47,7 @@ export default function ChartShowHero({ className }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors rounded-md"
+              className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors rounded-md"
               onClick={() => setIsInteractive(true)}
             >
               <div className="z-30 bg-primary/10 flex items-center justify-center rounded-full backdrop-blur-md size-28 group-hover:scale-105 transition-transform">
@@ -47,9 +61,6 @@ export default function ChartShowHero({ className }) {
                   />
                 </div>
               </div>
-              <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-white/90 font-medium bg-black/40 px-3 py-1 rounded-full">
-                Click to try the chart
-              </p>
             </motion.div>
           )}
         </AnimatePresence>

@@ -14,23 +14,28 @@ import { useState } from "react";
 import { FaStar } from "react-icons/fa";
 
 export default function Pricing() {
-  const [isMonthly, setIsMonthly] = useState(true);
+  const [applyDiscount, setApplyDiscount] = useState(false);
   const { isDesktop } = useWindowSize();
 
   const handleToggle = () => {
-    setIsMonthly(!isMonthly);
+    setApplyDiscount(!applyDiscount);
   };
 
   return (
     <Section id="pricing" title="Pricing" subtitle="Choose the plan that's right for you">
-      <div className="flex justify-center mb-10">
-        <span className="mr-2 font-semibold">Monthly</span>
+      <div className="flex justify-center mb-10 items-center gap-3">
+        <span className="font-semibold">Apply discount</span>
         <label className="relative inline-flex items-center cursor-pointer">
           <Label>
-            <Switch checked={!isMonthly} onCheckedChange={handleToggle} />
+            <Switch
+              checked={applyDiscount}
+              onCheckedChange={handleToggle}
+              className={cn(
+                "data-[state=checked]:bg-green-500 data-[state=checked]:dark:bg-green-600"
+              )}
+            />
           </Label>
         </label>
-        <span className="ml-2 font-semibold">Yearly</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 sm:grid-cols-2 gap-4">
         {landingPageV2Config.pricing.map((plan, index) => (
@@ -76,29 +81,60 @@ export default function Pricing() {
           >
             {plan.isPopular && (
               <div className="absolute top-0 right-0 bg-primary py-0.5 px-2 rounded-bl-xl rounded-tr-xl flex items-center">
-                <FaStar className="text-white" />
-                <span className="text-white ml-1 font-sans font-semibold">
-                  Popular
-                </span>
+                {plan.badgeLabel ? (
+                  <span className="text-white font-sans font-semibold text-sm">
+                    {plan.badgeLabel}
+                  </span>
+                ) : (
+                  <>
+                    <FaStar className="text-white" />
+                    <span className="text-white ml-1 font-sans font-semibold">
+                      Popular
+                    </span>
+                  </>
+                )}
               </div>
             )}
             <div>
               <p className="text-base font-semibold text-muted-foreground">
                 {plan.name}
               </p>
-              <p className="mt-6 flex items-center justify-center gap-x-2 flex-wrap">
-                <span className="text-5xl font-bold tracking-tight text-foreground">
-                  {isMonthly ? plan.price : plan.yearlyPrice}
-                </span>
-                {plan.period !== "trial" && plan.period !== "one-time" && (
-                  <span className="text-sm font-semibold leading-6 tracking-wide text-muted-foreground">
-                    / {plan.period}
-                  </span>
-                )}
-              </p>
-              <p className="text-xs leading-5 text-muted-foreground text-center">
-                {plan.period === "one-time" ? "One time payment" : plan.period === "trial" ? "2 day trial" : isMonthly ? "billed monthly" : "billed annually"}
-              </p>
+              {plan.period === "one-time" ? (
+                <>
+                  <p className="mt-6 flex items-center justify-center gap-x-2 flex-wrap">
+                    <span className="text-5xl font-bold tracking-tight text-foreground">
+                      {plan.price}
+                    </span>
+                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground text-center">
+                    Never pay again
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-6 flex flex-col items-center justify-center gap-1">
+                    {plan.trial && (
+                      <span className="text-sm text-muted-foreground">{plan.trial}</span>
+                    )}
+                    <span className="flex items-center justify-center gap-x-2 flex-wrap">
+                      <span className="text-5xl font-bold tracking-tight text-foreground">
+                        {applyDiscount ? plan.yearlyPrice : plan.price}
+                      </span>
+                      <span className="text-sm font-semibold leading-6 tracking-wide text-muted-foreground">
+                        / {applyDiscount && plan.yearlyPeriod ? plan.yearlyPeriod : plan.period}
+                      </span>
+                    </span>
+                    {applyDiscount && plan.yearlyNote && (
+                      <span className="text-xs text-muted-foreground">
+                        ({plan.yearlyNote})
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground text-center">
+                    {applyDiscount ? "billed annually" : "billed monthly"}
+                  </p>
+                </>
+              )}
               <ul className="mt-5 gap-2 flex flex-col items-start">
                 {plan.features.map((feature, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-left">
