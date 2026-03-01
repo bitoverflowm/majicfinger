@@ -20,10 +20,10 @@ export const landingPageV2Config = {
       href: "https://buy.stripe.com/3csbL2c8K2iye6QcNg",
       price: "$19.99",
       period: "month",
-      yearlyPrice: "$15.91",
+      yearlyPrice: "$15.99",
       yearlyPeriod: "month",
       yearlyNote: "charged annually",
-      trial: "Free 7 day trial then",
+      trial: "Free 7-day trial then",
       features: [
         "Access all stable and experimental features",
         "Charts, API integrations, Data Analysis, Quant tools, dashboards and presentation",
