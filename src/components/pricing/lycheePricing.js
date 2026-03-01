@@ -4,94 +4,16 @@ import Link from "next/link";
 
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { CheckIcon, Cross1Icon } from "@radix-ui/react-icons";
+import { CheckIcon } from "@radix-ui/react-icons";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
-import { useMyStateV2 } from "@/context/stateContextV2";
-
-
-export const toHumanPrice = (price, decimals = 2) => {
-  return Number(price / 100).toFixed(decimals);
-};
-const lycheePrices = [
-  {
-    id: "price_0",
-    name: "100 tokens",
-    description: "Get a single time bag of 100 tokens to do whatever you want with?",
-    features: [
-      "Take a look around",
-      "Use for charts",
-      "Upload and Save Datasets",
-      "Use the Powerful Table",
-      "Connect to any Integration",
-      "1,000+ Charts (new charts added daily)",
-      "796,000+ curated colors and pallates",
-      "AI Analysis requests",
-      "Scrape requests",
-      "Data Set generations",
-    ],
-    missing: [
-        "This is a one time purchase. Based on usage metrics, should cover usage for 1 month of regular use."
-    ],
-    monthRef: 'https://buy.stripe.com/aEUaGY3CebT85Ak00m',
-    yearRef: 'https://buy.stripe.com/aEUaGY3CebT85Ak00m',
-    monthlyPrice: 799,
-    yearlyPrice: 799,
-    isMostPopular: false,
-    singlePay: true
-  },
-  {
-    id: "price_1",
-    name: "Pro",
-    description: "Access Everything and More.",
-    features: [
-      "Access to everything",
-      "Upload 0.85GB worth of Datasets",
-      "100 Tokens/month (top ups available)",
-      "Generate data",
-      "Create personalized dashboards with your custom data",
-      "Host your presentations to share with your team or audience",
-      "Create presentations with Katsu",
-      "Unlimited Integrations (based on rate limits)",
-      "Scrape URLs"
-    ],
-    missing: [
-        "Subscription prices might rise as new features are added and platform matures"
-    ],
-    monthRef: 'https://buy.stripe.com/aEU02k8Wy6yO6Eo5kH',
-    yearRef: 'https://buy.stripe.com/bIY8yQfkW0aq9QAeVi',
-    monthlyPrice: 499,
-    yearlyPrice: 399,
-    isMostPopular: false,
-  },
-  {
-    id: "price_2",
-    name: "LifeTime (85% off, original $199.99)",
-    description: "A single payment, own everything for life.",
-    features: [
-      "Includes everything in all plans",
-      "2GB worth of Datasets",
-      "Includes all future features",
-      "Includes 100 tokens/ month (free) for life (top-ups available)",
-      "Not a single penny more than what you pay today.",
-      "Be added to our legacy customer list and know our secrets and what we got in store WAAAYYY before everyone else",
-    ],
-    monthRef: 'https://buy.stripe.com/aEUaGYfkW9L04wgbJ3',
-    yearRef: 'https://buy.stripe.com/aEUaGYfkW9L04wgbJ3',
-    monthlyPrice: 2999,
-    yearlyPrice: 2999,
-    singlePay: true,
-    isMostPopular: true,
-  },
-];
+import { landingPageV2Config } from "@/lib/landingPageV2Config";
 
 export function Pricing() {
-  const [interval, setInterval] = useState("year");
+  const [applyDiscount, setApplyDiscount] = useState(false);
 
-  const contextStateV2 = useMyStateV2()
-  let setViewing = contextStateV2?.setViewing || []
-
+  const plans = landingPageV2Config.pricing;
 
   return (
     <section id="pricing">
@@ -104,159 +26,108 @@ export function Pricing() {
             Something For Everyone.
           </h2>
           <p className="mt-6 text-xl leading-8 text-black/80 dark:text-white">
-            Choose a plan  that&apos;s <strong>packed </strong>with
-            the best features for doing everything you could passibly want to do with data.
+            Choose a plan that&apos;s <strong>packed</strong> with
+            the best features for doing everything you could possibly want to do with data.
           </p>
         </div>
 
         <div className="flex w-full items-center justify-center space-x-2">
           <Switch
             id="interval"
-            checked={interval === 'year'}
-            onCheckedChange={(checked) => {
-              setInterval(checked ? "year" : "month");
-            }}
+            checked={applyDiscount}
+            onCheckedChange={setApplyDiscount}
           />
-          <span>{interval && interval === 'year' ? "Remove Discount" : "Apply Discount"}</span>
+          <span>{applyDiscount ? "Remove Discount" : "Apply Discount"}</span>
         </div>
 
         <div className="mx-auto grid w-full justify-center gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {lycheePrices.map((price, idx) => (
-            <div
-              key={price.id}
-              className={cn(
-                " relative flex w-full max-w-[400px] flex-col gap-4 overflow-hidden rounded-2xl border p-4 text-black dark:text-white",
-                {
-                  "border-2 border-neutral-700 shadow-lg shadow-neutral-500 dark:border-neutral-400 dark:shadow-neutral-600":
-                    price.isMostPopular,
-                },
-              )}
-            >
-              <div className="flex items-center">
-                <div className="ml-4">
-                  <h2 className="text-base font-semibold leading-7">
-                    {price.name}
-                  </h2>
-                  <p className="h-16 text-sm leading-5 text-black/70 dark:text-white">
-                    {price.description}
-                  </p>
+          {plans.map((plan, idx) => {
+            const isOneTime = plan.period === "one-time";
+            const href = isOneTime
+              ? plan.href
+              : applyDiscount ? plan.hrefYearly : plan.hrefMonthly;
+
+            return (
+              <div
+                key={plan.name}
+                className={cn(
+                  "relative flex w-full max-w-[400px] flex-col gap-4 overflow-hidden rounded-2xl border p-4 text-black dark:text-white",
+                  {
+                    "border-2 border-neutral-700 shadow-lg shadow-neutral-500 dark:border-neutral-400 dark:shadow-neutral-600":
+                      plan.isPopular,
+                  }
+                )}
+              >
+                {plan.isPopular && plan.badgeLabel && (
+                  <div className="absolute top-0 right-0 bg-green-500 py-0.5 px-2 rounded-bl-xl rounded-tr-xl">
+                    <span className="text-white font-sans font-semibold text-sm">
+                      {plan.badgeLabel}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center">
+                  <div className="ml-4">
+                    <h2 className="text-base font-semibold leading-7">
+                      {plan.name}
+                    </h2>
+                    <p className="h-16 text-sm leading-5 text-black/70 dark:text-white">
+                      {plan.description}
+                    </p>
+                  </div>
                 </div>
+
+                <motion.div
+                  key={`${plan.name}-${applyDiscount}`}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.4,
+                    delay: 0.1 + idx * 0.05,
+                    ease: [0.21, 0.47, 0.32, 0.98],
+                  }}
+                  className="flex flex-row gap-1"
+                >
+                  <span className="text-4xl font-bold text-black dark:text-white text-center w-full">
+                    {isOneTime ? plan.price : (applyDiscount ? plan.yearlyPrice : plan.price)}
+                    <span className="text-xs font-normal">
+                      {isOneTime ? " one-time" : ` /${applyDiscount && plan.yearlyPeriod ? plan.yearlyPeriod : plan.period}`}
+                      {applyDiscount && plan.yearlyNote && !isOneTime && " (charged annually)"}
+                    </span>
+                  </span>
+                </motion.div>
+
+                <Link
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "cursor-pointer text-center rounded-sm w-3/4 mx-auto py-2 font-semibold",
+                    plan.isPopular
+                      ? "bg-green-500 hover:bg-green-600 text-black"
+                      : "bg-green-400 hover:bg-black hover:text-white text-black"
+                  )}
+                >
+                  {plan.buttonText}
+                </Link>
+
+                <hr className="m-0 h-px w-full border-none bg-gradient-to-r from-neutral-200/0 via-neutral-500/30 to-neutral-200/0" />
+                {plan.features && plan.features.length > 0 && (
+                  <ul className="flex flex-col gap-2 font-normal">
+                    {plan.features.map((feature, fidx) => (
+                      <li
+                        key={fidx}
+                        className="flex items-start gap-3 text-xs font-medium text-black dark:text-white"
+                      >
+                        <CheckIcon className="h-5 w-5 shrink-0 rounded-full bg-green-400 p-[2px] text-black dark:text-white mt-0.5" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-
-              {
-                price.singlePay ?
-                        <motion.div
-                            key={`${price.id}`}
-                            initial="initial"
-                            animate="animate"
-                            variants={{
-                            initial: {
-                                opacity: 0,
-                                y: 12,
-                            },
-                            animate: {
-                                opacity: 1,
-                                y: 0,
-                            },
-                            }}
-                            transition={{
-                            duration: 0.4,
-                            delay: 0.1 + idx * 0.05,
-                            ease: [0.21, 0.47, 0.32, 0.98],
-                            }}
-                            className="flex flex-row gap-1"
-                        >
-                            <span className="text-4xl font-bold text-black dark:text-white text-center w-full">
-                                ${toHumanPrice(price.yearlyPrice, 2)}
-                            <span className="text-xs"> one payment</span>
-                        </span>
-                    </motion.div>
-                    :
-                    <motion.div
-                        key={`${price.id}-${interval}`}
-                        initial="initial"
-                        animate="animate"
-                        variants={{
-                        initial: {
-                            opacity: 0,
-                            y: 12,
-                        },
-                        animate: {
-                            opacity: 1,
-                            y: 0,
-                        },
-                        }}
-                        transition={{
-                        duration: 0.4,
-                        delay: 0.1 + idx * 0.05,
-                        ease: [0.21, 0.47, 0.32, 0.98],
-                        }}
-                        className="flex flex-row gap-1"
-                    >
-                        <span className="text-4xl font-bold text-black text-center w-full">
-                            $
-                            {interval === "year"
-                                ? toHumanPrice(price.yearlyPrice, 2)
-                                : toHumanPrice(price.monthlyPrice, 2)}
-                        <span className="text-xs">  /month  {interval === "year" && " charged annually"}</span>
-                        </span>
-                    </motion.div>
-              }
-              {
-                price.singlePay ?
-                    <Link href={price && price.monthRef} target="_blank" rel="noopener noreferrer" className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm w-3/4 mx-auto">
-                        Go
-                    </Link>
-                    :<Link href={price && interval === "year" ? price.yearRef : price.monthRef} className="hover:bg-black hover:text-white cursor-pointer text-center bg-green-400 rounded-sm rounded-sm w-3/4 mx-auto" target="_blank" rel="noopener noreferrer">
-                        Go
-                    </Link>
-              }             
-
-              <hr className="m-0 h-px w-full border-none bg-gradient-to-r from-neutral-200/0 via-neutral-500/30 to-neutral-200/0" />
-              {price.features && price.features.length > 0 && (
-                <ul className="flex flex-col gap-2 font-normal">
-                  {price.features.map((feature, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-center gap-3 text-xs font-medium text-black dark:text-white"
-                    >
-                      <CheckIcon className="h-5 w-5 shrink-0 rounded-full bg-green-400 p-[2px] text-black dark:text-white" />
-                      <span className="flex">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {price.missing && price.missing.length > 0 && (
-                <ul className="flex flex-col gap-2 font-normal">
-                  {price.missing.map((missing, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-center gap-3 text-xs font-medium text-black dark:text-white"
-                    >
-                      <Cross1Icon className="h-5 w-5 shrink-0 rounded-full bg-red-400 p-[2px] text-black dark:text-white" />
-                      <span className="flex">{missing}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
-        <div className="mt-4 text-sm bg-slate-200 p-4 text-justify grid grid-cols-2 gap-10">
-            <div className="px-10">
-              <div className="font-bold">A note on Tokens:</div>
-              <div className="pt-2"> Why 100 Tokens?</div>
-              <div className="py-1">Based on my personal usage, unless you are a power user, 100 Tokens should be sufficient. Top ups are available.</div>
-              <div className="py-1">It is impossible to assign "n" number of requests for 100 tokens, becuase each request can constitute different data analysis, image, pdf sizes, APIs have different usage limits, and different websites have different amounts of data to scrape.</div> 
-              <div>Everything is highly variable</div>
-              <div className="py-1">This is our first issuance event for Lychee, so bear with me as I actively monitoring usage, to optimize billing for the community.</div>
-            </div>
-            <div className="px-10">
-              <div className="font-bold">Self-custody</div>
-              <div className="py-1">I fully support self-custody of assets. I believe that tokens you buy should be your assets, along with your data. This means eventually I will code tokens up as ERC 20 or some other blockchain based token that you can keep in your own wallets. Or leave it here (up to you, they're yours)</div>
-              <div className="py-1">If you are a blockchain based grant issuer please click here if you would like me to build Lychee's native token on your blockchain</div>
-            </div>            
-          </div>
       </div>
     </section>
   );
