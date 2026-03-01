@@ -110,7 +110,8 @@
     "use-count-up": "^3.0.1",
     "usgs-earthquake-api": "^1.0.32",
     "vaul": "^0.9.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "y-prosemirror": "^1.3.7"
   },
   "devDependencies": {
     "@types/node": "^25.3.1",
