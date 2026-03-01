@@ -19,6 +19,15 @@ const UserSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    subscriptionTier: {
+        type: String,
+    },
+    billingCycle: {
+        type: String,
+    },
+    subscriptionStatus: {
+        type: String,
+    },
     subscriptionType: {
         type: String,
     },

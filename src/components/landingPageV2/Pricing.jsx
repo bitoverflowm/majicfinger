@@ -145,7 +145,7 @@ export default function Pricing() {
               </ul>
               <hr className="w-full my-4" />
               <Link
-                href={plan.href}
+                href={plan.period === "one-time" ? plan.href : (applyDiscount ? plan.hrefYearly : plan.hrefMonthly)}
                 className={cn(
                   buttonVariants({ variant: "outline" }),
                   "group relative w-full gap-2 overflow-hidden text-lg font-semibold tracking-tighter",

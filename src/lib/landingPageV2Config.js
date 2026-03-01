@@ -17,7 +17,8 @@ export const landingPageV2Config = {
   pricing: [
     {
       name: "Basic Tier",
-      href: "https://buy.stripe.com/3csbL2c8K2iye6QcNg",
+      hrefMonthly: "https://buy.stripe.com/14A9AUcQx0Lc3licrm2ZO0x",
+      hrefYearly: "https://buy.stripe.com/4gMbJ2g2J8dE9JG2QM2ZO0y",
       price: "$19.99",
       period: "month",
       yearlyPrice: "$15.99",
@@ -39,7 +40,7 @@ export const landingPageV2Config = {
     },
     {
       name: "Lifetime",
-      href: "https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4",
+      href: "https://buy.stripe.com/cNieVe3fX1PgcVSdvq2ZO0B",
       price: "$199.99",
       period: "one-time",
       yearlyPrice: "$199.99",
@@ -54,7 +55,8 @@ export const landingPageV2Config = {
     },
     {
       name: "Premium",
-      href: "https://buy.stripe.com/bIY7uM4Gi7CS7IsaF4",
+      hrefMonthly: "https://buy.stripe.com/fZu28s3fXfG63libni2ZO0z",
+      hrefYearly: "https://buy.stripe.com/aFa7sM7wdeC24pm62Y2ZO0A",
       price: "$39.99",
       period: "month",
       yearlyPrice: "$31.99",

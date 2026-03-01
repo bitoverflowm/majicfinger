@@ -9,13 +9,18 @@ export const config = {
 };
 
 // Stripe amounts in cents - must match Stripe product prices exactly
-// Lychee Basic - $19.99/month | Lychee Basic Annual - $191.90/year
-// Lychee Premium Monthly - $39.99/month | Lychee Premium Annual - $383.90/year
-// Lychee Lifetime v2 - $199.99
+// Lychee Basic - $19.99/month | Lychee Basic Annual - $191.90/year (or $15.99/mo billed annually)
+// Lychee Premium Monthly - $39.99/month | Lychee Premium Annual - $383.90/year (or $31.99/mo billed annually)
+// Lychee Lifetime - $199.99
+// Optional: add PRICE_ID_MAP for bulletproof mapping (price_xxx -> tier/cycle)
 const AMOUNT_MAP = {
   1999: { tier: "basic", cycle: "monthly" },
+  1599: { tier: "basic", cycle: "annual" }, // $15.99/mo billed annually
+  19188: { tier: "basic", cycle: "annual" },
   19190: { tier: "basic", cycle: "annual" },
   3999: { tier: "premium", cycle: "monthly" },
+  3199: { tier: "premium", cycle: "annual" }, // $31.99/mo billed annually
+  38388: { tier: "premium", cycle: "annual" },
   38390: { tier: "premium", cycle: "annual" },
   19999: { tier: "lifetime", cycle: "one-time" },
 };
@@ -77,7 +82,10 @@ async function handleCheckoutCompleted(session) {
     }
     const mapping = AMOUNT_MAP[amount];
     if (!mapping) {
-      console.warn(`Unrecognized payment amount: ${amount} cents`);
+      console.error(
+        `[Stripe Webhook] Unrecognized one-time payment amount: ${amount} cents. ` +
+        `Add to AMOUNT_MAP or verify Stripe price. User may not get access.`
+      );
       return;
     }
     const email = session.customer_details?.email;
@@ -99,6 +107,7 @@ async function handleCheckoutCompleted(session) {
     const isActive = sub.status === "active" || sub.status === "trialing";
     if (email && isActive) {
       const mapping = mapSubscriptionToTier(sub);
+      if (!mapping) return; // Unrecognized - skip update, error already logged
       const amount = sub.items?.data?.[0]?.plan?.amount ?? sub.items?.data?.[0]?.price?.unit_amount ?? 0;
       await updateUserPayment(email, session.customer_details?.name, amount, {
         tier: mapping.tier,
@@ -126,11 +135,11 @@ async function handleSubscriptionChange(subscription, eventType) {
   }
 
   if (customerEmail) {
-    const { tier, cycle } = mapSubscriptionToTier(subscription);
+    const mapping = mapSubscriptionToTier(subscription);
     await updateUserSubscriptionStatus(customerEmail, {
       status: status === "canceled" ? "cancelled" : status,
-      tier,
-      cycle,
+      tier: mapping?.tier,
+      cycle: mapping?.cycle,
     });
   }
 }
@@ -151,15 +160,17 @@ async function handlePaymentFailed(invoice) {
 
 function mapSubscriptionToTier(subscription) {
   const amount = subscription.items?.data?.[0]?.price?.unit_amount;
-  const interval = subscription.items?.data?.[0]?.plan?.interval;
+  const interval = subscription.items?.data?.[0]?.plan?.interval ?? subscription.items?.data?.[0]?.price?.recurring?.interval;
   const mapping = AMOUNT_MAP[amount];
   if (mapping) {
     return { tier: mapping.tier, cycle: mapping.cycle };
   }
-  return {
-    tier: interval === "year" ? "basic" : "basic",
-    cycle: interval === "year" ? "annual" : "monthly",
-  };
+  // Do NOT guess - unrecognized amounts could wrongly downgrade premium users
+  console.error(
+    `[Stripe Webhook] Unrecognized subscription amount: ${amount} cents, interval: ${interval}. ` +
+    `Add to AMOUNT_MAP or use price ID mapping. User may not get access.`
+  );
+  return null;
 }
 
 async function updateUserPayment(email, name, amount, opts) {
