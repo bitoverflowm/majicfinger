@@ -60,6 +60,8 @@ export default function FeaturesVertical({
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, amount: 0.5 });
 
+  const currentDuration = data[currentIndex]?.duration ?? collapseDelay;
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setCurrentIndex(isInView ? 0 : -1);
@@ -86,20 +88,22 @@ export default function FeaturesVertical({
   };
 
   useEffect(() => {
+    if (currentIndex < 0 || !isInView) return;
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % data.length);
-    }, collapseDelay);
+    }, currentDuration);
     return () => clearInterval(timer);
-  }, [collapseDelay, data.length]);
+  }, [currentIndex, currentDuration, data.length, isInView]);
 
   useEffect(() => {
+    if (currentIndex < 0 || !isInView) return;
     const handleAutoScroll = () => {
       const nextIndex = (currentIndex + 1) % data.length;
       scrollToIndex(nextIndex);
     };
-    const autoScrollTimer = setInterval(handleAutoScroll, collapseDelay);
+    const autoScrollTimer = setInterval(handleAutoScroll, currentDuration);
     return () => clearInterval(autoScrollTimer);
-  }, [collapseDelay, currentIndex, data.length]);
+  }, [currentIndex, currentDuration, data.length, isInView]);
 
   useEffect(() => {
     const carousel = carouselRef.current;
@@ -156,7 +160,7 @@ export default function FeaturesVertical({
                           style={{
                             transitionDuration:
                               currentIndex === index
-                                ? `${collapseDelay}ms`
+                                ? `${currentDuration}ms`
                                 : "0s",
                           }}
                         />
@@ -187,7 +191,10 @@ export default function FeaturesVertical({
                   key={currentIndex}
                   src={data[currentIndex].image}
                   alt="feature"
-                  className="aspect-auto h-full w-full rounded-xl border border-neutral-300/50 object-cover object-left-top p-1 shadow-lg"
+                  className={cn(
+                    "aspect-auto h-full w-full rounded-xl border border-neutral-300/50 p-1 shadow-lg",
+                    data[currentIndex]?.imageClassName ?? "object-cover object-left-top"
+                  )}
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
@@ -216,7 +223,7 @@ export default function FeaturesVertical({
                       } origin-top bg-primary transition-all ease-linear`}
                       style={{
                         transitionDuration:
-                          currentIndex === index ? `${collapseDelay}ms` : "0s",
+                          currentIndex === index ? `${currentDuration}ms` : "0s",
                       }}
                     />
                   </div>

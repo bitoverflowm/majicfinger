@@ -10,24 +10,28 @@ const data = [
     title: "1. Connect Your Data Instantly",
     content:
       "Pull data directly from Polymarket, Twitter, CoinGecko, and more—no code required. Or upload your own CSV, JSON, or XLSX. Zero setup. Zero headaches. Just data ready to use.",
-    image: "/ogImage.png",
+    image: "/polymarketDemo.gif",
     icon: <Upload className="w-6 h-6 text-primary" />,
+    duration: 16000, // 2 loops of polymarketDemo.gif (8000ms × 2)
   },
   {
     id: 2,
     title: "2. Run Reliable Models or Ask AI",
     content:
       "Choose from our most trusted, battle-tested models to uncover deep insights in seconds—or let the AI handle it. No Python, no debugging, just actionable results at the click of a button.",
-    image: "/ogImage.png",
+    image: "/sims.jpeg",
     icon: <Zap className="w-6 h-6 text-primary" />,
+    duration: 5000,
+    imageClassName: "object-contain object-center bg-muted/30 p-4",
   },
   {
     id: 3,
     title: "3. Present & Share Like a Pro",
     content:
       "Build live dashboards or hosted reports that update in real-time. Invite your team, share with the world, or keep it private. Say goodbye to PowerPoint and Canva—Lychee makes your analysis look as smart as it actually is.",
-    image: "/ogImage.png",
+    image: "/landing_dashboard.png",
     icon: <Sparkles className="w-6 h-6 text-primary" />,
+    duration: 5000,
   },
 ];
 
