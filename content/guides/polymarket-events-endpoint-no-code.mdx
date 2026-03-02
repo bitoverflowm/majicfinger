@@ -1,47 +1,63 @@
 ---
 title: "How to Pull and Analyze Polymarket Event Data (No-Code)"
-description: "Learn how to connect to Polymarket’s Events endpoint, filter and analyze structured event data, and export datasets, from anywhere in the world — no code required."
-publishedAt: "2026-03-1"
+description: "Learn how to connect to Polymarket’s Events List endpoint, filter and analyze structured event data, and export datasets, from anywhere in the world — no code required."
+publishedAt: "2026-03-01"
 author: "misterrpink"
 topics: ["polymarket", "prediction markets", "market structure", "no-code"]
 integration: ["Polymarket"]
-coverImage: "/ogImage.png"
+coverImage: "/images/guides/polymarket-events-endpoint-no-code/main.png"
 featured: true
 ---
 
-Lychee is your quant in a box. Lychee's no-code service lets you interact with structured data as if it were a spreadsheet, not raw JSON. This provides you a framework for analyzing prediction market data including the most up-to date Polymarket market, trade, user and events data. Lychee also provides access to data collection from CoinGecko, Reddit, Twitter, Government Data sources, and numerous increasing data sources that would typically take a developer weeks or months to ingest, and non-coders much longer. Furthermore Lychee provides a suite of analysis scripts, charting libraries, and presentation tools to generate sharable figures, stastics and dashboards.
+Lychee is your quant in a box.
 
-If you are serious about building a real quantitative edge, take a few minutes to understand how easy it is to get the proper data with Lychee and Polymarket.
+Lychee’s no-code platform lets you interact with structured data as if it were a spreadsheet — not raw JSON. It provides a framework for analyzing prediction market data, including the most up-to-date Polymarket market, trade, user, and event data.
 
-In this guide we specifically focus on the connecting to and utilizing the Polymarket Events Endpoint.
+In addition to Polymarket, Lychee connects to sources like CoinGecko, Reddit, Twitter, and government datasets — data streams that would typically take developers weeks to ingest and structure.
 
-## What Is the Polymarket Events?
+Lychee also includes built-in analysis scripts, charting tools, and presentation features so you can generate shareable figures, statistics, and dashboards from structured datasets.
 
-As stated in the Polymarket Documentation "Every prediction on Polymarket is structured around two core concepts: markets and events." We will talk more in detail about markets in another guide. But in brief markets in Polymarket represent the fundamental binary question with a "Yes/No" outcome.
+The Polymarket Events endpoint returns structured metadata about every event listed on the platform, making it the foundation for systematic prediction market analysis.
 
-So an example of a market:
+If you’re serious about building a quantitative edge, understanding how to access clean event-level data is the first step.
 
-> Will the Iranian regime fall by June 30
-(leading market as of this publication)
+In this guide, we focus specifically on connecting to and utilizing the Polymarket Events endpoint.
 
-Now an Event ties groups of markets together. 
+---
 
-Events can be Single-Market Events
-Event: Will the Iranian regime fall by June 30? 
-> Market: Will the Iranian regime fall by June 30? (Yes/No)
+## What Is the Polymarket Events Endpoint?
 
-Multi-Market Events
-Events: Fed decision in March?
-> Market: 50+ bps decrease (Yes/No)
-> Market: 25 bps decrease (Yes/No)
-> Market: No Change (Yes/No)
-> Market: 25 bps increase (Yes/No)
+As stated in the Polymarket documentation, “Every prediction on Polymarket is structured around two core concepts: markets and events.”
 
-##What is the Events endpoint?
+We’ll cover markets in greater detail in a separate guide. For now, it’s important to understand how events organize related markets into a coherent structure.
 
-The Events endpoint returns high-level metadata about every event listed on Polymarket.
+A market in Polymarket represents a fundamental binary question with a "Yes/No" outcome. Example:
 
-Each event includes:
+> Will the Iranian regime fall by June 30?
+> *(Leading market as of this publication)*
+
+An event ties groups of markets together. Events can be:
+
+**Single-Market Events**
+
+- Event: Will the Iranian regime fall by June 30?  
+  > Market: Will the Iranian regime fall by June 30? (Yes/No)
+
+**Multi-Market Events**
+
+- Event: Fed decision in March?  
+  > Market: 50+ bps decrease (Yes/No)  
+  > Market: 25 bps decrease (Yes/No)  
+  > Market: No change (Yes/No)  
+  > Market: 25 bps increase (Yes/No)
+
+Understanding this hierarchy is essential if you want to filter, aggregate, or export meaningful datasets.
+
+---
+
+## What Is the Events Endpoint?
+
+The Events endpoint returns high-level metadata about every event listed on Polymarket. Each event includes:
 
 - Title  
 - Description  
@@ -55,13 +71,11 @@ Polymarket structures its data hierarchically:
 
 **Event → Markets → Outcomes**
 
-An event represents a broader question.
-
 For example:
 
 > “Which crypto company will ZachXBT expose for insider trading?”
 
-That single event may contain multiple markets, such as:
+That event may contain multiple markets, such as:
 
 - Axiom  
 - Metaroa  
@@ -70,15 +84,11 @@ That single event may contain multiple markets, such as:
 
 Each market represents an outcome within that event.
 
-Understanding this structure is critical if you want to filter, aggregate, or export meaningful data.
-
 ---
 
 ## Why Event-Level Data Matters
 
-Most users look at Polymarket through the front-end interface.
-
-But once you access the Events endpoint directly, you can:
+Most users interact with Polymarket through the front-end interface. Accessing the Events endpoint directly allows you to:
 
 ### 1. Analyze Market Structure
 
@@ -96,13 +106,13 @@ By grouping events by tag or category, you can track:
 
 ### 3. Compare Liquidity Across Categories
 
-You can sort events by:
+Sort events by:
 
 - Total volume  
 - Liquidity  
 - Status (open vs closed)  
 
-This helps you identify where capital is concentrating.
+This shows where capital is concentrating.
 
 ### 4. Export Structured Data
 
@@ -113,15 +123,13 @@ Instead of manually browsing the UI, you can export event-level data to:
 - BI tools  
 - Python environments  
 
-This makes systematic research possible.
-
-And with Lychee, this entire workflow is no-code.
+With Lychee, this entire workflow is no-code.
 
 ---
 
 ## Who This Is For
 
-This workflow is especially useful for:
+This workflow is useful for:
 
 - Quantitative traders analyzing prediction market structure  
 - Researchers studying crowd forecasting behavior  
@@ -156,8 +164,6 @@ No scripts.
 No backend setup.  
 No JSON wrangling.  
 
-Just structured analysis.
-
 This is where “quant in a box” becomes real.
 
 ---
@@ -173,41 +179,62 @@ Once the data is inside Lychee, you can:
 - Expand nested markets  
 - Export structured event data  
 
-This is the foundation for more advanced workflows, including:
+This lays the foundation for advanced workflows, including:
 
 - Joining event data with trades endpoint data  
 - Charting volume by category  
 - Tracking open interest trends  
 - Building recurring market structure reports  
 
-Each of those will be covered in future guides.
+Each of these will be covered in future guides.
 
 ---
 
 ## Step-by-Step: Connecting the Polymarket Events Endpoint in Lychee
 
-_Add screenshots and detailed UI instructions in this section._
+Follow these steps:
 
-Structure this clearly:
+### 1. Head to the Integrations Panel
 
-1. Create a new API connection  
-2. Enter the Events endpoint URL  
-3. Fetch the dataset  
-4. Expand nested markets  
-5. Apply filters  
-6. Sort by volume  
-7. Export data  
+![Create API connection screen](/images/guides/polymarket-events-endpoint-no-code/1.png)
 
-Keep this section practical and visual.
+### 2. Select Polymarket
+
+This loads the available Polymarket API endpoints inside Lychee.
+
+![Create API connection screen](/images/guides/polymarket-events-endpoint-no-code/2.png)
+
+### 3. Fetch the Dataset
+
+Select **Events** → **List events** to load all Polymarket events. The response includes nested markets and metadata.
+
+![Create API connection screen](/images/guides/polymarket-events-endpoint-no-code/3.png)
+
+### 4. Select Your API Parameters
+
+Each event contains a list of markets. Specify query parameters to get the dataset you need.
+
+![Create API connection screen](/images/guides/polymarket-events-endpoint-no-code/4.png)
+
+### 5. Apply Sort, Filter, and Other Operations
+
+Filter events by category (e.g., Crypto), status (open/closed), or search by keyword. Sort by volume or liquidity to identify high-activity events.
+
+![Create API connection screen](/images/guides/polymarket-events-endpoint-no-code/5.png)
+
+### 6. Export Data
+
+Export the filtered dataset to CSV or Excel, or continue your analysis in Lychee’s charting and dashboard tools.
+
+![Create API connection screen](/images/guides/polymarket-events-endpoint-no-code/6.png)
 
 ---
 
 ## How This Fits Into the Larger Polymarket API Series
 
-This article is part of a structured walkthrough of Polymarket’s API inside Lychee.
+This guide is part of a structured walkthrough of Polymarket’s API inside Lychee. Upcoming guides will cover:
 
-Upcoming guides will cover:
-
+- Other Events endpoints  
 - Markets endpoint  
 - Trades endpoint  
 - Orderbook data  
@@ -216,9 +243,9 @@ Upcoming guides will cover:
 
 The goal is to move from:
 
-**Raw endpoint → Structured dataset → Visualization → Insight**
+**Raw endpoint → Structured dataset → Visualization → Insight → Share**
 
-By the end of this series, you’ll be able to analyze prediction markets without writing a single line of code.
+By the end of this series, you’ll analyze prediction markets without writing a single line of code.
 
 ---
 
@@ -233,24 +260,4 @@ Sort them.
 Export them.  
 Build on them.  
 
-This is the first layer of prediction market intelligence — and the foundation for deeper quantitative analysis.
-
----
-
-## Why This Structure Works Long-Term
-
-This article:
-
-- Targets durable search intent (Polymarket Events endpoint)  
-- Positions Lychee as infrastructure  
-- Builds a repeatable template for other endpoints  
-- Creates internal linking opportunities  
-- Sets up future charting and analysis content  
-
-And most importantly:
-
-It builds trust.
-
-No hype.  
-No trend-chasing.  
-Just real utility.
+This is the first layer of prediction market intelligence — the foundation for deeper quantitative analysis.
