@@ -1,17 +1,43 @@
 ---
-title: "How to Pull and Analyze Polymarket Event Data (No-Code) Using the Events Endpoint"
-description: "Learn how to connect Polymarket’s Events endpoint to Lychee, filter and analyze structured event data, and export datasets — no code required."
-publishedAt: "2025-02-26"
-author: "Lychee Team"
+title: "How to Pull and Analyze Polymarket Event Data (No-Code)"
+description: "Learn how to connect to Polymarket’s Events endpoint, filter and analyze structured event data, and export datasets, from anywhere in the world — no code required."
+publishedAt: "2026-03-1"
+author: "misterrpink"
 topics: ["polymarket", "prediction markets", "market structure", "no-code"]
 integration: ["Polymarket"]
 coverImage: "/ogImage.png"
 featured: true
 ---
 
-Lychee acts as your quant in a box — letting you interact with structured market data as if it were a spreadsheet, not raw JSON.
+Lychee is your quant in a box. Lychee's no-code service lets you interact with structured data as if it were a spreadsheet, not raw JSON. This provides you a framework for analyzing prediction market data including the most up-to date Polymarket market, trade, user and events data. Lychee also provides access to data collection from CoinGecko, Reddit, Twitter, Government Data sources, and numerous increasing data sources that would typically take a developer weeks or months to ingest, and non-coders much longer. Furthermore Lychee provides a suite of analysis scripts, charting libraries, and presentation tools to generate sharable figures, stastics and dashboards.
 
-## What Is the Polymarket Events Endpoint?
+If you are serious about building a real quantitative edge, take a few minutes to understand how easy it is to get the proper data with Lychee and Polymarket.
+
+In this guide we specifically focus on the connecting to and utilizing the Polymarket Events Endpoint.
+
+## What Is the Polymarket Events?
+
+As stated in the Polymarket Documentation "Every prediction on Polymarket is structured around two core concepts: markets and events." We will talk more in detail about markets in another guide. But in brief markets in Polymarket represent the fundamental binary question with a "Yes/No" outcome.
+
+So an example of a market:
+
+> Will the Iranian regime fall by June 30
+(leading market as of this publication)
+
+Now an Event ties groups of markets together. 
+
+Events can be Single-Market Events
+Event: Will the Iranian regime fall by June 30? 
+> Market: Will the Iranian regime fall by June 30? (Yes/No)
+
+Multi-Market Events
+Events: Fed decision in March?
+> Market: 50+ bps decrease (Yes/No)
+> Market: 25 bps decrease (Yes/No)
+> Market: No Change (Yes/No)
+> Market: 25 bps increase (Yes/No)
+
+##What is the Events endpoint?
 
 The Events endpoint returns high-level metadata about every event listed on Polymarket.
 
