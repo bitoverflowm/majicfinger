@@ -76,6 +76,12 @@ const Nav = () => {
   const loadedChartMeta = contextStateV2?.loadedChartMeta
   const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta
 
+  // summarization: when charting a summary table
+  const chartDataOverride = contextStateV2?.chartDataOverride
+  const chartDataOverrideMeta = contextStateV2?.chartDataOverrideMeta
+  const setChartDataOverride = contextStateV2?.setChartDataOverride
+  const setChartDataOverrideMeta = contextStateV2?.setChartDataOverrideMeta
+
   //setting loaded chart values for viewing
   const setChartOptions = contextStateV2?.setChartOptions
   const setChartTheme = contextStateV2?.setChartTheme
@@ -173,14 +179,11 @@ const Nav = () => {
         }        
       }else{
         if(viewing === 'charts'){
-          // console.log("data to save: ", data)
-          // Here you can add code to save the projectName to a database or state management
-          fetch('/api/charts', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
+          const saveChartWithData = async (dataSetId) => {
+            const res = await fetch('/api/charts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
                 chart_name: newChartName,
                 chart_properties: [{
                   'chartOptions': chartOptions,
@@ -195,19 +198,58 @@ const Nav = () => {
                 last_saved_date: new Date(),
                 labels: ['test'],
                 user_id: user.userId,           
-                data_set_id: loadedDataMeta._id
-            }),
-          })
-          .then(response => response.json())
-          .then(data => {
-              toast(`Your Chart has been saved as ${newChartName}`)
-              setRefetchChart(1)
-              // Handle the response data here
-          })
-          .catch(error => {
-              console.error('Error saving Data:', error);
-              // Handle the error here
-          });
+                data_set_id: dataSetId
+              }),
+            });
+            const data = await res.json();
+            if (data._id || data.success) {
+              toast(`Your Chart has been saved as ${newChartName}`);
+              setRefetchChart(1);
+              setChartDataOverride?.(null);
+              setChartDataOverrideMeta?.(null);
+            }
+          };
+
+          if (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length > 0) {
+            // Save summary data as DataSet first, then chart
+            fetch('/api/dataSets', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                data_set_name: `${newChartName || 'Summary'} (summary)`,
+                data: chartDataOverride,
+                created_date: new Date(),
+                last_saved_date: new Date(),
+                labels: JSON.stringify({
+                  parentDataSetId: loadedDataMeta?._id,
+                  summarizationType: chartDataOverrideMeta?.type,
+                  summarizationTitle: chartDataOverrideMeta?.title
+                }),
+                source: 'summarization',
+                user_id: user.userId,
+              }),
+            })
+              .then(r => r.json())
+              .then((dsRes) => {
+                const summaryDataSetId = dsRes.data?._id || dsRes._id;
+                if (summaryDataSetId) {
+                  saveChartWithData(summaryDataSetId);
+                } else {
+                  toast.error('Failed to save summary data');
+                }
+              })
+              .catch((err) => {
+                console.error('Error saving summary data:', err);
+                toast.error('Failed to save summary data');
+              });
+          } else {
+            const dataSetId = loadedDataMeta?._id;
+            if (!dataSetId) {
+              toast.error('Save your data first, or create a summary from the Summarize drawer.');
+              return;
+            }
+            saveChartWithData(dataSetId);
+          }
         }else{
           fetch('/api/dataSets', {
             method: 'POST',
@@ -370,7 +412,7 @@ const Nav = () => {
                   {showUnsavedFlag && (
                     <span className="text-[7pt] px-2 py-1 rounded-sm bg-rose-100 text-rose-500  dark:text-amber-400 font-bold shrink-0">Viewing Unsaved Data</span>
                   )}
-                  {connectedData && (
+                  {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
                       <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm">Save {viewing === 'charts' ? 'Chart' : 'Data'}</Button>

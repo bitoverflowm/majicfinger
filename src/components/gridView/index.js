@@ -48,7 +48,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { ArrowDownFromLine, ArrowUpFromLine, TrafficCone, Filter, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Calendar, X, Download } from 'lucide-react';
+import { SummarizeDrawer } from '@/components/summarizationView'
+import { ArrowDownFromLine, ArrowUpFromLine, TrafficCone, Filter, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Calendar, X, Download, BarChart2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 
@@ -71,6 +72,7 @@ const GridView = ({startNew}) => {
     const [colAddOpen, setColAddOpen] = useState()
     const [gridExpanded, setGridExpanded] = useState()
 
+    const [summarizeOpen, setSummarizeOpen] = useState(false);
     const [filterState, setFilterState] = useState({
       dateColumn: null,
       dateFrom: '',
@@ -353,6 +355,10 @@ const GridView = ({startNew}) => {
                     Sort & filter
                   </TabsTrigger>
                 </TabsList>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setSummarizeOpen(true)}>
+                  <BarChart2 className="h-3.5 w-3.5" />
+                  Summarize
+                </Button>
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={resetFilters}>
                   <RotateCcw className="h-3.5 w-3.5" />
                   Reset
@@ -540,6 +546,7 @@ const GridView = ({startNew}) => {
               <TabsContent value="table" className="mt-0" />
             </Tabs>
             )}
+            <SummarizeDrawer open={summarizeOpen} onOpenChange={setSummarizeOpen} />
             <div className={gridExpanded ? 'h-[750px]' :'h-[550px]'}>
                 <AgGridReact 
                     defaultColDef={defaultColDef} 

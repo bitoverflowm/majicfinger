@@ -127,6 +127,18 @@ const ChartView = ({demo}) => {
     let connectedData = contextStateV2 && contextStateV2.connectedData
     let setViewing = contextStateV2 && contextStateV2?.setViewing
     let dataTypes = contextStateV2 && contextStateV2.dataTypes
+    const chartDataOverride = contextStateV2?.chartDataOverride
+    const setChartDataOverride = contextStateV2?.setChartDataOverride
+    const setChartDataOverrideMeta = contextStateV2?.setChartDataOverrideMeta
+    const chartDataOverrideMeta = contextStateV2?.chartDataOverrideMeta
+
+    // When charting a summary table, use override data; else use main connectedData
+    const effectiveData = chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length > 0
+      ? chartDataOverride
+      : connectedData
+    const effectiveCols = chartDataOverride && chartDataOverride.length > 0
+      ? Object.keys(chartDataOverride[0] || {}).map((field) => ({ field }))
+      : connectedCols
 
     //chart is usable once data requirements are satisfied 
     const [chartUsable, setChartUsable] = useState()
@@ -210,12 +222,12 @@ const ChartView = ({demo}) => {
    
     //Extract column names
     useEffect(()=> {
-        connectedCols ? extractData(connectedCols) : setChartUsable(false)
-    }, [connectedCols])
+        effectiveCols && effectiveCols.length ? extractData(effectiveCols) : setChartUsable(false)
+    }, [effectiveCols])
 
     useEffect(() => {
-        connectedData && setFilteredData(connectedData)
-    }, [connectedData])
+        effectiveData && setFilteredData(effectiveData)
+    }, [effectiveData])
 
     // Sorted data by X and/or Y axis (asc/desc by type: number, date, string)
     const sortedData = useMemo(() => {
@@ -926,7 +938,7 @@ const ChartView = ({demo}) => {
                 </div>
                 { !(editHidden) &&
                     <>
-                    {!demo && !connectedData && 
+                    {!demo && !effectiveData && 
                         <div className='flex place-items-center text-xs gap-2 place-items-center bg-indigo-500/80 rounded-lg px-4 py-2 mx-8 mb-4'>
                             <div className='rounded-full bg-white h-2 w-2 mr-1 animate-bounce'></div>
                             <small className="text-xs text-white"> You haven't connected any data yet. 
@@ -934,6 +946,13 @@ const ChartView = ({demo}) => {
                             <span className='flex place-items-center ml-2 text-[10px] rounded-md bg-white text-black cursor-pointer hover:bg-black hover:text-white px-2' onClick={()=>setViewing('dataStart')}>Fix<CaretRightIcon/></span>
                         </div>
                     }
+                    {!demo && chartDataOverride && chartDataOverrideMeta && (
+                        <div className='flex place-items-center text-xs gap-2 place-items-center bg-lychee_blue/80 rounded-lg px-4 py-2 mx-8 mb-4'>
+                            <small className="text-xs text-white"> Viewing summary: {chartDataOverrideMeta.title}
+                            </small>
+                            <span className='flex place-items-center ml-2 text-[10px] rounded-md bg-white text-black cursor-pointer hover:bg-black hover:text-white px-2' onClick={() => { setChartDataOverride?.(null); setChartDataOverrideMeta?.(null); }}>Back to main data<CaretRightIcon/></span>
+                        </div>
+                    )}
                     
                     {
                         !(colorVisible) &&
