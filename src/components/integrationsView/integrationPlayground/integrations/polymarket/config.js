@@ -39,6 +39,38 @@ export const EVENTS_RESPONSE_FIELDS = [
   "gmpChartMode", "eventCreators", "tweetCount", "chats", "featuredOrder", "estimateValue", "cantEstimate", "estimatedValue",
   "templates", "spreadsMainLine", "totalsMainLine", "carouselMap", "pendingDeployment", "deploying",
   "deployingTimestamp", "scheduledDeploymentTimestamp", "gameStatus",
+  "marketId", "eventId", "outcome", "price", "winner",
+];
+
+/** Market response fields (List markets) — top-level + flattened nested keys from gamma-api.polymarket.com/markets */
+export const MARKETS_RESPONSE_FIELDS = [
+  "id", "question", "conditionId", "slug", "twitterCardImage", "resolutionSource", "endDate", "category", "ammType",
+  "liquidity", "sponsorName", "sponsorImage", "startDate", "xAxisValue", "yAxisValue", "denominationToken", "fee",
+  "image", "icon", "lowerBound", "upperBound", "description", "outcomes", "outcomePrices", "volume", "active",
+  "marketType", "formatType", "lowerBoundDate", "upperBoundDate", "closed", "marketMakerAddress", "createdBy", "updatedBy",
+  "createdAt", "updatedAt", "closedTime", "wideFormat", "new", "mailchimpTag", "featured", "archived", "resolvedBy",
+  "restricted", "marketGroup", "groupItemTitle", "groupItemThreshold", "questionID", "umaEndDate", "enableOrderBook",
+  "orderPriceMinTickSize", "orderMinSize", "umaResolutionStatus", "curationOrder", "volumeNum", "liquidityNum",
+  "endDateIso", "startDateIso", "umaEndDateIso", "hasReviewedDates", "readyForCron", "commentsEnabled",
+  "volume24hr", "volume1wk", "volume1mo", "volume1yr", "gameStartTime", "secondsDelay", "clobTokenIds", "disqusThread",
+  "shortOutcomes", "teamAID", "teamBID", "umaBond", "umaReward", "fpmmLive",
+  "volume24hrAmm", "volume1wkAmm", "volume1moAmm", "volume1yrAmm", "volume24hrClob", "volume1wkClob", "volume1moClob", "volume1yrClob",
+  "volumeAmm", "volumeClob", "liquidityAmm", "liquidityClob", "makerBaseFee", "takerBaseFee", "customLiveness",
+  "acceptingOrders", "notificationsEnabled", "score",
+  "imageOptimized_id", "imageOptimized_imageUrlSource", "imageOptimized_imageUrlOptimized", "imageOptimized_imageSizeKbSource",
+  "imageOptimized_imageSizeKbOptimized", "imageOptimized_imageOptimizedComplete", "imageOptimized_imageOptimizedLastUpdated",
+  "imageOptimized_relID", "imageOptimized_field", "imageOptimized_relname",
+  "iconOptimized_id", "iconOptimized_imageUrlSource", "iconOptimized_imageUrlOptimized", "iconOptimized_imageSizeKbSource",
+  "iconOptimized_imageSizeKbOptimized", "iconOptimized_imageOptimizedComplete", "iconOptimized_imageOptimizedLastUpdated",
+  "iconOptimized_relID", "iconOptimized_field", "iconOptimized_relname",
+  "events", "categories", "tags", "creator", "ready", "funded", "pastSlugs", "readyTimestamp", "fundedTimestamp",
+  "acceptingOrdersTimestamp", "competitive", "rewardsMinSize", "rewardsMaxSpread", "spread", "automaticallyResolved",
+  "oneDayPriceChange", "oneHourPriceChange", "oneWeekPriceChange", "oneMonthPriceChange", "oneYearPriceChange",
+  "lastTradePrice", "bestBid", "bestAsk", "automaticallyActive", "clearBookOnStart", "chartColor", "seriesColor",
+  "showGmpSeries", "showGmpOutcome", "manualActivation", "negRiskOther", "gameId", "groupItemRange", "sportsMarketType",
+  "line", "umaResolutionStatuses", "pendingDeployment", "deploying", "deployingTimestamp", "scheduledDeploymentTimestamp",
+  "rfqEnabled", "eventStartTime",
+  "marketId", "eventId", "outcome", "price", "winner",
 ];
 
 export const ENDPOINTS = [
@@ -50,6 +82,7 @@ export const ENDPOINTS = [
     group: "events",
     responseFields: EVENTS_RESPONSE_FIELDS,
     params: [
+      { key: "outcomeOptimizedFormat", label: "Outcome-optimized format", required: false, type: "boolean", default: "", hint: "Flatten outcomes with prices; add winner for closed markets" },
       { key: "limit", label: "Limit", required: false, type: "number", default: 20, hint: "Range >= 0" },
       { key: "offset", label: "Offset", required: false, type: "number", default: 0, hint: "Range >= 0" },
       { key: "order", label: "Order", required: false, type: "text", hint: "Comma-separated fields to order by" },
@@ -85,6 +118,7 @@ export const ENDPOINTS = [
     group: "events",
     params: [
       { key: "id", label: "Event ID", required: true, type: "text", listQuery: "listEvents", listLabelKey: "title", listValueKey: "id" },
+      { key: "outcomeOptimizedFormat", label: "Outcome-optimized format", required: false, type: "boolean", default: "", hint: "Flatten outcomes with prices; add winner for closed markets" },
     ],
   },
   {
@@ -94,6 +128,7 @@ export const ENDPOINTS = [
     group: "events",
     params: [
       { key: "slug", label: "Event slug", required: true, type: "text" },
+      { key: "outcomeOptimizedFormat", label: "Outcome-optimized format", required: false, type: "boolean", default: "", hint: "Flatten outcomes with prices; add winner for closed markets" },
     ],
   },
   {
@@ -109,11 +144,37 @@ export const ENDPOINTS = [
   {
     query: "listMarkets",
     name: "List markets",
-    description: "Fetch markets with optional filters.",
+    description: "Fetch markets with optional filters. All query params supported.",
     group: "markets",
+    responseFields: MARKETS_RESPONSE_FIELDS,
     params: [
-      { key: "limit", label: "Limit", required: false, type: "number", default: 20 },
-      { key: "offset", label: "Offset", required: false, type: "number", default: 0 },
+      { key: "outcomeOptimizedFormat", label: "Outcome-optimized format", required: false, type: "boolean", default: "", hint: "Flatten outcomes with prices; add winner for closed markets" },
+      { key: "limit", label: "Limit", required: false, type: "number", default: 20, hint: "Range >= 0" },
+      { key: "offset", label: "Offset", required: false, type: "number", default: 0, hint: "Range >= 0" },
+      { key: "order", label: "Order", required: false, type: "text", hint: "Comma-separated fields to order by" },
+      { key: "ascending", label: "Ascending", required: false, type: "boolean", default: "" },
+      { key: "id", label: "Market ID(s)", required: false, type: "text", hint: "Comma-separated market IDs" },
+      { key: "slug", label: "Slug(s)", required: false, type: "text", hint: "Comma-separated market slugs" },
+      { key: "clob_token_ids", label: "CLOB token IDs", required: false, type: "text", hint: "Comma-separated" },
+      { key: "condition_ids", label: "Condition ID(s)", required: false, type: "text", hint: "Comma-separated condition IDs" },
+      { key: "market_maker_address", label: "Market maker address", required: false, type: "text", hint: "Comma-separated addresses" },
+      { key: "liquidity_num_min", label: "Liquidity min", required: false, type: "number" },
+      { key: "liquidity_num_max", label: "Liquidity max", required: false, type: "number" },
+      { key: "volume_num_min", label: "Volume min", required: false, type: "number" },
+      { key: "volume_num_max", label: "Volume max", required: false, type: "number" },
+      { key: "start_date_min", label: "Start date min", required: false, type: "text", hint: "ISO date-time" },
+      { key: "start_date_max", label: "Start date max", required: false, type: "text", hint: "ISO date-time" },
+      { key: "end_date_min", label: "End date min", required: false, type: "text", hint: "ISO date-time" },
+      { key: "end_date_max", label: "End date max", required: false, type: "text", hint: "ISO date-time" },
+      { key: "tag_id", label: "Tag ID", required: false, type: "number" },
+      { key: "related_tags", label: "Related tags", required: false, type: "boolean", default: "" },
+      { key: "cyom", label: "CYOM", required: false, type: "boolean", default: "" },
+      { key: "uma_resolution_status", label: "UMA resolution status", required: false, type: "text" },
+      { key: "game_id", label: "Game ID", required: false, type: "text" },
+      { key: "sports_market_types", label: "Sports market types", required: false, type: "text", hint: "Comma-separated" },
+      { key: "rewards_min_size", label: "Rewards min size", required: false, type: "number" },
+      { key: "question_ids", label: "Question ID(s)", required: false, type: "text", hint: "Comma-separated" },
+      { key: "include_tag", label: "Include tag", required: false, type: "boolean", default: "" },
       { key: "closed", label: "Closed only", required: false, type: "boolean", default: "" },
     ],
   },
@@ -122,8 +183,10 @@ export const ENDPOINTS = [
     name: "Get market by ID",
     description: "Get a single market by ID. Use List markets to get IDs, or pull list below.",
     group: "markets",
+    responseFields: MARKETS_RESPONSE_FIELDS,
     params: [
       { key: "id", label: "Market ID", required: true, type: "text", listQuery: "listMarkets", listLabelKey: "question", listValueKey: "id" },
+      { key: "outcomeOptimizedFormat", label: "Outcome-optimized format", required: false, type: "boolean", default: "", hint: "Flatten outcomes with prices; add winner for closed markets" },
     ],
   },
   {
@@ -131,8 +194,10 @@ export const ENDPOINTS = [
     name: "Get market by slug",
     description: "Get a single market by URL slug.",
     group: "markets",
+    responseFields: MARKETS_RESPONSE_FIELDS,
     params: [
       { key: "slug", label: "Market slug", required: true, type: "text" },
+      { key: "outcomeOptimizedFormat", label: "Outcome-optimized format", required: false, type: "boolean", default: "", hint: "Flatten outcomes with prices; add winner for closed markets" },
     ],
   },
   {

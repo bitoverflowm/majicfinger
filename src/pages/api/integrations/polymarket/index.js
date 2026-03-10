@@ -10,12 +10,152 @@ const EVENTS_PARAMS = [
 ];
 
 const MARKETS_PARAMS = [
-  "limit", "offset", "order", "ascending", "slug", "clob_token_ids", "condition_ids",
-  "market_maker_address", "liquidity_num_min", "liquidity_num_max", "volume_num_min", "volume_num_max",
+  "limit", "offset", "order", "ascending",
+  "id", "slug", "clob_token_ids", "condition_ids", "market_maker_address",
+  "liquidity_num_min", "liquidity_num_max", "volume_num_min", "volume_num_max",
   "start_date_min", "start_date_max", "end_date_min", "end_date_max",
   "tag_id", "related_tags", "cyom", "uma_resolution_status", "game_id", "sports_market_types",
   "rewards_min_size", "question_ids", "include_tag", "closed",
 ];
+
+/** Parse outcomes/outcomePrices from API (may be JSON string or array) */
+function parseOutcomesAndPrices(market) {
+  let outcomes = market.outcomes;
+  let outcomePrices = market.outcomePrices;
+  if (typeof outcomes === "string") {
+    try {
+      outcomes = JSON.parse(outcomes);
+    } catch {
+      outcomes = [];
+    }
+  }
+  if (typeof outcomePrices === "string") {
+    try {
+      outcomePrices = JSON.parse(outcomePrices);
+    } catch {
+      outcomePrices = [];
+    }
+  }
+  if (!Array.isArray(outcomes)) outcomes = [];
+  if (!Array.isArray(outcomePrices)) outcomePrices = [];
+  return { outcomes, outcomePrices };
+}
+
+/** Determine winner for closed market: outcome with highest price (Polymarket: winner ≈ 1) */
+function getWinner(outcomes, outcomePrices) {
+  if (!outcomes?.length || !outcomePrices?.length) return "";
+  let maxIdx = 0;
+  let maxPrice = -1;
+  for (let i = 0; i < Math.min(outcomes.length, outcomePrices.length); i++) {
+    const p = parseFloat(outcomePrices[i]);
+    if (!Number.isNaN(p) && p > maxPrice) {
+      maxPrice = p;
+      maxIdx = i;
+    }
+  }
+  return maxPrice >= 0 ? String(outcomes[maxIdx]) : "";
+}
+
+/** Flatten object for sheet, optionally excluding keys. Used for outcome-optimized rows. */
+function flattenForOutcomeRow(obj, excludeKeys = new Set()) {
+  if (obj === null || obj === undefined) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (excludeKeys.has(k)) continue;
+    if (Array.isArray(v)) {
+      if (v.length === 0) out[k] = "";
+      else if (typeof v[0] === "object" && v[0] !== null && !(v[0] instanceof Date)) {
+        out[k] = JSON.stringify(v);
+      } else {
+        out[k] = v.join(", ");
+      }
+    } else if (v !== null && typeof v === "object" && !(v instanceof Date) && typeof v !== "function") {
+      Object.assign(out, flattenForSheet(v, k));
+    } else {
+      out[k] = v === null || v === undefined ? "" : v;
+    }
+  }
+  return out;
+}
+
+/** Convert Events or Markets response to outcome-optimized format: one row per outcome, with all source fields */
+function toOutcomeOptimizedFormat(data, source, fieldsFilter) {
+  const rows = [];
+  const arr = Array.isArray(data) ? data : data != null ? [data] : [];
+
+  if (source === "events") {
+    for (const event of arr) {
+      const eventCategory = event.category ?? "";
+      const markets = event.markets ?? [];
+      const eventFlat = flattenForOutcomeRow(event, new Set(["markets"]));
+
+      for (const market of markets) {
+        const { outcomes, outcomePrices } = parseOutcomesAndPrices(market);
+        const marketId = market.id ?? market.conditionId ?? "";
+        const category = market.category ?? eventCategory;
+        const closed = market.closed === true || market.closed === "true";
+        const winner = closed ? getWinner(outcomes, outcomePrices) : "";
+
+        const marketFlat = flattenForOutcomeRow(market, new Set(["outcomes", "outcomePrices", "events"]));
+
+        const n = Math.min(outcomes.length, outcomePrices.length);
+        for (let i = 0; i < n; i++) {
+          const price = outcomePrices[i] != null ? String(outcomePrices[i]) : "";
+          const row = {
+            ...eventFlat,
+            ...marketFlat,
+            marketId: marketId || marketFlat.id || marketFlat.conditionId,
+            eventId: event.id ?? "",
+            outcome: String(outcomes[i]),
+            price,
+            closed,
+            winner: closed ? winner : "",
+          };
+          rows.push(row);
+        }
+      }
+    }
+  } else if (source === "markets") {
+    for (const market of arr) {
+      const { outcomes, outcomePrices } = parseOutcomesAndPrices(market);
+      const marketId = market.id ?? market.conditionId ?? "";
+      const eventId = market.events?.[0]?.id ?? "";
+      const closed = market.closed === true || market.closed === "true";
+      const winner = closed ? getWinner(outcomes, outcomePrices) : "";
+
+      const marketFlat = flattenForOutcomeRow(market, new Set(["outcomes", "outcomePrices", "events"]));
+
+      const n = Math.min(outcomes.length, outcomePrices.length);
+      for (let i = 0; i < n; i++) {
+        const price = outcomePrices[i] != null ? String(outcomePrices[i]) : "";
+        const row = {
+          ...marketFlat,
+          marketId: marketId || marketFlat.id || marketFlat.conditionId,
+          eventId,
+          outcome: String(outcomes[i]),
+          price,
+          closed,
+          winner: closed ? winner : "",
+        };
+        rows.push(row);
+      }
+    }
+  }
+
+  if (fieldsFilter && fieldsFilter.length > 0) {
+    const set = new Set(fieldsFilter.map((f) => f.trim()).filter(Boolean));
+    if (set.size > 0) {
+      return sortByDate(rows.map((row) => {
+        const out = {};
+        for (const k of Object.keys(row)) {
+          if (set.has(k)) out[k] = row[k];
+        }
+        return out;
+      }));
+    }
+  }
+  return sortByDate(rows);
+}
 
 /** Flatten nested objects for ag-grid; stringify arrays of objects */
 function flattenForSheet(obj, prefix = "") {
@@ -219,12 +359,20 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: "Invalid query" });
     }
 
+    const outcomeOptimizedFormat = req.query.outcomeOptimizedFormat === "true" || req.query.outcomeOptimizedFormat === "1";
     const fieldsParam = req.query.fields;
     const fieldsFilter = fieldsParam
       ? String(fieldsParam).split(",").map((f) => f.trim()).filter(Boolean)
       : null;
-    const normalized = normalizeResponse(data, fieldsFilter);
-    return res.status(200).json(normalized);
+
+    let result;
+    if (outcomeOptimizedFormat && (query === "listEvents" || query === "getEvent" || query === "getEventBySlug" || query === "listMarkets" || query === "getMarket" || query === "getMarketBySlug")) {
+      const source = (query === "listEvents" || query === "getEvent" || query === "getEventBySlug") ? "events" : "markets";
+      result = toOutcomeOptimizedFormat(data, source, fieldsFilter);
+    } else {
+      result = normalizeResponse(data, fieldsFilter);
+    }
+    return res.status(200).json(result);
   } catch (err) {
     console.error("[polymarket]", query, err.message);
     return res.status(500).json({
