@@ -6,6 +6,7 @@ export const POLYMARKET_GROUPS = {
   events: "Events",
   markets: "Markets",
   trades: "Trades",
+  liveDataWebsocket: "Live data - WebSocket",
 };
 
 /** Trade response fields from https://docs.polymarket.com/api-reference/core/get-trades-for-a-user-or-markets */
@@ -251,6 +252,27 @@ export const ENDPOINTS = [
       { key: "limit", label: "Limit", required: false, type: "number", default: 100 },
       { key: "offset", label: "Offset", required: false, type: "number", default: 0 },
       { key: "side", label: "Side", required: false, type: "text", hint: "BUY or SELL" },
+    ],
+  },
+  // Live data - WebSocket (handled separately in index.js)
+  {
+    query: "wsPrice",
+    name: "Price",
+    description: "Live price change stream via WebSocket. Subscribe to market token IDs to receive real-time orderbook price updates.",
+    group: "liveDataWebsocket",
+    wsType: true,
+    params: [
+      {
+        key: "market_token_id",
+        label: "Token / Condition ID",
+        required: true,
+        type: "text",
+        listQuery: "listMarkets",
+        listLabelKey: "question",
+        listValueKey: "conditionId",
+        listFilter: { closed: "false" },
+        hint: "Select a market (uses condition_id) or enter token/condition ID(s) comma-separated.",
+      },
     ],
   },
   {

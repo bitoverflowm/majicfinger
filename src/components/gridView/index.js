@@ -54,6 +54,7 @@ import * as XLSX from 'xlsx';
 
 
 const DATE_LIKE = /^\d{4}-\d{2}-\d{2}/;
+const TOKEN_ID_FIELDS = new Set(['conditionid', 'condition_id', 'clobtokenids', 'clob_token_ids', 'asset_id', 'market', 'market_id']);
 
 function getColKeys(connectedCols) {
   return (connectedCols || []).map((c) => (c && typeof c === 'object' && 'field' in c ? c.field : c)).filter(Boolean);
@@ -138,10 +139,12 @@ const GridView = ({startNew}) => {
     const columnDefsWithMeta = useMemo(() => {
       const cols = (connectedCols || []).map((c) => {
         const field = c && typeof c === 'object' && 'field' in c ? c.field : c;
-        const isIdLike = field && (field === 'id' || field.toLowerCase().endsWith('id'));
+        const fl = field && field.toLowerCase();
+        const isTokenId = fl && (TOKEN_ID_FIELDS.has(fl) || fl.endsWith('_conditionid') || fl.endsWith('_condition_id') || fl.endsWith('_asset_id') || fl === 'id' || fl.endsWith('id'));
+        const fmt = isTokenId ? (p) => (p?.value != null ? String(p.value) : '') : undefined;
         return typeof c === 'object' && c !== null
-          ? { ...c, valueFormatter: isIdLike ? (p) => (p?.value != null ? String(p.value) : '') : c.valueFormatter }
-          : { field: c, valueFormatter: isIdLike ? (p) => (p?.value != null ? String(p.value) : '') : undefined };
+          ? { ...c, valueFormatter: isTokenId ? fmt : c.valueFormatter }
+          : { field: c, valueFormatter: fmt };
       });
       cols.push({ field: '_origIndex', hide: true, suppressColumnsToolPanel: true });
       return cols;

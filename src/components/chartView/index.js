@@ -41,7 +41,7 @@ import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon, ShuffleIcon } f
 import { MinusCircle, Moon, Sun, Tag, TrendingUp } from 'react-feather';
 import { IoConstructOutline, IoPieChartOutline, IoShuffleOutline, IoStatsChart } from 'react-icons/io5';
 import { Toggle } from '../ui/toggle';
-import { CameraIcon, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn } from 'lucide-react';
+import { CameraIcon, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Radio, Square } from 'lucide-react';
 import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin } from 'react-icons/pi';
 import { MdOutlineAreaChart, MdStackedBarChart } from 'react-icons/md';
 import { GoDotFill } from 'react-icons/go';
@@ -50,6 +50,7 @@ import { CircleDot } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { toPng, toJpeg, toBlob, toPixelData, toSvg } from 'html-to-image';
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Tooltip,
   TooltipContent,
@@ -98,6 +99,76 @@ function getAxisType(key, dataTypes, data) {
   return 'string';
 }
 
+/** Safe domain with padding; returns [0, 1] if min/max are NaN so Recharts/d3 never get undefined (non-iterable). */
+function safeDomainWithPadding(dataMin, dataMax) {
+  const min = Number(dataMin);
+  const max = Number(dataMax);
+  if (Number.isNaN(min) || Number.isNaN(max) || !Number.isFinite(min) || !Number.isFinite(max)) return [0, 1];
+  const pad = Math.max((max - min) * 0.05, 0.01);
+  return [min - pad, max + pad];
+}
+
+/** Format date for chart tick - uses time (with seconds) for short ranges, date for long. */
+function formatDateTick(value, dataMin, dataMax) {
+  if (value == null) return "";
+  const v = typeof value === "number" ? value : new Date(value).getTime();
+  const range = (dataMax ?? v) - (dataMin ?? v);
+  const d = new Date(v);
+  if (range < 60000) return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (range < 86400000) return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString();
+}
+
+/** Get distinct values for a column (for categorical filter) */
+function getDistinctValues(data, colKey) {
+  const set = new Set();
+  (data || []).forEach((row) => {
+    const v = row[colKey];
+    if (v != null && v !== "") set.add(String(v));
+  });
+  return Array.from(set).sort();
+}
+
+/** Apply chart filter: categorical (selectedValues), numeric (operator+value), date (from/to) */
+function applyChartFilter(data, col, config, filterType) {
+  if (!data?.length || !col || !config) return data;
+  return data.filter((row) => {
+    const v = row[col];
+    if (filterType === "string") {
+      const selected = config.selectedValues;
+      if (!selected?.length) return true;
+      const s = v != null ? String(v) : "";
+      return selected.includes(s);
+    }
+    if (filterType === "number") {
+      const n = Number(v);
+      if (Number.isNaN(n)) return false;
+      const { operator, value, value2 } = config;
+      if (operator === "gt") return n > (value ?? 0);
+      if (operator === "gte") return n >= (value ?? 0);
+      if (operator === "lt") return n < (value ?? 0);
+      if (operator === "lte") return n <= (value ?? 0);
+      if (operator === "between" && value != null && value2 != null) return n >= value && n <= value2;
+      return true;
+    }
+    if (filterType === "date") {
+      const t = v instanceof Date ? v.getTime() : new Date(v).getTime();
+      if (Number.isNaN(t)) return false;
+      const { from, to } = config;
+      if (from) {
+        const fromT = new Date(from).getTime();
+        if (t < fromT) return false;
+      }
+      if (to) {
+        const toT = new Date(to).getTime();
+        if (t > toT) return false;
+      }
+      return true;
+    }
+    return true;
+  });
+}
+
 /** Compare two values for sorting by axis type. Returns negative, zero, or positive. */
 function compareAxis(a, b, type) {
   if (a == null && b == null) return 0;
@@ -131,6 +202,7 @@ const ChartView = ({demo}) => {
     const setChartDataOverride = contextStateV2?.setChartDataOverride
     const setChartDataOverrideMeta = contextStateV2?.setChartDataOverrideMeta
     const chartDataOverrideMeta = contextStateV2?.chartDataOverrideMeta
+    const polymarketWsState = contextStateV2?.polymarketWsState
 
     // When charting a summary table, use override data; else use main connectedData
     const effectiveData = chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length > 0
@@ -197,6 +269,10 @@ const ChartView = ({demo}) => {
     const [selColorCol, setSelColorCol] = useState(null)
     const BUBBLE_RADIUS_RANGE = [50, 400]
 
+    // Chart filter by column value (for live WS: e.g. side=BUY/SELL; generic: categorical, numeric, date)
+    const [chartFilterColumn, setChartFilterColumn] = useState(null)
+    const [chartFilterConfig, setChartFilterConfig] = useState({})
+
     const selectedPaletteHandler = (index) => {
         let newPalette = masterPalette[selectedCategory][index]
         setSelectedPalette(newPalette)
@@ -229,14 +305,27 @@ const ChartView = ({demo}) => {
         effectiveData && setFilteredData(effectiveData)
     }, [effectiveData])
 
-    // Sorted data by X and/or Y axis (asc/desc by type: number, date, string)
+    // Chart filter type for selected column
+    const chartFilterType = useMemo(() => {
+        if (!chartFilterColumn || !filteredData?.length) return null;
+        return getAxisType(chartFilterColumn, dataTypes, filteredData);
+    }, [chartFilterColumn, filteredData, dataTypes]);
+
+    // Distinct values for categorical filter
+    const chartFilterDistinct = useMemo(() => {
+        if (!chartFilterColumn || !filteredData?.length || chartFilterType !== "string") return [];
+        return getDistinctValues(filteredData, chartFilterColumn);
+    }, [chartFilterColumn, filteredData, chartFilterType]);
+
+    // Filtered then sorted data
     const sortedData = useMemo(() => {
         if (!filteredData || !filteredData.length) return filteredData;
+        let out = applyChartFilter(filteredData, chartFilterColumn, chartFilterConfig, chartFilterType);
+        if (!out?.length) out = out || [];
         const xKey = selX;
         const yKey = Array.isArray(selY) && selY.length ? selY[0] : null;
-        const xType = getAxisType(xKey, dataTypes, filteredData);
-        const yType = yKey ? getAxisType(yKey, dataTypes, filteredData) : 'string';
-        let out = [...filteredData];
+        const xType = getAxisType(xKey, dataTypes, out);
+        const yType = yKey ? getAxisType(yKey, dataTypes, out) : 'string';
         if (sortYDir && yKey) {
             out.sort((a, b) => {
                 const c = compareAxis(a[yKey], b[yKey], yType);
@@ -250,7 +339,7 @@ const ChartView = ({demo}) => {
             });
         }
         return out;
-    }, [filteredData, selX, selY, sortXDir, sortYDir, dataTypes])
+    }, [filteredData, chartFilterColumn, chartFilterConfig, chartFilterType, selX, selY, sortXDir, sortYDir, dataTypes])
 
     // Chart-ready data: ensure numeric/date axes are proper types for Recharts (numbers; dates as timestamps or kept for category)
     const chartData = useMemo(() => {
@@ -278,6 +367,18 @@ const ChartView = ({demo}) => {
             return r;
         });
     }, [sortedData, selX, selY, dataTypes])
+
+    // X-axis min/max for date tick formatting (short range = time with seconds)
+    const xAxisRange = useMemo(() => {
+        if (!chartData?.length || !selX) return null;
+        const xType = getAxisType(selX, dataTypes, chartData);
+        if (xType !== "date" && xType !== "number") return null;
+        const vals = chartData.map((r) => r[selX]).filter((v) => v != null && !Number.isNaN(Number(v)));
+        if (!vals.length) return null;
+        const min = Math.min(...vals);
+        const max = Math.max(...vals);
+        return { min, max };
+    }, [chartData, selX, dataTypes]);
 
     // Scatter/bubble chart: X, Y, Z (size), optional color column; nulls default to 0 for Z; optional log scale for Z
     const scatterChartData = useMemo(() => {
@@ -336,6 +437,22 @@ const ChartView = ({demo}) => {
             setAvailableYOptons(['desktop', 'mobile', 'other'])
         }
     }, [demo])
+
+    // Polymarket WebSocket chart preset: line chart with time (X) and price (Y)
+    useEffect(() => {
+        const preset = polymarketWsState?.chartPreset;
+        if (preset && preset.type === 'line' && preset.xKey && preset.yKey && effectiveData?.length) {
+            const keys = Object.keys(effectiveData[0] || {});
+            if (keys.includes(preset.xKey) && keys.includes(preset.yKey)) {
+                setSelChartType('line');
+                setSelX(preset.xKey);
+                setSelY([preset.yKey]);
+                setSortXDir('asc');
+                setDots(false); // Clean line for live data (no dot clutter)
+                setChartConfig((prev) => ({ ...prev, [preset.yKey]: { label: 'Price', color: 'hsl(142 88% 28%)' } }));
+            }
+        }
+    }, [polymarketWsState?.chartPreset, effectiveData]);
 
     useEffect(()=>{
         if(chartUsable){            
@@ -481,8 +598,50 @@ const ChartView = ({demo}) => {
         }
     };
     
+    const wsStop = polymarketWsState?.stop;
+    const wsStart = polymarketWsState?.start;
+    const wsRunning = polymarketWsState?.isRunning;
+    const showWsFeedControl = (wsStop || wsStart) && effectiveData?.length > 0;
+
     return(
-        <div className={`gradualEffect xl:flex ${dark ? 'bg-black text-white': 'bg-slate-100 text-black' } p-10`}>
+        <div className={`gradualEffect relative xl:flex ${dark ? 'bg-black text-white': 'bg-slate-100 text-black' } p-10`}>
+            {showWsFeedControl && (
+                <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-lg border px-3 py-2 ${dark ? 'bg-slate-800/90 border-slate-600' : 'bg-white/95 border-slate-200'} shadow-lg`}>
+                    <span className="text-xs font-medium">
+                        {wsRunning ? (
+                            <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                                Live feed
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                                Feed paused
+                            </span>
+                        )}
+                    </span>
+                    {wsRunning && wsStop && (
+                        <button
+                            type="button"
+                            onClick={wsStop}
+                            className="flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/50"
+                        >
+                            <Square className="h-3 w-3" />
+                            Stop feed
+                        </button>
+                    )}
+                    {!wsRunning && wsStart && (
+                        <button
+                            type="button"
+                            onClick={wsStart}
+                            className="flex items-center gap-1.5 rounded-md border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-950/50 dark:text-green-300 dark:hover:bg-green-900/50"
+                        >
+                            <Radio className="h-3 w-3" />
+                            Start feed
+                        </button>
+                    )}
+                </div>
+            )}
             <div className={`gradualEffect lg:py-10 lg:px-10`}>                    
                     <div className='gradualEffect py-12 px-12 rounded-xl' ref={chartRef} style={{backgroundColor: selectedPalette ? selectedPalette[0] : "#0064E6"}}>
                         <div className='py-4 px-4 rounded-xl shadow-xl backdrop-blur-xl bg-opacity-50' style={{backgroundColor: dark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)'}}>
@@ -515,15 +674,17 @@ const ChartView = ({demo}) => {
                                                 dataKey={selX ? selX : "month"}
                                                 type={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? 'number' : getAxisType(selX, dataTypes, chartData) === 'date' ? 'number' : 'category'}
                                                 scale={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? scaleX : undefined}
+                                                domain={chartData?.length && selX && (getAxisType(selX, dataTypes, chartData) === 'number' || getAxisType(selX, dataTypes, chartData) === 'date') ? ['dataMin', 'dataMax'] : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
-                                                tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => (v != null ? new Date(v).toLocaleDateString() : '') : undefined}
+                                                tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => formatDateTick(v, xAxisRange?.min, xAxisRange?.max) : undefined}
                                                 label={{ fill: dark ? '#fff' : '#000' }}
                                             />
                                             <YAxis
                                                 type={scaleY === 'log' || (selY && selY[0] && getAxisType(selY[0], dataTypes, chartData) === 'number') ? 'number' : 'category'}
                                                 scale={scaleY === 'log' ? 'log' : undefined}
+                                                domain={chartData?.length && selY?.[0] && getAxisType(selY[0], dataTypes, chartData) === 'number' && scaleY !== 'log' ? safeDomainWithPadding : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
@@ -570,21 +731,23 @@ const ChartView = ({demo}) => {
                                             {
                                                 horizontal ?
                                                     <>
-                                                    <XAxis
-                                                        tickLine={false}
-                                                        axisLine={false}
-                                                        tickMargin={8}
-                                                        tickCount={3}
-                                                        dataKey={selY[0]}
-                                                        type="number"
-                                                        scale={scaleY === 'log' ? 'log' : undefined}
-                                                        hide
-                                                        tick={{ fill: dark ? 'white' : 'black' }}
-                                                    />
+                                            <XAxis
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={8}
+                                                tickCount={3}
+                                                dataKey={selY[0]}
+                                                type="number"
+                                                scale={scaleY === 'log' ? 'log' : undefined}
+                                                domain={chartData?.length && scaleY !== 'log' ? safeDomainWithPadding : undefined}
+                                                hide
+                                                tick={{ fill: dark ? 'white' : 'black' }}
+                                            />
                                                     <YAxis
                                                         dataKey={selX ? selX : "month"}
                                                         type={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? 'number' : 'category'}
                                                         scale={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? scaleX : undefined}
+                                                        domain={chartData?.length && selX && (getAxisType(selX, dataTypes, chartData) === 'number' || getAxisType(selX, dataTypes, chartData) === 'date') ? ['dataMin', 'dataMax'] : undefined}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         tickMargin={8}
@@ -597,15 +760,17 @@ const ChartView = ({demo}) => {
                                                         dataKey={selX ? selX : "month"}
                                                         type={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? 'number' : getAxisType(selX, dataTypes, chartData) === 'date' ? 'number' : 'category'}
                                                         scale={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? scaleX : undefined}
+                                                        domain={chartData?.length && selX && (getAxisType(selX, dataTypes, chartData) === 'number' || getAxisType(selX, dataTypes, chartData) === 'date') ? ['dataMin', 'dataMax'] : undefined}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         tickMargin={8}
-                                                        tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => (v != null ? new Date(v).toLocaleDateString() : '') : undefined}
+                                                        tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => formatDateTick(v, xAxisRange?.min, xAxisRange?.max) : undefined}
                                                         tick={{ fill: dark ? 'white' : 'black' }}
                                                     />
                                                     <YAxis
                                                         type={scaleY === 'log' || (selY && selY[0] && getAxisType(selY[0], dataTypes, chartData) === 'number') ? 'number' : 'category'}
                                                         scale={scaleY === 'log' ? 'log' : undefined}
+                                                        domain={chartData?.length && selY?.[0] && getAxisType(selY[0], dataTypes, chartData) === 'number' && scaleY !== 'log' ? safeDomainWithPadding : undefined}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         tickMargin={8}
@@ -667,15 +832,17 @@ const ChartView = ({demo}) => {
                                                 dataKey={selX ? selX : "month"}
                                                 type={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? 'number' : getAxisType(selX, dataTypes, chartData) === 'date' ? 'number' : 'category'}
                                                 scale={selX && getAxisType(selX, dataTypes, chartData) === 'number' ? scaleX : undefined}
+                                                domain={chartData?.length && selX && (getAxisType(selX, dataTypes, chartData) === 'number' || getAxisType(selX, dataTypes, chartData) === 'date') ? ['dataMin', 'dataMax'] : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
-                                                tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => (v != null ? new Date(v).toLocaleDateString() : '') : undefined}
+                                                tickFormatter={selX && getAxisType(selX, dataTypes, chartData) === 'date' ? (v) => formatDateTick(v, xAxisRange?.min, xAxisRange?.max) : undefined}
                                                 tick={{ fill: dark ? 'white' : 'black' }}
                                             />
                                             <YAxis
                                                 type={scaleY === 'log' || (selY && selY[0] && getAxisType(selY[0], dataTypes, chartData) === 'number') ? 'number' : 'category'}
                                                 scale={scaleY === 'log' ? 'log' : undefined}
+                                                domain={chartData?.length && selY?.[0] && getAxisType(selY[0], dataTypes, chartData) === 'number' && scaleY !== 'log' ? safeDomainWithPadding : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
@@ -695,7 +862,7 @@ const ChartView = ({demo}) => {
                                                     //fillOpacity={0.4}
                                                     stroke={selectedPalette && selectedPalette.length > index ? selectedPalette[index] : selectedPalette[0]}
                                                     //stackId={'a'}
-                                                    dot={dots}
+                                                    dot={dots && (!chartData || chartData.length <= 40)}
                                                     strokeWidth={2}
                                                 >
                                                     {labelLine &&<LabelList
@@ -828,11 +995,12 @@ const ChartView = ({demo}) => {
                                                 dataKey={selX}
                                                 type="number"
                                                 scale={getAxisType(selX, dataTypes, scatterChartData) === 'number' ? scaleX : undefined}
+                                                domain={scatterChartData?.length && (getAxisType(selX, dataTypes, scatterChartData) === 'number' || getAxisType(selX, dataTypes, scatterChartData) === 'date') ? ['dataMin', 'dataMax'] : undefined}
                                                 name={selX}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
-                                                tickFormatter={getAxisType(selX, dataTypes, scatterChartData) === 'date' ? (v) => (v != null ? new Date(v).toLocaleDateString() : '') : undefined}
+                                                tickFormatter={getAxisType(selX, dataTypes, scatterChartData) === 'date' ? (v) => formatDateTick(v, xAxisRange?.min, xAxisRange?.max) : undefined}
                                                 tick={{ fill: dark ? '#fff' : '#000' }}
                                             />
                                             <YAxis
@@ -840,6 +1008,7 @@ const ChartView = ({demo}) => {
                                                 dataKey={selY[0]}
                                                 name={selY[0]}
                                                 scale={scaleY === 'log' ? 'log' : undefined}
+                                                domain={scatterChartData?.length && scaleY !== 'log' ? safeDomainWithPadding : undefined}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tickMargin={8}
@@ -1102,6 +1271,73 @@ const ChartView = ({demo}) => {
                                         {availableYOptions && availableYOptions.length === 0 ? 'You have no more columns': '+ Stack Another Value'}
                                     </button>
                                 }
+                                {/* Filter by column value (e.g. side=BUY for WS; categorical, numeric, date) */}
+                                {!demo && effectiveData?.length > 0 && xOptions?.length > 0 && (
+                                    <div className="py-2 space-y-2">
+                                        <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}>Filter by column</p>
+                                        <p className={`text-xs ${dark ? 'text-slate-300' : 'text-muted-foreground'}`}>Plot only rows matching filter</p>
+                                        <Select value={chartFilterColumn ?? "__none__"} onValueChange={(v) => { setChartFilterColumn(v === "__none__" ? null : v); setChartFilterConfig({}); }}>
+                                            <SelectTrigger className="h-8 text-xs">
+                                                <SelectValue placeholder="No filter" />
+                                            </SelectTrigger>
+                                            <SelectContent className="text-xs">
+                                                <SelectItem value="__none__" className="text-xs">No filter</SelectItem>
+                                                {xOptions.map((k) => (
+                                                    <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {chartFilterColumn && chartFilterType === 'string' && (
+                                            <div className="max-h-[100px] overflow-y-auto space-y-1">
+                                                {chartFilterDistinct.slice(0, 20).map((v) => {
+                                                    const selected = chartFilterConfig.selectedValues || [];
+                                                    const checked = selected.length === 0 || selected.includes(v);
+                                                    return (
+                                                        <label key={v} className="flex items-center gap-2 text-xs cursor-pointer">
+                                                            <Checkbox
+                                                                checked={checked}
+                                                                onCheckedChange={(c) => {
+                                                                    const prev = chartFilterConfig.selectedValues || [];
+                                                                    let next;
+                                                                    if (c) {
+                                                                        next = prev.length === 0 ? prev : (prev.includes(v) ? prev : [...prev, v]);
+                                                                    } else {
+                                                                        next = prev.length === 0 ? chartFilterDistinct.filter((x) => x !== v) : prev.filter((x) => x !== v);
+                                                                    }
+                                                                    setChartFilterConfig({ ...chartFilterConfig, selectedValues: next });
+                                                                }}
+                                                            />
+                                                            <span className="truncate">{String(v).slice(0, 40)}{String(v).length > 40 ? '…' : ''}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                                {chartFilterDistinct.length > 20 && <p className="text-[10px] text-muted-foreground">+{chartFilterDistinct.length - 20} more</p>}
+                                            </div>
+                                        )}
+                                        {chartFilterColumn && chartFilterType === 'number' && (
+                                            <div className="space-y-1">
+                                                <Select value={chartFilterConfig.operator ?? ""} onValueChange={(v) => setChartFilterConfig({ ...chartFilterConfig, operator: v })}>
+                                                    <SelectTrigger className="h-7 text-xs">
+                                                        <SelectValue placeholder="Operator" />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="text-xs">
+                                                        <SelectItem value="gt">&gt;</SelectItem>
+                                                        <SelectItem value="gte">≥</SelectItem>
+                                                        <SelectItem value="lt">&lt;</SelectItem>
+                                                        <SelectItem value="lte">≤</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <Input value={chartFilterConfig.value ?? ""} onChange={(e) => setChartFilterConfig({ ...chartFilterConfig, value: parseFloat(e.target.value) || 0 })} placeholder="Value" className="h-7 text-xs" type="number" />
+                                            </div>
+                                        )}
+                                        {chartFilterColumn && chartFilterType === 'date' && (
+                                            <div className="space-y-1">
+                                                <Input value={chartFilterConfig.from ?? ""} onChange={(e) => setChartFilterConfig({ ...chartFilterConfig, from: e.target.value || undefined })} placeholder="From date" className="h-7 text-xs" type="date" />
+                                                <Input value={chartFilterConfig.to ?? ""} onChange={(e) => setChartFilterConfig({ ...chartFilterConfig, to: e.target.value || undefined })} placeholder="To date" className="h-7 text-xs" type="date" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 {/* Axis sort: X and Y ascending/descending by type (number, date, string) */}
                                 <div className="py-2 space-y-2">
                                     <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}>Sort axis</p>

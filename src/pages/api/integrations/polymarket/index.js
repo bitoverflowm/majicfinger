@@ -56,6 +56,12 @@ function getWinner(outcomes, outcomePrices) {
   return maxPrice >= 0 ? String(outcomes[maxIdx]) : "";
 }
 
+/** True if key is a token/condition ID field (preserve as string, no truncation) */
+function isTokenIdKey(key) {
+  const k = String(key).toLowerCase();
+  return k === "conditionid" || k === "condition_id" || k === "clobtokenids" || k === "clob_token_ids" || k.endsWith("_conditionid") || k.endsWith("_condition_id") || k.endsWith("_clobtokenids") || k.endsWith("_clob_token_ids");
+}
+
 /** Flatten object for sheet, optionally excluding keys. Used for outcome-optimized rows. */
 function flattenForOutcomeRow(obj, excludeKeys = new Set()) {
   if (obj === null || obj === undefined) return {};
@@ -67,12 +73,14 @@ function flattenForOutcomeRow(obj, excludeKeys = new Set()) {
       else if (typeof v[0] === "object" && v[0] !== null && !(v[0] instanceof Date)) {
         out[k] = JSON.stringify(v);
       } else {
-        out[k] = v.join(", ");
+        out[k] = v.map((x) => (isTokenIdKey(k) && typeof x === "number" ? String(x) : x)).join(", ");
       }
     } else if (v !== null && typeof v === "object" && !(v instanceof Date) && typeof v !== "function") {
       Object.assign(out, flattenForSheet(v, k));
     } else {
-      out[k] = v === null || v === undefined ? "" : v;
+      let val = v === null || v === undefined ? "" : v;
+      if (isTokenIdKey(k) && typeof val === "number") val = String(val);
+      out[k] = val;
     }
   }
   return out;
@@ -91,7 +99,7 @@ function toOutcomeOptimizedFormat(data, source, fieldsFilter) {
 
       for (const market of markets) {
         const { outcomes, outcomePrices } = parseOutcomesAndPrices(market);
-        const marketId = market.id ?? market.conditionId ?? "";
+        const marketId = String(market.id ?? market.conditionId ?? "").trim();
         const category = market.category ?? eventCategory;
         const closed = market.closed === true || market.closed === "true";
         const winner = closed ? getWinner(outcomes, outcomePrices) : "";
@@ -104,7 +112,7 @@ function toOutcomeOptimizedFormat(data, source, fieldsFilter) {
           const row = {
             ...eventFlat,
             ...marketFlat,
-            marketId: marketId || marketFlat.id || marketFlat.conditionId,
+            marketId: marketId || String(marketFlat.id ?? marketFlat.conditionId ?? "").trim(),
             eventId: event.id ?? "",
             outcome: String(outcomes[i]),
             price,
@@ -118,7 +126,7 @@ function toOutcomeOptimizedFormat(data, source, fieldsFilter) {
   } else if (source === "markets") {
     for (const market of arr) {
       const { outcomes, outcomePrices } = parseOutcomesAndPrices(market);
-      const marketId = market.id ?? market.conditionId ?? "";
+      const marketId = String(market.id ?? market.conditionId ?? "").trim();
       const eventId = market.events?.[0]?.id ?? "";
       const closed = market.closed === true || market.closed === "true";
       const winner = closed ? getWinner(outcomes, outcomePrices) : "";
@@ -130,7 +138,7 @@ function toOutcomeOptimizedFormat(data, source, fieldsFilter) {
         const price = outcomePrices[i] != null ? String(outcomePrices[i]) : "";
         const row = {
           ...marketFlat,
-          marketId: marketId || marketFlat.id || marketFlat.conditionId,
+          marketId: marketId || String(marketFlat.id ?? marketFlat.conditionId ?? "").trim(),
           eventId,
           outcome: String(outcomes[i]),
           price,
@@ -168,12 +176,14 @@ function flattenForSheet(obj, prefix = "") {
       else if (typeof v[0] === "object" && v[0] !== null && !(v[0] instanceof Date)) {
         out[key] = JSON.stringify(v);
       } else {
-        out[key] = v.join(", ");
+        out[key] = v.map((x) => (isTokenIdKey(key) && typeof x === "number" ? String(x) : x)).join(", ");
       }
     } else if (v !== null && typeof v === "object" && !(v instanceof Date) && typeof v !== "function") {
       Object.assign(out, flattenForSheet(v, key));
     } else {
-      out[key] = v === null || v === undefined ? "" : v;
+      let val = v === null || v === undefined ? "" : v;
+      if (isTokenIdKey(key) && typeof val === "number") val = String(val);
+      out[key] = val;
     }
   }
   return out;
@@ -227,6 +237,35 @@ function buildSearchParams(allowed, query) {
   return p;
 }
 
+/** ERC1155 token/condition ID fields - must stay as strings, never parsed as numbers */
+const TOKEN_ID_KEYS = ["conditionId", "condition_id", "id", "clobTokenIds", "clob_token_ids"];
+
+/** Preprocess JSON text so large numbers in token ID fields are quoted (preserve full precision) */
+function preserveTokenIdsInJson(text) {
+  let result = text;
+  for (const key of TOKEN_ID_KEYS) {
+    // "conditionId": 1126086428953813... or "conditionId": 1.126e+77 -> "conditionId": "1126..."
+    result = result.replace(
+      new RegExp(`"${key}"\\s*:\\s*((?:\\d{15,})|(?:[\\d.]+e[+-]?\\d+))`, "gi"),
+      (_, num) => `"${key}": "${num}"`
+    );
+  }
+  // clobTokenIds array: [123456..., 789...] -> ["123456...", "789..."] (numbers inside array)
+  result = result.replace(
+    /"(clobTokenIds|clob_token_ids)"\s*:\s*\[([^\]]*)\]/g,
+    (match, key, inner) => {
+      const quoted = inner.split(",").map((s) => {
+        const n = s.trim();
+        if (/^\d+$/.test(n)) return `"${n}"`;
+        if (/^[\d.e+-]+$/i.test(n)) return `"${n}"`;
+        return s;
+      }).join(", ");
+      return `"${key}": [${quoted}]`;
+    }
+  );
+  return result;
+}
+
 async function fetchJson(url, opts = {}) {
   const res = await fetch(url, {
     method: "GET",
@@ -238,7 +277,9 @@ async function fetchJson(url, opts = {}) {
     const text = await res.text();
     throw new Error(text || res.statusText);
   }
-  return res.json();
+  const text = await res.text();
+  const preserved = preserveTokenIdsInJson(text);
+  return JSON.parse(preserved);
 }
 
 export default async function handler(req, res) {

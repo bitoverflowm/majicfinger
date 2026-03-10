@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,26 +39,74 @@ import {
   Zap,
   Check,
   Square,
+  Radio,
+  SquareIcon,
+  LineChart,
+  Search,
 } from "lucide-react";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { ENDPOINTS, POLYMARKET_GROUPS, TRADES_RESPONSE_FIELDS } from "./config";
 
 const COOLDOWN_MS = 1500;
+const POLYMARKET_WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
+const PING_INTERVAL_MS = 10000;
 // Fallback when no endpoint responseFields and no prior pull – use Trade schema (docs: get-trades-for-a-user-or-markets)
 const DEFAULT_FIELD_OPTIONS = TRADES_RESPONSE_FIELDS;
 const PROGRESS_STAGES = ["Sending request…", "Receiving data…", "Processing…", "Done"];
 
+/** Parse clobTokenIds (token IDs) from market for CLOB websocket. Preserves full ERC1155 strings. */
+function parseTokenIdsFromMarket(market) {
+  let ids = market?.clobTokenIds ?? market?.clob_token_ids;
+  if (typeof ids === "string") {
+    try {
+      ids = JSON.parse(ids);
+    } catch {
+      ids = ids.includes(",") ? ids.split(",").map((s) => s.trim()) : [ids];
+    }
+  }
+  return Array.isArray(ids) ? ids.filter(Boolean).map((s) => String(s).trim()) : [];
+}
+
+/** Parse condition_id from market for display/selection. Preserves full string. */
+function getConditionId(market) {
+  const cid = market?.conditionId ?? market?.condition_id;
+  return cid ? String(cid).trim() : "";
+}
+
+/** Parse comma-separated token/condition IDs from manual input. Preserves full strings. */
+function parseManualIds(input) {
+  if (!input || typeof input !== "string") return [];
+  return input
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 const Polymarket = ({ setConnectedData }) => {
+  const contextStateV2 = useMyStateV2();
+  const setViewing = contextStateV2?.setViewing;
+  const setPolymarketWsState = contextStateV2?.setPolymarketWsState;
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedAction, setSelectedAction] = useState(null);
   const [paramValues, setParamValues] = useState({});
-  const [listOptions, setListOptions] = useState({}); // { paramKey: [{ value, label }] }
+  const [listOptions, setListOptions] = useState({}); // { paramKey: [{ value, label, marketData? }] }
   const [pullListLoading, setPullListLoading] = useState({});
   const [throttleRemaining, setThrottleRemaining] = useState(0);
   const [lastRequestAt, setLastRequestAt] = useState(0);
   const [progress, setProgress] = useState(0);
   const [stageIndex, setStageIndex] = useState(0);
   const [lastResultKeys, setLastResultKeys] = useState([]);
+
+  // WebSocket state
+  const [wsConnected, setWsConnected] = useState(false);
+  const [wsConnecting, setWsConnecting] = useState(false);
+  const wsRef = useRef(null);
+  const pingIntervalRef = useRef(null);
+
+  // Market search (for wsPrice market_token_id)
+  const [marketSearch, setMarketSearch] = useState("");
 
   // Countdown until next request allowed
   useEffect(() => {
@@ -93,20 +141,39 @@ const Polymarket = ({ setConnectedData }) => {
     return p.toString();
   }, []);
 
-  const fetchListForParam = useCallback(async (listQuery, listLabelKey, listValueKey, paramKey) => {
+  const fetchListForParam = useCallback(async (listQuery, listLabelKey, listValueKey, paramKey, listFilter) => {
     setPullListLoading((prev) => ({ ...prev, [paramKey]: true }));
     try {
-      const res = await fetch(`/api/integrations/polymarket?query=${listQuery}&limit=100`, {
+      let url = `/api/integrations/polymarket?query=${listQuery}&limit=500`;
+      if (listFilter && typeof listFilter === "object") {
+        const sp = new URLSearchParams(listFilter);
+        url += "&" + sp.toString();
+      }
+      const res = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || "Failed to fetch list");
-      const arr = Array.isArray(data) ? data : [data];
+      let arr = Array.isArray(data) ? data : [data];
+      if (paramKey === "market_token_id") {
+        arr = arr.filter((m) => {
+          if (m.closed === true || m.closed === "true") return false;
+          const vol = m.volumeNum ?? m.volume ?? 0;
+          const volNum = typeof vol === "number" ? vol : parseFloat(vol);
+          if (volNum === 0 || Number.isNaN(volNum)) return false;
+          return true;
+        });
+      }
       const options = arr.map((item) => {
-        const value = item[listValueKey] ?? item.id ?? "";
-        const label = (item[listLabelKey] ?? item.title ?? item.question ?? value) + (value ? ` (${value})` : "");
-        return { value: String(value), label };
+        const condId = (item.conditionId ?? item.condition_id ?? "").toString().trim();
+        const tokenIds = parseTokenIdsFromMarket(item);
+        const value = condId || tokenIds[0] || String(item.id ?? "");
+        const question = item[listLabelKey] ?? item.title ?? item.question ?? "";
+        const label = question + (value ? ` (${value})` : "");
+        const opt = { value, label };
+        if (paramKey === "market_token_id") opt.marketData = item;
+        return opt;
       });
       setListOptions((prev) => ({ ...prev, [paramKey]: options }));
     } catch (e) {
@@ -179,8 +246,135 @@ const Polymarket = ({ setConnectedData }) => {
     [buildQueryString, setConnectedData, throttleRemaining]
   );
 
+  const connectWebSocket = useCallback(
+    (assetIds) => {
+      if (wsRef.current || !assetIds?.length) return;
+      setWsConnecting(true);
+      setError(null);
+      const ws = new WebSocket(POLYMARKET_WS_URL);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(
+          JSON.stringify({
+            assets_ids: assetIds,
+            type: "market",
+            initial_dump: true,
+          })
+        );
+        setWsConnected(true);
+        setWsConnecting(false);
+        setConnectedData([]);
+
+        const pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) ws.send("PING");
+        }, PING_INTERVAL_MS);
+        pingIntervalRef.current = pingInterval;
+
+        setPolymarketWsState?.({
+          isRunning: true,
+          assetIds,
+          stop: () => disconnectWebSocket(),
+          start: () => connectWebSocket(assetIds),
+          chartPreset: { type: "line", xKey: "time", yKey: "price" },
+        });
+      };
+
+      ws.onmessage = (event) => {
+        if (event.data === "PONG") return;
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.event_type === "price_change" && msg.price_changes) {
+            const rows = msg.price_changes.map((pc) => {
+              const priceNum = pc.price != null ? parseFloat(pc.price) : null;
+              return {
+                event_type: msg.event_type,
+                market: msg.market,
+                timestamp: msg.timestamp,
+                time: msg.timestamp ? new Date(Number(msg.timestamp)).toISOString() : "",
+                asset_id: pc.asset_id,
+                price: priceNum != null && !Number.isNaN(priceNum) ? priceNum : (pc.price != null ? String(pc.price) : ""),
+                size: pc.size != null ? String(pc.size) : "",
+                side: pc.side ?? "",
+                hash: pc.hash ?? "",
+                best_bid: pc.best_bid ?? "",
+                best_ask: pc.best_ask ?? "",
+              };
+            });
+            setConnectedData((prev) => (Array.isArray(prev) ? [...prev, ...rows] : rows));
+          } else if (msg.event_type === "book" && msg.asset_id) {
+            // Initial orderbook snapshot (initial_dump: true) - derive price from best bid/ask
+            const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+            const bids = Array.isArray(msg.bids) ? msg.bids : [];
+            const asks = Array.isArray(msg.asks) ? msg.asks : [];
+            const parsePrice = (p) => (p?.price != null ? parseFloat(String(p.price)) : Array.isArray(p) ? parseFloat(String(p[0])) : null);
+            const parseSize = (p) => (p?.size != null ? String(p.size) : Array.isArray(p) ? String(p[1] ?? "") : "");
+            const bestBid = parsePrice(bids[0]);
+            const bestAsk = parsePrice(asks[0]);
+            let price = null;
+            if (bestBid != null && bestAsk != null && !Number.isNaN(bestBid) && !Number.isNaN(bestAsk)) {
+              price = (bestBid + bestAsk) / 2;
+            } else if (bestBid != null && !Number.isNaN(bestBid)) {
+              price = bestBid;
+            } else if (bestAsk != null && !Number.isNaN(bestAsk)) {
+              price = bestAsk;
+            }
+            if (price != null) {
+              const row = {
+                event_type: msg.event_type,
+                market: msg.market ?? "",
+                timestamp: String(ts),
+                time: new Date(ts).toISOString(),
+                asset_id: msg.asset_id,
+                price,
+                size: parseSize(bids[0]) || parseSize(asks[0]) || "",
+                side: "",
+                hash: msg.hash ?? "",
+                best_bid: bestBid != null ? String(bestBid) : "",
+                best_ask: bestAsk != null ? String(bestAsk) : "",
+              };
+              setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
+            }
+          }
+        } catch (_) {}
+      };
+
+      ws.onerror = () => {
+        setError("WebSocket error");
+        setWsConnecting(false);
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+        setWsConnected(false);
+        setWsConnecting(false);
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = null;
+        }
+        setPolymarketWsState?.((prev) => ({ ...prev, isRunning: false, stop: null }));
+      };
+    },
+    [setConnectedData, setPolymarketWsState]
+  );
+
+  const disconnectWebSocket = useCallback(() => {
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setWsConnected(false);
+    setWsConnecting(false);
+    setPolymarketWsState?.((prev) => ({ ...prev, isRunning: false, stop: null }));
+  }, [setPolymarketWsState]);
+
   const openForm = (action) => {
     setSelectedAction(action);
+    setMarketSearch("");
     const initial = { selectedFields: {} };
     action.params?.forEach((p) => {
       initial[p.key] = p.default !== undefined ? String(p.default) : "";
@@ -220,6 +414,16 @@ const Polymarket = ({ setConnectedData }) => {
     }
     return true;
   };
+
+  const canConnectWs = useCallback(() => {
+    const raw = paramValues.market_token_id;
+    if (!raw || typeof raw !== "string" || !raw.trim()) return false;
+    const ids = parseManualIds(raw);
+    if (ids.length > 0) return true;
+    const opts = listOptions.market_token_id || [];
+    const opt = opts.find((o) => o.value === raw.trim());
+    return !!opt?.marketData;
+  }, [paramValues.market_token_id, listOptions.market_token_id]);
 
   const handleSubmit = () => {
     if (!selectedAction || loading || throttleRemaining > 0) return;
@@ -267,41 +471,63 @@ const Polymarket = ({ setConnectedData }) => {
                 {param.required && <span className="text-destructive ml-0.5">*</span>}
               </Label>
               {param.listQuery ? (
-                <div className="flex gap-2 flex-wrap items-center min-w-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs shrink-0"
-                    disabled={pullListLoading[param.key]}
-                    onClick={() =>
-                      fetchListForParam(
-                        param.listQuery,
-                        param.listLabelKey,
-                        param.listValueKey,
-                        param.key
-                      )
-                    }
-                  >
-                    {pullListLoading[param.key] ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                    ) : (
-                      <ListFilter className="h-3.5 w-3.5 shrink-0" />
-                    )}
-                    <span className="ml-1.5 truncate">Pull list</span>
-                  </Button>
+                <div className="flex flex-col gap-2 min-w-0">
+                  <div className="flex gap-2 flex-wrap items-center min-w-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs shrink-0"
+                      disabled={pullListLoading[param.key]}
+                      onClick={() =>
+                        fetchListForParam(
+                          param.listQuery,
+                          param.listLabelKey,
+                          param.listValueKey,
+                          param.key,
+                          param.listFilter
+                        )
+                      }
+                    >
+                      {pullListLoading[param.key] ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                      ) : (
+                        <ListFilter className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                      <span className="ml-1.5 truncate">Pull list</span>
+                    </Button>
+                    {listOptions[param.key]?.length > 0 && param.key === "market_token_id" ? (
+                      <div className="relative flex-1 min-w-[140px] max-w-[220px]">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          type="text"
+                          placeholder="Search markets (e.g. kamala, bitcoin)"
+                          className="h-8 pl-8 text-xs placeholder:text-[10px] w-full"
+                          value={marketSearch}
+                          onChange={(e) => setMarketSearch(e.target.value)}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                   {listOptions[param.key]?.length > 0 ? (
                     <Select
                       value={paramValues[param.key] || ""}
                       onValueChange={(v) => setParamValues((prev) => ({ ...prev, [param.key]: v }))}
                     >
-                      <SelectTrigger className="h-8 w-full max-w-[220px] text-xs min-w-0">
-                        <SelectValue placeholder="Select or type below" />
+                      <SelectTrigger className="h-8 w-full max-w-full text-xs min-w-0 font-mono">
+                        <SelectValue placeholder="Select market or enter token ID below" />
                       </SelectTrigger>
                       <SelectContent>
-                        {listOptions[param.key].map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-xs" title={opt.label}>
-                            <span className="truncate block max-w-[200px]" title={opt.label}>{opt.label}</span>
+                        {(param.key === "market_token_id" && marketSearch
+                          ? listOptions[param.key].filter((opt) =>
+                              (opt.marketData?.question ?? opt.label ?? "")
+                                .toLowerCase()
+                                .includes(marketSearch.toLowerCase())
+                            )
+                          : listOptions[param.key]
+                        ).map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value} className="text-xs font-mono" title={opt.value}>
+                            <span className="block truncate max-w-[280px]" title={opt.label}>{opt.label}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -309,8 +535,8 @@ const Polymarket = ({ setConnectedData }) => {
                   ) : null}
                   <Input
                     type="text"
-                    placeholder={param.hint || `Enter ${param.key}`}
-                    className="h-8 text-xs placeholder:text-[10px] w-full max-w-[180px] min-w-0"
+                    placeholder={param.hint || `Enter token/condition ID(s), comma-separated`}
+                    className="h-8 text-xs placeholder:text-[10px] w-full font-mono min-w-0"
                     value={paramValues[param.key] || ""}
                     onChange={(e) => setParamValues((prev) => ({ ...prev, [param.key]: e.target.value }))}
                   />
@@ -347,59 +573,62 @@ const Polymarket = ({ setConnectedData }) => {
               )}
             </div>
           ))}
-          <div className="space-y-1 min-w-0">
-            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <LayoutList className="h-3.5 w-3.5 shrink-0" />
-              Properties to include (optional)
-            </Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 w-full justify-between text-xs min-w-0">
-                  <span className="truncate">
-                    {Object.keys(selectedFields).filter((k) => selectedFields[k]).length > 0
-                      ? `${Object.keys(selectedFields).filter((k) => selectedFields[k]).length} selected`
-                      : "All fields"}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="max-h-[280px] w-56 overflow-y-auto" align="start">
-                <DropdownMenuLabel className="text-xs">Choose columns</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={() => selectAllFields()}
-                  checked={propertyOptions.length > 0 && propertyOptions.every((k) => selectedFields[k])}
-                >
-                  <Check className="h-3.5 w-3.5 mr-2" />
-                  Select all
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={() => clearAllFields()}
-                  checked={false}
-                >
-                  <Square className="h-3.5 w-3.5 mr-2" />
-                  Clear all
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                {propertyOptions.map((key) => (
+          {!selectedAction?.wsType && (
+            <div className="space-y-1 min-w-0">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <LayoutList className="h-3.5 w-3.5 shrink-0" />
+                Properties to include (optional)
+              </Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 w-full justify-between text-xs min-w-0">
+                    <span className="truncate">
+                      {Object.keys(selectedFields).filter((k) => selectedFields[k]).length > 0
+                        ? `${Object.keys(selectedFields).filter((k) => selectedFields[k]).length} selected`
+                        : "All fields"}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-[280px] w-56 overflow-y-auto" align="start">
+                  <DropdownMenuLabel className="text-xs">Choose columns</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
                   <DropdownMenuCheckboxItem
-                    key={key}
-                    checked={selectedFields[key] === true}
-                    onCheckedChange={(checked) => setSelectedField(key, checked)}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={() => selectAllFields()}
+                    checked={propertyOptions.length > 0 && propertyOptions.every((k) => selectedFields[k])}
                   >
-                    <span className="truncate">{key}</span>
+                    <Check className="h-3.5 w-3.5 mr-2" />
+                    Select all
                   </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                  <DropdownMenuCheckboxItem
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={() => clearAllFields()}
+                    checked={false}
+                  >
+                    <Square className="h-3.5 w-3.5 mr-2" />
+                    Clear all
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                  {propertyOptions.map((key) => (
+                    <DropdownMenuCheckboxItem
+                      key={key}
+                      checked={selectedFields[key] === true}
+                      onCheckedChange={(checked) => setSelectedField(key, checked)}
+                    >
+                      <span className="truncate">{key}</span>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
           <div className="flex gap-2 pt-1 flex-wrap">
             <Button
               variant="outline"
               size="sm"
               className="h-8 text-xs shrink-0"
               onClick={() => {
+                if (selectedAction?.wsType && wsConnected) disconnectWebSocket();
                 setSelectedAction(null);
                 setParamValues({});
                 setError(null);
@@ -408,25 +637,98 @@ const Polymarket = ({ setConnectedData }) => {
               <X className="h-3.5 w-3.5 shrink-0" />
               <span className="ml-1.5">Cancel</span>
             </Button>
-            <Button
-              variant="default"
-              size="sm"
-              className="h-8 text-xs shrink-0"
-              disabled={!canSubmit}
-              onClick={handleSubmit}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                  <span className="ml-1.5">Requesting…</span>
-                </>
-              ) : (
-                <>
-                  <Play className="h-3.5 w-3.5 shrink-0" />
-                  <span className="ml-1.5">Run request</span>
-                </>
-              )}
-            </Button>
+            {selectedAction?.wsType ? (
+              <>
+                {wsConnected ? (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 text-xs shrink-0"
+                    onClick={disconnectWebSocket}
+                  >
+                    <SquareIcon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="ml-1.5">Stop feed</span>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-8 text-xs shrink-0"
+                    disabled={!canConnectWs() || wsConnecting}
+                    onClick={() => {
+                      const raw = String(paramValues.market_token_id || "").trim();
+                      const opts = listOptions.market_token_id || [];
+                      const opt = opts.find((o) => o.value === raw);
+                      let assetIds = [];
+                      if (opt?.marketData) {
+                        assetIds = parseTokenIdsFromMarket(opt.marketData);
+                        if (!assetIds.length) {
+                          const cid = getConditionId(opt.marketData);
+                          if (cid) assetIds = [cid];
+                        }
+                      } else {
+                        assetIds = parseManualIds(raw);
+                      }
+                      if (!assetIds.length) {
+                        setError("Enter a valid token/condition ID or select a market.");
+                        return;
+                      }
+                      connectWebSocket(assetIds);
+                    }}
+                  >
+                    {wsConnecting ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                        <span className="ml-1.5">Connecting…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Radio className="h-3.5 w-3.5 shrink-0" />
+                        <span className="ml-1.5">Connect</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+                {wsConnected && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs shrink-0"
+                    onClick={() => {
+                      setPolymarketWsState?.((prev) => ({
+                        ...prev,
+                        chartPreset: { type: "line", xKey: "time", yKey: "price" },
+                      }));
+                      contextStateV2?.setIntegrationSidebar?.("polymarket");
+                      setViewing?.("charts");
+                    }}
+                  >
+                    <LineChart className="h-3.5 w-3.5 shrink-0" />
+                    <span className="ml-1.5">Chart</span>
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                className="h-8 text-xs shrink-0"
+                disabled={!canSubmit}
+                onClick={handleSubmit}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                    <span className="ml-1.5">Requesting…</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3.5 w-3.5 shrink-0" />
+                    <span className="ml-1.5">Run request</span>
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       )}
