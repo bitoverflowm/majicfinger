@@ -41,7 +41,7 @@ import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon, ShuffleIcon } f
 import { MinusCircle, Moon, Sun, Tag, TrendingUp } from 'react-feather';
 import { IoConstructOutline, IoPieChartOutline, IoShuffleOutline, IoStatsChart } from 'react-icons/io5';
 import { Toggle } from '../ui/toggle';
-import { CameraIcon, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Radio, Square } from 'lucide-react';
+import { CameraIcon, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Radio, Square, CircleFadingArrowUpIcon } from 'lucide-react';
 import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin } from 'react-icons/pi';
 import { MdOutlineAreaChart, MdStackedBarChart } from 'react-icons/md';
 import { GoDotFill } from 'react-icons/go';
@@ -49,6 +49,7 @@ import { AiOutlineRadarChart } from 'react-icons/ai';
 import { CircleDot } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { toPng, toJpeg, toBlob, toPixelData, toSvg } from 'html-to-image';
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -1126,30 +1127,48 @@ const ChartView = ({demo}) => {
                     {
                         !(colorVisible) &&
                             <>
-                                <ToggleGroup variant="outline" type="single" area-label="Chart Type"
-                                    value={selChartType}
-                                    onValueChange={(value) => {
-                                        if (value) setSelChartType(value);
-                                    }}>
-                                    <ToggleGroupItem value="area" aria-label="Toggle area">
-                                        <MdOutlineAreaChart className="h-4 w-4" />
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem value="bar" aria-label="Toggle bar">
-                                        <IoStatsChart className="h-4 w-4" />
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem value="line" aria-label="Toggle line">
-                                        <PiChartLine className="h-4 w-4" />
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem value="pie" aria-label="Toggle pie">
-                                        <IoPieChartOutline className="h-4 w-4" />
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem value="radar" aria-label="Toggle radar">
-                                        <AiOutlineRadarChart className="h-4 w-4" />
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem value="scatter" aria-label="Toggle bubble (scatter)">
-                                        <CircleDot className="h-4 w-4" />
-                                    </ToggleGroupItem>
-                                </ToggleGroup>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <ToggleGroup variant="outline" type="single" area-label="Chart Type"
+                                      value={selChartType}
+                                      onValueChange={(value) => {
+                                          if (value) setSelChartType(value);
+                                      }}>
+                                      <ToggleGroupItem value="area" aria-label="Toggle area">
+                                          <MdOutlineAreaChart className="h-4 w-4" />
+                                      </ToggleGroupItem>
+                                      <ToggleGroupItem value="bar" aria-label="Toggle bar">
+                                          <IoStatsChart className="h-4 w-4" />
+                                      </ToggleGroupItem>
+                                      <ToggleGroupItem value="line" aria-label="Toggle line">
+                                          <PiChartLine className="h-4 w-4" />
+                                      </ToggleGroupItem>
+                                      <ToggleGroupItem value="pie" aria-label="Toggle pie">
+                                          <IoPieChartOutline className="h-4 w-4" />
+                                      </ToggleGroupItem>
+                                      <ToggleGroupItem value="radar" aria-label="Toggle radar">
+                                          <AiOutlineRadarChart className="h-4 w-4" />
+                                      </ToggleGroupItem>
+                                      <ToggleGroupItem value="scatter" aria-label="Toggle bubble (scatter)">
+                                          <CircleDot className="h-4 w-4" />
+                                      </ToggleGroupItem>
+                                  </ToggleGroup>
+                                  {/* Liveline button (visual only for now) */}
+                                  <TooltipProvider delayDuration={200}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="outline" size="icon" type="button">
+                                          <span className="relative inline-flex h-3 w-3">
+                                            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                                            <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                                          </span>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="bottom" className="text-xs">
+                                        Liveline chart
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
                                 <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'} pt-2`}>Select your x-axis </p>
                                 <p className="text-xs text-muted-foreground"></p>
                                 <div className="py-2 text-black">

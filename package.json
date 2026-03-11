@@ -66,6 +66,7 @@
     "gray-matter": "^4.0.3",
     "html-react-parser": "^5.1.0",
     "html-to-image": "^1.11.11",
+    "liveline": "^0.0.6",
     "lucide-react": "^0.365.0",
     "magic-sdk": "^13.6.2",
     "micro": "^10.0.1",
