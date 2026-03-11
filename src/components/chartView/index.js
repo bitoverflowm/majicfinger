@@ -59,6 +59,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+import { Liveline } from 'liveline'  
+
 const dfltChartData = [
     { month: "January", desktop: 186, mobile: 80, other: 45 },
     { month: "February", desktop: 305, mobile: 200, other: 100 },
@@ -270,6 +272,9 @@ const ChartView = ({demo}) => {
     const [selColorCol, setSelColorCol] = useState(null)
     const BUBBLE_RADIUS_RANGE = [50, 400]
 
+    // Liveline mode (only one of Liveline or Recharts is active at a time)
+    const [useLiveline, setUseLiveline] = useState(false)
+
     // Chart filter by column value (for live WS: e.g. side=BUY/SELL; generic: categorical, numeric, date)
     const [chartFilterColumn, setChartFilterColumn] = useState(null)
     const [chartFilterConfig, setChartFilterConfig] = useState({})
@@ -368,6 +373,27 @@ const ChartView = ({demo}) => {
             return r;
         });
     }, [sortedData, selX, selY, dataTypes])
+
+    // Liveline-ready data: { time, value } derived from current X/Y selection and chartData
+    const livelineData = useMemo(() => {
+        if (!chartData || !chartData.length || !selX || !selY || !selY.length) return [];
+        const valueKey = selY[0];
+        const rows = chartData
+          .map((row, idx) => {
+            const rawT = row[selX];
+            let t;
+            if (typeof rawT === "number" && Number.isFinite(rawT)) {
+              t = rawT;
+            } else {
+              const parsed = Date.parse(String(rawT));
+              t = Number.isFinite(parsed) ? parsed : idx;
+            }
+            const vNum = Number(row[valueKey]);
+            const value = Number.isFinite(vNum) ? vNum : 0;
+            return { time: t, value };
+          });
+        return rows;
+    }, [chartData, selX, selY])
 
     // X-axis min/max for date tick formatting (short range = time with seconds)
     const xAxisRange = useMemo(() => {
@@ -1064,6 +1090,7 @@ const ChartView = ({demo}) => {
                                         )
                                     )
                                     }
+                                    
                                 </ChartContainer>
                             </CardContent>
                             <CardFooter>
@@ -1131,7 +1158,10 @@ const ChartView = ({demo}) => {
                                   <ToggleGroup variant="outline" type="single" area-label="Chart Type"
                                       value={selChartType}
                                       onValueChange={(value) => {
-                                          if (value) setSelChartType(value);
+                                          if (value) {
+                                            setSelChartType(value);
+                                            setUseLiveline(false);
+                                          }
                                       }}>
                                       <ToggleGroupItem value="area" aria-label="Toggle area">
                                           <MdOutlineAreaChart className="h-4 w-4" />
@@ -1152,11 +1182,16 @@ const ChartView = ({demo}) => {
                                           <CircleDot className="h-4 w-4" />
                                       </ToggleGroupItem>
                                   </ToggleGroup>
-                                  {/* Liveline button (visual only for now) */}
+                                  {/* Liveline button */}
                                   <TooltipProvider delayDuration={200}>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <Button variant="outline" size="icon" type="button">
+                                        <Button
+                                          variant={useLiveline ? "default" : "outline"}
+                                          size="icon"
+                                          type="button"
+                                          onClick={() => setUseLiveline((v) => !v)}
+                                        >
                                           <span className="relative inline-flex h-3 w-3">
                                             <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
                                             <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
