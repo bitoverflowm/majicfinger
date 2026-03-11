@@ -104,6 +104,7 @@ const Polymarket = ({ setConnectedData }) => {
   const [wsConnecting, setWsConnecting] = useState(false);
   const wsRef = useRef(null);
   const pingIntervalRef = useRef(null);
+  const wsEventTypeRef = useRef("price_change"); // 'price_change' | 'last_trade_price'
 
   // Market search (for wsPrice market_token_id)
   const [marketSearch, setMarketSearch] = useState("");
@@ -247,8 +248,9 @@ const Polymarket = ({ setConnectedData }) => {
   );
 
   const connectWebSocket = useCallback(
-    (assetIds) => {
+    (assetIds, eventType = "price_change") => {
       if (wsRef.current || !assetIds?.length) return;
+      wsEventTypeRef.current = eventType;
       setWsConnecting(true);
       setError(null);
       const ws = new WebSocket(POLYMARKET_WS_URL);
@@ -275,7 +277,7 @@ const Polymarket = ({ setConnectedData }) => {
           isRunning: true,
           assetIds,
           stop: () => disconnectWebSocket(),
-          start: () => connectWebSocket(assetIds),
+          start: () => connectWebSocket(assetIds, wsEventTypeRef.current),
           chartPreset: { type: "line", xKey: "time", yKey: "price" },
         });
       };
@@ -284,7 +286,7 @@ const Polymarket = ({ setConnectedData }) => {
         if (event.data === "PONG") return;
         try {
           const msg = JSON.parse(event.data);
-          if (msg.event_type === "price_change" && msg.price_changes) {
+          if (wsEventTypeRef.current === "price_change" && msg.event_type === "price_change" && msg.price_changes) {
             const rows = msg.price_changes.map((pc) => {
               const priceNum = pc.price != null ? parseFloat(pc.price) : null;
               return {
@@ -302,7 +304,23 @@ const Polymarket = ({ setConnectedData }) => {
               };
             });
             setConnectedData((prev) => (Array.isArray(prev) ? [...prev, ...rows] : rows));
-          } else if (msg.event_type === "book" && msg.asset_id) {
+          } else if (wsEventTypeRef.current === "last_trade_price" && msg.event_type === "last_trade_price" && msg.asset_id) {
+            const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+            const priceNum = msg.price != null ? parseFloat(String(msg.price)) : null;
+            const row = {
+              event_type: msg.event_type,
+              market: msg.market ?? "",
+              timestamp: msg.timestamp ?? String(ts),
+              time: (msg.timestamp ?? ts) ? new Date(Number(msg.timestamp ?? ts)).toISOString() : "",
+              asset_id: msg.asset_id,
+              price: priceNum != null && !Number.isNaN(priceNum) ? priceNum : (msg.price != null ? String(msg.price) : ""),
+              size: msg.size != null ? String(msg.size) : "",
+              fee_rate_bps: msg.fee_rate_bps != null ? String(msg.fee_rate_bps) : "",
+              side: msg.side ?? "",
+              transaction_hash: msg.transaction_hash ?? "",
+            };
+            setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
+          } else if (wsEventTypeRef.current === "price_change" && msg.event_type === "book" && msg.asset_id) {
             // Initial orderbook snapshot (initial_dump: true) - derive price from best bid/ask
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
             const bids = Array.isArray(msg.bids) ? msg.bids : [];
@@ -673,7 +691,8 @@ const Polymarket = ({ setConnectedData }) => {
                         setError("Enter a valid token/condition ID or select a market.");
                         return;
                       }
-                      connectWebSocket(assetIds);
+                      const desiredEventType = selectedAction?.query === "wsLastTradePrice" ? "last_trade_price" : "price_change";
+                      connectWebSocket(assetIds, desiredEventType);
                     }}
                   >
                     {wsConnecting ? (

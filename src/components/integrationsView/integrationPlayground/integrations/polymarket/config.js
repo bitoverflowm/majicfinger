@@ -276,6 +276,26 @@ export const ENDPOINTS = [
     ],
   },
   {
+    query: "wsLastTradePrice",
+    name: "Last trade price",
+    description: "Live last trade price stream via WebSocket. Streams executed trade prints (last_trade_price) for subscribed market token IDs.",
+    group: "liveDataWebsocket",
+    wsType: true,
+    params: [
+      {
+        key: "market_token_id",
+        label: "Token / Condition ID",
+        required: true,
+        type: "text",
+        listQuery: "listMarkets",
+        listLabelKey: "question",
+        listValueKey: "conditionId",
+        listFilter: { closed: "false" },
+        hint: "Select a market (uses condition_id) or enter token/condition ID(s) comma-separated.",
+      },
+    ],
+  },
+  {
     query: "getTradesByUser",
     name: "Get trades by user",
     description: "Get trades for a user (wallet address). Enter a 0x-prefixed Ethereum address.",
