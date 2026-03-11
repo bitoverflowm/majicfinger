@@ -320,6 +320,19 @@ const Polymarket = ({ setConnectedData }) => {
               transaction_hash: msg.transaction_hash ?? "",
             };
             setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
+          } else if (wsEventTypeRef.current === "book" && msg.event_type === "book" && msg.asset_id) {
+            const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+            const row = {
+              event_type: msg.event_type,
+              asset_id: msg.asset_id,
+              market: msg.market ?? "",
+              timestamp: msg.timestamp ?? String(ts),
+              time: new Date(ts).toISOString(),
+              bids: Array.isArray(msg.bids) ? JSON.stringify(msg.bids) : "",
+              asks: Array.isArray(msg.asks) ? JSON.stringify(msg.asks) : "",
+              hash: msg.hash ?? "",
+            };
+            setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
           } else if (wsEventTypeRef.current === "price_change" && msg.event_type === "book" && msg.asset_id) {
             // Initial orderbook snapshot (initial_dump: true) - derive price from best bid/ask
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
@@ -353,6 +366,59 @@ const Polymarket = ({ setConnectedData }) => {
               };
               setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
             }
+          } else if (wsEventTypeRef.current === "tick_size_change" && msg.event_type === "tick_size_change" && msg.asset_id) {
+            const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+            const row = {
+              event_type: msg.event_type,
+              asset_id: msg.asset_id,
+              market: msg.market ?? "",
+              old_tick_size: msg.old_tick_size ?? "",
+              new_tick_size: msg.new_tick_size ?? "",
+              timestamp: msg.timestamp ?? String(ts),
+              time: new Date(ts).toISOString(),
+            };
+            setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
+          } else if (wsEventTypeRef.current === "best_bid_ask" && msg.event_type === "best_bid_ask" && msg.asset_id) {
+            const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+            const row = {
+              event_type: msg.event_type,
+              asset_id: msg.asset_id,
+              market: msg.market ?? "",
+              best_bid: msg.best_bid ?? "",
+              best_ask: msg.best_ask ?? "",
+              spread: msg.spread ?? "",
+              timestamp: msg.timestamp ?? String(ts),
+              time: new Date(ts).toISOString(),
+            };
+            setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
+          } else if (wsEventTypeRef.current === "new_market" && msg.event_type === "new_market") {
+            const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+            const row = {
+              event_type: msg.event_type,
+              id: msg.id ?? "",
+              question: msg.question ?? "",
+              market: msg.market ?? "",
+              slug: msg.slug ?? "",
+              description: msg.description ?? "",
+              assets_ids: Array.isArray(msg.assets_ids) ? JSON.stringify(msg.assets_ids) : "",
+              outcomes: Array.isArray(msg.outcomes) ? JSON.stringify(msg.outcomes) : "",
+              timestamp: msg.timestamp ?? String(ts),
+              time: new Date(ts).toISOString(),
+            };
+            setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
+          } else if (wsEventTypeRef.current === "market_resolved" && msg.event_type === "market_resolved") {
+            const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+            const row = {
+              event_type: msg.event_type,
+              id: msg.id ?? "",
+              market: msg.market ?? "",
+              assets_ids: Array.isArray(msg.assets_ids) ? JSON.stringify(msg.assets_ids) : "",
+              winning_asset_id: msg.winning_asset_id ?? "",
+              winning_outcome: msg.winning_outcome ?? "",
+              timestamp: msg.timestamp ?? String(ts),
+              time: new Date(ts).toISOString(),
+            };
+            setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
           }
         } catch (_) {}
       };
@@ -691,7 +757,29 @@ const Polymarket = ({ setConnectedData }) => {
                         setError("Enter a valid token/condition ID or select a market.");
                         return;
                       }
-                      const desiredEventType = selectedAction?.query === "wsLastTradePrice" ? "last_trade_price" : "price_change";
+                      let desiredEventType = "price_change";
+                      switch (selectedAction?.query) {
+                        case "wsLastTradePrice":
+                          desiredEventType = "last_trade_price";
+                          break;
+                        case "wsOrderbookSnapshot":
+                          desiredEventType = "book";
+                          break;
+                        case "wsTickSizeChange":
+                          desiredEventType = "tick_size_change";
+                          break;
+                        case "wsBestBidAsk":
+                          desiredEventType = "best_bid_ask";
+                          break;
+                        case "wsNewMarket":
+                          desiredEventType = "new_market";
+                          break;
+                        case "wsMarketResolved":
+                          desiredEventType = "market_resolved";
+                          break;
+                        default:
+                          desiredEventType = "price_change";
+                      }
                       connectWebSocket(assetIds, desiredEventType);
                     }}
                   >
