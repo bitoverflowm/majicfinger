@@ -374,24 +374,27 @@ const ChartView = ({demo}) => {
         });
     }, [sortedData, selX, selY, dataTypes])
 
-    // Liveline-ready data: { time, value } derived from current X/Y selection and chartData
+    // Liveline-ready data: { time, value } derived from current X/Y selection.
+    // Liveline expects time in unix seconds, so we normalise accordingly.
     const livelineData = useMemo(() => {
         if (!chartData || !chartData.length || !selX || !selY || !selY.length) return [];
         const valueKey = selY[0];
-        const rows = chartData
-          .map((row, idx) => {
+        const rows = chartData.map((row, idx) => {
             const rawT = row[selX];
-            let t;
-            if (typeof rawT === "number" && Number.isFinite(rawT)) {
-              t = rawT;
+            let timeSec;
+            if (rawT instanceof Date) {
+                timeSec = rawT.getTime() / 1000;
+            } else if (typeof rawT === "number" && Number.isFinite(rawT)) {
+                // Heuristic: >1e12 is likely ms, otherwise treat as seconds
+                timeSec = rawT > 1e12 ? rawT / 1000 : rawT;
             } else {
-              const parsed = Date.parse(String(rawT));
-              t = Number.isFinite(parsed) ? parsed : idx;
+                const parsed = Date.parse(String(rawT));
+                timeSec = Number.isFinite(parsed) ? parsed / 1000 : idx;
             }
             const vNum = Number(row[valueKey]);
             const value = Number.isFinite(vNum) ? vNum : 0;
-            return { time: t, value };
-          });
+            return { time: timeSec, value };
+        });
         return rows;
     }, [chartData, selX, selY])
 
@@ -683,6 +686,20 @@ const ChartView = ({demo}) => {
                                 }                                
                             </CardHeader>
                             <CardContent>
+                                {useLiveline ? (
+                                  <div style={{ height: 400 }} className="w-full flex items-center justify-center">
+                                    {livelineData && livelineData.length > 0 ? (
+                                      <Liveline
+                                        data={livelineData}
+                                        value={livelineData[livelineData.length - 1].value}
+                                      />
+                                    ) : (
+                                      <div className="text-xs text-muted-foreground">
+                                        Liveline: select a time-like X and numeric Y, then connect a live feed.
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
                                 <ChartContainer config={chartConfig ? chartConfig : dfltChartConfig} className={`h-[300px] lg:h-[500px] w-full ${dark && 'text-slate-200'}`}>
                                     { selChartType === 'area' &&
                                         <AreaChart
@@ -1090,8 +1107,8 @@ const ChartView = ({demo}) => {
                                         )
                                     )
                                     }
-                                    
                                 </ChartContainer>
+                                )}
                             </CardContent>
                             <CardFooter>
                                 <div className="flex w-full items-start gap-2 text-sm">
@@ -1156,7 +1173,7 @@ const ChartView = ({demo}) => {
                             <>
                                 <div className="flex flex-wrap items-center gap-2">
                                   <ToggleGroup variant="outline" type="single" area-label="Chart Type"
-                                      value={selChartType}
+                                      value={useLiveline ? "" : selChartType}
                                       onValueChange={(value) => {
                                           if (value) {
                                             setSelChartType(value);
