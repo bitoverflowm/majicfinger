@@ -58,8 +58,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Liveline } from "liveline";
 
-import { Liveline } from 'liveline'  
+const LIVELINE_WINDOWS = [
+  { label: "1m", secs: 60 },
+  { label: "5m", secs: 300 },
+  { label: "15m", secs: 900 },
+];
+
+const LIVELINE_COLOR_OPTIONS = [
+  { label: "Palette (auto)", value: "__palette__" },
+  { label: "Blue", value: "#3b82f6" },
+  { label: "Green", value: "#22c55e" },
+  { label: "Red", value: "#ef4444" },
+  { label: "Orange", value: "#f97316" },
+];
 
 const dfltChartData = [
     { month: "January", desktop: 186, mobile: 80, other: 45 },
@@ -274,6 +287,18 @@ const ChartView = ({demo}) => {
 
     // Liveline mode (only one of Liveline or Recharts is active at a time)
     const [useLiveline, setUseLiveline] = useState(false)
+
+    // Liveline controls (only used when useLiveline === true)
+    const [livelineMomentum, setLivelineMomentum] = useState(true)
+    const [livelineShowValue, setLivelineShowValue] = useState(false)
+    const [livelineValueMomentumColor, setLivelineValueMomentumColor] = useState(false)
+    const [livelineWindowsEnabled, setLivelineWindowsEnabled] = useState(false)
+    const [livelineExaggerate, setLivelineExaggerate] = useState(false)
+    const [livelineScrub, setLivelineScrub] = useState(true)
+    const [livelineDegen, setLivelineDegen] = useState(false)
+    const [livelineBadge, setLivelineBadge] = useState(true)
+    const [livelineBadgeVariant, setLivelineBadgeVariant] = useState("default") // 'default' | 'minimal'
+    const [livelineColorChoice, setLivelineColorChoice] = useState("__palette__")
 
     // Chart filter by column value (for live WS: e.g. side=BUY/SELL; generic: categorical, numeric, date)
     const [chartFilterColumn, setChartFilterColumn] = useState(null)
@@ -687,11 +712,25 @@ const ChartView = ({demo}) => {
                             </CardHeader>
                             <CardContent>
                                 {useLiveline ? (
-                                  <div style={{ height: 400 }} className="w-full flex items-center justify-center">
+                                  <div style={{ height: 200 }} className="w-full flex items-center justify-center">
                                     {livelineData && livelineData.length > 0 ? (
                                       <Liveline
                                         data={livelineData}
                                         value={livelineData[livelineData.length - 1].value}
+                                        theme={dark ? "dark" : "light"}
+                                        color={livelineColorChoice === "__palette__"
+                                          ? (selectedPalette?.[0] ?? "#3b82f6")
+                                          : livelineColorChoice}
+                                        momentum={livelineMomentum}
+                                        showValue={livelineShowValue}
+                                        valueMomentumColor={livelineValueMomentumColor}
+                                        windows={livelineWindowsEnabled ? LIVELINE_WINDOWS : undefined}
+                                        windowStyle="rounded"
+                                        exaggerate={livelineExaggerate}
+                                        scrub={livelineScrub}
+                                        degen={livelineDegen}
+                                        badge={livelineBadge}
+                                        badgeVariant={livelineBadgeVariant}
                                       />
                                     ) : (
                                       <div className="text-xs text-muted-foreground">
@@ -1342,6 +1381,137 @@ const ChartView = ({demo}) => {
                                         {availableYOptions && availableYOptions.length === 0 ? 'You have no more columns': '+ Stack Another Value'}
                                     </button>
                                 }
+                                {/* Liveline controls (only when Liveline is selected) */}
+                                {useLiveline && (
+                                  <div className="mt-3 rounded-lg border p-3 space-y-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-muted-foreground'}`}>Liveline</p>
+                                      <span className="text-[10px] text-muted-foreground">Live canvas chart</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Button
+                                        type="button"
+                                        variant={livelineMomentum ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs justify-start"
+                                        onClick={() => setLivelineMomentum((v) => !v)}
+                                      >
+                                        Momentum
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={livelineShowValue ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs justify-start"
+                                        onClick={() => setLivelineShowValue((v) => !v)}
+                                      >
+                                        Value overlay
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={livelineValueMomentumColor ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs justify-start"
+                                        onClick={() => setLivelineValueMomentumColor((v) => !v)}
+                                        disabled={!livelineShowValue}
+                                        title={!livelineShowValue ? "Enable value overlay first" : undefined}
+                                      >
+                                        Value momentum color
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={livelineWindowsEnabled ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs justify-start"
+                                        onClick={() => setLivelineWindowsEnabled((v) => !v)}
+                                      >
+                                        Time windows
+                                      </Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Button
+                                        type="button"
+                                        variant={livelineExaggerate ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs justify-start"
+                                        onClick={() => setLivelineExaggerate((v) => !v)}
+                                      >
+                                        Exaggerate
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={livelineScrub ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs justify-start"
+                                        onClick={() => setLivelineScrub((v) => !v)}
+                                      >
+                                        Scrub
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={livelineDegen ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs justify-start"
+                                        onClick={() => setLivelineDegen((v) => !v)}
+                                      >
+                                        Degen
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={livelineBadge ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs justify-start"
+                                        onClick={() => setLivelineBadge((v) => !v)}
+                                      >
+                                        Badge
+                                      </Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 items-center">
+                                      <div className="space-y-1">
+                                        <p className={`text-[11px] ${dark ? 'text-slate-300' : 'text-muted-foreground'}`}>Badge variant</p>
+                                        <Select
+                                          value={livelineBadgeVariant}
+                                          onValueChange={(v) => setLivelineBadgeVariant(v)}
+                                          disabled={!livelineBadge}
+                                        >
+                                          <SelectTrigger className="h-8 text-xs">
+                                            <SelectValue placeholder="default" />
+                                          </SelectTrigger>
+                                          <SelectContent className="text-xs">
+                                            <SelectItem value="default">default</SelectItem>
+                                            <SelectItem value="minimal">minimal</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className={`text-[11px] ${dark ? 'text-slate-300' : 'text-muted-foreground'}`}>Line color</p>
+                                        <Select value={livelineColorChoice} onValueChange={(v) => setLivelineColorChoice(v)}>
+                                          <SelectTrigger className="h-8 text-xs">
+                                            <SelectValue placeholder="Palette (auto)" />
+                                          </SelectTrigger>
+                                          <SelectContent className="text-xs">
+                                            {LIVELINE_COLOR_OPTIONS.map((opt) => (
+                                              <SelectItem key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </div>
+
+                                    {livelineWindowsEnabled && (
+                                      <div className="pt-1">
+                                        <p className={`text-[11px] ${dark ? 'text-slate-300' : 'text-muted-foreground'}`}>
+                                          Windows: 1m, 5m, 15m (rounded)
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                                 {/* Filter by column value (e.g. side=BUY for WS; categorical, numeric, date) */}
                                 {!demo && effectiveData?.length > 0 && xOptions?.length > 0 && (
                                     <div className="py-2 space-y-2">
