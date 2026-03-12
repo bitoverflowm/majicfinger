@@ -76,7 +76,7 @@ function HeroTitles() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6, duration: 0.8, ease }}
       >
-          One operator. Full pipeline. Real edge.
+          Your edge in prediction markets.
       </motion.p>
     </div>
   );
@@ -108,9 +108,7 @@ function HeroCTA() {
         animate={{ opacity: 1 }}
         transition={{ delay: 1.0, duration: 0.8 }}
       >
-        <p>Stop juggling CSVs, Python scripts, and messy charts.</p>
-        <p>Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser.</p>
-        <p>Zero coding. Zero friction. <Highlighter action="highlight" color="#87CEFA">Real results</Highlighter>.</p>
+        <p>Connect directly to Polymarket API, pull live data, analyze everything, generate stunning dashboards and gain the ultimate edge.</p><p> <span className="underline">Zero coding.</span> Real results.</p>
       </motion.div>
     </>
   );
@@ -136,7 +134,7 @@ export default function Hero() {
         <HeroPill />
         <HeroTitles />
         <HeroCTA />
-        <HeroImage />
+        {/*<HeroImage />*/}
       </div>
     </section>
   );

@@ -28,7 +28,7 @@ const problems = [
 
 export default function Problem() {
   return (
-    <Section title="Problem" subtitle="You have no edge.">
+    <Section title="Problem" subtitle="You have no idea what's going on.">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
         {problems.map((problem, index) => (
           <BlurFade key={index} delay={0.2 + index * 0.2} inView>

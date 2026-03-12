@@ -27,10 +27,10 @@ export default function Header() {
         <Link
           href="/"
           title="brand-logo"
-          className="relative mr-6 flex items-center space-x-2"
+          className="relative mr-6 flex items-center"
         >
-          <Icons.logo width={40} height={40} className="w-10 h-10" />
-          <span className="font-bold text-xl">{landingPageV2Config.name}</span>
+          <Icons.logo width={40} height={40} className="w-8 h-8 brightness-0 dark:invert" />
+          <span className="font-black text-2xl mt-1">{landingPageV2Config.name}</span>
         </Link>
 
         <div className="hidden lg:block">

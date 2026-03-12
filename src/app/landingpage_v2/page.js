@@ -17,7 +17,7 @@ import { getAllContent } from "@/lib/content";
 export const metadata = {
   title: "Lychee: Your Quant in a Box",
   description:
-    "Stop juggling CSVs, Python scripts, and messy charts. Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser. Zero coding. Zero friction. Real results.",
+    "No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.",
 };
 
 export default function LandingPageV2() {
