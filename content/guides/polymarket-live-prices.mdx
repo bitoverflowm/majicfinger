@@ -5,7 +5,7 @@ publishedAt: "2026-03-12"
 author: "misterrpink"
 topics: ["polymarket", "prediction markets", "market data", "websockets", "no-code"]
 integration: ["Polymarket"]
-coverImage: "/images/guides/polymarket-live-price-charts/main.png"
+coverImage: "/images/guides/polymarket-live-prices/main.png"
 featured: true
 ---
 
@@ -41,7 +41,7 @@ Unlike traditional REST API endpoints, which return data when you request it, a 
 Polymarket’s market stream works exactly this way.
 
 The WebSocket endpoint is:
-```
+```bash
 wss://ws-subscriptions-clob.polymarket.com/ws/market
 ```
 
@@ -164,75 +164,65 @@ Below is a simple walkthrough of how to set up a live chart using the market pri
 
 Navigate to the **Integrations** section and select **Connect** under the Polymarket integration.
 
-![Create API connection screen](/images/guides/polymarket-events-endpoint-no-code/1.png)
+![Create API connection screen](/images/guides/polymarket-live-prices/1.png)
 
 ---
 
-## 2. Enable Live Data
-
-Inside the integrations playground, select the **Live** data option.
-
-This allows Lychee to subscribe to Polymarket’s real-time market stream.
-
-*(Insert screenshot)*
-
----
-
-## 3. Select the Market Data Stream
+## 2. Select the Market Data Stream
 
 Choose which type of market data you want to stream.
 
 For this example, select the **Prices** endpoint.
 
-*(Insert screenshot)*
+![Select Price Market Data](/images/guides/polymarket-live-prices/2.png)
 
 ---
 
-## 4. Select the Market Token
+## 3. Select the Market Token
 
 If you already know the **market token ID**, paste it directly into the field.
 
 If not, select **Pull Markets** to automatically retrieve available markets and choose one from the list.
 
-*(Insert screenshot)*
+![Get the market token](/images/guides/polymarket-live-prices/3.png)
 
 ---
 
-## 5. Start the Live Data Connection
+## 4. Start the Live Data Connection
 
 Once the market token is selected, the live data connection is established.
 
 Developers often refer to this type of continuous stream as a **webhook-style data connection**, where updates are delivered automatically as they occur.
 
-*(Insert screenshot)*
+![Start the live data connection](/images/guides/polymarket-live-prices/4.png)
 
 ---
 
-## 6. Create a Chart
+## 5. Create a Chart
 
 Next, select **Chart** to visualize the incoming data.
 
-*(Insert screenshot)*
+![Create the chart](/images/guides/polymarket-live-prices/5.png)
 
 ---
 
-## 7. Enable Live Charting
+## 6. Enable Live Charting
 
 Choose the **Live** chart option to display a continuously updating price chart.
 
 Lychee’s charting interface is inspired by modern streaming chart libraries, allowing prices to update smoothly as new events arrive.
 
-*(Insert screenshot)*
+![Enable live charting](/images/guides/polymarket-live-prices/6.png)
 
 ---
 
-## 8. View the Live Market Chart
+## 7. View the Live Market Chart
 
 That’s it.
 
 You now have a **live updating chart of Polymarket price data** streaming directly from the market WebSocket.
 
-*(Insert screenshot)*
+![View the live marrkeet chart](/images/guides/polymarket-live-prices/7.png)
 
 ---
 

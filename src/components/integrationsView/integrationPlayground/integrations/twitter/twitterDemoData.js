@@ -13174,8 +13174,8 @@ const twitterDemoData ={
                             "start": 0,
                             "end": 23,
                             "url": "https://t.co/GA6NKwuvN6",
-                            "expanded_url": "http://lych3e.com",
-                            "display_url": "lych3e.com"
+                            "expanded_url": "http://lycheedata.com",
+                            "display_url": "lycheedata.com"
                         }
                     ]
                 }
@@ -22031,8 +22031,8 @@ const twitterDemoData ={
                             "start": 0,
                             "end": 23,
                             "url": "https://t.co/GYCr8lAibB",
-                            "expanded_url": "https://www.lych3e.com/",
-                            "display_url": "lych3e.com"
+                            "expanded_url": "https://www.lycheedata.com/",
+                            "display_url": "lycheedata.com"
                         }
                     ]
                 }

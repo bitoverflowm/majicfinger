@@ -27,11 +27,11 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    domain: 'lycheedata.com/',
+    domain: 'lycheedata.com',
     url: 'https://www.lycheedata.com',
     title: 'Lychee: Your Quant in a Box',
     description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
-    image: 'https://www.lych3e.com/ogImage.png'
+    image: 'https://www.lycheedata.com/ogImage.png'
   }
 };
 

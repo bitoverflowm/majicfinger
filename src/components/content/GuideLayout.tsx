@@ -69,19 +69,22 @@ export function GuideLayout({ slug, frontmatter, contentType = "guides", childre
         )}
 
         <Section>
-                <div className="prose prose-neutral dark:prose-invert prose-lg max-w-none
-                  prose-headings:scroll-mt-24
-                  prose-headings:font-semibold
-                  prose-headings:tracking-tight
-                  prose-h1:text-4xl prose-h1:font-bold
-                  prose-h2:mt-12 prose-h2:text-2xl
-                  prose-h3:mt-8 prose-h3:text-xl
-                  prose-p:leading-8 prose-p:text-base
-                  prose-a:font-medium prose-a:text-primary
-                  prose-a:no-underline
-                  hover:prose-a:underline
-                  prose-blockquote:border-l-primary
-                  prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
+          <div
+            className="prose prose-neutral dark:prose-invert prose-lg max-w-none
+              prose-headings:scroll-mt-24
+              prose-headings:font-semibold
+              prose-headings:tracking-tight
+              prose-h1:text-4xl prose-h1:font-bold
+              prose-h2:mt-12 prose-h2:text-2xl
+              prose-h3:mt-8 prose-h3:text-xl
+              prose-p:leading-8 prose-p:text-base
+              prose-a:font-medium prose-a:text-primary
+              prose-a:no-underline
+              hover:prose-a:underline
+              prose-blockquote:border-l-primary
+              prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-xl prose-pre:px-4 prose-pre:py-3
+              prose-code:px-1 prose-code:py-0.5 prose-code:rounded"
+          >
             {children}
           </div>
         </Section>

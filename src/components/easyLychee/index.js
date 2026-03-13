@@ -36,7 +36,7 @@ import { toast } from 'sonner';
 
 const EasyLychee = () => {
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const baseUrl = isDevelopment ? 'http://localhost:3000/easy/' : 'https://www.lych3e.com/easy/';
+    const baseUrl = isDevelopment ? 'http://localhost:3000/easy/' : 'https://www.lycheedata.com/easy/';
 
     const user = useUser()
     const contextStateV2 = useMyStateV2()
@@ -306,7 +306,7 @@ const EasyLychee = () => {
                                     @{userHandle}
                                 </code></Link> 
                             using 
-                            <Link rel="noopener noreferrer" target="_blank" href="https://www.lych3e.com/#easyLychee">
+                            <Link rel="noopener noreferrer" target="_blank" href="https://www.lycheedata.com/#easyLychee">
                                 <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                     EasyLychee
                                 </code>
@@ -423,8 +423,8 @@ const EasyLychee = () => {
                                 <p className="text-xs font-bold text-muted-foreground pt-2">Admin Stuff</p>
                                 <p className="text-xs text-muted-foreground">When you deploy, your page will be accessible here:</p>
                                 <div className="max-w-full break-words px-2 py-4">
-                                    <Link rel="noopener noreferrer" target="_blank" href={`${baseUrl}${userHandle}/${projectName}/${presentationName}`}>
-                                        <small className="text-xs font-medium leading-none">www.lych3e.com/easy/{userHandle}/{projectName}/{presentationName}</small>
+                                <Link rel="noopener noreferrer" target="_blank" href={`${baseUrl}${userHandle}/${projectName}/${presentationName}`}>
+                                        <small className="text-xs font-medium leading-none">www.lycheedata.com/easy/{userHandle}/{projectName}/{presentationName}</small>
                                     </Link>
                                 </div>
                                 <div>

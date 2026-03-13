@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { BaseContent, ContentType } from "./types";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lych3e.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lycheedata.com";
 
 export function buildContentMetadata(
   frontmatter: BaseContent,

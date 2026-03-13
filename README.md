@@ -5,7 +5,7 @@ I'm MisterrPink1, the mastermind behind the Luychee platform! 🚀
 ## About Me
 
 - **Twitter**: [@misterrpink1](https://x.com/misterrpink1) 🐦
-- **Website**: [Lychee](https://www.lych3e.com/) 🌐
+- **Website**: [Lychee](https://www.lycheedata.com/) 🌐
 
 I'm passionate about making data analysis a breeze and turning complex data into beautiful, actionable insights. Whether you're pulling data from APIs like Twitter, YouTube, Instagram, or QuickBooks, Lychee is here to simplify your workflow. 📊
 

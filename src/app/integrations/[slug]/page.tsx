@@ -35,7 +35,7 @@ export default async function IntegrationPage({
   if (!data) notFound();
 
   const { frontmatter, content } = data;
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lych3e.com";
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lycheedata.com";
 
   const articleJsonLd = buildArticleJsonLd(frontmatter, "integrations", slug);
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(

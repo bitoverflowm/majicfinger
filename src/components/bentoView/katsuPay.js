@@ -37,7 +37,7 @@ const katsuPrices = [
   {
     id: "price_2",
     name: "Hosted Link",
-    description: "<name>.lych3e.com or custom domain. Creates a rich interactive experience.",
+    description: "<name>.lycheedata.com or custom domain. Creates a rich interactive experience.",
     features: [
       "1 vote cast towards building Hosted URL Downloads",
       "1 license to for 1 seat for life",
