@@ -47,7 +47,7 @@ export default function HeroVideoDialog({
       >
         <div className="relative w-full aspect-video min-h-[200px] rounded-md border bg-muted overflow-hidden">
           <Image
-            src={thumbnailSrc || "/ogImage.png"}
+            src={thumbnailSrc || "/ogImage2.png"}
             alt={thumbnailAlt}
             fill
             sizes="(max-width: 1024px) 100vw, 1024px"

@@ -18,7 +18,7 @@ export const metadata = {
     siteName: 'Lychee',
     images: [
       {
-        url: 'https://www.lycheedata.com/ogImage.png',
+        url: 'https://www.lycheedata.com/ogImage2.png',
         width: 1200,
         height: 630,
         alt: 'Lychee OG Image'
@@ -31,7 +31,7 @@ export const metadata = {
     url: 'https://www.lycheedata.com/charts',
     title: 'Lychee: Your Quant in a Box',
     description: 'One operator. Full pipeline. Real edge. Stop juggling CSVs, Python scripts, and messy charts. Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser. Zero coding. Zero friction. Real results.',
-    image: 'https://www.lycheedata.com/ogImage.png'
+    image: 'https://www.lycheedata.com/ogImage2.png'
   }
 };
 
