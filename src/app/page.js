@@ -9,6 +9,9 @@ import LandingPageV2 from '@/app/landingpage_v2/page'
 
 const SITE_URL = 'https://lycheedata.com';
 const OG_IMAGE = `${SITE_URL}/ogImage2.png`;
+// Twitter/social cards work best at 1200×630 (1.91:1). If ogImage2.png is not 1200×630, resize it for consistent display.
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
 
 export const metadata = {
   title: 'Lychee: Your Quant in a Box',
@@ -22,8 +25,8 @@ export const metadata = {
     images: [
       {
         url: OG_IMAGE,
-        width: 1200,
-        height: 630,
+        width: OG_IMAGE_WIDTH,
+        height: OG_IMAGE_HEIGHT,
         alt: 'Lychee OG Image',
       },
     ],

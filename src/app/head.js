@@ -20,6 +20,8 @@ export default function Head() {
       <meta property="og:title" content="Lychee: Your Quant in a Box" key="title"></meta>
       <meta property="og:site_name" content="Lychee"></meta>
       <meta property="og:image" content="https://lycheedata.com/ogImage2.png" key="ogimage"></meta>
+      <meta property="og:image:width" content="1200" key="ogimagewidth"></meta>
+      <meta property="og:image:height" content="630" key="ogimageheight"></meta>
 
       <meta property="og:type" content="website" key="type"/>
       <meta property="twitter:domain" content="lycheedata.com" key="twitterdomain"/>
