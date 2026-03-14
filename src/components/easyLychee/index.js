@@ -36,7 +36,7 @@ import { toast } from 'sonner';
 
 const EasyLychee = () => {
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const baseUrl = isDevelopment ? 'http://localhost:3000/easy/' : 'https://www.lycheedata.com/easy/';
+    const baseUrl = isDevelopment ? 'http://localhost:3000/easy/' : 'https://lycheedata.com/easy/';
 
     const user = useUser()
     const contextStateV2 = useMyStateV2()

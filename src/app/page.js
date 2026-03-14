@@ -7,6 +7,37 @@ import { StateProvider } from '@/context/stateContext'
 
 import LandingPageV2 from '@/app/landingpage_v2/page'
 
+const SITE_URL = 'https://lycheedata.com';
+const OG_IMAGE = `${SITE_URL}/ogImage2.png`;
+
+export const metadata = {
+  title: 'Lychee: Your Quant in a Box',
+  description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
+  openGraph: {
+    url: SITE_URL,
+    type: 'website',
+    title: 'Lychee: Your Quant in a Box',
+    description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
+    siteName: 'Lychee',
+    images: [
+      {
+        url: OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: 'Lychee OG Image',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    domain: 'lycheedata.com',
+    url: SITE_URL,
+    title: 'Lychee: Your Quant in a Box',
+    description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
+    image: OG_IMAGE,
+  },
+};
+
 export default function Home() {
 
   const clairtyCode = `

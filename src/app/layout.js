@@ -11,14 +11,14 @@ export const metadata = {
     other: { _foundr: ['973f2a49e12fad2ad799756c823a6d3b'] },
   },
   openGraph: {
-    url: 'https://www.lycheedata.com/charts',
+    url: 'https://lycheedata.com',
     type: 'website',
     title: 'Lychee: Your Quant in a Box',
     description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
     siteName: 'Lychee',
     images: [
       {
-        url: 'https://www.lycheedata.com/ogImage2.png',
+        url: 'https://lycheedata.com/ogImage2.png',
         width: 1200,
         height: 630,
         alt: 'Lychee OG Image'
@@ -28,10 +28,10 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     domain: 'lycheedata.com',
-    url: 'https://www.lycheedata.com',
+    url: 'https://lycheedata.com',
     title: 'Lychee: Your Quant in a Box',
     description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
-    image: 'https://www.lycheedata.com/ogImage2.png'
+    image: 'https://lycheedata.com/ogImage2.png'
   }
 };
 

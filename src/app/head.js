@@ -15,18 +15,18 @@ export default function Head() {
       <title>Lychee: Your Quant in a Box</title>
       <meta name="description" content="No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results."/>
 
-      <meta property="og:url" content="https://www.lycheedata.com" key="url"></meta>
+      <meta property="og:url" content="https://lycheedata.com" key="url"></meta>
       <meta property="og:description" content="No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results." key="description" />
       <meta property="og:title" content="Lychee: Your Quant in a Box" key="title"></meta>
       <meta property="og:site_name" content="Lychee"></meta>
-      <meta property="og:image" content="https://www.lycheedata.com/ogImage2.png" key="ogimage"></meta>
+      <meta property="og:image" content="https://lycheedata.com/ogImage2.png" key="ogimage"></meta>
 
       <meta property="og:type" content="website" key="type"/>
       <meta property="twitter:domain" content="lycheedata.com" key="twitterdomain"/>
-      <meta property="twitter:url" content="https://www.lycheedata.com" key="twitterurl"/>            
+      <meta property="twitter:url" content="https://lycheedata.com" key="twitterurl"/>            
       
 
-      <meta property="twitter:image" content="https://www.lycheedata.com/ogImage2.png" key="twitterImage"></meta>
+      <meta property="twitter:image" content="https://lycheedata.com/ogImage2.png" key="twitterImage"></meta>
       <meta property="twitter:card" content="summary_large_image" key="twittercard"></meta>
       <meta property="twitter:title" content="Lychee: Your Quant in a Box" key="twittertitle"></meta>
       <meta property="twitter:description" content="No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results." key="twitterdescription"></meta>

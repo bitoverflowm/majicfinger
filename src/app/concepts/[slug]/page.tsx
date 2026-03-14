@@ -35,7 +35,7 @@ export default async function ConceptPage({
   if (!data) notFound();
 
   const { frontmatter, content } = data;
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lycheedata.com";
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
   const articleJsonLd = buildArticleJsonLd(frontmatter, "concepts", slug);
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(
