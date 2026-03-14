@@ -219,6 +219,7 @@ const ChartView = ({demo}) => {
     const setChartDataOverrideMeta = contextStateV2?.setChartDataOverrideMeta
     const chartDataOverrideMeta = contextStateV2?.chartDataOverrideMeta
     const polymarketWsState = contextStateV2?.polymarketWsState
+    const chainlinkWsState = contextStateV2?.chainlinkWsState
 
     // When charting a summary table, use override data; else use main connectedData
     const effectiveData = chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length > 0
@@ -493,9 +494,9 @@ const ChartView = ({demo}) => {
         }
     }, [demo])
 
-    // Polymarket WebSocket chart preset: line chart with time (X) and price (Y)
+    // Polymarket or Chainlink WebSocket chart preset: line chart with time (X) and price/value (Y)
     useEffect(() => {
-        const preset = polymarketWsState?.chartPreset;
+        const preset = polymarketWsState?.chartPreset || chainlinkWsState?.chartPreset;
         if (preset && preset.type === 'line' && preset.xKey && preset.yKey && effectiveData?.length) {
             const keys = Object.keys(effectiveData[0] || {});
             if (keys.includes(preset.xKey) && keys.includes(preset.yKey)) {
@@ -503,11 +504,11 @@ const ChartView = ({demo}) => {
                 setSelX(preset.xKey);
                 setSelY([preset.yKey]);
                 setSortXDir('asc');
-                setDots(false); // Clean line for live data (no dot clutter)
+                setDots(false);
                 setChartConfig((prev) => ({ ...prev, [preset.yKey]: { label: 'Price', color: 'hsl(142 88% 28%)' } }));
             }
         }
-    }, [polymarketWsState?.chartPreset, effectiveData]);
+    }, [polymarketWsState?.chartPreset, chainlinkWsState?.chartPreset, effectiveData]);
 
     useEffect(()=>{
         if(chartUsable){            
@@ -653,9 +654,9 @@ const ChartView = ({demo}) => {
         }
     };
     
-    const wsStop = polymarketWsState?.stop;
-    const wsStart = polymarketWsState?.start;
-    const wsRunning = polymarketWsState?.isRunning;
+    const wsStop = polymarketWsState?.stop ?? chainlinkWsState?.stop;
+    const wsStart = polymarketWsState?.start ?? chainlinkWsState?.start;
+    const wsRunning = polymarketWsState?.isRunning || chainlinkWsState?.isRunning;
     const showWsFeedControl = (wsStop || wsStart) && effectiveData?.length > 0;
 
     return(

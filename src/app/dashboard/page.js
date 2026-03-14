@@ -11,6 +11,7 @@ import { StateProvider } from '@/context/stateContext'
 import { StateProviderV2 } from '@/context/stateContextV2';
 
 import DashBody from './dashBody';
+import LiveStreamManager from './components/liveStreamManager';
 
 import { Toaster } from "@/components/ui/sonner"
 
@@ -54,6 +55,7 @@ const Dashbaord = () => {
             <GoogleAnalytics gaId="G-G8X2NEPTEG" />
             <StateProvider>
                 <StateProviderV2>
+                    <LiveStreamManager />
                     <Toaster />
                     <main>
                         <DashBody user={user}/>

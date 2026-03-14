@@ -52,6 +52,7 @@ const DashBody = ({user}) => {
     const setUserHandle = contextStateV2?.setUserHandle
     const userHandle = contextStateV2?.userHandle
     const polymarketWsState = contextStateV2?.polymarketWsState
+    const chainlinkWsState = contextStateV2?.chainlinkWsState
     const setIsLifeTimeMember = contextStateV2?.setIsLifeTimeMember
     const isLifeTimeMember = contextStateV2?.isLifeTimeMember
 
@@ -241,7 +242,7 @@ const DashBody = ({user}) => {
                 ) : <div className="py-4"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
-                { viewing === 'charts' && (polymarketWsState?.isRunning && polymarketWsState?.stop ? (
+                { viewing === 'charts' && ((polymarketWsState?.isRunning && polymarketWsState?.stop) || (chainlinkWsState?.isRunning && chainlinkWsState?.stop) ? (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-8">
                     <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} chartMode />
                   </div>

@@ -8,6 +8,8 @@ import CoinGecko from "@/components/integrationsView/integrationPlayground/integ
 import Twitter from "@/components/integrationsView/integrationPlayground/integrations/twitter";
 import WallStreetBets from "@/components/integrationsView/integrationPlayground/integrations/wallStreetBets";
 import GeckoDex from "@/components/integrationsView/integrationPlayground/integrations/geckoDex";
+import Binance from "@/components/integrationsView/integrationPlayground/integrations/binance";
+import Chainlink from "@/components/integrationsView/integrationPlayground/integrations/chainlink";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -25,6 +27,8 @@ const INTEGRATION_OPTIONS = [
   { value: "twitter", label: "Twitter" },
   { value: "wallStreetBets", label: "Wall Street Bets" },
   { value: "geckoDex", label: "GeckoTerminal" },
+  { value: "binance", label: "Binance" },
+  { value: "chainlink", label: "Chainlink" },
 ];
 
 export default function DataSheetWithIntegration({ user, startNew, setStartNew, chartMode }) {
@@ -45,6 +49,10 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
         return <WallStreetBets setConnectedData={setConnectedData} />;
       case "geckoDex":
         return <GeckoDex setConnectedData={setConnectedData} />;
+      case "binance":
+        return <Binance setConnectedData={setConnectedData} />;
+      case "chainlink":
+        return <Chainlink setConnectedData={setConnectedData} />;
       default:
         return null;
     }

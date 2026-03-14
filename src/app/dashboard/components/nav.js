@@ -20,6 +20,7 @@ import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
+import { Pause, Play, RotateCw, Square } from "lucide-react"
 
 
 const Nav = () => {
@@ -82,6 +83,9 @@ const Nav = () => {
   const setChartDataOverride = contextStateV2?.setChartDataOverride
   const setChartDataOverrideMeta = contextStateV2?.setChartDataOverrideMeta
 
+  const liveStreamState = contextStateV2?.liveStreamState
+  const liveStreamActions = contextStateV2?.liveStreamActions
+
   //setting loaded chart values for viewing
   const setChartOptions = contextStateV2?.setChartOptions
   const setChartTheme = contextStateV2?.setChartTheme
@@ -98,18 +102,14 @@ const Nav = () => {
   const [newChartName, setNewChartName] = useState()
 
   const handleLogout = async () => {
-    //e.preventDefault(); // Prevent the default link behavior
-
     try {
+      liveStreamActions?.stop?.();
       const response = await fetch('/api/logout', {
-        method: 'POST', // Make sure to use POST if your logout API expects it
+        method: 'POST',
       });
-
-      // If the logout was successful, redirect to the homepage
       if (response.ok) {
         router.push('/');
       } else {
-        // Handle errors or unsuccessful logout attempts here
         console.error('Logout failed');
       }
     } catch (error) {
@@ -409,6 +409,22 @@ const Nav = () => {
           </div>
           { user ? (
               <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:justify-end">
+                  {liveStreamState?.isRunning && (
+                    <div className="flex items-center gap-1 shrink-0 rounded-md border bg-muted/50 px-1 py-0.5">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Pause" disabled={liveStreamState?.isPaused} onClick={() => liveStreamActions?.pause?.()}>
+                        <Pause className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title={liveStreamState?.isPaused ? "Resume" : "Start"} onClick={() => liveStreamActions?.resume?.()}>
+                        <Play className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Restart" onClick={() => liveStreamActions?.restart?.()}>
+                        <RotateCw className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Stop" onClick={() => liveStreamActions?.stop?.()}>
+                        <Square className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
                   {showUnsavedFlag && (
                     <span className="text-[7pt] px-2 py-1 rounded-sm bg-rose-100 text-rose-500  dark:text-amber-400 font-bold shrink-0">Viewing Unsaved Data</span>
                   )}

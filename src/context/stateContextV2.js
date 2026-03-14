@@ -294,6 +294,30 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       chartPreset: null, // { type: 'line', xKey: 'time', yKey: 'price' } when user clicks Chart
     });
 
+    // Chainlink (RTDS crypto_prices_chainlink) live feed: keep sidebar mounted on Charts so WS stays alive
+    const [chainlinkWsState, setChainlinkWsState] = useState({
+      isRunning: false,
+      stop: null,
+      start: null,
+      chartPreset: { type: 'line', xKey: 'time', yKey: 'value' },
+    });
+
+    // App-level live stream: one active stream (polymarket | chainlink | binance), persists across Table/Charts/nav until logout or window close
+    const [liveStreamState, setLiveStreamState] = useState({
+      type: null,
+      config: {},
+      isRunning: false,
+      isPaused: false,
+    });
+    const noop = useCallback(() => {}, []);
+    const [liveStreamActions, setLiveStreamActions] = useState({
+      start: noop,
+      stop: noop,
+      pause: noop,
+      resume: noop,
+      restart: noop,
+    });
+
     // Memoize the context value to optimize performance
     const providerValue = useMemo(() => ({
         settings, setSettings, viewing, setViewing, connectedData, setConnectedData, connectedCols, setConnectedCols, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch
@@ -354,7 +378,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, sheetNames, setSheetNames, userHandle, setUserHandle, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, polymarketWsState, setPolymarketWsState}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, sheetNames, setSheetNames, userHandle, setUserHandle, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions}}>
             {children}
         </StateContextV2.Provider>
     )

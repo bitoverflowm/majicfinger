@@ -14,7 +14,7 @@ import { BorderBeam } from "@/components/magicui/border-beam";
 import { useMyStateV2 } from "@/context/stateContextV2";
 
 /** Integrations that open the datasheet with a right-side API pull panel */
-const API_INTEGRATIONS = ["polymarket", "coinGecko", "twitter", "wallStreetBets", "geckoDex"];
+const API_INTEGRATIONS = ["polymarket", "coinGecko", "twitter", "wallStreetBets", "geckoDex", "binance", "chainlink"];
 
 const integrations_list = [
   {
@@ -34,6 +34,24 @@ const integrations_list = [
     description: "Connect to the most reliable and comprehensive cryptocurrency data API for traders and developers.",
     tags: ['featured', 'crypto', 'finance', 'trading', 'coming soon'],
     live: false,
+  },
+  {
+    color: "#000",
+    icon: <div className="w-full h-full flex items-center justify-center p-2"><span className="text-yellow-400 font-bold text-xl">Binance</span></div>,
+    clickHandler: "binance",
+    name: "Binance",
+    description: "Real-time cryptocurrency price data from: Binance",
+    tags: ['crypto', 'finance', 'trading'],
+    live: true,
+  },
+  {
+    color: "#375BD2",
+    icon: <div className="w-full h-full flex items-center justify-center p-2"><span className="text-white font-bold text-xl">Chainlink</span></div>,
+    clickHandler: "chainlink",
+    name: "Chainlink",
+    description: "Real-time cryptocurrency price data from Chainlink — the world's #1 oracle",
+    tags: ['crypto', 'finance', 'oracles'],
+    live: true,
   },
   {
     color: "#000",
