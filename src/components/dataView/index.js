@@ -134,8 +134,8 @@ const DataView = ({ user }) => {
             {/* Empty cells so integrations start on row 2 */}
             <div className="hidden lg:block" aria-hidden />
             <div className="hidden lg:block" aria-hidden />
-            {/* Empty cells so integrations start on row 2 */}
-            <div className="place-items-center text-xl font-bold text-left">
+            {/* Section label - vertically centered in grid cell */}
+            <div className="flex items-center text-xl font-bold text-left min-h-[3rem]">
               Connect directly to an external data source
             </div>
 

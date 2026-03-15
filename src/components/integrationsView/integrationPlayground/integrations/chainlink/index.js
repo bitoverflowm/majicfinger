@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
+import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 
 const SYMBOLS = [
   { value: "btc/usd", label: "btc/usd — Bitcoin to USD" },
@@ -91,8 +92,9 @@ const Chainlink = () => {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Real-time cryptocurrency price data from Chainlink — the world&apos;s #1 oracle
+      <p className="text-xs text-muted-foreground">
+        {integrations_list.find((i) => i.clickHandler === "chainlink")?.playgroundDescription ??
+          "Real-time cryptocurrency price data from Chainlink — the world's #1 oracle"}
       </p>
 
       <div className="grid gap-2">

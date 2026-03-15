@@ -39,6 +39,7 @@ export const integrations_list = [
     clickHandler: "chainlink",
     name: "Chainlink",
     description: "Real-time cryptocurrency price data from Chainlink — the world's #1 oracle",
+    playgroundDescription: "Select a trading pair to start pulling live prices",
     tags: ['crypto', 'finance', 'oracles'],
     live: true,
   },
