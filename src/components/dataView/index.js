@@ -102,9 +102,9 @@ const DataView = ({ user }) => {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 py-6">
-            {/* Top row: only 2 cells - Upload & New Sheet (each spans 2 cols on lg) */}
+            {/* Top row: 2 cells (1 col each), then 2 empty columns */}
             <Card
-              className="flex flex-col h-full cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md lg:col-span-2"
+              className="flex flex-col h-full cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md"
               onClick={() => setViewing("upload")}
             >
               <CardHeader className="w-full items-center justify-center rounded-t-lg py-12 bg-muted/60">
@@ -119,7 +119,7 @@ const DataView = ({ user }) => {
             </Card>
 
             <Card
-              className="flex flex-col h-full cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md lg:col-span-2"
+              className="flex flex-col h-full cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md"
               onClick={() => setViewing("newSheet")}
             >
               <CardHeader className="w-full items-center justify-center rounded-t-lg py-12 bg-muted/60">
@@ -130,6 +130,14 @@ const DataView = ({ user }) => {
                 <p className="text-sm pt-1 text-muted-foreground">Start with an empty sheet.</p>
               </CardContent>
             </Card>
+
+            {/* Empty cells so integrations start on row 2 */}
+            <div className="hidden lg:block" aria-hidden />
+            <div className="hidden lg:block" aria-hidden />
+            {/* Empty cells so integrations start on row 2 */}
+            <div className="place-items-center text-xl font-bold text-left">
+              Connect directly to an external data source
+            </div>
 
             {/* Integration cards - same UI as integrationsView, 4-column grid */}
             {integrations_list.map((integration, index) => (
