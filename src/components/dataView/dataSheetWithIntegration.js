@@ -86,9 +86,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     const letter = (opt.label || opt.value)[0].toUpperCase();
     const letterClass = opt.letterAvatarStyle || "bg-muted/30 text-muted-foreground";
     return (
-      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${letterClass}`}>
+      <div className={`flex h-7 w-7 shrink-0 self-center place-items-center place-content-center rounded-full text-xs font-medium ${letterClass}`}>
         {letter}
-      </span>
+      </div>
     );
   };
 
@@ -153,7 +153,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                     value={integrationSidebar}
                     onValueChange={(value) => setIntegrationSidebar(value)}
                   >
-                    <SelectTrigger className="h-9 min-w-0 flex-1 text-sm gap-2">
+                    <SelectTrigger className="h-9 min-w-0 flex-1 text-sm gap-2 focus:ring-0 focus:ring-offset-0">
                       {integrationSidebar && renderIntegrationAvatar(INTEGRATION_OPTIONS.find((o) => o.value === integrationSidebar) || { label: integrationSidebar, value: integrationSidebar, logo: null })}
                       <SelectValue placeholder="Select API" />
                     </SelectTrigger>
