@@ -20,7 +20,7 @@ import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
-import { Pause, Play, RotateCw, Square } from "lucide-react"
+import { Pause, Play, RotateCw, Square, ArrowLeft } from "lucide-react"
 
 
 const Nav = () => {
@@ -412,6 +412,17 @@ const Nav = () => {
   return (
     <div className="container flex flex-col items-start justify-between gap-2 py-4 sm:flex-row sm:items-center sm:gap-0 md:h-16">
           <div className="w-full flex items-center gap-2 min-w-0">
+            {viewing === "dataStart" && integrationSidebar && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => setIntegrationSidebar?.(null)}
+                title="Back to Data options"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
             <div className="w-full pl-0.5 text-sm font-semibold">{breadcrumb}</div>
           </div>
           { user ? (
