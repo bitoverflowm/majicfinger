@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
 
 const POLYMARKET_WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
@@ -37,7 +38,6 @@ export default function LiveStreamManager() {
   const firstDataReceivedBySheetIdRef = useRef({});
   const reconnectTimeoutBySheetIdRef = useRef({});
   const typeConfigBySheetIdRef = useRef({});
-
   const stop = useCallback(
     (sheetId) => {
       if (sheetId != null) {
@@ -55,11 +55,11 @@ export default function LiveStreamManager() {
           pingIntervalBySheetIdRef.current[sheetId] = null;
         }
         const ws = wsBySheetIdRef.current[sheetId];
+        wsBySheetIdRef.current[sheetId] = null;
         if (ws) {
           try {
-            ws.close();
+            ws.close(1000, "Closed by user");
           } catch (_) {}
-          wsBySheetIdRef.current[sheetId] = null;
         }
         setPolymarketWsState?.((prev) => (prev?.sheetId === sheetId ? { ...prev, isRunning: false, stop: null, start: null } : prev));
         setChainlinkWsState?.((prev) => (prev?.sheetId === sheetId ? { isRunning: false, stop: null, start: null, chartPreset: { type: "line", xKey: "time", yKey: "value" } } : prev));
@@ -258,6 +258,8 @@ export default function LiveStreamManager() {
     [setSheetData, setLiveStreamState, setPolymarketWsState, stop]
   );
 
+  // --- Chainlink: one WebSocket per sheet (unlimited parallel streams) ---
+  // Each connection is independent: wsBySheetIdRef[sheetId], pingIntervalBySheetIdRef[sheetId]. Stop(sheetId) only closes that connection.
   const startChainlink = useCallback(
     (sheetId, symbol) => {
       if (wsBySheetIdRef.current[sheetId] || !setSheetData) return;
@@ -346,23 +348,25 @@ export default function LiveStreamManager() {
       };
 
       ws.onclose = () => {
+        if (wsBySheetIdRef.current[sheetId] !== ws) return;
         wsBySheetIdRef.current[sheetId] = null;
         const pi = pingIntervalBySheetIdRef.current[sheetId];
         if (pi) {
           clearInterval(pi);
           pingIntervalBySheetIdRef.current[sheetId] = null;
         }
+        const intentional = intentionalCloseBySheetIdRef.current[sheetId];
         setChainlinkWsState?.((prev) => (prev?.sheetId === sheetId ? { isRunning: false, stop: null, start: null, chartPreset: { type: "line", xKey: "time", yKey: "value" } } : prev));
-        setLiveStreamState((s) => {
-          const next = { ...(s.streamsBySheetId || {}) };
-          if (next[sheetId]) next[sheetId] = { ...next[sheetId], isRunning: false, connecting: false };
-          return { ...s, streamsBySheetId: next };
-        });
-        if (!intentionalCloseBySheetIdRef.current[sheetId] && symbol) {
-          reconnectTimeoutBySheetIdRef.current[sheetId] = setTimeout(() => {
-            reconnectTimeoutBySheetIdRef.current[sheetId] = null;
-            startChainlink(sheetId, symbol);
-          }, 3000);
+        if (!intentional) {
+          setLiveStreamState((s) => {
+            const next = { ...(s.streamsBySheetId || {}) };
+            const chainlinkCount = Object.values(next).filter((st) => st?.type === "chainlink").length;
+            delete next[sheetId];
+            if (chainlinkCount <= 1) {
+              toast.error("Connection failed, something went wrong. Try again or another selection.");
+            }
+            return { ...s, streamsBySheetId: next };
+          });
         }
       };
     },
@@ -414,12 +418,15 @@ export default function LiveStreamManager() {
   const restart = useCallback(
     (sheetId) => {
       const st = typeConfigBySheetIdRef.current[sheetId];
-      if (sheetId && st?.type && (st.type === "polymarket" ? st.config?.assetIds?.length : st.type === "chainlink" ? st.config?.symbol : false)) {
-        stop(sheetId);
-        setTimeout(() => start(sheetId, st.type, st.config), 0);
+      if (!sheetId || !st?.type) return;
+      const canRestart = st.type === "polymarket" ? st.config?.assetIds?.length : st.type === "chainlink" ? st.config?.symbol : false;
+      if (!canRestart) return;
+      // Clear collected data only; keep the existing connection and continue receiving
+      if ((st.type === "chainlink" || st.type === "polymarket") && setSheetData) {
+        setSheetData(sheetId, []);
       }
     },
-    [stop, start]
+    [setSheetData]
   );
 
   useEffect(() => {
