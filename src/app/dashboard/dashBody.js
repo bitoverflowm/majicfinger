@@ -240,7 +240,7 @@ const DashBody = ({user}) => {
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} />
                   </div>
-                ) : <div className="py-1"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
+                ) : <div className="min-h-0 flex-1 min-h-[70vh] overflow-y-auto overflow-x-hidden py-1"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'charts' && (hasAnyLiveStream || (polymarketWsState?.isRunning && polymarketWsState?.stop) || (chainlinkWsState?.isRunning && chainlinkWsState?.stop) ? (

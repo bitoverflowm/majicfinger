@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import GridView from "@/components/gridView";
+import { ChainlinkLiveChart } from "@/components/dataView/ChainlinkLiveChart";
 import { VscCircleFilled } from "react-icons/vsc";
 import { API_INTEGRATIONS, integrations_list } from "@/components/integrationsView/integrationsConfig";
 
@@ -26,6 +27,8 @@ const DataView = ({ user }) => {
   const activeSheetId = contextStateV2?.activeSheetId;
   const setActiveSheetId = contextStateV2?.setActiveSheetId;
   const setConnectedCols = contextStateV2?.setConnectedCols;
+  const liveStreamState = contextStateV2?.liveStreamState;
+  const hasChainlinkStream = Object.values(liveStreamState?.streamsBySheetId || {}).some((s) => s?.type === "chainlink");
 
   const sheetSwitchHandler = (sheetName, id) => {
     setConnectedData(multiSheetData[sheetName]);
@@ -46,7 +49,7 @@ const DataView = ({ user }) => {
   };
 
   return (
-    <div className="min-w-0 max-w-full px-2 sm:px-4 md:px-6">
+    <div className="min-w-0 max-w-full min-h-0 px-2 sm:px-4 md:px-6">
       {hasMultipleDataSheets && (
         <div className="flex flex-wrap gap-1 mb-2">
           {dataSheetIds.map((id) => (
@@ -75,13 +78,23 @@ const DataView = ({ user }) => {
       )}
 
       {showGrid ? (
-        <div className="relative">
+        <div className="relative min-h-0 flex flex-col">
           {!integrationSidebar && setIntegrationSidebar && (
             <OpenApiPanelTab onOpen={() => setIntegrationSidebar("polymarket")} />
           )}
-          <div className="min-h-0 w-full max-w-full overflow-auto">
+          <div
+            className={`min-h-0 w-full max-w-full overflow-auto ${hasChainlinkStream ? "max-h-[55vh] shrink-0" : ""}`}
+          >
             <GridView />
           </div>
+          {hasChainlinkStream && (
+            <div className="shrink-0 pb-6">
+              <ChainlinkLiveChart
+                dataSheets={dataSheets || {}}
+                streamsBySheetId={liveStreamState?.streamsBySheetId || {}}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="relative">
