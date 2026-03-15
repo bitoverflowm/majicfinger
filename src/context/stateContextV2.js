@@ -225,7 +225,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         "refType": "external",
         "href": "https://buy.stripe.com/aEUaGYfkW9L04wgbJ3",
         "cta": "Go",
-        "navTo": "gallery",
+        "navTo": "charts",
         "className": "col-span-1 lg:col-span-1",
         "background": "",
         "background_color": "",

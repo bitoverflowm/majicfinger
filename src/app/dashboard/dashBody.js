@@ -11,7 +11,6 @@ import DataView from "@/components/dataView";
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
 import Upload from '@/components/dataView/upload'
 import ChartView from "@/components/chartView";
-import { ChartGallery } from "@/components/chartGallery";
 import IntegrationsView from "@/components/integrationsView";
 import NewSheetView from "@/components/newSheetView";
 
@@ -251,7 +250,6 @@ const DashBody = ({user}) => {
                 ) : (
                   <div className="py-16"><ChartView user={user}/></div>
                 )) }
-                { viewing === 'gallery' && <div className="py-16 min-h-screen"><ChartGallery/></div> }
                 { viewing === 'integrations' && <div className="py-10"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }
                 { viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }

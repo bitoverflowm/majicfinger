@@ -10,7 +10,6 @@ import {
   Shovel,
   Cable,
   BarChart3,
-  Gem,
   Bot,
   Camera,
   FilePlus2,
@@ -44,7 +43,7 @@ import {
 } from "@/components/ui/tooltip";
 
 const dataViewKeys = ["dataStart", "newSheet", "upload", "integrations"];
-const chartViewKeys = ["charts", "gallery"];
+const chartViewKeys = ["charts"];
 const dashboardViewKeys = ["dashboard", "presentation"];
 const underConstructionKeys = ["scrape", "generate", "ai"];
 
@@ -164,17 +163,6 @@ const SideNav = () => {
                   <BarChart3 className="h-5 w-5" />
                   <span>Chart</span>
                 </SidebarMenuButton>
-                <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      isActive={viewing === "gallery"}
-                      onClick={() => viewHandler("gallery")}
-                    >
-                      <Gem className="h-4 w-4" />
-                      <span>Gallery</span>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                </SidebarMenuSub>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

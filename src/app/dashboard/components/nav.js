@@ -400,7 +400,7 @@ const Nav = () => {
 
 
   const breadcrumb = viewing === 'dashboard' ? 'Lychee / Dashboard' :
-    viewing === 'charts' || viewing === 'gallery' ? 'Lychee / Charts' :
+    viewing === 'charts' ? 'Lychee / Charts' :
     (viewing === 'dataStart' && integrationSidebar) ? 'Lychee / Data' :
     (viewing === 'dataStart' || viewing === 'upload' || viewing === 'newSheet' || viewing === 'integrations') ? 'Lychee / Data' :
     viewing === 'ai' ? 'Lychee / AI' :
