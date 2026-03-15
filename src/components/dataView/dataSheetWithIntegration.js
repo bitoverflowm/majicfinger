@@ -19,8 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, PanelRightOpen } from "lucide-react";
+import { X } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 
 const INTEGRATION_OPTIONS = [
   { value: "polymarket", label: "Polymarket" },
@@ -104,14 +105,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
         {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
         <main className="min-w-0 flex-1 overflow-auto relative">
           {!showSidebar && !isPanelClosing && (
-            <button
-              type="button"
-              onClick={() => setIntegrationSidebar("polymarket")}
-              className="absolute top-0 right-0 z-10 flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-muted"
-            >
-              <PanelRightOpen className="h-3.5 w-3.5" />
-              Open API panel
-            </button>
+            <OpenApiPanelTab onOpen={() => setIntegrationSidebar("polymarket")} />
           )}
           {chartMode ? (
             <div className="py-16">

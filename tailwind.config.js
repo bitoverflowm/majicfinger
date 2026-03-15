@@ -199,6 +199,10 @@ module.exports = {
   				'50%': {
   					transform: 'translate(-50%, -50%) scale(0.9)'
   				}
+  			},
+  			'api-tab-pulse': {
+  				'0%': { transform: 'translate(-50%, -50%) scale(0.5)', opacity: '0.6' },
+  				'100%': { transform: 'translate(-50%, -50%) scale(2.5)', opacity: '0' }
   			}
   		},
   		animation: {
@@ -213,7 +217,8 @@ module.exports = {
   			shimmer: 'shimmer 8s infinite',
   			gradient: 'gradient 8s linear infinite',
   			'border-beam': 'border-beam calc(var(--duration)*1s) infinite linear',
-  			ripple: 'ripple var(--duration,2s) ease calc(var(--i, 0)*.2s) infinite'
+  			ripple: 'ripple var(--duration,2s) ease calc(var(--i, 0)*.2s) infinite',
+  			'api-tab-pulse': 'api-tab-pulse 0.6s ease-out forwards'
   		},
   		slide: {
   			to: {

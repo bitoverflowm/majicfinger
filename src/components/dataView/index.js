@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { HardDriveUpload, FilePlus2, PanelRightOpen } from "lucide-react";
+import { HardDriveUpload, FilePlus2 } from "lucide-react";
+import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,14 +77,7 @@ const DataView = ({ user }) => {
       {showGrid ? (
         <div className="relative">
           {!integrationSidebar && setIntegrationSidebar && (
-            <button
-              type="button"
-              onClick={() => setIntegrationSidebar("polymarket")}
-              className="absolute top-0 right-0 z-10 flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-muted"
-            >
-              <PanelRightOpen className="h-3.5 w-3.5" />
-              Open API panel
-            </button>
+            <OpenApiPanelTab onOpen={() => setIntegrationSidebar("polymarket")} />
           )}
           <div className="min-h-0 w-full max-w-full overflow-auto">
             <GridView />
