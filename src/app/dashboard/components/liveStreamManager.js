@@ -10,92 +10,109 @@ const CHAINLINK_PING_MS = 5000;
 
 const noop = () => {};
 
-function pushRow(setConnectedData, pausedRef, row) {
-  if (pausedRef.current) return;
-  setConnectedData((prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
+function pushRow(setSheetData, sheetId, pausedRef, row) {
+  if (pausedRef.current[sheetId]) return;
+  setSheetData(sheetId, (prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
 }
 
-function pushRows(setConnectedData, pausedRef, rows) {
-  if (pausedRef.current) return;
-  setConnectedData((prev) => (Array.isArray(prev) ? [...prev, ...rows] : rows));
+function pushRows(setSheetData, sheetId, pausedRef, rows) {
+  if (pausedRef.current[sheetId]) return;
+  setSheetData(sheetId, (prev) => (Array.isArray(prev) ? [...prev, ...rows] : rows));
 }
 
 export default function LiveStreamManager() {
   const ctx = useMyStateV2();
-  const setConnectedData = ctx?.setConnectedData;
+  const setSheetData = ctx?.setSheetData;
   const setLiveStreamState = ctx?.setLiveStreamState;
   const setLiveStreamActions = ctx?.setLiveStreamActions;
   const setPolymarketWsState = ctx?.setPolymarketWsState;
   const setChainlinkWsState = ctx?.setChainlinkWsState;
 
-  const wsRef = useRef(null);
-  const pingIntervalRef = useRef(null);
-  const typeRef = useRef(null);
-  const configRef = useRef({});
-  const eventTypeRef = useRef("price_change");
-  const pausedRef = useRef(false);
-  const intentionalCloseRef = useRef(false);
-  const reconnectTimeoutRef = useRef(null);
+  const wsBySheetIdRef = useRef({});
+  const pingIntervalBySheetIdRef = useRef({});
+  const eventTypeBySheetIdRef = useRef({});
+  const symbolBySheetIdRef = useRef({});
+  const pausedBySheetIdRef = useRef({});
+  const intentionalCloseBySheetIdRef = useRef({});
+  const reconnectTimeoutBySheetIdRef = useRef({});
+  const typeConfigBySheetIdRef = useRef({});
 
-  const stop = useCallback(() => {
-    intentionalCloseRef.current = true;
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    if (pingIntervalRef.current) {
-      clearInterval(pingIntervalRef.current);
-      pingIntervalRef.current = null;
-    }
-    if (wsRef.current) {
-      try {
-        wsRef.current.close();
-      } catch (_) {}
-      wsRef.current = null;
-    }
-    const t = typeRef.current;
-    typeRef.current = null;
-    configRef.current = {};
-    setPolymarketWsState?.((prev) => ({ ...prev, isRunning: false, stop: null, start: null }));
-    setChainlinkWsState?.({ isRunning: false, stop: null, start: null, chartPreset: { type: "line", xKey: "time", yKey: "value" } });
-    setLiveStreamState({ type: null, config: {}, isRunning: false, isPaused: false });
-  }, [setLiveStreamState, setPolymarketWsState, setChainlinkWsState]);
+  const stop = useCallback(
+    (sheetId) => {
+      if (sheetId != null) {
+        intentionalCloseBySheetIdRef.current[sheetId] = true;
+        delete typeConfigBySheetIdRef.current[sheetId];
+        const tid = reconnectTimeoutBySheetIdRef.current[sheetId];
+        if (tid) {
+          clearTimeout(tid);
+          reconnectTimeoutBySheetIdRef.current[sheetId] = null;
+        }
+        const pi = pingIntervalBySheetIdRef.current[sheetId];
+        if (pi) {
+          clearInterval(pi);
+          pingIntervalBySheetIdRef.current[sheetId] = null;
+        }
+        const ws = wsBySheetIdRef.current[sheetId];
+        if (ws) {
+          try {
+            ws.close();
+          } catch (_) {}
+          wsBySheetIdRef.current[sheetId] = null;
+        }
+        setPolymarketWsState?.((prev) => (prev?.sheetId === sheetId ? { ...prev, isRunning: false, stop: null, start: null } : prev));
+        setChainlinkWsState?.((prev) => (prev?.sheetId === sheetId ? { isRunning: false, stop: null, start: null, chartPreset: { type: "line", xKey: "time", yKey: "value" } } : prev));
+        setLiveStreamState((s) => {
+          const next = { ...(s.streamsBySheetId || {}) };
+          delete next[sheetId];
+          return { ...s, streamsBySheetId: next };
+        });
+      } else {
+        Object.keys(wsBySheetIdRef.current).forEach((id) => stop(id));
+      }
+    },
+    [setLiveStreamState, setPolymarketWsState, setChainlinkWsState]
+  );
 
   const startPolymarket = useCallback(
-    (assetIds, eventType) => {
-      if (wsRef.current || !assetIds?.length || !setConnectedData) return;
-      eventTypeRef.current = eventType;
+    (sheetId, assetIds, eventType) => {
+      if (wsBySheetIdRef.current[sheetId] || !assetIds?.length || !setSheetData) return;
+      eventTypeBySheetIdRef.current[sheetId] = eventType;
+      intentionalCloseBySheetIdRef.current[sheetId] = false;
       const ws = new WebSocket(POLYMARKET_WS_URL);
-      wsRef.current = ws;
+      wsBySheetIdRef.current[sheetId] = ws;
 
       ws.onopen = () => {
         ws.send(JSON.stringify({ assets_ids: assetIds, type: "market", initial_dump: true }));
-        setConnectedData([]);
-        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-        pingIntervalRef.current = setInterval(() => {
+        setSheetData(sheetId, []);
+        const pi = pingIntervalBySheetIdRef.current[sheetId];
+        if (pi) clearInterval(pi);
+        pingIntervalBySheetIdRef.current[sheetId] = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) ws.send("PING");
         }, POLYMARKET_PING_MS);
 
         setPolymarketWsState?.({
           isRunning: true,
+          sheetId,
           assetIds,
-          stop,
-          start: () => start("polymarket", { assetIds, eventType }),
+          stop: () => stop(sheetId),
+          start: () => start(sheetId, "polymarket", { assetIds, eventType }),
           chartPreset: { type: "line", xKey: "time", yKey: "price" },
         });
-        setLiveStreamState({
-          type: "polymarket",
-          config: { assetIds, eventType },
-          isRunning: true,
-          isPaused: false,
-        });
+        typeConfigBySheetIdRef.current[sheetId] = { type: "polymarket", config: { assetIds, eventType } };
+        setLiveStreamState((s) => ({
+          ...s,
+          streamsBySheetId: {
+            ...(s.streamsBySheetId || {}),
+            [sheetId]: { type: "polymarket", config: { assetIds, eventType }, isRunning: true, isPaused: false },
+          },
+        }));
       };
 
       ws.onmessage = (event) => {
         if (event.data === "PONG") return;
         try {
           const msg = JSON.parse(event.data);
-          const et = eventTypeRef.current;
+          const et = eventTypeBySheetIdRef.current[sheetId] || "price_change";
           if (et === "price_change" && msg.event_type === "price_change" && msg.price_changes) {
             const rows = msg.price_changes.map((pc) => {
               const priceNum = pc.price != null ? parseFloat(pc.price) : null;
@@ -113,11 +130,11 @@ export default function LiveStreamManager() {
                 best_ask: pc.best_ask ?? "",
               };
             });
-            pushRows(setConnectedData, pausedRef, rows);
+            pushRows(setSheetData, sheetId, pausedBySheetIdRef, rows);
           } else if (et === "last_trade_price" && msg.event_type === "last_trade_price" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
             const priceNum = msg.price != null ? parseFloat(String(msg.price)) : null;
-            pushRow(setConnectedData, pausedRef, {
+            pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
               event_type: msg.event_type,
               market: msg.market ?? "",
               timestamp: msg.timestamp ?? String(ts),
@@ -131,7 +148,7 @@ export default function LiveStreamManager() {
             });
           } else if (et === "book" && msg.event_type === "book" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
-            pushRow(setConnectedData, pausedRef, {
+            pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
               event_type: msg.event_type,
               asset_id: msg.asset_id,
               market: msg.market ?? "",
@@ -154,7 +171,7 @@ export default function LiveStreamManager() {
             else if (bestBid != null && !Number.isNaN(bestBid)) price = bestBid;
             else if (bestAsk != null && !Number.isNaN(bestAsk)) price = bestAsk;
             if (price != null) {
-              pushRow(setConnectedData, pausedRef, {
+              pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
                 event_type: msg.event_type,
                 market: msg.market ?? "",
                 timestamp: String(ts),
@@ -170,7 +187,7 @@ export default function LiveStreamManager() {
             }
           } else if (et === "tick_size_change" && msg.event_type === "tick_size_change" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
-            pushRow(setConnectedData, pausedRef, {
+            pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
               event_type: msg.event_type,
               asset_id: msg.asset_id,
               market: msg.market ?? "",
@@ -181,7 +198,7 @@ export default function LiveStreamManager() {
             });
           } else if (et === "best_bid_ask" && msg.event_type === "best_bid_ask" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
-            pushRow(setConnectedData, pausedRef, {
+            pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
               event_type: msg.event_type,
               asset_id: msg.asset_id,
               market: msg.market ?? "",
@@ -193,7 +210,7 @@ export default function LiveStreamManager() {
             });
           } else if (et === "new_market" && msg.event_type === "new_market") {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
-            pushRow(setConnectedData, pausedRef, {
+            pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
               event_type: msg.event_type,
               id: msg.id ?? "",
               question: msg.question ?? "",
@@ -207,7 +224,7 @@ export default function LiveStreamManager() {
             });
           } else if (et === "market_resolved" && msg.event_type === "market_resolved") {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
-            pushRow(setConnectedData, pausedRef, {
+            pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
               event_type: msg.event_type,
               id: msg.id ?? "",
               market: msg.market ?? "",
@@ -222,41 +239,57 @@ export default function LiveStreamManager() {
       };
 
       ws.onclose = () => {
-        wsRef.current = null;
-        if (pingIntervalRef.current) {
-          clearInterval(pingIntervalRef.current);
-          pingIntervalRef.current = null;
+        wsBySheetIdRef.current[sheetId] = null;
+        const pi = pingIntervalBySheetIdRef.current[sheetId];
+        if (pi) {
+          clearInterval(pi);
+          pingIntervalBySheetIdRef.current[sheetId] = null;
         }
-        setPolymarketWsState?.((prev) => ({ ...prev, isRunning: false, stop: null }));
-        setLiveStreamState((s) => (s.type === "polymarket" ? { ...s, isRunning: false } : s));
+        setPolymarketWsState?.((prev) => (prev?.sheetId === sheetId ? { ...prev, isRunning: false, stop: null } : prev));
+        setLiveStreamState((s) => {
+          const next = { ...(s.streamsBySheetId || {}) };
+          if (next[sheetId]) next[sheetId] = { ...next[sheetId], isRunning: false };
+          return { ...s, streamsBySheetId: next };
+        });
       };
     },
-    [setConnectedData, setLiveStreamState, setPolymarketWsState, stop]
+    [setSheetData, setLiveStreamState, setPolymarketWsState, stop]
   );
 
   const startChainlink = useCallback(
-    (symbol) => {
-      if (wsRef.current || !setConnectedData) return;
+    (sheetId, symbol) => {
+      if (wsBySheetIdRef.current[sheetId] || !setSheetData) return;
+      symbolBySheetIdRef.current[sheetId] = symbol;
+      intentionalCloseBySheetIdRef.current[sheetId] = false;
       const subscriptionMsg = {
         action: "subscribe",
         subscriptions: [{ topic: "crypto_prices_chainlink", type: "*", filters: JSON.stringify({ symbol }) }],
       };
       const ws = new WebSocket(CHAINLINK_WS_URL);
-      wsRef.current = ws;
+      wsBySheetIdRef.current[sheetId] = ws;
 
       ws.onopen = () => {
         ws.send(JSON.stringify(subscriptionMsg));
-        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-        pingIntervalRef.current = setInterval(() => {
+        const pi = pingIntervalBySheetIdRef.current[sheetId];
+        if (pi) clearInterval(pi);
+        pingIntervalBySheetIdRef.current[sheetId] = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) ws.send("PING");
         }, CHAINLINK_PING_MS);
         setChainlinkWsState?.({
           isRunning: true,
-          stop,
-          start: () => start("chainlink", { symbol }),
+          sheetId,
+          stop: () => stop(sheetId),
+          start: () => start(sheetId, "chainlink", { symbol }),
           chartPreset: { type: "line", xKey: "time", yKey: "value" },
         });
-        setLiveStreamState({ type: "chainlink", config: { symbol }, isRunning: true, isPaused: false });
+        typeConfigBySheetIdRef.current[sheetId] = { type: "chainlink", config: { symbol } };
+        setLiveStreamState((s) => ({
+          ...s,
+          streamsBySheetId: {
+            ...(s.streamsBySheetId || {}),
+            [sheetId]: { type: "chainlink", config: { symbol }, isRunning: true, isPaused: false },
+          },
+        }));
       };
 
       ws.onmessage = (event) => {
@@ -265,7 +298,7 @@ export default function LiveStreamManager() {
           if (!msg?.payload || msg.topic !== "crypto_prices_chainlink" || msg.type !== "update") return;
           const payload = msg.payload;
           if (payload?.symbol !== symbol) return;
-          if (pausedRef.current) return;
+          if (pausedBySheetIdRef.current[sheetId]) return;
           const row = {
             source: "chainlink",
             symbol: payload.symbol,
@@ -274,7 +307,7 @@ export default function LiveStreamManager() {
             price: payload.value,
             receivedAt: msg.timestamp,
           };
-          setConnectedData((prev) => {
+          setSheetData(sheetId, (prev) => {
             const next = Array.isArray(prev) ? [...prev, row] : [row];
             return next.length > 2000 ? next.slice(-2000) : next;
           });
@@ -282,58 +315,81 @@ export default function LiveStreamManager() {
       };
 
       ws.onclose = () => {
-        wsRef.current = null;
-        if (pingIntervalRef.current) {
-          clearInterval(pingIntervalRef.current);
-          pingIntervalRef.current = null;
+        wsBySheetIdRef.current[sheetId] = null;
+        const pi = pingIntervalBySheetIdRef.current[sheetId];
+        if (pi) {
+          clearInterval(pi);
+          pingIntervalBySheetIdRef.current[sheetId] = null;
         }
-        setChainlinkWsState?.({ isRunning: false, stop: null, start: null, chartPreset: { type: "line", xKey: "time", yKey: "value" } });
-        setLiveStreamState((s) => (s.type === "chainlink" ? { ...s, isRunning: false } : s));
-        if (!intentionalCloseRef.current && symbol) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectTimeoutRef.current = null;
-            startChainlink(symbol);
+        setChainlinkWsState?.((prev) => (prev?.sheetId === sheetId ? { isRunning: false, stop: null, start: null, chartPreset: { type: "line", xKey: "time", yKey: "value" } } : prev));
+        setLiveStreamState((s) => {
+          const next = { ...(s.streamsBySheetId || {}) };
+          if (next[sheetId]) next[sheetId] = { ...next[sheetId], isRunning: false };
+          return { ...s, streamsBySheetId: next };
+        });
+        if (!intentionalCloseBySheetIdRef.current[sheetId] && symbol) {
+          reconnectTimeoutBySheetIdRef.current[sheetId] = setTimeout(() => {
+            reconnectTimeoutBySheetIdRef.current[sheetId] = null;
+            startChainlink(sheetId, symbol);
           }, 3000);
         }
       };
     },
-    [setConnectedData, setLiveStreamState, setChainlinkWsState, stop]
+    [setSheetData, setLiveStreamState, setChainlinkWsState, stop]
   );
 
   const start = useCallback(
-    (type, config) => {
-      stop();
-      intentionalCloseRef.current = false;
-      typeRef.current = type;
-      configRef.current = config || {};
+    (sheetId, type, config) => {
+      if (!sheetId) return;
+      stop(sheetId);
+      if (!pausedBySheetIdRef.current[sheetId]) pausedBySheetIdRef.current[sheetId] = false;
       if (type === "polymarket" && config?.assetIds?.length) {
-        startPolymarket(config.assetIds, config.eventType || "price_change");
+        startPolymarket(sheetId, config.assetIds, config.eventType || "price_change");
       } else if (type === "chainlink" && config?.symbol) {
-        startChainlink(config.symbol);
+        startChainlink(sheetId, config.symbol);
       }
-      // binance: leave as no-op for now
     },
     [stop, startPolymarket, startChainlink]
   );
 
-  const pause = useCallback(() => {
-    pausedRef.current = true;
-    setLiveStreamState((s) => (s.isRunning ? { ...s, isPaused: true } : s));
-  }, [setLiveStreamState]);
+  const pause = useCallback(
+    (sheetId) => {
+      if (sheetId != null) {
+        pausedBySheetIdRef.current[sheetId] = true;
+        setLiveStreamState((s) => {
+          const next = { ...(s.streamsBySheetId || {}) };
+          if (next[sheetId]) next[sheetId] = { ...next[sheetId], isPaused: true };
+          return { ...s, streamsBySheetId: next };
+        });
+      }
+    },
+    [setLiveStreamState]
+  );
 
-  const resume = useCallback(() => {
-    pausedRef.current = false;
-    setLiveStreamState((s) => (s.isRunning ? { ...s, isPaused: false } : s));
-  }, [setLiveStreamState]);
+  const resume = useCallback(
+    (sheetId) => {
+      if (sheetId != null) {
+        pausedBySheetIdRef.current[sheetId] = false;
+        setLiveStreamState((s) => {
+          const next = { ...(s.streamsBySheetId || {}) };
+          if (next[sheetId]) next[sheetId] = { ...next[sheetId], isPaused: false };
+          return { ...s, streamsBySheetId: next };
+        });
+      }
+    },
+    [setLiveStreamState]
+  );
 
-  const restart = useCallback(() => {
-    const t = typeRef.current;
-    const c = configRef.current;
-    if (t && (t === "polymarket" ? c?.assetIds?.length : t === "chainlink" ? c?.symbol : false)) {
-      stop();
-      setTimeout(() => start(t, c), 0);
-    }
-  }, [stop, start]);
+  const restart = useCallback(
+    (sheetId) => {
+      const st = typeConfigBySheetIdRef.current[sheetId];
+      if (sheetId && st?.type && (st.type === "polymarket" ? st.config?.assetIds?.length : st.type === "chainlink" ? st.config?.symbol : false)) {
+        stop(sheetId);
+        setTimeout(() => start(sheetId, st.type, st.config), 0);
+      }
+    },
+    [stop, start]
+  );
 
   useEffect(() => {
     setLiveStreamActions({

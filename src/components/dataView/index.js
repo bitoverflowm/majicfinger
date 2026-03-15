@@ -22,17 +22,34 @@ const DataView = ({user}) => {
     const multiSheetFlag = contextStateV2?.multiSheetFlag
     const multiSheetData = contextStateV2?.multiSheetData
     const sheetNames = contextStateV2?.sheetNames
+    const dataSheets = contextStateV2?.dataSheets
+    const activeSheetId = contextStateV2?.activeSheetId
+    const setActiveSheetId = contextStateV2?.setActiveSheetId
 
     const sheetSwitchHandler = (sheetName, id) => {
-        console.log('sheet :', sheetName)
         setConnectedData(multiSheetData[sheetName])
         setSheetId(id)
     }
 
-    
+    const dataSheetIds = dataSheets ? Object.keys(dataSheets) : []
+    const hasMultipleDataSheets = dataSheetIds.length > 1
+    const showGrid = (connectedData?.length > 0) || hasMultipleDataSheets || integrationSidebar
 
     return(
         <div className='min-w-0 max-w-full px-2 sm:px-4 md:px-6'>                       
+            {hasMultipleDataSheets && (
+                <div className='flex flex-wrap gap-1 mb-2'>
+                    {dataSheetIds.map((id) => (
+                        <code
+                            key={id}
+                            className={`${id === activeSheetId ? 'bg-lychee_blue/30' : 'bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white'} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
+                            onClick={() => setActiveSheetId?.(id)}
+                        >
+                            {dataSheets[id]?.name || id}
+                        </code>
+                    ))}
+                </div>
+            )}
             {multiSheetFlag && (
                 <div className='flex flex-wrap gap-1 mb-2'>
                     {Object.keys(multiSheetData).map((sheetName, index) => (
@@ -43,7 +60,7 @@ const DataView = ({user}) => {
                 </div>
             )}
             {
-                (connectedData) ? (
+                showGrid ? (
                 <div className="relative">
                     {!integrationSidebar && setIntegrationSidebar && (
                         <button

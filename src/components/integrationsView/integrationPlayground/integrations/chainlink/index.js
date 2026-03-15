@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 
 const SYMBOLS = [
   { value: "btc/usd", label: "btc/usd — Bitcoin to USD" },
@@ -23,22 +24,55 @@ const SYMBOLS = [
 const Chainlink = () => {
   const [symbol, setSymbol] = useState("btc/usd");
   const [error, setError] = useState(null);
-  const liveStreamState = useMyStateV2()?.liveStreamState;
-  const liveStreamActions = useMyStateV2()?.liveStreamActions;
+  const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
+  const ctx = useMyStateV2();
+  const liveStreamState = ctx?.liveStreamState;
+  const liveStreamActions = ctx?.liveStreamActions;
+  const activeSheetId = ctx?.activeSheetId;
+  const replaceCurrentSheetData = ctx?.replaceCurrentSheetData;
+  const addNewSheetAndActivate = ctx?.addNewSheetAndActivate;
 
-  const isConnected = liveStreamState?.type === "chainlink" && liveStreamState?.isRunning;
+  const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
+  const isConnected = activeSheetId && streamsBySheetId[activeSheetId]?.type === "chainlink" && streamsBySheetId[activeSheetId]?.isRunning;
+  const hasDataOrStream = (ctx?.connectedData?.length > 0) || Object.values(streamsBySheetId).some((s) => s?.isRunning);
+  const hasLiveConnection = Object.values(streamsBySheetId).some((s) => s?.isRunning);
+
+  const doConnect = (sheetId) => {
+    setError(null);
+    liveStreamActions?.start?.(sheetId, "chainlink", { symbol });
+  };
 
   const handleConnect = () => {
-    setError(null);
-    liveStreamActions?.start?.("chainlink", { symbol });
+    if (hasDataOrStream) {
+      setReplaceOrNewSheetOpen(true);
+    } else {
+      doConnect(activeSheetId);
+    }
+  };
+
+  const handleReplace = () => {
+    liveStreamActions?.stop?.(activeSheetId);
+    replaceCurrentSheetData?.([]);
+    doConnect(activeSheetId);
+  };
+
+  const handleAddNewSheet = () => {
+    addNewSheetAndActivate?.((newId) => doConnect(newId));
   };
 
   const handleDisconnect = () => {
-    liveStreamActions?.stop?.();
+    liveStreamActions?.stop?.(activeSheetId);
   };
 
   return (
     <div className="space-y-4">
+      <ReplaceOrNewSheetDialog
+        open={replaceOrNewSheetOpen}
+        onOpenChange={setReplaceOrNewSheetOpen}
+        hasLiveConnection={hasLiveConnection}
+        onReplace={handleReplace}
+        onAddNewSheet={handleAddNewSheet}
+      />
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <p className="font-medium text-foreground">Chainlink</p>
@@ -50,7 +84,7 @@ const Chainlink = () => {
               Disconnect
             </Button>
           ) : (
-            <Button size="sm" onClick={handleConnect}>
+            <Button size="sm" onClick={handleConnect} disabled={!activeSheetId}>
               Connect
             </Button>
           )}
@@ -68,7 +102,7 @@ const Chainlink = () => {
           onValueChange={(v) => {
             setSymbol(v);
             if (isConnected) {
-              liveStreamActions?.start?.("chainlink", { symbol: v });
+              liveStreamActions?.start?.(activeSheetId, "chainlink", { symbol: v });
             }
           }}
         >

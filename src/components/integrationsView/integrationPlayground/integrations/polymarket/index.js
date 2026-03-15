@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,6 +87,9 @@ const Polymarket = ({ setConnectedData }) => {
   const setPolymarketWsState = contextStateV2?.setPolymarketWsState;
   const liveStreamState = contextStateV2?.liveStreamState;
   const liveStreamActions = contextStateV2?.liveStreamActions;
+  const activeSheetId = contextStateV2?.activeSheetId;
+  const replaceCurrentSheetData = contextStateV2?.replaceCurrentSheetData;
+  const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -99,8 +103,13 @@ const Polymarket = ({ setConnectedData }) => {
   const [stageIndex, setStageIndex] = useState(0);
   const [lastResultKeys, setLastResultKeys] = useState([]);
   const [wsConnecting, setWsConnecting] = useState(false);
+  const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
 
-  const wsConnected = liveStreamState?.type === "polymarket" && liveStreamState?.isRunning;
+  const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
+  const wsConnected = activeSheetId && streamsBySheetId[activeSheetId]?.type === "polymarket" && streamsBySheetId[activeSheetId]?.isRunning;
+  const hasDataOrStream = (contextStateV2?.connectedData?.length > 0) || Object.values(streamsBySheetId).some((s) => s?.isRunning);
+  const hasLiveConnection = Object.values(streamsBySheetId).some((s) => s?.isRunning);
+  const pendingWsConfigRef = useRef(null);
 
   // Market search (for wsPrice market_token_id)
   const [marketSearch, setMarketSearch] = useState("");
@@ -314,6 +323,23 @@ const Polymarket = ({ setConnectedData }) => {
 
   return (
     <div className="text-sm space-y-3 min-w-0 max-w-full overflow-hidden">
+      <ReplaceOrNewSheetDialog
+        open={replaceOrNewSheetOpen}
+        onOpenChange={setReplaceOrNewSheetOpen}
+        hasLiveConnection={hasLiveConnection}
+        onReplace={() => {
+          liveStreamActions?.stop?.(activeSheetId);
+          replaceCurrentSheetData?.([]);
+          liveStreamActions?.start?.(activeSheetId, "polymarket", pendingWsConfigRef.current);
+          setWsConnecting(true);
+        }}
+        onAddNewSheet={() => {
+          addNewSheetAndActivate?.((newId) => {
+            liveStreamActions?.start?.(newId, "polymarket", pendingWsConfigRef.current);
+            setWsConnecting(true);
+          });
+        }}
+      />
       {/* Rate throttle */}
       <div className="flex items-center gap-2 flex-wrap min-w-0">
         {throttleRemaining > 0 ? (
@@ -503,7 +529,7 @@ const Polymarket = ({ setConnectedData }) => {
               size="sm"
               className="h-8 text-xs shrink-0"
               onClick={() => {
-                if (selectedAction?.wsType && wsConnected) liveStreamActions?.stop?.();
+                if (selectedAction?.wsType && wsConnected) liveStreamActions?.stop?.(activeSheetId);
                 setSelectedAction(null);
                 setParamValues({});
                 setError(null);
@@ -519,7 +545,7 @@ const Polymarket = ({ setConnectedData }) => {
                     variant="destructive"
                     size="sm"
                     className="h-8 text-xs shrink-0"
-                    onClick={() => liveStreamActions?.stop?.()}
+                    onClick={() => liveStreamActions?.stop?.(activeSheetId)}
                   >
                     <SquareIcon className="h-3.5 w-3.5 shrink-0" />
                     <span className="ml-1.5">Stop feed</span>
@@ -529,7 +555,7 @@ const Polymarket = ({ setConnectedData }) => {
                     variant="default"
                     size="sm"
                     className="h-8 text-xs shrink-0"
-                    disabled={!canConnectWs() || wsConnecting}
+                    disabled={!canConnectWs() || wsConnecting || !activeSheetId}
                     onClick={() => {
                       const raw = String(paramValues.market_token_id || "").trim();
                       const opts = listOptions.market_token_id || [];
@@ -572,8 +598,14 @@ const Polymarket = ({ setConnectedData }) => {
                           desiredEventType = "price_change";
                       }
                       setError(null);
-                      setWsConnecting(true);
-                      liveStreamActions?.start?.("polymarket", { assetIds, eventType: desiredEventType });
+                      const config = { assetIds, eventType: desiredEventType };
+                      pendingWsConfigRef.current = config;
+                      if (hasDataOrStream) {
+                        setReplaceOrNewSheetOpen(true);
+                      } else {
+                        setWsConnecting(true);
+                        liveStreamActions?.start?.(activeSheetId, "polymarket", config);
+                      }
                     }}
                   >
                     {wsConnecting ? (

@@ -261,15 +261,49 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [multiSheetData, setMultiSheetData] = useState()
     const [sheetNames, setSheetNames] = useState()
 
-    //Connected Data is active working data. 
-    const [dataConnected, setDataConnected] = useState() //boolean, do we have connected data or not
-    const [connectedData, _setConnectedData] = useState()
+    // Data sheets: user can have multiple sheets (Sheet 1, Sheet 2, ...); each can have its own data and optional live stream
+    const [dataSheets, setDataSheets] = useState(() => ({ 'sheet-1': { name: 'Sheet 1', data: [] } }));
+    const [activeSheetId, setActiveSheetId] = useState('sheet-1');
+
+    //Connected Data is active working data (derived from active sheet)
+    const [dataConnected, setDataConnected] = useState()
+    const connectedData = useMemo(() => dataSheets[activeSheetId]?.data ?? [], [dataSheets, activeSheetId]);
     const setConnectedData = useCallback((value) => {
-      _setConnectedData((prev) => {
-        const raw = typeof value === 'function' ? value(prev) : value;
-        if (Array.isArray(raw)) return coerceDataTypes(raw);
-        if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) return coerceDataTypes([raw]);
-        return raw;
+      setDataSheets((prev) => {
+        const sheet = prev[activeSheetId] || { name: 'Sheet 1', data: [] };
+        const raw = typeof value === 'function' ? value(sheet.data || []) : value;
+        const data = Array.isArray(raw) ? coerceDataTypes(raw) : (raw != null && typeof raw === 'object' ? coerceDataTypes([raw]) : sheet.data || []);
+        return { ...prev, [activeSheetId]: { ...sheet, data } };
+      });
+    }, [activeSheetId]);
+
+    const addNewSheetAndActivate = useCallback((onNewSheet) => {
+      setDataSheets((prev) => {
+        const keys = Object.keys(prev);
+        const nextNum = keys.length + 1;
+        const newId = `sheet-${nextNum}`;
+        setTimeout(() => {
+          setActiveSheetId(newId);
+          if (typeof onNewSheet === 'function') onNewSheet(newId);
+        }, 0);
+        return { ...prev, [newId]: { name: `Sheet ${nextNum}`, data: [] } };
+      });
+    }, []);
+
+    const replaceCurrentSheetData = useCallback((data) => {
+      const raw = Array.isArray(data) ? data : (data != null ? [data] : []);
+      setDataSheets((prev) => ({
+        ...prev,
+        [activeSheetId]: { ...(prev[activeSheetId] || { name: 'Sheet 1' }), data: coerceDataTypes(raw) },
+      }));
+    }, [activeSheetId]);
+
+    const setSheetData = useCallback((sheetId, value) => {
+      setDataSheets((prev) => {
+        const sheet = prev[sheetId] || { name: `Sheet ${sheetId}`, data: [] };
+        const raw = typeof value === 'function' ? value(sheet.data || []) : value;
+        const data = Array.isArray(raw) ? coerceDataTypes(raw) : (raw != null && typeof raw === 'object' ? coerceDataTypes([raw]) : sheet.data || []);
+        return { ...prev, [sheetId]: { ...sheet, data } };
       });
     }, []);
     const [connectedCols, setConnectedCols] = useState() //cols of fresh data
@@ -302,12 +336,9 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       chartPreset: { type: 'line', xKey: 'time', yKey: 'value' },
     });
 
-    // App-level live stream: one active stream (polymarket | chainlink | binance), persists across Table/Charts/nav until logout or window close
+    // App-level live streams: multiple streams keyed by sheetId (streamsBySheetId)
     const [liveStreamState, setLiveStreamState] = useState({
-      type: null,
-      config: {},
-      isRunning: false,
-      isPaused: false,
+      streamsBySheetId: {},
     });
     const noop = useCallback(() => {}, []);
     const [liveStreamActions, setLiveStreamActions] = useState({
@@ -378,7 +409,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, sheetNames, setSheetNames, userHandle, setUserHandle, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions}}>
+        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, multiSheetFlag, setMultiSheetFlag, multiSheetData, setMultiSheetData, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, sheetNames, setSheetNames, userHandle, setUserHandle, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions, dataSheets, setDataSheets, activeSheetId, setActiveSheetId, addNewSheetAndActivate, replaceCurrentSheetData, setSheetData}}>
             {children}
         </StateContextV2.Provider>
     )

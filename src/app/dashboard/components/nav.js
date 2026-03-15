@@ -85,6 +85,13 @@ const Nav = () => {
 
   const liveStreamState = contextStateV2?.liveStreamState
   const liveStreamActions = contextStateV2?.liveStreamActions
+  const dataSheets = contextStateV2?.dataSheets
+  const [selectedStreamSheetId, setSelectedStreamSheetId] = useState(null)
+  const streamsBySheetId = liveStreamState?.streamsBySheetId || {}
+  const streamSheetIds = Object.keys(streamsBySheetId).filter((id) => streamsBySheetId[id]?.isRunning || streamsBySheetId[id]?.config)
+  const hasAnyStream = streamSheetIds.length > 0
+  const effectiveStreamSheetId = selectedStreamSheetId && streamsBySheetId[selectedStreamSheetId] ? selectedStreamSheetId : (streamSheetIds[0] || null)
+  const currentStreamState = effectiveStreamSheetId ? streamsBySheetId[effectiveStreamSheetId] : null
 
   //setting loaded chart values for viewing
   const setChartOptions = contextStateV2?.setChartOptions
@@ -409,18 +416,32 @@ const Nav = () => {
           </div>
           { user ? (
               <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:justify-end">
-                  {liveStreamState?.isRunning && (
+                  {hasAnyStream && (
                     <div className="flex items-center gap-1 shrink-0 rounded-md border bg-muted/50 px-1 py-0.5">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Pause" disabled={liveStreamState?.isPaused} onClick={() => liveStreamActions?.pause?.()}>
+                      {streamSheetIds.length > 1 && (
+                        <select
+                          className="text-xs bg-transparent border-0 rounded px-1 py-0.5 min-w-0 max-w-[80px]"
+                          value={effectiveStreamSheetId || ""}
+                          onChange={(e) => setSelectedStreamSheetId(e.target.value || null)}
+                          title="Select sheet"
+                        >
+                          {streamSheetIds.map((id) => (
+                            <option key={id} value={id}>
+                              {dataSheets?.[id]?.name || id}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Pause" disabled={!currentStreamState?.isRunning || currentStreamState?.isPaused} onClick={() => liveStreamActions?.pause?.(effectiveStreamSheetId)}>
                         <Pause className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title={liveStreamState?.isPaused ? "Resume" : "Start"} onClick={() => liveStreamActions?.resume?.()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title={currentStreamState?.isPaused ? "Resume" : "Start"} onClick={() => liveStreamActions?.resume?.(effectiveStreamSheetId)}>
                         <Play className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Restart" onClick={() => liveStreamActions?.restart?.()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Restart" onClick={() => liveStreamActions?.restart?.(effectiveStreamSheetId)}>
                         <RotateCw className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Stop" onClick={() => liveStreamActions?.stop?.()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Stop" onClick={() => liveStreamActions?.stop?.(effectiveStreamSheetId)}>
                         <Square className="h-3.5 w-3.5" />
                       </Button>
                     </div>
