@@ -19,19 +19,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Image from "next/image";
 import { X } from "lucide-react";
-import { Label } from "@/components/ui/label";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 
 const INTEGRATION_OPTIONS = [
-  { value: "polymarket", label: "Polymarket" },
-  { value: "coinGecko", label: "CoinGecko" },
-  { value: "twitter", label: "Twitter" },
-  { value: "wallStreetBets", label: "Wall Street Bets" },
-  { value: "geckoDex", label: "GeckoTerminal" },
-  { value: "binance", label: "Binance" },
-  { value: "chainlink", label: "Chainlink" },
-];
+  { value: "binance", label: "Binance", logo: null, letterAvatarStyle: "bg-black text-yellow-500" },
+  { value: "chainlink", label: "Chainlink", logo: null, letterAvatarStyle: "bg-blue-600 text-white" },
+  { value: "coinGecko", label: "CoinGecko", logo: "/coinGecko.png" },
+  { value: "geckoDex", label: "GeckoTerminal", logo: "/geckoDex1.png" },
+  { value: "polymarket", label: "Polymarket", logo: "/polymarket.png" },
+  { value: "twitter", label: "Twitter", logo: "/x.png" },
+  { value: "wallStreetBets", label: "Wall Street Bets", logo: "/wallStreetBets.png" },
+].sort((a, b) => a.label.localeCompare(b.label));
 
 const PANEL_CLOSE_MS = 300;
 
@@ -74,6 +74,23 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   useEffect(() => () => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
   }, []);
+
+  const renderIntegrationAvatar = (opt) => {
+    if (opt.logo) {
+      return (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted/30">
+          <Image src={opt.logo} alt="" width={28} height={28} className="object-cover" />
+        </span>
+      );
+    }
+    const letter = (opt.label || opt.value)[0].toUpperCase();
+    const letterClass = opt.letterAvatarStyle || "bg-muted/30 text-muted-foreground";
+    return (
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${letterClass}`}>
+        {letter}
+      </span>
+    );
+  };
 
   const renderIntegration = () => {
     switch (integrationSidebar) {
@@ -131,10 +148,23 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
               }`}
             >
               <div className="grid gap-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    API
-                  </Label>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={integrationSidebar}
+                    onValueChange={(value) => setIntegrationSidebar(value)}
+                  >
+                    <SelectTrigger className="h-9 min-w-0 flex-1 text-sm gap-2">
+                      {integrationSidebar && renderIntegrationAvatar(INTEGRATION_OPTIONS.find((o) => o.value === integrationSidebar) || { label: integrationSidebar, value: integrationSidebar, logo: null })}
+                      <SelectValue placeholder="Select API" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTEGRATION_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value} left={renderIntegrationAvatar(opt)}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -145,21 +175,6 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <Select
-                  value={integrationSidebar}
-                  onValueChange={(value) => setIntegrationSidebar(value)}
-                >
-                  <SelectTrigger className="h-9 w-full text-sm">
-                    <SelectValue placeholder="Select API" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INTEGRATION_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               <div className="grid min-h-0 gap-3">
                 <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30 p-3">
