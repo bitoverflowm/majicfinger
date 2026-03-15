@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
-import { Play, Square, RotateCw, Pause } from "lucide-react";
+import { Play, Square, RotateCw, Pause, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 // symbol format "btc/usd" -> base "btc", quote "usd"
@@ -49,7 +51,6 @@ function TokenLogo({ base, quote, className }) {
 }
 
 const Chainlink = () => {
-  const [selectedSymbols, setSelectedSymbols] = useState([]);
   const [error, setError] = useState(null);
   const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
   const [pendingSymbol, setPendingSymbol] = useState(null);
@@ -103,10 +104,8 @@ const Chainlink = () => {
     }
   };
 
-  const toggleSymbol = (symbol) => {
-    setSelectedSymbols((prev) =>
-      prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
-    );
+  const handleCheckboxChange = (symbol, checked) => {
+    if (checked) handleStart(symbol);
   };
 
   return (
@@ -136,15 +135,20 @@ const Chainlink = () => {
           const stream = sheetId ? streamsBySheetId[sheetId] : null;
           const isRunning = stream?.isRunning ?? false;
           const isPaused = stream?.isPaused ?? false;
-          const isSelected = selectedSymbols.includes(pair.value);
+          const isLoading =
+            stream?.connecting || (stream?.isRunning && !stream?.hasReceivedFirstData);
+          const progressValue = stream?.connecting
+            ? 0
+            : stream?.hasReceivedFirstData
+              ? 100
+              : isRunning
+                ? 50
+                : 0;
 
           return (
-            <label
+            <div
               key={pair.value}
-              className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors duration-200 hover:bg-muted/50",
-                isSelected && "bg-muted/30"
-              )}
+              className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2 transition-colors hover:bg-muted/70"
             >
               <TokenLogo base={pair.base} quote={pair.quote} />
               <div className="min-w-0 flex-1">
@@ -153,86 +157,110 @@ const Chainlink = () => {
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={() => toggleSymbol(pair.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mr-1"
-                />
-                {isSelected && (
-                  isRunning ? (
-                    <>
-                      {isPaused ? (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            liveStreamActions?.resume?.(sheetId);
-                          }}
-                          aria-label="Resume"
-                        >
-                          <Play className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            liveStreamActions?.pause?.(sheetId);
-                          }}
-                          aria-label="Pause"
-                        >
-                          <Pause className="h-3.5 w-3.5" />
-                        </Button>
+                {isLoading ? (
+                  <>
+                    <div className="flex w-24 flex-col gap-0.5">
+                      <Progress
+                        value={progressValue}
+                        className="h-1.5 w-full"
+                        indicatorClassName="bg-blue-500 dark:bg-blue-400"
+                      />
+                      {stream?.statusMessage && (
+                        <span className="text-xs text-muted-foreground">{stream.statusMessage}</span>
                       )}
+                    </div>
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              liveStreamActions?.stop?.(sheetId);
+                            }}
+                            aria-label="Cancel connection"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>Cancel connection</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </>
+                ) : isRunning ? (
+                  <>
+                    {isPaused ? (
                       <Button
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
                         onClick={(e) => {
                           e.preventDefault();
-                          liveStreamActions?.restart?.(sheetId);
+                          e.stopPropagation();
+                          liveStreamActions?.resume?.(sheetId);
                         }}
-                        aria-label="Restart"
+                        aria-label="Resume"
                       >
-                        <RotateCw className="h-3.5 w-3.5" />
+                        <Play className="h-3.5 w-3.5" />
                       </Button>
+                    ) : (
                       <Button
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
                         onClick={(e) => {
                           e.preventDefault();
-                          liveStreamActions?.stop?.(sheetId);
+                          e.stopPropagation();
+                          liveStreamActions?.pause?.(sheetId);
                         }}
-                        aria-label="Stop"
+                        aria-label="Pause"
                       >
-                        <Square className="h-3.5 w-3.5" />
+                        <Pause className="h-3.5 w-3.5" />
                       </Button>
-                    </>
-                  ) : (
+                    )}
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1 text-xs"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
                       onClick={(e) => {
                         e.preventDefault();
-                        handleStart(pair.value);
+                        e.stopPropagation();
+                        liveStreamActions?.restart?.(sheetId);
                       }}
-                      disabled={!activeSheetId}
-                      aria-label="Start"
+                      aria-label="Restart"
                     >
-                      <Play className="h-3 w-3" />
-                      Start
+                      <RotateCw className="h-3.5 w-3.5" />
                     </Button>
-                  )
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        liveStreamActions?.stop?.(sheetId);
+                      }}
+                      aria-label="Stop"
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                ) : (
+                  <Checkbox
+                    checked={false}
+                    onCheckedChange={(checked) => handleCheckboxChange(pair.value, checked === true)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-3.5 w-3.5 shrink-0 rounded-[3px] border border-input [&_svg]:h-2.5 [&_svg]:w-2.5"
+                    disabled={!activeSheetId}
+                  />
                 )}
               </div>
-            </label>
+            </div>
           );
         })}
       </div>

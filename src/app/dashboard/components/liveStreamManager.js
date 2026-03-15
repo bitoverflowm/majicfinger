@@ -34,6 +34,7 @@ export default function LiveStreamManager() {
   const symbolBySheetIdRef = useRef({});
   const pausedBySheetIdRef = useRef({});
   const intentionalCloseBySheetIdRef = useRef({});
+  const firstDataReceivedBySheetIdRef = useRef({});
   const reconnectTimeoutBySheetIdRef = useRef({});
   const typeConfigBySheetIdRef = useRef({});
 
@@ -42,6 +43,7 @@ export default function LiveStreamManager() {
       if (sheetId != null) {
         intentionalCloseBySheetIdRef.current[sheetId] = true;
         delete typeConfigBySheetIdRef.current[sheetId];
+        delete firstDataReceivedBySheetIdRef.current[sheetId];
         const tid = reconnectTimeoutBySheetIdRef.current[sheetId];
         if (tid) {
           clearTimeout(tid);
@@ -261,6 +263,21 @@ export default function LiveStreamManager() {
       if (wsBySheetIdRef.current[sheetId] || !setSheetData) return;
       symbolBySheetIdRef.current[sheetId] = symbol;
       intentionalCloseBySheetIdRef.current[sheetId] = false;
+      typeConfigBySheetIdRef.current[sheetId] = { type: "chainlink", config: { symbol } };
+      setLiveStreamState((s) => ({
+        ...s,
+        streamsBySheetId: {
+          ...(s.streamsBySheetId || {}),
+          [sheetId]: {
+            type: "chainlink",
+            config: { symbol },
+            isRunning: false,
+            isPaused: false,
+            connecting: true,
+            statusMessage: "Making connection…",
+          },
+        },
+      }));
       const subscriptionMsg = {
         action: "subscribe",
         subscriptions: [{ topic: "crypto_prices_chainlink", type: "*", filters: JSON.stringify({ symbol }) }],
@@ -282,12 +299,18 @@ export default function LiveStreamManager() {
           start: () => start(sheetId, "chainlink", { symbol }),
           chartPreset: { type: "line", xKey: "time", yKey: "value" },
         });
-        typeConfigBySheetIdRef.current[sheetId] = { type: "chainlink", config: { symbol } };
         setLiveStreamState((s) => ({
           ...s,
           streamsBySheetId: {
             ...(s.streamsBySheetId || {}),
-            [sheetId]: { type: "chainlink", config: { symbol }, isRunning: true, isPaused: false },
+            [sheetId]: {
+              type: "chainlink",
+              config: { symbol },
+              isRunning: true,
+              isPaused: false,
+              connecting: false,
+              statusMessage: "Connected, waiting for data…",
+            },
           },
         }));
       };
@@ -307,6 +330,14 @@ export default function LiveStreamManager() {
             price: payload.value,
             receivedAt: msg.timestamp,
           };
+          if (!firstDataReceivedBySheetIdRef.current[sheetId]) {
+            firstDataReceivedBySheetIdRef.current[sheetId] = true;
+            setLiveStreamState((s) => {
+              const next = { ...(s.streamsBySheetId || {}) };
+              if (next[sheetId]) next[sheetId] = { ...next[sheetId], hasReceivedFirstData: true, statusMessage: "Receiving data…" };
+              return { ...s, streamsBySheetId: next };
+            });
+          }
           setSheetData(sheetId, (prev) => {
             const next = Array.isArray(prev) ? [...prev, row] : [row];
             return next.length > 2000 ? next.slice(-2000) : next;
@@ -324,7 +355,7 @@ export default function LiveStreamManager() {
         setChainlinkWsState?.((prev) => (prev?.sheetId === sheetId ? { isRunning: false, stop: null, start: null, chartPreset: { type: "line", xKey: "time", yKey: "value" } } : prev));
         setLiveStreamState((s) => {
           const next = { ...(s.streamsBySheetId || {}) };
-          if (next[sheetId]) next[sheetId] = { ...next[sheetId], isRunning: false };
+          if (next[sheetId]) next[sheetId] = { ...next[sheetId], isRunning: false, connecting: false };
           return { ...s, streamsBySheetId: next };
         });
         if (!intentionalCloseBySheetIdRef.current[sheetId] && symbol) {
