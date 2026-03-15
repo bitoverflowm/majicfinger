@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useUser, mutateUser } from '@/lib/hooks';
 import { Magic } from 'magic-sdk';
@@ -18,6 +18,14 @@ const Login = ({ fromHome }) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Dev: pre-fill test user so you can one-click login (works even when VPN blocks MongoDB)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      setEmail('rikesh@bitoverflow.org');
+      setName('Rikesh');
+    }
+  }, []);
   const [progress, setProgress] = useState(0);
   const user = useUser();
 
