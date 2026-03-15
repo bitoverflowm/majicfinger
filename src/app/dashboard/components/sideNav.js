@@ -72,9 +72,9 @@ const SideNav = () => {
             isExpanded ? "w-full justify-between" : "w-full justify-center"
           }`}
         >
-          <div className="flex min-w-0 shrink-0 items-center gap-2">
-            <div className="flex h-10 w-10 shrink-0 pl-2 items-center justify-center rounded-md bg-white overflow-hidden">
-              <Image src="/fruit.png" width={24} height={24} alt="Lychee" />
+          <div className={`flex min-w-0 shrink-0 items-center ${!isExpanded ? "w-full justify-center" : "gap-2"}`}>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white overflow-hidden">
+              <Image src="/logo.png" width={32} height={32} alt="Lychee" className="object-cover rounded-full" />
             </div>
             <span
               className={`font-semibold text-sidebar-foreground truncate transition-opacity duration-200 ${

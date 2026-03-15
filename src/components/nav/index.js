@@ -57,7 +57,7 @@ const Nav = () => {
                 <Link href="/" className="flex gap-1.5 items-center pr-3">
                   {!logoError && (
                     <span className="flex shrink-0 items-center justify-center">
-                      <Image src="/fruit.png" alt="Lychee" width={24} height={24} className="grayscale object-contain block" onError={() => setLogoError(true)} />
+                      <Image src="/logo.png" alt="Lychee" width={24} height={24} className="grayscale object-contain block" onError={() => setLogoError(true)} />
                     </span>
                   )}
                   <span className="pt-2 font-black text-xl leading-none">Lychee</span>

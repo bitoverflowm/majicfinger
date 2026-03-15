@@ -44,7 +44,7 @@ const QuickNav = () => {
                                         <div className='p-2 px-3 cursor-pointer bg-white rounded-xl hover:bg-black hover:text-white shadow-inner' onClick={()=>setWorking('getLychee')}>Get Lychee Now!</div>
                                     </div>
                                     <div className="w-16 p-4">
-                                        <img src={"./fruit.png"}/>
+                                        <img src="/logo.png" alt="Lychee" />
                                     </div>
                                 </div>
                                     :

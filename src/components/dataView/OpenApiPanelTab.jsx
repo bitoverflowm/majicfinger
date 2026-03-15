@@ -6,7 +6,7 @@ import Ripple from "@/components/magicui/ripple";
 
 const ENTRANCE_MS = 280;
 const EXIT_MS = 150;
-const RIPPLE_VISIBLE_MS = 600;
+const RIPPLE_VISIBLE_MS = 2400;
 
 export default function OpenApiPanelTab({ onOpen }) {
   const [entered, setEntered] = useState(false);
@@ -73,16 +73,18 @@ export default function OpenApiPanelTab({ onOpen }) {
           ${entered && !isExiting ? "bg-background hover:bg-muted/80" : "bg-lychee_red"}
         `}
       >
-        {/* Lychee-red Ripple pulse when button appears, shown momentarily then hidden */}
+        {/* Ripple behind the icon, inside the button so it stays visible */}
         {showRipple && (
-          <Ripple
-            mainCircleSize={12}
-            mainCircleOpacity={0.35}
-            numCircles={4}
-            circleSizeStep={14}
-            className="[mask-image:none]"
-            circleClassName="!border-lychee_red !bg-lychee_red/25"
-          />
+          <span className="absolute inset-0 z-0">
+            <Ripple
+              mainCircleSize={12}
+              mainCircleOpacity={0.14}
+              numCircles={4}
+              circleSizeStep={14}
+              className="[mask-image:none]"
+              circleClassName="!border-lychee_red/35 !bg-lychee_red/12"
+            />
+          </span>
         )}
         <PanelRightOpen
           className={`relative z-10 h-4 w-4 ${entered && !isExiting ? "text-muted-foreground" : "text-white"}`}
