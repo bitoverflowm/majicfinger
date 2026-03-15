@@ -234,17 +234,17 @@ const DashBody = ({user}) => {
                     <Nav />
                 </header>
                 {integrationSidebar && <Separator className="shrink-0" />}
-                <div className="relative z-0 flex min-h-0 flex-1 flex-col">
+                <div className="relative z-0 flex min-h-0 flex-1 flex-col py-1">
                 { viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
                 { viewing === 'dataStart' && (integrationSidebar ? (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-8">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} />
                   </div>
-                ) : <div className="py-4"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
+                ) : <div className="py-1"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'charts' && (hasAnyLiveStream || (polymarketWsState?.isRunning && polymarketWsState?.stop) || (chainlinkWsState?.isRunning && chainlinkWsState?.stop) ? (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-8">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} chartMode />
                   </div>
                 ) : (
