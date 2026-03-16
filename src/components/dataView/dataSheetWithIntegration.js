@@ -24,8 +24,8 @@ import { X } from "lucide-react";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 
 const INTEGRATION_OPTIONS = [
-  { value: "binance", label: "Binance", logo: null, letterAvatarStyle: "bg-black text-yellow-500" },
-  { value: "chainlink", label: "Chainlink", logo: null, letterAvatarStyle: "bg-blue-600 text-white" },
+  { value: "binance", label: "Binance", logo: "/binance.jpeg" },
+  { value: "chainlink", label: "Chainlink", logo: "/chainlink.png" },
   { value: "coinGecko", label: "CoinGecko", logo: "/coinGecko.png" },
   { value: "geckoDex", label: "GeckoTerminal", logo: "/geckoDex1.png" },
   { value: "polymarket", label: "Polymarket", logo: "/polymarket.png" },
@@ -79,14 +79,19 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     if (opt.logo) {
       return (
         <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted/30">
-          <Image src={opt.logo} alt="" width={28} height={28} className="object-cover" />
+          <Image
+            src={opt.logo}
+            alt={opt.label || opt.value}
+            width={28}
+            height={28}
+            className="h-7 w-7 rounded-full object-cover"
+          />
         </span>
       );
     }
     const letter = (opt.label || opt.value)[0].toUpperCase();
-    const letterClass = opt.letterAvatarStyle || "bg-muted/30 text-muted-foreground";
     return (
-      <div className={`flex h-7 w-7 shrink-0 self-center place-items-center place-content-center rounded-full text-xs font-medium ${letterClass}`}>
+      <div className="flex h-7 w-7 shrink-0 self-center place-items-center place-content-center rounded-full bg-muted/30 text-xs font-medium text-muted-foreground">
         {letter}
       </div>
     );

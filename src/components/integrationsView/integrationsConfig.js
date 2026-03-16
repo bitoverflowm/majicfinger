@@ -26,7 +26,11 @@ export const integrations_list = [
   },
   {
     color: "#000",
-    icon: <div className="w-full h-full flex items-center justify-center p-2"><span className="text-yellow-400 font-bold text-xl">Binance</span></div>,
+    icon: (
+      <div className="w-full h-full flex items-center justify-center bg-black">
+        <Image src={'/binance.jpeg'} height={60} width={60} className="rounded-full object-contain" />
+      </div>
+    ),
     clickHandler: "binance",
     name: "Binance",
     description: "Real-time cryptocurrency price data from: Binance",
@@ -35,7 +39,11 @@ export const integrations_list = [
   },
   {
     color: "#375BD2",
-    icon: <div className="w-full h-full flex items-center justify-center p-2"><span className="text-white font-bold text-xl">Chainlink</span></div>,
+    icon: (
+      <div className="w-full h-full flex items-center justify-center bg-[#375BD2]">
+        <Image src={'/chainlink.png'} height={60} width={60} className="rounded-full object-contain" />
+      </div>
+    ),
     clickHandler: "chainlink",
     name: "Chainlink",
     description: "Real-time cryptocurrency price data from Chainlink — the world's #1 oracle",
