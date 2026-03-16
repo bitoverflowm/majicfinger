@@ -415,14 +415,14 @@ const Chainlink = () => {
         onReplaceAll={handleReplaceAll}
         onAddNewSheet={handleAddNewSheet}
       />
-      <p className="text-xs text-muted-foreground">
+      <div className="text-xs text-muted-foreground">
         {integrations_list.find((i) => i.clickHandler === "chainlink")?.playgroundDescription ??
           "Real-time cryptocurrency price data from Chainlink — the world's #1 oracle"}
-      </p>
+      </div>
 
       <div className="flex flex-col gap-1">
         <div
-          className="overflow-hidden transition-[max-height] duration-300 ease-in-out pb-4"
+          className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
           style={{
             maxHeight: showCollapsedView
               ? (() => {
