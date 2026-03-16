@@ -28,7 +28,6 @@ const DataView = ({ user }) => {
   const setActiveSheetId = contextStateV2?.setActiveSheetId;
   const setConnectedCols = contextStateV2?.setConnectedCols;
   const liveStreamState = contextStateV2?.liveStreamState;
-  const hasChainlinkStream = Object.values(liveStreamState?.streamsBySheetId || {}).some((s) => s?.type === "chainlink");
 
   const sheetSwitchHandler = (sheetName, id) => {
     setConnectedData(multiSheetData[sheetName]);
@@ -78,23 +77,21 @@ const DataView = ({ user }) => {
       )}
 
       {showGrid ? (
-        <div className="relative min-h-0 flex flex-col">
+        <div className="relative min-h-0 flex flex-col gap-3">
           {!integrationSidebar && setIntegrationSidebar && (
             <OpenApiPanelTab onOpen={() => setIntegrationSidebar("polymarket")} />
           )}
           <div
-            className={`min-h-0 w-full max-w-full overflow-auto ${hasChainlinkStream ? "max-h-[55vh] shrink-0" : ""}`}
+            className="min-h-0 w-full max-w-full shrink-0"
           >
             <GridView />
           </div>
-          {hasChainlinkStream && (
-            <div className="shrink-0 pb-6">
-              <ChainlinkLiveChart
-                dataSheets={dataSheets || {}}
-                streamsBySheetId={liveStreamState?.streamsBySheetId || {}}
-              />
-            </div>
-          )}
+          <div className="pb-10">
+            <ChainlinkLiveChart
+              dataSheets={dataSheets || {}}
+              streamsBySheetId={liveStreamState?.streamsBySheetId || {}}
+            />
+          </div>
         </div>
       ) : (
         <div className="relative">

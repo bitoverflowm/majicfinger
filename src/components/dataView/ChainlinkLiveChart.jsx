@@ -72,15 +72,21 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
     return c;
   }, [chainlinkSheets, dataSheets]);
 
-  if (chainlinkSheets.length === 0) return null;
-
   if (chainlinkSheets.length === 1) {
     const sheetId = chainlinkSheets[0];
-    const rows = (dataSheets[sheetId]?.data ?? [])
+    const rawRows = (dataSheets[sheetId]?.data ?? [])
       .map((row) => ({ time: toTimeSec(row), value: toValue(row) }))
       .filter((r) => r.time != null && r.value != null)
       .sort((a, b) => a.time - b.time);
-    if (rows.length === 0) return null;
+    const rows =
+      rawRows.length > 0
+        ? rawRows
+        : [
+            {
+              time: Math.floor(Date.now() / 1000),
+              value: 0,
+            },
+          ];
     return (
       <div className="mt-4 overflow-visible rounded-lg border border-border bg-card p-3">
         <p className="mb-2 text-xs font-medium text-muted-foreground">Price vs time (live)</p>
@@ -106,12 +112,10 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
     );
   }
 
-  if (chartData.length === 0) return null;
-
   return (
-    <div className="mt-4 overflow-visible rounded-lg border border-border bg-card p-3 pb-10">
+    <div className="overflow-visible rounded-lg border border-border bg-card p-3">
       <p className="mb-2 text-xs font-medium text-muted-foreground">Price vs time (live)</p>
-      <ChartContainer config={config} className="!aspect-auto h-[360px] min-h-[360px] w-full overflow-visible">
+      <ChartContainer config={config} className="!aspect-auto h-[400px] min-h-[360px] w-full overflow-visible">
         <LineChart data={chartData} margin={{ left: 12, right: 12, top: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis
