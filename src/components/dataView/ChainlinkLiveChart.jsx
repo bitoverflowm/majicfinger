@@ -162,10 +162,10 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
             {series.map((s, index) => (
               <div
                 key={s.id}
-                className="h-[500px] rounded-lg border border-border/60 bg-card/80 p-2 transition-all duration-300 ease-in-out"
+                className="h-[460px] rounded-lg border border-border/60 bg-card/80 p-2 transition-all duration-300 ease-in-out"
               >
                 <p className="mb-1 text-[11px] font-medium text-muted-foreground">{s.label}</p>
-                <div className="w-full" style={{ height: 360, minHeight: 360 }}>
+                <div className="w-full" style={{ height: 340, minHeight: 340 }}>
                   <Liveline
                     data={s.data}
                     value={s.value}
