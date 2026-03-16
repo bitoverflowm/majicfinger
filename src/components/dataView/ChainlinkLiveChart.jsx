@@ -1,14 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from "@/components/ui/chart";
 import { Liveline } from "liveline";
 
 const SHEET_COLORS = [
@@ -47,46 +39,49 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
       .sort();
   }, [streamsBySheetId]);
 
+  // Build series for all chainlink sheets (used for both single and multi)
+  const series = useMemo(() => {
+    return chainlinkSheets.map((sheetId, index) => {
+      const rows = (dataSheets[sheetId]?.data ?? [])
+        .map((row) => ({ time: toTimeSec(row), value: toValue(row) }))
+        .filter((r) => r.time != null && r.value != null)
+        .sort((a, b) => a.time - b.time);
+      const name = dataSheets[sheetId]?.name ?? sheetId;
+      return {
+        id: sheetId,
+        label: name,
+        color: SHEET_COLORS[index % SHEET_COLORS.length],
+        data: rows,
+        value: rows[rows.length - 1]?.value ?? 0,
+      };
+    });
+  }, [chainlinkSheets, dataSheets]);
+
   if (!chainlinkSheets.length) {
     return null;
   }
 
-  const chartData = useMemo(() => {
-    const timeToRow = {};
-    for (const sheetId of chainlinkSheets) {
-      const rows = dataSheets[sheetId]?.data ?? [];
-      for (const row of rows) {
-        const t = toTimeSec(row);
-        const v = toValue(row);
-        if (t == null || v == null) continue;
-        if (!timeToRow[t]) timeToRow[t] = { time: t };
-        timeToRow[t][sheetId] = v;
-      }
-    }
-    return Object.values(timeToRow).sort((a, b) => a.time - b.time);
-  }, [dataSheets, chainlinkSheets]);
-
-  const config = useMemo(() => {
-    const c = {};
-    chainlinkSheets.forEach((sheetId, i) => {
-      const name = dataSheets[sheetId]?.name ?? sheetId;
-      c[sheetId] = { label: name, color: SHEET_COLORS[i % SHEET_COLORS.length] };
-    });
-    return c;
-  }, [chainlinkSheets, dataSheets]);
+  const anyDataMulti = series.some((s) => s.data.length > 0);
+  const anyConnecting = chainlinkSheets.some((id) => streamsBySheetId[id]?.connecting);
+  const anyRunning = chainlinkSheets.some(
+    (id) => streamsBySheetId[id]?.isRunning && !streamsBySheetId[id]?.hasReceivedFirstData
+  );
+  const loadingMulti = !anyDataMulti && (anyConnecting || anyRunning);
+  const allPausedMulti =
+    chainlinkSheets.length > 0 && chainlinkSheets.every((id) => streamsBySheetId[id]?.isPaused);
+  const pausedMulti = allPausedMulti;
 
   // Single-stream Liveline mode
   if (chainlinkSheets.length === 1) {
     const sheetId = chainlinkSheets[0];
     const stream = streamsBySheetId[sheetId] || {};
-    const rawRows = (dataSheets[sheetId]?.data ?? [])
-      .map((row) => ({ time: toTimeSec(row), value: toValue(row) }))
-      .filter((r) => r.time != null && r.value != null)
-      .sort((a, b) => a.time - b.time);
-    const hasData = rawRows.length > 0;
-    const loading = !hasData && (stream.connecting || (stream.isRunning && !stream.hasReceivedFirstData));
-    const paused = !!stream.isPaused && hasData && !loading;
-    const empty = !hasData && !loading;
+    const s = series[0];
+    const rows = s?.data ?? [];
+    const hasData = rows.length > 0;
+    const loading =
+      !hasData && (stream.connecting || (stream.isRunning && !stream.hasReceivedFirstData));
+    const paused = !!stream.isPaused;
+
     return (
       <div className="h-[520px] pb-10 mb-20 mt-4 rounded-lg border border-border bg-card p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
@@ -98,54 +93,36 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
           )}
         </div>
         <div style={{ height: 360, minHeight: 360 }} className=" w-full">
-          {loading && (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-2">
-              <div className="h-0.5 w-3/4 animate-pulse rounded-full bg-slate-300/70 dark:bg-slate-700/70" />
-              <p className="text-[11px] text-muted-foreground">Waiting for live data…</p>
-            </div>
-          )}
-          {empty && !loading && (
-            <div className="flex h-full w-full flex-col items-center justify-center">
-              <p className="text-[11px] text-muted-foreground">waiting for data to load in</p>
-            </div>
-          )}
-          {hasData && (
-            <Liveline
-              data={rawRows}
-              value={rawRows[rawRows.length - 1]?.value ?? 0}
-              theme="light"
-              color={SHEET_COLORS[0]}
-              momentum={true}
-              showValue={true}
-              valueMomentumColor={true}
-              windows={LIVELINE_WINDOWS}
-              windowStyle="rounded"
-              exaggerate={true}
-              scrub={true}
-              degen={true}
-              badge={true}
-              badgeVariant="default"
-            />
-          )}
+          <Liveline
+            data={rows}
+            value={rows[rows.length - 1]?.value ?? 0}
+            theme="light"
+            color={SHEET_COLORS[0]}
+            momentum={true}
+            showValue={true}
+            valueMomentumColor={true}
+            windows={LIVELINE_WINDOWS}
+            windowStyle="rounded"
+            exaggerate={true}
+            scrub={true}
+            degen={true}
+            badge={true}
+            badgeVariant="default"
+            loading={loading}
+            paused={paused}
+            emptyText="waiting for data to load in"
+          />
         </div>
       </div>
     );
   }
 
-  // Multi-stream Recharts mode
-  const anyData = chartData.length > 0;
-  const anyStream = chainlinkSheets.some((id) => streamsBySheetId[id]);
-  const anyConnecting = chainlinkSheets.some((id) => streamsBySheetId[id]?.connecting);
-  const anyRunning = chainlinkSheets.some(
-    (id) => streamsBySheetId[id]?.isRunning && !streamsBySheetId[id]?.hasReceivedFirstData
-  );
-  const loading = !anyData && (anyConnecting || anyRunning);
-  const anyPaused = chainlinkSheets.some((id) => streamsBySheetId[id]?.isPaused);
-  const paused = anyPaused && anyData && !loading;
-  const empty = !anyData && !loading && anyStream;
+  const anyData = series.some((s) => s.data.length > 0);
+  const loading = loadingMulti;
+  const paused = pausedMulti;
 
   return (
-    <div className="overflow-visible rounded-lg border border-border bg-card p-3">
+    <div className="h-[520px] pb-10 mb-20 rounded-lg border border-border bg-card p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">Price vs time (live)</p>
         {paused && (
@@ -154,57 +131,24 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
           </span>
         )}
       </div>
-      <ChartContainer config={config} className="!aspect-auto h-[400px] min-h-[360px] w-full overflow-visible">
-        {loading && (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2">
-            <div className="h-0.5 w-3/4 animate-pulse rounded-full bg-slate-300/70 dark:bg-slate-700/70" />
-            <p className="text-[11px] text-muted-foreground">Waiting for live data…</p>
-          </div>
-        )}
-        {empty && !loading && (
-          <div className="flex h-full w-full flex-col items-center justify-center">
-            <p className="text-[11px] text-muted-foreground">waiting for data to load in</p>
-          </div>
-        )}
-        {anyData && (
-          <LineChart data={chartData} margin={{ left: 12, right: 12, top: 8, bottom: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis
-            dataKey="time"
-            type="number"
-            domain={["dataMin", "dataMax"]}
-            tickFormatter={(t) => new Date(t * 1000).toLocaleTimeString()}
-            tickLine={false}
-            axisLine={false}
-            tick={{ fontSize: 10 }}
-          />
-          <YAxis
-            type="number"
-            domain={["auto", "auto"]}
-            tickLine={false}
-            axisLine={false}
-            tick={{ fontSize: 10 }}
-            width={48}
-          />
-          <ChartTooltip
-            content={<ChartTooltipContent indicator="line" />}
-            labelFormatter={(t) => new Date(Number(t) * 1000).toLocaleString()}
-          />
-          {chainlinkSheets.map((sheetId, i) => (
-            <Line
-              key={sheetId}
-              dataKey={sheetId}
-              type="monotone"
-              stroke={SHEET_COLORS[i % SHEET_COLORS.length]}
-              strokeWidth={2}
-              dot={false}
-              connectNulls
-            />
-          ))}
-          <ChartLegend content={<ChartLegendContent />} />
-        </LineChart>
-        )}
-      </ChartContainer>
+      <div style={{ height: 360, minHeight: 360 }} className="w-full overflow-visible">
+        <Liveline
+          series={series}
+          theme="light"
+          windows={LIVELINE_WINDOWS}
+          windowStyle="rounded"
+          showValue={true}
+          valueMomentumColor={true}
+          exaggerate={true}
+          scrub={true}
+          degen={true}
+          badge={true}
+          badgeVariant="default"
+          loading={loading}
+          paused={paused}
+          emptyText="waiting for data to load in"
+        />
+      </div>
     </div>
   );
 }
