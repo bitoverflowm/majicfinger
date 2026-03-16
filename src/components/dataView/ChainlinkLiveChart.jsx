@@ -43,15 +43,24 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
   const series = useMemo(() => {
     return chainlinkSheets.map((sheetId, index) => {
       const rows = (dataSheets[sheetId]?.data ?? [])
-        .map((row) => ({ time: toTimeSec(row), value: toValue(row) }))
+        .map((row) => ({ time: toTimeSec(row), value: toValue(row), symbol: row?.symbol }))
         .filter((r) => r.time != null && r.value != null)
         .sort((a, b) => a.time - b.time);
-      const name = dataSheets[sheetId]?.name ?? sheetId;
+
+      // Derive symbol label like "btc" from "BTC/USD"
+      const firstSymbolRow = rows.find((r) => r.symbol);
+      const rawSymbol = firstSymbolRow?.symbol || "";
+      const baseSymbol = rawSymbol.split("/")[0]?.trim().toLowerCase() || null;
+
+      const labelPrefix = `${index + 1}: `;
+      const labelCore = baseSymbol || dataSheets[sheetId]?.name || sheetId;
+      const label = `${labelPrefix}${labelCore}`;
+
       return {
         id: sheetId,
-        label: name,
+        label,
         color: SHEET_COLORS[index % SHEET_COLORS.length],
-        data: rows,
+        data: rows.map(({ time, value }) => ({ time, value })), // strip symbol for Liveline
         value: rows[rows.length - 1]?.value ?? 0,
       };
     });
