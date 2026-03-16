@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Liveline } from "liveline";
+import { Button } from "@/components/ui/button";
 
 const SHEET_COLORS = [
   "#3b82f6", // shadcn blue
@@ -32,6 +33,8 @@ function toValue(row) {
 }
 
 export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
+  const [split, setSplit] = useState(false);
+
   const chainlinkSheets = useMemo(() => {
     return Object.entries(streamsBySheetId)
       .filter(([, s]) => s?.type === "chainlink")
@@ -92,7 +95,7 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
     const paused = !!stream.isPaused;
 
     return (
-      <div className="h-[520px] pb-10 mb-20 mt-4 rounded-lg border border-border bg-card p-3">
+      <div className="pb-10 mb-20 mt-4 rounded-lg border border-border bg-card p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-xs font-medium text-muted-foreground">Price vs time (live)</p>
           {paused && (
@@ -101,7 +104,7 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
             </span>
           )}
         </div>
-        <div style={{ height: 360, minHeight: 360 }} className=" w-full">
+        <div style={{ height: 500, minHeight: 500 }} className=" w-full">
           <Liveline
             data={rows}
             value={rows[rows.length - 1]?.value ?? 0}
@@ -131,32 +134,81 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
   const paused = pausedMulti;
 
   return (
-    <div className="h-[520px] pb-10 mb-20 rounded-lg border border-border bg-card p-3">
+    <div className="pb-10 mb-20 rounded-lg border border-border bg-card p-3 transition-all duration-300 ease-in-out">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">Price vs time (live)</p>
-        {paused && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
-            Feed paused
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {paused && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+              Feed paused
+            </span>
+          )}
+          {series.length > 1 && (
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              className="h-6 px-2 text-[11px]"
+              onClick={() => setSplit((v) => !v)}
+            >
+              {split ? "Merge charts" : "Split chart"}
+            </Button>
+          )}
+        </div>
       </div>
-      <div style={{ height: 360, minHeight: 360 }} className="w-full overflow-visible">
-        <Liveline
-          series={series}
-          theme="light"
-          windows={LIVELINE_WINDOWS}
-          windowStyle="rounded"
-          showValue={true}
-          valueMomentumColor={true}
-          exaggerate={true}
-          scrub={true}
-          degen={true}
-          badge={true}
-          badgeVariant="default"
-          loading={loading}
-          paused={paused}
-          emptyText="waiting for data to load in"
-        />
+          <div className="w-full overflow-visible transition-all duration-300 ease-in-out">
+        {split && series.length > 1 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {series.map((s, index) => (
+              <div
+                key={s.id}
+                className="h-[500px] rounded-lg border border-border/60 bg-card/80 p-2 transition-all duration-300 ease-in-out"
+              >
+                <p className="mb-1 text-[11px] font-medium text-muted-foreground">{s.label}</p>
+                <div className="w-full" style={{ height: 360, minHeight: 360 }}>
+                  <Liveline
+                    data={s.data}
+                    value={s.value}
+                    theme="light"
+                    color={SHEET_COLORS[index % SHEET_COLORS.length]}
+                    momentum={true}
+                    showValue={true}
+                    valueMomentumColor={true}
+                    windows={LIVELINE_WINDOWS}
+                    windowStyle="rounded"
+                    exaggerate={true}
+                    scrub={true}
+                    degen={true}
+                    badge={true}
+                    badgeVariant="default"
+                    loading={loading && s.data.length === 0}
+                    paused={paused}
+                    emptyText="waiting for data to load in"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ height: 360, minHeight: 360 }} className="w-full overflow-visible">
+            <Liveline
+              series={series}
+              theme="light"
+              windows={LIVELINE_WINDOWS}
+              windowStyle="rounded"
+              showValue={true}
+              valueMomentumColor={true}
+              exaggerate={true}
+              scrub={true}
+              degen={true}
+              badge={true}
+              badgeVariant="default"
+              loading={loading}
+              paused={paused}
+              emptyText="waiting for data to load in"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
