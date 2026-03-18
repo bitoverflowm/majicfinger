@@ -38,7 +38,6 @@ export default function ChartControls() {
     effectiveData,
     setViewing,
     dark,
-    downloadChart,
 
     chartDataOverride,
     chartDataOverrideMeta,
@@ -151,17 +150,6 @@ export default function ChartControls() {
 
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
-      <div className="flex min-w-0 flex-wrap gap-1 place-items-center place-content-center py-2">
-        <Toggle area-label="Toggle png" onClick={() => downloadChart("png")} pressed={false} className="bg-slate-100/40">
-          <div className="text-[10px] text-slate-800">png</div>
-        </Toggle>
-        <Toggle area-label="Toggle svg" onClick={() => downloadChart("svg")} pressed={false} className="bg-slate-100/40">
-          <div className="text-[10px] text-slate-800">svg</div>
-        </Toggle>
-        <Toggle area-label="Toggle jpg" onClick={() => downloadChart("jpg")} pressed={false} className="bg-slate-100/40">
-          <div className="text-[10px] text-slate-800">jpeg</div>
-        </Toggle>
-      </div>
       <>
         {!demo && !effectiveData && (
             <div className="flex place-items-center text-xs gap-2 place-items-center bg-indigo-500/80 rounded-lg px-4 py-2 mx-8 mb-4">

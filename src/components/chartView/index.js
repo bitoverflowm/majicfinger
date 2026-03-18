@@ -11,6 +11,8 @@ import { Liveline } from 'liveline';
 
 import { useMyStateV2 } from '@/context/stateContextV2';
 import ChartControls from '@/components/chartView/ChartControls';
+import { toPng, toSvg, toJpeg } from 'html-to-image';
+import { toast } from 'sonner';
 
 const ChartBuilderContext = createContext(null);
 
@@ -209,7 +211,55 @@ export function ChartBuilderProvider({ demo, children }) {
 
   const handleToggleDark = (pressed) => setDark(!!pressed);
 
-  const downloadChart = () => {};
+  const downloadChart = (format) => {
+    const el = chartRef.current;
+    if (!el) {
+      toast.error('Chart not ready to export');
+      return;
+    }
+    const opts = { cacheBust: true, pixelRatio: 2 };
+    const filename = `chart-${Date.now()}`;
+    if (format === 'png') {
+      toPng(el, opts)
+        .then((dataUrl) => {
+          const link = document.createElement('a');
+          link.download = `${filename}.png`;
+          link.href = dataUrl;
+          link.click();
+          toast.success('Chart exported as PNG');
+        })
+        .catch((err) => {
+          console.error('Export error:', err);
+          toast.error('Failed to export chart');
+        });
+    } else if (format === 'svg') {
+      toSvg(el, opts)
+        .then((dataUrl) => {
+          const link = document.createElement('a');
+          link.download = `${filename}.svg`;
+          link.href = dataUrl;
+          link.click();
+          toast.success('Chart exported as SVG');
+        })
+        .catch((err) => {
+          console.error('Export error:', err);
+          toast.error('Failed to export chart');
+        });
+    } else if (format === 'jpg' || format === 'jpeg') {
+      toJpeg(el, { ...opts, quality: 0.95 })
+        .then((dataUrl) => {
+          const link = document.createElement('a');
+          link.download = `${filename}.jpg`;
+          link.href = dataUrl;
+          link.click();
+          toast.success('Chart exported as JPEG');
+        })
+        .catch((err) => {
+          console.error('Export error:', err);
+          toast.error('Failed to export chart');
+        });
+    }
+  };
 
   const wsStop = polymarketWsState?.stop ?? chainlinkWsState?.stop;
   const wsStart = polymarketWsState?.start ?? chainlinkWsState?.start;

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import DataView from "@/components/dataView";
-import ChartView, { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
+import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import ChartControls from "@/components/chartView/ChartControls";
 import Polymarket from "@/components/integrationsView/integrationPlayground/integrations/polymarket";
 import CoinGecko from "@/components/integrationsView/integrationPlayground/integrations/coinGecko";
@@ -23,6 +23,7 @@ import {
 import Image from "next/image";
 import { X } from "lucide-react";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
+import ExportPanel from "@/components/dataView/ExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const INTEGRATION_OPTIONS = [
@@ -54,9 +55,11 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const closeTimeoutRef = useRef(null);
   const wasOpenRef = useRef(false);
 
-  // When arriving to charts view, default the panel tab to charts (without forcing open)
+  // When arriving to charts view, default the panel tab to charts (don't override if user chose Export)
   useEffect(() => {
-    if (chartMode && setRightPanelTab && rightPanelTab !== "charts") setRightPanelTab("charts");
+    if (chartMode && setRightPanelTab && rightPanelTab !== "charts" && rightPanelTab !== "export") {
+      setRightPanelTab("charts");
+    }
   }, [chartMode, rightPanelTab, setRightPanelTab]);
 
   // Slide-in when panel opens: every time we go from closed → open
@@ -153,13 +156,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
               }}
             />
           )}
-          {chartsActive ? (
+          {chartMode ? (
             <div className="py-6 sm:py-10">
               <ChartCanvas />
-            </div>
-          ) : chartMode ? (
-            <div className="py-16">
-              <ChartView user={user} />
             </div>
           ) : (
             <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
@@ -189,7 +188,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                       setRightPanelOpen?.(true);
                       if (v === "charts") {
                         setViewing?.("charts");
-                      } else {
+                      } else if (v === "integrations") {
                         setViewing?.("dataStart");
                         setIntegrationSidebar?.((prev) => prev ?? "polymarket");
                       }
@@ -203,6 +202,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                         </TabsTrigger>
                         <TabsTrigger value="charts" className="text-xs">
                           Charts
+                        </TabsTrigger>
+                        <TabsTrigger value="export" className="text-xs">
+                          Export
                         </TabsTrigger>
                       </TabsList>
                       <div className="ml-auto flex items-center gap-1">
@@ -271,6 +273,12 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                           )}
                         </div>
                       </TabsContent>
+
+                      <TabsContent value="export" className="m-0 h-full min-w-0">
+                        <div className="h-full min-w-0 overflow-auto">
+                          <ExportPanel />
+                        </div>
+                      </TabsContent>
                     </div>
                   </Tabs>
                 </div>
@@ -281,5 +289,5 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       </div>
     </div>
   );
-  return chartsActive ? <ChartBuilderProvider demo={false}>{layout}</ChartBuilderProvider> : layout;
+  return <ChartBuilderProvider demo={false}>{layout}</ChartBuilderProvider>;
 }
