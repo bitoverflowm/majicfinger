@@ -113,7 +113,6 @@ export function ChartBuilderProvider({ demo, children }) {
   const [donut, setDonut] = useState(false);
 
   const [dark, setDark] = useState(false);
-  const [editHidden, setEditHidden] = useState(false);
 
   const [titleHidden, setTitleHidden] = useState(true);
   const [title, setTitle] = useState('Your Amazing Title');
@@ -229,8 +228,6 @@ export function ChartBuilderProvider({ demo, children }) {
     setChartDataOverrideMeta,
 
     dark,
-    editHidden,
-    setEditHidden,
     downloadChart,
 
     colorVisible: false,

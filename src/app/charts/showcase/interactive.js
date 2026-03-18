@@ -132,7 +132,6 @@ const Interactive = ({demo}) => {
 
     const [bgColor, setBgColor] = useState()
     const [cardColor, setCardColor] = useState()
-    const [editHidden, setEditHidden] = useState()
 
     //data filtering and management
     const [filteredData, setFilteredData] = useState()

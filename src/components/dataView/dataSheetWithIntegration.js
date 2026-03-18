@@ -262,8 +262,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                         </div>
                       </TabsContent>
 
-                      <TabsContent value="charts" className="m-0 h-full">
-                        <div className="h-full overflow-auto p-3">
+                      <TabsContent value="charts" className="m-0 h-full min-w-0">
+                        <div className="h-full min-w-0 overflow-auto p-3">
                           {chartsActive ? (
                             <ChartControls />
                           ) : (

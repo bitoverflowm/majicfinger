@@ -38,8 +38,6 @@ export default function ChartControls() {
     effectiveData,
     setViewing,
     dark,
-    editHidden,
-    setEditHidden,
     downloadChart,
 
     chartDataOverride,
@@ -151,20 +149,9 @@ export default function ChartControls() {
     setBodyContent,
   } = useChartBuilder();
 
-  const wrapperClassName = ``;
-
   return (
-    <div className={`gradualEffect flex flex-col px-4 py-4 w-full border rounded-lg`} style={{ zIndex: 20 }}>
-      <div className="flex gap-1 place-items-center place-content-center py-2">
-        {editHidden ? (
-          <Toggle area-label="Toggle edit close" onClick={() => setEditHidden(false)} pressed={false} className="bg-slate-100/40 mr-10">
-            <EyeOpenIcon />
-          </Toggle>
-        ) : (
-          <Toggle area-label="Toggle edit open" onClick={() => setEditHidden(true)} pressed={false} className="bg-slate-100/40 mr-10">
-            <EyeClosedIcon />
-          </Toggle>
-        )}
+    <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
+      <div className="flex min-w-0 flex-wrap gap-1 place-items-center place-content-center py-2">
         <Toggle area-label="Toggle png" onClick={() => downloadChart("png")} pressed={false} className="bg-slate-100/40">
           <div className="text-[10px] text-slate-800">png</div>
         </Toggle>
@@ -175,9 +162,8 @@ export default function ChartControls() {
           <div className="text-[10px] text-slate-800">jpeg</div>
         </Toggle>
       </div>
-      {!editHidden && (
-        <>
-          {!demo && !effectiveData && (
+      <>
+        {!demo && !effectiveData && (
             <div className="flex place-items-center text-xs gap-2 place-items-center bg-indigo-500/80 rounded-lg px-4 py-2 mx-8 mb-4">
               <div className="rounded-full bg-white h-2 w-2 mr-1 animate-bounce" />
               <small className="text-xs text-white"> You haven't connected any data yet. </small>
@@ -202,7 +188,7 @@ export default function ChartControls() {
           )}
           {!colorVisible && (
             <>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <ToggleGroup
                   variant="outline"
                   type="single"
@@ -252,9 +238,9 @@ export default function ChartControls() {
               </div>
               <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Select your x-axis </p>
               <p className="text-xs text-muted-foreground" />
-              <div className="py-2 text-black">
+              <div className="min-w-0 py-2 text-black">
                 <Select value={selX} onValueChange={(value) => setSelX(value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="min-w-0">
                     <SelectValue placeholder="x axis" className="text-xs" />
                   </SelectTrigger>
                   <SelectContent className="text-xs">
@@ -272,9 +258,9 @@ export default function ChartControls() {
                 <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"} pt-2`}>Typically this should be something quantifiable (numerical)</p>
                 {selY.length > 0 &&
                   selY.map((yValue, index) => (
-                    <div className="py-1 flex place-items-center gap-2 text-black" key={index}>
+                    <div className="py-1 flex min-w-0 place-items-center gap-2 text-black" key={index}>
                       <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="min-w-0 flex-1">
                           <SelectValue className="text-xs">{yValue}</SelectValue>
                         </SelectTrigger>
                         <SelectContent className="text-xs">
@@ -294,9 +280,9 @@ export default function ChartControls() {
                     </div>
                   ))}
                 {selY.length === 0 && (
-                  <div>
+                  <div className="min-w-0">
                     <Select onValueChange={(val) => handleSelectY(val)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="min-w-0">
                         <SelectValue placeholder="desktop" className="text-xs" />
                       </SelectTrigger>
                       <SelectContent className="text-xs">
@@ -314,11 +300,11 @@ export default function ChartControls() {
               {/* Scatter/bubble: Z (bubble size) and Color column */}
               {selChartType === "scatter" && (
                 <>
-                  <div className="py-2">
+                  <div className="min-w-0 py-2">
                     <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Bubble size (Z)</p>
                     <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Numeric column for bubble radius</p>
                     <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
-                      <SelectTrigger className="mt-1">
+                      <SelectTrigger className="mt-1 min-w-0">
                         <SelectValue placeholder="Select Z column" className="text-xs" />
                       </SelectTrigger>
                       <SelectContent className="text-xs">
@@ -331,11 +317,11 @@ export default function ChartControls() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="py-2">
+                  <div className="min-w-0 py-2">
                     <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Color by</p>
                     <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional column for point color</p>
                     <Select value={selColorCol ?? "__none__"} onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}>
-                      <SelectTrigger className="mt-1">
+                      <SelectTrigger className="mt-1 min-w-0">
                         <SelectValue placeholder="None or select column" className="text-xs" />
                       </SelectTrigger>
                       <SelectContent className="text-xs">
@@ -422,11 +408,11 @@ export default function ChartControls() {
                       Badge
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 items-center">
+                  <div className="grid min-w-0 grid-cols-2 gap-2 items-center">
                     <div className="space-y-1">
                       <p className={`text-[11px] ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Badge variant</p>
                       <Select value={livelineBadgeVariant} onValueChange={(v) => setLivelineBadgeVariant(v)} disabled={!livelineBadge}>
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-8 min-w-0 text-xs">
                           <SelectValue placeholder="default" />
                         </SelectTrigger>
                         <SelectContent className="text-xs">
@@ -438,7 +424,7 @@ export default function ChartControls() {
                     <div className="space-y-1">
                       <p className={`text-[11px] ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Line color</p>
                       <Select value={livelineColorChoice} onValueChange={(v) => setLivelineColorChoice(v)}>
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-8 min-w-0 text-xs">
                           <SelectValue placeholder="Palette (auto)" />
                         </SelectTrigger>
                         <SelectContent className="text-xs">
@@ -459,7 +445,7 @@ export default function ChartControls() {
                 </div>
               )}
               {!demo && effectiveData?.length > 0 && xOptions?.length > 0 && (
-                <div className="py-2 space-y-2">
+                <div className="min-w-0 py-2 space-y-2">
                   <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Filter by column</p>
                   <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Plot only rows matching filter</p>
                   <Select
@@ -469,7 +455,7 @@ export default function ChartControls() {
                       setChartFilterConfig({});
                     }}
                   >
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-8 min-w-0 text-xs">
                       <SelectValue placeholder="No filter" />
                     </SelectTrigger>
                     <SelectContent className="text-xs">
@@ -516,7 +502,7 @@ export default function ChartControls() {
                   {chartFilterColumn && chartFilterType === "number" && (
                     <div className="space-y-1">
                       <Select value={chartFilterConfig.operator ?? ""} onValueChange={(v) => setChartFilterConfig({ ...chartFilterConfig, operator: v })}>
-                        <SelectTrigger className="h-7 text-xs">
+                        <SelectTrigger className="h-7 min-w-0 text-xs">
                           <SelectValue placeholder="Operator" />
                         </SelectTrigger>
                         <SelectContent className="text-xs">
@@ -692,11 +678,11 @@ export default function ChartControls() {
             </div>
           </div>
           {(selChartType === "area" || selChartType === "line") && (
-            <div className="py-2">
+            <div className="min-w-0 py-2">
               <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Line Style</p>
               <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"} pt-2`}>How do you want your line</p>
-              <Select className="text-black" value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
-                <SelectTrigger className="text-black">
+              <Select className="min-w-0 text-black" value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
+                <SelectTrigger className="min-w-0 text-black">
                   <SelectValue placeholder="y axis" className="text-xs" />
                 </SelectTrigger>
                 <SelectContent className="text-xs text-black">
@@ -797,7 +783,6 @@ export default function ChartControls() {
             </div>
           </Link>
         </>
-      )}
     </div>
   );
 }
