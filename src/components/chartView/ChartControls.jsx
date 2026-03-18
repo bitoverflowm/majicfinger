@@ -32,7 +32,7 @@ import {
 import { useChartBuilder } from "@/components/chartView";
 import { masterPalette } from "@/components/chartView/panels/masterPalette";
 
-export default function ChartControls({ variant = "panel" }) {
+export default function ChartControls() {
   const {
     demo,
     effectiveData,
@@ -151,17 +151,10 @@ export default function ChartControls({ variant = "panel" }) {
     setBodyContent,
   } = useChartBuilder();
 
-  const wrapperClassName =
-    variant === "floating"
-      ? `gradualEffect absolute right-10 rounded-xl flex flex-col ${dark ? "bg-slate-900/60" : "bg-white"} shadow-lg px-10 py-5 ${
-          editHidden
-            ? "bg-opacity-20 w-1/12 border-0 top-14 md:top-14"
-            : "top-1/4 md:top-14 w-9/12 md:w-2/5 xl:w-1/4"
-        }`
-      : `gradualEffect rounded-xl flex flex-col ${dark ? "bg-slate-900/60" : "bg-white"} shadow-lg px-4 py-4 w-full border border-border`;
+  const wrapperClassName = ``;
 
   return (
-    <div className={wrapperClassName} style={{ zIndex: 20 }}>
+    <div className={`gradualEffect flex flex-col px-4 py-4 w-full border rounded-lg`} style={{ zIndex: 20 }}>
       <div className="flex gap-1 place-items-center place-content-center py-2">
         {editHidden ? (
           <Toggle area-label="Toggle edit close" onClick={() => setEditHidden(false)} pressed={false} className="bg-slate-100/40 mr-10">

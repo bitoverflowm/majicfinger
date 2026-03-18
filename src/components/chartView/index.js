@@ -537,7 +537,7 @@ export default function ChartView({ demo }) {
   return (
     <ChartBuilderProvider demo={demo}>
       <ChartCanvas />
-      <ChartControls variant="floating" />
+      <ChartControls />
     </ChartBuilderProvider>
   );
 }

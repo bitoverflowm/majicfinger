@@ -39,6 +39,8 @@ const PANEL_CLOSE_MS = 300;
 
 export default function DataSheetWithIntegration({ user, startNew, setStartNew, chartMode }) {
   const contextStateV2 = useMyStateV2();
+  const viewing = contextStateV2?.viewing;
+  const setViewing = contextStateV2?.setViewing;
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const setConnectedData = contextStateV2?.setConnectedData;
@@ -54,7 +56,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
 
   // When arriving to charts view, default the panel tab to charts (without forcing open)
   useEffect(() => {
-    if (chartMode && setRightPanelTab && !rightPanelTab) setRightPanelTab("charts");
+    if (chartMode && setRightPanelTab && rightPanelTab !== "charts") setRightPanelTab("charts");
   }, [chartMode, rightPanelTab, setRightPanelTab]);
 
   // Slide-in when panel opens: every time we go from closed → open
@@ -62,12 +64,10 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     const isOpen = !!rightPanelOpen;
     if (isOpen && !wasOpenRef.current) {
       setIsPanelOpen(false); // start off-screen so we can animate in
-      const id = requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          setIsPanelOpen(true); // trigger slide-open animation; panel ends in "open" state
-          wasOpenRef.current = true;
-        })
-      );
+      const id = requestAnimationFrame(() => {
+        setIsPanelOpen(true); // trigger slide-open animation; panel ends in "open" state
+        wasOpenRef.current = true;
+      });
       return () => cancelAnimationFrame(id);
     }
     if (!isOpen) wasOpenRef.current = false;
@@ -141,9 +141,15 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
           {!showSidebar && !isPanelClosing && (
             <OpenApiPanelTab
               onOpen={() => {
-                setRightPanelTab?.("integrations");
+                if (chartMode) {
+                  setRightPanelTab?.("charts");
+                  setViewing?.("charts");
+                } else {
+                  setRightPanelTab?.("integrations");
+                  setViewing?.("dataStart");
+                  setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+                }
                 setRightPanelOpen?.(true);
-                setIntegrationSidebar?.((prev) => prev ?? "polymarket");
               }}
             />
           )}
@@ -178,7 +184,16 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                 <div className="flex h-full flex-col rounded-lg border bg-background/80 backdrop-blur-sm shadow-sm">
                   <Tabs
                     value={rightPanelTab || "integrations"}
-                    onValueChange={(v) => setRightPanelTab?.(v)}
+                    onValueChange={(v) => {
+                      setRightPanelTab?.(v);
+                      setRightPanelOpen?.(true);
+                      if (v === "charts") {
+                        setViewing?.("charts");
+                      } else {
+                        setViewing?.("dataStart");
+                        setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+                      }
+                    }}
                     className="flex h-full flex-col"
                   >
                     <div className="flex items-center gap-2 p-2">
@@ -248,9 +263,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                       </TabsContent>
 
                       <TabsContent value="charts" className="m-0 h-full">
-                        <div className="h-full overflow-auto rounded-md border bg-muted/30 p-3">
+                        <div className="h-full overflow-auto p-3">
                           {chartsActive ? (
-                            <ChartControls variant="panel" />
+                            <ChartControls />
                           ) : (
                             <div className="text-xs text-muted-foreground">Select Charts tab to edit.</div>
                           )}
