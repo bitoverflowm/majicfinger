@@ -176,16 +176,21 @@ export default function ChartControls() {
           )}
           {!colorVisible && (
             <>
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="min-w-0 flex-wrap items-center gap-2">
                 <ToggleGroup
                   variant="outline"
                   type="single"
-                  area-label="Chart Type"
-                  value={useLiveline ? "" : selChartType}
+                  aria-label="Chart Type"
+                  className="flex-wrap"
+                  value={useLiveline ? "liveline" : selChartType}
                   onValueChange={(value) => {
                     if (value) {
-                      setSelChartType(value);
-                      setUseLiveline(false);
+                      if (value === "liveline") {
+                        setUseLiveline(true);
+                      } else {
+                        setSelChartType(value);
+                        setUseLiveline(false);
+                      }
                     }
                   }}
                 >
@@ -207,22 +212,13 @@ export default function ChartControls() {
                   <ToggleGroupItem value="scatter" aria-label="Toggle bubble (scatter)">
                     <CircleDot className="h-4 w-4" />
                   </ToggleGroupItem>
+                  <ToggleGroupItem value="liveline" aria-label="Liveline chart">
+                    <span className="relative inline-flex h-3 w-3">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                    </span>
+                  </ToggleGroupItem>
                 </ToggleGroup>
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant={useLiveline ? "default" : "outline"} size="icon" type="button" onClick={() => setUseLiveline((v) => !v)}>
-                        <span className="relative inline-flex h-3 w-3">
-                          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                          <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
-                        </span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      Liveline chart
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
               </div>
               <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Select your x-axis </p>
               <p className="text-xs text-muted-foreground" />
