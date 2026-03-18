@@ -24,6 +24,8 @@ const IntegrationsView = () => {
   const setIntegrationSidebar = context?.setIntegrationSidebar;
   const setConnectedData = context?.setConnectedData;
   const setConnectedCols = context?.setConnectedCols;
+  const setRightPanelOpen = context?.setRightPanelOpen;
+  const setRightPanelTab = context?.setRightPanelTab;
 
   const clickHandler = (clickHandlerId) => {
     if (API_INTEGRATIONS.includes(clickHandlerId)) {
@@ -31,6 +33,8 @@ const IntegrationsView = () => {
       setConnectedCols?.([]);
       setViewing?.("dataStart");
       setIntegrationSidebar?.(clickHandlerId);
+      setRightPanelTab?.("integrations");
+      setRightPanelOpen?.(true);
     }
   };
 
@@ -112,10 +116,6 @@ const IntegrationsView = () => {
                   </CardFooter>
                 </Card>
               ))}
-            </div>
-            <div className="mx-auto text-center py-20 w-1/2">
-              <div className="text-4xl font-black px-4"></div>
-              <div className="text-4xl font-black px-4">On a mission to connect 100,000+ data sources by the end of 2026</div>
             </div>
       </div>
     </div>

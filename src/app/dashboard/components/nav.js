@@ -33,6 +33,8 @@ const Nav = () => {
   const setViewing = contextStateV2?.setViewing
   const integrationSidebar = contextStateV2?.integrationSidebar
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar
+  const rightPanelOpen = contextStateV2?.rightPanelOpen
+  const setRightPanelOpen = contextStateV2?.setRightPanelOpen
 
 
   const connectedData = contextStateV2?.connectedData
@@ -401,7 +403,6 @@ const Nav = () => {
 
   const breadcrumb = viewing === 'dashboard' ? 'Lychee / Dashboard' :
     viewing === 'charts' ? 'Lychee / Charts' :
-    (viewing === 'dataStart' && integrationSidebar) ? 'Lychee / Data' :
     (viewing === 'dataStart' || viewing === 'upload' || viewing === 'newSheet' || viewing === 'integrations') ? 'Lychee / Data' :
     viewing === 'ai' ? 'Lychee / AI' :
     viewing === 'scrape' ? 'Lychee / Scrape' :
@@ -412,13 +413,16 @@ const Nav = () => {
   return (
     <div className="container flex flex-col items-start justify-between gap-2 py-4 sm:flex-row sm:items-center sm:gap-0 md:h-16">
           <div className="w-full flex items-center gap-2 min-w-0">
-            {viewing === "dataStart" && integrationSidebar && (
+            {(viewing === "dataStart" || viewing === "charts") && rightPanelOpen && (
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 shrink-0"
-                onClick={() => setIntegrationSidebar?.(null)}
-                title="Back to Data options"
+                onClick={() => {
+                  setRightPanelOpen?.(false)
+                  setIntegrationSidebar?.(null)
+                }}
+                title="Close right panel"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>

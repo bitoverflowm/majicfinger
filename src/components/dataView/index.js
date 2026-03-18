@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { HardDriveUpload, FilePlus2 } from "lucide-react";
-import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,8 @@ const DataView = ({ user }) => {
   const setViewing = contextStateV2?.setViewing;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const integrationSidebar = contextStateV2?.integrationSidebar;
+  const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
+  const setRightPanelTab = contextStateV2?.setRightPanelTab;
   const multiSheetFlag = contextStateV2?.multiSheetFlag;
   const multiSheetData = contextStateV2?.multiSheetData;
   const sheetNames = contextStateV2?.sheetNames;
@@ -47,6 +48,8 @@ const DataView = ({ user }) => {
       setConnectedCols?.([]);
       setViewing?.("dataStart");
       setIntegrationSidebar?.(clickHandlerId);
+      setRightPanelTab?.("integrations");
+      setRightPanelOpen?.(true);
     }
   };
 
@@ -81,9 +84,6 @@ const DataView = ({ user }) => {
 
       {showGrid ? (
         <div className="relative min-h-0 flex flex-col gap-3">
-          {!integrationSidebar && setIntegrationSidebar && (
-            <OpenApiPanelTab onOpen={() => setIntegrationSidebar("polymarket")} />
-          )}
           <div
             className={`min-h-0 w-full max-w-full shrink-0 ${
               hasChainlinkStream ? "overflow-auto" : ""

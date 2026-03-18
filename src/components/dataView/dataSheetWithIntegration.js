@@ -3,7 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import DataView from "@/components/dataView";
-import ChartView from "@/components/chartView";
+import ChartView, { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
+import ChartControls from "@/components/chartView/ChartControls";
 import Polymarket from "@/components/integrationsView/integrationPlayground/integrations/polymarket";
 import CoinGecko from "@/components/integrationsView/integrationPlayground/integrations/coinGecko";
 import Twitter from "@/components/integrationsView/integrationPlayground/integrations/twitter";
@@ -22,6 +23,7 @@ import {
 import Image from "next/image";
 import { X } from "lucide-react";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const INTEGRATION_OPTIONS = [
   { value: "binance", label: "Binance", logo: "/binance.jpeg" },
@@ -40,15 +42,24 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const setConnectedData = contextStateV2?.setConnectedData;
+  const rightPanelOpen = contextStateV2?.rightPanelOpen;
+  const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
+  const rightPanelTab = contextStateV2?.rightPanelTab;
+  const setRightPanelTab = contextStateV2?.setRightPanelTab;
 
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const closeTimeoutRef = useRef(null);
   const wasOpenRef = useRef(false);
 
-  // Slide-in when panel opens: every time we go from no panel → panel (e.g. first time opening or after close)
+  // When arriving to charts view, default the panel tab to charts (without forcing open)
   useEffect(() => {
-    const isOpen = integrationSidebar != null;
+    if (chartMode && setRightPanelTab && !rightPanelTab) setRightPanelTab("charts");
+  }, [chartMode, rightPanelTab, setRightPanelTab]);
+
+  // Slide-in when panel opens: every time we go from closed → open
+  useEffect(() => {
+    const isOpen = !!rightPanelOpen;
     if (isOpen && !wasOpenRef.current) {
       setIsPanelOpen(false); // start off-screen so we can animate in
       const id = requestAnimationFrame(() =>
@@ -60,16 +71,16 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       return () => cancelAnimationFrame(id);
     }
     if (!isOpen) wasOpenRef.current = false;
-  }, [integrationSidebar]);
+  }, [rightPanelOpen]);
 
   const closePanel = useCallback(() => {
     setIsPanelClosing(true);
     closeTimeoutRef.current = setTimeout(() => {
-      setIntegrationSidebar?.(null);
+      setRightPanelOpen?.(false);
       setIsPanelClosing(false);
       closeTimeoutRef.current = null;
     }, PANEL_CLOSE_MS);
-  }, [setIntegrationSidebar]);
+  }, [setRightPanelOpen]);
 
   useEffect(() => () => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
@@ -118,18 +129,29 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     }
   };
 
-  const showSidebar = integrationSidebar != null;
+  const showSidebar = !!rightPanelOpen;
   const isPanelVisible = showSidebar || isPanelClosing;
+  const chartsActive = rightPanelTab === "charts";
 
-  return (
+  const layout = (
     <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-4 px-2 py-2 sm:gap-6 sm:px-4">
       <div className="flex min-h-0 w-full max-w-full flex-1 flex-row gap-4 sm:gap-6">
         {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
         <main className="min-w-0 flex-1 overflow-auto relative">
           {!showSidebar && !isPanelClosing && (
-            <OpenApiPanelTab onOpen={() => setIntegrationSidebar("polymarket")} />
+            <OpenApiPanelTab
+              onOpen={() => {
+                setRightPanelTab?.("integrations");
+                setRightPanelOpen?.(true);
+                setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+              }}
+            />
           )}
-          {chartMode ? (
+          {chartsActive ? (
+            <div className="py-6 sm:py-10">
+              <ChartCanvas />
+            </div>
+          ) : chartMode ? (
             <div className="py-16">
               <ChartView user={user} />
             </div>
@@ -152,38 +174,90 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                 isPanelClosing || !isPanelOpen ? "translate-x-full" : "translate-x-0"
               }`}
             >
-              <div className="grid gap-3">
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={integrationSidebar}
-                    onValueChange={(value) => setIntegrationSidebar(value)}
+              <div className="h-[calc(100dvh-7rem)] w-full">
+                <div className="flex h-full flex-col rounded-lg border bg-background/80 backdrop-blur-sm shadow-sm">
+                  <Tabs
+                    value={rightPanelTab || "integrations"}
+                    onValueChange={(v) => setRightPanelTab?.(v)}
+                    className="flex h-full flex-col"
                   >
-                    <SelectTrigger className="h-9 min-w-0 flex-1 text-sm gap-2 focus:ring-0 focus:ring-offset-0">
-                      {integrationSidebar && renderIntegrationAvatar(INTEGRATION_OPTIONS.find((o) => o.value === integrationSidebar) || { label: integrationSidebar, value: integrationSidebar, logo: null })}
-                      <SelectValue placeholder="Select API" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INTEGRATION_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value} left={renderIntegrationAvatar(opt)}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={closePanel}
-                    aria-label="Close panel"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="grid min-h-0 gap-3">
-                <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30 p-3">
-                  {renderIntegration()}
+                    <div className="flex items-center gap-2 p-2">
+                      <TabsList className="h-9">
+                        <TabsTrigger value="integrations" className="text-xs">
+                          Integrations
+                        </TabsTrigger>
+                        <TabsTrigger value="charts" className="text-xs">
+                          Charts
+                        </TabsTrigger>
+                      </TabsList>
+                      <div className="ml-auto flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={closePanel}
+                          aria-label="Close panel"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 px-2 pb-2">
+                      <TabsContent value="integrations" className="m-0 h-full">
+                        <div className="flex h-full flex-col gap-3">
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={integrationSidebar || ""}
+                              onValueChange={(value) => setIntegrationSidebar?.(value)}
+                            >
+                              <SelectTrigger className="h-9 min-w-0 flex-1 text-sm gap-2 focus:ring-0 focus:ring-offset-0">
+                                {integrationSidebar &&
+                                  renderIntegrationAvatar(
+                                    INTEGRATION_OPTIONS.find((o) => o.value === integrationSidebar) || {
+                                      label: integrationSidebar,
+                                      value: integrationSidebar,
+                                      logo: null,
+                                    }
+                                  )}
+                                <SelectValue placeholder="Select API" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {INTEGRATION_OPTIONS.map((opt) => (
+                                  <SelectItem
+                                    key={opt.value}
+                                    value={opt.value}
+                                    left={renderIntegrationAvatar(opt)}
+                                  >
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30 p-3">
+                            {integrationSidebar ? (
+                              renderIntegration()
+                            ) : (
+                              <div className="text-xs text-muted-foreground">
+                                Select an integration to get started.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="charts" className="m-0 h-full">
+                        <div className="h-full overflow-auto rounded-md border bg-muted/30 p-3">
+                          {chartsActive ? (
+                            <ChartControls variant="panel" />
+                          ) : (
+                            <div className="text-xs text-muted-foreground">Select Charts tab to edit.</div>
+                          )}
+                        </div>
+                      </TabsContent>
+                    </div>
+                  </Tabs>
                 </div>
               </div>
             </aside>
@@ -192,4 +266,5 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       </div>
     </div>
   );
+  return chartsActive ? <ChartBuilderProvider demo={false}>{layout}</ChartBuilderProvider> : layout;
 }

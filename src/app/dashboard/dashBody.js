@@ -7,10 +7,8 @@ import SideNav from './components/sideNav'
 import Nav from './components/nav'
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import KatsuView from './components/katsuView';
-import DataView from "@/components/dataView";
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
 import Upload from '@/components/dataView/upload'
-import ChartView from "@/components/chartView";
 import IntegrationsView from "@/components/integrationsView";
 import NewSheetView from "@/components/newSheetView";
 
@@ -36,7 +34,7 @@ const DashBody = ({user}) => {
     const setViewing = contextStateV2?.setViewing
 
     const viewing = contextStateV2?.viewing
-    const integrationSidebar = contextStateV2?.integrationSidebar
+    const rightPanelOpen = contextStateV2?.rightPanelOpen
     //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
     const setSavedCharts = contextStateV2?.setSavedCharts
@@ -233,23 +231,21 @@ const DashBody = ({user}) => {
                 <header className="sticky top-0 z-30 w-full shrink-0 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none">
                     <Nav />
                 </header>
-                {integrationSidebar && <Separator className="shrink-0" />}
+                {rightPanelOpen && <Separator className="shrink-0" />}
                 <div className="relative z-0 flex min-h-0 flex-1 flex-col py-1">
                 { viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
-                { viewing === 'dataStart' && (integrationSidebar ? (
+                { viewing === 'dataStart' && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} />
                   </div>
-                ) : <div className="min-h-0 flex-1 min-h-[70vh] overflow-y-auto overflow-x-hidden py-1"><DataView user={user} startNew={startNew} setStartNew={setStartNew} /></div>) }
+                ) }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
-                { viewing === 'charts' && (hasAnyLiveStream || (polymarketWsState?.isRunning && polymarketWsState?.stop) || (chainlinkWsState?.isRunning && chainlinkWsState?.stop) ? (
+                { viewing === 'charts' && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} chartMode />
                   </div>
-                ) : (
-                  <div className="py-16"><ChartView user={user}/></div>
-                )) }
+                ) }
                 { viewing === 'integrations' && <div className="py-10"><IntegrationsView/></div> }
                 { viewing === 'ai' && <AiView/> }
                 { viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
