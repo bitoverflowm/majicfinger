@@ -358,27 +358,6 @@ const GridView = ({startNew}) => {
                     Sort & filter
                   </TabsTrigger>
                 </TabsList>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setSummarizeOpen(true)}>
-                  <BarChart2 className="h-3.5 w-3.5" />
-                  Summarize
-                </Button>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={resetFilters}>
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Reset
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                      <Download className="h-3.5 w-3.5" />
-                      Export
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={downloadCSV}>Download CSV</DropdownMenuItem>
-                    <DropdownMenuItem onClick={downloadJSON}>Download JSON</DropdownMenuItem>
-                    <DropdownMenuItem onClick={downloadXLSX}>Download XLSX</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
                 <div className="h-4 w-px bg-border shrink-0" />
                 <Menu compact />
                 <Dialog open={colAddOpen} onOpenChange={setColAddOpen}>
@@ -549,7 +528,6 @@ const GridView = ({startNew}) => {
               <TabsContent value="table" className="mt-0" />
             </Tabs>
             )}
-            <SummarizeDrawer open={summarizeOpen} onOpenChange={setSummarizeOpen} />
             <div className={gridExpanded ? 'h-[750px]' :'h-[550px]'}>
                 <AgGridReact 
                     defaultColDef={defaultColDef} 

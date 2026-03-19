@@ -206,7 +206,7 @@ export default function ChartControls() {
                   <span className="flex items-center gap-2">
                     <span>Chart Type</span>
                     <span className={`text-[10px] font-medium ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
-                      {`Chart Type: ${chartTypeLabel}`}
+                      {`${chartTypeLabel}`}
                     </span>
                   </span>
                 </AccordionTrigger>
