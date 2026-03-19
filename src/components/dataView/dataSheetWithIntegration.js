@@ -167,19 +167,20 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
 
         {/* Right: API playground — slide in when opened, slide out when X is clicked */}
         {isPanelVisible && (
-          <div
-            className={`flex shrink-0 flex-col overflow-hidden transition-[width] duration-300 ease-out ${
-              isPanelClosing || !isPanelOpen
-                ? "w-0 min-w-0 gap-0"
-                : "w-[18rem] min-w-[18rem] sm:w-[300px] sm:min-w-[300px] gap-4 sm:gap-6"
-            }`}
-          >
+          <>
+            {/* Spacer: keeps main from expanding when panel is fixed */}
+            <div
+              className={`shrink-0 transition-[width] duration-300 ease-out ${
+                isPanelClosing || !isPanelOpen ? "w-0" : "w-[18rem] sm:w-[300px]"
+              }`}
+              aria-hidden
+            />
             <aside
-              className={`flex min-w-[18rem] sm:min-w-[300px] w-[18rem] sm:w-[300px] flex-1 flex-col gap-4 sm:gap-6 transition-transform duration-300 ease-out ${
+              className={`fixed right-2 top-[4.5rem] z-20 flex min-w-[18rem] sm:min-w-[300px] w-[18rem] sm:w-[300px] h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-transform duration-300 ease-out sm:right-4 ${
                 isPanelClosing || !isPanelOpen ? "translate-x-full" : "translate-x-0"
               }`}
             >
-              <div className="h-[calc(100dvh-7rem)] w-full">
+              <div className="h-full min-h-0 w-full flex flex-col">
                 <div className="flex h-full flex-col rounded-lg border bg-background/80 backdrop-blur-sm shadow-sm">
                   <Tabs
                     value={rightPanelTab || "integrations"}
@@ -265,7 +266,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                       </TabsContent>
 
                       <TabsContent value="charts" className="m-0 h-full min-w-0">
-                        <div className="h-full min-w-0 overflow-auto p-3">
+                        <div className="h-full min-w-0 overflow-auto p-1 ">
                           {chartsActive ? (
                             <ChartControls />
                           ) : (
@@ -284,7 +285,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                 </div>
               </div>
             </aside>
-          </div>
+          </>
         )}
       </div>
     </div>

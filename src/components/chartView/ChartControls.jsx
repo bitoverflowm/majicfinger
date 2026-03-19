@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon } from "@radix-ui/react-icons";
 import { MinusCircle, Moon } from "react-feather";
 import { IoPieChartOutline, IoShuffleOutline, IoStatsChart } from "react-icons/io5";
@@ -31,6 +32,7 @@ import {
 
 import { useChartBuilder } from "@/components/chartView";
 import { masterPalette } from "@/components/chartView/panels/masterPalette";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function ChartControls() {
   const {
@@ -49,8 +51,6 @@ export default function ChartControls() {
 
     selChartType,
     setSelChartType,
-    useLiveline,
-    setUseLiveline,
 
     selX,
     setSelX,
@@ -148,6 +148,16 @@ export default function ChartControls() {
     setBodyContent,
   } = useChartBuilder();
 
+  const chartTypeLabel =
+    selChartType === "liveline"
+      ? "Liveline"
+      : selChartType
+          ? selChartType.charAt(0).toUpperCase() + selChartType.slice(1)
+          : "—";
+
+  // Only one section open at a time; default to Chart Type.
+  const [openSection, setOpenSection] = useState("chartType");
+
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
       <>
@@ -174,104 +184,78 @@ export default function ChartControls() {
               </span>
             </div>
           )}
-          {!colorVisible && (
-            <>
-              <div className="min-w-0 flex-wrap items-center gap-2">
-                <ToggleGroup
-                  variant="outline"
-                  type="single"
-                  aria-label="Chart Type"
-                  className="flex-wrap"
-                  value={useLiveline ? "liveline" : selChartType}
-                  onValueChange={(value) => {
-                    if (value) {
-                      if (value === "liveline") {
-                        setUseLiveline(true);
-                      } else {
-                        setSelChartType(value);
-                        setUseLiveline(false);
-                      }
-                    }
-                  }}
-                >
-                  <ToggleGroupItem value="area" aria-label="Toggle area">
-                    <MdOutlineAreaChart className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="bar" aria-label="Toggle bar">
-                    <IoStatsChart className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="line" aria-label="Toggle line">
-                    <PiChartLine className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="pie" aria-label="Toggle pie">
-                    <IoPieChartOutline className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="radar" aria-label="Toggle radar">
-                    <AiOutlineRadarChart className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="scatter" aria-label="Toggle bubble (scatter)">
-                    <CircleDot className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="liveline" aria-label="Liveline chart">
-                    <span className="relative inline-flex h-3 w-3">
-                      <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                      <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+          <Accordion
+            type="single"
+            collapsible
+            value={openSection}
+            onValueChange={(v) => setOpenSection(v || "")}
+            className="w-full"
+          >
+              <AccordionItem value="chartType">
+                <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
+                  <span className="flex items-center gap-2">
+                    <span>Chart Type</span>
+                    <span className={`text-[10px] font-medium ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+                      {`Chart Type: ${chartTypeLabel}`}
                     </span>
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-              <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Select your x-axis </p>
-              <p className="text-xs text-muted-foreground" />
-              <div className="min-w-0 py-2 text-black">
-                <Select value={selX} onValueChange={(value) => setSelX(value)}>
-                  <SelectTrigger className="min-w-0">
-                    <SelectValue placeholder="x axis" className="text-xs" />
-                  </SelectTrigger>
-                  <SelectContent className="text-xs">
-                    {xOptions &&
-                      xOptions.map((i) => (
-                        <SelectItem key={i} value={i} className="text-xs">
-                          {i}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="py-2">
-                <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Select your y-axis</p>
-                <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"} pt-2`}>Typically this should be something quantifiable (numerical)</p>
-                {selY.length > 0 &&
-                  selY.map((yValue, index) => (
-                    <div className="py-1 flex min-w-0 place-items-center gap-2 text-black" key={index}>
-                      <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
-                        <SelectTrigger className="min-w-0 flex-1">
-                          <SelectValue className="text-xs">{yValue}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className="text-xs">
-                          {availableYOptions &&
-                            availableYOptions.map((i) => (
-                              <SelectItem key={i} value={i} className="text-xs">
-                                {i}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                      {!(selY.length === 1) && (
-                        <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
-                          <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                {selY.length === 0 && (
-                  <div className="min-w-0">
-                    <Select onValueChange={(val) => handleSelectY(val)}>
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="min-w-0 flex-wrap items-center gap-2">
+                    <ToggleGroup
+                      variant="outline"
+                      type="single"
+                      aria-label="Chart Type"
+                      className="flex-wrap"
+                      value={selChartType}
+                      onValueChange={(value) => {
+                        if (value) setSelChartType(value);
+                      }}
+                    >
+                      <ToggleGroupItem value="area" aria-label="Toggle area">
+                        <MdOutlineAreaChart className="h-4 w-4" />
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="bar" aria-label="Toggle bar">
+                        <IoStatsChart className="h-4 w-4" />
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="line" aria-label="Toggle line">
+                        <PiChartLine className="h-4 w-4" />
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="pie" aria-label="Toggle pie">
+                        <IoPieChartOutline className="h-4 w-4" />
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="radar" aria-label="Toggle radar">
+                        <AiOutlineRadarChart className="h-4 w-4" />
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="scatter" aria-label="Toggle bubble (scatter)">
+                        <CircleDot className="h-4 w-4" />
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="liveline" aria-label="Liveline chart">
+                        <span className="relative inline-flex h-3 w-3">
+                          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                          <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                        </span>
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="data">
+                <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
+                  Data
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Select your x-axis </p>
+                  <p className="text-xs text-muted-foreground" />
+                  <div className="min-w-0 py-2 text-black">
+                    <Select value={selX} onValueChange={(value) => setSelX(value)}>
                       <SelectTrigger className="min-w-0">
-                        <SelectValue placeholder="desktop" className="text-xs" />
+                        <SelectValue placeholder="x axis" className="text-xs" />
                       </SelectTrigger>
                       <SelectContent className="text-xs">
-                        {availableYOptions &&
-                          availableYOptions.map((i) => (
+                        {xOptions &&
+                          xOptions.map((i) => (
                             <SelectItem key={i} value={i} className="text-xs">
                               {i}
                             </SelectItem>
@@ -279,8 +263,131 @@ export default function ChartControls() {
                       </SelectContent>
                     </Select>
                   </div>
-                )}
-              </div>
+
+                  <div className="py-2">
+                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Select your y-axis</p>
+                    <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"} pt-2`}>Typically this should be something quantifiable (numerical)</p>
+                    {selY.length > 0 &&
+                      selY.map((yValue, index) => (
+                        <div className="py-1 flex min-w-0 place-items-center gap-2 text-black" key={index}>
+                          <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
+                            <SelectTrigger className="min-w-0 flex-1">
+                              <SelectValue className="text-xs">{yValue}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              {availableYOptions &&
+                                availableYOptions.map((i) => (
+                                  <SelectItem key={i} value={i} className="text-xs">
+                                    {i}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          {!(selY.length === 1) && (
+                            <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
+                              <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    {selY.length === 0 && (
+                      <div className="min-w-0">
+                        <Select onValueChange={(val) => handleSelectY(val)}>
+                          <SelectTrigger className="min-w-0">
+                            <SelectValue placeholder="desktop" className="text-xs" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            {availableYOptions &&
+                              availableYOptions.map((i) => (
+                                <SelectItem key={i} value={i} className="text-xs">
+                                  {i}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Scatter/bubble: Z (bubble size) and Color column */}
+                  {selChartType === "scatter" && (
+                    <>
+                      <div className="min-w-0 py-2">
+                        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Bubble size (Z)</p>
+                        <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Numeric column for bubble radius</p>
+                        <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
+                          <SelectTrigger className="mt-1 min-w-0">
+                            <SelectValue placeholder="Select Z column" className="text-xs" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            {xOptions &&
+                              xOptions.filter((k) => k !== selX).map((i) => (
+                                <SelectItem key={i} value={i} className="text-xs">
+                                  {i}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="min-w-0 py-2">
+                        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Color by</p>
+                        <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional column for point color</p>
+                        <Select value={selColorCol ?? "__none__"} onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}>
+                          <SelectTrigger className="mt-1 min-w-0">
+                            <SelectValue placeholder="None or select column" className="text-xs" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value="__none__" className="text-xs">
+                              None
+                            </SelectItem>
+                            {xOptions &&
+                              xOptions.map((i) => (
+                                <SelectItem key={i} value={i} className="text-xs">
+                                  {i}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {selZ && (
+                        <div className="py-2 flex items-center gap-2">
+                          <span className={`text-xs ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Z scale:</span>
+                          <TooltipProvider delayDuration={300}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={`p-1.5 rounded border ${scaleZ === "log" ? "bg-muted" : "bg-background"} border-border flex items-center gap-1`}
+                                  onClick={() => setScaleZ((s) => (s === "log" ? "linear" : "log"))}
+                                >
+                                  <LogIn className="h-4 w-4" />
+                                  <span className="text-[10px]">Z</span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                                {scaleZ === "linear" ? "Z: Linear scale." : "Z: Log scale (for large value ranges)."}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && (
+                    <button className="p-2 bg-black text-white rounded-md text-xs" onClick={() => handleSelectY(availableYOptions[0])} disabled={availableYOptions && availableYOptions.length === 0}>
+                      {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
+                    </button>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="design">
+                <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
+                  Design
+                </AccordionTrigger>
+                {/* Remount when palette picker toggles so height re-measures */}
+                <AccordionContent key={colorVisible ? "palette-open" : "palette-closed"} className="pt-2">
               {/* Scatter/bubble: Z (bubble size) and Color column */}
               {selChartType === "scatter" && (
                 <>
@@ -345,12 +452,12 @@ export default function ChartControls() {
                   )}
                 </>
               )}
-              {selChartType !== "pie" && selChartType !== "scatter" && (
+              {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && (
                 <button className="p-2 bg-black text-white rounded-md text-xs" onClick={() => handleSelectY(availableYOptions[0])} disabled={availableYOptions && availableYOptions.length === 0}>
                   {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
                 </button>
               )}
-              {useLiveline && (
+              {selChartType === "liveline" && (
                 <div className="mt-3 rounded-lg border p-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Liveline</p>
@@ -613,15 +720,20 @@ export default function ChartControls() {
                   </div>
                 </div>
               ) : null}
-            </>
-          )}
           <div className="py-2">
             <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Paletter</p>
             <div className="flex gap-3 place-items-center">
-              <div className="flex text-xs rounded-md py-2 cursor-pointer" onClick={() => setColorVisible(true)}>
+              <button
+                type="button"
+                className="flex text-xs rounded-md py-2 cursor-pointer"
+                onClick={() => {
+                  setOpenSection("design");
+                  setColorVisible(true);
+                }}
+              >
                 {selectedPalette &&
                   selectedPalette.map((color) => <div key={color} className="p-3" style={{ backgroundColor: color }} />)}
-              </div>
+              </button>
               <div className="p-1 cursor-pointer" onClick={() => shufflePalette()}>
                 <IoShuffleOutline className="h-4 w-4 text-slate-600" />
               </div>
@@ -756,16 +868,9 @@ export default function ChartControls() {
               {bodyContentHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}
             </div>
           </div>
-          <Link rel="noopener noreferrer" target="_blank" href="https://misterrpink.beehiiv.com/p/how-to-create-crarts-on-lychee">
-            <div className="bottom-0 flex place-items-center place-content-center w-5/6 py-3 bg-slate-200/40 rounded-t-md hover:bg-slate-300/30">
-              <div className="flex place-content-center gap-2 place-items-center text-center w-full">
-                <small className="text-xs">
-                  New? <span className="underline">Click</span> to get up to speed on MajicCharts in no time.
-                </small>
-                <CaretRightIcon />
-              </div>
-            </div>
-          </Link>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
         </>
     </div>
   );

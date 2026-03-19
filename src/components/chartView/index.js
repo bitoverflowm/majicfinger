@@ -106,6 +106,7 @@ export function ChartBuilderProvider({ demo, children }) {
   const categories = Object.keys(masterPalette || {});
   const [selectedCategory, setSelectedCategory] = useState(categories?.[0]);
   const [selectedPalette, setSelectedPalette] = useState(["hsl(142 88% 28%)"]);
+  const [colorVisible, setColorVisible] = useState(false);
 
   const [expanded, setExpanded] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
@@ -127,7 +128,7 @@ export function ChartBuilderProvider({ demo, children }) {
 
   const [chartConfig, setChartConfig] = useState(dfltChartConfig);
 
-  const [useLiveline, setUseLiveline] = useState(false);
+  // Liveline is modeled as a chart type (selChartType === "liveline")
   const [livelineMomentum, setLivelineMomentum] = useState(true);
   const [livelineShowValue, setLivelineShowValue] = useState(false);
   const [livelineValueMomentumColor, setLivelineValueMomentumColor] = useState(false);
@@ -151,6 +152,17 @@ export function ChartBuilderProvider({ demo, children }) {
     setAvailableYOptons(yOpts);
     if (!selY?.length) setSelY(yOpts.length ? [yOpts[0]] : []);
   }, [effectiveCols]);
+
+  // Auto-trim Y for single-series chart types (keeps filters/sorts intact).
+  useEffect(() => {
+    const singleSeries = selChartType === "pie" || selChartType === "radar" || selChartType === "liveline";
+    if (!singleSeries) return;
+    setSelY((prev) => {
+      const curr = Array.isArray(prev) ? prev : [];
+      if (curr.length <= 1) return curr;
+      return curr.slice(0, 1);
+    });
+  }, [selChartType]);
 
   useEffect(() => {
     if (!demo) return;
@@ -280,13 +292,11 @@ export function ChartBuilderProvider({ demo, children }) {
     dark,
     downloadChart,
 
-    colorVisible: false,
-    setColorVisible: () => {},
+    colorVisible,
+    setColorVisible,
 
     selChartType,
     setSelChartType,
-    useLiveline,
-    setUseLiveline,
     selX,
     setSelX,
     xOptions,
@@ -423,7 +433,6 @@ export function ChartCanvas() {
     title,
     subTitleHidden,
     subTitle,
-    useLiveline,
     livelineData,
     livelineColorChoice,
     livelineMomentum,
@@ -456,7 +465,7 @@ export function ChartCanvas() {
   const yKeys = (selY && selY.length) ? selY : ["desktop"];
 
   return (
-    <div className={`gradualEffect relative xl:flex ${dark ? "bg-black text-white" : "bg-slate-100 text-black"} p-10`}>
+    <div className={`gradualEffect relative xl:flex p-10`}>
       {showWsFeedControl && (
         <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-lg border px-3 py-2 ${dark ? "bg-slate-800/90 border-slate-600" : "bg-white/95 border-slate-200"} shadow-lg`}>
           <span className="text-xs font-medium">{wsRunning ? "Live feed" : "Feed paused"}</span>
@@ -477,14 +486,14 @@ export function ChartCanvas() {
 
       <div className="gradualEffect lg:py-10 lg:px-10">
         <div className="gradualEffect py-12 px-12 rounded-xl" ref={chartRef} style={{ backgroundColor: selectedPalette?.[0] || "#0064E6" }}>
-          <div className="py-4 px-4 rounded-xl shadow-xl backdrop-blur-xl bg-opacity-50" style={{ backgroundColor: dark ? "rgba(0, 0, 0, 0.5)" : "rgba(255, 255, 255, 0.5)" }}>
-            <Card className={`py-4 border-0 ${dark ? "text-white bg-black" : " text-black bg-white"}`}>
+          <div className="py-4 px-4 rounded-xl shadow-xl bg-opacity-50" style={{ backgroundColor: selectedPalette?.[1] || "white" }}>
+            <Card className={`py-4 border-0`} style={{ backgroundColor: selectedPalette?.[selectedPalette.length - 1] || "white" }}>
               <CardHeader>
                 {titleHidden && <CardTitle>{title}</CardTitle>}
-                {subTitleHidden && <CardDescription className={`${dark && "text-slate-200"}`}>{subTitle}</CardDescription>}
+                {subTitleHidden && <CardDescription>{subTitle}</CardDescription>}
               </CardHeader>
               <CardContent>
-                {useLiveline ? (
+                {selChartType === "liveline" ? (
                   <div style={{ height: 200 }} className="w-full flex items-center justify-center">
                     {livelineData && livelineData.length > 0 ? (
                       <Liveline
