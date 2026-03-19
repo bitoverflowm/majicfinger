@@ -105,7 +105,7 @@ export function ChartBuilderProvider({ demo, children }) {
 
   const categories = Object.keys(masterPalette || {});
   const [selectedCategory, setSelectedCategory] = useState(categories?.[0]);
-  const [selectedPalette, setSelectedPalette] = useState(["hsl(142 88% 28%)"]);
+  const [selectedPalette, setSelectedPalette] = useState([]);
   const [colorVisible, setColorVisible] = useState(false);
 
   const [expanded, setExpanded] = useState(false);
@@ -463,6 +463,12 @@ export function ChartCanvas() {
   const data = chartData && chartData.length ? chartData : dfltChartData;
   const xKey = selX || "month";
   const yKeys = (selY && selY.length) ? selY : ["desktop"];
+  const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
+  const defaultPalette = dark
+    ? ["#ffffff", "#000000", "#000000", "#ffffff"]
+    : ["#000000", "#ffffff", "#ffffff", "#000000"];
+  const activePalette = hasSelectedPalette ? selectedPalette : defaultPalette;
+  const seriesColorAt = (idx) => activePalette?.[idx] || activePalette?.[3] || activePalette?.[0] || (dark ? "#ffffff" : "#000000");
 
   return (
     <div className={`gradualEffect relative xl:flex p-10`}>
@@ -485,9 +491,9 @@ export function ChartCanvas() {
       )}
 
       <div className="gradualEffect lg:py-10 lg:px-10">
-        <div className="gradualEffect py-12 px-12 rounded-xl" ref={chartRef} style={{ backgroundColor: selectedPalette?.[0] || "#0064E6" }}>
-          <div className="py-4 px-4 rounded-xl shadow-xl bg-opacity-50" style={{ backgroundColor: selectedPalette?.[1] || "white" }}>
-            <Card className={`py-4 border-0`} style={{ backgroundColor: selectedPalette?.[selectedPalette.length - 1] || "white" }}>
+        <div className="gradualEffect py-12 px-12 rounded-xl" ref={chartRef} style={{ backgroundColor: activePalette?.[0] || (dark ? "#ffffff" : "#000000") }}>
+          <div className="py-4 px-4 rounded-xl shadow-xl bg-opacity-50" style={{ backgroundColor: activePalette?.[1] || (dark ? "#000000" : "#ffffff") }}>
+            <Card className={`py-4 border-0`} style={{ backgroundColor: activePalette?.[2] || (dark ? "#000000" : "#ffffff") }}>
               <CardHeader>
                 {titleHidden && <CardTitle>{title}</CardTitle>}
                 {subTitleHidden && <CardDescription>{subTitle}</CardDescription>}
@@ -500,7 +506,7 @@ export function ChartCanvas() {
                         data={livelineData}
                         value={livelineData[livelineData.length - 1].value}
                         theme={dark ? "dark" : "light"}
-                        color={livelineColorChoice === "__palette__" ? (selectedPalette?.[0] ?? "#3b82f6") : livelineColorChoice}
+                        color={livelineColorChoice === "__palette__" ? seriesColorAt(0) : livelineColorChoice}
                         momentum={livelineMomentum}
                         showValue={livelineShowValue}
                         valueMomentumColor={livelineValueMomentumColor}
@@ -525,7 +531,7 @@ export function ChartCanvas() {
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
-                          <Area key={yKey + idx} dataKey={yKey} type={lineStyle} fill={selectedPalette?.[idx] || selectedPalette?.[0]} fillOpacity={0.4} stroke={selectedPalette?.[idx] || selectedPalette?.[0]} stackId={"a"} />
+                          <Area key={yKey + idx} dataKey={yKey} type={lineStyle} fill={seriesColorAt(idx)} fillOpacity={0.4} stroke={seriesColorAt(idx)} stackId={"a"} />
                         ))}
                         {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
                       </AreaChart>
@@ -538,9 +544,9 @@ export function ChartCanvas() {
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
-                          <Bar key={yKey + idx} dataKey={yKey} fill={selectedPalette?.[idx] || selectedPalette?.[0]} radius={4} stackId={stackedBar ? "a" : idx}>
+                          <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorAt(idx)} radius={4} stackId={stackedBar ? "a" : idx}>
                             {(data || []).map((_, i) => (
-                              <Cell key={`cell-${i}`} fill={selectedPalette?.[idx] || selectedPalette?.[0]} />
+                              <Cell key={`cell-${i}`} fill={seriesColorAt(idx)} />
                             ))}
                           </Bar>
                         ))}
@@ -555,7 +561,7 @@ export function ChartCanvas() {
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
-                          <Line key={yKey + idx} dataKey={yKey} type={lineStyle} stroke={selectedPalette?.[idx] || selectedPalette?.[0]} strokeWidth={2} dot={dots && data.length <= 40}>
+                          <Line key={yKey + idx} dataKey={yKey} type={lineStyle} stroke={seriesColorAt(idx)} strokeWidth={2} dot={dots && data.length <= 40}>
                             {labelLine && <LabelList position="top" offset={12} className="font-black" fontSize={12} />}
                           </Line>
                         ))}

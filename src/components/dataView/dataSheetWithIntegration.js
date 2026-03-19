@@ -62,10 +62,26 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     }
   }, [chartMode, rightPanelTab, setRightPanelTab]);
 
-  // Slide-in when panel opens: every time we go from closed → open
+  const beginPanelClose = useCallback((onAfterClose) => {
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    setIsPanelOpen(false); // animate to off-screen
+    setIsPanelClosing(true);
+    closeTimeoutRef.current = setTimeout(() => {
+      onAfterClose?.();
+      setIsPanelClosing(false);
+      closeTimeoutRef.current = null;
+    }, PANEL_CLOSE_MS);
+  }, []);
+
+  // Slide-in when panel opens and ensure externally-triggered closes animate out.
   useEffect(() => {
     const isOpen = !!rightPanelOpen;
     if (isOpen && !wasOpenRef.current) {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
+      setIsPanelClosing(false);
       setIsPanelOpen(false); // start off-screen so we can animate in
       const id = requestAnimationFrame(() => {
         setIsPanelOpen(true); // trigger slide-open animation; panel ends in "open" state
@@ -73,17 +89,19 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       });
       return () => cancelAnimationFrame(id);
     }
-    if (!isOpen) wasOpenRef.current = false;
-  }, [rightPanelOpen]);
+    if (!isOpen && wasOpenRef.current && !isPanelClosing) {
+      beginPanelClose();
+      wasOpenRef.current = false;
+    }
+  }, [rightPanelOpen, isPanelClosing, beginPanelClose]);
 
   const closePanel = useCallback(() => {
-    setIsPanelClosing(true);
-    closeTimeoutRef.current = setTimeout(() => {
+    if (isPanelClosing) return;
+    beginPanelClose(() => {
       setRightPanelOpen?.(false);
-      setIsPanelClosing(false);
-      closeTimeoutRef.current = null;
-    }, PANEL_CLOSE_MS);
-  }, [setRightPanelOpen]);
+      wasOpenRef.current = false;
+    });
+  }, [isPanelClosing, beginPanelClose, setRightPanelOpen]);
 
   useEffect(() => () => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);

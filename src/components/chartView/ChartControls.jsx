@@ -9,7 +9,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag } from "lucide-react";
+import { CircleDot, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag, Settings } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -157,6 +157,7 @@ export default function ChartControls() {
 
   // Only one section open at a time; default to Chart Type.
   const [openSection, setOpenSection] = useState("chartType");
+  const [openLineEditors, setOpenLineEditors] = useState({});
 
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
@@ -246,59 +247,84 @@ export default function ChartControls() {
                   Data
                 </AccordionTrigger>
                 <AccordionContent className="pt-2">
-                  <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Select your x-axis </p>
-                  <p className="text-xs text-muted-foreground" />
-                  <div className="min-w-0 py-2 text-black">
-                    <Select value={selX} onValueChange={(value) => setSelX(value)}>
-                      <SelectTrigger className="min-w-0">
-                        <SelectValue placeholder="x axis" className="text-xs" />
-                      </SelectTrigger>
-                      <SelectContent className="text-xs">
-                        {xOptions &&
-                          xOptions.map((i) => (
-                            <SelectItem key={i} value={i} className="text-xs">
-                              {i}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="py-2">
-                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Select your y-axis</p>
-                    <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"} pt-2`}>Typically this should be something quantifiable (numerical)</p>
-                    {selY.length > 0 &&
-                      selY.map((yValue, index) => (
-                        <div className="py-1 flex min-w-0 place-items-center gap-2 text-black" key={index}>
-                          <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
-                            <SelectTrigger className="min-w-0 flex-1">
-                              <SelectValue className="text-xs">{yValue}</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent className="text-xs">
-                              {availableYOptions &&
-                                availableYOptions.map((i) => (
-                                  <SelectItem key={i} value={i} className="text-xs">
-                                    {i}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                          {!(selY.length === 1) && (
-                            <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
-                              <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
+                  {(selChartType === "area" || selChartType === "line") ? (
+                    <>
+                      {selY.length > 0 &&
+                        selY.map((yValue, index) => {
+                          const isOpen = !!openLineEditors[index];
+                          return (
+                            <div key={index} className="rounded-md border mb-2">
+                              <button
+                                type="button"
+                                className="w-full px-2 py-2 flex items-center justify-between text-left"
+                                onClick={() => setOpenLineEditors((prev) => ({ ...prev, [index]: !isOpen }))}
+                              >
+                                <span className={`text-xs font-medium ${dark ? "text-slate-200" : "text-muted-foreground"}`}>
+                                  {`Line ${index + 1} (${selX || "x-axis"}, ${yValue || "y-axis"})`}
+                                </span>
+                                <CaretRightIcon className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                              </button>
+                              {isOpen && (
+                                <div className="px-2 pb-2 space-y-2 text-black">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>x:</span>
+                                    <Select value={selX} onValueChange={(value) => setSelX(value)}>
+                                      <SelectTrigger className="min-w-0 flex-1">
+                                        <SelectValue placeholder="x axis" className="text-xs" />
+                                      </SelectTrigger>
+                                      <SelectContent className="text-xs">
+                                        {xOptions &&
+                                          xOptions.map((i) => (
+                                            <SelectItem key={i} value={i} className="text-xs">
+                                              {i}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Button type="button" size="icon" variant="outline" className="h-8 w-8" aria-label="x-axis settings">
+                                      <Settings className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>y:</span>
+                                    <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
+                                      <SelectTrigger className="min-w-0 flex-1">
+                                        <SelectValue className="text-xs">{yValue}</SelectValue>
+                                      </SelectTrigger>
+                                      <SelectContent className="text-xs">
+                                        {availableYOptions &&
+                                          availableYOptions.map((i) => (
+                                            <SelectItem key={i} value={i} className="text-xs">
+                                              {i}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Button type="button" size="icon" variant="outline" className="h-8 w-8" aria-label="y-axis settings">
+                                      <Settings className="h-4 w-4" />
+                                    </Button>
+                                    {!(selY.length === 1) && (
+                                      <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
+                                        <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    {selY.length === 0 && (
-                      <div className="min-w-0">
-                        <Select onValueChange={(val) => handleSelectY(val)}>
+                          );
+                        })}
+                    </>
+                  ) : (
+                    <>
+                      <div className="min-w-0 py-2 text-black">
+                        <Select value={selX} onValueChange={(value) => setSelX(value)}>
                           <SelectTrigger className="min-w-0">
-                            <SelectValue placeholder="desktop" className="text-xs" />
+                            <SelectValue placeholder="x axis" className="text-xs" />
                           </SelectTrigger>
                           <SelectContent className="text-xs">
-                            {availableYOptions &&
-                              availableYOptions.map((i) => (
+                            {xOptions &&
+                              xOptions.map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs">
                                   {i}
                                 </SelectItem>
@@ -306,8 +332,50 @@ export default function ChartControls() {
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
-                  </div>
+                      <div className="py-2">
+                        {selY.length > 0 &&
+                          selY.map((yValue, index) => (
+                            <div className="py-1 flex min-w-0 place-items-center gap-2 text-black" key={index}>
+                              <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
+                                <SelectTrigger className="min-w-0 flex-1">
+                                  <SelectValue className="text-xs">{yValue}</SelectValue>
+                                </SelectTrigger>
+                                <SelectContent className="text-xs">
+                                  {availableYOptions &&
+                                    availableYOptions.map((i) => (
+                                      <SelectItem key={i} value={i} className="text-xs">
+                                        {i}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              {!(selY.length === 1) && (
+                                <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
+                                  <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        {selY.length === 0 && (
+                          <div className="min-w-0">
+                            <Select onValueChange={(val) => handleSelectY(val)}>
+                              <SelectTrigger className="min-w-0">
+                                <SelectValue placeholder="desktop" className="text-xs" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                {availableYOptions &&
+                                  availableYOptions.map((i) => (
+                                    <SelectItem key={i} value={i} className="text-xs">
+                                      {i}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
 
                   {/* Scatter/bubble: Z (bubble size) and Color column */}
                   {selChartType === "scatter" && (
