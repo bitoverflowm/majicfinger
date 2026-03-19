@@ -67,6 +67,34 @@ export function getAxisType(key, dataTypes, data) {
   return 'string';
 }
 
+function isLikelyTemporalKey(key, dataTypes, data) {
+  return getAxisType(key, dataTypes, data) === "date";
+}
+
+function formatXAxisValue(value, temporal) {
+  if (!temporal) return value;
+  if (value == null || value === "") return "";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  }).format(d);
+}
+
+function toSortableXAxisValue(value, axisType) {
+  if (axisType === "date") {
+    const ts = Date.parse(String(value));
+    return Number.isFinite(ts) ? ts : Number.POSITIVE_INFINITY;
+  }
+  if (axisType === "number") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
+  }
+  return null;
+}
+
 function getDistinctValues(data, colKey) {
   const set = new Set();
   (data || []).forEach((row) => {
@@ -127,6 +155,8 @@ export function ChartBuilderProvider({ demo, children }) {
   const [bodyContent, setBodyContent] = useState('...');
 
   const [chartConfig, setChartConfig] = useState(dfltChartConfig);
+  const [lineSeriesColumn, setLineSeriesColumn] = useState(null);
+  const [lineSeriesValues, setLineSeriesValues] = useState([]);
 
   // Liveline is modeled as a chart type (selChartType === "liveline")
   const [livelineMomentum, setLivelineMomentum] = useState(true);
@@ -147,11 +177,24 @@ export function ChartBuilderProvider({ demo, children }) {
     if (!effectiveCols?.length) return;
     const cols = effectiveCols.map((c) => c.field);
     setXOptions(cols);
-    if (!selX) setSelX(cols[0]);
+    if (!selX) {
+      const temporalCol = cols.find((col) => isLikelyTemporalKey(col, dataTypes, effectiveData));
+      setSelX(temporalCol || cols[0]);
+    }
     const yOpts = cols.filter((c) => c !== cols[0]);
     setAvailableYOptons(yOpts);
     if (!selY?.length) setSelY(yOpts.length ? [yOpts[0]] : []);
-  }, [effectiveCols]);
+  }, [effectiveCols, selX, selY, dataTypes, effectiveData]);
+
+  useEffect(() => {
+    const cols = effectiveCols?.map((c) => c.field) || [];
+    if (!cols.length) return;
+    const current = selX && cols.includes(selX) ? selX : null;
+    if (!current) {
+      const temporalCol = cols.find((col) => isLikelyTemporalKey(col, dataTypes, effectiveData));
+      if (temporalCol) setSelX(temporalCol);
+    }
+  }, [effectiveCols, dataTypes, effectiveData, selX]);
 
   // Auto-trim Y for single-series chart types (keeps filters/sorts intact).
   useEffect(() => {
@@ -178,6 +221,36 @@ export function ChartBuilderProvider({ demo, children }) {
     return Array.isArray(d) && d.length ? d : dfltChartData;
   }, [demo, effectiveData]);
 
+  const lineSeriesColumnOptions = useMemo(() => {
+    if (!xOptions?.length) return [];
+    return xOptions.filter((k) => k !== selX && k !== selY?.[0]);
+  }, [xOptions, selX, selY]);
+
+  const inferredLineSeriesColumn = useMemo(() => {
+    if (!lineSeriesColumnOptions.length) return null;
+    const byType = lineSeriesColumnOptions.find((k) => getAxisType(k, dataTypes, chartData) === "string");
+    return byType || lineSeriesColumnOptions[0];
+  }, [lineSeriesColumnOptions, dataTypes, chartData]);
+
+  useEffect(() => {
+    if (!lineSeriesColumn && inferredLineSeriesColumn) setLineSeriesColumn(inferredLineSeriesColumn);
+  }, [lineSeriesColumn, inferredLineSeriesColumn]);
+
+  const lineSeriesCandidates = useMemo(() => {
+    if (!lineSeriesColumn || !chartData?.length) return [];
+    return getDistinctValues(chartData, lineSeriesColumn);
+  }, [lineSeriesColumn, chartData]);
+
+  useEffect(() => {
+    setLineSeriesValues((prev) => {
+      const allowed = new Set(lineSeriesCandidates);
+      const kept = (prev || []).filter((v) => allowed.has(v));
+      if (kept.length) return kept;
+      if (lineSeriesCandidates.length) return [lineSeriesCandidates[0]];
+      return [];
+    });
+  }, [lineSeriesCandidates]);
+
   const chartFilterType = useMemo(() => {
     if (!chartFilterColumn || !chartData?.length) return null;
     return getAxisType(chartFilterColumn, dataTypes, chartData);
@@ -200,6 +273,38 @@ export function ChartBuilderProvider({ demo, children }) {
       return { time: timeSec, value };
     });
   }, [chartData, selX, selY]);
+
+  const lineIsTemporalX = useMemo(() => isLikelyTemporalKey(selX, dataTypes, chartData), [selX, dataTypes, chartData]);
+
+  const lineChartData = useMemo(() => {
+    if (!chartData?.length || !selX || !selY?.[0]) return chartData || dfltChartData;
+    if (!lineSeriesColumn || !lineSeriesValues?.length) return chartData;
+    const yKey = selY[0];
+    const selectedSet = new Set(lineSeriesValues);
+    const rowsByX = new Map();
+    (chartData || []).forEach((row) => {
+      const seriesValue = row?.[lineSeriesColumn];
+      if (seriesValue == null || !selectedSet.has(String(seriesValue))) return;
+      const xVal = row?.[selX];
+      const xMapKey = xVal == null ? "__null__" : String(xVal);
+      const existing = rowsByX.get(xMapKey) || { [selX]: xVal };
+      const vNum = Number(row?.[yKey]);
+      if (!Number.isNaN(vNum) && Number.isFinite(vNum)) {
+        existing[String(seriesValue)] = vNum;
+      }
+      rowsByX.set(xMapKey, existing);
+    });
+    const rows = Array.from(rowsByX.values());
+    const xType = getAxisType(selX, dataTypes, chartData);
+    if (xType === "date" || xType === "number") {
+      rows.sort((a, b) => {
+        const av = toSortableXAxisValue(a?.[selX], xType);
+        const bv = toSortableXAxisValue(b?.[selX], xType);
+        return av - bv;
+      });
+    }
+    return rows;
+  }, [chartData, selX, selY, lineSeriesColumn, lineSeriesValues, lineIsTemporalX, dataTypes]);
 
   const selectedPaletteHandler = (index) => {
     const cat = selectedCategory || categories?.[0];
@@ -302,6 +407,7 @@ export function ChartBuilderProvider({ demo, children }) {
     xOptions,
 
     selY,
+    setSelY,
     availableYOptions,
     handleSelectY,
     removeY,
@@ -415,6 +521,15 @@ export function ChartBuilderProvider({ demo, children }) {
     setCardColor: () => {},
     chartConfig,
     setChartConfig,
+    lineSeriesColumn,
+    setLineSeriesColumn,
+    lineSeriesColumnOptions,
+    lineSeriesCandidates,
+    lineSeriesValues,
+    setLineSeriesValues,
+    lineIsTemporalX,
+    lineChartData,
+    formatXAxisValue,
   };
 
   return <ChartBuilderContext.Provider value={value}>{children}</ChartBuilderContext.Provider>;
@@ -447,8 +562,10 @@ export function ChartCanvas() {
     chartConfig,
     selChartType,
     chartData,
+    dataTypes,
     selX,
     selY,
+    lineSeriesValues,
     lineStyle,
     expanded,
     legendVisible,
@@ -458,11 +575,37 @@ export function ChartCanvas() {
     donut,
     bodyHeading,
     bodyContent,
+    lineIsTemporalX,
+    lineChartData,
+    formatXAxisValue,
   } = useChartBuilder();
 
   const data = chartData && chartData.length ? chartData : dfltChartData;
   const xKey = selX || "month";
-  const yKeys = (selY && selY.length) ? selY : ["desktop"];
+  const xAxisType = getAxisType(xKey, dataTypes, data);
+  const sortedData = useMemo(() => {
+    if (!Array.isArray(data) || data.length <= 1) return data;
+    if (xAxisType !== "date" && xAxisType !== "number") return data;
+    return [...data].sort((a, b) => {
+      const av = toSortableXAxisValue(a?.[xKey], xAxisType);
+      const bv = toSortableXAxisValue(b?.[xKey], xAxisType);
+      return av - bv;
+    });
+  }, [data, xAxisType, xKey]);
+  const renderedData = selChartType === "line" ? (lineChartData?.length ? lineChartData : data) : data;
+  const finalRenderedData = useMemo(() => {
+    if (selChartType !== "line") return sortedData;
+    if (!Array.isArray(renderedData) || renderedData.length <= 1) return renderedData;
+    if (xAxisType !== "date" && xAxisType !== "number") return renderedData;
+    return [...renderedData].sort((a, b) => {
+      const av = toSortableXAxisValue(a?.[xKey], xAxisType);
+      const bv = toSortableXAxisValue(b?.[xKey], xAxisType);
+      return av - bv;
+    });
+  }, [selChartType, renderedData, sortedData, xAxisType, xKey]);
+  const yKeys = selChartType === "line"
+    ? ((lineSeriesValues && lineSeriesValues.length) ? lineSeriesValues : ((selY && selY.length) ? selY : ["desktop"]))
+    : ((selY && selY.length) ? selY : ["desktop"]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
   const defaultPalette = dark
     ? ["#ffffff", "#000000", "#000000", "#ffffff"]
@@ -525,9 +668,9 @@ export function ChartCanvas() {
                 ) : (
                   <ChartContainer config={chartConfig || dfltChartConfig} className={`h-[300px] lg:h-[500px] w-full ${dark && "text-slate-200"}`}>
                     {selChartType === "area" && (
-                      <AreaChart accessibilityLayer data={data} margin={{ left: 12, right: 12, top: 0, bottom: 0 }} stackOffset={expanded ? "expand" : false}>
+                      <AreaChart accessibilityLayer data={finalRenderedData} margin={{ left: 12, right: 12, top: 0, bottom: 0 }} stackOffset={expanded ? "expand" : false}>
                         <CartesianGrid vertical={false} />
-                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} />
+                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
@@ -538,14 +681,14 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "bar" && (
-                      <BarChart accessibilityLayer data={data} margin={{ left: 12, right: 12 }}>
+                      <BarChart accessibilityLayer data={finalRenderedData} margin={{ left: 12, right: 12 }}>
                         <CartesianGrid vertical={false} />
-                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} />
+                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
                           <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorAt(idx)} radius={4} stackId={stackedBar ? "a" : idx}>
-                            {(data || []).map((_, i) => (
+                            {(finalRenderedData || []).map((_, i) => (
                               <Cell key={`cell-${i}`} fill={seriesColorAt(idx)} />
                             ))}
                           </Bar>
@@ -555,13 +698,13 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "line" && (
-                      <LineChart accessibilityLayer data={data} margin={{ left: 12, right: 12, top: 0, bottom: 0 }}>
+                      <LineChart accessibilityLayer data={finalRenderedData} margin={{ left: 12, right: 12, top: 0, bottom: 0 }}>
                         <CartesianGrid vertical={false} />
-                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} />
+                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
-                          <Line key={yKey + idx} dataKey={yKey} type={lineStyle} stroke={seriesColorAt(idx)} strokeWidth={2} dot={dots && data.length <= 40}>
+                          <Line key={yKey + idx} dataKey={yKey} type={lineStyle} stroke={seriesColorAt(idx)} strokeWidth={2} dot={dots && finalRenderedData.length <= 40}>
                             {labelLine && <LabelList position="top" offset={12} className="font-black" fontSize={12} />}
                           </Line>
                         ))}

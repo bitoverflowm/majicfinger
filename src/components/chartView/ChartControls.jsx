@@ -9,9 +9,10 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag, Settings } from "lucide-react";
+import { CircleDot, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -54,12 +55,19 @@ export default function ChartControls() {
 
     selX,
     setSelX,
+    setSelY,
     xOptions,
 
     selY,
     availableYOptions,
     handleSelectY,
     removeY,
+    lineSeriesColumn,
+    setLineSeriesColumn,
+    lineSeriesColumnOptions,
+    lineSeriesCandidates,
+    lineSeriesValues,
+    setLineSeriesValues,
 
     selZ,
     setSelZ,
@@ -157,7 +165,8 @@ export default function ChartControls() {
 
   // Only one section open at a time; default to Chart Type.
   const [openSection, setOpenSection] = useState("chartType");
-  const [openLineEditors, setOpenLineEditors] = useState({});
+  const addableLineSeriesValues = (lineSeriesCandidates || []).filter((v) => !(lineSeriesValues || []).includes(v));
+  const addLineLabel = `+ Line ${((lineSeriesValues?.length || 0) + 1)}`;
 
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
@@ -247,73 +256,157 @@ export default function ChartControls() {
                   Data
                 </AccordionTrigger>
                 <AccordionContent className="pt-2">
-                  {(selChartType === "area" || selChartType === "line") ? (
+                  {selChartType === "line" ? (
                     <>
-                      {selY.length > 0 &&
-                        selY.map((yValue, index) => {
-                          const isOpen = !!openLineEditors[index];
-                          return (
-                            <div key={index} className="rounded-md border mb-2">
-                              <button
-                                type="button"
-                                className="w-full px-2 py-2 flex items-center justify-between text-left"
-                                onClick={() => setOpenLineEditors((prev) => ({ ...prev, [index]: !isOpen }))}
-                              >
-                                <span className={`text-xs font-medium ${dark ? "text-slate-200" : "text-muted-foreground"}`}>
-                                  {`Line ${index + 1} (${selX || "x-axis"}, ${yValue || "y-axis"})`}
-                                </span>
-                                <CaretRightIcon className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-                              </button>
-                              {isOpen && (
-                                <div className="px-2 pb-2 space-y-2 text-black">
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>x:</span>
-                                    <Select value={selX} onValueChange={(value) => setSelX(value)}>
-                                      <SelectTrigger className="min-w-0 flex-1">
-                                        <SelectValue placeholder="x axis" className="text-xs" />
-                                      </SelectTrigger>
-                                      <SelectContent className="text-xs">
-                                        {xOptions &&
-                                          xOptions.map((i) => (
-                                            <SelectItem key={i} value={i} className="text-xs">
-                                              {i}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <Button type="button" size="icon" variant="outline" className="h-8 w-8" aria-label="x-axis settings">
-                                      <Settings className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>y:</span>
-                                    <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
-                                      <SelectTrigger className="min-w-0 flex-1">
-                                        <SelectValue className="text-xs">{yValue}</SelectValue>
-                                      </SelectTrigger>
-                                      <SelectContent className="text-xs">
-                                        {availableYOptions &&
-                                          availableYOptions.map((i) => (
-                                            <SelectItem key={i} value={i} className="text-xs">
-                                              {i}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <Button type="button" size="icon" variant="outline" className="h-8 w-8" aria-label="y-axis settings">
-                                      <Settings className="h-4 w-4" />
-                                    </Button>
-                                    {!(selY.length === 1) && (
-                                      <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
-                                        <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
-                                      </div>
-                                    )}
-                                  </div>
+                      <div className="py-2 space-y-2">
+                        <div className="flex min-w-0 items-center gap-2 text-black">
+                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>x:</span>
+                          <Select value={selX} onValueChange={(value) => setSelX(value)}>
+                            <SelectTrigger className="min-w-0 flex-1">
+                              <SelectValue placeholder="x axis" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              {(xOptions || []).map((i) => (
+                                <SelectItem key={i} value={i} className="text-xs">
+                                  {i}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>y:</span>
+                          <Select
+                            value={selY?.[0] || ""}
+                            onValueChange={(val) => {
+                              setSelY([val]);
+                            }}
+                          >
+                            <SelectTrigger className="min-w-0 flex-1">
+                              <SelectValue placeholder="y axis" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              {(availableYOptions || []).map((i) => (
+                                <SelectItem key={i} value={i} className="text-xs">
+                                  {i}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex min-w-0 items-center gap-2 text-black">
+                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>series:</span>
+                          <Select value={lineSeriesColumn || ""} onValueChange={(v) => setLineSeriesColumn(v)}>
+                            <SelectTrigger className="min-w-0 flex-1">
+                              <SelectValue placeholder="series column" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              {(lineSeriesColumnOptions || []).map((i) => (
+                                <SelectItem key={i} value={i} className="text-xs">
+                                  {i}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="py-2 flex flex-wrap gap-2">
+                        {(lineSeriesValues || []).map((lineValue, index) => (
+                          <Badge key={`${lineValue}-${index}`} variant="secondary" className="text-xs gap-2 pr-1 pl-2 py-1">
+                            <span className="inline-flex items-center gap-1">
+                              <span
+                                className="inline-block h-2 w-2 rounded-full"
+                                style={{ backgroundColor: selectedPalette?.[index] || selectedPalette?.[3] || (dark ? "#ffffff" : "#000000") }}
+                              />
+                              {`Line ${index + 1}: ${lineValue}`}
+                            </span>
+                            <button
+                              type="button"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
+                              aria-label={`Remove Line ${index + 1}`}
+                              onClick={() => setLineSeriesValues((prev) => (prev || []).filter((_, i) => i !== index))}
+                            >
+                              x
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="p-2 bg-black text-white rounded-md text-xs disabled:opacity-50"
+                          onClick={() => {
+                            if (!addableLineSeriesValues.length) return;
+                            const next = addableLineSeriesValues[0];
+                            setLineSeriesValues((prev) => [...(prev || []), next]);
+                          }}
+                          disabled={!addableLineSeriesValues.length}
+                        >
+                          {addLineLabel}
+                        </button>
+                        {!addableLineSeriesValues.length && (
+                          <span className={`text-[10px] ${dark ? "text-slate-300" : "text-muted-foreground"}`}>No more category values</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (selChartType === "area") ? (
+                    <>
+                      <div className="min-w-0 py-2 text-black">
+                        <Select value={selX} onValueChange={(value) => setSelX(value)}>
+                          <SelectTrigger className="min-w-0">
+                            <SelectValue placeholder="x axis" className="text-xs" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            {xOptions &&
+                              xOptions.map((i) => (
+                                <SelectItem key={i} value={i} className="text-xs">
+                                  {i}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="py-2">
+                        {selY.length > 0 &&
+                          selY.map((yValue, index) => (
+                            <div className="py-1 flex min-w-0 place-items-center gap-2 text-black" key={index}>
+                              <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
+                                <SelectTrigger className="min-w-0 flex-1">
+                                  <SelectValue className="text-xs">{yValue}</SelectValue>
+                                </SelectTrigger>
+                                <SelectContent className="text-xs">
+                                  {availableYOptions &&
+                                    availableYOptions.map((i) => (
+                                      <SelectItem key={i} value={i} className="text-xs">
+                                        {i}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              {!(selY.length === 1) && (
+                                <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
+                                  <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
                                 </div>
                               )}
                             </div>
-                          );
-                        })}
+                          ))}
+                        {selY.length === 0 && (
+                          <div className="min-w-0">
+                            <Select onValueChange={(val) => handleSelectY(val)}>
+                              <SelectTrigger className="min-w-0">
+                                <SelectValue placeholder="desktop" className="text-xs" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                {availableYOptions &&
+                                  availableYOptions.map((i) => (
+                                    <SelectItem key={i} value={i} className="text-xs">
+                                      {i}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <>
@@ -442,7 +535,7 @@ export default function ChartControls() {
                     </>
                   )}
 
-                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && (
+                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "line" && (
                     <button className="p-2 bg-black text-white rounded-md text-xs" onClick={() => handleSelectY(availableYOptions[0])} disabled={availableYOptions && availableYOptions.length === 0}>
                       {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
                     </button>
