@@ -1,10 +1,27 @@
+const path = require('path')
 const { withNextVideo } = require('next-video/process')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@nivo"],
+  transpilePackages: ["@nivo", "@duckdb/duckdb-wasm", "apache-arrow"],
   experimental: {
     esmExternals: 'loose',
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@duckdb/duckdb-wasm': path.join(
+          __dirname,
+          'node_modules',
+          '@duckdb',
+          'duckdb-wasm',
+          'dist',
+          'duckdb-browser.mjs',
+        ),
+      }
+    }
+    return config
   },
   images: {
     remotePatterns: [
