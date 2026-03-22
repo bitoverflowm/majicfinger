@@ -29,6 +29,9 @@ yarn-error.log*
 .env
 .env*.local
 
+# legacy Becker upload script output (no longer in repo)
+.tmp-becker-manifest/
+
 # vercel
 .vercel
 
