@@ -1,6 +1,6 @@
 ---
 description: Lychee data lake — reading Parquet from S3 (proxy API + client config; no upload tooling in-repo)
-globs: src/pages/api/data-lake/**/*,src/config/dataLakeParquetSamples.js
+globs: src/pages/api/data-lake/**/*,src/config/dataLakeParquetSamples.js,src/lib/dataLake/**/*
 alwaysApply: false
 ---
 
@@ -16,9 +16,14 @@ Upload / ETL tooling for Becker archives is **not** in this repo. This rule cove
 - **Dataset switch**: `?lake=kalshi` uses the Kalshi prefix; default uses the polymarket prefix.
 - **Client**: `NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY=true` plus bucket/region/AWS credentials on the server (see env docs in the API file).
 
+## Athena (lake SQL)
+
+- **Routes**: `athena-query.js` (sync POST), `athena-query/start.js` (POST → id), `athena-query/status.js` (GET poll + rows when done). Bounded `SELECT` only; table names mapped server-side.
+- **Historical UI samples**: `DataLakeParquetPanel` → start + status poll via `fetchAthenaSample.js` → `ingestAthenaResultAsView` in `duckdbWasmClient.js`.
+
 ## Public HTTPS (optional)
 
-If Parquet is served from a public bucket URL, the UI can use `NEXT_PUBLIC_*` base URL envs — see `src/config/dataLakeParquetSamples.js`.
+If Parquet is served from a public bucket URL, other flows can use `NEXT_PUBLIC_*` base URL envs — helpers remain in `src/config/dataLakeParquetSamples.js`.
 
 ## Security
 

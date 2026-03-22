@@ -10,10 +10,10 @@ function pickRandom(arr) {
 /** Status line updates while a Parquet → DuckDB → sheet load runs. */
 export const PARQUET_LOAD_PHASE_MESSAGES = [
   { delayMs: 0, text: "Preparing your request…" },
-  { delayMs: 450, text: "Fetching Parquet from your data repository…" },
-  { delayMs: 1100, text: "Loading bytes in the browser…" },
+  { delayMs: 450, text: "Querying the lake API (Athena)…" },
+  { delayMs: 1100, text: "Receiving rows in the browser…" },
   { delayMs: 1850, text: "Registering data with DuckDB…" },
-  { delayMs: 2650, text: "Executing query…" },
+  { delayMs: 2650, text: "Building sheet & SQL view…" },
 ];
 
 /**

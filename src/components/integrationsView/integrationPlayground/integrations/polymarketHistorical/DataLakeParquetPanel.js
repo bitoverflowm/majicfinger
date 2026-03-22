@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -12,22 +11,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Play, AlertCircle } from "lucide-react";
-import {
-  getDataLakeDatasetConfig,
-  isDataLakeS3ProxyEnabled,
-  buildParquetUrl,
-} from "@/config/dataLakeParquetSamples";
-import { ingestRemoteParquetAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
+import { getDataLakeDatasetConfig, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
+import { ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
 import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
 
-const DEFAULT_LIMIT = 200;
-
 /**
- * Becker / DuckDB-backed historical Parquet pulls (Polymarket Historical, Kalshi Historical).
- * Each sheet stores its own row array in `dataSheets[sheetId].data`; DuckDB keeps parallel views for re-query.
+ * Becker / DuckDB-backed historical data: bounded Athena `SELECT *` → JSON → DuckDB view → sheet.
+ * Polymarket: markets, blocks, trades. Kalshi: markets, trades (no blocks in Glue).
  *
  * @param {{ setConnectedData: (rows: Record<string, unknown>[]) => void; dataset?: "polymarket" | "kalshi" }} props
  */
@@ -46,13 +40,10 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
     !!activeSheetId &&
     !!streamsBySheetId[activeSheetId]?.isRunning;
 
-  const { sampleOptions, getBaseUrl, proxyLake } = useMemo(() => getDataLakeDatasetConfig(dataset), [dataset]);
+  const { sampleOptions, lake } = useMemo(() => getDataLakeDatasetConfig(dataset), [dataset]);
 
-  const useS3Proxy = isDataLakeS3ProxyEnabled();
-  const baseConfigured = Boolean(getBaseUrl());
-  const canUseSamples = baseConfigured || useS3Proxy;
+  const canUseSamples = true;
   const [sampleId, setSampleId] = useState(sampleOptions[0]?.id || "");
-  const [limit, setLimit] = useState(String(DEFAULT_LIMIT));
   const [loading, setLoading] = useState(false);
   const [loadLabel, setLoadLabel] = useState(PARQUET_LOAD_PHASE_MESSAGES[0].text);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -61,7 +52,7 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
   const [beckerViews, setBeckerViews] = useState(() => listBeckerParquetViews());
 
-  /** @type {React.MutableRefObject<null | { loadArg: unknown; lim: number; sampleId: string }>} */
+  /** @type {React.MutableRefObject<null | { lake: string; table: string; sampleId: string }>} */
   const pendingIngestRef = useRef(null);
 
   useEffect(() => {
@@ -75,25 +66,6 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
     setBeckerViews(listBeckerParquetViews());
   }, []);
 
-  const resolveUrl = useCallback(() => {
-    if (!baseConfigured || !selected) return "";
-    return buildParquetUrl(selected.path, getBaseUrl());
-  }, [baseConfigured, selected, getBaseUrl]);
-
-  const buildLoadArg = useCallback(() => {
-    if (useS3Proxy && selected?.path) {
-      return proxyLake === "kalshi"
-        ? { proxyPath: selected.path, lake: "kalshi" }
-        : { proxyPath: selected.path };
-    }
-    const url = resolveUrl();
-    return url || null;
-  }, [useS3Proxy, selected, proxyLake, resolveUrl]);
-
-  /**
-   * Writes rows only to the **currently active** sheet. Uses replaceCurrentSheetData so `activeSheetId`
-   * is read inside setState (fresh), not a stale closure.
-   */
   const applyRowsToActiveSheet = useCallback(
     (rows) => {
       replaceCurrentSheetData?.(rows);
@@ -103,17 +75,24 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   );
 
   const runIngestWithProgress = useCallback(
-    async (loadArg, lim, sid) => {
+    async (lakeVal, table, sid) => {
       return runParquetSheetLoadWithProgress({
         onLabel: setLoadLabel,
         onProgress: setLoadProgress,
-        loadFn: () =>
-          ingestRemoteParquetAsView({
+        loadFn: async () => {
+          const { columns, rows } = await fetchAthenaLakeSample({
+            lake: lakeVal,
+            table,
+            limit: ATHENA_SAMPLE_ROW_LIMIT,
+          });
+          return ingestAthenaResultAsView({
             dataset,
             sampleId: sid,
-            urlOrProxy: loadArg,
-            limit: lim,
-          }),
+            columns,
+            rows,
+            limit: ATHENA_SAMPLE_ROW_LIMIT,
+          });
+        },
       });
     },
     [dataset],
@@ -122,7 +101,7 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   const executeIngestReplace = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { loadArg, lim, sampleId: sid } = pending;
+    const { lake: lk, table, sampleId: sid } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -131,18 +110,13 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
     try {
-      const { rows, rowCount } = await runIngestWithProgress(loadArg, lim, sid);
+      const { rows, rowCount } = await runIngestWithProgress(lk, table, sid);
       applyRowsToActiveSheet(rows);
       setLastRowCount(rowCount);
       refreshBeckerViews();
     } catch (e) {
       const msg = e?.message || String(e);
-      setError(
-        msg +
-          (msg.includes("CORS") || msg.includes("fetch") || msg.includes("NetworkError")
-            ? " — check S3 CORS for this app’s origin."
-            : ""),
-      );
+      setError(msg);
     } finally {
       setLoading(false);
       setLoadProgress(0);
@@ -152,7 +126,7 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   const executeIngestNewSheet = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { loadArg, lim, sampleId: sid } = pending;
+    const { lake: lk, table, sampleId: sid } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -161,18 +135,12 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
 
-    const sampleLabel =
-      sampleOptions.find((s) => s.id === sid)?.label || sid;
+    const sampleLabel = sampleOptions.find((s) => s.id === sid)?.label || sid;
     const prefix = dataset === "kalshi" ? "Kalshi" : "Polymarket";
 
     try {
-      const { rows, rowCount } = await runIngestWithProgress(loadArg, lim, sid);
+      const { rows, rowCount } = await runIngestWithProgress(lk, table, sid);
 
-      /**
-       * Important: do **not** call `setConnectedData` here. It always targets `activeSheetId` from the
-       * hook closure, which is still the *previous* sheet until React re-renders after `setActiveSheetId`.
-       * That was overwriting sheet 1 with sheet 2’s rows. Only `setSheetData(newId, …)` for the new tab.
-       */
       addNewSheetAndActivate?.((newId) => {
         setSheetData?.(newId, rows);
         setDataSheets?.((prev) => {
@@ -192,12 +160,7 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
       refreshBeckerViews();
     } catch (e) {
       const msg = e?.message || String(e);
-      setError(
-        msg +
-          (msg.includes("CORS") || msg.includes("fetch") || msg.includes("NetworkError")
-            ? " — check S3 CORS for this app’s origin."
-            : ""),
-      );
+      setError(msg);
     } finally {
       setLoading(false);
       setLoadProgress(0);
@@ -215,19 +178,16 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   const handleLoad = () => {
     setError(null);
     setLastRowCount(null);
-    const lim = Number(limit) || DEFAULT_LIMIT;
-    const loadArg = buildLoadArg();
-    if (!loadArg) {
-      setError(
-        canUseSamples
-          ? "Choose a sample below."
-          : "Set NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY=true plus server DATA_LAKE_S3_* and AWS_* env vars, or set the public HTTPS base URL env for this dataset.",
-      );
+    if (!selected?.table) {
+      setError("Choose a table below.");
       return;
     }
 
-    const sid = selected?.id || sampleId;
-    pendingIngestRef.current = { loadArg, lim, sampleId: sid };
+    pendingIngestRef.current = {
+      lake,
+      table: selected.table,
+      sampleId: selected.id,
+    };
 
     if (connectedData.length > 0) {
       setSheetDialogOpen(true);
@@ -261,10 +221,10 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
       />
 
       <div className="space-y-1 min-w-0 max-w-full">
-        <Label className="text-xs">What to load</Label>
+        <Label className="text-xs">Table</Label>
         <Select value={sampleId} onValueChange={setSampleId} disabled={!canUseSamples || loading}>
           <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full">
-            <SelectValue placeholder={canUseSamples ? "Choose sample" : "Configure proxy or public base URL"} />
+            <SelectValue placeholder="Choose table" />
           </SelectTrigger>
           <SelectContent>
             {sampleOptions.map((s) => (
@@ -274,23 +234,15 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
             ))}
           </SelectContent>
         </Select>
+        <p className="text-[10px] text-muted-foreground">
+          Loads up to <strong>{ATHENA_SAMPLE_ROW_LIMIT}</strong> rows via Athena, then registers a DuckDB view for SQL / joins.
+        </p>
       </div>
 
       {loading ? (
         <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="pt-0.5" />
       ) : (
         <div className="flex gap-2 items-end flex-wrap min-w-0 max-w-full">
-          <div className="space-y-1">
-            <Label className="text-xs">Max rows</Label>
-            <Input
-              type="number"
-              min={1}
-              max={5000}
-              className="h-8 text-xs w-24"
-              value={limit}
-              onChange={(e) => setLimit(e.target.value)}
-            />
-          </div>
           <Button type="button" size="sm" className="h-8 text-xs shrink-0" onClick={handleLoad}>
             <Play className="h-3.5 w-3.5 shrink-0" />
             <span className="ml-1.5">Run request</span>

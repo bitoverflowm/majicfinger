@@ -195,6 +195,81 @@ export async function ingestRemoteParquetAsView(opts) {
   return { rows, rowCount: rows.length, logicalKey, viewName };
 }
 
+/**
+ * Register Athena result (column names + string cells) as JSON and expose a DuckDB view
+ * (same registry pattern as Parquet — enables runBeckerSelectSql / joins).
+ *
+ * @param {{ dataset: "polymarket" | "kalshi"; sampleId: string; columns: string[]; rows: string[][]; limit?: number }} opts
+ */
+export async function ingestAthenaResultAsView(opts) {
+  const { dataset, sampleId, columns, rows } = opts;
+  const limit = Math.min(5000, Math.max(1, Number(opts.limit) || 200));
+
+  if (!Array.isArray(columns) || !Array.isArray(rows)) {
+    throw new Error("Athena ingest expects columns and rows arrays.");
+  }
+
+  const logicalKey = beckerLogicalKey(dataset, sampleId);
+  const viewName = viewNameForLogical(logicalKey);
+  const jsonFileName = `becker_${logicalKey}_athena.json`;
+
+  const { db, conn } = await getOrCreateInstance();
+
+  const prev = beckerParquetRegistry.get(logicalKey);
+  if (prev) {
+    try {
+      await conn.query(`DROP VIEW IF EXISTS ${prev.viewName}`);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await db.dropFile(prev.virtualFileName);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (rows.length === 0 && columns.length === 0) {
+    throw new Error("Athena returned no columns.");
+  }
+
+  /** Empty result set: JSON has no reliable schema; use an explicit zero-row view. */
+  if (rows.length === 0 && columns.length > 0) {
+    const colSql = columns
+      .map((c) => {
+        const safe = String(c).replace(/"/g, '""');
+        return `CAST(NULL AS VARCHAR) AS "${safe}"`;
+      })
+      .join(", ");
+    await conn.query(`CREATE OR REPLACE VIEW ${viewName} AS SELECT ${colSql} WHERE FALSE`);
+    beckerParquetRegistry.set(logicalKey, { virtualFileName: jsonFileName, viewName });
+    return { rows: [], rowCount: 0, logicalKey, viewName };
+  }
+
+  const objects = rows.map((row) => {
+    const o = {};
+    columns.forEach((col, i) => {
+      const v = row[i];
+      o[col] = v === "" || v == null ? null : v;
+    });
+    return o;
+  });
+
+  const jsonBytes = new TextEncoder().encode(JSON.stringify(objects));
+  await db.registerFileBuffer(jsonFileName, jsonBytes);
+
+  const escapedFile = jsonFileName.replace(/'/g, "''");
+  await conn.query(
+    `CREATE OR REPLACE VIEW ${viewName} AS SELECT * FROM read_json_auto('${escapedFile}')`,
+  );
+
+  beckerParquetRegistry.set(logicalKey, { virtualFileName: jsonFileName, viewName });
+
+  const table = await conn.query(`SELECT * FROM ${viewName} LIMIT ${limit}`);
+  const outRows = arrowTableToRows(table);
+  return { rows: outRows, rowCount: outRows.length, logicalKey, viewName };
+}
+
 /** @returns {{ logicalKey: string; viewName: string }[]} */
 export function listBeckerParquetViews() {
   return Array.from(beckerParquetRegistry.entries()).map(([logicalKey, v]) => ({
