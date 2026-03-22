@@ -6,7 +6,11 @@
  * Env (server):
  *   DATA_LAKE_S3_BUCKET       — e.g. becker
  *   DATA_LAKE_S3_KEY_PREFIX   — e.g. becker/data/polymarket (no trailing slash)
+ *   DATA_LAKE_KALSHI_S3_KEY_PREFIX — optional; default: same as polymarket with final /polymarket → /kalshi
  *   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+ *
+ * Query: ?path=markets/foo.parquet  (polymarket prefix)
+ *         ?path=markets/foo.parquet&lake=kalshi  (kalshi prefix)
  *
  * Client enables proxy with NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY=true
  */
@@ -18,6 +22,16 @@ function getBucket() {
 
 function getKeyPrefix() {
   return String(process.env.DATA_LAKE_S3_KEY_PREFIX || "").replace(/\/+$/, "");
+}
+
+/** Same bucket; typically `…/kalshi` next to polymarket prefix. */
+function getKalshiKeyPrefix() {
+  const explicit = String(process.env.DATA_LAKE_KALSHI_S3_KEY_PREFIX || "").replace(/\/+$/, "");
+  if (explicit) return explicit;
+  const pm = getKeyPrefix();
+  if (!pm) return "";
+  if (/\/polymarket$/i.test(pm)) return pm.replace(/\/polymarket$/i, "/kalshi");
+  return `${pm}/kalshi`;
 }
 
 /** @param {string} pathParam */
@@ -54,7 +68,24 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Invalid or missing path (expect …/file.parquet, no ..)." });
   }
 
-  const prefix = getKeyPrefix();
+  const lakeRaw = req.query.lake;
+  const lake = String(Array.isArray(lakeRaw) ? lakeRaw[0] : lakeRaw || "")
+    .toLowerCase()
+    .trim();
+
+  let prefix = "";
+  if (lake === "kalshi") {
+    prefix = getKalshiKeyPrefix();
+    if (!prefix) {
+      return res.status(503).json({
+        message:
+          "Server missing DATA_LAKE_KALSHI_S3_KEY_PREFIX (or set DATA_LAKE_S3_KEY_PREFIX ending with /polymarket to derive …/kalshi).",
+      });
+    }
+  } else {
+    prefix = getKeyPrefix();
+  }
+
   const key = prefix ? `${prefix}/${rel}` : rel;
 
   const s3 = new AWS.S3({

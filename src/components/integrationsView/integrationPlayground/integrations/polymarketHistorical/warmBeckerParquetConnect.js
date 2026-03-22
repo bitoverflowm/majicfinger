@@ -9,9 +9,9 @@ function pickRandom(arr) {
 
 /**
  * Runs DuckDB warm + panel chunk preload with the same labels/progress as the sidebar boot.
- * @param {{ signal?: AbortSignal; onLabel: (s: string) => void; onProgress: (n: number) => void }} opts
+ * @param {{ signal?: AbortSignal; onLabel: (s: string) => void; onProgress: (n: number | ((p: number) => number)) => void }} opts
  */
-export async function warmPolymarketHistoricalConnect({ signal, onLabel, onProgress }) {
+export async function warmBeckerParquetConnect({ signal, onLabel, onProgress }) {
   const aborted = () => signal?.aborted;
 
   onLabel(CONNECT_PHASE_MESSAGES[0].text);
@@ -72,3 +72,6 @@ export async function warmPolymarketHistoricalConnect({ signal, onLabel, onProgr
     clearAll();
   }
 }
+
+/** @deprecated use warmBeckerParquetConnect */
+export const warmPolymarketHistoricalConnect = warmBeckerParquetConnect;

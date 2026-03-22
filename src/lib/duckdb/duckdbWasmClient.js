@@ -74,9 +74,9 @@ const MAX_PARQUET_FETCH_BYTES = 80 * 1024 * 1024;
  *
  * We **fetch bytes in the browser** then **registerFileBuffer** (reliable vs WASM httpfs on S3).
  *
- * @param {string | { proxyPath: string }} urlOrProxy
+ * @param {string | { proxyPath: string; lake?: 'polymarket' | 'kalshi' }} urlOrProxy
  *        - HTTPS URL for **public** objects (CORS + bucket policy).
- *        - `{ proxyPath: 'markets/foo.parquet' }` fetches same-origin `/api/data-lake/parquet` (**private** bucket; server uses AWS keys).
+ *        - `{ proxyPath: 'markets/foo.parquet', lake?: 'kalshi' }` fetches `/api/data-lake/parquet` (private bucket).
  * @param {{ limit?: number }} [opts]
  * @returns {Promise<{ rows: Record<string, unknown>[]; rowCount: number }>}
  */
@@ -92,8 +92,10 @@ export async function queryRemoteParquet(urlOrProxy, opts = {}) {
       throw new Error("Invalid proxy path.");
     }
     const q = new URLSearchParams({ path: p });
+    const lake = urlOrProxy.lake === "kalshi" ? "kalshi" : "";
+    if (lake) q.set("lake", lake);
     fetchUrl = `/api/data-lake/parquet?${q.toString()}`;
-    virtualKeySource = `proxy:${p}`;
+    virtualKeySource = lake ? `proxy:${lake}:${p}` : `proxy:${p}`;
   } else {
     const safeUrl = assertHttpsParquetUrl(urlOrProxy);
     fetchUrl = safeUrl;

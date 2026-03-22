@@ -7,6 +7,7 @@ import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import ChartControls from "@/components/chartView/ChartControls";
 import Polymarket from "@/components/integrationsView/integrationPlayground/integrations/polymarket";
 import PolymarketHistorical from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical";
+import KalshiHistorical from "@/components/integrationsView/integrationPlayground/integrations/kalshiHistorical";
 import CoinGecko from "@/components/integrationsView/integrationPlayground/integrations/coinGecko";
 import Twitter from "@/components/integrationsView/integrationPlayground/integrations/twitter";
 import WallStreetBets from "@/components/integrationsView/integrationPlayground/integrations/wallStreetBets";
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import Image from "next/image";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,6 +36,13 @@ const INTEGRATION_OPTIONS = [
   { value: "geckoDex", label: "GeckoTerminal", logo: "/geckoDex1.png" },
   { value: "polymarket", label: "Polymarket", logo: "/polymarket.png" },
   { value: "polymarketHistorical", label: "Polymarket Historical", logo: "/polymarket.png" },
+  {
+    value: "kalshiHistorical",
+    label: "Kalshi Historical",
+    logo: "/kalshi.png",
+    avatarBgClass: "bg-black",
+    avatarImageClass: "object-contain p-0.5",
+  },
   { value: "twitter", label: "Twitter", logo: "/x.png" },
   { value: "wallStreetBets", label: "Wall Street Bets", logo: "/wallStreetBets.png" },
 ].sort((a, b) => a.label.localeCompare(b.label));
@@ -112,13 +121,18 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const renderIntegrationAvatar = (opt) => {
     if (opt.logo) {
       return (
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted/30">
+        <span
+          className={cn(
+            "relative flex h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-border/60",
+            opt.avatarBgClass ?? "bg-muted/30",
+          )}
+        >
           <Image
             src={opt.logo}
             alt={opt.label || opt.value}
-            width={28}
-            height={28}
-            className="h-7 w-7 rounded-full object-cover"
+            fill
+            className={cn(opt.avatarImageClass ?? "object-cover")}
+            sizes="28px"
           />
         </span>
       );
@@ -137,6 +151,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
         return <Polymarket setConnectedData={setConnectedData} />;
       case "polymarketHistorical":
         return <PolymarketHistorical setConnectedData={setConnectedData} />;
+      case "kalshiHistorical":
+        return <KalshiHistorical setConnectedData={setConnectedData} />;
       case "coinGecko":
         return <CoinGecko setConnectedData={setConnectedData} />;
       case "twitter":
@@ -245,8 +261,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
 
                     <div className="min-h-0 flex-1 px-2 pb-2">
                       <TabsContent value="integrations" className="m-0 h-full">
-                        <div className="flex h-full flex-col gap-3">
-                          <div className="flex items-center gap-2">
+                        <div className="flex h-full min-w-0 max-w-full flex-col gap-3">
+                          <div className="flex min-w-0 max-w-full items-center gap-2">
                             <Select
                               value={integrationSidebar || ""}
                               onValueChange={(value) => setIntegrationSidebar?.(value)}
@@ -275,7 +291,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30 p-3">
+                          <div className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto overflow-x-hidden rounded-md border bg-muted/30 p-3">
                             {integrationSidebar ? (
                               renderIntegration()
                             ) : (

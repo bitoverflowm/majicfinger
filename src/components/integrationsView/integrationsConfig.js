@@ -6,6 +6,7 @@ import Image from "next/image";
 export const API_INTEGRATIONS = [
   "polymarket",
   "polymarketHistorical",
+  "kalshiHistorical",
   "coinGecko",
   "twitter",
   "wallStreetBets",
@@ -17,7 +18,11 @@ export const API_INTEGRATIONS = [
 export const integrations_list = [
   {
     color: "#2E5CFF",
-    icon: <div className="p-1 rounded-full shadow-2xl"><Image src={'/polymarket.png'} height={60} width={60} /></div>,
+    icon: (
+      <div className="relative mx-auto h-[60px] w-[60px] shrink-0 overflow-hidden rounded-full shadow-2xl">
+        <Image src="/polymarket.png" alt="" fill className="object-cover" sizes="60px" />
+      </div>
+    ),
     clickHandler: "polymarket",
     name: "Polymarket",
     description: "All the data you could want on the world's largest prediction market.",
@@ -27,14 +32,27 @@ export const integrations_list = [
   {
     color: "#0f172a",
     icon: (
-      <div className="p-1 rounded-full shadow-2xl ring-2 ring-slate-600/50">
-        <Image src="/polymarket.png" height={60} width={60} alt="" />
+      <div className="relative mx-auto h-[60px] w-[60px] shrink-0 overflow-hidden rounded-full shadow-2xl ring-2 ring-slate-600/50">
+        <Image src="/polymarket.png" alt="" fill className="object-cover" sizes="60px" />
       </div>
     ),
     clickHandler: "polymarketHistorical",
     name: "Polymarket Historical",
     description:
       "Load archived Polymarket Parquet from your S3 data lake into the sheet (DuckDB in the browser).",
+    tags: ["featured", "crypto", "finance", "trading", "prediction", "data lake"],
+    live: true,
+  },
+  {
+    color: "#28CC95",
+    icon: (
+      <div className="relative mx-auto flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-black shadow-2xl">
+        <Image src="/kalshi.png" alt="" fill className="object-contain p-1.5" sizes="60px" />
+      </div>
+    ),
+    clickHandler: "kalshiHistorical",
+    name: "Kalshi Historical",
+    description: "Archived Kalshi Parquet from the Becker data lake — same flow as Polymarket Historical.",
     tags: ["featured", "crypto", "finance", "trading", "prediction", "data lake"],
     live: true,
   },

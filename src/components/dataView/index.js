@@ -11,7 +11,7 @@ import { ChainlinkLiveChart } from "@/components/dataView/ChainlinkLiveChart";
 import { VscCircleFilled } from "react-icons/vsc";
 import { API_INTEGRATIONS, integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
-import { usePolymarketHistoricalIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/usePolymarketHistoricalIntegrationsConnect";
+import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
 
 const DataView = ({ user }) => {
   const contextStateV2 = useMyStateV2();
@@ -63,7 +63,26 @@ const DataView = ({ user }) => {
     setViewing,
   ]);
 
-  const polymarketHistoricalConnect = usePolymarketHistoricalIntegrationsConnect(navigatePolymarketHistorical);
+  const polymarketHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigatePolymarketHistorical);
+
+  const navigateKalshiHistorical = useCallback(() => {
+    if (!API_INTEGRATIONS.includes("kalshiHistorical")) return;
+    setConnectedData?.([]);
+    setConnectedCols?.([]);
+    setViewing?.("dataStart");
+    setIntegrationSidebar?.("kalshiHistorical");
+    setRightPanelTab?.("integrations");
+    setRightPanelOpen?.(true);
+  }, [
+    setConnectedCols,
+    setConnectedData,
+    setIntegrationSidebar,
+    setRightPanelOpen,
+    setRightPanelTab,
+    setViewing,
+  ]);
+
+  const kalshiHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigateKalshiHistorical);
 
   const openIntegrationPlayground = (clickHandlerId) => {
     if (API_INTEGRATIONS.includes(clickHandlerId)) {
@@ -187,35 +206,42 @@ const DataView = ({ user }) => {
                   <p className="text-sm pt-1 text-muted-foreground line-clamp-2">{integration.description}</p>
                 </CardContent>
                 <CardFooter className="flex flex-col items-stretch gap-2 place-content-end">
-                  {!integration.live || integration.tags.includes("coming soon") ? (
-                    <Button disabled>Coming soon</Button>
-                  ) : integration.clickHandler === "polymarketHistorical" ? (
-                    polymarketHistoricalConnect.busy ? (
-                      <ConnectProgressWithLabel
-                        label={polymarketHistoricalConnect.label}
-                        progress={polymarketHistoricalConnect.progress}
-                      />
-                    ) : polymarketHistoricalConnect.error ? (
-                      <>
-                        <p className="text-xs text-destructive break-words">{polymarketHistoricalConnect.error}</p>
-                        <Button
-                          type="button"
-                          onClick={() => polymarketHistoricalConnect.start()}
-                          className="w-full sm:w-auto self-end"
-                        >
-                          Try again
+                  {(() => {
+                    const warmConnect =
+                      integration.clickHandler === "polymarketHistorical"
+                        ? polymarketHistoricalConnect
+                        : integration.clickHandler === "kalshiHistorical"
+                          ? kalshiHistoricalConnect
+                          : null;
+                    if (!integration.live || integration.tags.includes("coming soon")) {
+                      return <Button disabled>Coming soon</Button>;
+                    }
+                    if (warmConnect) {
+                      return warmConnect.busy ? (
+                        <ConnectProgressWithLabel label={warmConnect.label} progress={warmConnect.progress} />
+                      ) : warmConnect.error ? (
+                        <>
+                          <p className="text-xs text-destructive break-words">{warmConnect.error}</p>
+                          <Button
+                            type="button"
+                            onClick={() => warmConnect.start()}
+                            className="w-full sm:w-auto self-end"
+                          >
+                            Try again
+                          </Button>
+                        </>
+                      ) : (
+                        <Button type="button" onClick={() => warmConnect.start()} className="self-end">
+                          Connect
                         </Button>
-                      </>
-                    ) : (
-                      <Button type="button" onClick={() => polymarketHistoricalConnect.start()} className="self-end">
+                      );
+                    }
+                    return (
+                      <Button onClick={() => openIntegrationPlayground(integration.clickHandler)} className="self-end">
                         Connect
                       </Button>
-                    )
-                  ) : (
-                    <Button onClick={() => openIntegrationPlayground(integration.clickHandler)} className="self-end">
-                      Connect
-                    </Button>
-                  )}
+                    );
+                  })()}
                 </CardFooter>
               </Card>
             ))}

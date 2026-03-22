@@ -17,7 +17,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [isLifeTimeMember, setIsLifeTimeMember] = useState()
     const [settings, setSettings] = useState(initialSettings)
     const [viewing, setViewing] = useState('dataStart')
-    const [integrationSidebar, setIntegrationSidebar] = useState(null) // 'polymarket' | 'polymarketHistorical' | 'coinGecko' | etc. when on datasheet with API panel
+    const [integrationSidebar, setIntegrationSidebar] = useState(null) // 'polymarket' | 'polymarketHistorical' | 'kalshiHistorical' | 'coinGecko' | etc.
     const [rightPanelOpen, setRightPanelOpen] = useState(false) // unified right-side panel (integrations/charts)
     const [rightPanelTab, setRightPanelTab] = useState('integrations') // 'integrations' | 'charts'
 

@@ -2,12 +2,12 @@
 
 import { useState, useCallback } from "react";
 import { CONNECT_PHASE_MESSAGES } from "./connectProgressMessages";
-import { warmPolymarketHistoricalConnect } from "./warmPolymarketHistoricalConnect";
+import { warmBeckerParquetConnect } from "./warmBeckerParquetConnect";
 
 /**
  * Warm DuckDB + preload panel on the Integrations (or data-start) page, then run navigate().
  */
-export function usePolymarketHistoricalIntegrationsConnect(navigate) {
+export function useBeckerHistoricalWarmIntegrationsConnect(navigate) {
   const [busy, setBusy] = useState(false);
   const [label, setLabel] = useState(CONNECT_PHASE_MESSAGES[0].text);
   const [progress, setProgress] = useState(4);
@@ -19,7 +19,7 @@ export function usePolymarketHistoricalIntegrationsConnect(navigate) {
     setLabel(CONNECT_PHASE_MESSAGES[0].text);
     setProgress(4);
     try {
-      await warmPolymarketHistoricalConnect({
+      await warmBeckerParquetConnect({
         onLabel: setLabel,
         onProgress: setProgress,
       });

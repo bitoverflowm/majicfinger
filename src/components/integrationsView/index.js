@@ -14,7 +14,7 @@ import { BorderBeam } from "@/components/magicui/border-beam";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { API_INTEGRATIONS, integrations_list } from "./integrationsConfig";
 import { ConnectProgressWithLabel } from "./integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
-import { usePolymarketHistoricalIntegrationsConnect } from "./integrationPlayground/integrations/polymarketHistorical/usePolymarketHistoricalIntegrationsConnect";
+import { useBeckerHistoricalWarmIntegrationsConnect } from "./integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
 
 // Extract tags categories
 const tags_categories = [...new Set(integrations_list.flatMap(integration => integration.tags))];
@@ -46,7 +46,26 @@ const IntegrationsView = () => {
     setViewing,
   ]);
 
-  const polymarketHistoricalConnect = usePolymarketHistoricalIntegrationsConnect(navigatePolymarketHistorical);
+  const polymarketHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigatePolymarketHistorical);
+
+  const navigateKalshiHistorical = useCallback(() => {
+    if (!API_INTEGRATIONS.includes("kalshiHistorical")) return;
+    setConnectedData?.([]);
+    setConnectedCols?.([]);
+    setViewing?.("dataStart");
+    setIntegrationSidebar?.("kalshiHistorical");
+    setRightPanelTab?.("integrations");
+    setRightPanelOpen?.(true);
+  }, [
+    setConnectedCols,
+    setConnectedData,
+    setIntegrationSidebar,
+    setRightPanelOpen,
+    setRightPanelTab,
+    setViewing,
+  ]);
+
+  const kalshiHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigateKalshiHistorical);
 
   const clickHandler = (clickHandlerId) => {
     if (API_INTEGRATIONS.includes(clickHandlerId)) {
@@ -71,7 +90,9 @@ const IntegrationsView = () => {
                 <BorderBeam size={250} duration={12} colorFrom="#2E5CFF" colorTo="#60a5fa" className="pointer-events-none" />
                 <div className="flex w-full min-h-[180px]">
                   <div className="w-48 sm:w-56 shrink-0 flex items-center justify-center bg-[#2E5CFF] p-6">
-                    <Image src="/polymarket.png" height={80} width={80} alt="Polymarket" className="rounded-full" />
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full ring-2 ring-white/25">
+                      <Image src="/polymarket.png" alt="Polymarket" fill className="object-cover" sizes="80px" />
+                    </div>
                   </div>
                   <div className="flex flex-1 flex-col justify-between p-6 relative z-10">
                     <div>
@@ -95,7 +116,9 @@ const IntegrationsView = () => {
                 <BorderBeam size={250} duration={14} colorFrom="#64748b" colorTo="#38bdf8" className="pointer-events-none" />
                 <div className="flex w-full min-h-[180px]">
                   <div className="w-48 sm:w-56 shrink-0 flex items-center justify-center bg-slate-900 p-6">
-                    <Image src="/polymarket.png" height={80} width={80} alt="Polymarket Historical" className="rounded-full opacity-95" />
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full ring-2 ring-slate-500/40">
+                      <Image src="/polymarket.png" alt="Polymarket Historical" fill className="object-cover opacity-95" sizes="80px" />
+                    </div>
                   </div>
                   <div className="flex flex-1 flex-col justify-between p-6 relative z-10 bg-slate-950/40">
                     <div>
@@ -176,31 +199,38 @@ const IntegrationsView = () => {
                     <p className="text-sm pt-1 text-muted-foreground pb-2">{integration.description}</p>
                   </CardContent>
                   <CardFooter className="flex flex-col items-stretch gap-2 place-content-end">
-                    {!integration.live || integration.tags.includes("coming soon") ? (
-                      <Button disabled>Coming soon</Button>
-                    ) : integration.clickHandler === "polymarketHistorical" ? (
-                      polymarketHistoricalConnect.busy ? (
-                        <ConnectProgressWithLabel
-                          label={polymarketHistoricalConnect.label}
-                          progress={polymarketHistoricalConnect.progress}
-                        />
-                      ) : polymarketHistoricalConnect.error ? (
-                        <>
-                          <p className="text-xs text-destructive break-words">{polymarketHistoricalConnect.error}</p>
-                          <Button type="button" onClick={() => polymarketHistoricalConnect.start()} className="w-full sm:w-auto self-end">
-                            Try again
+                    {(() => {
+                      const warmConnect =
+                        integration.clickHandler === "polymarketHistorical"
+                          ? polymarketHistoricalConnect
+                          : integration.clickHandler === "kalshiHistorical"
+                            ? kalshiHistoricalConnect
+                            : null;
+                      if (!integration.live || integration.tags.includes("coming soon")) {
+                        return <Button disabled>Coming soon</Button>;
+                      }
+                      if (warmConnect) {
+                        return warmConnect.busy ? (
+                          <ConnectProgressWithLabel label={warmConnect.label} progress={warmConnect.progress} />
+                        ) : warmConnect.error ? (
+                          <>
+                            <p className="text-xs text-destructive break-words">{warmConnect.error}</p>
+                            <Button type="button" onClick={() => warmConnect.start()} className="w-full sm:w-auto self-end">
+                              Try again
+                            </Button>
+                          </>
+                        ) : (
+                          <Button type="button" onClick={() => warmConnect.start()} className="self-end">
+                            Connect
                           </Button>
-                        </>
-                      ) : (
-                        <Button type="button" onClick={() => polymarketHistoricalConnect.start()} className="self-end">
+                        );
+                      }
+                      return (
+                        <Button onClick={() => clickHandler(integration.clickHandler)} className="self-end">
                           Connect
                         </Button>
-                      )
-                    ) : (
-                      <Button onClick={() => clickHandler(integration.clickHandler)} className="self-end">
-                        Connect
-                      </Button>
-                    )}
+                      );
+                    })()}
                   </CardFooter>
                 </Card>
               ))}

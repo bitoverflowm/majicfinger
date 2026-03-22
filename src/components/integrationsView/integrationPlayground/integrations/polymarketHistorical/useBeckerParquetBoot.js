@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { isDuckDbWasmReady } from "@/lib/duckdb/duckdbWasmClient";
 import { CONNECT_PHASE_MESSAGES } from "./connectProgressMessages";
-import { warmPolymarketHistoricalConnect } from "./warmPolymarketHistoricalConnect";
+import { warmBeckerParquetConnect } from "./warmBeckerParquetConnect";
 
 /**
- * After navigating from Integrations (post-warm), finish mounting the panel — fast if DuckDB is already hot.
+ * After Connect (or opening the panel), warm DuckDB and preload the Becker Parquet panel chunk.
  */
-export function usePolymarketHistoricalBoot() {
+export function useBeckerParquetBoot() {
   const [label, setLabel] = useState(CONNECT_PHASE_MESSAGES[0].text);
   const [progress, setProgress] = useState(4);
   const [ready, setReady] = useState(false);
@@ -30,7 +30,7 @@ export function usePolymarketHistoricalBoot() {
         setReady(true);
         return;
       }
-      await warmPolymarketHistoricalConnect({
+      await warmBeckerParquetConnect({
         onLabel: setLabel,
         onProgress: setProgress,
       });

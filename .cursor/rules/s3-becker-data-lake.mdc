@@ -1,0 +1,54 @@
+---
+description: Becker S3 data lake — upload script, bucket layout, manifests, and app proxy env (Polymarket + Kalshi Parquet)
+globs: scripts/publish-becker-both-parquet-to-s3-stream-extract.js,src/pages/api/data-lake/**/*,src/config/dataLakeParquetSamples.js
+alwaysApply: false
+---
+
+# Becker / Lychee S3 data lake (handoff context)
+
+Use this when changing **S3 uploads**, **manifests**, or the **data-lake Parquet API**. The Next.js UI + DuckDB pipelines live elsewhere; this rule is **storage and ingestion** only.
+
+## Primary script
+
+- **`scripts/publish-becker-both-parquet-to-s3-stream-extract.js`**
+  - **Flow**: HTTP download `data.tar.zst` (default Becker URL) → `zstd -d` → `tar-stream` → **one S3 `PutObject` per `.parquet`** (no full local extract of the whole archive).
+  - **Phases**: `[1]` stream pipeline → `[2/3]` stream pass complete (upload counts / skipped) → optional S3 listing sample → `[3/3]` write **local** JSON manifests under `.tmp-becker-manifest/` → **upload manifests** to S3.
+  - **`Done.`** means the script finished without throw; manifests were uploaded (unless `--dry-run`).
+
+## S3 layout (typical)
+
+- **Parquet objects** (examples from past runs):
+  - `becker/data/polymarket/{markets,trades,blocks}/…/*.parquet`
+  - `becker/data/kalshi/{markets,trades}/…/*.parquet`
+- **Manifests** (written by script):
+  - `…/data-lake/becker-polymarket/dataset_manifest.json`
+  - `…/data-lake/becker-kalshi/dataset_manifest.json`
+- **Public URLs** in manifests use `publicBaseUrl` / `--public-base-url` (HTTPS base for the bucket+prefix).
+
+## Useful CLI flags (see script header)
+
+- `--dry-run`, `--max-files-per-table`, `--skip-existing-by-list`, `--check-existing`, `--list-s3-parquet-limit`, `--download-url`, `--public-base-url`, `--acl`, `--region`, retries, `--verbose` / `--quiet`, `--heartbeat-seconds`, etc.
+
+## App ↔ private bucket (separate from this script)
+
+- **Route**: `src/pages/api/data-lake/parquet.js` — server **`GetObject`**; browser calls same-origin with `?path=relative/to/prefix/file.parquet`.
+- **Polymarket prefix**: `DATA_LAKE_S3_KEY_PREFIX` (e.g. ends with `…/polymarket`).
+- **Kalshi prefix**: `DATA_LAKE_KALSHI_S3_KEY_PREFIX` **or** derive by replacing trailing `/polymarket` with `/kalshi` on the polymarket prefix.
+- **Dataset switch**: `?lake=kalshi` uses the Kalshi prefix; default path uses polymarket prefix.
+- **Client**: `NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY=true` plus bucket/region/AWS keys on the server.
+
+## Security / ops
+
+- **Never commit real AWS keys** in the upload script or repo. Use **environment variables** or local secrets; rotate any keys that were ever committed.
+- **CORS** on the bucket matters only if the **browser** fetches Parquet via **public HTTPS URLs** (not via the proxy).
+
+## Past improvements (conversation summary)
+
+- Streaming pipeline to avoid disk blow-up; per-file upload from tar.
+- Manifest generation + S3 upload as final step (`[3/3]`).
+- **Kalshi** added as a second dataset alongside Polymarket (same bucket, `kalshi/` tree + separate manifest id `becker-kalshi`).
+- Placeholder vs real AWS credential detection in the script to avoid “silent” misconfiguration.
+
+## When the user opens a “full S3 focus” chat
+
+Tell them to **open files matching the globs above** (or @-mention this rule if your Cursor version supports it) so this context attaches automatically.
