@@ -59,7 +59,7 @@ export default function DataLakeParquetPanel({ setConnectedData }) {
         setError(
           canUseSamples
             ? "Choose a sample below, or expand Advanced and paste a public HTTPS Parquet URL."
-            : "Set NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY=true plus server DATA_LAKE_S3_* and AWS_* env vars, or set NEXT_PUBLIC_DATA_LAKE_BASE_URL for a public bucket.",
+            : "Set NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY=true plus server DATA_LAKE_S3_* and AWS_* env vars, or set NEXT_PUBLIC_DATA_LAKE_BASE_URL for a public HTTPS base.",
         );
         return;
       }
@@ -88,12 +88,11 @@ export default function DataLakeParquetPanel({ setConnectedData }) {
     <div className="rounded-lg border border-dashed border-primary/30 bg-muted/30 p-3 space-y-3 min-w-0">
       <div className="flex items-center gap-2 text-xs font-medium text-foreground">
         <Database className="h-4 w-4 shrink-0 text-primary" />
-        <span>Data lake (sample)</span>
+        <span>Lychee S3 Parquet samples</span>
       </div>
       <p className="text-[10px] text-muted-foreground leading-snug">
-        Loads a small Parquet sample into the sheet (DuckDB in the browser). With{" "}
-        <code className="font-mono">NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY</code>, your app fetches via the server so the
-        bucket can stay private.
+        Load archived Polymarket Parquet from your data lake into the grid (DuckDB in the browser). Use{" "}
+        <code className="font-mono">NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY</code> so a private bucket can stay private.
       </p>
 
       {!canUseSamples && (

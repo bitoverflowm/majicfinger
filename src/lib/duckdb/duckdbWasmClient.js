@@ -31,6 +31,20 @@ async function getOrCreateInstance() {
   return instance;
 }
 
+/**
+ * Pre-create DuckDB-WASM (worker + in-memory DB) so the first Parquet query feels instant.
+ * Safe to call multiple times; subsequent calls resolve to the same instance.
+ * @returns {Promise<{ db: import('@duckdb/duckdb-wasm').AsyncDuckDB; conn: import('@duckdb/duckdb-wasm').AsyncDuckDBConnection }>}
+ */
+export async function warmDuckDbWasm() {
+  return getOrCreateInstance();
+}
+
+/** True after the first successful {@link warmDuckDbWasm} in this tab (skips redundant loaders). */
+export function isDuckDbWasmReady() {
+  return instance != null;
+}
+
 function assertHttpsParquetUrl(url) {
   const u = String(url).trim();
   if (!/^https:\/\//i.test(u)) {

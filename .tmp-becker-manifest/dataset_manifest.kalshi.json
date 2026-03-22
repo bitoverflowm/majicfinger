@@ -1,0 +1,53 @@
+{
+  "id": "becker-kalshi",
+  "title": "Becker Kalshi (Parquet)",
+  "generatedAt": "2026-03-22T08:17:28.329Z",
+  "publicBaseUrl": "https://becker.s3.us-east-1.amazonaws.com",
+  "tables": {
+    "trades": {
+      "columns": [
+        "trade_id",
+        "ticker",
+        "price",
+        "count",
+        "created_time"
+      ],
+      "files": [
+        {
+          "key": "becker/data/kalshi/trades/trades_61810000_61820000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/kalshi/trades/trades_61810000_61820000.parquet"
+        },
+        {
+          "key": "becker/data/kalshi/trades/trades_15370000_15380000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/kalshi/trades/trades_15370000_15380000.parquet"
+        },
+        {
+          "key": "becker/data/kalshi/trades/trades_26780000_26790000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/kalshi/trades/trades_26780000_26790000.parquet"
+        }
+      ]
+    },
+    "markets": {
+      "columns": [
+        "ticker",
+        "title",
+        "category",
+        "status"
+      ],
+      "files": [
+        {
+          "key": "becker/data/kalshi/markets/markets_860000_870000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/kalshi/markets/markets_860000_870000.parquet"
+        },
+        {
+          "key": "becker/data/kalshi/markets/markets_5630000_5640000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/kalshi/markets/markets_5630000_5640000.parquet"
+        },
+        {
+          "key": "becker/data/kalshi/markets/markets_5850000_5860000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/kalshi/markets/markets_5850000_5860000.parquet"
+        }
+      ]
+    }
+  }
+}

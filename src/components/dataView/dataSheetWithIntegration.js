@@ -6,6 +6,7 @@ import DataView from "@/components/dataView";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import ChartControls from "@/components/chartView/ChartControls";
 import Polymarket from "@/components/integrationsView/integrationPlayground/integrations/polymarket";
+import PolymarketHistorical from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical";
 import CoinGecko from "@/components/integrationsView/integrationPlayground/integrations/coinGecko";
 import Twitter from "@/components/integrationsView/integrationPlayground/integrations/twitter";
 import WallStreetBets from "@/components/integrationsView/integrationPlayground/integrations/wallStreetBets";
@@ -32,6 +33,7 @@ const INTEGRATION_OPTIONS = [
   { value: "coinGecko", label: "CoinGecko", logo: "/coinGecko.png" },
   { value: "geckoDex", label: "GeckoTerminal", logo: "/geckoDex1.png" },
   { value: "polymarket", label: "Polymarket", logo: "/polymarket.png" },
+  { value: "polymarketHistorical", label: "Polymarket Historical", logo: "/polymarket.png" },
   { value: "twitter", label: "Twitter", logo: "/x.png" },
   { value: "wallStreetBets", label: "Wall Street Bets", logo: "/wallStreetBets.png" },
 ].sort((a, b) => a.label.localeCompare(b.label));
@@ -133,6 +135,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     switch (integrationSidebar) {
       case "polymarket":
         return <Polymarket setConnectedData={setConnectedData} />;
+      case "polymarketHistorical":
+        return <PolymarketHistorical setConnectedData={setConnectedData} />;
       case "coinGecko":
         return <CoinGecko setConnectedData={setConnectedData} />;
       case "twitter":

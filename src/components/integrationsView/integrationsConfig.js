@@ -3,7 +3,16 @@
 import Image from "next/image";
 
 /** Integrations that open the datasheet with a right-side API pull panel */
-export const API_INTEGRATIONS = ["polymarket", "coinGecko", "twitter", "wallStreetBets", "geckoDex", "binance", "chainlink"];
+export const API_INTEGRATIONS = [
+  "polymarket",
+  "polymarketHistorical",
+  "coinGecko",
+  "twitter",
+  "wallStreetBets",
+  "geckoDex",
+  "binance",
+  "chainlink",
+];
 
 export const integrations_list = [
   {
@@ -13,6 +22,20 @@ export const integrations_list = [
     name: "Polymarket",
     description: "All the data you could want on the world's largest prediction market.",
     tags: ['featured', 'crypto', 'finance', 'trading', 'prediction'],
+    live: true,
+  },
+  {
+    color: "#0f172a",
+    icon: (
+      <div className="p-1 rounded-full shadow-2xl ring-2 ring-slate-600/50">
+        <Image src="/polymarket.png" height={60} width={60} alt="" />
+      </div>
+    ),
+    clickHandler: "polymarketHistorical",
+    name: "Polymarket Historical",
+    description:
+      "Load archived Polymarket Parquet from your S3 data lake into the sheet (DuckDB in the browser).",
+    tags: ["featured", "crypto", "finance", "trading", "prediction", "data lake"],
     live: true,
   },
   {

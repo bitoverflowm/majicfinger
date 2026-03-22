@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { Button } from "@/components/ui/button";
@@ -48,11 +47,6 @@ import {
 } from "lucide-react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ENDPOINTS, POLYMARKET_GROUPS, TRADES_RESPONSE_FIELDS } from "./config";
-
-const DataLakeParquetPanel = dynamic(() => import("./DataLakeParquetPanel"), {
-  ssr: false,
-  loading: () => null,
-});
 
 const COOLDOWN_MS = 1500;
 // Fallback when no endpoint responseFields and no prior pull – use Trade schema (docs: get-trades-for-a-user-or-markets)
@@ -366,8 +360,6 @@ const Polymarket = ({ setConnectedData }) => {
           </>
         )}
       </div>
-
-      <DataLakeParquetPanel setConnectedData={setConnectedData} />
 
       {/* Param form when an action with params is selected */}
       {selectedAction && (

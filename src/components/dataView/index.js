@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { HardDriveUpload, FilePlus2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -8,6 +10,8 @@ import GridView from "@/components/gridView";
 import { ChainlinkLiveChart } from "@/components/dataView/ChainlinkLiveChart";
 import { VscCircleFilled } from "react-icons/vsc";
 import { API_INTEGRATIONS, integrations_list } from "@/components/integrationsView/integrationsConfig";
+import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
+import { usePolymarketHistoricalIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/usePolymarketHistoricalIntegrationsConnect";
 
 const DataView = ({ user }) => {
   const contextStateV2 = useMyStateV2();
@@ -41,6 +45,25 @@ const DataView = ({ user }) => {
   const dataSheetIds = dataSheets ? Object.keys(dataSheets) : [];
   const hasMultipleDataSheets = dataSheetIds.length > 1;
   const showGrid = (connectedData?.length > 0) || hasMultipleDataSheets || integrationSidebar;
+
+  const navigatePolymarketHistorical = useCallback(() => {
+    if (!API_INTEGRATIONS.includes("polymarketHistorical")) return;
+    setConnectedData?.([]);
+    setConnectedCols?.([]);
+    setViewing?.("dataStart");
+    setIntegrationSidebar?.("polymarketHistorical");
+    setRightPanelTab?.("integrations");
+    setRightPanelOpen?.(true);
+  }, [
+    setConnectedCols,
+    setConnectedData,
+    setIntegrationSidebar,
+    setRightPanelOpen,
+    setRightPanelTab,
+    setViewing,
+  ]);
+
+  const polymarketHistoricalConnect = usePolymarketHistoricalIntegrationsConnect(navigatePolymarketHistorical);
 
   const openIntegrationPlayground = (clickHandlerId) => {
     if (API_INTEGRATIONS.includes(clickHandlerId)) {
@@ -163,11 +186,35 @@ const DataView = ({ user }) => {
                   <small className="text-sm font-medium leading-none">{integration.name}</small>
                   <p className="text-sm pt-1 text-muted-foreground line-clamp-2">{integration.description}</p>
                 </CardContent>
-                <CardFooter className="flex place-content-end">
+                <CardFooter className="flex flex-col items-stretch gap-2 place-content-end">
                   {!integration.live || integration.tags.includes("coming soon") ? (
                     <Button disabled>Coming soon</Button>
+                  ) : integration.clickHandler === "polymarketHistorical" ? (
+                    polymarketHistoricalConnect.busy ? (
+                      <ConnectProgressWithLabel
+                        label={polymarketHistoricalConnect.label}
+                        progress={polymarketHistoricalConnect.progress}
+                      />
+                    ) : polymarketHistoricalConnect.error ? (
+                      <>
+                        <p className="text-xs text-destructive break-words">{polymarketHistoricalConnect.error}</p>
+                        <Button
+                          type="button"
+                          onClick={() => polymarketHistoricalConnect.start()}
+                          className="w-full sm:w-auto self-end"
+                        >
+                          Try again
+                        </Button>
+                      </>
+                    ) : (
+                      <Button type="button" onClick={() => polymarketHistoricalConnect.start()} className="self-end">
+                        Connect
+                      </Button>
+                    )
                   ) : (
-                    <Button onClick={() => openIntegrationPlayground(integration.clickHandler)}>Connect</Button>
+                    <Button onClick={() => openIntegrationPlayground(integration.clickHandler)} className="self-end">
+                      Connect
+                    </Button>
                   )}
                 </CardFooter>
               </Card>

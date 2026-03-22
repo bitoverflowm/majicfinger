@@ -1,0 +1,79 @@
+{
+  "id": "becker-polymarket",
+  "title": "Becker Polymarket (Parquet)",
+  "generatedAt": "2026-03-22T08:17:28.329Z",
+  "publicBaseUrl": "https://becker.s3.us-east-1.amazonaws.com",
+  "tables": {
+    "trades": {
+      "columns": [
+        "block_number",
+        "transaction_hash",
+        "log_index",
+        "timestamp",
+        "maker",
+        "taker",
+        "price",
+        "size"
+      ],
+      "files": [
+        {
+          "key": "becker/data/polymarket/trades/trades_403730000_403740000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/trades/trades_403730000_403740000.parquet"
+        },
+        {
+          "key": "becker/data/polymarket/trades/trades_15370000_15380000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/trades/trades_15370000_15380000.parquet"
+        },
+        {
+          "key": "becker/data/polymarket/trades/trades_179830000_179840000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/trades/trades_179830000_179840000.parquet"
+        }
+      ]
+    },
+    "blocks": {
+      "columns": [
+        "block_number",
+        "block_timestamp",
+        "base_fee_per_gas"
+      ],
+      "files": [
+        {
+          "key": "becker/data/polymarket/blocks/blocks_60700000_60800000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/blocks/blocks_60700000_60800000.parquet"
+        },
+        {
+          "key": "becker/data/polymarket/blocks/blocks_46300000_46400000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/blocks/blocks_46300000_46400000.parquet"
+        },
+        {
+          "key": "becker/data/polymarket/blocks/blocks_24000000_24100000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/blocks/blocks_24000000_24100000.parquet"
+        }
+      ]
+    },
+    "markets": {
+      "columns": [
+        "condition_id",
+        "question",
+        "slug",
+        "category",
+        "closed",
+        "volume"
+      ],
+      "files": [
+        {
+          "key": "becker/data/polymarket/markets/markets_390000_400000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/markets/markets_390000_400000.parquet"
+        },
+        {
+          "key": "becker/data/polymarket/markets/markets_260000_270000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/markets/markets_260000_270000.parquet"
+        },
+        {
+          "key": "becker/data/polymarket/markets/markets_320000_330000.parquet",
+          "url": "https://becker.s3.us-east-1.amazonaws.com/becker/data/polymarket/markets/markets_320000_330000.parquet"
+        }
+      ]
+    }
+  }
+}
