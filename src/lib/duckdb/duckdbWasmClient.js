@@ -4,9 +4,6 @@ import { arrowTableToRows } from "@/lib/duckdb/arrowTableToRows";
 let instance = null;
 let initPromise = null;
 
-/**
- * Lazily boot DuckDB-WASM (worker + module from jsDelivr). Browser only.
- */
 async function getOrCreateInstance() {
   if (typeof window === "undefined") {
     throw new Error("DuckDB-WASM is only available in the browser.");
@@ -14,7 +11,6 @@ async function getOrCreateInstance() {
   if (instance) return instance;
   if (!initPromise) {
     initPromise = (async () => {
-      // Resolved to duckdb-browser.mjs via next.config.js webpack alias (avoids duckdb-node.cjs).
       const duckdb = await import("@duckdb/duckdb-wasm");
       const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
       const worker = await duckdb.createWorker(bundle.mainWorker);
@@ -31,16 +27,10 @@ async function getOrCreateInstance() {
   return instance;
 }
 
-/**
- * Pre-create DuckDB-WASM (worker + in-memory DB) so the first Parquet query feels instant.
- * Safe to call multiple times; subsequent calls resolve to the same instance.
- * @returns {Promise<{ db: import('@duckdb/duckdb-wasm').AsyncDuckDB; conn: import('@duckdb/duckdb-wasm').AsyncDuckDBConnection }>}
- */
 export async function warmDuckDbWasm() {
   return getOrCreateInstance();
 }
 
-/** True after the first successful {@link warmDuckDbWasm} in this tab (skips redundant loaders). */
 export function isDuckDbWasmReady() {
   return instance != null;
 }
@@ -56,7 +46,6 @@ function assertHttpsParquetUrl(url) {
   return u;
 }
 
-/** Stable virtual filename on the WASM VFS. */
 function virtualParquetName(url) {
   let h = 2166136261;
   for (let i = 0; i < url.length; i++) {
@@ -66,23 +55,41 @@ function virtualParquetName(url) {
   return `remote_${(h >>> 0).toString(16)}.parquet`;
 }
 
-/** Guardrail: full file is buffered in memory before DuckDB reads it. */
 const MAX_PARQUET_FETCH_BYTES = 80 * 1024 * 1024;
 
-/**
- * Run a bounded SELECT over a single remote Parquet file via DuckDB read_parquet.
- *
- * We **fetch bytes in the browser** then **registerFileBuffer** (reliable vs WASM httpfs on S3).
- *
- * @param {string | { proxyPath: string; lake?: 'polymarket' | 'kalshi' }} urlOrProxy
- *        - HTTPS URL for **public** objects (CORS + bucket policy).
- *        - `{ proxyPath: 'markets/foo.parquet', lake?: 'kalshi' }` fetches `/api/data-lake/parquet` (private bucket).
- * @param {{ limit?: number }} [opts]
- * @returns {Promise<{ rows: Record<string, unknown>[]; rowCount: number }>}
- */
-export async function queryRemoteParquet(urlOrProxy, opts = {}) {
-  const limit = Math.min(5000, Math.max(1, Number(opts.limit) || 200));
+/** @type {Map<string, { virtualFileName: string; viewName: string }>} */
+const beckerParquetRegistry = new Map();
 
+function sanitizeBeckerKeyPart(s) {
+  const t = String(s || "x")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  return t || "x";
+}
+
+/**
+ * @param {"polymarket" | "kalshi"} dataset
+ * @param {string} sampleId
+ */
+export function beckerLogicalKey(dataset, sampleId) {
+  return `${sanitizeBeckerKeyPart(dataset)}_${sanitizeBeckerKeyPart(sampleId)}`;
+}
+
+function virtualFileNameForLogical(logicalKey) {
+  return `becker_${logicalKey}.parquet`;
+}
+
+function viewNameForLogical(logicalKey) {
+  return `v_becker_${logicalKey}`;
+}
+
+/**
+ * @param {string | { proxyPath: string; lake?: string }} urlOrProxy
+ * @returns {Promise<{ buf: Uint8Array; virtualKeySource: string }>}
+ */
+async function fetchParquetBytes(urlOrProxy) {
   let fetchUrl;
   let virtualKeySource;
 
@@ -141,6 +148,95 @@ export async function queryRemoteParquet(urlOrProxy, opts = {}) {
     );
   }
 
+  return { buf, virtualKeySource };
+}
+
+/**
+ * Fetch Parquet, register on WASM VFS, CREATE VIEW — multiple samples can coexist for JOINs.
+ *
+ * @param {{ dataset: "polymarket" | "kalshi"; sampleId: string; urlOrProxy: string | { proxyPath: string; lake?: string }; limit?: number }} opts
+ */
+export async function ingestRemoteParquetAsView(opts) {
+  const { dataset, sampleId, urlOrProxy } = opts;
+  const limit = Math.min(5000, Math.max(1, Number(opts.limit) || 200));
+
+  const logicalKey = beckerLogicalKey(dataset, sampleId);
+  const virtualFileName = virtualFileNameForLogical(logicalKey);
+  const viewName = viewNameForLogical(logicalKey);
+
+  const { buf } = await fetchParquetBytes(urlOrProxy);
+  const { db, conn } = await getOrCreateInstance();
+
+  const prev = beckerParquetRegistry.get(logicalKey);
+  if (prev) {
+    try {
+      await conn.query(`DROP VIEW IF EXISTS ${prev.viewName}`);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await db.dropFile(prev.virtualFileName);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  await db.registerFileBuffer(virtualFileName, buf);
+
+  const escapedFile = virtualFileName.replace(/'/g, "''");
+  await conn.query(
+    `CREATE OR REPLACE VIEW ${viewName} AS SELECT * FROM read_parquet('${escapedFile}')`,
+  );
+
+  beckerParquetRegistry.set(logicalKey, { virtualFileName, viewName });
+
+  const table = await conn.query(`SELECT * FROM ${viewName} LIMIT ${limit}`);
+  const rows = arrowTableToRows(table);
+  return { rows, rowCount: rows.length, logicalKey, viewName };
+}
+
+/** @returns {{ logicalKey: string; viewName: string }[]} */
+export function listBeckerParquetViews() {
+  return Array.from(beckerParquetRegistry.entries()).map(([logicalKey, v]) => ({
+    logicalKey,
+    viewName: v.viewName,
+  }));
+}
+
+/**
+ * Single SELECT only (e.g. JOIN across v_becker_* views).
+ * @param {string} sql
+ */
+export async function runBeckerSelectSql(sql) {
+  const trimmed = String(sql || "").trim();
+  const parts = trimmed
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length !== 1) {
+    throw new Error("Enter exactly one SQL statement (no multiple statements).");
+  }
+  const stmt = parts[0];
+  if (!/^\s*select\b/i.test(stmt)) {
+    throw new Error("Only SELECT queries are allowed.");
+  }
+  if (/\b(attach|copy|export|import|load|install|pragma|execute|call|checkpoint|vacuum)\b/i.test(stmt)) {
+    throw new Error("This statement type is not allowed.");
+  }
+
+  const { conn } = await getOrCreateInstance();
+  const table = await conn.query(stmt);
+  const rows = arrowTableToRows(table);
+  return { rows, rowCount: rows.length };
+}
+
+/**
+ * One-shot: fetch → register → SELECT LIMIT → drop file (no persistent view).
+ */
+export async function queryRemoteParquet(urlOrProxy, opts = {}) {
+  const limit = Math.min(5000, Math.max(1, Number(opts.limit) || 200));
+
+  const { buf, virtualKeySource } = await fetchParquetBytes(urlOrProxy);
   const { db, conn } = await getOrCreateInstance();
   const virtualName = virtualParquetName(virtualKeySource);
   await db.registerFileBuffer(virtualName, buf);

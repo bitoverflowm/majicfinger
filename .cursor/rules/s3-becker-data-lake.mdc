@@ -1,6 +1,6 @@
 ---
 description: Becker S3 data lake — upload script, bucket layout, manifests, and app proxy env (Polymarket + Kalshi Parquet)
-globs: scripts/publish-becker-both-parquet-to-s3-stream-extract.js,src/pages/api/data-lake/**/*,src/config/dataLakeParquetSamples.js
+globs: scripts/publish-becker-both-parquet-to-s3-stream-extract.js,scripts/report-becker-s3-upload-completeness.js,scripts/loadRepoEnvForAws.js,src/pages/api/data-lake/**/*,src/config/dataLakeParquetSamples.js
 alwaysApply: false
 ---
 
@@ -14,6 +14,10 @@ Use this when changing **S3 uploads**, **manifests**, or the **data-lake Parquet
   - **Flow**: HTTP download `data.tar.zst` (default Becker URL) → `zstd -d` → `tar-stream` → **one S3 `PutObject` per `.parquet`** (no full local extract of the whole archive).
   - **Phases**: `[1]` stream pipeline → `[2/3]` stream pass complete (upload counts / skipped) → optional S3 listing sample → `[3/3]` write **local** JSON manifests under `.tmp-becker-manifest/` → **upload manifests** to S3.
   - **`Done.`** means the script finished without throw; manifests were uploaded (unless `--dry-run`).
+
+## Completeness report
+
+- **`scripts/report-becker-s3-upload-completeness.js`** — streams the same `data.tar.zst` source (inventory only), lists Parquet under `{prefix}/data/` in S3, and prints missing keys, byte-size mismatches vs tar headers, per-table counts, and optional `--json` / `--fail-on-gap`.
 
 ## S3 layout (typical)
 
@@ -39,7 +43,7 @@ Use this when changing **S3 uploads**, **manifests**, or the **data-lake Parquet
 
 ## Security / ops
 
-- **Never commit real AWS keys** in the upload script or repo. Use **environment variables** or local secrets; rotate any keys that were ever committed.
+- **Never commit real AWS keys.** Becker CLI scripts load **repo-root `.env` / `.env.local`** via `scripts/loadRepoEnvForAws.js` (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`). Rotate any keys that were ever committed.
 - **CORS** on the bucket matters only if the **browser** fetches Parquet via **public HTTPS URLs** (not via the proxy).
 
 ## Past improvements (conversation summary)
