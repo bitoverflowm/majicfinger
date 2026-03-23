@@ -1,6 +1,13 @@
 /**
  * Browser → POST start → poll GET status until SUCCEEDED (serverless-friendly).
- * @param {{ lake: "polymarket" | "kalshi"; table: string; limit?: number }} opts
+ * @param {{
+ *   lake: "polymarket" | "kalshi";
+ *   table: string;
+ *   limit?: number;
+ *   columns?: string[] | null;
+ *   queryType?: "select" | "count";
+ *   countAlias?: string | null;
+ * }} opts
  * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number }} [pollOpts]
  * @returns {Promise<{ columns: string[]; rows: string[][]; rowCount: number; dataScannedBytes: number | null; queryExecutionId: string }>}
  */
@@ -20,7 +27,16 @@ function sleep(ms, signal) {
 }
 
 export async function fetchAthenaLakeSample(
-  { lake, table, limit = 100 },
+  {
+    lake,
+    table,
+    limit = 100,
+    columns = null,
+    queryType = "select",
+    countAlias = null,
+    filters = null,
+    caseSensitive = false,
+  },
   pollOpts = {},
 ) {
   const { signal, pollIntervalMs = 900, maxWaitMs = 180000 } = pollOpts;
@@ -32,7 +48,16 @@ export async function fetchAthenaLakeSample(
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
     signal,
-    body: JSON.stringify({ lake, table, limit: lim }),
+    body: JSON.stringify({
+      lake,
+      table,
+      limit: lim,
+      columns: Array.isArray(columns) && columns.length ? columns : null,
+      queryType,
+      countAlias,
+      filters,
+      caseSensitive,
+    }),
   });
 
   let startJson = {};

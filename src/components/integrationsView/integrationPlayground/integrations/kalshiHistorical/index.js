@@ -12,7 +12,6 @@ export default function KalshiHistorical({ setConnectedData }) {
   if (error) {
     return (
       <div className="text-sm space-y-4 min-w-0 max-w-full overflow-hidden">
-        <h3 className="text-sm font-semibold tracking-tight">Kalshi Historical</h3>
         <ConnectProgressWithLabel label={label} progress={progress} />
         <p className="text-[11px] text-destructive break-words min-w-0 max-w-full">{error}</p>
         <Button type="button" size="sm" className="h-8 text-xs w-fit" variant="secondary" onClick={retry}>
@@ -25,7 +24,6 @@ export default function KalshiHistorical({ setConnectedData }) {
   if (!ready) {
     return (
       <div className="text-sm space-y-4 min-w-0 max-w-full overflow-hidden">
-        <h3 className="text-sm font-semibold tracking-tight">Kalshi Historical</h3>
         <ConnectProgressWithLabel label={label} progress={progress} />
       </div>
     );
@@ -33,7 +31,6 @@ export default function KalshiHistorical({ setConnectedData }) {
 
   return (
     <div className="text-sm space-y-3 min-w-0 max-w-full overflow-hidden">
-      <h3 className="text-sm font-semibold tracking-tight">Kalshi Historical</h3>
       <DataLakeParquetPanel setConnectedData={setConnectedData} dataset="kalshi" />
     </div>
   );

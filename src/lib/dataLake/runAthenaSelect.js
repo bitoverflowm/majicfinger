@@ -35,10 +35,23 @@ function assertAthenaConfig() {
  * @param {string} opts.physicalTableName
  * @param {string} opts.database
  * @param {string[] | null | undefined} opts.columns
+ * @param {"select" | "count"} [opts.queryType]
+ * @param {string | null | undefined} [opts.countAlias]
+ * @param {{ and: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }>; or: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }> } | null | undefined} [opts.filters]
+ * @param {boolean} [opts.caseSensitive]
  * @param {number} opts.limit
  * @returns {Promise<{ queryExecutionId: string; sql: string; rowLimit: number }>}
  */
-export async function startAthenaBoundedQuery({ physicalTableName, database, columns, limit }) {
+export async function startAthenaBoundedQuery({
+  physicalTableName,
+  database,
+  columns,
+  queryType = "select",
+  countAlias,
+  filters = null,
+  caseSensitive = false,
+  limit,
+}) {
   const output = assertAthenaConfig();
 
   const workGroup = process.env.DATA_LAKE_ATHENA_WORKGROUP || "primary";
@@ -50,16 +63,28 @@ export async function startAthenaBoundedQuery({ physicalTableName, database, col
     throw err;
   }
 
-  let selectList = "*";
-  if (columns && columns.length > 0) {
-    for (const c of columns) {
-      if (!isValidColumnIdentifier(c)) {
-        const err = new Error(`Invalid column name: ${c}`);
-        err.code = "BAD_REQUEST";
-        throw err;
-      }
+  let sqlSelect = "*";
+  if (queryType === "count") {
+    const alias = String(countAlias || "count").trim();
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(alias)) {
+      const err = new Error("Invalid countAlias");
+      err.code = "BAD_REQUEST";
+      throw err;
     }
-    selectList = columns.map((c) => `"${c}"`).join(", ");
+    sqlSelect = `COUNT(*) AS "${alias}"`;
+  } else {
+    let selectList = "*";
+    if (columns && columns.length > 0) {
+      for (const c of columns) {
+        if (!isValidColumnIdentifier(c)) {
+          const err = new Error(`Invalid column name: ${c}`);
+          err.code = "BAD_REQUEST";
+          throw err;
+        }
+      }
+      selectList = columns.map((c) => `"${c}"`).join(", ");
+    }
+    sqlSelect = selectList;
   }
 
   const safeTable = String(physicalTableName).trim();
@@ -68,9 +93,47 @@ export async function startAthenaBoundedQuery({ physicalTableName, database, col
     err.code = "BAD_REQUEST";
     throw err;
   }
+  const sqlTable = `"${safeTable}"`;
 
   const lim = Math.min(Math.max(1, Math.floor(Number(limit) || 1)), 1000);
-  const sql = `SELECT ${selectList} FROM "${safeTable}" LIMIT ${lim}`;
+
+  const escapeSqlString = (s) => String(s).replace(/'/g, "''");
+  const escapeLike = (s) => String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+
+  /** @param {{ column: string; kind: "date" | "string" | "number"; op: string; value: any }} p */
+  const predicateToSql = (p) => {
+    const colSql = `"${p.column}"`;
+
+    if (p.kind === "date") {
+      const colMs = `CASE WHEN ${colSql} < 1000000000000 THEN ${colSql} * 1000 ELSE ${colSql} END`;
+      const opSql = p.op === "gt" ? ">" : p.op === "lt" ? "<" : p.op === "eq" ? "=" : "<>";
+      return `${colMs} ${opSql} ${Number(p.value)}`;
+    }
+
+    if (p.kind === "number") {
+      const opSql = p.op === "gt" ? ">" : p.op === "lt" ? "<" : p.op === "eq" ? "=" : "<>";
+      return `${colSql} ${opSql} ${Number(p.value)}`;
+    }
+
+    // string
+    const pattern = `%${escapeLike(p.value)}%`;
+    const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
+    const litMaybeLower = caseSensitive ? `'${escapeSqlString(pattern)}'` : `LOWER('${escapeSqlString(pattern)}')`;
+    const opSql = p.op === "contains" ? "LIKE" : "NOT LIKE";
+    // Use backslash as ESCAPE char so escaped %/_ are treated literally.
+    return `${colMaybeLower} ${opSql} ${litMaybeLower} ESCAPE '\\\\'`;
+  };
+
+  let whereSql = "";
+  if (queryType === "count" && filters) {
+    const andPreds = Array.isArray(filters.and) ? filters.and : [];
+    const orPreds = Array.isArray(filters.or) ? filters.or : [];
+    const andExpr = andPreds.length ? andPreds.map(predicateToSql).join(" AND ") : "TRUE";
+    const orExpr = orPreds.length ? orPreds.map(predicateToSql).join(" OR ") : "TRUE";
+    whereSql = ` WHERE (${andExpr}) AND (${orExpr})`;
+  }
+
+  const sql = `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql} LIMIT ${lim}`;
 
   const athena = new AWS.Athena({ region: getRegion() });
   const { QueryExecutionId } = await athena
@@ -172,6 +235,10 @@ export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
  * @param {string} opts.physicalTableName
  * @param {string} opts.database
  * @param {string[] | null | undefined} opts.columns
+ * @param {"select" | "count"} [opts.queryType]
+ * @param {string | null | undefined} [opts.countAlias]
+ * @param {{ and: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }>; or: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }> } | null | undefined} [opts.filters]
+ * @param {boolean} [opts.caseSensitive]
  * @param {number} opts.limit
  * @param {number} opts.maxWaitMs
  */
@@ -179,6 +246,10 @@ export async function runAthenaBoundedSelect({
   physicalTableName,
   database,
   columns,
+  queryType = "select",
+  countAlias = null,
+  filters = null,
+  caseSensitive = false,
   limit,
   maxWaitMs,
 }) {
@@ -186,6 +257,10 @@ export async function runAthenaBoundedSelect({
     physicalTableName,
     database,
     columns,
+    queryType,
+    countAlias,
+    filters,
+    caseSensitive,
     limit,
   });
 

@@ -47,6 +47,10 @@ export default async function handler(req, res) {
       physicalTableName: validated.physical,
       database: validated.database,
       columns: validated.columns,
+      queryType: validated.queryType,
+      countAlias: validated.countAlias,
+      filters: validated.filters,
+      caseSensitive: validated.caseSensitive,
       limit: validated.limit,
     });
 
