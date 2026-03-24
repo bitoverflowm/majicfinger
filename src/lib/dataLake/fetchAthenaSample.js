@@ -5,8 +5,11 @@
  *   table: string;
  *   limit?: number;
  *   columns?: string[] | null;
- *   queryType?: "select" | "count";
+ *   queryType?: "select" | "count" | "sum";
  *   countAlias?: string | null;
+ *   countDistinctColumn?: string | null;
+ *   sumColumn?: string | null;
+ *   sumAlias?: string | null;
  * }} opts
  * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number }} [pollOpts]
  * @returns {Promise<{ columns: string[]; rows: string[][]; rowCount: number; dataScannedBytes: number | null; queryExecutionId: string }>}
@@ -34,6 +37,9 @@ export async function fetchAthenaLakeSample(
     columns = null,
     queryType = "select",
     countAlias = null,
+    countDistinctColumn = null,
+    sumColumn = null,
+    sumAlias = null,
     filters = null,
     caseSensitive = false,
   },
@@ -55,6 +61,9 @@ export async function fetchAthenaLakeSample(
       columns: Array.isArray(columns) && columns.length ? columns : null,
       queryType,
       countAlias,
+      countDistinctColumn,
+      sumColumn,
+      sumAlias,
       filters,
       caseSensitive,
     }),

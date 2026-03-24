@@ -4,7 +4,7 @@ import Script from 'next/script'
 
 import { GoogleAnalytics } from '@next/third-parties/google'
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 
 import { useUser } from '@/lib/hooks';
 import { StateProvider } from '@/context/stateContext'
@@ -20,6 +20,7 @@ import { toast } from "sonner"
 
 const Dashbaord = () => {
     const user = useUser()    
+    const hasShownWelcomeToastRef = useRef(false);
 
     const clairtyCode = `
         (function (c,l,a,r,i,t,y){
@@ -29,16 +30,30 @@ const Dashbaord = () => {
         })(window, document, "clarity", "script", "l5zqf94lap"); `
 
     useEffect(() => {
-        if(!user){
+        if (hasShownWelcomeToastRef.current) return;
+
+        // Session-level guard: avoid duplicate welcome toasts on remounts.
+        const key = "dashboard_welcome_toast_shown";
+        if (typeof window !== "undefined" && window.sessionStorage.getItem(key) === "1") {
+            hasShownWelcomeToastRef.current = true;
+            return;
+        }
+
+        if (!user) {
             toast('Welcome to Lychee!', {
                 description: `I'm Mr Pink. Take a look around. Don't forget to signup to save your work.`,
                 duration: 10000
               });
-        }else{
+        } else {
             toast('Hey!', {
                 description: `Welcome ${user.email}`,
                 duration: 10000
               });
+        }
+
+        hasShownWelcomeToastRef.current = true;
+        if (typeof window !== "undefined") {
+            window.sessionStorage.setItem(key, "1");
         }
     }, [user])
 

@@ -35,8 +35,11 @@ function assertAthenaConfig() {
  * @param {string} opts.physicalTableName
  * @param {string} opts.database
  * @param {string[] | null | undefined} opts.columns
- * @param {"select" | "count"} [opts.queryType]
+ * @param {"select" | "count" | "sum"} [opts.queryType]
  * @param {string | null | undefined} [opts.countAlias]
+ * @param {string | null | undefined} [opts.countDistinctColumn]
+ * @param {string | null | undefined} [opts.sumColumn]
+ * @param {string | null | undefined} [opts.sumAlias]
  * @param {{ and: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }>; or: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }> } | null | undefined} [opts.filters]
  * @param {boolean} [opts.caseSensitive]
  * @param {number} opts.limit
@@ -48,6 +51,9 @@ export async function startAthenaBoundedQuery({
   columns,
   queryType = "select",
   countAlias,
+  countDistinctColumn,
+  sumColumn,
+  sumAlias,
   filters = null,
   caseSensitive = false,
   limit,
@@ -71,7 +77,31 @@ export async function startAthenaBoundedQuery({
       err.code = "BAD_REQUEST";
       throw err;
     }
-    sqlSelect = `COUNT(*) AS "${alias}"`;
+    const distinctCol = String(countDistinctColumn || "").trim();
+    if (distinctCol) {
+      if (!isValidColumnIdentifier(distinctCol)) {
+        const err = new Error("Invalid countDistinctColumn");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      sqlSelect = `COUNT(DISTINCT "${distinctCol}") AS "${alias}"`;
+    } else {
+      sqlSelect = `COUNT(*) AS "${alias}"`;
+    }
+  } else if (queryType === "sum") {
+    const col = String(sumColumn || "").trim();
+    if (!isValidColumnIdentifier(col)) {
+      const err = new Error("Invalid sumColumn");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    const alias = String(sumAlias || "sum").trim();
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(alias)) {
+      const err = new Error("Invalid sumAlias");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    sqlSelect = `SUM("${col}") AS "${alias}"`;
   } else {
     let selectList = "*";
     if (columns && columns.length > 0) {
@@ -125,15 +155,33 @@ export async function startAthenaBoundedQuery({
   };
 
   let whereSql = "";
-  if (queryType === "count" && filters) {
+  if ((queryType === "count" || queryType === "sum") && filters) {
     const andPreds = Array.isArray(filters.and) ? filters.and : [];
     const orPreds = Array.isArray(filters.or) ? filters.or : [];
+    const mergeAndPreds = Array.isArray(filters.mergeAnd) ? filters.mergeAnd : [];
+    const mergeOrBranchPreds = Array.isArray(filters.mergeOrBranch) ? filters.mergeOrBranch : [];
+
     const andExpr = andPreds.length ? andPreds.map(predicateToSql).join(" AND ") : "TRUE";
     const orExpr = orPreds.length ? orPreds.map(predicateToSql).join(" OR ") : "TRUE";
-    whereSql = ` WHERE (${andExpr}) AND (${orExpr})`;
+    const baseExpr = `(${andExpr}) AND (${orExpr})`;
+
+    if (mergeAndPreds.length > 0 || mergeOrBranchPreds.length > 0) {
+      const baseWithAnd =
+        mergeAndPreds.length > 0 ? `((${baseExpr}) AND (${mergeAndPreds.map(predicateToSql).join(" AND ")}))` : `(${baseExpr})`;
+      if (mergeOrBranchPreds.length > 0) {
+        whereSql = ` WHERE ${baseWithAnd} OR (${mergeOrBranchPreds.map(predicateToSql).join(" OR ")})`;
+      } else {
+        whereSql = ` WHERE ${baseWithAnd}`;
+      }
+    } else if (andPreds.length > 0 || orPreds.length > 0) {
+      whereSql = ` WHERE ${baseExpr}`;
+    }
   }
 
-  const sql = `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql} LIMIT ${lim}`;
+  const sql =
+    queryType === "count" || queryType === "sum"
+      ? `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql}`
+      : `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql} LIMIT ${lim}`;
 
   const athena = new AWS.Athena({ region: getRegion() });
   const { QueryExecutionId } = await athena

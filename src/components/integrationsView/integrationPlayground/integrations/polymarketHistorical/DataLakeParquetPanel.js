@@ -30,13 +30,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus } from "lucide-react";
+import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Wrench } from "lucide-react";
 import { getDataLakeDatasetConfig, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
 import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
+import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
 
 // Athena/Glue schema metadata for each Becker dataset/table.
@@ -139,16 +140,103 @@ function operatorSymbol(op) {
   return "=";
 }
 
+function genMetaOpId() {
+  return `metaop-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
+/**
+ * @param {{ mode: string; filters?: { and: any[]; or: any[] }; merge?: { and: any[]; or: any[] } | null }} op
+ * @returns {{ and: any[]; or: any[]; mergeAnd?: any[]; mergeOrBranch?: any[] } | null}
+ */
+function resolveFiltersForMetaSpec(op) {
+  if (op.mode === "all") return null;
+  const base = { and: [...(op.filters?.and || [])], or: [...(op.filters?.or || [])] };
+  const mergeAnd = Array.isArray(op.merge?.and) ? op.merge.and : [];
+  const mergeOrBranch = Array.isArray(op.merge?.or) ? op.merge.or : [];
+  return {
+    ...base,
+    ...(mergeAnd.length ? { mergeAnd } : {}),
+    ...(mergeOrBranch.length ? { mergeOrBranch } : {}),
+  };
+}
+
+/**
+ * @param {any} spec
+ * @param {"AND" | "OR"} combinator
+ * @param {any[]} predicates
+ */
+function applyMergeToSpec(spec, combinator, predicates) {
+  const prevAnd = Array.isArray(spec?.merge?.and) ? spec.merge.and : [];
+  const prevOr = Array.isArray(spec?.merge?.or) ? spec.merge.or : [];
+  const nextMerge =
+    combinator === "AND"
+      ? { and: [...prevAnd, ...predicates], or: prevOr }
+      : { and: prevAnd, or: [...prevOr, ...predicates] };
+  return {
+    ...spec,
+    merge: nextMerge,
+    label: metaOperationLabel(spec.kind, "filter", spec.aggregateColumn),
+  };
+}
+
+function specHasIncompleteFilters(spec) {
+  if (spec.mode !== "filter") return false;
+  const all = [...(spec.filters?.and || []), ...(spec.filters?.or || [])];
+  if (all.length === 0) return true;
+  return all.some((f) => {
+    if (!f?.column || !f?.op || !f?.kind) return true;
+    if (f.kind === "string") return !String(f.value ?? "").trim();
+    if (f.kind === "date") return !Number.isFinite(Number(f.value));
+    return !Number.isFinite(Number(f.value));
+  });
+}
+
+function metaOperationLabel(kind, mode, aggregateColumn) {
+  const col = String(aggregateColumn || "").trim();
+  if (kind === "count_distinct") {
+    if (mode === "all") return col ? `Count unique ${col} (all rows)` : "Count unique (all rows)";
+    return col ? `Count unique ${col} (filtered)` : "Count unique (filtered)";
+  }
+  if (kind === "sum") {
+    if (mode === "all") return col ? `Sum ${col} (all rows)` : "Sum (all rows)";
+    return col ? `Sum ${col} (filtered)` : "Sum (filtered)";
+  }
+  return mode === "all" ? "Count All Rows" : "Count (filtered)";
+}
+
+function metaOperationHeading(kind) {
+  if (kind === "sum") return "Sum";
+  return "Count";
+}
+
+function metaOperationDisplayName(op) {
+  const custom = String(op?.label || "").trim();
+  return custom || metaOperationHeading(op?.kind);
+}
+
+function areMetaRowsEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const ar = a[i] || {};
+    const br = b[i] || {};
+    if (String(ar["meta query"] ?? "") !== String(br["meta query"] ?? "")) return false;
+    if (String(ar.value ?? "") !== String(br.value ?? "")) return false;
+  }
+  return true;
+}
+
 /**
  * Becker / DuckDB-backed historical data: bounded Athena `SELECT <columns>` → JSON → DuckDB view → sheet.
  * Polymarket: markets, blocks, trades. Kalshi: markets, trades (no blocks in Glue).
  *
- * @param {{ setConnectedData: (rows: Record<string, unknown>[]) => void; dataset?: "polymarket" | "kalshi" }} props
+ * @param {{ setConnectedData?: (rows: Record<string, unknown>[]) => void; dataset?: "polymarket" | "kalshi" }} props
  */
-export default function DataLakeParquetPanel({ setConnectedData, dataset = "polymarket" }) {
+export default function DataLakeParquetPanel({ setConnectedData: setConnectedDataFromProp, dataset = "polymarket" }) {
   const ctx = useMyStateV2();
   const connectedData = ctx?.connectedData ?? [];
   const replaceCurrentSheetData = ctx?.replaceCurrentSheetData;
+  const setConnectedData = ctx?.setConnectedData ?? setConnectedDataFromProp;
   const addNewSheetAndActivate = ctx?.addNewSheetAndActivate;
   const setSheetData = ctx?.setSheetData;
   const setDataSheets = ctx?.setDataSheets;
@@ -173,10 +261,24 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   const [selectedColumns, setSelectedColumns] = useState(initialSelectedColumns);
   const [selectionTab, setSelectionTab] = useState("columns"); // "columns" | "meta"
   const [metaQueryMode, setMetaQueryMode] = useState("all"); // "all" | "filter"
-  const [metaCaseSensitive, setMetaCaseSensitive] = useState(false);
+  const [metaOperationKind, setMetaOperationKind] = useState("count"); // "count" | "count_distinct" | "sum"
+  const [metaOperationColumn, setMetaOperationColumn] = useState(""); // for SUM
   const [metaAndFilters, setMetaAndFilters] = useState([]); // advanced tags (AND)
   const [metaOrFilters, setMetaOrFilters] = useState([]); // advanced tags (OR)
   const [metaAdvancedOpen, setMetaAdvancedOpen] = useState(false);
+  /** @type {Array<{ id: string; kind: string; mode: string; label: string; filters: { and: any[]; or: any[] }; merge: null | { targetId: string; combinator: string; extraPredicates: any[] } }>} */
+  const [metaPriorOperations, setMetaPriorOperations] = useState([]);
+  const [metaOperationAllSelected, setMetaOperationAllSelected] = useState(false);
+  const [metaOperationsMenuOpen, setMetaOperationsMenuOpen] = useState(false);
+  const [metaAddOperationDialogOpen, setMetaAddOperationDialogOpen] = useState(false);
+  const [editingMetaOpId, setEditingMetaOpId] = useState(null);
+  const [editingMetaOpName, setEditingMetaOpName] = useState("");
+  const [editingDraftMetaName, setEditingDraftMetaName] = useState(false);
+  const [draftMetaOpName, setDraftMetaOpName] = useState("");
+  const [editingOperationTargetId, setEditingOperationTargetId] = useState(null);
+  const [forceMetaOperationsMenuOpen, setForceMetaOperationsMenuOpen] = useState(false);
+  /** @type {"default" | "new_sheet" | "append_row"} */
+  const [metaRunDisposition, setMetaRunDisposition] = useState("default");
   const [loading, setLoading] = useState(false);
   const [loadLabel, setLoadLabel] = useState(PARQUET_LOAD_PHASE_MESSAGES[0].text);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -185,7 +287,7 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
   const [beckerViews, setBeckerViews] = useState(() => listBeckerParquetViews());
 
-  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; columns: string[] }>} */
+  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; columns: string[]; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
 
   useEffect(() => {
@@ -224,9 +326,15 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
     if (!selected?.table) return;
     setSelectedColumns(availableColumns);
     setMetaQueryMode("all");
+    setMetaOperationKind("count");
+    setMetaOperationColumn("");
     setMetaAndFilters([]);
     setMetaOrFilters([]);
     setMetaAdvancedOpen(false);
+    setMetaPriorOperations([]);
+    setMetaOperationAllSelected(false);
+    setMetaRunDisposition("default");
+    setMetaOperationsMenuOpen(false);
   }, [selected?.table, availableColumns]);
 
   const refreshBeckerViews = useCallback(() => {
@@ -242,21 +350,55 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   );
 
   const runIngestWithProgress = useCallback(
-    async (lakeVal, table, sid, mode, cols, metaQueryMode, metaCaseSensitive, metaFilters) => {
+    async (lakeVal, table, sid, mode, cols, metaQueryMode, metaFilters, metaOpSpecs) => {
       return runParquetSheetLoadWithProgress({
         onLabel: setLoadLabel,
         onProgress: setLoadProgress,
         loadFn: async () => {
           if (mode === "meta") {
+            if (Array.isArray(metaOpSpecs) && metaOpSpecs.length > 0) {
+              /** @type {string[][]} */
+              const tableRows = [];
+              for (let i = 0; i < metaOpSpecs.length; i++) {
+                const op = metaOpSpecs[i];
+                const filters = resolveFiltersForMetaSpec(op);
+                const { columns: resultColumns, rows } = await fetchAthenaLakeSample({
+                  lake: lakeVal,
+                  table,
+                  limit: ATHENA_SAMPLE_ROW_LIMIT,
+                  queryType: op.kind === "sum" ? "sum" : "count",
+                  countAlias: "count",
+                  countDistinctColumn: op.kind === "count_distinct" ? op.aggregateColumn : null,
+                  sumColumn: op.kind === "sum" ? op.aggregateColumn : null,
+                  sumAlias: "sum",
+                  caseSensitive: true,
+                  filters,
+                });
+                const resultKey = op.kind === "sum" ? "sum" : "count";
+                const valueIdx = resultColumns.indexOf(resultKey);
+                const val = rows[0]?.[valueIdx >= 0 ? valueIdx : 0] ?? "";
+                tableRows.push([metaOperationDisplayName(op), String(val)]);
+              }
+              return ingestAthenaResultAsView({
+                dataset,
+                sampleId: `${sid}-meta-multi`,
+                columns: ["meta query", "value"],
+                rows: tableRows,
+                limit: ATHENA_SAMPLE_ROW_LIMIT,
+              });
+            }
             // Meta table (count): a single-cell COUNT(*) result (optionally with filters).
             const isFilterMode = metaQueryMode === "filter";
             const { columns: resultColumns, rows } = await fetchAthenaLakeSample({
               lake: lakeVal,
               table,
               limit: ATHENA_SAMPLE_ROW_LIMIT,
-              queryType: "count",
+              queryType: metaOperationKind === "sum" ? "sum" : "count",
               countAlias: "count",
-              caseSensitive: metaCaseSensitive,
+              countDistinctColumn: metaOperationKind === "count_distinct" ? metaOperationColumn : null,
+              sumColumn: metaOperationKind === "sum" ? metaOperationColumn : null,
+              sumAlias: "sum",
+              caseSensitive: true,
               filters: isFilterMode ? metaFilters : null,
             });
             return ingestAthenaResultAsView({
@@ -286,13 +428,13 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
         },
       });
     },
-    [dataset],
+    [dataset, metaOperationColumn, metaOperationKind],
   );
 
   const executeIngestReplace = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, columns, metaQueryMode, metaCaseSensitive, metaFilters } = pending;
+    const { mode, lake: lk, table, sampleId: sid, columns, metaQueryMode, metaFilters, metaOpSpecs } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -308,8 +450,8 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
         mode,
         columns,
         metaQueryMode,
-        metaCaseSensitive,
         metaFilters,
+        metaOpSpecs,
       );
       applyRowsToActiveSheet(rows);
       setLastRowCount(rowCount);
@@ -323,10 +465,60 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
     }
   }, [applyRowsToActiveSheet, refreshBeckerViews, runIngestWithProgress]);
 
+  const executeIngestAppend = useCallback(async () => {
+    const pending = pendingIngestRef.current;
+    if (!pending) return;
+    const { mode, lake: lk, table, sampleId: sid, columns, metaQueryMode, metaFilters, metaOpSpecs, metaAppendTargetIndex } = pending;
+    pendingIngestRef.current = null;
+    setSheetDialogOpen(false);
+    setError(null);
+    setLastRowCount(null);
+    setLoading(true);
+    setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
+    setLoadProgress(5);
+    try {
+      const { rows, rowCount } = await runIngestWithProgress(
+        lk,
+        table,
+        sid,
+        mode,
+        columns,
+        metaQueryMode,
+        metaFilters,
+        metaOpSpecs,
+      );
+      if (mode === "meta") {
+        // Replace only the template row that was appended in preview.
+        const patchRow = rows[0];
+        if (patchRow && Number.isInteger(metaAppendTargetIndex)) {
+          setConnectedData?.((prev) => {
+            const list = Array.isArray(prev) ? [...prev] : [];
+            const idx = Math.max(0, Math.min(metaAppendTargetIndex, list.length));
+            if (idx < list.length) list[idx] = patchRow;
+            else list.push(patchRow);
+            return list;
+          });
+        } else {
+          applyRowsToActiveSheet(rows);
+        }
+      } else {
+        setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
+      }
+      setLastRowCount(rowCount);
+      refreshBeckerViews();
+    } catch (e) {
+      const msg = e?.message || String(e);
+      setError(msg);
+    } finally {
+      setLoading(false);
+      setLoadProgress(0);
+    }
+  }, [applyRowsToActiveSheet, refreshBeckerViews, runIngestWithProgress, setConnectedData]);
+
   const executeIngestNewSheet = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, columns, metaQueryMode, metaCaseSensitive, metaFilters } = pending;
+    const { mode, lake: lk, table, sampleId: sid, columns, metaQueryMode, metaFilters, metaOpSpecs } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -346,8 +538,8 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
         mode,
         columns,
         metaQueryMode,
-        metaCaseSensitive,
         metaFilters,
+        metaOpSpecs,
       );
 
       addNewSheetAndActivate?.((newId) => {
@@ -384,10 +576,6 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
     setSheetData,
   ]);
 
-  const anyStringFilterSelected = useMemo(() => {
-    return [...metaAndFilters, ...metaOrFilters].some((f) => f.kind === "string");
-  }, [metaAndFilters, metaOrFilters]);
-
   const hasIncompleteMetaFilters = useMemo(() => {
     const all = [...metaAndFilters, ...metaOrFilters];
     return all.some((f) => {
@@ -397,6 +585,240 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
       return !Number.isFinite(Number(f.value));
     });
   }, [metaAndFilters, metaOrFilters]);
+
+  const snapshotEditorToSpec = useCallback(() => {
+    const customName = String(draftMetaOpName || "").trim();
+    if (metaOperationAllSelected) {
+      return {
+        id: genMetaOpId(),
+        kind: metaOperationKind,
+        aggregateColumn: metaOperationKind === "sum" || metaOperationKind === "count_distinct" ? metaOperationColumn : null,
+        mode: "all",
+        filters: { and: [], or: [] },
+        label: customName,
+        merge: null,
+      };
+    }
+    if (metaQueryMode === "filter" && metaAndFilters.length + metaOrFilters.length > 0) {
+      if (hasIncompleteMetaFilters) return null;
+      if ((metaOperationKind === "sum" || metaOperationKind === "count_distinct") && !metaOperationColumn) return null;
+      return {
+        id: genMetaOpId(),
+        kind: metaOperationKind,
+        aggregateColumn: metaOperationKind === "sum" || metaOperationKind === "count_distinct" ? metaOperationColumn : null,
+        mode: "filter",
+        filters: {
+          and: JSON.parse(JSON.stringify(metaAndFilters)),
+          or: JSON.parse(JSON.stringify(metaOrFilters)),
+        },
+        label: customName,
+        merge: null,
+      };
+    }
+    return null;
+  }, [
+    hasIncompleteMetaFilters,
+    metaAndFilters,
+    draftMetaOpName,
+    metaOperationAllSelected,
+    metaOperationColumn,
+    metaOperationKind,
+    metaOrFilters,
+    metaQueryMode,
+  ]);
+
+  const buildAllMetaOpSpecsForRun = useCallback(() => {
+    const list = [...metaPriorOperations];
+    const draft = snapshotEditorToSpec();
+    if (draft) list.push(draft);
+    return list;
+  }, [metaPriorOperations, snapshotEditorToSpec]);
+
+  const applySpecToMetaEditor = useCallback((spec) => {
+    if (!spec) return;
+    setMetaOperationKind(spec.kind === "sum" ? "sum" : spec.kind === "count_distinct" ? "count_distinct" : "count");
+    setMetaOperationColumn(
+      spec.kind === "sum" || spec.kind === "count_distinct" ? String(spec.aggregateColumn || "") : "",
+    );
+    setDraftMetaOpName(String(spec.label || ""));
+    setEditingDraftMetaName(false);
+
+    if (spec.mode === "all") {
+      setMetaQueryMode("all");
+      setMetaAndFilters([]);
+      setMetaOrFilters([]);
+      setMetaOperationAllSelected(true);
+      return;
+    }
+
+    const baseAnd = Array.isArray(spec.filters?.and) ? spec.filters.and : [];
+    const baseOr = Array.isArray(spec.filters?.or) ? spec.filters.or : [];
+    const mergeAnd = Array.isArray(spec.merge?.and) ? spec.merge.and : [];
+    const mergeOr = Array.isArray(spec.merge?.or) ? spec.merge.or : [];
+
+    setMetaQueryMode("filter");
+    setMetaAndFilters(JSON.parse(JSON.stringify([...baseAnd, ...mergeAnd])));
+    setMetaOrFilters(JSON.parse(JSON.stringify([...baseOr, ...mergeOr])));
+    setMetaOperationAllSelected(false);
+  }, []);
+
+  const handleEditPriorOperation = useCallback(
+    (opId) => {
+      const chosen = metaPriorOperations.find((op) => op.id === opId);
+      if (!chosen) return;
+      setEditingOperationTargetId(opId);
+      applySpecToMetaEditor(chosen);
+    },
+    [applySpecToMetaEditor, metaPriorOperations],
+  );
+
+  const handleRemovePriorOperation = useCallback((opId) => {
+    setMetaPriorOperations((prev) => prev.filter((op) => op.id !== opId));
+  }, []);
+
+  const beginEditPriorOperationLabel = useCallback((op) => {
+    setEditingMetaOpId(op?.id || null);
+    setEditingMetaOpName(String(op?.label || ""));
+  }, []);
+
+  const commitEditPriorOperationLabel = useCallback(() => {
+    const id = editingMetaOpId;
+    if (!id) return;
+    const nextLabel = String(editingMetaOpName || "").trim();
+    setMetaPriorOperations((prev) =>
+      prev.map((op) => (op.id === id ? { ...op, label: nextLabel } : op)),
+    );
+    setEditingMetaOpId(null);
+    setEditingMetaOpName("");
+  }, [editingMetaOpId, editingMetaOpName]);
+
+  const resetMetaEditor = useCallback(() => {
+    setMetaQueryMode("all");
+    setMetaAndFilters([]);
+    setMetaOrFilters([]);
+    setMetaOperationKind("count");
+    setMetaOperationColumn("");
+    setMetaOperationAllSelected(false);
+    setEditingDraftMetaName(false);
+    setDraftMetaOpName("");
+    setEditingOperationTargetId(null);
+  }, []);
+
+  const metaCanAddAnotherIntercept = useMemo(() => {
+    return (
+      metaPriorOperations.length > 0 ||
+      metaOperationAllSelected ||
+      (metaAndFilters.length + metaOrFilters.length > 0 && !hasIncompleteMetaFilters)
+    );
+  }, [metaPriorOperations.length, metaOperationAllSelected, metaAndFilters.length, metaOrFilters.length, hasIncompleteMetaFilters]);
+
+  const commitCurrentEditorAsOperation = useCallback(() => {
+    const spec = snapshotEditorToSpec();
+    if (!spec) return null;
+    if (editingOperationTargetId) {
+      setMetaPriorOperations((prev) =>
+        prev.map((op) => (op.id === editingOperationTargetId ? { ...spec, id: op.id } : op)),
+      );
+      setEditingOperationTargetId(null);
+      resetMetaEditor();
+      return editingOperationTargetId;
+    }
+    setMetaPriorOperations((p) => [...p, spec]);
+    resetMetaEditor();
+    return spec.id;
+  }, [editingOperationTargetId, snapshotEditorToSpec, resetMetaEditor]);
+
+  const handleMetaAddOperationComplete = useCallback(
+    (result) => {
+      if (result.intent === "new_sheet" || result.intent === "append_row") {
+        const id = commitCurrentEditorAsOperation();
+        if (!id) {
+          setError("Finish configuring the current operation first.");
+          return;
+        }
+        setMetaRunDisposition(result.intent);
+        setMetaAddOperationDialogOpen(false);
+        setMetaOperationsMenuOpen(true);
+        return;
+      }
+
+      if (result.intent === "merge_and" || result.intent === "merge_or") {
+        const m = result.merge;
+        if (!m?.targetId || !m.predicates?.length) return;
+        const combinator = result.intent === "merge_and" ? "AND" : "OR";
+
+        if (m.targetId === "__draft__") {
+          const snap = snapshotEditorToSpec();
+          if (!snap) {
+            setError("Configure the current operation before merging.");
+            return;
+          }
+          const mergedDraft = applyMergeToSpec(snap, combinator, m.predicates);
+          setMetaPriorOperations((prev) => [...prev, mergedDraft]);
+          resetMetaEditor();
+          setMetaAddOperationDialogOpen(false);
+          return;
+        }
+
+        setMetaPriorOperations((prev) =>
+          prev.map((op) => (op.id === m.targetId ? applyMergeToSpec(op, combinator, m.predicates) : op)),
+        );
+        resetMetaEditor();
+        setMetaAddOperationDialogOpen(false);
+      }
+    },
+    [commitCurrentEditorAsOperation, resetMetaEditor, setError, snapshotEditorToSpec],
+  );
+
+  const onMetaOperationsMenuOpenChange = useCallback(
+    (open) => {
+      if (open && !forceMetaOperationsMenuOpen && selectionTab === "meta" && metaCanAddAnotherIntercept) {
+        setMetaAddOperationDialogOpen(true);
+        setMetaOperationsMenuOpen(false);
+        return;
+      }
+      setMetaOperationsMenuOpen(open);
+      if (!open || forceMetaOperationsMenuOpen) {
+        setForceMetaOperationsMenuOpen(false);
+      }
+    },
+    [forceMetaOperationsMenuOpen, selectionTab, metaCanAddAnotherIntercept],
+  );
+
+  const metaPreviewRows = useMemo(() => {
+    const existingRows = Array.isArray(connectedData) ? connectedData : [];
+
+    const rows = metaPriorOperations.map((op, i) => {
+      const q = metaOperationDisplayName(op);
+      const existing = existingRows[i]?.value;
+      const fallback = `operation ${i + 1}`;
+      const isTemplate = typeof existing === "string" && /^operation\s+\d+$/i.test(existing);
+      return {
+        "meta query": q,
+        value: existing != null && !isTemplate ? existing : fallback,
+      };
+    });
+    const draft = snapshotEditorToSpec();
+    if (draft) {
+      const q = metaOperationDisplayName(draft);
+      const existing = existingRows[rows.length]?.value;
+      const fallback = `operation ${rows.length + 1}`;
+      const isTemplate = typeof existing === "string" && /^operation\s+\d+$/i.test(existing);
+      rows.push({
+        "meta query": q,
+        value: existing != null && !isTemplate ? existing : fallback,
+      });
+    }
+    return rows;
+  }, [connectedData, metaPriorOperations, snapshotEditorToSpec]);
+
+  // Push placeholder rows while composing meta ops. Do not depend on `loading` — when a run
+  // finishes, `loading` flipping false would re-apply preview and wipe real counts.
+  useEffect(() => {
+    if (selectionTab !== "meta") return;
+    if (areMetaRowsEqual(metaPreviewRows, connectedData)) return;
+    applyRowsToActiveSheet(metaPreviewRows);
+  }, [selectionTab, metaPreviewRows, connectedData, applyRowsToActiveSheet]);
 
   const handleLoad = () => {
     setError(null);
@@ -409,17 +831,41 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
       setError("Must select at least 1 column to pull.");
       return;
     }
-    if (selectionTab === "meta" && metaQueryMode === "filter") {
-      const total = metaAndFilters.length + metaOrFilters.length;
-      if (total === 0) {
-        setError("Must select at least 1 filter to pull.");
+    if (selectionTab === "meta") {
+      const allSpecs = buildAllMetaOpSpecsForRun();
+      if (allSpecs.length === 0) {
+        setError("Select Count → All or add at least one filter before running.");
         return;
       }
-      if (hasIncompleteMetaFilters) {
-        setError("Complete all filter values before running request.");
-        return;
+      for (const spec of allSpecs) {
+        if (specHasIncompleteFilters(spec)) {
+          setError("Enter a value for each operation before running request.");
+          return;
+        }
       }
     }
+
+    let disposition = "default";
+    if (selectionTab === "meta") {
+      disposition = metaRunDisposition;
+      if (disposition !== "default") {
+        setMetaRunDisposition("default");
+      }
+    }
+
+    const allMetaSpecs = selectionTab === "meta" ? buildAllMetaOpSpecsForRun() : [];
+    const templateRowCount =
+      selectionTab === "meta"
+        ? (Array.isArray(connectedData) ? connectedData : []).filter((r) => {
+            const v = r?.value;
+            return typeof v === "string" && /^operation\s+\d+$/i.test(v);
+          }).length
+        : 0;
+    const shouldRunSingleMetaAppend =
+      selectionTab === "meta" &&
+      disposition === "append_row" &&
+      allMetaSpecs.length > 0 &&
+      templateRowCount <= 1;
 
     pendingIngestRef.current = {
       mode: selectionTab,
@@ -428,14 +874,48 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
       sampleId: selected.id,
       columns: selectionTab === "columns" ? selectedColumns : [],
       metaQueryMode,
-      metaCaseSensitive,
       metaFilters: {
         and: metaAndFilters,
         or: metaOrFilters,
       },
+      metaOpSpecs:
+        selectionTab === "meta"
+          ? shouldRunSingleMetaAppend
+            ? (() => {
+                const all = allMetaSpecs;
+                return all.length ? [all[all.length - 1]] : [];
+              })()
+            : allMetaSpecs
+          : undefined,
+      metaAppendTargetIndex:
+        selectionTab === "meta" && shouldRunSingleMetaAppend ? Math.max(0, metaPreviewRows.length - 1) : undefined,
     };
 
-    if (connectedData.length > 0) {
+    if (disposition === "new_sheet") {
+      void executeIngestNewSheet();
+      return;
+    }
+    if (disposition === "append_row" && shouldRunSingleMetaAppend) {
+      void executeIngestAppend();
+      return;
+    }
+
+    const hasOnlyMetaPreviewRows =
+      selectionTab === "meta" &&
+      connectedData.length > 0 &&
+      connectedData.every((row) => {
+        if (!row || typeof row !== "object") return false;
+        const keys = Object.keys(row);
+        if (keys.length === 0) return false;
+        return (
+          keys.includes("Operation name") ||
+          keys.includes("Op ref") ||
+          keys.includes("meta query") ||
+          keys.includes("value")
+        );
+      });
+
+    if (connectedData.length > 0 && !hasOnlyMetaPreviewRows) {
       setSheetDialogOpen(true);
       return;
     }
@@ -462,13 +942,20 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
     if (selectionTab === "columns" && selectedColumns.length === 0) {
       reasons.push("Must select at least 1 column to pull.");
     }
-    if (selectionTab === "meta" && metaQueryMode === "filter") {
-      const total = metaAndFilters.length + metaOrFilters.length;
-      if (total === 0) reasons.push("Must select at least 1 filter to pull.");
-      if (hasIncompleteMetaFilters) reasons.push("Complete all filter values.");
+    if (selectionTab === "meta") {
+      const allSpecs = buildAllMetaOpSpecsForRun();
+      if (allSpecs.length === 0) reasons.push("Select Count → All or add filters.");
+      else {
+        for (const spec of allSpecs) {
+          if (specHasIncompleteFilters(spec)) {
+            reasons.push("Enter a value for each operation.");
+            break;
+          }
+        }
+      }
     }
     return reasons;
-  }, [selected?.table, selectionTab, selectedColumns, metaQueryMode, metaAndFilters.length, metaOrFilters.length, hasIncompleteMetaFilters]);
+  }, [selected?.table, selectionTab, selectedColumns, buildAllMetaOpSpecsForRun]);
 
   const canRunRequest = runRequestReasons.length === 0;
 
@@ -488,6 +975,7 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
   const addMetaFilterPreset = useCallback(
     (column, op) => {
       setError(null);
+      setMetaOperationAllSelected(false);
       const kind = kindForColumn(column);
       const id = `f-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const defaultValue = kind === "date" ? Date.now() : kind === "number" ? 0 : "";
@@ -556,6 +1044,27 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
         hasLiveConnection={hasLiveConnection}
         onReplace={onDialogReplace}
         onAddNewSheet={onDialogAddNewSheet}
+      />
+
+      <MetaAddOperationDialog
+        open={metaAddOperationDialogOpen}
+        onOpenChange={setMetaAddOperationDialogOpen}
+        existingOperations={metaPriorOperations.map((o) => ({ id: o.id, label: o.label }))}
+        hasDraftOperation={
+          metaOperationAllSelected ||
+          (metaQueryMode === "filter" && metaAndFilters.length + metaOrFilters.length > 0 && !hasIncompleteMetaFilters)
+        }
+        draftLabel={
+          metaOperationAllSelected
+            ? metaOperationLabel(metaOperationKind, "all", metaOperationColumn)
+            : metaQueryMode === "filter" && metaAndFilters.length + metaOrFilters.length > 0
+              ? metaOperationLabel(metaOperationKind, "filter", metaOperationColumn)
+              : "Current operation"
+        }
+        availableColumns={availableColumns}
+        columnTypeByName={availableColumnTypesByName}
+        isDateLikeName={isDateLikeName}
+        onComplete={handleMetaAddOperationComplete}
       />
 
       <div className="space-y-1 min-w-0 max-w-full">
@@ -642,14 +1151,16 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                       <Label className="text-xs text-muted-foreground">
                         {`Compose your summary for ${selected?.label || "selected"} data`}
                       </Label>
-                      <DropdownMenu>
+                      <DropdownMenu open={metaOperationsMenuOpen} onOpenChange={onMetaOperationsMenuOpenChange}>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="h-8 text-xs min-w-0 w-full justify-between">
-                            {metaAndFilters.length + metaOrFilters.length > 0 ? (
+                            {metaCanAddAnotherIntercept ? (
                               <span className="inline-flex items-center gap-1.5">
                                 <Plus className="h-3 w-3" />
                                 add another operation
                               </span>
+                            ) : metaAndFilters.length + metaOrFilters.length > 0 && hasIncompleteMetaFilters ? (
+                              "Complete filter values"
                             ) : (
                               "Select an operation"
                             )}
@@ -668,9 +1179,12 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                                   <DropdownMenuItem
                                     className="text-xs"
                                     onSelect={() => {
+                                      setMetaOperationKind("count");
+                                      setMetaOperationColumn("");
                                       setMetaQueryMode("all");
                                       setMetaAndFilters([]);
                                       setMetaOrFilters([]);
+                                      setMetaOperationAllSelected(true);
                                     }}
                                   >
                                     All
@@ -694,10 +1208,12 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                                                 <DropdownMenuSeparator />
                                                 {(String(availableColumnTypesByName[col]).toLowerCase() === "string"
                                                   ? [
+                                                      { id: "unique", label: "UNIQUE" },
                                                       { id: "contains", label: "===" },
                                                       { id: "not_contains", label: "!==" },
                                                     ]
                                                   : [
+                                                      { id: "unique", label: "UNIQUE" },
                                                       { id: "gt", label: ">" },
                                                       { id: "lt", label: "<" },
                                                       { id: "eq", label: "===" },
@@ -708,15 +1224,31 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                                                     key={op.id}
                                                     className="text-xs"
                                                     onSelect={() => {
-                                                      setMetaQueryMode("filter");
-                                                      addMetaFilterPreset(col, op.id);
+                                                      if (op.id === "unique") {
+                                                        setMetaOperationKind("count_distinct");
+                                                        setMetaOperationColumn(col);
+                                                        setMetaQueryMode("all");
+                                                        setMetaAndFilters([]);
+                                                        setMetaOrFilters([]);
+                                                        setMetaOperationAllSelected(true);
+                                                      } else {
+                                                        setMetaOperationKind("count");
+                                                        setMetaOperationColumn("");
+                                                        setMetaQueryMode("filter");
+                                                        setMetaOperationAllSelected(false);
+                                                        addMetaFilterPreset(col, op.id);
+                                                      }
                                                     }}
                                                   >
                                                     <span className="inline-flex items-center gap-2">
                                                       <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
-                                                        {operatorSymbol(op.id)}
+                                                        {op.id === "unique" ? "*" : operatorSymbol(op.id)}
                                                       </span>
-                                                      {op.id === "eq" || op.id === "contains" ? (
+                                                      {op.id === "unique" ? (
+                                                        <span>
+                                                          count <strong>unique</strong> values
+                                                        </span>
+                                                      ) : op.id === "eq" || op.id === "contains" ? (
                                                         <span>
                                                           is <strong>equal</strong> to
                                                         </span>
@@ -746,10 +1278,297 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                                 </DropdownMenuSubContent>
                               </DropdownMenuPortal>
                             </DropdownMenuSub>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger className="text-xs">
+                                sum
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="w-60 max-h-[280px] overflow-y-auto">
+                                  <DropdownMenuLabel className="text-xs">Column to sum</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  {availableColumns.map((sumCol) => (
+                                    <DropdownMenuSub key={`sum-${sumCol}`}>
+                                      <DropdownMenuSubTrigger className="text-xs">
+                                        {sumCol}
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuPortal>
+                                        <DropdownMenuSubContent className="w-56">
+                                          <DropdownMenuItem
+                                            className="text-xs"
+                                            onSelect={() => {
+                                              setMetaOperationKind("sum");
+                                              setMetaOperationColumn(sumCol);
+                                              setMetaQueryMode("all");
+                                              setMetaAndFilters([]);
+                                              setMetaOrFilters([]);
+                                              setMetaOperationAllSelected(true);
+                                            }}
+                                          >
+                                            All
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSub>
+                                            <DropdownMenuSubTrigger className="text-xs">
+                                              Filter
+                                            </DropdownMenuSubTrigger>
+                                            <DropdownMenuPortal>
+                                              <DropdownMenuSubContent className="w-60 max-h-[280px] overflow-y-auto">
+                                                <DropdownMenuLabel className="text-xs">Columns</DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                {availableColumns.map((filterCol) => (
+                                                  <DropdownMenuSub key={`sum-filter-${sumCol}-${filterCol}`}>
+                                                    <DropdownMenuSubTrigger className="text-xs">
+                                                      {filterCol}
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuPortal>
+                                                      <DropdownMenuSubContent className="w-44">
+                                                        <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
+                                                        <DropdownMenuSeparator />
+                                                        {(String(availableColumnTypesByName[filterCol]).toLowerCase() === "string"
+                                                          ? [
+                                                              { id: "contains", label: "===" },
+                                                              { id: "not_contains", label: "!==" },
+                                                            ]
+                                                          : [
+                                                              { id: "gt", label: ">" },
+                                                              { id: "lt", label: "<" },
+                                                              { id: "eq", label: "===" },
+                                                              { id: "neq", label: "!==" },
+                                                            ]
+                                                        ).map((op) => (
+                                                          <DropdownMenuItem
+                                                            key={`sum-op-${sumCol}-${filterCol}-${op.id}`}
+                                                            className="text-xs"
+                                                            onSelect={() => {
+                                                              setMetaOperationKind("sum");
+                                                              setMetaOperationColumn(sumCol);
+                                                              setMetaQueryMode("filter");
+                                                              setMetaOperationAllSelected(false);
+                                                              addMetaFilterPreset(filterCol, op.id);
+                                                            }}
+                                                          >
+                                                            <span className="inline-flex items-center gap-2">
+                                                              <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                                                {operatorSymbol(op.id)}
+                                                              </span>
+                                                              {op.id === "eq" || op.id === "contains" ? (
+                                                                <span>
+                                                                  is <strong>equal</strong> to
+                                                                </span>
+                                                              ) : op.id === "neq" || op.id === "not_contains" ? (
+                                                                <span>
+                                                                  <strong>not</strong> equal to
+                                                                </span>
+                                                              ) : op.id === "lt" ? (
+                                                                <span>
+                                                                  <strong>less</strong> than
+                                                                </span>
+                                                              ) : (
+                                                                <span>
+                                                                  <strong>greater</strong> than
+                                                                </span>
+                                                              )}
+                                                            </span>
+                                                          </DropdownMenuItem>
+                                                        ))}
+                                                      </DropdownMenuSubContent>
+                                                    </DropdownMenuPortal>
+                                                  </DropdownMenuSub>
+                                                ))}
+                                              </DropdownMenuSubContent>
+                                            </DropdownMenuPortal>
+                                          </DropdownMenuSub>
+                                        </DropdownMenuSubContent>
+                                      </DropdownMenuPortal>
+                                    </DropdownMenuSub>
+                                  ))}
+                                </DropdownMenuSubContent>
+                              </DropdownMenuPortal>
+                            </DropdownMenuSub>
                           </DropdownMenuGroup>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
+
+                    {metaPriorOperations.length > 0 && (
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-semibold tracking-wide text-muted-foreground">
+                          Configured operations
+                        </Label>
+                        <div className="space-y-1.5">
+                          {metaPriorOperations.map((op, idx) => (
+                            <div
+                              key={op.id}
+                              className="rounded-md border border-border/60 bg-background/50 px-2 py-1.5"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[10px] text-muted-foreground">{`${idx + 1}: ${metaOperationHeading(op.kind)}`}</div>
+                                  {editingMetaOpId === op.id ? (
+                                    <input
+                                      type="text"
+                                      className="mt-0.5 h-6 w-full min-w-[140px] rounded border border-border/60 bg-background px-1.5 text-[11px]"
+                                      value={editingMetaOpName}
+                                      onChange={(e) => setEditingMetaOpName(e.target.value)}
+                                      onBlur={commitEditPriorOperationLabel}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") commitEditPriorOperationLabel();
+                                        if (e.key === "Escape") {
+                                          setEditingMetaOpId(null);
+                                          setEditingMetaOpName("");
+                                        }
+                                      }}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <div
+                                      className="mt-0.5 text-[11px] truncate text-left"
+                                      title="Operation display label"
+                                    >
+                                      {metaOperationDisplayName(op)}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                    onClick={() => beginEditPriorOperationLabel(op)}
+                                    aria-label="rename operation label"
+                                    title="Rename label"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                    onClick={() => {
+                                      setEditingMetaOpId(null);
+                                      setEditingMetaOpName("");
+                                      handleEditPriorOperation(op.id);
+                                      setForceMetaOperationsMenuOpen(true);
+                                      setMetaOperationsMenuOpen(true);
+                                    }}
+                                    aria-label="edit operation filters"
+                                    title="Edit operation"
+                                  >
+                                    <Wrench className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-destructive/80 hover:text-destructive"
+                                    onClick={() => handleRemovePriorOperation(op.id)}
+                                    aria-label="remove operation"
+                                    title="Remove operation"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(metaOperationAllSelected || metaQueryMode === "filter") && (
+                      <div className="space-y-1 rounded-md border border-border/60 bg-background/50 px-2 py-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold tracking-wide text-muted-foreground">
+                              {metaOperationKind === "sum" ? "SUM" : metaOperationKind === "count_distinct" ? "COUNT UNIQUE" : "COUNT"}
+                            </Label>
+                            {editingDraftMetaName ? (
+                              <input
+                                type="text"
+                                className="h-6 w-full min-w-[140px] rounded border border-border/60 bg-background px-1.5 text-[11px]"
+                                value={draftMetaOpName}
+                                onChange={(e) => setDraftMetaOpName(e.target.value)}
+                                onBlur={() => setEditingDraftMetaName(false)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") setEditingDraftMetaName(false);
+                                  if (e.key === "Escape") {
+                                    setEditingDraftMetaName(false);
+                                    setDraftMetaOpName("");
+                                  }
+                                }}
+                                autoFocus
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                className="text-[11px] text-foreground/90 text-left hover:underline"
+                                onClick={() => setEditingDraftMetaName(true)}
+                                title="Rename current operation label"
+                              >
+                                {String(draftMetaOpName || "").trim() ||
+                                  metaOperationLabel(
+                                    metaOperationKind,
+                                    metaQueryMode === "filter" ? "filter" : "all",
+                                    metaOperationColumn,
+                                  )}
+                              </button>
+                            )}
+                            <div className="text-[11px] text-muted-foreground">
+                              {metaOperationKind === "sum" || metaOperationKind === "count_distinct"
+                                ? (metaOperationColumn || "Select column")
+                                : "All Rows"}
+                              , {metaQueryMode === "filter" ? "FILTER" : "ALL"}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              onClick={() => {
+                                setForceMetaOperationsMenuOpen(true);
+                                setMetaOperationsMenuOpen(true);
+                              }}
+                              aria-label="edit current operation logic"
+                              title="Edit operation"
+                            >
+                              <Wrench className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              onClick={() => setEditingDraftMetaName((v) => !v)}
+                              aria-label="rename current operation"
+                              title="Rename current operation"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            {metaQueryMode !== "filter" && (
+                              <button
+                                type="button"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive/80 hover:bg-muted/60 hover:text-destructive"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  resetMetaEditor();
+                                }}
+                                aria-label="remove operation"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {metaQueryMode === "filter" && (
                       <div className="space-y-4">
@@ -766,12 +1585,12 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                                   updateMetaFilter(f.id, { column: val, kind, op: nextOp, value: defaultValue });
                                 }}
                               >
-                                <SelectTrigger className="h-7 text-[9px] min-w-0 w-16">
+                                <SelectTrigger className="h-7 text-[11px] min-w-0 w-16">
                                   <SelectValue placeholder="Column" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {availableColumns.map((col) => (
-                                    <SelectItem key={col} value={col} className="text-[11px]">
+                                    <SelectItem key={col} value={col} className="text-[13px]">
                                       {col}
                                     </SelectItem>
                                   ))}
@@ -780,7 +1599,7 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
 
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="outline" size="sm" className="h-7 px-2 text-[9px] min-w-8">
+                                  <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] min-w-8">
                                     {operatorSymbol(f.op)}
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -797,7 +1616,7 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                                         { id: "neq", label: "not equal to" },
                                       ]
                                   ).map((op) => (
-                                    <DropdownMenuItem key={op.id} className="text-[11px]" onSelect={() => updateMetaFilter(f.id, { op: op.id })}>
+                                    <DropdownMenuItem key={op.id} className="text-[13px]" onSelect={() => updateMetaFilter(f.id, { op: op.id })}>
                                       <span className="inline-flex items-center gap-2">
                                         <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
                                           {operatorSymbol(op.id)}
@@ -812,25 +1631,27 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                               {f.kind === "date" ? (
                                 <Input
                                   type="datetime-local"
-                                  className="h-7 text-[9px] min-w-0 flex-[2]"
+                                  className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${!Number.isFinite(Number(f.value)) ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                   value={Number.isFinite(Number(f.value)) ? new Date(Number(f.value)).toISOString().slice(0, 16) : ""}
                                   onChange={(e) => {
                                     const ms = new Date(String(e.target.value)).getTime();
                                     updateMetaFilter(f.id, { value: Number.isFinite(ms) ? ms : "" });
                                   }}
+                                  placeholder="Value"
                                 />
                               ) : f.kind === "number" ? (
                                 <Input
                                   type="number"
                                   step="1"
-                                  className="h-7 text-[9px] min-w-0 flex-[2]"
+                                  className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${f.value === "" ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                   value={f.value}
                                   onChange={(e) => updateMetaFilter(f.id, { value: e.target.value === "" ? "" : Number(e.target.value) })}
+                                  placeholder="Value"
                                 />
                               ) : (
                                 <Input
                                   type="text"
-                                  className="h-7 text-[9px] min-w-0 flex-[2]"
+                                  className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${!String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                   value={String(f.value ?? "")}
                                   onChange={(e) => updateMetaFilter(f.id, { value: e.target.value })}
                                   placeholder="Value"
@@ -840,9 +1661,13 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                               <TooltipProvider delayDuration={250}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => removeMetaFilter(f.id)}>
-                                      <Minus className="h-1.5 w-1.5" />
-                                    </Button>
+                                    <button
+                                      type="button"
+                                      className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                      onClick={() => removeMetaFilter(f.id)}
+                                    >
+                                      <Minus className="h-2 w-2" />
+                                    </button>
                                   </TooltipTrigger>
                                   <TooltipContent side="top" className="text-xs">
                                     remove operation
@@ -852,19 +1677,6 @@ export default function DataLakeParquetPanel({ setConnectedData, dataset = "poly
                             </div>
                           ))}
                         </div>
-
-                        {anyStringFilterSelected && (
-                          <div className="flex items-center gap-1.5">
-                            <Checkbox
-                              id="meta-case-sensitive"
-                              checked={metaCaseSensitive}
-                              onCheckedChange={(v) => setMetaCaseSensitive(v === true)}
-                            />
-                            <Label htmlFor="meta-case-sensitive" className="text-[10px] text-muted-foreground">
-                              Case sensitive
-                            </Label>
-                          </div>
-                        )}
 
                       <CollapsibleRoot open={metaAdvancedOpen} onOpenChange={setMetaAdvancedOpen}>
                         <CollapsibleTrigger asChild>

@@ -28,9 +28,12 @@ export function databaseForLake(lake) {
  *   lake: string;
  *   table: string;
  *   limit: number;
- *   queryType: "select" | "count";
+ *   queryType: "select" | "count" | "sum";
  *   columns: string[] | null;
  *   countAlias: string | null;
+ *   countDistinctColumn: string | null;
+ *   sumColumn: string | null;
+ *   sumAlias: string | null;
  *   physical: string;
  *   database: string
  * }}
@@ -44,14 +47,19 @@ export function validateAthenaLakeQueryBody(body) {
   const table = String(body.table || "").toLowerCase().trim();
   const limit = body.limit != null ? Number(body.limit) : 100;
   const queryTypeRaw = String(body.queryType || "select").toLowerCase().trim();
-  const queryType = queryTypeRaw === "count" ? "count" : "select";
+  const queryType = queryTypeRaw === "count" ? "count" : queryTypeRaw === "sum" ? "sum" : "select";
   const caseSensitive = body.caseSensitive === true;
   const columns = Array.isArray(body.columns)
     ? body.columns.map((c) => String(c).trim()).filter(Boolean)
     : null;
   const countAlias = queryType === "count" ? String(body.countAlias || "count").trim() : null;
+  const countDistinctColumn = queryType === "count" ? String(body.countDistinctColumn || "").trim() : null;
+  const sumColumn = queryType === "sum" ? String(body.sumColumn || "").trim() : null;
+  const sumAlias = queryType === "sum" ? String(body.sumAlias || "sum").trim() : null;
   const filtersInput =
-    queryType === "count" && body.filters && typeof body.filters === "object" ? body.filters : null;
+    (queryType === "count" || queryType === "sum") && body.filters && typeof body.filters === "object"
+      ? body.filters
+      : null;
   let validatedFilters = null;
 
   if (lake !== "polymarket" && lake !== "kalshi") {
@@ -61,24 +69,38 @@ export function validateAthenaLakeQueryBody(body) {
     throw new AthenaLakeRequestError('Invalid table (use "markets", "trades", or "blocks")');
   }
 
-  // For count query we don't validate "columns" identifiers, because the SQL is COUNT(*).
-  if (queryType === "count") {
-    if (!countAlias) {
+  // For aggregate queries we don't validate "columns" identifiers.
+  if (queryType === "count" || queryType === "sum") {
+    if (queryType === "count" && !countAlias) {
       throw new AthenaLakeRequestError("Missing countAlias", { statusCode: 400, code: "BAD_REQUEST" });
     }
     // Reuse safe identifier rules from athenaTableMap via isValidColumnIdentifier in runAthenaSelect.
     // We'll still block obviously bad aliases here.
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(countAlias)) {
+    if (queryType === "count" && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(countAlias)) {
       throw new AthenaLakeRequestError("Invalid countAlias", { statusCode: 400, code: "BAD_REQUEST" });
     }
+    if (queryType === "count" && countDistinctColumn && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(countDistinctColumn)) {
+      throw new AthenaLakeRequestError("Invalid countDistinctColumn", { statusCode: 400, code: "BAD_REQUEST" });
+    }
 
-    /** @type {{ and: any[]; or: any[] } | null} */
+    if (queryType === "sum") {
+      if (!sumColumn || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(sumColumn)) {
+        throw new AthenaLakeRequestError("Invalid sumColumn", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      if (!sumAlias || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(sumAlias)) {
+        throw new AthenaLakeRequestError("Invalid sumAlias", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+    }
+
+    /** @type {{ and: any[]; or: any[]; mergeAnd?: any[]; mergeOrBranch?: any[] } | null} */
     const normalizedFilters =
       filtersInput == null
         ? null
         : {
             and: Array.isArray(filtersInput.and) ? filtersInput.and : [],
             or: Array.isArray(filtersInput.or) ? filtersInput.or : [],
+            mergeAnd: Array.isArray(filtersInput.mergeAnd) ? filtersInput.mergeAnd : [],
+            mergeOrBranch: Array.isArray(filtersInput.mergeOrBranch) ? filtersInput.mergeOrBranch : [],
           };
 
     const safeIdent = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -133,10 +155,19 @@ export function validateAthenaLakeQueryBody(body) {
     const normalizedValidatedFilters =
       normalizedFilters == null
         ? null
-        : {
-            and: normalizedFilters.and.map(normalizePredicate),
-            or: normalizedFilters.or.map(normalizePredicate),
-          };
+        : (() => {
+            const mergeAnd = normalizedFilters.mergeAnd.map(normalizePredicate);
+            const mergeOrBranch = normalizedFilters.mergeOrBranch.map(normalizePredicate);
+            const base = {
+              and: normalizedFilters.and.map(normalizePredicate),
+              or: normalizedFilters.or.map(normalizePredicate),
+            };
+            return {
+              ...base,
+              ...(mergeAnd.length ? { mergeAnd } : {}),
+              ...(mergeOrBranch.length ? { mergeOrBranch } : {}),
+            };
+          })();
 
     // Store on closure so return statement can include it.
     validatedFilters = normalizedValidatedFilters;
@@ -167,8 +198,11 @@ export function validateAthenaLakeQueryBody(body) {
     columns: columns && columns.length ? columns : null,
     queryType,
     countAlias: queryType === "count" ? countAlias : null,
+    countDistinctColumn: queryType === "count" && countDistinctColumn ? countDistinctColumn : null,
+    sumColumn: queryType === "sum" ? sumColumn : null,
+    sumAlias: queryType === "sum" ? sumAlias : null,
     caseSensitive,
-    filters: queryType === "count" ? validatedFilters : null,
+    filters: queryType === "count" || queryType === "sum" ? validatedFilters : null,
     physical,
     database,
   };
