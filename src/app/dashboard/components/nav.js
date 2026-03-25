@@ -411,8 +411,8 @@ const Nav = () => {
   const showUnsavedFlag = connectedData && connectedData.length > 0 && !loadedDataMeta?.data_set_name && !loadedChartMeta?.chart_name;
 
   return (
-    <div className="container flex flex-col items-start justify-between gap-2 py-4 sm:flex-row sm:items-center sm:gap-0 md:h-16">
-          <div className="w-full flex items-center gap-2 min-w-0">
+    <div className="w-full flex flex-col items-start gap-2 px-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2 md:h-16">
+          <div className="w-full flex items-center gap-2 min-w-0 pl-2">
             {(viewing === "dataStart" || viewing === "charts") && rightPanelOpen && (
               <Button
                 variant="ghost"
@@ -427,10 +427,10 @@ const Nav = () => {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            <div className="w-full pl-0.5 text-sm font-semibold">{breadcrumb}</div>
+            <div className="w-full min-w-0 text-sm font-semibold truncate">{breadcrumb}</div>
           </div>
           { user ? (
-              <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:justify-end">
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:ml-auto sm:flex-nowrap">
                   {hasAnyStream && (
                     <div className="flex items-center gap-1 shrink-0 rounded-md border bg-muted/50 px-1 py-0.5">
                       {streamSheetIds.length > 1 && (
@@ -675,9 +675,9 @@ const Nav = () => {
                 <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
               </div>
             ) : (
-              <div className="ml-auto flex items-center gap-2">
+              <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:ml-auto">
                 {connectedData && <span className="text-xs text-muted-foreground hidden sm:inline">Register to save your work</span>}
-                <Button variant="default" size="sm" onClick={()=>setViewing('register')}>Member Log In</Button>
+                <Button variant="default" size="sm" onClick={()=>setViewing('register')}>Log In</Button>
                 <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
               </div>
             )}
