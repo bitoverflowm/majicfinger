@@ -2,6 +2,13 @@
  * Shared validation for Athena lake POST bodies (start + sync query).
  */
 import { resolveAthenaTableName } from "./athenaTableMap";
+import {
+  allowedColumnsForLakeTable,
+  columnHiveTypeForLakeTable,
+  isDateLikeColumnName,
+  isNumericHiveType,
+} from "./lakeTableColumns";
+import { buildComposeAthenaSelectSql } from "./buildComposeAthenaSql";
 
 export class AthenaLakeRequestError extends Error {
   /**
@@ -28,7 +35,7 @@ export function databaseForLake(lake) {
  *   lake: string;
  *   table: string;
  *   limit: number;
- *   queryType: "select" | "count" | "sum";
+ *   queryType: "select" | "count" | "sum" | "compose";
  *   columns: string[] | null;
  *   countAlias: string | null;
  *   countDistinctColumn: string | null;
@@ -47,7 +54,14 @@ export function validateAthenaLakeQueryBody(body) {
   const table = String(body.table || "").toLowerCase().trim();
   const limit = body.limit != null ? Number(body.limit) : 100;
   const queryTypeRaw = String(body.queryType || "select").toLowerCase().trim();
-  const queryType = queryTypeRaw === "count" ? "count" : queryTypeRaw === "sum" ? "sum" : "select";
+  const queryType =
+    queryTypeRaw === "count"
+      ? "count"
+      : queryTypeRaw === "sum"
+        ? "sum"
+        : queryTypeRaw === "compose"
+          ? "compose"
+          : "select";
   const caseSensitive = body.caseSensitive === true;
   const columns = Array.isArray(body.columns)
     ? body.columns.map((c) => String(c).trim()).filter(Boolean)
@@ -56,6 +70,9 @@ export function validateAthenaLakeQueryBody(body) {
   const countDistinctColumn = queryType === "count" ? String(body.countDistinctColumn || "").trim() : null;
   const sumColumn = queryType === "sum" ? String(body.sumColumn || "").trim() : null;
   const sumAlias = queryType === "sum" ? String(body.sumAlias || "sum").trim() : null;
+  /** @type {object | null} */
+  let validatedCompose = null;
+
   const filtersInput =
     (queryType === "count" || queryType === "sum") && body.filters && typeof body.filters === "object"
       ? body.filters
@@ -191,11 +208,184 @@ export function validateAthenaLakeQueryBody(body) {
     );
   }
 
+  const limClamped = Math.min(1000, Math.max(1, Math.floor(Number(limit) || 100)));
+
+  if (queryType === "compose") {
+    const raw = body.compose;
+    if (!raw || typeof raw !== "object") {
+      throw new AthenaLakeRequestError("compose query requires a compose object", { statusCode: 400, code: "BAD_REQUEST" });
+    }
+    const allowed = new Set(allowedColumnsForLakeTable(lake, table));
+    if (allowed.size === 0) {
+      throw new AthenaLakeRequestError("Compose query is not available for this table", { statusCode: 400, code: "BAD_REQUEST" });
+    }
+
+    const dateBuckets = new Set(["day", "week", "month", "quarter", "year"]);
+    const dateFormats = new Set(["dmy", "ym", "dm"]);
+    const scales = new Set(["none", "thousand", "million", "billion"]);
+    const safeAlias = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+    const selectIn = Array.isArray(raw.select) ? raw.select : [];
+    if (selectIn.length === 0) {
+      throw new AthenaLakeRequestError("compose.select must be a non-empty array", { statusCode: 400, code: "BAD_REQUEST" });
+    }
+
+    /** @type {Array<{ column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: string | null; dateFormat: string | null; numberScale: string; decimals: number | null; treatAsDate: boolean; columnType: string }>} */
+    const normalizedSelect = [];
+
+    for (const row of selectIn) {
+      if (!row || typeof row !== "object") {
+        throw new AthenaLakeRequestError("Invalid compose.select entry", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      const column = String(row.column || "").trim();
+      if (!allowed.has(column)) {
+        throw new AthenaLakeRequestError(`Unknown or disallowed column: ${column}`, { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      const colType = columnHiveTypeForLakeTable(lake, table, column);
+      if (!colType) {
+        throw new AthenaLakeRequestError(`Unknown column type: ${column}`, { statusCode: 400, code: "BAD_REQUEST" });
+      }
+
+      const alias = String(row.alias || "").trim();
+      if (!safeAlias.test(alias)) {
+        throw new AthenaLakeRequestError(`Invalid alias: ${alias}`, { statusCode: 400, code: "BAD_REQUEST" });
+      }
+
+      const aggRaw = row.aggregate == null || row.aggregate === "" ? null : String(row.aggregate).toLowerCase().trim();
+      const aggregate = aggRaw === "sum" ? "sum" : aggRaw === "count" ? "count" : null;
+
+      const db = row.dateBucket != null && String(row.dateBucket).trim() !== "" ? String(row.dateBucket).trim().toLowerCase() : null;
+      const dateBucket = db && dateBuckets.has(db) ? db : null;
+
+      const dfRaw = row.dateFormat != null && String(row.dateFormat).trim() !== "" ? String(row.dateFormat).trim().toLowerCase() : null;
+      const dateFormat = dfRaw && dateFormats.has(dfRaw) ? dfRaw : null;
+
+      if (dateBucket && dateFormat) {
+        throw new AthenaLakeRequestError("Use only one of dateBucket or dateFormat per column", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      const treatAsDate = row.treatAsDate === true;
+      if ((dateBucket || dateFormat) && !treatAsDate) {
+        throw new AthenaLakeRequestError("dateBucket/dateFormat require treatAsDate: true", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      if ((dateBucket || dateFormat) && !isNumericHiveType(colType)) {
+        throw new AthenaLakeRequestError("Date truncation applies only to numeric epoch columns", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+      if ((dateBucket || dateFormat) && !isDateLikeColumnName(column)) {
+        throw new AthenaLakeRequestError("Date truncation applies only to date-like columns", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      if (aggregate === "sum" && !isNumericHiveType(colType)) {
+        throw new AthenaLakeRequestError("SUM applies only to numeric columns", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+
+      const scaleRaw = row.numberScale != null ? String(row.numberScale).toLowerCase().trim() : "none";
+      const numberScale = scales.has(scaleRaw) ? scaleRaw : "none";
+      if (numberScale !== "none" && !isNumericHiveType(colType)) {
+        throw new AthenaLakeRequestError("Scaling applies only to numeric columns", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+
+      let decimals = null;
+      if (row.decimals != null && String(row.decimals).trim() !== "") {
+        const d = Math.floor(Number(row.decimals));
+        if (!Number.isFinite(d) || d < 0 || d > 8) {
+          throw new AthenaLakeRequestError("decimals must be between 0 and 8", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        decimals = d;
+      }
+      if (decimals != null && !isNumericHiveType(colType)) {
+        throw new AthenaLakeRequestError("decimals apply only to numeric columns", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+
+      if (aggregate && (dateBucket || dateFormat)) {
+        throw new AthenaLakeRequestError("Do not combine aggregates with date truncation on the same select item", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      normalizedSelect.push({
+        column,
+        alias,
+        aggregate,
+        dateBucket,
+        dateFormat,
+        numberScale,
+        decimals,
+        treatAsDate,
+        columnType: colType,
+      });
+    }
+
+    const hasAggInSelect = normalizedSelect.some((r) => r.aggregate === "sum" || r.aggregate === "count");
+    const dimensionAliases = normalizedSelect.filter((r) => !r.aggregate).map((r) => r.alias);
+    const allSelectAliases = new Set(normalizedSelect.map((r) => r.alias));
+
+    if (hasAggInSelect && dimensionAliases.length === 0) {
+      throw new AthenaLakeRequestError(
+        "With SUM or COUNT, add at least one other field without Sum/Count (e.g. trade time → bucket by quarter) so results can GROUP BY that bucket.",
+        { statusCode: 400, code: "BAD_REQUEST" },
+      );
+    }
+
+    /** With aggregates, GROUP BY is always every non-aggregated column (e.g. quarter); tens of thousands of trades in Q1 2024 collapse to one row. */
+    let groupByAliases;
+    if (hasAggInSelect) {
+      groupByAliases = dimensionAliases;
+    } else {
+      groupByAliases = Array.isArray(raw.groupByAliases)
+        ? raw.groupByAliases.map((a) => String(a || "").trim()).filter(Boolean)
+        : [];
+      for (const a of groupByAliases) {
+        if (!safeAlias.test(a) || !allSelectAliases.has(a)) {
+          throw new AthenaLakeRequestError(`Invalid compose.groupByAliases: ${a}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+      }
+    }
+
+    const orderBy = Array.isArray(raw.orderBy)
+      ? raw.orderBy.map((o) => {
+          if (!o || typeof o !== "object") {
+            throw new AthenaLakeRequestError("Invalid compose.orderBy entry", { statusCode: 400, code: "BAD_REQUEST" });
+          }
+          const a = String(o.alias || "").trim();
+          const dir = String(o.direction || "asc").toLowerCase().trim() === "desc" ? "desc" : "asc";
+          return { alias: a, direction: dir };
+        })
+      : [];
+
+    validatedCompose = {
+      select: normalizedSelect,
+      groupByAliases,
+      orderBy,
+    };
+
+    try {
+      buildComposeAthenaSelectSql({
+        physicalTableName: physical,
+        limit: null,
+        compose: validatedCompose,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new AthenaLakeRequestError(msg, { statusCode: 400, code: "BAD_REQUEST" });
+    }
+  }
+
   return {
     lake,
     table,
-    limit: Math.min(1000, Math.max(1, Math.floor(Number(limit) || 100))),
-    columns: columns && columns.length ? columns : null,
+    limit: limClamped,
+    columns: queryType === "compose" ? null : columns && columns.length ? columns : null,
     queryType,
     countAlias: queryType === "count" ? countAlias : null,
     countDistinctColumn: queryType === "count" && countDistinctColumn ? countDistinctColumn : null,
@@ -205,5 +395,6 @@ export function validateAthenaLakeQueryBody(body) {
     filters: queryType === "count" || queryType === "sum" ? validatedFilters : null,
     physical,
     database,
+    compose: validatedCompose,
   };
 }

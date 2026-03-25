@@ -5,7 +5,8 @@
  *   table: string;
  *   limit?: number;
  *   columns?: string[] | null;
- *   queryType?: "select" | "count" | "sum";
+ *   queryType?: "select" | "count" | "sum" | "compose";
+ *   compose?: object | null;
  *   countAlias?: string | null;
  *   countDistinctColumn?: string | null;
  *   sumColumn?: string | null;
@@ -40,6 +41,7 @@ export async function fetchAthenaLakeSample(
     countDistinctColumn = null,
     sumColumn = null,
     sumAlias = null,
+    compose = null,
     filters = null,
     caseSensitive = false,
   },
@@ -47,7 +49,8 @@ export async function fetchAthenaLakeSample(
 ) {
   const { signal, pollIntervalMs = 900, maxWaitMs = 180000 } = pollOpts;
 
-  const lim = Math.min(1000, Math.max(1, Number(limit) || 100));
+  const isCompose = queryType === "compose";
+  const lim = isCompose ? null : Math.min(1000, Math.max(1, Number(limit) || 100));
 
   const startRes = await fetch("/api/data-lake/athena-query/start", {
     method: "POST",
@@ -57,13 +60,14 @@ export async function fetchAthenaLakeSample(
     body: JSON.stringify({
       lake,
       table,
-      limit: lim,
+      ...(isCompose ? {} : { limit: lim }),
       columns: Array.isArray(columns) && columns.length ? columns : null,
       queryType,
       countAlias,
       countDistinctColumn,
       sumColumn,
       sumAlias,
+      compose: isCompose && compose && typeof compose === "object" ? compose : undefined,
       filters,
       caseSensitive,
     }),
@@ -81,16 +85,19 @@ export async function fetchAthenaLakeSample(
   }
 
   const queryExecutionId = startJson.queryExecutionId;
-  const rowLimit = startJson.rowLimit ?? lim;
+  /** null = paginate entire Athena result (compose queries; no SQL LIMIT). */
+  const rowLimit = isCompose ? (startJson.rowLimit ?? null) : startJson.rowLimit != null ? startJson.rowLimit : lim;
   if (!queryExecutionId) {
     throw new Error("Athena start response missing queryExecutionId");
   }
 
   const deadline = Date.now() + maxWaitMs;
-  const q = new URLSearchParams({
-    queryExecutionId,
-    limit: String(rowLimit),
-  });
+  const q = new URLSearchParams({ queryExecutionId });
+  if (rowLimit == null) {
+    q.set("limit", "all");
+  } else {
+    q.set("limit", String(rowLimit));
+  }
 
   while (Date.now() < deadline) {
     if (signal?.aborted) {

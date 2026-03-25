@@ -144,6 +144,38 @@ function genMetaOpId() {
   return `metaop-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
 }
 
+function genComposeRowId() {
+  return `cs-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** @param {{ aggregate: null | string }} item */
+function composeRollUpSelectValue(item) {
+  if (item.aggregate === "sum") return "sum";
+  if (item.aggregate === "count") return "count";
+  return "none";
+}
+
+/** @param {{ dateBucket: null | string; dateFormat: null | string }} item */
+function composeDateShapeSelectValue(item) {
+  if (item.dateBucket) return `bucket:${item.dateBucket}`;
+  if (item.dateFormat === "dmy") return "fmt:dmy";
+  if (item.dateFormat === "ym") return "fmt:ym";
+  if (item.dateFormat === "dm") return "fmt:dm";
+  return "raw";
+}
+
+/** @param {string} shape */
+function patchesForDateShape(shape) {
+  if (shape === "raw") return { dateBucket: null, dateFormat: null };
+  if (shape.startsWith("bucket:")) {
+    return { dateBucket: shape.slice(7), dateFormat: null, treatAsDate: true };
+  }
+  if (shape.startsWith("fmt:")) {
+    return { dateBucket: null, dateFormat: shape.slice(4), treatAsDate: true };
+  }
+  return {};
+}
+
 /**
  * @param {{ mode: string; filters?: { and: any[]; or: any[] }; merge?: { and: any[]; or: any[] } | null }} op
  * @returns {{ and: any[]; or: any[]; mergeAnd?: any[]; mergeOrBranch?: any[] } | null}
@@ -252,13 +284,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   const canUseSamples = true;
   const [sampleId, setSampleId] = useState(sampleOptions[0]?.id || "");
-  const initialSelectedColumns = useMemo(() => {
-    const first = sampleOptions[0];
-    if (!first?.table) return [];
-    return getColumnMetaForTable(dataset, first.table).map((c) => c.name);
-  }, [dataset, sampleOptions]);
-
-  const [selectedColumns, setSelectedColumns] = useState(initialSelectedColumns);
+  /** @type {Array<{ id: string; column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: null | string; dateFormat: null | string; numberScale: string; decimals: null | number; treatAsDate: boolean }>} */
+  const [columnComposeItems, setColumnComposeItems] = useState([]);
+  /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
+  const [columnComposeOrderBy, setColumnComposeOrderBy] = useState([]);
   const [selectionTab, setSelectionTab] = useState("columns"); // "columns" | "meta"
   const [metaQueryMode, setMetaQueryMode] = useState("all"); // "all" | "filter"
   const [metaOperationKind, setMetaOperationKind] = useState("count"); // "count" | "count_distinct" | "sum"
@@ -287,7 +316,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
   const [beckerViews, setBeckerViews] = useState(() => listBeckerParquetViews());
 
-  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; columns: string[]; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
+  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
 
   useEffect(() => {
@@ -321,10 +350,118 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     return "string";
   }, [availableColumnTypesByName, isDateLikeName]);
 
-  // Default behavior: when the table changes, populate all its columns.
+  const hasComposeAggregates = useMemo(
+    () => columnComposeItems.some((i) => i.aggregate === "sum" || i.aggregate === "count"),
+    [columnComposeItems],
+  );
+
+  /** Date bucket / string format on a non-aggregated field — usually paired with Sum/Count for one row per bucket. */
+  const hasComposeBucketOrDateFormat = useMemo(
+    () =>
+      columnComposeItems.some(
+        (i) =>
+          !i.aggregate &&
+          ((i.dateBucket != null && String(i.dateBucket).trim() !== "") ||
+            (i.dateFormat != null && String(i.dateFormat).trim() !== "")),
+      ),
+    [columnComposeItems],
+  );
+
+  const showComposeGroupingSection = hasComposeAggregates || hasComposeBucketOrDateFormat;
+
+  /** Non-aggregate SELECT aliases — these are the GROUP BY keys when Sum/Count is used (e.g. one row per quarter). */
+  const composeDimensionAliases = useMemo(
+    () =>
+      columnComposeItems
+        .filter((i) => i.aggregate !== "sum" && i.aggregate !== "count")
+        .map((i) => String(i.alias || i.column).trim()),
+    [columnComposeItems],
+  );
+
+  const composeSelectAliasChoices = useMemo(() => {
+    return columnComposeItems.map((i) => ({
+      alias: i.alias,
+      column: i.column,
+      label: i.alias === i.column ? i.alias : `${i.alias} (${i.column})`,
+    }));
+  }, [columnComposeItems]);
+
+  const buildServerComposePayload = useCallback(() => {
+    return {
+      select: columnComposeItems.map((i) => ({
+        column: i.column,
+        alias: String(i.alias || i.column).trim(),
+        aggregate: i.aggregate || null,
+        dateBucket: i.dateBucket || null,
+        dateFormat: i.dateFormat || null,
+        numberScale: i.numberScale || "none",
+        decimals: i.decimals != null ? Number(i.decimals) : null,
+        treatAsDate: i.treatAsDate === true,
+      })),
+      // Server normalizes too: with Sum/Count, GROUP BY is every non-aggregate field (e.g. quarter) so many trades in Q1 2024 become one row.
+      groupByAliases: hasComposeAggregates ? composeDimensionAliases : [],
+      orderBy: columnComposeOrderBy,
+    };
+  }, [columnComposeItems, columnComposeOrderBy, hasComposeAggregates, composeDimensionAliases]);
+
+  const composeFriendlySummary = useMemo(() => {
+    const tableName = selected?.label || "this table";
+    if (!columnComposeItems.length) {
+      return `Pick fields from ${tableName} below. Nothing will load until you add at least one field.`;
+    }
+    const bits = columnComposeItems.map((it) => {
+      const title = String(it.alias || it.column).trim();
+      if (it.aggregate === "sum") {
+        return `“${title}” = sum of ${it.column}`;
+      }
+      if (it.aggregate === "count") {
+        return `“${title}” = count of ${it.column}`;
+      }
+      if (it.dateBucket === "quarter") {
+        return `“${title}” = ${it.column} by calendar quarter`;
+      }
+      if (it.dateBucket) {
+        return `“${title}” = ${it.column} by ${it.dateBucket}`;
+      }
+      if (it.dateFormat === "dmy") {
+        return `“${title}” = ${it.column} as day-month-year text`;
+      }
+      if (it.dateFormat === "ym") {
+        return `“${title}” = ${it.column} as year-month text`;
+      }
+      if (it.dateFormat === "dm") {
+        return `“${title}” = ${it.column} as day-month text`;
+      }
+      return `“${title}” = values from ${it.column}`;
+    });
+    let tail = "";
+    if (hasComposeAggregates && composeDimensionAliases.length) {
+      tail += ` All raw rows that share the same ${composeDimensionAliases.join(", ")} are rolled into one sheet row (like SQL GROUP BY).`;
+    } else if (hasComposeAggregates && !composeDimensionAliases.length) {
+      tail += " Result is a single totals row.";
+    } else if (!hasComposeAggregates) {
+      tail += " Each matching row in the table is loaded into the sheet.";
+    }
+    if (columnComposeOrderBy.length) {
+      const ord = columnComposeOrderBy
+        .map((o) => `“${o.alias}” (${o.direction === "desc" ? "high first" : "low first"})`)
+        .join(", then ");
+      tail += ` Sorted by ${ord}.`;
+    }
+    return `${bits.join("; ")}.${tail}`;
+  }, [
+    selected?.label,
+    columnComposeItems,
+    hasComposeAggregates,
+    composeDimensionAliases,
+    columnComposeOrderBy,
+  ]);
+
+  // When the table changes, reset meta editor and start with an empty column list (user adds fields explicitly).
   useEffect(() => {
     if (!selected?.table) return;
-    setSelectedColumns(availableColumns);
+    setColumnComposeItems([]);
+    setColumnComposeOrderBy([]);
     setMetaQueryMode("all");
     setMetaOperationKind("count");
     setMetaOperationColumn("");
@@ -335,7 +472,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setMetaOperationAllSelected(false);
     setMetaRunDisposition("default");
     setMetaOperationsMenuOpen(false);
-  }, [selected?.table, availableColumns]);
+  }, [selected?.table]);
 
   const refreshBeckerViews = useCallback(() => {
     setBeckerViews(listBeckerParquetViews());
@@ -350,7 +487,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   );
 
   const runIngestWithProgress = useCallback(
-    async (lakeVal, table, sid, mode, cols, metaQueryMode, metaFilters, metaOpSpecs) => {
+    async (lakeVal, table, sid, mode, composeSpec, metaQueryMode, metaFilters, metaOpSpecs) => {
       return runParquetSheetLoadWithProgress({
         onLabel: setLoadLabel,
         onProgress: setLoadProgress,
@@ -410,20 +547,26 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             });
           }
 
-          // Data table: bounded Athena SELECT <columns> → JSON → DuckDB view → sheet.
-          const { rows } = await fetchAthenaLakeSample({
-            lake: lakeVal,
-            table,
-            limit: ATHENA_SAMPLE_ROW_LIMIT,
-            columns: cols,
-          });
+          // Data table: composed Athena SELECT (GROUP BY / ORDER BY) → JSON → DuckDB view → sheet.
+          if (!composeSpec || typeof composeSpec !== "object") {
+            throw new Error("Missing compose query spec.");
+          }
+          const { columns: resultColumns, rows } = await fetchAthenaLakeSample(
+            {
+              lake: lakeVal,
+              table,
+              queryType: "compose",
+              compose: composeSpec,
+            },
+            { maxWaitMs: 900000 },
+          );
 
           return ingestAthenaResultAsView({
             dataset,
-            sampleId: sid,
-            columns: cols,
+            sampleId: `${sid}-compose`,
+            columns: resultColumns,
             rows,
-            limit: ATHENA_SAMPLE_ROW_LIMIT,
+            ingestFullResult: true,
           });
         },
       });
@@ -434,7 +577,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const executeIngestReplace = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, columns, metaQueryMode, metaFilters, metaOpSpecs } = pending;
+    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -448,7 +591,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         table,
         sid,
         mode,
-        columns,
+        composeSpec,
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
@@ -468,7 +611,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const executeIngestAppend = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, columns, metaQueryMode, metaFilters, metaOpSpecs, metaAppendTargetIndex } = pending;
+    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs, metaAppendTargetIndex } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -482,7 +625,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         table,
         sid,
         mode,
-        columns,
+        composeSpec,
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
@@ -518,7 +661,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const executeIngestNewSheet = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, columns, metaQueryMode, metaFilters, metaOpSpecs } = pending;
+    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -536,7 +679,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         table,
         sid,
         mode,
-        columns,
+        composeSpec,
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
@@ -551,7 +694,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             ...prev,
             [newId]: {
               ...sheet,
-              name: `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : ""}`.slice(0, 80),
+              name: `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
+                0,
+                80,
+              ),
             },
           };
         });
@@ -827,9 +973,25 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       setError("Choose a table below.");
       return;
     }
-    if (selectionTab === "columns" && selectedColumns.length === 0) {
-      setError("Must select at least 1 column to pull.");
-      return;
+    if (selectionTab === "columns") {
+      if (columnComposeItems.length === 0) {
+        setError("Add at least one column to SELECT.");
+        return;
+      }
+      const safeAlias = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+      const seen = new Set();
+      for (const i of columnComposeItems) {
+        const a = String(i.alias || "").trim();
+        if (!safeAlias.test(a)) {
+          setError(`Invalid alias "${a}" — use letters, numbers, underscore (start with letter or _).`);
+          return;
+        }
+        if (seen.has(a)) {
+          setError(`Duplicate alias "${a}".`);
+          return;
+        }
+        seen.add(a);
+      }
     }
     if (selectionTab === "meta") {
       const allSpecs = buildAllMetaOpSpecsForRun();
@@ -872,7 +1034,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       lake,
       table: selected.table,
       sampleId: selected.id,
-      columns: selectionTab === "columns" ? selectedColumns : [],
+      composeSpec: selectionTab === "columns" ? buildServerComposePayload() : undefined,
       metaQueryMode,
       metaFilters: {
         and: metaAndFilters,
@@ -939,8 +1101,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const runRequestReasons = useMemo(() => {
     const reasons = [];
     if (!selected?.table) reasons.push("Choose a table below.");
-    if (selectionTab === "columns" && selectedColumns.length === 0) {
-      reasons.push("Must select at least 1 column to pull.");
+    if (selectionTab === "columns" && columnComposeItems.length === 0) {
+      reasons.push("Add at least one column to SELECT.");
     }
     if (selectionTab === "meta") {
       const allSpecs = buildAllMetaOpSpecsForRun();
@@ -955,22 +1117,103 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       }
     }
     return reasons;
-  }, [selected?.table, selectionTab, selectedColumns, buildAllMetaOpSpecsForRun]);
+  }, [selected?.table, selectionTab, columnComposeItems.length, buildAllMetaOpSpecsForRun]);
 
   const canRunRequest = runRequestReasons.length === 0;
 
-  const toggleColumn = useCallback(
-    (col, checked) => {
-      setSelectedColumns((prev) => {
-        const nextSet = new Set(prev);
-        if (checked) nextSet.add(col);
-        else nextSet.delete(col);
-        // Preserve dropdown order (same order as Athena select list).
-        return availableColumns.filter((c) => nextSet.has(c));
-      });
+  const addComposeColumn = useCallback(
+    (col) => {
+      setError(null);
+      const t = availableColumnTypesByName[col];
+      const typeNorm = String(t || "").toLowerCase();
+      const isDate = (typeNorm === "bigint" || typeNorm === "int") && isDateLikeName(col);
+      setColumnComposeItems((prev) => [
+        ...prev,
+        {
+          id: genComposeRowId(),
+          column: col,
+          alias: col,
+          aggregate: null,
+          dateBucket: null,
+          dateFormat: null,
+          numberScale: "none",
+          decimals: null,
+          treatAsDate: isDate,
+        },
+      ]);
     },
-    [availableColumns],
+    [availableColumnTypesByName, isDateLikeName],
   );
+
+  const resetComposeToAllColumns = useCallback(() => {
+    setError(null);
+    setColumnComposeItems(
+      availableColumns.map((col) => {
+        const t = availableColumnTypesByName[col];
+        const typeNorm = String(t || "").toLowerCase();
+        const isDate = (typeNorm === "bigint" || typeNorm === "int") && isDateLikeName(col);
+        return {
+          id: genComposeRowId(),
+          column: col,
+          alias: col,
+          aggregate: null,
+          dateBucket: null,
+          dateFormat: null,
+          numberScale: "none",
+          decimals: null,
+          treatAsDate: isDate,
+        };
+      }),
+    );
+    setColumnComposeOrderBy([]);
+  }, [availableColumns, availableColumnTypesByName, isDateLikeName]);
+
+  const updateComposeItem = useCallback((id, patch) => {
+    if (Object.prototype.hasOwnProperty.call(patch, "alias")) {
+      const newAlias = String(patch.alias ?? "");
+      let oldAlias = null;
+      setColumnComposeItems((prev) => {
+        const row = prev.find((r) => r.id === id);
+        oldAlias = row?.alias ?? null;
+        return prev.map((r) => (r.id === id ? { ...r, ...patch } : r));
+      });
+      if (oldAlias != null && oldAlias !== newAlias) {
+        setColumnComposeOrderBy((o) => o.map((x) => (x.alias === oldAlias ? { ...x, alias: newAlias } : x)));
+      }
+      return;
+    }
+    setColumnComposeItems((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  }, []);
+
+  const removeComposeItem = useCallback(
+    (id) => {
+      const victim = columnComposeItems.find((r) => r.id === id);
+      const al = victim?.alias;
+      setColumnComposeItems((prev) => prev.filter((row) => row.id !== id));
+      if (al) {
+        setColumnComposeOrderBy((o) => o.filter((x) => x.alias !== al));
+      }
+    },
+    [columnComposeItems],
+  );
+
+  const moveComposeItem = useCallback((id, dir) => {
+    setColumnComposeItems((prev) => {
+      const i = prev.findIndex((r) => r.id === id);
+      if (i < 0) return prev;
+      const j = dir === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }, []);
+
+  const addComposeOrderByClause = useCallback(() => {
+    const first = composeSelectAliasChoices[0];
+    if (!first) return;
+    setColumnComposeOrderBy((prev) => [...prev, { alias: first.alias, direction: "asc" }]);
+  }, [composeSelectAliasChoices]);
 
   const addMetaFilterPreset = useCallback(
     (column, op) => {
@@ -1095,54 +1338,416 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="columns" className="space-y-1">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+            <TabsContent value="columns" className="space-y-4 min-w-0">
+              <div className="rounded-lg border border-primary/20 bg-muted/35 px-3 py-2.5">
+                <p className="text-xs font-medium text-foreground mb-1">What you are building</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{composeFriendlySummary}</p>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                One pull per run. If the sheet already has data, you will be asked to replace it or open a new sheet.
+              </p>
+
+              <div className="space-y-2 min-w-0">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Fields in your sheet</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Each card is one column. Add fields from the table, set the header name, then choose totals or date/number
+                    formatting.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 text-xs" type="button">
+                        Add field
+                        <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="max-h-56 overflow-y-auto" align="start">
+                      <DropdownMenuLabel className="text-xs">Choose a column</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {availableColumns.filter((c) => !columnComposeItems.some((i) => i.column === c)).length === 0 ? (
+                        <DropdownMenuItem disabled className="text-xs">
+                          Every column is already in the list
+                        </DropdownMenuItem>
+                      ) : (
+                        availableColumns
+                          .filter((c) => !columnComposeItems.some((i) => i.column === c))
+                          .map((col) => (
+                            <DropdownMenuItem key={col} className="text-xs" onSelect={() => addComposeColumn(col)}>
+                              {col}
+                            </DropdownMenuItem>
+                          ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="outline" size="sm" className="h-8 text-xs" type="button" onClick={resetComposeToAllColumns}>
+                    Add all fields
+                  </Button>
                   <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs"
+                    type="button"
+                    onClick={() => {
+                      setColumnComposeItems([]);
+                      setColumnComposeOrderBy([]);
+                    }}
+                  >
+                    Clear list
+                  </Button>
+                </div>
+
+                {columnComposeItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-3">
+                    No fields yet. Use <span className="font-medium text-foreground">Add field</span> or{" "}
+                    <span className="font-medium text-foreground">Add all fields</span>, then run the request.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {columnComposeItems.map((item, idx) => {
+                      const k = kindForColumn(item.column);
+                      const isDateCol = k === "date";
+                      const isNumericCol = k === "number";
+                      const canNumberFormat = isNumericCol && item.aggregate !== "count";
+                      const clearFormatPatch = {
+                        dateBucket: null,
+                        dateFormat: null,
+                        numberScale: "none",
+                        decimals: null,
+                      };
+                      const rollVal = composeRollUpSelectValue(item);
+                      const dateShapeVal = composeDateShapeSelectValue(item);
+                      const scaleVal = item.numberScale || "none";
+                      const decVal = item.decimals == null ? "default" : String(item.decimals);
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-lg border border-border/80 bg-card text-card-foreground shadow-sm p-3 space-y-3 min-w-0"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Source column</p>
+                              <p className="font-mono text-sm font-semibold truncate" title={item.column}>
+                                {item.column}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-muted-foreground"
+                              onClick={() => removeComposeItem(item.id)}
+                              aria-label={`Remove ${item.column}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1 min-w-0">
+                              <Label className="text-xs">Header name in sheet</Label>
+                              <Input
+                                className="h-8 text-xs"
+                                value={item.alias}
+                                onChange={(e) => updateComposeItem(item.id, { alias: e.target.value })}
+                                spellCheck={false}
+                              />
+                            </div>
+                            <div className="space-y-1 min-w-0">
+                              <Label className="text-xs">Summarize</Label>
+                              <Select
+                                value={rollVal}
+                                onValueChange={(v) => {
+                                  if (v === "none") {
+                                    updateComposeItem(item.id, { aggregate: null });
+                                  } else if (v === "sum") {
+                                    updateComposeItem(item.id, {
+                                      aggregate: "sum",
+                                      dateBucket: null,
+                                      dateFormat: null,
+                                    });
+                                  } else if (v === "count") {
+                                    updateComposeItem(item.id, {
+                                      aggregate: "count",
+                                      dateBucket: null,
+                                      dateFormat: null,
+                                    });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none" className="text-xs">
+                                    Show values (no total)
+                                  </SelectItem>
+                                  <SelectItem value="sum" className="text-xs" disabled={!isNumericCol}>
+                                    Sum numbers
+                                  </SelectItem>
+                                  <SelectItem value="count" className="text-xs">
+                                    Count (non-empty)
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {isDateCol && !item.aggregate ? (
+                            <div className="space-y-1 min-w-0">
+                              <Label className="text-xs">Date / time shape</Label>
+                              <Select
+                                value={dateShapeVal}
+                                onValueChange={(shape) => {
+                                  updateComposeItem(item.id, {
+                                    aggregate: null,
+                                    ...patchesForDateShape(shape),
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="raw" className="text-xs">
+                                    Keep as stored (epoch number)
+                                  </SelectItem>
+                                  <SelectItem value="bucket:day" className="text-xs">
+                                    Bucket by day
+                                  </SelectItem>
+                                  <SelectItem value="bucket:week" className="text-xs">
+                                    Bucket by week
+                                  </SelectItem>
+                                  <SelectItem value="bucket:month" className="text-xs">
+                                    Bucket by month
+                                  </SelectItem>
+                                  <SelectItem value="bucket:quarter" className="text-xs">
+                                    Bucket by quarter
+                                  </SelectItem>
+                                  <SelectItem value="bucket:year" className="text-xs">
+                                    Bucket by year
+                                  </SelectItem>
+                                  <SelectItem value="fmt:dmy" className="text-xs">
+                                    Text: day-month-year
+                                  </SelectItem>
+                                  <SelectItem value="fmt:ym" className="text-xs">
+                                    Text: year-month
+                                  </SelectItem>
+                                  <SelectItem value="fmt:dm" className="text-xs">
+                                    Text: day-month
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : null}
+
+                          {canNumberFormat ? (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="space-y-1 min-w-0">
+                                <Label className="text-xs">Number scale</Label>
+                                <Select
+                                  value={scaleVal}
+                                  onValueChange={(v) => updateComposeItem(item.id, { numberScale: v })}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none" className="text-xs">
+                                      No scaling
+                                    </SelectItem>
+                                    <SelectItem value="thousand" className="text-xs">
+                                      Divide by 1,000
+                                    </SelectItem>
+                                    <SelectItem value="million" className="text-xs">
+                                      Divide by 1,000,000
+                                    </SelectItem>
+                                    <SelectItem value="billion" className="text-xs">
+                                      Divide by 1,000,000,000
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1 min-w-0">
+                                <Label className="text-xs">Decimal places</Label>
+                                <Select
+                                  value={decVal}
+                                  onValueChange={(v) =>
+                                    updateComposeItem(item.id, {
+                                      decimals: v === "default" ? null : Number(v),
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="default" className="text-xs">
+                                      Default
+                                    </SelectItem>
+                                    {[0, 1, 2, 3, 4].map((d) => (
+                                      <SelectItem key={d} value={String(d)} className="text-xs">
+                                        {d} decimal{d === 1 ? "" : "s"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 border-t border-border/50">
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              disabled={idx === 0}
+                              onClick={() => moveComposeItem(item.id, "up")}
+                            >
+                              Move up
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              disabled={idx === columnComposeItems.length - 1}
+                              onClick={() => moveComposeItem(item.id, "down")}
+                            >
+                              Move down
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs text-muted-foreground"
+                              onClick={() => updateComposeItem(item.id, clearFormatPatch)}
+                            >
+                              Reset formatting
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {showComposeGroupingSection ? (
+                <div className="rounded-md border border-border/70 bg-muted/25 px-3 py-2 space-y-1.5">
+                  <p className="text-xs font-medium text-foreground">Grouping (GROUP BY)</p>
+                  {hasComposeAggregates ? (
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      With <span className="font-medium text-foreground">Sum</span> or{" "}
+                      <span className="font-medium text-foreground">Count</span>, Athena uses{" "}
+                      <span className="font-medium text-foreground">GROUP BY</span> on every non-aggregated field (for example
+                      your quarter column). Many trades in the same calendar quarter are not separate rows — they collapse into{" "}
+                      <span className="font-medium text-foreground">one row per quarter</span> with volume summed.{" "}
+                      <span className="font-medium text-foreground">Group keys:</span>{" "}
+                      {composeDimensionAliases.length ? composeDimensionAliases.join(", ") : "— (add a bucket or dimension)"}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      You’re using a <span className="font-medium text-foreground">date bucket</span> or{" "}
+                      <span className="font-medium text-foreground">date text</span> shape. That alone still returns{" "}
+                      <span className="font-medium text-foreground">one sheet row per table row</span> (the bucket is just an
+                      extra column). To get <span className="font-medium text-foreground">one row per quarter</span> (or per
+                      month, etc.), add <span className="font-medium text-foreground">Sum</span> or{" "}
+                      <span className="font-medium text-foreground">Count</span> on a numeric field — then all rows sharing the
+                      same quarter combine into one row, like{" "}
+                      <span className="font-medium text-foreground">GROUP BY quarter</span> in SQL.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="space-y-2 min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Sort rows</h3>
+                    <p className="text-xs text-muted-foreground">Optional. Order the result by a column header.</p>
+                  </div>
+                  <Button
+                    type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs min-w-0 w-full justify-between"
-                    type="button"
+                    className="h-8 text-xs shrink-0"
+                    disabled={composeSelectAliasChoices.length === 0}
+                    onClick={addComposeOrderByClause}
                   >
-                    <span className="truncate">
-                      {selectedColumns.length === availableColumns.length
-                        ? "All columns"
-                        : selectedColumns.length > 0
-                          ? `${selectedColumns.length} selected`
-                          : "None selected"}
-                    </span>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add sort rule
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="max-h-[280px] w-64 overflow-y-auto" align="start">
-                  <DropdownMenuLabel className="text-xs">Choose columns</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={() => setSelectedColumns(availableColumns)}
-                    checked={selectedColumns.length === availableColumns.length && availableColumns.length > 0}
-                  >
-                    All
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={() => setSelectedColumns([])}
-                    checked={selectedColumns.length === 0}
-                  >
-                    clear
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuSeparator />
-                  {availableColumns.map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col}
-                      checked={selectedColumns.includes(col)}
-                      onSelect={(e) => e.preventDefault()}
-                      onCheckedChange={(checked) => toggleColumn(col, checked === true)}
-                    >
-                      <span className="truncate">{col}</span>
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </div>
+                {columnComposeOrderBy.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No sorting — Athena’s default order for all matching rows.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {columnComposeOrderBy.map((ob, obIdx) => (
+                      <div
+                        key={`${ob.alias}-${obIdx}`}
+                        className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/80 p-2"
+                      >
+                        <Select
+                          value={ob.alias}
+                          onValueChange={(v) => {
+                            setColumnComposeOrderBy((prev) =>
+                              prev.map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
+                            <SelectValue placeholder="Column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {composeSelectAliasChoices.map((c) => (
+                              <SelectItem key={c.alias} value={c.alias} className="text-xs">
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={ob.direction}
+                          onValueChange={(v) => {
+                            setColumnComposeOrderBy((prev) =>
+                              prev.map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[11rem] min-w-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="asc" className="text-xs">
+                              Ascending (A→Z, low→high)
+                            </SelectItem>
+                            <SelectItem value="desc" className="text-xs">
+                              Descending (Z→A, high→low)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() =>
+                            setColumnComposeOrderBy((prev) => prev.filter((_, j) => j !== obIdx))
+                          }
+                          aria-label="Remove sort"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="meta" className="space-y-2">

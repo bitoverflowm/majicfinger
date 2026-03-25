@@ -57,6 +57,7 @@ export default async function handler(req, res) {
       countDistinctColumn: validated.countDistinctColumn,
       sumColumn: validated.sumColumn,
       sumAlias: validated.sumAlias,
+      compose: validated.compose,
       filters: validated.filters,
       caseSensitive: validated.caseSensitive,
       limit: validated.limit,

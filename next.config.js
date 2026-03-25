@@ -8,6 +8,14 @@ const nextConfig = {
     esmExternals: 'loose',
   },
   webpack: (config, { isServer }) => {
+    // One Yjs module instance: @blocknote/core nests y-prosemirror; duplicate copies break
+    // instanceof / constructor checks (https://github.com/yjs/yjs/issues/438).
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      yjs: path.join(__dirname, 'node_modules', 'yjs'),
+      'y-protocols': path.join(__dirname, 'node_modules', 'y-protocols'),
+      lib0: path.join(__dirname, 'node_modules', 'lib0'),
+    }
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,

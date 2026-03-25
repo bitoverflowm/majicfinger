@@ -54,6 +54,43 @@ import * as XLSX from 'xlsx';
 
 
 const DATE_LIKE = /^\d{4}-\d{2}-\d{2}/;
+// Labels produced by the Athena compose "dateBucket" formatter.
+// Examples: "Q1 '24", "2024-03", "2024"
+const QUARTER_LIKE = /^Q([1-4])\s*'?\s*(\d{2})$/i;
+const MONTH_LIKE = /^(\d{4})-(\d{2})$/;
+const YEAR_LIKE = /^(\d{4})$/;
+
+function dateBucketToSortKey(val) {
+  if (val == null) return null;
+  if (typeof val === "number" && Number.isFinite(val)) return val;
+  if (typeof val !== "string") return null;
+  const s = val.trim();
+  if (DATE_LIKE.test(s)) return new Date(s).getTime();
+
+  const q = s.match(QUARTER_LIKE);
+  if (q) {
+    const quarter = Number(q[1]);
+    const yy = Number(q[2]);
+    const year = yy >= 70 ? 1900 + yy : 2000 + yy; // 2-digit year heuristic
+    const monthIndex = (quarter - 1) * 3; // Jan/Apr/Jul/Oct
+    return Date.UTC(year, monthIndex, 1);
+  }
+
+  const m = s.match(MONTH_LIKE);
+  if (m) {
+    const year = Number(m[1]);
+    const monthIndex = Number(m[2]) - 1;
+    return Date.UTC(year, monthIndex, 1);
+  }
+
+  const y = s.match(YEAR_LIKE);
+  if (y) {
+    const year = Number(y[1]);
+    return Date.UTC(year, 0, 1);
+  }
+
+  return null;
+}
 const TOKEN_ID_FIELDS = new Set(['conditionid', 'condition_id', 'clobtokenids', 'clob_token_ids', 'asset_id', 'market', 'market_id']);
 
 function getColKeys(connectedCols) {
@@ -129,8 +166,14 @@ const GridView = ({startNew}) => {
         out = [...out].sort((a, b) => {
           const va = a[sortKey];
           const vb = b[sortKey];
-          const cmp = va == null && vb == null ? 0 : va == null ? 1 : vb == null ? -1 : String(va).localeCompare(String(vb), undefined, { numeric: true });
-          return sortDir === 'asc' ? cmp : -cmp;
+          if (va == null && vb == null) return 0;
+          if (va == null) return 1;
+          if (vb == null) return -1;
+
+          const ka = dateBucketToSortKey(va);
+          const kb = dateBucketToSortKey(vb);
+          const cmp = ka != null && kb != null ? ka - kb : String(va).localeCompare(String(vb), undefined, { numeric: true });
+          return sortDir === "asc" ? cmp : -cmp;
         });
       }
       return out;

@@ -4,6 +4,8 @@
  */
 import AWS from "aws-sdk";
 import { isValidColumnIdentifier } from "./athenaTableMap";
+import { buildComposeAthenaSelectSql } from "./buildComposeAthenaSql";
+import { sortRowsChronologicallyByDetectedBucketColumn } from "./sortAthenaDateBuckets";
 
 function getRegion() {
   return process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
@@ -35,7 +37,8 @@ function assertAthenaConfig() {
  * @param {string} opts.physicalTableName
  * @param {string} opts.database
  * @param {string[] | null | undefined} opts.columns
- * @param {"select" | "count" | "sum"} [opts.queryType]
+ * @param {"select" | "count" | "sum" | "compose"} [opts.queryType]
+ * @param {object | null | undefined} [opts.compose]
  * @param {string | null | undefined} [opts.countAlias]
  * @param {string | null | undefined} [opts.countDistinctColumn]
  * @param {string | null | undefined} [opts.sumColumn]
@@ -54,6 +57,7 @@ export async function startAthenaBoundedQuery({
   countDistinctColumn,
   sumColumn,
   sumAlias,
+  compose = null,
   filters = null,
   caseSensitive = false,
   limit,
@@ -126,6 +130,29 @@ export async function startAthenaBoundedQuery({
   const sqlTable = `"${safeTable}"`;
 
   const lim = Math.min(Math.max(1, Math.floor(Number(limit) || 1)), 1000);
+
+  if (queryType === "compose") {
+    if (!compose || typeof compose !== "object") {
+      const err = new Error("compose query missing compose spec");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    const sql = buildComposeAthenaSelectSql({
+      physicalTableName: safeTable,
+      limit: null,
+      compose,
+    });
+    const athena = new AWS.Athena({ region: getRegion() });
+    const { QueryExecutionId } = await athena
+      .startQueryExecution({
+        QueryString: sql,
+        WorkGroup: workGroup,
+        ResultConfiguration: { OutputLocation: output },
+        QueryExecutionContext: { Catalog: catalog, Database: db },
+      })
+      .promise();
+    return { queryExecutionId: QueryExecutionId, sql, rowLimit: null };
+  }
 
   const escapeSqlString = (s) => String(s).replace(/'/g, "''");
   const escapeLike = (s) => String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
@@ -217,10 +244,11 @@ export async function getAthenaQueryState(queryExecutionId) {
 /**
  * Paginate GetQueryResults until rowLimit data rows (excluding header).
  * @param {string} queryExecutionId
- * @param {number} rowLimit
+ * @param {number | null} rowLimit max rows, or null to read every page until exhausted
  */
 export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
-  const lim = Math.min(1000, Math.max(1, Math.floor(Number(rowLimit) || 1)));
+  const unlimited = rowLimit == null;
+  const lim = unlimited ? Number.MAX_SAFE_INTEGER : Math.min(1000, Math.max(1, Math.floor(Number(rowLimit) || 1)));
   const athena = new AWS.Athena({ region: getRegion() });
 
   const columnNames = [];
@@ -263,15 +291,24 @@ export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
 
     nextToken = page.NextToken;
     if (!nextToken) break;
-    if (dataRows.length >= lim) {
+    if (!unlimited && dataRows.length >= lim) {
       truncated = true;
       break;
     }
   }
 
-  return {
+  // If the compose result contains a human-readable date bucket column
+  // (e.g. "Q1 '24"), Athena may return grouped rows in lexicographic
+  // order when no explicit ORDER BY is present. Re-sort chronologically
+  // on the detected bucket column so the client can display correctly.
+  const sorted = sortRowsChronologicallyByDetectedBucketColumn({
     columns: columnNames,
     rows: dataRows,
+  });
+
+  return {
+    columns: columnNames,
+    rows: sorted,
     rowCount: dataRows.length,
     truncated,
   };
@@ -296,6 +333,10 @@ export async function runAthenaBoundedSelect({
   columns,
   queryType = "select",
   countAlias = null,
+  countDistinctColumn = null,
+  sumColumn = null,
+  sumAlias = null,
+  compose = null,
   filters = null,
   caseSensitive = false,
   limit,
@@ -307,6 +348,10 @@ export async function runAthenaBoundedSelect({
     columns,
     queryType,
     countAlias,
+    countDistinctColumn,
+    sumColumn,
+    sumAlias,
+    compose,
     filters,
     caseSensitive,
     limit,

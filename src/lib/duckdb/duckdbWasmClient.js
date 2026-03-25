@@ -199,11 +199,12 @@ export async function ingestRemoteParquetAsView(opts) {
  * Register Athena result (column names + string cells) as JSON and expose a DuckDB view
  * (same registry pattern as Parquet — enables runBeckerSelectSql / joins).
  *
- * @param {{ dataset: "polymarket" | "kalshi"; sampleId: string; columns: string[]; rows: string[][]; limit?: number }} opts
+ * @param {{ dataset: "polymarket" | "kalshi"; sampleId: string; columns: string[]; rows: string[][]; limit?: number; ingestFullResult?: boolean }} opts
  */
 export async function ingestAthenaResultAsView(opts) {
   const { dataset, sampleId, columns, rows } = opts;
-  const limit = Math.min(5000, Math.max(1, Number(opts.limit) || 200));
+  const full = opts.ingestFullResult === true;
+  const limit = full ? null : Math.min(5000, Math.max(1, Number(opts.limit) || 200));
 
   if (!Array.isArray(columns) || !Array.isArray(rows)) {
     throw new Error("Athena ingest expects columns and rows arrays.");
@@ -265,7 +266,9 @@ export async function ingestAthenaResultAsView(opts) {
 
   beckerParquetRegistry.set(logicalKey, { virtualFileName: jsonFileName, viewName });
 
-  const table = await conn.query(`SELECT * FROM ${viewName} LIMIT ${limit}`);
+  const table = await conn.query(
+    limit == null ? `SELECT * FROM ${viewName}` : `SELECT * FROM ${viewName} LIMIT ${limit}`,
+  );
   const outRows = arrowTableToRows(table);
   return { rows: outRows, rowCount: outRows.length, logicalKey, viewName };
 }
