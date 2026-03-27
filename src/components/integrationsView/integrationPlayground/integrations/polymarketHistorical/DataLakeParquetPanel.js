@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Wrench } from "lucide-react";
+import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
 import { getDataLakeDatasetConfig, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
@@ -1311,7 +1311,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       />
 
       <div className="space-y-1 min-w-0 max-w-full">
-        <Label className="text-xs">Table</Label>
+        <Label className="text-xs">Data Source</Label>
         <Select value={sampleId} onValueChange={setSampleId} disabled={!canUseSamples || loading}>
           <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full">
             <SelectValue placeholder="Choose table" />
@@ -1339,34 +1339,21 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             </TabsList>
 
             <TabsContent value="columns" className="space-y-4 min-w-0">
-              <div className="rounded-lg border border-primary/20 bg-muted/35 px-3 py-2.5">
-                <p className="text-xs font-medium text-foreground mb-1">What you are building</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{composeFriendlySummary}</p>
-              </div>
-
-              <p className="text-[11px] text-muted-foreground leading-snug">
-                One pull per run. If the sheet already has data, you will be asked to replace it or open a new sheet.
-              </p>
-
               <div className="space-y-2 min-w-0">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Fields in your sheet</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Each card is one column. Add fields from the table, set the header name, then choose totals or date/number
-                    formatting.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex place-items-center gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8 text-xs" type="button">
-                        Add field
+                        Add Column
                         <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="max-h-56 overflow-y-auto" align="start">
                       <DropdownMenuLabel className="text-xs">Choose a column</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-xs font-medium" onSelect={resetComposeToAllColumns}>
+                        Add all
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       {availableColumns.filter((c) => !columnComposeItems.some((i) => i.column === c)).length === 0 ? (
                         <DropdownMenuItem disabled className="text-xs">
@@ -1383,29 +1370,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button variant="outline" size="sm" className="h-8 text-xs" type="button" onClick={resetComposeToAllColumns}>
-                    Add all fields
-                  </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs"
+                    size="icon"
+                    className="group h-3 w-3 rounded-full bg-red-300/30 text-red-900/70 hover:bg-red-400/80 focus-visible:ring-1 focus-visible:ring-red-300"
                     type="button"
+                    aria-label="Clear selected columns"
+                    title="Clear selected columns"
                     onClick={() => {
                       setColumnComposeItems([]);
                       setColumnComposeOrderBy([]);
                     }}
                   >
-                    Clear list
                   </Button>
                 </div>
 
-                {columnComposeItems.length === 0 ? (
-                  <p className="text-xs text-muted-foreground rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-3">
-                    No fields yet. Use <span className="font-medium text-foreground">Add field</span> or{" "}
-                    <span className="font-medium text-foreground">Add all fields</span>, then run the request.
-                  </p>
-                ) : (
+                {columnComposeItems.length !== 0 && (
                   <div className="space-y-3">
                     {columnComposeItems.map((item, idx) => {
                       const k = kindForColumn(item.column);

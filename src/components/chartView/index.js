@@ -104,6 +104,16 @@ function getDistinctValues(data, colKey) {
   return Array.from(set).sort();
 }
 
+function formatCompactNumber(value) {
+  if (!Number.isFinite(value)) return "";
+  const abs = Math.abs(value);
+  if (abs >= 1e12) return `${(value / 1e12).toFixed(abs >= 1e13 ? 0 : 1).replace(/\.0$/, "")}t`;
+  if (abs >= 1e9) return `${(value / 1e9).toFixed(abs >= 1e10 ? 0 : 1).replace(/\.0$/, "")}b`;
+  if (abs >= 1e6) return `${(value / 1e6).toFixed(abs >= 1e7 ? 0 : 1).replace(/\.0$/, "")}m`;
+  if (abs >= 1e3) return `${(value / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace(/\.0$/, "")}k`;
+  return `${Math.round(value * 100) / 100}`;
+}
+
 export function ChartBuilderProvider({ demo, children }) {
   const contextStateV2 = useMyStateV2();
   const chartRef = useRef(null);
@@ -130,6 +140,10 @@ export function ChartBuilderProvider({ demo, children }) {
   const [xOptions, setXOptions] = useState([]);
   const [availableYOptions, setAvailableYOptons] = useState(["desktop","mobile","other"]);
   const [lineStyle, setLineStyle] = useState("natural");
+  const [scaleX, setScaleX] = useState("linear");
+  const [scaleY, setScaleY] = useState("linear");
+  const [yAxisDivisor, setYAxisDivisor] = useState(1);
+  const [yAxisCompact, setYAxisCompact] = useState(true);
 
   const categories = Object.keys(masterPalette || {});
   const [selectedCategory, setSelectedCategory] = useState(categories?.[0]);
@@ -172,6 +186,15 @@ export function ChartBuilderProvider({ demo, children }) {
 
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
+
+  useEffect(() => {
+    if (selectedPalette?.length) return;
+    const firstCategory = categories?.[0];
+    const firstPalette = firstCategory ? masterPalette?.[firstCategory]?.[0] : null;
+    if (Array.isArray(firstPalette) && firstPalette.length) {
+      setSelectedPalette(firstPalette);
+    }
+  }, [categories, selectedPalette]);
 
   useEffect(() => {
     if (!effectiveCols?.length) return;
@@ -452,10 +475,14 @@ export function ChartBuilderProvider({ demo, children }) {
     setSortXDir: () => {},
     sortYDir: null,
     setSortYDir: () => {},
-    scaleX: "linear",
-    setScaleX: () => {},
-    scaleY: "linear",
-    setScaleY: () => {},
+    scaleX,
+    setScaleX,
+    scaleY,
+    setScaleY,
+    yAxisDivisor,
+    setYAxisDivisor,
+    yAxisCompact,
+    setYAxisCompact,
 
     chartData,
     getAxisType,
@@ -530,6 +557,7 @@ export function ChartBuilderProvider({ demo, children }) {
     lineIsTemporalX,
     lineChartData,
     formatXAxisValue,
+    formatCompactNumber,
   };
 
   return <ChartBuilderContext.Provider value={value}>{children}</ChartBuilderContext.Provider>;
@@ -578,6 +606,10 @@ export function ChartCanvas() {
     lineIsTemporalX,
     lineChartData,
     formatXAxisValue,
+    formatCompactNumber,
+    scaleY,
+    yAxisDivisor,
+    yAxisCompact,
   } = useChartBuilder();
 
   const data = chartData && chartData.length ? chartData : dfltChartData;
@@ -612,6 +644,13 @@ export function ChartCanvas() {
     : ["#000000", "#ffffff", "#ffffff", "#000000"];
   const activePalette = hasSelectedPalette ? selectedPalette : defaultPalette;
   const seriesColorAt = (idx) => activePalette?.[idx] || activePalette?.[3] || activePalette?.[0] || (dark ? "#ffffff" : "#000000");
+  const yAxisFormatter = (raw) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return raw;
+    const divisor = Number(yAxisDivisor) > 0 ? Number(yAxisDivisor) : 1;
+    const adjusted = n / divisor;
+    return yAxisCompact ? formatCompactNumber(adjusted) : adjusted.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  };
 
   return (
     <div className={`gradualEffect relative xl:flex p-10`}>
@@ -666,12 +705,12 @@ export function ChartCanvas() {
                     )}
                   </div>
                 ) : (
-                  <ChartContainer config={chartConfig || dfltChartConfig} className={`h-[300px] lg:h-[500px] w-full ${dark && "text-slate-200"}`}>
+                  <ChartContainer config={chartConfig || dfltChartConfig} className={`h-[300px] lg:h-[500px] w-[calc(100%-8px)] mx-auto ${dark && "text-slate-200"}`}>
                     {selChartType === "area" && (
-                      <AreaChart accessibilityLayer data={finalRenderedData} margin={{ left: 12, right: 12, top: 0, bottom: 0 }} stackOffset={expanded ? "expand" : false}>
+                      <AreaChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }} stackOffset={expanded ? "expand" : false}>
                         <CartesianGrid vertical={false} />
                         <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
                           <Area key={yKey + idx} dataKey={yKey} type={lineStyle} fill={seriesColorAt(idx)} fillOpacity={0.4} stroke={seriesColorAt(idx)} stackId={"a"} />
@@ -681,10 +720,10 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "bar" && (
-                      <BarChart accessibilityLayer data={finalRenderedData} margin={{ left: 12, right: 12 }}>
+                      <BarChart accessibilityLayer data={finalRenderedData} margin={{ left: 24, right: 18 }}>
                         <CartesianGrid vertical={false} />
                         <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={74} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
                           <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorAt(idx)} radius={4} stackId={stackedBar ? "a" : idx}>
@@ -698,10 +737,10 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "line" && (
-                      <LineChart accessibilityLayer data={finalRenderedData} margin={{ left: 12, right: 12, top: 0, bottom: 0 }}>
+                      <LineChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }}>
                         <CartesianGrid vertical={false} />
                         <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
                           <Line key={yKey + idx} dataKey={yKey} type={lineStyle} stroke={seriesColorAt(idx)} strokeWidth={2} dot={dots && finalRenderedData.length <= 40}>

@@ -113,6 +113,10 @@ export default function ChartControls() {
     setScaleX,
     scaleY,
     setScaleY,
+    yAxisDivisor,
+    setYAxisDivisor,
+    yAxisCompact,
+    setYAxisCompact,
     dataTypes,
     chartData,
     getAxisType,
@@ -167,6 +171,9 @@ export default function ChartControls() {
   const [openSection, setOpenSection] = useState("chartType");
   const addableLineSeriesValues = (lineSeriesCandidates || []).filter((v) => !(lineSeriesValues || []).includes(v));
   const addLineLabel = `+ Line ${((lineSeriesValues?.length || 0) + 1)}`;
+  const palettePreview = selectedPalette && selectedPalette.length
+    ? selectedPalette
+    : (selectedCategory && masterPalette?.[selectedCategory]?.[0]) || [];
 
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
@@ -879,10 +886,43 @@ export default function ChartControls() {
                       </TooltipProvider>
                     )}
                   </div>
+                  {selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === "number" && (
+                    <div className="space-y-2">
+                      <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Y-axis format</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select
+                          value={String(yAxisDivisor || 1)}
+                          onValueChange={(v) => setYAxisDivisor(Number(v) || 1)}
+                        >
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
+                            <SelectValue placeholder="Divide by" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value="1">No divisor (x1)</SelectItem>
+                            <SelectItem value="1000">/ 1,000</SelectItem>
+                            <SelectItem value="1000000">/ 1,000,000</SelectItem>
+                            <SelectItem value="1000000000">/ 1,000,000,000</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={yAxisCompact ? "compact" : "full"}
+                          onValueChange={(v) => setYAxisCompact(v === "compact")}
+                        >
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
+                            <SelectValue placeholder="Label style" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value="compact">Compact (5m, 1.5b)</SelectItem>
+                            <SelectItem value="full">Full numbers</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : null}
           <div className="py-2">
-            <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Paletter</p>
+            <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Palette</p>
             <div className="flex gap-3 place-items-center">
               <button
                 type="button"
@@ -892,8 +932,9 @@ export default function ChartControls() {
                   setColorVisible(true);
                 }}
               >
-                {selectedPalette &&
-                  selectedPalette.map((color) => <div key={color} className="p-3" style={{ backgroundColor: color }} />)}
+                {palettePreview.map((color, idx) => (
+                  <div key={`${color}-${idx}`} className="p-3" style={{ backgroundColor: color }} />
+                ))}
               </button>
               <div className="p-1 cursor-pointer" onClick={() => shufflePalette()}>
                 <IoShuffleOutline className="h-4 w-4 text-slate-600" />
