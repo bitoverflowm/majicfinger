@@ -9,7 +9,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag } from "lucide-react";
+import { CircleDot, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -163,7 +163,9 @@ export default function ChartControls() {
   const chartTypeLabel =
     selChartType === "liveline"
       ? "Liveline"
-      : selChartType
+      : selChartType === "treemap"
+        ? "Treemap"
+        : selChartType
           ? selChartType.charAt(0).toUpperCase() + selChartType.slice(1)
           : "—";
 
@@ -218,43 +220,105 @@ export default function ChartControls() {
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="pt-2">
-                  <div className="min-w-0 flex-wrap items-center gap-2">
-                    <ToggleGroup
-                      variant="outline"
-                      type="single"
-                      aria-label="Chart Type"
-                      className="flex-wrap"
-                      value={selChartType}
-                      onValueChange={(value) => {
-                        if (value) setSelChartType(value);
-                      }}
-                    >
-                      <ToggleGroupItem value="area" aria-label="Toggle area">
-                        <MdOutlineAreaChart className="h-4 w-4" />
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="bar" aria-label="Toggle bar">
-                        <IoStatsChart className="h-4 w-4" />
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="line" aria-label="Toggle line">
-                        <PiChartLine className="h-4 w-4" />
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="pie" aria-label="Toggle pie">
-                        <IoPieChartOutline className="h-4 w-4" />
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="radar" aria-label="Toggle radar">
-                        <AiOutlineRadarChart className="h-4 w-4" />
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="scatter" aria-label="Toggle bubble (scatter)">
-                        <CircleDot className="h-4 w-4" />
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="liveline" aria-label="Liveline chart">
-                        <span className="relative inline-flex h-3 w-3">
-                          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                          <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
-                        </span>
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  </div>
+                  <TooltipProvider delayDuration={400}>
+                    <div className="min-w-0 flex-wrap items-center gap-2">
+                      <ToggleGroup
+                        variant="outline"
+                        type="single"
+                        aria-label="Chart Type"
+                        className="flex-wrap"
+                        value={selChartType}
+                        onValueChange={(value) => {
+                          if (value) setSelChartType(value);
+                        }}
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem value="area" aria-label="Area chart">
+                              <MdOutlineAreaChart className="h-4 w-4" />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                            Area chart — filled band under the line; emphasizes magnitude and stacked totals.
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem value="bar" aria-label="Bar chart">
+                              <IoStatsChart className="h-4 w-4" />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                            Bar chart — compare categories side by side along the X axis.
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem value="line" aria-label="Line chart">
+                              <PiChartLine className="h-4 w-4" />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                            Line chart — show change and trends over the X axis (often time).
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem value="pie" aria-label="Pie chart">
+                              <IoPieChartOutline className="h-4 w-4" />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                            Pie chart — each slice is a share of the whole (uses one numeric Y column).
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem value="radar" aria-label="Radar chart">
+                              <AiOutlineRadarChart className="h-4 w-4" />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                            Radar chart — compare several variables on radial axes from the center.
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem value="treemap" aria-label="Treemap">
+                              <LayoutGrid className="h-4 w-4" />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                            Treemap — nested rectangles sized by value (Recharts Treemap). Uses your X column for
+                            labels and Y for area; good for category share (e.g. Kalshi volume by prefix).
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem value="scatter" aria-label="Scatter / bubble chart">
+                              <CircleDot className="h-4 w-4" />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                            Scatter / bubble — points from X and Y; optional Z column for bubble size.
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem value="liveline" aria-label="Liveline chart">
+                              <span className="relative inline-flex h-3 w-3">
+                                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                                <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                              </span>
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                            Liveline — compact live canvas for streaming or high-frequency numeric series.
+                          </TooltipContent>
+                        </Tooltip>
+                      </ToggleGroup>
+                    </div>
+                  </TooltipProvider>
                 </AccordionContent>
               </AccordionItem>
 
@@ -542,7 +606,7 @@ export default function ChartControls() {
                     </>
                   )}
 
-                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "line" && (
+                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "line" && selChartType !== "treemap" && (
                     <button className="p-2 bg-black text-white rounded-md text-xs" onClick={() => handleSelectY(availableYOptions[0])} disabled={availableYOptions && availableYOptions.length === 0}>
                       {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
                     </button>
@@ -620,7 +684,7 @@ export default function ChartControls() {
                   )}
                 </>
               )}
-              {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && (
+              {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "treemap" && (
                 <button className="p-2 bg-black text-white rounded-md text-xs" onClick={() => handleSelectY(availableYOptions[0])} disabled={availableYOptions && availableYOptions.length === 0}>
                   {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
                 </button>

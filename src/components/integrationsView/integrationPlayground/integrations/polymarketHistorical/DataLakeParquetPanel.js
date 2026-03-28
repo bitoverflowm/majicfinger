@@ -33,12 +33,18 @@ import {
 import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
 import { getDataLakeDatasetConfig, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
-import { ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
+import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
 import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { rollupKalshiPrefixRowsByTaxonomyGroup } from "@/lib/kalshi/kalshiCategoryTaxonomy";
+
+/** Shown in the column picker / compose cards for server-computed Kalshi fields. */
+const KALSHI_VIRTUAL_COMPOSE_LABELS = {
+  kalshi_event_ticker_category: "Event ticker prefix (from event_ticker)",
+};
 
 // Athena/Glue schema metadata for each Becker dataset/table.
 // We store types for later use, but only display column names in the UI.
@@ -84,6 +90,7 @@ const POLYMARKET_BLOCKS_COLUMNS = [
 
 const KALSHI_MARKETS_COLUMNS = [
   { name: "ticker", type: "string" },
+  { name: "kalshi_event_ticker_category", type: "string" },
   { name: "event_ticker", type: "string" },
   { name: "market_type", type: "string" },
   { name: "title", type: "string" },
@@ -146,6 +153,11 @@ function genMetaOpId() {
 
 function genComposeRowId() {
   return `cs-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** @param {string} col */
+function composeSourceColumnLabel(col) {
+  return KALSHI_VIRTUAL_COMPOSE_LABELS[col] || col;
 }
 
 /** @param {{ aggregate: null | string }} item */
@@ -288,6 +300,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [columnComposeItems, setColumnComposeItems] = useState([]);
   /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
   const [columnComposeOrderBy, setColumnComposeOrderBy] = useState([]);
+  /** After Athena returns rows grouped by event-ticker prefix, merge into Sports / Politics / … (client-side, matches pandas get_group). */
+  const [kalshiTaxonomyRollup, setKalshiTaxonomyRollup] = useState(false);
   const [selectionTab, setSelectionTab] = useState("columns"); // "columns" | "meta"
   const [metaQueryMode, setMetaQueryMode] = useState("all"); // "all" | "filter"
   const [metaOperationKind, setMetaOperationKind] = useState("count"); // "count" | "count_distinct" | "sum"
@@ -316,7 +330,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
   const [beckerViews, setBeckerViews] = useState(() => listBeckerParquetViews());
 
-  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
+  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
 
   useEffect(() => {
@@ -417,6 +431,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       if (it.aggregate === "count") {
         return `“${title}” = count of ${it.column}`;
       }
+      if (it.column === "kalshi_event_ticker_category") {
+        return `“${title}” = leading A–Z/0–9 token from event_ticker (Athena regexp_extract)`;
+      }
       if (it.dateBucket === "quarter") {
         return `“${title}” = ${it.column} by calendar quarter`;
       }
@@ -472,6 +489,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setMetaOperationAllSelected(false);
     setMetaRunDisposition("default");
     setMetaOperationsMenuOpen(false);
+    setKalshiTaxonomyRollup(false);
   }, [selected?.table]);
 
   const refreshBeckerViews = useCallback(() => {
@@ -486,8 +504,48 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     [replaceCurrentSheetData, setConnectedData],
   );
 
+  const applyKalshiCategoryVolumePreset = useCallback(() => {
+    setError(null);
+    setColumnComposeItems([
+      {
+        id: genComposeRowId(),
+        column: "kalshi_event_ticker_category",
+        alias: "category",
+        aggregate: null,
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        id: genComposeRowId(),
+        column: "volume",
+        alias: "total_volume",
+        aggregate: "sum",
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        id: genComposeRowId(),
+        column: "ticker",
+        alias: "market_count",
+        aggregate: "count",
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+    ]);
+    setColumnComposeOrderBy([{ alias: "total_volume", direction: "desc" }]);
+  }, []);
+
   const runIngestWithProgress = useCallback(
-    async (lakeVal, table, sid, mode, composeSpec, metaQueryMode, metaFilters, metaOpSpecs) => {
+    async (lakeVal, table, sid, mode, composeSpec, metaQueryMode, metaFilters, metaOpSpecs, kalshiIngestExtras = null) => {
       return runParquetSheetLoadWithProgress({
         onLabel: setLoadLabel,
         onProgress: setLoadProgress,
@@ -561,11 +619,36 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             { maxWaitMs: 900000 },
           );
 
+          let outRows = rows;
+          const kr = kalshiIngestExtras?.taxonomyRollup;
+          const snap = kalshiIngestExtras?.composeItemsSnapshot;
+          if (
+            kr &&
+            dataset === "kalshi" &&
+            table === "markets" &&
+            Array.isArray(snap) &&
+            Array.isArray(outRows) &&
+            outRows.length > 0
+          ) {
+            const catItem = snap.find((i) => i.column === "kalshi_event_ticker_category");
+            const sumItem = snap.find((i) => i.aggregate === "sum");
+            const cntItem = snap.find((i) => i.aggregate === "count");
+            if (catItem && sumItem && cntItem) {
+              const ca = String(catItem.alias || "").trim();
+              const va = String(sumItem.alias || "").trim();
+              const na = String(cntItem.alias || "").trim();
+              if (ca && va && na) {
+                const asObjects = athenaRowsToObjects(resultColumns, outRows);
+                outRows = rollupKalshiPrefixRowsByTaxonomyGroup(asObjects, ca, va, na);
+              }
+            }
+          }
+
           return ingestAthenaResultAsView({
             dataset,
             sampleId: `${sid}-compose`,
             columns: resultColumns,
-            rows,
+            rows: outRows,
             ingestFullResult: true,
           });
         },
@@ -577,7 +660,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const executeIngestReplace = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs } = pending;
+    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs, kalshiIngestExtras } =
+      pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -595,6 +679,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
+        kalshiIngestExtras,
       );
       applyRowsToActiveSheet(rows);
       setLastRowCount(rowCount);
@@ -611,7 +696,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const executeIngestAppend = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs, metaAppendTargetIndex } = pending;
+    const {
+      mode,
+      lake: lk,
+      table,
+      sampleId: sid,
+      composeSpec,
+      metaQueryMode,
+      metaFilters,
+      metaOpSpecs,
+      metaAppendTargetIndex,
+      kalshiIngestExtras,
+    } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -629,6 +725,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
+        kalshiIngestExtras,
       );
       if (mode === "meta") {
         // Replace only the template row that was appended in preview.
@@ -661,7 +758,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const executeIngestNewSheet = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs } = pending;
+    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs, kalshiIngestExtras } =
+      pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -683,6 +781,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
+        kalshiIngestExtras,
       );
 
       addNewSheetAndActivate?.((newId) => {
@@ -1035,6 +1134,17 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       table: selected.table,
       sampleId: selected.id,
       composeSpec: selectionTab === "columns" ? buildServerComposePayload() : undefined,
+      kalshiIngestExtras:
+        selectionTab === "columns" && dataset === "kalshi" && selected.table === "markets"
+          ? {
+              taxonomyRollup: kalshiTaxonomyRollup,
+              composeItemsSnapshot: columnComposeItems.map((i) => ({
+                column: i.column,
+                alias: i.alias,
+                aggregate: i.aggregate,
+              })),
+            }
+          : null,
       metaQueryMode,
       metaFilters: {
         and: metaAndFilters,
@@ -1364,7 +1474,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                           .filter((c) => !columnComposeItems.some((i) => i.column === c))
                           .map((col) => (
                             <DropdownMenuItem key={col} className="text-xs" onSelect={() => addComposeColumn(col)}>
-                              {col}
+                              {composeSourceColumnLabel(col)}
                             </DropdownMenuItem>
                           ))
                       )}
@@ -1394,6 +1504,39 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   </TooltipProvider>
                 </div>
 
+                {dataset === "kalshi" && selected?.table === "markets" && (
+                  <div className="rounded-md border border-border/70 bg-muted/25 p-2.5 space-y-2 min-w-0">
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Recreate the Becker-style query: group markets by the leading token of{" "}
+                      <span className="font-mono">event_ticker</span>, sum <span className="font-mono">volume</span>,
+                      count rows. Optional roll-up merges prefixes into top-level taxonomy (Sports, Politics, …) using
+                      the same pattern list as your Python tooling.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={applyKalshiCategoryVolumePreset}
+                      >
+                        Preset: volume + count by event prefix
+                      </Button>
+                    </div>
+                    <label className="flex items-start gap-2 text-xs cursor-pointer select-none">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={kalshiTaxonomyRollup}
+                        onCheckedChange={(v) => setKalshiTaxonomyRollup(v === true)}
+                      />
+                      <span>
+                        After Athena returns, roll up into taxonomy groups (Sports, Politics, Crypto, …) — matches{" "}
+                        <span className="font-mono">get_group</span> + pandas groupby.
+                      </span>
+                    </label>
+                  </div>
+                )}
+
                 {columnComposeItems.length !== 0 && (
                   <div className="space-y-3">
                     {columnComposeItems.map((item, idx) => {
@@ -1420,7 +1563,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             <div className="min-w-0">
                               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Source column</p>
                               <p className="font-mono text-sm font-semibold truncate" title={item.column}>
-                                {item.column}
+                                {composeSourceColumnLabel(item.column)}
                               </p>
                             </div>
                             <Button

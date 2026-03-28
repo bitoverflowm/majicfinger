@@ -2,8 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { masterPalette } from '@/components/chartView/panels/masterPalette';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, XAxis, YAxis } from 'recharts';
-
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, Treemap, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Square, Radio } from 'lucide-react';
@@ -11,6 +10,8 @@ import { Liveline } from 'liveline';
 
 import { useMyStateV2 } from '@/context/stateContextV2';
 import ChartControls from '@/components/chartView/ChartControls';
+import { TreemapCategoryRect } from '@/components/chartView/treemapCategoryContent';
+import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtrapolation';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 
@@ -135,6 +136,10 @@ export function ChartBuilderProvider({ demo, children }) {
   const effectiveCols = (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length) ? Object.keys(chartDataOverride[0] || {}).map((field) => ({ field })) : connectedCols;
 
   const [selChartType, setSelChartType] = useState('area');
+
+  useEffect(() => {
+    setSelChartType((prev) => (prev === "heatmap" ? "treemap" : prev));
+  }, []);
   const [selX, setSelX] = useState(undefined);
   const [selY, setSelY] = useState(["desktop"]);
   const [xOptions, setXOptions] = useState([]);
@@ -221,7 +226,8 @@ export function ChartBuilderProvider({ demo, children }) {
 
   // Auto-trim Y for single-series chart types (keeps filters/sorts intact).
   useEffect(() => {
-    const singleSeries = selChartType === "pie" || selChartType === "radar" || selChartType === "liveline";
+    const singleSeries =
+      selChartType === "pie" || selChartType === "radar" || selChartType === "liveline" || selChartType === "treemap";
     if (!singleSeries) return;
     setSelY((prev) => {
       const curr = Array.isArray(prev) ? prev : [];
@@ -638,7 +644,32 @@ export function ChartCanvas() {
   const yKeys = selChartType === "line"
     ? ((lineSeriesValues && lineSeriesValues.length) ? lineSeriesValues : ((selY && selY.length) ? selY : ["desktop"]))
     : ((selY && selY.length) ? selY : ["desktop"]);
+  /** Recharts Treemap: one synthetic root whose children are sheet rows (name ← X, value ← Y). */
+  const treemapData = useMemo(() => {
+    if (selChartType !== "treemap" || !Array.isArray(finalRenderedData) || !yKeys[0]) {
+      return [{ name: "root", children: [] }];
+    }
+    const yk = yKeys[0];
+    const leaves = finalRenderedData
+      .map((row) => {
+        const name = String(row?.[xKey] ?? "").trim() || "—";
+        const value = Math.max(0, Number(row?.[yk]) || 0);
+        return { name, value };
+      })
+      .filter((d) => d.value > 0);
+    leaves.sort((a, b) => b.value - a.value);
+    if (leaves.length === 0) {
+      return [{ name: "root", children: [{ name: "No positive values", value: 1 }] }];
+    }
+    return [{ name: "root", children: leaves }];
+  }, [selChartType, finalRenderedData, xKey, yKeys]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
+  const treemapLeafFills = useMemo(() => {
+    const leaves = treemapData?.[0]?.children;
+    const n = Array.isArray(leaves) ? leaves.length : 0;
+    if (!n || !hasSelectedPalette) return null;
+    return extrapolateColorsFromPalette(selectedPalette, n);
+  }, [treemapData, hasSelectedPalette, selectedPalette]);
   const defaultPalette = dark
     ? ["#ffffff", "#000000", "#000000", "#ffffff"]
     : ["#000000", "#ffffff", "#ffffff", "#000000"];
@@ -734,6 +765,20 @@ export function ChartCanvas() {
                         ))}
                         {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
                       </BarChart>
+                    )}
+
+                    {selChartType === "treemap" && yKeys[0] && (
+                      <Treemap
+                        data={treemapData}
+                        dataKey="value"
+                        nameKey="name"
+                        aspectRatio={4 / 3}
+                        stroke="hsl(var(--border))"
+                        isAnimationActive={finalRenderedData.length < 100}
+                        content={(nodeProps) => <TreemapCategoryRect {...nodeProps} leafColors={treemapLeafFills ?? undefined} />}
+                      >
+                        <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+                      </Treemap>
                     )}
 
                     {selChartType === "line" && (

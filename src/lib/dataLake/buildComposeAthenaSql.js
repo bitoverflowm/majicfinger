@@ -8,6 +8,11 @@ import { isValidColumnIdentifier } from "./athenaTableMap";
 
 const SAFE_ALIAS = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+/** Virtual Kalshi markets column: leading token from event_ticker (Athena/Presto regexp_extract). */
+export const KALSHI_EVENT_TICKER_CATEGORY_SQL = `(CASE WHEN "event_ticker" IS NULL OR CAST("event_ticker" AS VARCHAR) = '' THEN 'independent' WHEN regexp_extract(CAST("event_ticker" AS VARCHAR), '^([A-Z0-9]+)', 1) = '' THEN 'independent' ELSE regexp_extract(CAST("event_ticker" AS VARCHAR), '^([A-Z0-9]+)', 1) END)`;
+
+const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
+
 const DATE_BUCKETS = new Set(["day", "week", "month", "quarter", "year"]);
 const DATE_FORMATS = new Set(["dmy", "ym", "dm"]);
 const SCALES = new Set(["none", "thousand", "million", "billion"]);
@@ -66,6 +71,18 @@ function isNumericHiveType(hiveType) {
  */
 function buildSelectExpression(opts) {
   const { column, columnType, treatAsDate, dateBucket, dateFormat, aggregate, numberScale, decimals } = opts;
+
+  if (column === KALSHI_VIRTUAL_CATEGORY) {
+    if (aggregate === "sum") {
+      const err = new Error("Cannot SUM the computed event-ticker category column");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    if (aggregate === "count") {
+      return { innerSql: `COUNT(${KALSHI_EVENT_TICKER_CATEGORY_SQL})`, isAggregate: true };
+    }
+    return { innerSql: KALSHI_EVENT_TICKER_CATEGORY_SQL, isAggregate: false };
+  }
 
   if (!isValidColumnIdentifier(column)) {
     const err = new Error(`Invalid column: ${column}`);
