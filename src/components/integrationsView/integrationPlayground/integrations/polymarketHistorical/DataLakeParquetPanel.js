@@ -1370,19 +1370,28 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="group h-3 w-3 rounded-full bg-red-300/30 text-red-900/70 hover:bg-red-400/80 focus-visible:ring-1 focus-visible:ring-red-300"
-                    type="button"
-                    aria-label="Clear selected columns"
-                    title="Clear selected columns"
-                    onClick={() => {
-                      setColumnComposeItems([]);
-                      setColumnComposeOrderBy([]);
-                    }}
-                  >
-                  </Button>
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="group h-4 w-4 rounded-full bg-red-300/35 text-red-900/70 hover:bg-red-400/80 focus-visible:ring-1 focus-visible:ring-red-300"
+                          type="button"
+                          aria-label="clear all selections"
+                          onClick={() => {
+                            setColumnComposeItems([]);
+                            setColumnComposeOrderBy([]);
+                          }}
+                        >
+                          <X className="h-2.5 w-2.5 opacity-0 transition-opacity group-hover:opacity-80 group-focus-visible:opacity-80" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        clear all selections
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
 
                 {columnComposeItems.length !== 0 && (

@@ -12,8 +12,6 @@ export const RANDOM_LOADING_SNIPPETS = [
   "Fetching bundle assets from the CDN…",
   "Spinning up a private in-memory database…",
   "Tip: Use a smaller row limit first to preview schema quickly.",
-  "Tip: Parquet is columnar — DuckDB only reads the columns your SQL needs.",
-  "Tip: Proxied S3 keeps your bucket private while still loading in the sheet.",
   "Tip: Join markets and trades on stable ids from the manifest.",
   "Tip: Filter early with WHERE to keep browser memory happy.",
   "Almost there — optimizing worker threads…",
