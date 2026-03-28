@@ -1506,12 +1506,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
                 {dataset === "kalshi" && selected?.table === "markets" && (
                   <div className="rounded-md border border-border/70 bg-muted/25 p-2.5 space-y-2 min-w-0">
-                    <p className="text-[11px] text-muted-foreground leading-snug">
-                      Recreate the Becker-style query: group markets by the leading token of{" "}
-                      <span className="font-mono">event_ticker</span>, sum <span className="font-mono">volume</span>,
-                      count rows. Optional roll-up merges prefixes into top-level taxonomy (Sports, Politics, …) using
-                      the same pattern list as your Python tooling.
-                    </p>
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
                         type="button"

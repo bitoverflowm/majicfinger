@@ -1,4 +1,14 @@
 export const masterPalette = {
+    monochrome: [
+        [
+            "#fafafa",
+            "#e4e4e7",
+            "#a1a1aa",
+            "#52525b",
+            "#27272a",
+            "#171717",
+        ],
+    ],
     popular: [
         [
             "#987070",

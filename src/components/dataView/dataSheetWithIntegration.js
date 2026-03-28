@@ -23,8 +23,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Image from "next/image";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,6 +69,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
 
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
   const closeTimeoutRef = useRef(null);
   const wasOpenRef = useRef(false);
 
@@ -106,8 +113,13 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     }
   }, [rightPanelOpen, isPanelClosing, beginPanelClose]);
 
+  useEffect(() => {
+    if (!rightPanelOpen) setDrawerExpanded(false);
+  }, [rightPanelOpen]);
+
   const closePanel = useCallback(() => {
     if (isPanelClosing) return;
+    setDrawerExpanded(false);
     beginPanelClose(() => {
       setRightPanelOpen?.(false);
       wasOpenRef.current = false;
@@ -173,10 +185,20 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const showSidebar = !!rightPanelOpen;
   const isPanelVisible = showSidebar || isPanelClosing;
   const chartsActive = rightPanelTab === "charts";
+  const panelAnimatingOpen = isPanelOpen && !isPanelClosing;
+
+  /** Collapsed (default) vs expanded — spacer reserves width; aside is fixed (mobile: inset-x-0 + w-auto). */
+  const drawerWidthCollapsed = "w-[18rem] min-w-[18rem] sm:w-[300px] sm:min-w-[300px]";
+  const drawerSpacerWidthClass = drawerExpanded
+    ? "max-md:w-[100dvw] max-md:min-w-0 max-md:max-w-[100dvw] md:w-1/2 md:min-w-0 md:max-w-[50vw] 2xl:w-1/3 2xl:max-w-[33.333vw]"
+    : drawerWidthCollapsed;
+  const drawerAsideWidthClass = drawerExpanded
+    ? "max-md:w-auto max-md:min-w-0 max-md:max-w-none md:w-1/2 md:min-w-0 md:max-w-[50vw] 2xl:w-1/3 2xl:max-w-[33.333vw]"
+    : drawerWidthCollapsed;
 
   const layout = (
-    <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-4 px-2 py-2 sm:gap-6 sm:px-4">
-      <div className="flex min-h-0 w-full max-w-full flex-1 flex-row gap-4 sm:gap-6">
+    <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-4 overflow-x-hidden px-2 py-2 sm:gap-6 sm:px-4">
+      <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 sm:gap-6">
         {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
         <main className="min-w-0 flex-1 overflow-auto relative">
           {!showSidebar && !isPanelClosing && (
@@ -208,15 +230,21 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
           <>
             {/* Spacer: keeps main from expanding when panel is fixed */}
             <div
-              className={`shrink-0 transition-[width] duration-300 ease-out ${
-                isPanelClosing || !isPanelOpen ? "w-0" : "w-[18rem] sm:w-[300px]"
-              }`}
+              className={cn(
+                "shrink-0 transition-[width,min-width,max-width] duration-300 ease-out",
+                isPanelClosing || !isPanelOpen ? "w-0 min-w-0 max-w-0 overflow-hidden" : drawerSpacerWidthClass,
+              )}
               aria-hidden
             />
             <aside
-              className={`fixed right-2 top-[4.5rem] z-20 flex min-w-[18rem] sm:min-w-[300px] w-[18rem] sm:w-[300px] h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-transform duration-300 ease-out sm:right-4 ${
-                isPanelClosing || !isPanelOpen ? "translate-x-full" : "translate-x-0"
-              }`}
+              className={cn(
+                "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out",
+                drawerExpanded
+                  ? "max-md:left-0 max-md:right-0 md:right-4"
+                  : "right-2 sm:right-4",
+                drawerAsideWidthClass,
+                isPanelClosing || !isPanelOpen ? "translate-x-full" : "translate-x-0",
+              )}
             >
               <div className="h-full min-h-0 w-full flex flex-col">
                 <div className="flex h-full flex-col rounded-lg border bg-background/80 backdrop-blur-sm shadow-sm">
@@ -234,8 +262,29 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                     }}
                     className="flex h-full flex-col"
                   >
-                    <div className="flex items-center gap-2 p-2">
-                      <TabsList className="h-9">
+                    <div className="relative flex items-center gap-2 p-2">
+                      {panelAnimatingOpen && !drawerExpanded && (
+                        <TooltipProvider delayDuration={250}>
+                          <div className="absolute left-0 top-0 z-30 h-11 w-11 group/expandcorner">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => setDrawerExpanded(true)}
+                                  className="flex h-11 w-11 items-start justify-start rounded-br-lg rounded-tl-md p-1.5 text-muted-foreground/0 opacity-0 transition-opacity duration-200 group-hover/expandcorner:opacity-100 hover:!opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                  aria-label="Expand panel"
+                                >
+                                  <ChevronLeft className="h-4 w-4 text-muted-foreground/70 drop-shadow-sm" strokeWidth={2} />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" sideOffset={6} className="text-xs">
+                                Expand
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TooltipProvider>
+                      )}
+                      <TabsList className={cn("h-9", !drawerExpanded && "pl-5")}>
                         <TabsTrigger value="integrations" className="text-xs">
                           Integrations
                         </TabsTrigger>
@@ -247,21 +296,47 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                         </TabsTrigger>
                       </TabsList>
                       <div className="ml-auto flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          onClick={closePanel}
-                          aria-label="Close panel"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        {drawerExpanded ? (
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={() => setDrawerExpanded(false)}
+                                  aria-label="Collapse panel"
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="text-xs">
+                                Collapse
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={closePanel}
+                            aria-label="Close panel"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="min-h-0 flex-1 px-2 pb-2">
-                      <TabsContent value="integrations" className="m-0 h-full">
-                        <div className="flex h-full min-w-0 max-w-full flex-col gap-3">
+                    <div
+                      className={cn(
+                        "min-h-0 min-w-0 flex-1 pb-2",
+                        drawerExpanded ? "w-full max-w-none px-3 sm:px-4" : "max-w-full px-2",
+                      )}
+                    >
+                      <TabsContent value="integrations" className="m-0 h-full w-full min-w-0 max-w-full">
+                        <div className="flex h-full w-full min-w-0 max-w-full flex-col gap-3">
                           <div className="flex min-w-0 max-w-full items-center gap-2">
                             <Select
                               value={integrationSidebar || ""}
@@ -303,8 +378,13 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                         </div>
                       </TabsContent>
 
-                      <TabsContent value="charts" className="m-0 h-full min-w-0">
-                        <div className="h-full min-w-0 overflow-auto p-1 ">
+                      <TabsContent value="charts" className="m-0 h-full min-w-0 w-full max-w-full">
+                        <div
+                          className={cn(
+                            "h-full min-w-0 max-w-full overflow-auto",
+                            drawerExpanded ? "w-full p-1 sm:p-2" : "p-1",
+                          )}
+                        >
                           {chartsActive ? (
                             <ChartControls />
                           ) : (
@@ -313,8 +393,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                         </div>
                       </TabsContent>
 
-                      <TabsContent value="export" className="m-0 h-full min-w-0">
-                        <div className="h-full min-w-0 overflow-auto">
+                      <TabsContent value="export" className="m-0 h-full min-w-0 w-full max-w-full">
+                        <div className="h-full min-w-0 w-full max-w-full overflow-auto">
                           <ExportPanel />
                         </div>
                       </TabsContent>
