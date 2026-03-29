@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Sigma, Wrench, X } from "lucide-react";
+import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
 import { getDataLakeDatasetConfig, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
@@ -60,7 +60,7 @@ import {
 
 /** Shown in the column picker / compose cards for server-computed Kalshi fields. */
 const KALSHI_VIRTUAL_COMPOSE_LABELS = {
-  kalshi_event_ticker_category: "Event ticker prefix (from event_ticker)",
+  kalshi_event_ticker_category: "event ticker simplified",
   kalshi_resolved_centile_bin: "Price bucket index (1–10, equal-width on trade price ¢)",
   kalshi_resolved_centile_label: "Price bucket label (centile band, e.g. 1–10 pct)",
   kalshi_resolved_taker_notional: "Taker notional (count × taker price / 100)",
@@ -399,6 +399,25 @@ function areMetaRowsEqual(a, b) {
   return true;
 }
 
+/** Row shape used for meta-operation placeholders on the sheet (not Athena compose / lake rows). */
+function rowLooksLikeMetaPreviewRow(row) {
+  if (!row || typeof row !== "object") return false;
+  const keys = Object.keys(row);
+  if (keys.length === 0) return false;
+  return (
+    keys.includes("Operation name") ||
+    keys.includes("Op ref") ||
+    keys.includes("meta query") ||
+    keys.includes("value")
+  );
+}
+
+/** Empty sheet or only meta-placeholder rows — safe to replace with meta preview. */
+function connectedDataIsEmptyOrMetaPreviewOnly(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return true;
+  return rows.every(rowLooksLikeMetaPreviewRow);
+}
+
 /**
  * Becker / DuckDB-backed historical data: bounded Athena `SELECT <columns>` → JSON → DuckDB view → sheet.
  * Polymarket: markets, blocks, trades. Kalshi: markets, trades (no blocks in Glue).
@@ -424,7 +443,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const { sampleOptions, lake } = useMemo(() => getDataLakeDatasetConfig(dataset), [dataset]);
 
   const canUseSamples = true;
-  const [sampleId, setSampleId] = useState(sampleOptions[0]?.id || "");
+  const [sampleId, setSampleId] = useState("");
   /** @type {Array<{ id: string; column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: null | string; dateFormat: null | string; numberScale: string; decimals: null | number; treatAsDate: boolean }>} */
   const [columnComposeItems, setColumnComposeItems] = useState([]);
   /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
@@ -438,11 +457,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [nullishColumnList, setNullishColumnList] = useState([]);
   const nullishPendingRowsRef = useRef(null);
   const postNullishContinueRef = useRef(null);
-  const [mathPanelOpen, setMathPanelOpen] = useState(false);
-  const [mathOp, setMathOp] = useState("add");
-  const [mathColA, setMathColA] = useState("");
-  const [mathColB, setMathColB] = useState("");
-  const [mathOutCol, setMathOutCol] = useState("result");
   const [metaQueryMode, setMetaQueryMode] = useState("all"); // "all" | "filter"
   const [metaOperationKind, setMetaOperationKind] = useState("count"); // "count" | "count_distinct" | "sum"
   const [metaOperationColumn, setMetaOperationColumn] = useState(""); // for SUM
@@ -474,8 +488,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const pendingIngestRef = useRef(null);
 
   useEffect(() => {
-    const first = sampleOptions[0]?.id || "";
-    setSampleId((prev) => (sampleOptions.some((s) => s.id === prev) ? prev : first));
+    setSampleId((prev) => (prev && sampleOptions.some((s) => s.id === prev) ? prev : ""));
   }, [dataset, sampleOptions]);
 
   const selected = sampleOptions.find((s) => s.id === sampleId);
@@ -1115,118 +1128,52 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     if (fn && rows != null) fn(rows);
   }, []);
 
+  /** True when the active sheet only shows meta-operation placeholders (not "real" loaded data). */
+  const connectedDataIsMetaPreviewOnly = useMemo(() => {
+    if (selectionTab !== "meta") return false;
+    if (!connectedData.length) return false;
+    return connectedData.every((row) => {
+      if (!row || typeof row !== "object") return false;
+      const keys = Object.keys(row);
+      if (keys.length === 0) return false;
+      return (
+        keys.includes("Operation name") ||
+        keys.includes("Op ref") ||
+        keys.includes("meta query") ||
+        keys.includes("value")
+      );
+    });
+  }, [selectionTab, connectedData]);
+
+  const promptReplaceOrNewSheetIfNeeded = useCallback(() => {
+    if (connectedData.length > 0 && !connectedDataIsMetaPreviewOnly) {
+      setSheetDialogOpen(true);
+      return true;
+    }
+    return false;
+  }, [connectedData, connectedDataIsMetaPreviewOnly]);
+
   const runRecipeKalshiMarketsCategoryVolume = useCallback(() => {
     if (dataset !== "kalshi" || selected?.table !== "markets" || !selected?.id) return;
-    const snap = [
-      { column: "kalshi_event_ticker_category", alias: "category", aggregate: null },
-      { column: "volume", alias: "total_volume", aggregate: "sum" },
-      { column: "ticker", alias: "market_count", aggregate: "count" },
-    ];
-    pendingIngestRef.current = {
-      mode: "columns",
-      lake,
-      table: "markets",
-      sampleId: selected.id,
-      composeSpec: { ...KALSHI_MARKETS_CATEGORY_VOLUME_COMPOSE_SPEC },
-      kalshiIngestExtras: { taxonomyRollup: kalshiTaxonomyRollup, composeItemsSnapshot: snap },
-      metaQueryMode,
-      metaFilters: { and: metaAndFilters, or: metaOrFilters },
-      metaOpSpecs: undefined,
-      metaAppendTargetIndex: undefined,
-    };
+    setError(null);
     flushSync(() => {
       applyKalshiCategoryVolumePreset();
-      setSelectionTab("columns");
+      setSelectionTab("recipes");
     });
-    if (!promptReplaceOrNewSheetIfNeeded()) {
-      void executeIngestReplace();
-    }
-  }, [
-    applyKalshiCategoryVolumePreset,
-    dataset,
-    executeIngestReplace,
-    kalshiTaxonomyRollup,
-    lake,
-    metaAndFilters,
-    metaOrFilters,
-    metaQueryMode,
-    promptReplaceOrNewSheetIfNeeded,
-    selected?.id,
-    selected?.table,
-  ]);
+  }, [applyKalshiCategoryVolumePreset, dataset, selected?.id, selected?.table]);
 
   const runRecipeKalshiTradesVolumeByBucket = useCallback(
     (joinPreset) => {
       if (dataset !== "kalshi" || selected?.table !== "trades" || !selected?.id) return;
       if (!KALSHI_TRADES_JOIN_PRESETS.has(joinPreset)) return;
-      pendingIngestRef.current = {
-        mode: "columns",
-        lake,
-        table: "trades",
-        sampleId: selected.id,
-        composeSpec: buildKalshiTradesBucketComposeSpec(joinPreset),
-        kalshiIngestExtras: null,
-        metaQueryMode,
-        metaFilters: { and: metaAndFilters, or: metaOrFilters },
-        metaOpSpecs: undefined,
-        metaAppendTargetIndex: undefined,
-      };
+      setError(null);
       flushSync(() => {
         applyKalshiTradesBucketComposeUI(joinPreset);
-        setSelectionTab("columns");
+        setSelectionTab("recipes");
       });
-      if (!promptReplaceOrNewSheetIfNeeded()) {
-        void executeIngestReplace();
-      }
     },
-    [
-      applyKalshiTradesBucketComposeUI,
-      dataset,
-      executeIngestReplace,
-      lake,
-      metaAndFilters,
-      metaOrFilters,
-      metaQueryMode,
-      promptReplaceOrNewSheetIfNeeded,
-      selected?.id,
-      selected?.table,
-    ],
+    [applyKalshiTradesBucketComposeUI, dataset, selected?.id, selected?.table],
   );
-
-  const sheetColumnNamesForMath = useMemo(() => {
-    const row = Array.isArray(connectedData) && connectedData.length ? connectedData[0] : null;
-    if (!row || typeof row !== "object") return [];
-    return Object.keys(row).sort();
-  }, [connectedData]);
-
-  const applySheetMathOperation = useCallback(() => {
-    const rows = Array.isArray(connectedData) ? [...connectedData] : [];
-    if (!rows.length) {
-      setError("Load sheet data before running a column calculation.");
-      return;
-    }
-    const a = String(mathColA || "").trim();
-    const b = String(mathColB || "").trim();
-    const out = String(mathOutCol || "").trim();
-    if (!a || !b || !out) {
-      setError("Choose two columns and an output column name.");
-      return;
-    }
-    const next = rows.map((row) => {
-      if (!row || typeof row !== "object") return row;
-      const x = Number(row[a]);
-      const y = Number(row[b]);
-      let v = NaN;
-      if (mathOp === "add") v = x + y;
-      else if (mathOp === "subtract") v = x - y;
-      else if (mathOp === "multiply") v = x * y;
-      else if (mathOp === "divide") v = y === 0 ? NaN : x / y;
-      return { ...row, [out]: Number.isFinite(v) ? v : null };
-    });
-    replaceCurrentSheetData?.(next);
-    setConnectedData?.(next);
-    setError(null);
-  }, [connectedData, mathColA, mathColB, mathOp, mathOutCol, replaceCurrentSheetData, setConnectedData]);
 
   const hasIncompleteMetaFilters = useMemo(() => {
     const all = [...metaAndFilters, ...metaOrFilters];
@@ -1466,40 +1413,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   // Push placeholder rows while composing meta ops. Do not depend on `loading` — when a run
   // finishes, `loading` flipping false would re-apply preview and wipe real counts.
+  // Do not replace lake / compose query results when switching from Columns or Recipes — only
+  // overwrite when the sheet is empty or already showing meta placeholders.
   useEffect(() => {
     if (selectionTab !== "meta") return;
+    if (!connectedDataIsEmptyOrMetaPreviewOnly(connectedData)) return;
     if (areMetaRowsEqual(metaPreviewRows, connectedData)) return;
     applyRowsToActiveSheet(metaPreviewRows);
   }, [selectionTab, metaPreviewRows, connectedData, applyRowsToActiveSheet]);
-
-  /** True when the active sheet only shows meta-operation placeholders (not “real” loaded data). */
-  const connectedDataIsMetaPreviewOnly = useMemo(() => {
-    if (selectionTab !== "meta") return false;
-    if (!connectedData.length) return false;
-    return connectedData.every((row) => {
-      if (!row || typeof row !== "object") return false;
-      const keys = Object.keys(row);
-      if (keys.length === 0) return false;
-      return (
-        keys.includes("Operation name") ||
-        keys.includes("Op ref") ||
-        keys.includes("meta query") ||
-        keys.includes("value")
-      );
-    });
-  }, [selectionTab, connectedData]);
-
-  /**
-   * `pendingIngestRef` must already be set. Opens replace/new-sheet dialog when the sheet has real data.
-   * @returns {boolean} true if the dialog was shown (caller must not run ingest yet).
-   */
-  const promptReplaceOrNewSheetIfNeeded = useCallback(() => {
-    if (connectedData.length > 0 && !connectedDataIsMetaPreviewOnly) {
-      setSheetDialogOpen(true);
-      return true;
-    }
-    return false;
-  }, [connectedData, connectedDataIsMetaPreviewOnly]);
 
   const handleLoad = () => {
     setError(null);
@@ -1508,11 +1429,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       setError("Choose a table below.");
       return;
     }
-    if (selectionTab === "recipes") {
-      setError("Open the Columns or Meta tab to run a query. Recipes only fill in the compose fields (or run the one-click load on that tab).");
-      return;
-    }
-    if (selectionTab === "columns") {
+    const isComposeTab = selectionTab === "columns" || selectionTab === "recipes";
+    if (isComposeTab) {
       if (columnComposeItems.length === 0) {
         setError("Add at least one column to SELECT.");
         return;
@@ -1568,14 +1486,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       allMetaSpecs.length > 0 &&
       templateRowCount <= 1;
 
+    const effectiveIngestMode = selectionTab === "meta" ? "meta" : "columns";
     pendingIngestRef.current = {
-      mode: selectionTab,
+      mode: effectiveIngestMode,
       lake,
       table: selected.table,
       sampleId: selected.id,
-      composeSpec: selectionTab === "columns" ? buildServerComposePayload() : undefined,
+      composeSpec: isComposeTab ? buildServerComposePayload() : undefined,
       kalshiIngestExtras:
-        selectionTab === "columns" && dataset === "kalshi" && selected.table === "markets"
+        isComposeTab && dataset === "kalshi" && selected.table === "markets"
           ? {
               taxonomyRollup: kalshiTaxonomyRollup,
               composeItemsSnapshot: columnComposeItems.map((i) => ({
@@ -1633,10 +1552,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const runRequestReasons = useMemo(() => {
     const reasons = [];
     if (!selected?.table) reasons.push("Choose a table below.");
-    if (selectionTab === "recipes") {
-      reasons.push("Switch to Columns or Meta to run (Recipes are shortcuts only).");
-    }
-    if (selectionTab === "columns" && columnComposeItems.length === 0) {
+    if ((selectionTab === "columns" || selectionTab === "recipes") && columnComposeItems.length === 0) {
       reasons.push("Add at least one column to SELECT.");
     }
     if (selectionTab === "meta") {
@@ -1732,18 +1648,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     [columnComposeItems],
   );
 
-  const moveComposeItem = useCallback((id, dir) => {
-    setColumnComposeItems((prev) => {
-      const i = prev.findIndex((r) => r.id === id);
-      if (i < 0) return prev;
-      const j = dir === "up" ? i - 1 : i + 1;
-      if (j < 0 || j >= prev.length) return prev;
-      const next = [...prev];
-      [next[i], next[j]] = [next[j], next[i]];
-      return next;
-    });
-  }, []);
-
   const addComposeOrderByClause = useCallback(() => {
     const first = composeSelectAliasChoices[0];
     if (!first) return;
@@ -1814,92 +1718,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     [metaAndFilters, metaOrFilters],
   );
 
-  return (
-    <div className="rounded-lg border border-dashed border-primary/30 bg-muted/30 p-3 space-y-3 min-w-0 max-w-full overflow-hidden">
-      <ReplaceOrNewSheetDialog
-        open={sheetDialogOpen}
-        onOpenChange={onDialogOpenChange}
-        hasLiveConnection={hasLiveConnection}
-        onReplace={onDialogReplace}
-        onAddNewSheet={onDialogAddNewSheet}
-      />
-
-      <AlertDialog open={nullishAlertOpen} onOpenChange={onNullishAlertOpenChange}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Null or NaN values detected</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm">
-                <p>
-                  We detected null or NaN values in the following columns from this pull:{" "}
-                  <span className="font-mono font-medium text-foreground">{nullishColumnList.join(", ")}</span>. Would
-                  you like to remove rows that have a missing value in any of these columns?
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={onNullishDialogKeep}>Keep all rows</AlertDialogCancel>
-            <AlertDialogAction onClick={onNullishDialogRemoveRows}>Remove those rows</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <MetaAddOperationDialog
-        open={metaAddOperationDialogOpen}
-        onOpenChange={setMetaAddOperationDialogOpen}
-        existingOperations={metaPriorOperations.map((o) => ({ id: o.id, label: o.label }))}
-        hasDraftOperation={
-          metaOperationAllSelected ||
-          (metaQueryMode === "filter" && metaAndFilters.length + metaOrFilters.length > 0 && !hasIncompleteMetaFilters)
-        }
-        draftLabel={
-          metaOperationAllSelected
-            ? metaOperationLabel(metaOperationKind, "all", metaOperationColumn)
-            : metaQueryMode === "filter" && metaAndFilters.length + metaOrFilters.length > 0
-              ? metaOperationLabel(metaOperationKind, "filter", metaOperationColumn)
-              : "Current operation"
-        }
-        availableColumns={availableColumns}
-        columnTypeByName={availableColumnTypesByName}
-        isDateLikeName={isDateLikeName}
-        onComplete={handleMetaAddOperationComplete}
-      />
-
-      <div className="space-y-1 min-w-0 max-w-full">
-        <Label className="text-xs">Data Source</Label>
-        <Select value={sampleId} onValueChange={setSampleId} disabled={!canUseSamples || loading}>
-          <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full">
-            <SelectValue placeholder="Choose table" />
-          </SelectTrigger>
-          <SelectContent>
-            {sampleOptions.map((s) => (
-              <SelectItem key={s.id} value={s.id} className="text-xs">
-                {s.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {selected?.table && availableColumns.length > 0 && (
-        <div className="min-w-0 max-w-full">
-          <Tabs value={selectionTab} onValueChange={setSelectionTab} className="w-full">
-            <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
-              <TabsTrigger value="columns" className="h-7 px-2 text-xs">
-                Columns
-              </TabsTrigger>
-              <TabsTrigger value="meta" className="h-7 px-2 text-xs">
-                Meta Table
-              </TabsTrigger>
-              <TabsTrigger value="recipes" className="h-7 px-2 text-xs">
-                Recipes
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="columns" className="space-y-4 min-w-0">
+  const renderColumnsComposeSection = () => (
+    <>
               <div className="space-y-2 min-w-0">
-                <div className="flex place-items-center gap-2">
+                <div className="flex w-full min-w-0 items-center justify-between gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8 text-xs" type="button">
@@ -1907,192 +1729,83 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                         <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="max-h-56 overflow-y-auto" align="start">
-                      <DropdownMenuLabel className="text-xs">Choose a column</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
+                    <DropdownMenuContent className="max-h-96 overflow-y-auto" align="start">
                       <DropdownMenuItem className="text-xs font-medium" onSelect={resetComposeToAllColumns}>
-                        Add all
+                        * all
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      {availableColumns.filter((c) => !columnComposeItems.some((i) => i.column === c)).length === 0 ? (
-                        <DropdownMenuItem disabled className="text-xs">
-                          Every column is already in the list
-                        </DropdownMenuItem>
-                      ) : (
-                        availableColumns
-                          .filter((c) => !columnComposeItems.some((i) => i.column === c))
-                          .map((col) => (
-                            <DropdownMenuItem key={col} className="text-xs" onSelect={() => addComposeColumn(col)}>
-                              {composeSourceColumnLabel(col)}
+                      {(() => {
+                        const pending = availableColumns.filter(
+                          (c) => !columnComposeItems.some((i) => i.column === c),
+                        );
+                        if (pending.length === 0) {
+                          return (
+                            <DropdownMenuItem disabled className="text-xs">
+                              Every column is already in the list
                             </DropdownMenuItem>
-                          ))
-                      )}
+                          );
+                        }
+                        const composeCols = Object.keys(KALSHI_VIRTUAL_COMPOSE_LABELS).filter((c) =>
+                          pending.includes(c),
+                        );
+                        const restCols = pending.filter(
+                          (c) => !Object.prototype.hasOwnProperty.call(KALSHI_VIRTUAL_COMPOSE_LABELS, c),
+                        );
+                        return (
+                          <>
+                            {composeCols.length > 0 ? (
+                              <>
+                                <DropdownMenuLabel className="text-[10px] font-thin">Lychee Custom</DropdownMenuLabel>
+                                {composeCols.map((col) => (
+                                  <DropdownMenuItem key={col} className="text-xs" onSelect={() => addComposeColumn(col)}>
+                                    {composeSourceColumnLabel(col)}
+                                  </DropdownMenuItem>
+                                ))}
+                              </>
+                            ) : null}
+                            {composeCols.length > 0 && restCols.length > 0 ? <DropdownMenuSeparator /> : null}
+                            {restCols.map((col) => (
+                              <DropdownMenuItem key={col} className="text-xs" onSelect={() => addComposeColumn(col)}>
+                                {composeSourceColumnLabel(col)}
+                              </DropdownMenuItem>
+                            ))}
+                          </>
+                        );
+                      })()}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <TooltipProvider delayDuration={0}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="group h-4 w-4 rounded-full bg-red-300/35 text-red-900/70 hover:bg-red-400/80 focus-visible:ring-1 focus-visible:ring-red-300"
-                          type="button"
-                          aria-label="clear all selections"
-                          onClick={() => {
-                            setColumnComposeItems([]);
-                            setColumnComposeOrderBy([]);
-                          }}
-                        >
-                          <X className="h-2.5 w-2.5 opacity-0 transition-opacity group-hover:opacity-80 group-focus-visible:opacity-80" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        clear all selections
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-
-                {dataset === "kalshi" && selected?.table === "markets" && (
-                  <div className="rounded-md border border-border/70 bg-muted/25 p-2.5 min-w-0">
-                    <p className="text-[11px] text-muted-foreground">
-                      Volume-by-category recipe lives on the <strong>Recipes</strong> tab. Optional taxonomy roll-up is
-                      configured there before you run.
-                    </p>
-                  </div>
-                )}
-
-                {dataset === "kalshi" && selected?.table === "trades" && (
-                  <div className="rounded-md border border-border/70 bg-muted/25 p-2.5 space-y-2 min-w-0">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-medium">Compose data source</Label>
-                      <Select
-                        value={kalshiTradesJoinPreset || "none"}
-                        onValueChange={(v) => setKalshiTradesJoinPreset(v === "none" ? "" : v)}
-                      >
-                        <SelectTrigger className="h-9 text-xs">
-                          <SelectValue placeholder="Choose source" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Trades table only (raw Glue columns)</SelectItem>
-                          <SelectItem value={KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET}>
-                            Trades ⟕ resolved markets + equal-width decile buckets (10 bins on price range)
-                          </SelectItem>
-                          <SelectItem value={KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT}>
-                            Trades ⟕ resolved markets + fixed ¢ buckets (1–10c … 91–99c)
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[11px] text-muted-foreground leading-snug">
-                        Join keeps only trades on markets with <span className="font-mono">status = finalized</span> and{" "}
-                        <span className="font-mono">result</span> in yes/no. Price is the taker-side quote in cents. Use{" "}
-                        <strong>Recipes</strong> for a one-click “volume by bucket” pull. Non-SQL steps (e.g. statistical
-                        tests) can be done in the sheet — see <strong>Mathematics</strong> below.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <CollapsibleRoot open={mathPanelOpen} onOpenChange={setMathPanelOpen} className="rounded-md border border-border/60 bg-background/80">
-                  <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium hover:bg-muted/40 rounded-md">
-                    <TooltipProvider delayDuration={200}>
+                  {columnComposeItems.length > 0 ? (
+                    <TooltipProvider delayDuration={0}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground">
-                            <Sigma className="h-4 w-4" aria-hidden />
-                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="group h-3 w-3 shrink-0 rounded-full bg-red-300/35 text-red-900/70 hover:bg-red-400/80 focus-visible:ring-1 focus-visible:ring-red-300"
+                            type="button"
+                            aria-label="clear all selections"
+                            onClick={() => {
+                              setColumnComposeItems([]);
+                              setColumnComposeOrderBy([]);
+                            }}
+                          >
+                          </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="right" className="text-xs">
-                          Mathematics
+                        <TooltipContent side="top" className="text-xs">
+                          clear all selections
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <span>Mathematics (sheet columns)</span>
-                    <ChevronDown className={`ml-auto h-4 w-4 shrink-0 transition-transform ${mathPanelOpen ? "rotate-180" : ""}`} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="px-3 pb-3 pt-0 space-y-3 border-t border-border/50">
-                    <p className="text-[11px] text-muted-foreground pt-2">
-                      Row-wise math on the <strong>current sheet</strong> (like typing a formula in Excel). Choose two
-                      numeric columns and an output column name. For operations across <em>different sheets</em> or
-                      advanced stats, copy columns into one sheet first or use chart tools.
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <Label className="text-[11px]">Operation</Label>
-                        <Select value={mathOp} onValueChange={setMathOp}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="add">Add (A + B)</SelectItem>
-                            <SelectItem value="subtract">Subtract (A − B)</SelectItem>
-                            <SelectItem value="multiply">Multiply (A × B)</SelectItem>
-                            <SelectItem value="divide">Divide (A ÷ B)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[11px]">Output column name</Label>
-                        <Input
-                          className="h-8 text-xs"
-                          value={mathOutCol}
-                          onChange={(e) => setMathOutCol(e.target.value)}
-                          spellCheck={false}
-                          placeholder="result"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[11px]">Column A</Label>
-                        <Select value={mathColA || "__"} onValueChange={(v) => setMathColA(v === "__" ? "" : v)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Select column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__">—</SelectItem>
-                            {sheetColumnNamesForMath.map((c) => (
-                              <SelectItem key={c} value={c} className="font-mono text-xs">
-                                {c}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[11px]">Column B</Label>
-                        <Select value={mathColB || "__"} onValueChange={(v) => setMathColB(v === "__" ? "" : v)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Select column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__">—</SelectItem>
-                            {sheetColumnNamesForMath.map((c) => (
-                              <SelectItem key={`b-${c}`} value={c} className="font-mono text-xs">
-                                {c}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button type="button" size="sm" className="h-8 text-xs" onClick={applySheetMathOperation}>
-                      Apply to sheet
-                    </Button>
-                  </CollapsibleContent>
-                </CollapsibleRoot>
+                  ) : null}
+                </div>
 
                 {columnComposeItems.length !== 0 && (
                   <div className="space-y-3">
-                    {columnComposeItems.map((item, idx) => {
+                    {columnComposeItems.map((item) => {
                       const k = kindForColumn(item.column);
                       const isDateCol = k === "date";
                       const isNumericCol = k === "number";
                       const canNumberFormat = isNumericCol && item.aggregate !== "count";
-                      const clearFormatPatch = {
-                        dateBucket: null,
-                        dateFormat: null,
-                        numberScale: "none",
-                        decimals: null,
-                      };
                       const rollVal = composeRollUpSelectValue(item);
                       const dateShapeVal = composeDateShapeSelectValue(item);
                       const scaleVal = item.numberScale || "none";
@@ -2104,7 +1817,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Source column</p>
                               <p className="font-mono text-sm font-semibold truncate" title={item.column}>
                                 {composeSourceColumnLabel(item.column)}
                               </p>
@@ -2123,7 +1835,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-1 min-w-0">
-                              <Label className="text-xs">Header name in sheet</Label>
+                              <Label className="text-xs">Col Name</Label>
                               <Input
                                 className="h-8 text-xs"
                                 value={item.alias}
@@ -2273,38 +1985,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               </div>
                             </div>
                           ) : null}
-
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 border-t border-border/50">
-                            <Button
-                              type="button"
-                              variant="link"
-                              size="sm"
-                              className="h-auto p-0 text-xs"
-                              disabled={idx === 0}
-                              onClick={() => moveComposeItem(item.id, "up")}
-                            >
-                              Move up
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="link"
-                              size="sm"
-                              className="h-auto p-0 text-xs"
-                              disabled={idx === columnComposeItems.length - 1}
-                              onClick={() => moveComposeItem(item.id, "down")}
-                            >
-                              Move down
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="link"
-                              size="sm"
-                              className="h-auto p-0 text-xs text-muted-foreground"
-                              onClick={() => updateComposeItem(item.id, clearFormatPatch)}
-                            >
-                              Reset formatting
-                            </Button>
-                          </div>
                         </div>
                       );
                     })}
@@ -2342,10 +2022,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
               <div className="space-y-2 min-w-0">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">Sort rows</h3>
-                    <p className="text-xs text-muted-foreground">Optional. Order the result by a column header.</p>
-                  </div>
                   <Button
                     type="button"
                     variant="outline"
@@ -2358,9 +2034,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     Add sort rule
                   </Button>
                 </div>
-                {columnComposeOrderBy.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No sorting — Athena’s default order for all matching rows.</p>
-                ) : (
+                {columnComposeOrderBy.length !== 0 && (
                   <div className="space-y-2">
                     {columnComposeOrderBy.map((ob, obIdx) => (
                       <div
@@ -2423,6 +2097,93 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   </div>
                 )}
               </div>
+    </>
+  );
+
+  return (
+    <div className="space-y-3 min-w-0 max-w-full overflow-hidden">
+      <ReplaceOrNewSheetDialog
+        open={sheetDialogOpen}
+        onOpenChange={onDialogOpenChange}
+        hasLiveConnection={hasLiveConnection}
+        onReplace={onDialogReplace}
+        onAddNewSheet={onDialogAddNewSheet}
+      />
+
+      <AlertDialog open={nullishAlertOpen} onOpenChange={onNullishAlertOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Null or NaN values detected</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  We detected null or NaN values in the following columns from this pull:{" "}
+                  <span className="font-mono font-medium text-foreground">{nullishColumnList.join(", ")}</span>. Would
+                  you like to remove rows that have a missing value in any of these columns?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={onNullishDialogKeep}>Keep all rows</AlertDialogCancel>
+            <AlertDialogAction onClick={onNullishDialogRemoveRows}>Remove those rows</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <MetaAddOperationDialog
+        open={metaAddOperationDialogOpen}
+        onOpenChange={setMetaAddOperationDialogOpen}
+        existingOperations={metaPriorOperations.map((o) => ({ id: o.id, label: o.label }))}
+        hasDraftOperation={
+          metaOperationAllSelected ||
+          (metaQueryMode === "filter" && metaAndFilters.length + metaOrFilters.length > 0 && !hasIncompleteMetaFilters)
+        }
+        draftLabel={
+          metaOperationAllSelected
+            ? metaOperationLabel(metaOperationKind, "all", metaOperationColumn)
+            : metaQueryMode === "filter" && metaAndFilters.length + metaOrFilters.length > 0
+              ? metaOperationLabel(metaOperationKind, "filter", metaOperationColumn)
+              : "Current operation"
+        }
+        availableColumns={availableColumns}
+        columnTypeByName={availableColumnTypesByName}
+        isDateLikeName={isDateLikeName}
+        onComplete={handleMetaAddOperationComplete}
+      />
+
+      <div className="px-2 pb-2  space-y-1 min-w-0 max-w-full border-b border-gray-100 dark:border-gray-800">
+        <Select value={sampleId || undefined} onValueChange={setSampleId} disabled={!canUseSamples || loading}>
+          <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full">
+            <SelectValue placeholder="Select Data Source" />
+          </SelectTrigger>
+          <SelectContent>
+            {sampleOptions.map((s) => (
+              <SelectItem key={s.id} value={s.id} className="text-xs">
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {selected?.table && availableColumns.length > 0 && (
+        <div className="min-w-0 max-w-full px-2">
+          <Tabs value={selectionTab} onValueChange={setSelectionTab} className="w-full">
+            <TabsList className=" w-fit flex-wrap p-0.5 mb-2 h-auto bg-slate-100 dark:bg-slate-800">
+              <TabsTrigger value="columns" className="h-7 px-2 text-xs">
+                Columns
+              </TabsTrigger>
+              <TabsTrigger value="meta" className="h-7 px-2 text-xs">
+                Meta Table
+              </TabsTrigger>
+              <TabsTrigger value="recipes" className="h-7 px-2 text-xs">
+                Recipes
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="columns" className="space-y-4 min-w-0">
+              {renderColumnsComposeSection()}
             </TabsContent>
 
             <TabsContent value="meta" className="space-y-2">
@@ -3111,20 +2872,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             </TabsContent>
 
             <TabsContent value="recipes" className="space-y-4 min-w-0">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                One-click loads run the same Athena compose as the Columns tab, then apply the sheet to your data view.
-                If the replace/new-sheet dialog appears, choose how to merge. You can also open <strong>Columns</strong>{" "}
-                after a recipe to tweak fields before running again.
-              </p>
-              <div className="rounded-md border border-border/70 bg-muted/20 p-3 space-y-3 text-xs">
-                <p className="font-medium text-foreground">Steps: volume by fixed ¢ price bucket (Kalshi trades)</p>
-                <ol className="list-decimal pl-4 space-y-1 text-muted-foreground">
-                  <li>Data Source → Kalshi → table <span className="font-mono">trades</span>.</li>
-                  <li>Open <strong>Recipes</strong> → &quot;Contract volume by ¢ bucket (resolved markets)&quot;.</li>
-                  <li>Confirm replace if prompted. Sheet columns: <span className="font-mono">price_bucket</span> (X for
-                    bar chart), <span className="font-mono">volume_contracts</span> (Y = sum of contracts per bucket).</li>
-                </ol>
-              </div>
               {dataset === "kalshi" && selected?.table === "markets" && (
                 <div className="rounded-md border border-border/70 bg-muted/25 p-3 space-y-3 min-w-0">
                   <p className="text-xs font-medium">Kalshi · markets</p>
@@ -3135,8 +2882,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       onCheckedChange={(v) => setKalshiTaxonomyRollup(v === true)}
                     />
                     <span>
-                      After Athena returns, roll up into taxonomy groups (Sports, Politics, Crypto, …) — matches{" "}
-                      <span className="font-mono">get_group</span> + pandas groupby.
+                      Roll up into taxonomy categories (Sports, Politics, Crypto, …) — matches{" "}
                     </span>
                   </label>
                   <Button
@@ -3146,7 +2892,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     className="h-8 text-xs w-full sm:w-auto"
                     onClick={runRecipeKalshiMarketsCategoryVolume}
                   >
-                    Load: volume + market count by event prefix
+                    Volume by category
                   </Button>
                 </div>
               )}
@@ -3160,7 +2906,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     className="h-8 text-xs w-full sm:w-auto block"
                     onClick={() => runRecipeKalshiTradesVolumeByBucket(KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT)}
                   >
-                    Load: contract volume by ¢ bucket (1–10c … 91–99c, resolved markets)
+                    Contract volume by price bucket
                   </Button>
                   <Button
                     type="button"
@@ -3169,7 +2915,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     className="h-8 text-xs w-full sm:w-auto block"
                     onClick={() => runRecipeKalshiTradesVolumeByBucket(KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET)}
                   >
-                    Load: contract volume by equal-width decile buckets (resolved markets)
+                    Contract volume by equal-width decile buckets
                   </Button>
                 </div>
               )}
@@ -3179,15 +2925,21 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   above for available recipes.
                 </p>
               )}
+              <div className="border-t border-border/60 pt-4 space-y-4 min-w-0">
+                <p className="text-xs font-medium text-foreground">Compose (same as Columns tab)</p>
+                {renderColumnsComposeSection()}
+              </div>
             </TabsContent>
           </Tabs>
         </div>
       )}
 
       {loading ? (
-        <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="pt-0.5" />
+        <div className="px-2">
+          <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="pt-0.5" />
+        </div>
       ) : (
-        <div className="flex gap-2 items-end flex-wrap min-w-0 max-w-full">
+        <div className="flex gap-2 items-end flex-wrap min-w-0 max-w-full px-2">
           <div className="flex gap-2 items-center">
             <Button
               type="button"
@@ -3228,14 +2980,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       )}
 
       {error && (
-        <p className="text-destructive text-[10px] flex gap-1.5 items-start min-w-0 max-w-full">
+        <p className="text-destructive text-[10px] flex gap-1.5 items-start min-w-0 max-w-full px-2">
           <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <span className="min-w-0 break-words">{error}</span>
         </p>
       )}
 
       {lastRowCount != null && !error && (
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[10px] text-muted-foreground px-2">
           Loaded <strong>{lastRowCount}</strong> rows into the sheet.
         </p>
       )}

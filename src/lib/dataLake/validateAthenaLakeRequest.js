@@ -17,7 +17,11 @@ const KALSHI_TRADES_JOIN_PRESETS = new Set([
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
 ]);
-import { buildComposeAthenaSelectSql } from "./buildComposeAthenaSql";
+import {
+  buildComposeAthenaSelectSql,
+  composeUnboundedSelectShouldCapRows,
+  COMPOSE_UNCONSTRAINED_ROW_CAP,
+} from "./buildComposeAthenaSql";
 
 export class AthenaLakeRequestError extends Error {
   /**
@@ -411,9 +415,10 @@ export function validateAthenaLakeQueryBody(body) {
     };
 
     try {
+      const capRows = composeUnboundedSelectShouldCapRows(validatedCompose) ? COMPOSE_UNCONSTRAINED_ROW_CAP : null;
       buildComposeAthenaSelectSql({
         physicalTableName: physical,
-        limit: null,
+        limit: capRows,
         compose: validatedCompose,
         lake,
       });

@@ -4,7 +4,11 @@
  */
 import AWS from "aws-sdk";
 import { isValidColumnIdentifier } from "./athenaTableMap";
-import { buildComposeAthenaSelectSql } from "./buildComposeAthenaSql";
+import {
+  buildComposeAthenaSelectSql,
+  composeUnboundedSelectShouldCapRows,
+  COMPOSE_UNCONSTRAINED_ROW_CAP,
+} from "./buildComposeAthenaSql";
 import { sortRowsChronologicallyByDetectedBucketColumn } from "./sortAthenaDateBuckets";
 
 function getRegion() {
@@ -47,7 +51,7 @@ function assertAthenaConfig() {
  * @param {{ and: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }>; or: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }> } | null | undefined} [opts.filters]
  * @param {boolean} [opts.caseSensitive]
  * @param {number} opts.limit
- * @returns {Promise<{ queryExecutionId: string; sql: string; rowLimit: number }>}
+ * @returns {Promise<{ queryExecutionId: string; sql: string; rowLimit: number | null }>}
  */
 export async function startAthenaBoundedQuery({
   physicalTableName,
@@ -139,9 +143,10 @@ export async function startAthenaBoundedQuery({
       err.code = "BAD_REQUEST";
       throw err;
     }
+    const capRows = composeUnboundedSelectShouldCapRows(compose) ? COMPOSE_UNCONSTRAINED_ROW_CAP : null;
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
-      limit: null,
+      limit: capRows,
       compose,
       lake,
     });
@@ -154,7 +159,7 @@ export async function startAthenaBoundedQuery({
         QueryExecutionContext: { Catalog: catalog, Database: db },
       })
       .promise();
-    return { queryExecutionId: QueryExecutionId, sql, rowLimit: null };
+    return { queryExecutionId: QueryExecutionId, sql, rowLimit: capRows };
   }
 
   const escapeSqlString = (s) => String(s).replace(/'/g, "''");

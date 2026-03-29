@@ -17,6 +17,22 @@ export const KALSHI_EVENT_TICKER_CATEGORY_SQL = `(CASE WHEN "event_ticker" IS NU
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
 
+/** Max rows for compose queries that are a plain SELECT over a table (no SUM/COUNT, no join preset) — avoids huge result pulls. */
+export const COMPOSE_UNCONSTRAINED_ROW_CAP = 100;
+
+/**
+ * True when compose has no SQL-level row collapsing (aggregates) and no join subquery.
+ * Such queries have no WHERE in `buildComposeAthenaSelectSql` and can return one row per table row.
+ */
+export function composeUnboundedSelectShouldCapRows(compose) {
+  if (!compose || typeof compose !== "object") return false;
+  const joinPreset = compose.join && typeof compose.join === "object" ? String(compose.join.preset || "").trim() : "";
+  if (joinPreset) return false;
+  const rows = Array.isArray(compose.select) ? compose.select : [];
+  const hasAgg = rows.some((r) => r.aggregate === "sum" || r.aggregate === "count");
+  return !hasAgg;
+}
+
 /**
  * Kalshi: trades restricted to finalized yes/no markets; trade price in cents from taker side;
  * equal-width buckets over [min(price), max(price)] (10 bins, same idea as pandas cut(..., bins=10)).

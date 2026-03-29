@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from "react";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 
@@ -48,8 +48,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { SummarizeDrawer } from '@/components/summarizationView'
-import { ArrowDownFromLine, ArrowUpFromLine, TrafficCone, Filter, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Calendar, X, Download, BarChart2 } from 'lucide-react';
+import { SummarizeDrawer } from "@/components/summarizationView";
+import {
+  ArrowDownFromLine,
+  ArrowUpFromLine,
+  TrafficCone,
+  Filter,
+  RotateCcw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Calendar,
+  X,
+  Download,
+  BarChart2,
+  Sigma,
+} from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import * as XLSX from 'xlsx';
 
 
@@ -105,12 +120,18 @@ const GridView = ({startNew}) => {
     let setConnectedCols = contextStateV2?.setConnectedCols || []
     let connectedData = contextStateV2?.connectedData || []
     let setConnectedData = contextStateV2?.setConnectedData || []
+    const replaceCurrentSheetData = contextStateV2?.replaceCurrentSheetData
     
     const [columnName, setColumnName] = useState('');
     const [colAddOpen, setColAddOpen] = useState()
     const [gridExpanded, setGridExpanded] = useState()
 
     const [summarizeOpen, setSummarizeOpen] = useState(false);
+    const [mathDialogOpen, setMathDialogOpen] = useState(false);
+    const [mathOp, setMathOp] = useState("add");
+    const [mathColA, setMathColA] = useState("");
+    const [mathColB, setMathColB] = useState("");
+    const [mathOutCol, setMathOutCol] = useState("result");
     const [filterState, setFilterState] = useState({
       dateColumn: null,
       dateFrom: '',
@@ -121,6 +142,44 @@ const GridView = ({startNew}) => {
     });
 
     const colKeys = useMemo(() => getColKeys(connectedCols), [connectedCols]);
+
+    const sheetColumnNamesForMath = useMemo(() => {
+      const row = Array.isArray(connectedData) && connectedData.length ? connectedData[0] : null;
+      if (!row || typeof row !== "object") return [];
+      return Object.keys(row)
+        .filter((k) => k !== "_origIndex")
+        .sort();
+    }, [connectedData]);
+
+    const applySheetMathOperation = useCallback(() => {
+      const rows = Array.isArray(connectedData) ? [...connectedData] : [];
+      if (!rows.length) {
+        toast.error("Load sheet data before running a column calculation.");
+        return;
+      }
+      const a = String(mathColA || "").trim();
+      const b = String(mathColB || "").trim();
+      const out = String(mathOutCol || "").trim();
+      if (!a || !b || !out) {
+        toast.error("Choose two columns and an output column name.");
+        return;
+      }
+      const next = rows.map((row) => {
+        if (!row || typeof row !== "object") return row;
+        const x = Number(row[a]);
+        const y = Number(row[b]);
+        let v = NaN;
+        if (mathOp === "add") v = x + y;
+        else if (mathOp === "subtract") v = x - y;
+        else if (mathOp === "multiply") v = x * y;
+        else if (mathOp === "divide") v = y === 0 ? NaN : x / y;
+        return { ...row, [out]: Number.isFinite(v) ? v : null };
+      });
+      replaceCurrentSheetData?.(next);
+      setConnectedData?.(next);
+      toast.success("Applied calculation to sheet.");
+      setMathDialogOpen(false);
+    }, [connectedData, mathColA, mathColB, mathOp, mathOutCol, replaceCurrentSheetData, setConnectedData]);
     const dateColumns = useMemo(() => {
       if (!connectedData.length) return [];
       const first = connectedData[0];
@@ -436,6 +495,102 @@ const GridView = ({startNew}) => {
                   <PlusIcon className="h-3.5 w-3.5" />
                   Add Row
                 </Button>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label="Mathematics Operations"
+                        onClick={() => setMathDialogOpen(true)}
+                      >
+                        <Sigma className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Mathematics Operations
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Dialog open={mathDialogOpen} onOpenChange={setMathDialogOpen}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Mathematics Operations</DialogTitle>
+                      <DialogDescription>
+                        Row-wise math on the current sheet (like an Excel formula). Pick two numeric columns and an
+                        output column name.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3 sm:grid-cols-2 py-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Operation</Label>
+                        <Select value={mathOp} onValueChange={setMathOp}>
+                          <SelectTrigger className="h-9 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="add">Add (A + B)</SelectItem>
+                            <SelectItem value="subtract">Subtract (A − B)</SelectItem>
+                            <SelectItem value="multiply">Multiply (A × B)</SelectItem>
+                            <SelectItem value="divide">Divide (A ÷ B)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Output column name</Label>
+                        <Input
+                          className="h-9 text-xs"
+                          value={mathOutCol}
+                          onChange={(e) => setMathOutCol(e.target.value)}
+                          spellCheck={false}
+                          placeholder="result"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Column A</Label>
+                        <Select value={mathColA || "__"} onValueChange={(v) => setMathColA(v === "__" ? "" : v)}>
+                          <SelectTrigger className="h-9 text-xs">
+                            <SelectValue placeholder="Select column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__">—</SelectItem>
+                            {sheetColumnNamesForMath.map((c) => (
+                              <SelectItem key={c} value={c} className="font-mono text-xs">
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Column B</Label>
+                        <Select value={mathColB || "__"} onValueChange={(v) => setMathColB(v === "__" ? "" : v)}>
+                          <SelectTrigger className="h-9 text-xs">
+                            <SelectValue placeholder="Select column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__">—</SelectItem>
+                            {sheetColumnNamesForMath.map((c) => (
+                              <SelectItem key={`math-b-${c}`} value={c} className="font-mono text-xs">
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button type="button" variant="outline" onClick={() => setMathDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="button" onClick={applySheetMathOperation}>
+                        Apply to sheet
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
               <TabsContent value="sort-filter" className="mt-3">
                 <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-muted/30">
