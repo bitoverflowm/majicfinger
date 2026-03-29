@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,21 +31,149 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
+import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Sigma, Wrench, X } from "lucide-react";
 import { getDataLakeDatasetConfig, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
+import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
 import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { rollupKalshiPrefixRowsByTaxonomyGroup } from "@/lib/kalshi/kalshiCategoryTaxonomy";
+import {
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META,
+} from "@/lib/dataLake/lakeTableColumns";
 
 /** Shown in the column picker / compose cards for server-computed Kalshi fields. */
 const KALSHI_VIRTUAL_COMPOSE_LABELS = {
   kalshi_event_ticker_category: "Event ticker prefix (from event_ticker)",
+  kalshi_resolved_centile_bin: "Price bucket index (1–10, equal-width on trade price ¢)",
+  kalshi_resolved_centile_label: "Price bucket label (centile band, e.g. 1–10 pct)",
+  kalshi_resolved_taker_notional: "Taker notional (count × taker price / 100)",
+  kalshi_resolved_maker_notional: "Maker notional (count × maker side price / 100)",
+  kalshi_resolved_contract_count: "Contract count (trade count)",
 };
+
+const KALSHI_TRADES_JOIN_PRESETS = new Set([
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
+]);
+
+/** Server compose payload: Kalshi markets category + volume (matches applyKalshiCategoryVolumePreset). */
+const KALSHI_MARKETS_CATEGORY_VOLUME_COMPOSE_SPEC = {
+  select: [
+    {
+      column: "kalshi_event_ticker_category",
+      alias: "category",
+      aggregate: null,
+      dateBucket: null,
+      dateFormat: null,
+      numberScale: "none",
+      decimals: null,
+      treatAsDate: false,
+    },
+    {
+      column: "volume",
+      alias: "total_volume",
+      aggregate: "sum",
+      dateBucket: null,
+      dateFormat: null,
+      numberScale: "none",
+      decimals: null,
+      treatAsDate: false,
+    },
+    {
+      column: "ticker",
+      alias: "market_count",
+      aggregate: "count",
+      dateBucket: null,
+      dateFormat: null,
+      numberScale: "none",
+      decimals: null,
+      treatAsDate: false,
+    },
+  ],
+  groupByAliases: ["category"],
+  orderBy: [{ alias: "total_volume", direction: "desc" }],
+};
+
+/**
+ * @param {string} joinPreset
+ * @returns {object}
+ */
+function buildKalshiTradesBucketComposeSpec(joinPreset) {
+  return {
+    select: [
+      {
+        column: "kalshi_resolved_centile_bin",
+        alias: "price_decile",
+        aggregate: null,
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        column: "kalshi_resolved_centile_label",
+        alias: "price_bucket",
+        aggregate: null,
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        column: "kalshi_resolved_taker_notional",
+        alias: "sum_taker_notional",
+        aggregate: "sum",
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        column: "kalshi_resolved_maker_notional",
+        alias: "sum_maker_notional",
+        aggregate: "sum",
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        column: "kalshi_resolved_contract_count",
+        alias: "volume_contracts",
+        aggregate: "sum",
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+    ],
+    groupByAliases: ["price_decile", "price_bucket"],
+    orderBy: [{ alias: "price_decile", direction: "asc" }],
+    join: { preset: joinPreset },
+  };
+}
 
 // Athena/Glue schema metadata for each Becker dataset/table.
 // We store types for later use, but only display column names in the UI.
@@ -302,7 +431,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [columnComposeOrderBy, setColumnComposeOrderBy] = useState([]);
   /** After Athena returns rows grouped by event-ticker prefix, merge into Sports / Politics / … (client-side, matches pandas get_group). */
   const [kalshiTaxonomyRollup, setKalshiTaxonomyRollup] = useState(false);
-  const [selectionTab, setSelectionTab] = useState("columns"); // "columns" | "meta"
+  /** Kalshi trades compose: optional INNER JOIN to finalized yes/no markets (Athena subquery). */
+  const [kalshiTradesJoinPreset, setKalshiTradesJoinPreset] = useState("");
+  const [selectionTab, setSelectionTab] = useState("columns"); // "columns" | "meta" | "recipes"
+  const [nullishAlertOpen, setNullishAlertOpen] = useState(false);
+  const [nullishColumnList, setNullishColumnList] = useState([]);
+  const nullishPendingRowsRef = useRef(null);
+  const postNullishContinueRef = useRef(null);
+  const [mathPanelOpen, setMathPanelOpen] = useState(false);
+  const [mathOp, setMathOp] = useState("add");
+  const [mathColA, setMathColA] = useState("");
+  const [mathColB, setMathColB] = useState("");
+  const [mathOutCol, setMathOutCol] = useState("result");
   const [metaQueryMode, setMetaQueryMode] = useState("all"); // "all" | "filter"
   const [metaOperationKind, setMetaOperationKind] = useState("count"); // "count" | "count_distinct" | "sum"
   const [metaOperationColumn, setMetaOperationColumn] = useState(""); // for SUM
@@ -341,8 +481,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const selected = sampleOptions.find((s) => s.id === sampleId);
   const availableColumnMeta = useMemo(() => {
     if (!selected?.table) return [];
+    if (dataset === "kalshi" && selected.table === "trades" && KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
+      return [...KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META];
+    }
     return getColumnMetaForTable(dataset, selected.table);
-  }, [dataset, selected?.table]);
+  }, [dataset, selected?.table, kalshiTradesJoinPreset]);
   const availableColumns = useMemo(() => availableColumnMeta.map((c) => c.name), [availableColumnMeta]);
   const availableColumnTypesByName = useMemo(() => {
     const map = {};
@@ -401,7 +544,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [columnComposeItems]);
 
   const buildServerComposePayload = useCallback(() => {
-    return {
+    const payload = {
       select: columnComposeItems.map((i) => ({
         column: i.column,
         alias: String(i.alias || i.column).trim(),
@@ -416,7 +559,19 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       groupByAliases: hasComposeAggregates ? composeDimensionAliases : [],
       orderBy: columnComposeOrderBy,
     };
-  }, [columnComposeItems, columnComposeOrderBy, hasComposeAggregates, composeDimensionAliases]);
+    if (dataset === "kalshi" && selected?.table === "trades" && KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
+      payload.join = { preset: kalshiTradesJoinPreset };
+    }
+    return payload;
+  }, [
+    columnComposeItems,
+    columnComposeOrderBy,
+    hasComposeAggregates,
+    composeDimensionAliases,
+    dataset,
+    selected?.table,
+    kalshiTradesJoinPreset,
+  ]);
 
   const composeFriendlySummary = useMemo(() => {
     const tableName = selected?.label || "this table";
@@ -433,6 +588,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       }
       if (it.column === "kalshi_event_ticker_category") {
         return `“${title}” = leading A–Z/0–9 token from event_ticker (Athena regexp_extract)`;
+      }
+      if (String(it.column || "").startsWith("kalshi_resolved_")) {
+        return `“${title}” = ${KALSHI_VIRTUAL_COMPOSE_LABELS[it.column] || it.column} (trades ⟕ resolved markets join)`;
       }
       if (it.dateBucket === "quarter") {
         return `“${title}” = ${it.column} by calendar quarter`;
@@ -490,7 +648,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setMetaRunDisposition("default");
     setMetaOperationsMenuOpen(false);
     setKalshiTaxonomyRollup(false);
+    setKalshiTradesJoinPreset("");
   }, [selected?.table]);
+
+  useEffect(() => {
+    if (KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
+      setColumnComposeItems((items) =>
+        items.filter((i) => KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META.some((c) => c.name === i.column)),
+      );
+      return;
+    }
+    setColumnComposeItems((items) => items.filter((i) => !String(i.column || "").startsWith("kalshi_resolved_")));
+  }, [kalshiTradesJoinPreset]);
 
   const refreshBeckerViews = useCallback(() => {
     setBeckerViews(listBeckerParquetViews());
@@ -503,6 +672,21 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     },
     [replaceCurrentSheetData, setConnectedData],
   );
+
+  const finalizeIngestSheetRows = useCallback((rows, rowCountHint, applyWithCount) => {
+    const { columns: badCols } = scanNullishColumnsInSheetRows(rows);
+    if (!badCols.length) {
+      applyWithCount(rows, rowCountHint ?? rows.length);
+      return;
+    }
+    postNullishContinueRef.current = (finalRows) => {
+      applyWithCount(finalRows, finalRows.length);
+      postNullishContinueRef.current = null;
+    };
+    setNullishColumnList(badCols);
+    nullishPendingRowsRef.current = rows;
+    setNullishAlertOpen(true);
+  }, []);
 
   const applyKalshiCategoryVolumePreset = useCallback(() => {
     setError(null);
@@ -542,6 +726,70 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       },
     ]);
     setColumnComposeOrderBy([{ alias: "total_volume", direction: "desc" }]);
+  }, []);
+
+  /** Fills compose for trades join: bucket dimensions + summed notionals + contract volume (for bar charts). */
+  const applyKalshiTradesBucketComposeUI = useCallback((joinPreset) => {
+    setError(null);
+    setKalshiTradesJoinPreset(joinPreset);
+    setColumnComposeItems([
+      {
+        id: genComposeRowId(),
+        column: "kalshi_resolved_centile_bin",
+        alias: "price_decile",
+        aggregate: null,
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        id: genComposeRowId(),
+        column: "kalshi_resolved_centile_label",
+        alias: "price_bucket",
+        aggregate: null,
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        id: genComposeRowId(),
+        column: "kalshi_resolved_taker_notional",
+        alias: "sum_taker_notional",
+        aggregate: "sum",
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        id: genComposeRowId(),
+        column: "kalshi_resolved_maker_notional",
+        alias: "sum_maker_notional",
+        aggregate: "sum",
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+      {
+        id: genComposeRowId(),
+        column: "kalshi_resolved_contract_count",
+        alias: "volume_contracts",
+        aggregate: "sum",
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+        treatAsDate: false,
+      },
+    ]);
+    setColumnComposeOrderBy([{ alias: "price_decile", direction: "asc" }]);
   }, []);
 
   const runIngestWithProgress = useCallback(
@@ -681,9 +929,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaOpSpecs,
         kalshiIngestExtras,
       );
-      applyRowsToActiveSheet(rows);
-      setLastRowCount(rowCount);
-      refreshBeckerViews();
+      finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
+        applyRowsToActiveSheet(finalRows);
+        setLastRowCount(n);
+        refreshBeckerViews();
+      });
     } catch (e) {
       const msg = e?.message || String(e);
       setError(msg);
@@ -691,7 +941,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       setLoading(false);
       setLoadProgress(0);
     }
-  }, [applyRowsToActiveSheet, refreshBeckerViews, runIngestWithProgress]);
+  }, [applyRowsToActiveSheet, finalizeIngestSheetRows, refreshBeckerViews, runIngestWithProgress]);
 
   const executeIngestAppend = useCallback(async () => {
     const pending = pendingIngestRef.current;
@@ -727,25 +977,26 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaOpSpecs,
         kalshiIngestExtras,
       );
-      if (mode === "meta") {
-        // Replace only the template row that was appended in preview.
-        const patchRow = rows[0];
-        if (patchRow && Number.isInteger(metaAppendTargetIndex)) {
-          setConnectedData?.((prev) => {
-            const list = Array.isArray(prev) ? [...prev] : [];
-            const idx = Math.max(0, Math.min(metaAppendTargetIndex, list.length));
-            if (idx < list.length) list[idx] = patchRow;
-            else list.push(patchRow);
-            return list;
-          });
+      finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
+        if (mode === "meta") {
+          const patchRow = finalRows[0];
+          if (patchRow && Number.isInteger(metaAppendTargetIndex)) {
+            setConnectedData?.((prev) => {
+              const list = Array.isArray(prev) ? [...prev] : [];
+              const idx = Math.max(0, Math.min(metaAppendTargetIndex, list.length));
+              if (idx < list.length) list[idx] = patchRow;
+              else list.push(patchRow);
+              return list;
+            });
+          } else {
+            applyRowsToActiveSheet(finalRows);
+          }
         } else {
-          applyRowsToActiveSheet(rows);
+          setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...finalRows]);
         }
-      } else {
-        setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
-      }
-      setLastRowCount(rowCount);
-      refreshBeckerViews();
+        setLastRowCount(n);
+        refreshBeckerViews();
+      });
     } catch (e) {
       const msg = e?.message || String(e);
       setError(msg);
@@ -753,7 +1004,13 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       setLoading(false);
       setLoadProgress(0);
     }
-  }, [applyRowsToActiveSheet, refreshBeckerViews, runIngestWithProgress, setConnectedData]);
+  }, [
+    applyRowsToActiveSheet,
+    finalizeIngestSheetRows,
+    refreshBeckerViews,
+    runIngestWithProgress,
+    setConnectedData,
+  ]);
 
   const executeIngestNewSheet = useCallback(async () => {
     const pending = pendingIngestRef.current;
@@ -784,26 +1041,27 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         kalshiIngestExtras,
       );
 
-      addNewSheetAndActivate?.((newId) => {
-        setSheetData?.(newId, rows);
-        setDataSheets?.((prev) => {
-          const sheet = prev[newId];
-          if (!sheet) return prev;
-          return {
-            ...prev,
-            [newId]: {
-              ...sheet,
-              name: `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
-                0,
-                80,
-              ),
-            },
-          };
+      finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
+        addNewSheetAndActivate?.((newId) => {
+          setSheetData?.(newId, finalRows);
+          setDataSheets?.((prev) => {
+            const sheet = prev[newId];
+            if (!sheet) return prev;
+            return {
+              ...prev,
+              [newId]: {
+                ...sheet,
+                name: `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
+                  0,
+                  80,
+                ),
+              },
+            };
+          });
         });
+        setLastRowCount(n);
+        refreshBeckerViews();
       });
-
-      setLastRowCount(rowCount);
-      refreshBeckerViews();
     } catch (e) {
       const msg = e?.message || String(e);
       setError(msg);
@@ -814,12 +1072,161 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [
     addNewSheetAndActivate,
     dataset,
+    finalizeIngestSheetRows,
     refreshBeckerViews,
     runIngestWithProgress,
     sampleOptions,
     setDataSheets,
     setSheetData,
   ]);
+
+  const onNullishDialogRemoveRows = useCallback(() => {
+    const rows = nullishPendingRowsRef.current;
+    const cols = nullishColumnList;
+    const fn = postNullishContinueRef.current;
+    postNullishContinueRef.current = null;
+    nullishPendingRowsRef.current = null;
+    setNullishAlertOpen(false);
+    setNullishColumnList([]);
+    if (fn && rows && cols.length) {
+      fn(filterRowsWithoutNullishInColumns(rows, cols));
+    }
+  }, [nullishColumnList]);
+
+  const onNullishDialogKeep = useCallback(() => {
+    const rows = nullishPendingRowsRef.current;
+    const fn = postNullishContinueRef.current;
+    postNullishContinueRef.current = null;
+    nullishPendingRowsRef.current = null;
+    setNullishAlertOpen(false);
+    setNullishColumnList([]);
+    if (fn && rows) fn(rows);
+  }, []);
+
+  const onNullishAlertOpenChange = useCallback((open) => {
+    setNullishAlertOpen(open);
+    if (open) return;
+    if (!postNullishContinueRef.current) return;
+    const fn = postNullishContinueRef.current;
+    const rows = nullishPendingRowsRef.current;
+    postNullishContinueRef.current = null;
+    nullishPendingRowsRef.current = null;
+    setNullishColumnList([]);
+    if (fn && rows != null) fn(rows);
+  }, []);
+
+  const runRecipeKalshiMarketsCategoryVolume = useCallback(() => {
+    if (dataset !== "kalshi" || selected?.table !== "markets" || !selected?.id) return;
+    const snap = [
+      { column: "kalshi_event_ticker_category", alias: "category", aggregate: null },
+      { column: "volume", alias: "total_volume", aggregate: "sum" },
+      { column: "ticker", alias: "market_count", aggregate: "count" },
+    ];
+    pendingIngestRef.current = {
+      mode: "columns",
+      lake,
+      table: "markets",
+      sampleId: selected.id,
+      composeSpec: { ...KALSHI_MARKETS_CATEGORY_VOLUME_COMPOSE_SPEC },
+      kalshiIngestExtras: { taxonomyRollup: kalshiTaxonomyRollup, composeItemsSnapshot: snap },
+      metaQueryMode,
+      metaFilters: { and: metaAndFilters, or: metaOrFilters },
+      metaOpSpecs: undefined,
+      metaAppendTargetIndex: undefined,
+    };
+    flushSync(() => {
+      applyKalshiCategoryVolumePreset();
+      setSelectionTab("columns");
+    });
+    if (!promptReplaceOrNewSheetIfNeeded()) {
+      void executeIngestReplace();
+    }
+  }, [
+    applyKalshiCategoryVolumePreset,
+    dataset,
+    executeIngestReplace,
+    kalshiTaxonomyRollup,
+    lake,
+    metaAndFilters,
+    metaOrFilters,
+    metaQueryMode,
+    promptReplaceOrNewSheetIfNeeded,
+    selected?.id,
+    selected?.table,
+  ]);
+
+  const runRecipeKalshiTradesVolumeByBucket = useCallback(
+    (joinPreset) => {
+      if (dataset !== "kalshi" || selected?.table !== "trades" || !selected?.id) return;
+      if (!KALSHI_TRADES_JOIN_PRESETS.has(joinPreset)) return;
+      pendingIngestRef.current = {
+        mode: "columns",
+        lake,
+        table: "trades",
+        sampleId: selected.id,
+        composeSpec: buildKalshiTradesBucketComposeSpec(joinPreset),
+        kalshiIngestExtras: null,
+        metaQueryMode,
+        metaFilters: { and: metaAndFilters, or: metaOrFilters },
+        metaOpSpecs: undefined,
+        metaAppendTargetIndex: undefined,
+      };
+      flushSync(() => {
+        applyKalshiTradesBucketComposeUI(joinPreset);
+        setSelectionTab("columns");
+      });
+      if (!promptReplaceOrNewSheetIfNeeded()) {
+        void executeIngestReplace();
+      }
+    },
+    [
+      applyKalshiTradesBucketComposeUI,
+      dataset,
+      executeIngestReplace,
+      lake,
+      metaAndFilters,
+      metaOrFilters,
+      metaQueryMode,
+      promptReplaceOrNewSheetIfNeeded,
+      selected?.id,
+      selected?.table,
+    ],
+  );
+
+  const sheetColumnNamesForMath = useMemo(() => {
+    const row = Array.isArray(connectedData) && connectedData.length ? connectedData[0] : null;
+    if (!row || typeof row !== "object") return [];
+    return Object.keys(row).sort();
+  }, [connectedData]);
+
+  const applySheetMathOperation = useCallback(() => {
+    const rows = Array.isArray(connectedData) ? [...connectedData] : [];
+    if (!rows.length) {
+      setError("Load sheet data before running a column calculation.");
+      return;
+    }
+    const a = String(mathColA || "").trim();
+    const b = String(mathColB || "").trim();
+    const out = String(mathOutCol || "").trim();
+    if (!a || !b || !out) {
+      setError("Choose two columns and an output column name.");
+      return;
+    }
+    const next = rows.map((row) => {
+      if (!row || typeof row !== "object") return row;
+      const x = Number(row[a]);
+      const y = Number(row[b]);
+      let v = NaN;
+      if (mathOp === "add") v = x + y;
+      else if (mathOp === "subtract") v = x - y;
+      else if (mathOp === "multiply") v = x * y;
+      else if (mathOp === "divide") v = y === 0 ? NaN : x / y;
+      return { ...row, [out]: Number.isFinite(v) ? v : null };
+    });
+    replaceCurrentSheetData?.(next);
+    setConnectedData?.(next);
+    setError(null);
+  }, [connectedData, mathColA, mathColB, mathOp, mathOutCol, replaceCurrentSheetData, setConnectedData]);
 
   const hasIncompleteMetaFilters = useMemo(() => {
     const all = [...metaAndFilters, ...metaOrFilters];
@@ -1065,11 +1472,44 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     applyRowsToActiveSheet(metaPreviewRows);
   }, [selectionTab, metaPreviewRows, connectedData, applyRowsToActiveSheet]);
 
+  /** True when the active sheet only shows meta-operation placeholders (not “real” loaded data). */
+  const connectedDataIsMetaPreviewOnly = useMemo(() => {
+    if (selectionTab !== "meta") return false;
+    if (!connectedData.length) return false;
+    return connectedData.every((row) => {
+      if (!row || typeof row !== "object") return false;
+      const keys = Object.keys(row);
+      if (keys.length === 0) return false;
+      return (
+        keys.includes("Operation name") ||
+        keys.includes("Op ref") ||
+        keys.includes("meta query") ||
+        keys.includes("value")
+      );
+    });
+  }, [selectionTab, connectedData]);
+
+  /**
+   * `pendingIngestRef` must already be set. Opens replace/new-sheet dialog when the sheet has real data.
+   * @returns {boolean} true if the dialog was shown (caller must not run ingest yet).
+   */
+  const promptReplaceOrNewSheetIfNeeded = useCallback(() => {
+    if (connectedData.length > 0 && !connectedDataIsMetaPreviewOnly) {
+      setSheetDialogOpen(true);
+      return true;
+    }
+    return false;
+  }, [connectedData, connectedDataIsMetaPreviewOnly]);
+
   const handleLoad = () => {
     setError(null);
     setLastRowCount(null);
     if (!selected?.table) {
       setError("Choose a table below.");
+      return;
+    }
+    if (selectionTab === "recipes") {
+      setError("Open the Columns or Meta tab to run a query. Recipes only fill in the compose fields (or run the one-click load on that tab).");
       return;
     }
     if (selectionTab === "columns") {
@@ -1172,25 +1612,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       return;
     }
 
-    const hasOnlyMetaPreviewRows =
-      selectionTab === "meta" &&
-      connectedData.length > 0 &&
-      connectedData.every((row) => {
-        if (!row || typeof row !== "object") return false;
-        const keys = Object.keys(row);
-        if (keys.length === 0) return false;
-        return (
-          keys.includes("Operation name") ||
-          keys.includes("Op ref") ||
-          keys.includes("meta query") ||
-          keys.includes("value")
-        );
-      });
-
-    if (connectedData.length > 0 && !hasOnlyMetaPreviewRows) {
-      setSheetDialogOpen(true);
-      return;
-    }
+    if (promptReplaceOrNewSheetIfNeeded()) return;
 
     void executeIngestReplace();
   };
@@ -1211,6 +1633,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const runRequestReasons = useMemo(() => {
     const reasons = [];
     if (!selected?.table) reasons.push("Choose a table below.");
+    if (selectionTab === "recipes") {
+      reasons.push("Switch to Columns or Meta to run (Recipes are shortcuts only).");
+    }
     if (selectionTab === "columns" && columnComposeItems.length === 0) {
       reasons.push("Add at least one column to SELECT.");
     }
@@ -1399,6 +1824,27 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         onAddNewSheet={onDialogAddNewSheet}
       />
 
+      <AlertDialog open={nullishAlertOpen} onOpenChange={onNullishAlertOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Null or NaN values detected</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  We detected null or NaN values in the following columns from this pull:{" "}
+                  <span className="font-mono font-medium text-foreground">{nullishColumnList.join(", ")}</span>. Would
+                  you like to remove rows that have a missing value in any of these columns?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={onNullishDialogKeep}>Keep all rows</AlertDialogCancel>
+            <AlertDialogAction onClick={onNullishDialogRemoveRows}>Remove those rows</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <MetaAddOperationDialog
         open={metaAddOperationDialogOpen}
         onOpenChange={setMetaAddOperationDialogOpen}
@@ -1439,12 +1885,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       {selected?.table && availableColumns.length > 0 && (
         <div className="min-w-0 max-w-full">
           <Tabs value={selectionTab} onValueChange={setSelectionTab} className="w-full">
-            <TabsList className="w-fit p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
+            <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
               <TabsTrigger value="columns" className="h-7 px-2 text-xs">
                 Columns
               </TabsTrigger>
               <TabsTrigger value="meta" className="h-7 px-2 text-xs">
                 Meta Table
+              </TabsTrigger>
+              <TabsTrigger value="recipes" className="h-7 px-2 text-xs">
+                Recipes
               </TabsTrigger>
             </TabsList>
 
@@ -1505,31 +1954,131 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 </div>
 
                 {dataset === "kalshi" && selected?.table === "markets" && (
-                  <div className="rounded-md border border-border/70 bg-muted/25 p-2.5 space-y-2 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={applyKalshiCategoryVolumePreset}
-                      >
-                        Preset: volume + count by event prefix
-                      </Button>
-                    </div>
-                    <label className="flex items-start gap-2 text-xs cursor-pointer select-none">
-                      <Checkbox
-                        className="mt-0.5"
-                        checked={kalshiTaxonomyRollup}
-                        onCheckedChange={(v) => setKalshiTaxonomyRollup(v === true)}
-                      />
-                      <span>
-                        After Athena returns, roll up into taxonomy groups (Sports, Politics, Crypto, …) — matches{" "}
-                        <span className="font-mono">get_group</span> + pandas groupby.
-                      </span>
-                    </label>
+                  <div className="rounded-md border border-border/70 bg-muted/25 p-2.5 min-w-0">
+                    <p className="text-[11px] text-muted-foreground">
+                      Volume-by-category recipe lives on the <strong>Recipes</strong> tab. Optional taxonomy roll-up is
+                      configured there before you run.
+                    </p>
                   </div>
                 )}
+
+                {dataset === "kalshi" && selected?.table === "trades" && (
+                  <div className="rounded-md border border-border/70 bg-muted/25 p-2.5 space-y-2 min-w-0">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium">Compose data source</Label>
+                      <Select
+                        value={kalshiTradesJoinPreset || "none"}
+                        onValueChange={(v) => setKalshiTradesJoinPreset(v === "none" ? "" : v)}
+                      >
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Choose source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Trades table only (raw Glue columns)</SelectItem>
+                          <SelectItem value={KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET}>
+                            Trades ⟕ resolved markets + equal-width decile buckets (10 bins on price range)
+                          </SelectItem>
+                          <SelectItem value={KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT}>
+                            Trades ⟕ resolved markets + fixed ¢ buckets (1–10c … 91–99c)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Join keeps only trades on markets with <span className="font-mono">status = finalized</span> and{" "}
+                        <span className="font-mono">result</span> in yes/no. Price is the taker-side quote in cents. Use{" "}
+                        <strong>Recipes</strong> for a one-click “volume by bucket” pull. Non-SQL steps (e.g. statistical
+                        tests) can be done in the sheet — see <strong>Mathematics</strong> below.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <CollapsibleRoot open={mathPanelOpen} onOpenChange={setMathPanelOpen} className="rounded-md border border-border/60 bg-background/80">
+                  <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium hover:bg-muted/40 rounded-md">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground">
+                            <Sigma className="h-4 w-4" aria-hidden />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="text-xs">
+                          Mathematics
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <span>Mathematics (sheet columns)</span>
+                    <ChevronDown className={`ml-auto h-4 w-4 shrink-0 transition-transform ${mathPanelOpen ? "rotate-180" : ""}`} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="px-3 pb-3 pt-0 space-y-3 border-t border-border/50">
+                    <p className="text-[11px] text-muted-foreground pt-2">
+                      Row-wise math on the <strong>current sheet</strong> (like typing a formula in Excel). Choose two
+                      numeric columns and an output column name. For operations across <em>different sheets</em> or
+                      advanced stats, copy columns into one sheet first or use chart tools.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-[11px]">Operation</Label>
+                        <Select value={mathOp} onValueChange={setMathOp}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="add">Add (A + B)</SelectItem>
+                            <SelectItem value="subtract">Subtract (A − B)</SelectItem>
+                            <SelectItem value="multiply">Multiply (A × B)</SelectItem>
+                            <SelectItem value="divide">Divide (A ÷ B)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px]">Output column name</Label>
+                        <Input
+                          className="h-8 text-xs"
+                          value={mathOutCol}
+                          onChange={(e) => setMathOutCol(e.target.value)}
+                          spellCheck={false}
+                          placeholder="result"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px]">Column A</Label>
+                        <Select value={mathColA || "__"} onValueChange={(v) => setMathColA(v === "__" ? "" : v)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Select column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__">—</SelectItem>
+                            {sheetColumnNamesForMath.map((c) => (
+                              <SelectItem key={c} value={c} className="font-mono text-xs">
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px]">Column B</Label>
+                        <Select value={mathColB || "__"} onValueChange={(v) => setMathColB(v === "__" ? "" : v)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Select column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__">—</SelectItem>
+                            {sheetColumnNamesForMath.map((c) => (
+                              <SelectItem key={`b-${c}`} value={c} className="font-mono text-xs">
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button type="button" size="sm" className="h-8 text-xs" onClick={applySheetMathOperation}>
+                      Apply to sheet
+                    </Button>
+                  </CollapsibleContent>
+                </CollapsibleRoot>
 
                 {columnComposeItems.length !== 0 && (
                   <div className="space-y-3">
@@ -2559,6 +3108,77 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       </div>
                     )}
                   </div>
+            </TabsContent>
+
+            <TabsContent value="recipes" className="space-y-4 min-w-0">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                One-click loads run the same Athena compose as the Columns tab, then apply the sheet to your data view.
+                If the replace/new-sheet dialog appears, choose how to merge. You can also open <strong>Columns</strong>{" "}
+                after a recipe to tweak fields before running again.
+              </p>
+              <div className="rounded-md border border-border/70 bg-muted/20 p-3 space-y-3 text-xs">
+                <p className="font-medium text-foreground">Steps: volume by fixed ¢ price bucket (Kalshi trades)</p>
+                <ol className="list-decimal pl-4 space-y-1 text-muted-foreground">
+                  <li>Data Source → Kalshi → table <span className="font-mono">trades</span>.</li>
+                  <li>Open <strong>Recipes</strong> → &quot;Contract volume by ¢ bucket (resolved markets)&quot;.</li>
+                  <li>Confirm replace if prompted. Sheet columns: <span className="font-mono">price_bucket</span> (X for
+                    bar chart), <span className="font-mono">volume_contracts</span> (Y = sum of contracts per bucket).</li>
+                </ol>
+              </div>
+              {dataset === "kalshi" && selected?.table === "markets" && (
+                <div className="rounded-md border border-border/70 bg-muted/25 p-3 space-y-3 min-w-0">
+                  <p className="text-xs font-medium">Kalshi · markets</p>
+                  <label className="flex items-start gap-2 text-xs cursor-pointer select-none">
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={kalshiTaxonomyRollup}
+                      onCheckedChange={(v) => setKalshiTaxonomyRollup(v === true)}
+                    />
+                    <span>
+                      After Athena returns, roll up into taxonomy groups (Sports, Politics, Crypto, …) — matches{" "}
+                      <span className="font-mono">get_group</span> + pandas groupby.
+                    </span>
+                  </label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 text-xs w-full sm:w-auto"
+                    onClick={runRecipeKalshiMarketsCategoryVolume}
+                  >
+                    Load: volume + market count by event prefix
+                  </Button>
+                </div>
+              )}
+              {dataset === "kalshi" && selected?.table === "trades" && (
+                <div className="rounded-md border border-border/70 bg-muted/25 p-3 space-y-2 min-w-0">
+                  <p className="text-xs font-medium">Kalshi · trades</p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 text-xs w-full sm:w-auto block"
+                    onClick={() => runRecipeKalshiTradesVolumeByBucket(KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT)}
+                  >
+                    Load: contract volume by ¢ bucket (1–10c … 91–99c, resolved markets)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs w-full sm:w-auto block"
+                    onClick={() => runRecipeKalshiTradesVolumeByBucket(KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET)}
+                  >
+                    Load: contract volume by equal-width decile buckets (resolved markets)
+                  </Button>
+                </div>
+              )}
+              {!(dataset === "kalshi" && (selected?.table === "markets" || selected?.table === "trades")) && (
+                <p className="text-[11px] text-muted-foreground">
+                  Select Kalshi <span className="font-mono">markets</span> or <span className="font-mono">trades</span>{" "}
+                  above for available recipes.
+                </p>
+              )}
             </TabsContent>
           </Tabs>
         </div>

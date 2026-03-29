@@ -53,6 +53,7 @@ export default async function handler(req, res) {
       sumColumn: validated.sumColumn,
       sumAlias: validated.sumAlias,
       compose: validated.compose,
+      lake: validated.lake,
       filters: validated.filters,
       caseSensitive: validated.caseSensitive,
       limit: validated.limit,

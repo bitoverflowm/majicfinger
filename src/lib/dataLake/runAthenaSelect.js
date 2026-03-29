@@ -39,6 +39,7 @@ function assertAthenaConfig() {
  * @param {string[] | null | undefined} opts.columns
  * @param {"select" | "count" | "sum" | "compose"} [opts.queryType]
  * @param {object | null | undefined} [opts.compose]
+ * @param {string | null | undefined} [opts.lake] — required for compose queries that use compose.join (Kalshi presets).
  * @param {string | null | undefined} [opts.countAlias]
  * @param {string | null | undefined} [opts.countDistinctColumn]
  * @param {string | null | undefined} [opts.sumColumn]
@@ -58,6 +59,7 @@ export async function startAthenaBoundedQuery({
   sumColumn,
   sumAlias,
   compose = null,
+  lake = null,
   filters = null,
   caseSensitive = false,
   limit,
@@ -141,6 +143,7 @@ export async function startAthenaBoundedQuery({
       physicalTableName: safeTable,
       limit: null,
       compose,
+      lake,
     });
     const athena = new AWS.Athena({ region: getRegion() });
     const { QueryExecutionId } = await athena
@@ -337,6 +340,7 @@ export async function runAthenaBoundedSelect({
   sumColumn = null,
   sumAlias = null,
   compose = null,
+  lake = null,
   filters = null,
   caseSensitive = false,
   limit,
@@ -352,6 +356,7 @@ export async function runAthenaBoundedSelect({
     sumColumn,
     sumAlias,
     compose,
+    lake,
     filters,
     caseSensitive,
     limit,

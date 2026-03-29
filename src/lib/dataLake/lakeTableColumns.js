@@ -140,3 +140,27 @@ export function isNumericHiveType(t) {
   const x = String(t || "").toLowerCase();
   return x === "bigint" || x === "int" || x === "double";
 }
+
+/** Compose-only: Kalshi trades ⟕ markets (finalized, yes/no); equal-width decile buckets on trade price (¢). */
+export const KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET = "kalshi_trades_resolved_markets";
+
+/** Same join + filters; fixed cent buckets 1–10c … 91–99c on taker-side trade price. */
+export const KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT = "kalshi_trades_resolved_markets_cent";
+
+/** Output columns of the Athena subquery for that join (not physical Glue cols on `trades`). */
+export const KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META = [
+  { name: "kalshi_resolved_centile_bin", type: "bigint" },
+  { name: "kalshi_resolved_centile_label", type: "string" },
+  { name: "kalshi_resolved_taker_notional", type: "double" },
+  { name: "kalshi_resolved_maker_notional", type: "double" },
+  { name: "kalshi_resolved_contract_count", type: "bigint" },
+];
+
+/**
+ * @param {string} column
+ * @returns {{ name: string; type: string } | null}
+ */
+export function kalshiResolvedMarketsJoinColumnMeta(column) {
+  const key = String(column || "").trim();
+  return KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META.find((c) => c.name === key) || null;
+}

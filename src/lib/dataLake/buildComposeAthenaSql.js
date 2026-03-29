@@ -1,7 +1,11 @@
 /**
  * Build a bounded Athena SELECT from a validated compose spec (no raw SQL from clients).
  */
-import { isValidColumnIdentifier } from "./athenaTableMap";
+import { isValidColumnIdentifier, resolveAthenaTableName } from "./athenaTableMap";
+import {
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
+} from "./lakeTableColumns";
 
 /** @typedef {"day" | "week" | "month" | "quarter" | "year"} DateBucket */
 /** @typedef {"dmy" | "ym" | "dm"} DateFormat */
@@ -12,6 +16,136 @@ const SAFE_ALIAS = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 export const KALSHI_EVENT_TICKER_CATEGORY_SQL = `(CASE WHEN "event_ticker" IS NULL OR CAST("event_ticker" AS VARCHAR) = '' THEN 'independent' WHEN regexp_extract(CAST("event_ticker" AS VARCHAR), '^([A-Z0-9]+)', 1) = '' THEN 'independent' ELSE regexp_extract(CAST("event_ticker" AS VARCHAR), '^([A-Z0-9]+)', 1) END)`;
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
+
+/**
+ * Kalshi: trades restricted to finalized yes/no markets; trade price in cents from taker side;
+ * equal-width buckets over [min(price), max(price)] (10 bins, same idea as pandas cut(..., bins=10)).
+ */
+function buildKalshiTradesResolvedMarketsJoinSubqueryDecile(tradesPhysical, marketsPhysical) {
+  const t = String(tradesPhysical || "").trim();
+  const m = String(marketsPhysical || "").trim();
+  if (!/^[a-zA-Z0-9_]+$/.test(t) || !/^[a-zA-Z0-9_]+$/.test(m)) {
+    const err = new Error("Invalid physical table name for Kalshi join");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  return `(
+  WITH resolved_markets AS (
+    SELECT "ticker" FROM "${m}"
+    WHERE LOWER(CAST("status" AS VARCHAR)) = 'finalized'
+      AND LOWER(CAST("result" AS VARCHAR)) IN ('yes', 'no')
+  ),
+  joined AS (
+    SELECT
+      CAST(t."count" AS DOUBLE) AS c_cnt,
+      CASE WHEN LOWER(CAST(t."taker_side" AS VARCHAR)) = 'yes' THEN CAST(t."yes_price" AS DOUBLE) ELSE CAST(t."no_price" AS DOUBLE) END AS price_c,
+      CASE WHEN LOWER(CAST(t."taker_side" AS VARCHAR)) = 'yes'
+        THEN CAST(t."yes_price" AS DOUBLE) * CAST(t."count" AS DOUBLE) / 100.0
+        ELSE CAST(t."no_price" AS DOUBLE) * CAST(t."count" AS DOUBLE) / 100.0 END AS taker_n,
+      CASE WHEN LOWER(CAST(t."taker_side" AS VARCHAR)) = 'yes'
+        THEN CAST(t."no_price" AS DOUBLE) * CAST(t."count" AS DOUBLE) / 100.0
+        ELSE CAST(t."yes_price" AS DOUBLE) * CAST(t."count" AS DOUBLE) / 100.0 END AS maker_n
+    FROM "${t}" t
+    INNER JOIN resolved_markets m ON CAST(t."ticker" AS VARCHAR) = CAST(m."ticker" AS VARCHAR)
+  ),
+  bounds AS (
+    SELECT MIN(price_c) AS lo, MAX(price_c) AS hi FROM joined
+  ),
+  numbered AS (
+    SELECT
+      j.c_cnt,
+      j.taker_n,
+      j.maker_n,
+      CASE
+        WHEN b.hi IS NULL OR b.lo IS NULL THEN NULL
+        WHEN b.hi = b.lo THEN CAST(1 AS BIGINT)
+        ELSE CAST(width_bucket(j.price_c, b.lo, b.hi, 10) AS BIGINT)
+      END AS bin_idx
+    FROM joined j
+    CROSS JOIN bounds b
+  )
+  SELECT
+    CAST(c_cnt AS BIGINT) AS "kalshi_resolved_contract_count",
+    taker_n AS "kalshi_resolved_taker_notional",
+    maker_n AS "kalshi_resolved_maker_notional",
+    bin_idx AS "kalshi_resolved_centile_bin",
+    concat(CAST(((bin_idx - 1) * 10 + 1) AS VARCHAR), concat('-', concat(CAST((bin_idx * 10) AS VARCHAR), ' pct'))) AS "kalshi_resolved_centile_label"
+  FROM numbered
+  WHERE bin_idx IS NOT NULL AND bin_idx >= 1 AND bin_idx <= 10
+) `;
+}
+
+/** Same `joined` trade rows; bucket by fixed cent ranges (1–10c … 91–99c). Out-of-range prices excluded. */
+function buildKalshiTradesResolvedMarketsJoinSubqueryCent(tradesPhysical, marketsPhysical) {
+  const t = String(tradesPhysical || "").trim();
+  const m = String(marketsPhysical || "").trim();
+  if (!/^[a-zA-Z0-9_]+$/.test(t) || !/^[a-zA-Z0-9_]+$/.test(m)) {
+    const err = new Error("Invalid physical table name for Kalshi join");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  return `(
+  WITH resolved_markets AS (
+    SELECT "ticker" FROM "${m}"
+    WHERE LOWER(CAST("status" AS VARCHAR)) = 'finalized'
+      AND LOWER(CAST("result" AS VARCHAR)) IN ('yes', 'no')
+  ),
+  joined AS (
+    SELECT
+      CAST(t."count" AS DOUBLE) AS c_cnt,
+      CASE WHEN LOWER(CAST(t."taker_side" AS VARCHAR)) = 'yes' THEN CAST(t."yes_price" AS DOUBLE) ELSE CAST(t."no_price" AS DOUBLE) END AS price_c,
+      CASE WHEN LOWER(CAST(t."taker_side" AS VARCHAR)) = 'yes'
+        THEN CAST(t."yes_price" AS DOUBLE) * CAST(t."count" AS DOUBLE) / 100.0
+        ELSE CAST(t."no_price" AS DOUBLE) * CAST(t."count" AS DOUBLE) / 100.0 END AS taker_n,
+      CASE WHEN LOWER(CAST(t."taker_side" AS VARCHAR)) = 'yes'
+        THEN CAST(t."no_price" AS DOUBLE) * CAST(t."count" AS DOUBLE) / 100.0
+        ELSE CAST(t."yes_price" AS DOUBLE) * CAST(t."count" AS DOUBLE) / 100.0 END AS maker_n
+    FROM "${t}" t
+    INNER JOIN resolved_markets m ON CAST(t."ticker" AS VARCHAR) = CAST(m."ticker" AS VARCHAR)
+  ),
+  cent_labeled AS (
+    SELECT
+      j.c_cnt,
+      j.taker_n,
+      j.maker_n,
+      CASE
+        WHEN j.price_c >= 1 AND j.price_c <= 10 THEN CAST(1 AS BIGINT)
+        WHEN j.price_c >= 11 AND j.price_c <= 20 THEN CAST(2 AS BIGINT)
+        WHEN j.price_c >= 21 AND j.price_c <= 30 THEN CAST(3 AS BIGINT)
+        WHEN j.price_c >= 31 AND j.price_c <= 40 THEN CAST(4 AS BIGINT)
+        WHEN j.price_c >= 41 AND j.price_c <= 50 THEN CAST(5 AS BIGINT)
+        WHEN j.price_c >= 51 AND j.price_c <= 60 THEN CAST(6 AS BIGINT)
+        WHEN j.price_c >= 61 AND j.price_c <= 70 THEN CAST(7 AS BIGINT)
+        WHEN j.price_c >= 71 AND j.price_c <= 80 THEN CAST(8 AS BIGINT)
+        WHEN j.price_c >= 81 AND j.price_c <= 90 THEN CAST(9 AS BIGINT)
+        WHEN j.price_c >= 91 AND j.price_c <= 99 THEN CAST(10 AS BIGINT)
+        ELSE NULL
+      END AS bin_idx,
+      CASE
+        WHEN j.price_c BETWEEN 1 AND 10 THEN '1-10c'
+        WHEN j.price_c BETWEEN 11 AND 20 THEN '11-20c'
+        WHEN j.price_c BETWEEN 21 AND 30 THEN '21-30c'
+        WHEN j.price_c BETWEEN 31 AND 40 THEN '31-40c'
+        WHEN j.price_c BETWEEN 41 AND 50 THEN '41-50c'
+        WHEN j.price_c BETWEEN 51 AND 60 THEN '51-60c'
+        WHEN j.price_c BETWEEN 61 AND 70 THEN '61-70c'
+        WHEN j.price_c BETWEEN 71 AND 80 THEN '71-80c'
+        WHEN j.price_c BETWEEN 81 AND 90 THEN '81-90c'
+        WHEN j.price_c BETWEEN 91 AND 99 THEN '91-99c'
+        ELSE NULL
+      END AS bucket_lbl
+    FROM joined j
+  )
+  SELECT
+    CAST(c_cnt AS BIGINT) AS "kalshi_resolved_contract_count",
+    taker_n AS "kalshi_resolved_taker_notional",
+    maker_n AS "kalshi_resolved_maker_notional",
+    bin_idx AS "kalshi_resolved_centile_bin",
+    bucket_lbl AS "kalshi_resolved_centile_label"
+  FROM cent_labeled
+  WHERE bin_idx IS NOT NULL
+) `;
+}
 
 const DATE_BUCKETS = new Set(["day", "week", "month", "quarter", "year"]);
 const DATE_FORMATS = new Set(["dmy", "ym", "dm"]);
@@ -180,17 +314,48 @@ function buildGroupExpression(opts) {
  *     groupByAliases: string[];
  *     orderBy: Array<{ alias: string; direction: "asc" | "desc" }>;
  *   };
+ *   join?: { preset: string } | null | undefined;
  * }} params
+ * @param {{ physicalTableName: string; limit?: number | null; compose: object; lake?: string | null }} params
  * @returns {string}
  */
-export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose }) {
+export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose, lake = null }) {
   const safeTable = String(physicalTableName).trim();
   if (!/^[a-zA-Z0-9_]+$/.test(safeTable)) {
     const err = new Error("Invalid table name");
     err.code = "BAD_REQUEST";
     throw err;
   }
-  const sqlTable = `"${safeTable}"`;
+
+  const joinPreset = compose?.join && typeof compose.join === "object" ? String(compose.join.preset || "").trim() : "";
+  let fromClause;
+  if (
+    joinPreset === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET ||
+    joinPreset === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT
+  ) {
+    if (String(lake || "").toLowerCase() !== "kalshi") {
+      const err = new Error("Kalshi trades join presets are only valid for lake kalshi");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    const marketsPhysical = resolveAthenaTableName("kalshi", "markets");
+    if (!marketsPhysical) {
+      const err = new Error("Kalshi markets table is not configured");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    const nested =
+      joinPreset === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT
+        ? buildKalshiTradesResolvedMarketsJoinSubqueryCent(safeTable, marketsPhysical)
+        : buildKalshiTradesResolvedMarketsJoinSubqueryDecile(safeTable, marketsPhysical);
+    fromClause = `FROM ${nested} AS kalshi_trades_joined`;
+  } else if (joinPreset) {
+    const err = new Error(`Unknown compose.join.preset: ${joinPreset}`);
+    err.code = "BAD_REQUEST";
+    throw err;
+  } else {
+    fromClause = `FROM "${safeTable}"`;
+  }
 
   const rows = compose?.select;
   if (!Array.isArray(rows) || rows.length === 0) {
@@ -295,5 +460,5 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose 
       ? Math.min(1000, Math.max(1, Math.floor(Number(limit))))
       : null;
   const limitSql = lim != null ? ` LIMIT ${lim}` : "";
-  return `SELECT ${selectParts.join(", ")} FROM ${sqlTable}${groupSql}${orderSql}${limitSql}`;
+  return `SELECT ${selectParts.join(", ")} ${fromClause}${groupSql}${orderSql}${limitSql}`;
 }

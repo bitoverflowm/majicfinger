@@ -7,7 +7,16 @@ import {
   columnHiveTypeForLakeTable,
   isDateLikeColumnName,
   isNumericHiveType,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META,
+  kalshiResolvedMarketsJoinColumnMeta,
 } from "./lakeTableColumns";
+
+const KALSHI_TRADES_JOIN_PRESETS = new Set([
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
+]);
 import { buildComposeAthenaSelectSql } from "./buildComposeAthenaSql";
 
 export class AthenaLakeRequestError extends Error {
@@ -215,7 +224,35 @@ export function validateAthenaLakeQueryBody(body) {
     if (!raw || typeof raw !== "object") {
       throw new AthenaLakeRequestError("compose query requires a compose object", { statusCode: 400, code: "BAD_REQUEST" });
     }
-    const allowed = new Set(allowedColumnsForLakeTable(lake, table));
+    /** @type {string | null} */
+    let joinPresetValidated = null;
+    if (raw.join != null) {
+      if (typeof raw.join !== "object" || Array.isArray(raw.join)) {
+        throw new AthenaLakeRequestError("compose.join must be an object", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      const jp = String(raw.join.preset || "").trim();
+      if (!jp) {
+        throw new AthenaLakeRequestError("compose.join.preset is required when compose.join is set", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+      if (!KALSHI_TRADES_JOIN_PRESETS.has(jp)) {
+        throw new AthenaLakeRequestError(`Unknown compose.join.preset: ${jp}`, { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      if (lake !== "kalshi" || table !== "trades") {
+        throw new AthenaLakeRequestError(
+          'Kalshi trades compose.join presets are only allowed for lake "kalshi" and table "trades"',
+          { statusCode: 400, code: "BAD_REQUEST" },
+        );
+      }
+      joinPresetValidated = jp;
+    }
+
+    const allowed =
+      joinPresetValidated && KALSHI_TRADES_JOIN_PRESETS.has(joinPresetValidated)
+        ? new Set(KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META.map((c) => c.name))
+        : new Set(allowedColumnsForLakeTable(lake, table));
     if (allowed.size === 0) {
       throw new AthenaLakeRequestError("Compose query is not available for this table", { statusCode: 400, code: "BAD_REQUEST" });
     }
@@ -241,7 +278,10 @@ export function validateAthenaLakeQueryBody(body) {
       if (!allowed.has(column)) {
         throw new AthenaLakeRequestError(`Unknown or disallowed column: ${column}`, { statusCode: 400, code: "BAD_REQUEST" });
       }
-      const colType = columnHiveTypeForLakeTable(lake, table, column);
+      const colType =
+        joinPresetValidated && KALSHI_TRADES_JOIN_PRESETS.has(joinPresetValidated)
+          ? kalshiResolvedMarketsJoinColumnMeta(column)?.type
+          : columnHiveTypeForLakeTable(lake, table, column);
       if (!colType) {
         throw new AthenaLakeRequestError(`Unknown column type: ${column}`, { statusCode: 400, code: "BAD_REQUEST" });
       }
@@ -367,6 +407,7 @@ export function validateAthenaLakeQueryBody(body) {
       select: normalizedSelect,
       groupByAliases,
       orderBy,
+      ...(joinPresetValidated ? { join: { preset: joinPresetValidated } } : {}),
     };
 
     try {
@@ -374,6 +415,7 @@ export function validateAthenaLakeQueryBody(body) {
         physicalTableName: physical,
         limit: null,
         compose: validatedCompose,
+        lake,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
