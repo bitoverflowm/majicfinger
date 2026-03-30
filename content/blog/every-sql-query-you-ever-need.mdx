@@ -1,0 +1,423 @@
+---
+title: "Every SQL query you ever need"
+description: "Compose powerful analytics with Lychee using a no-code SQL builder: filter rows, compute metrics, group for charts, and join datasets for deep research."
+publishedAt: "2026-03-30"
+author: "misterrpink"
+keywords:
+  - "SQL"
+  - "no-code data analysis"
+  - "analytics"
+  - "quantitative finance"
+  - "Polymarket"
+  - "Kalshi"
+  - "Athena"
+  - "DuckDB"
+  - "data engineering"
+  - "metrics"
+topics: ["sql", "analytics", "no-code", "quant", "polymarket", "kalshi"]
+tags: ["sql", "analytics", "no-code"]
+---
+
+# Every SQL query you ever need
+
+SQL is the lingua franca of research and quantitative finance.
+
+When you’re investigating market structure, validating signals, or stress-testing a strategy, you don’t just need charts—you need repeatable logic you can trust. SQL gives you that logic: filtering, transforming, aggregating, and combining datasets with the same rigor you’d expect from a trading model.
+
+Lychee makes the same kinds of queries accessible as a **no-code workflow**. Instead of writing SQL, you select the columns, add filters, choose aggregations, and (where supported) apply join recipes—then run your query and load the result straight into your workspace.
+
+---
+
+## Filtering & Selection (`SELECT`, `WHERE`, `DISTINCT`, `LIMIT`, `ORDER BY`)
+
+### What it does in Lychee
+
+Lychee can build **row-level** queries on your dataset by letting you:
+- choose which columns to return,
+- add `WHERE` filters that narrow the rows,
+- sort results with `ORDER BY`,
+- keep queries bounded (to stay fast in-browser).
+
+For `DISTINCT`, Lychee supports two related (but different) experiences:
+
+1. **Aggregated distinct counting** (`COUNT(DISTINCT ...)`): available in the **Columns** compose flow as the `count distinct` summarize option, and also in the **Meta Table** flow via the `UNIQUE` operator.
+2. **Row-level deduping** (`SELECT DISTINCT ...`): available in the **grid toolbar** as **Remove duplicates** (it deduplicates rows in your current sheet).
+
+### Raw SQL (Kalshi example)
+
+```sql
+SELECT "ticker", "volume"
+FROM "trades"
+WHERE "volume" > 100
+ORDER BY "volume" DESC
+LIMIT 1000
+```
+
+### No-code UI steps (seconds, no SQL)
+
+1. Connect a dataset (example: **Kalshi → trades**).
+2. Go to the **Columns** tab.
+3. Open **Select** and check columns like `ticker` and `volume`.
+4. In the dropdown’s **Where (filter)** panel:
+   - choose `volume`
+   - choose operator `>`
+   - enter value `100`
+   - or choose operator `IN` / `NOT IN` to match categorical values from a list
+     (strings like `"yes", "no"`; numbers like `1, 2, 3`)
+5. Add a **sort rule** by choosing `volume` and direction `descending`.
+6. Click **Run request** to load the filtered + sorted result into your sheet.
+7. (Optional) If you want row-level deduping, open the grid toolbar and click **Remove duplicates**.
+
+---
+
+## Aggregation Core (`COUNT()`, `SUM()`, and more)
+
+### What it does in Lychee
+
+Lychee’s Columns/compose flow supports the most common aggregation primitives:
+- `COUNT(...)` (row counts per selected group)
+- `SUM(...)` (sums per selected group)
+- automatic grouping via `GROUP BY` when you include aggregations
+
+Lychee’s compose flow also exposes:
+- `AVG()` (average)
+- `MIN()` / `MAX()` (extremes)
+- `MEDIAN()` (approx)
+- `STDDEV()` / `VARIANCE()`
+- `COUNT(DISTINCT ...)` via the `count_distinct` option
+
+### Raw SQL (Kalshi example)
+
+```sql
+SELECT
+  "ticker",
+  COUNT("ticker") AS trades_count
+FROM "trades"
+WHERE "volume" > 100
+GROUP BY "ticker"
+```
+
+### No-code UI steps
+
+1. In **Columns**, select a **dimension** column (example: `ticker`) and leave its summarize as “no total” / none.
+2. Select a **measure** column (example: `volume`).
+3. In the card for the measure column, set **Summarize** to:
+   - `Count (non-empty)` / `Sum numbers`, or
+   - `Average`, `Min`, `Max`, `Median (approx)`, `Stddev`, `Variance`, `Count distinct`
+4. (Optional) set **Where (filter)** to narrow rows first.
+5. Click **Run request**. Lychee will group correctly for you.
+
+---
+
+## Grouping for Charts (`GROUP BY` and `HAVING`)
+
+### What it does in Lychee
+
+Lychee expresses grouping automatically:
+- When your query includes `SUM`/`COUNT`, Lychee sets up the needed `GROUP BY` under the hood.
+
+`HAVING` (filtering aggregated results) is exposed as **Having (filter aggregated results)** in the **Columns** compose flow (when you have aggregates selected).
+
+### Raw SQL (Kalshi example)
+
+```sql
+SELECT
+  "price_bucket",
+  COUNT(*)
+FROM "trades"
+WHERE "volume" > 100
+GROUP BY "price_bucket"
+HAVING COUNT(*) > 1000
+```
+
+### No-code UI steps
+
+1. Build an aggregation query in **Columns** (choose a dimension + set Summarize on measures).
+2. Use the **Where (filter)** editor to filter rows before aggregation.
+3. Add one or more **Having (filter aggregated results)** predicates:
+   - pick the aggregated alias
+   - choose an operator (`>`, `<`, `=`, `!=`)
+   - enter the numeric value
+4. Click **Run request** to get grouped results ready for charting.
+
+---
+
+## Joins (Multi-dataset analytics)
+
+### What it does in Lychee
+
+Lychee supports **dataset joins via join recipes** (not yet a free-form join editor).
+It also supports a sheet-level join across already-loaded sheets:
+- **Grid toolbar → Combine Sheets** (inner/left/right/full/cross)
+
+Supported join style today:
+- Kalshi trades + resolved markets via preset join recipes
+
+Free-form SQL join types are still limited in the compose builder; use **Combine Sheets** for cross-sheet joins.
+
+### Raw SQL (simplified Kalshi example)
+
+```sql
+SELECT
+  r."price_bucket",
+  SUM(CAST(t."count" AS DOUBLE)) AS contracts
+FROM (
+  SELECT * FROM "trades"
+  -- join with resolved markets (preset logic)
+) t
+JOIN "resolved_markets" r
+  ON t."ticker" = r."ticker"
+GROUP BY r."price_bucket"
+```
+
+### No-code UI steps
+
+1. Go to the **Recipes** tab.
+2. Choose a supported Kalshi trades join recipe, for example:
+   - **Contract volume by equal-width decile buckets**
+3. Lychee fills the Columns/compose configuration for you.
+4. Click **Run request**.
+5. (Optional) In the grid view, use **Combine Sheets** to join two already-loaded sheets (inner/left/right/full/cross).
+
+---
+
+## Calculated Columns (arithmetic + logic)
+
+### What it does in Lychee
+
+Lychee supports calculated columns primarily through spreadsheet-style operations:
+- arithmetic (`+`, `-`, `*`, `/`) via the **Σ (Sigma) Mathematics Operations** tool in the grid toolbar
+
+General conditional expression building (e.g. `CASE WHEN ... THEN ... ELSE ... END`) and boolean logic expressions are **not yet exposed** as a first-class expression builder in the current compose UI.
+
+Workaround flow today:
+- compute arithmetic-derived columns
+- then filter / aggregate based on those derived columns (with WHERE + aggregation)
+
+### Raw SQL (arithmetic example)
+
+```sql
+SELECT
+  "count" * "price" / 100 AS "notional"
+FROM "trades"
+```
+
+### No-code UI steps
+
+1. In the grid view, open **Mathematics Operations** (Σ icon next to Add Row).
+2. Choose:
+   - Operation: `Multiply` or `Add` etc.
+   - Column A (left operand)
+   - Column B (right operand)
+   - Output column name
+3. Click **Apply to sheet**.
+4. Use the new column immediately in sorting, grouping, and chart building.
+
+---
+
+## Bucketing / Binning
+
+### What it does in Lychee
+
+Lychee supports:
+- date bucketing via date/time shape controls (`bucket by day/week/month/quarter/year`)
+- Kalshi price bucketing via supported resolved columns (via join recipes and/or compose presets)
+
+Engine-level binning functions like `FLOOR()`, `ROUND()`, and `WIDTH_BUCKET()` are used in internal presets (including Kalshi join recipes), but are not yet exposed as generic UI controls for arbitrary columns.
+
+### Raw SQL (date/time bucketing concept)
+
+```sql
+SELECT
+  DATE_TRUNC('quarter', "timestamp") AS "quarter",
+  COUNT(*) AS trades
+FROM "trades"
+GROUP BY 1
+```
+
+### No-code UI steps
+
+1. In **Columns**, select a date-like numeric column.
+2. In that column’s card, set **Date / time shape** to:
+   - Bucket by `quarter` / `month` / `week` / etc.
+3. Select a measure column and choose Summarize (Sum/Count).
+4. Click **Run request**.
+
+---
+
+## Window Functions (advanced analytics)
+
+### Status in Lychee
+
+Window functions (e.g. `ROW_NUMBER()`, `RANK()`, `DENSE_RANK()`, `LAG() / LEAD()`, `SUM() OVER()`, `AVG() OVER()`, `NTILE()`) are not exposed in the current compose UI.
+
+If you tell us which window pattern you want first, we can add it in the same composable style as the rest of the SQL builder.
+
+### Raw SQL (example)
+
+```sql
+SELECT
+  "ticker",
+  "price",
+  LAG("price") OVER (PARTITION BY "ticker" ORDER BY "time") AS prev_price
+FROM "trades"
+```
+
+### No-code UI steps
+
+Window functions are **not yet exposed** in the current compose UI.
+
+What to do today:
+1. Use **Columns** to filter/aggregate your dataset first (WHERE + GROUP BY patterns).
+2. Export to your sheet and use grid-level transformations (e.g. mathematics operations) to approximate derived metrics.
+3. Tell us which window function you want next, and we can map it into the same composable UI.
+
+---
+
+## Subqueries & CTEs
+
+### Status in Lychee
+
+CTEs / pipeline subqueries are not exposed yet as a first-class UI construct.
+
+Lychee focuses on producing a single compose statement you can run and then refine through selection, aggregation, and post-processing.
+
+### Raw SQL (CTE example)
+
+```sql
+WITH volumes AS (
+  SELECT "ticker", SUM("size") AS v
+  FROM "trades"
+  GROUP BY "ticker"
+)
+SELECT *
+FROM volumes
+WHERE v > 1000
+```
+
+### No-code UI steps
+
+CTEs/subqueries are **not yet exposed** as a first-class compose option.
+
+What to do today:
+1. Build the outer query in **Columns** (SELECT + WHERE + aggregations).
+2. If you need “pipeline” steps, load intermediate results into a separate sheet and then compose again on that new dataset.
+
+---
+
+## Set Operations
+
+### Status in Lychee
+
+`UNION`, `INTERSECT`, and `EXCEPT` are not exposed yet in the current UI builder.
+
+### Raw SQL (UNION example)
+
+```sql
+SELECT "ticker" FROM "trades_2023"
+UNION ALL
+SELECT "ticker" FROM "trades_2024"
+```
+
+### No-code UI steps
+
+Set operations are **not yet exposed** as a UI builder.
+
+What to do today:
+1. Run one dataset query in **Columns**.
+2. Create/select the additional dataset(s) in a second run.
+3. Combine results by exporting/merging in the grid layer once the data is loaded into Lychee.
+
+---
+
+## Date / Time (very common)
+
+### What it does in Lychee
+
+Lychee supports date/time conversion and bucketing using the **Date / time shape** controls, so you can group and visualize time-series easily.
+
+Common SQL date functions like `EXTRACT()`, `CAST()`, and `INTERVAL` are not yet exposed as separate UI controls. In practice, you’ll get most of what you need via the bucketing/text-shape options plus normal filtering and aggregation.
+
+### Raw SQL (DATE_TRUNC example)
+
+```sql
+SELECT
+  DATE_TRUNC('day', "timestamp") AS day,
+  COUNT(*) AS trades
+FROM "trades"
+GROUP BY 1
+ORDER BY day DESC
+```
+
+### No-code UI steps
+
+1. In **Columns**, pick a date-like column.
+2. Set **Date / time shape** to one of the bucketing or text shapes.
+3. Add a measure and Summarize.
+4. Click **Run request**.
+
+---
+
+## Null Handling
+
+### What it does in Lychee
+
+Lychee detects `null`/`NaN`-ish values during loading and shows a dialog letting you choose to:
+- keep all rows, or
+- remove rows with null/NaN in selected columns.
+
+A direct expression-builder experience for SQL null functions like `COALESCE()`, `NULLIF()`, `IS NULL`, and `IS NOT NULL` is not yet exposed as a compose option.
+
+### Raw SQL (null expression example)
+
+```sql
+SELECT COALESCE("volume", 0) AS safe_volume
+FROM "trades"
+WHERE "volume" IS NOT NULL
+```
+
+### No-code UI steps
+
+1. Click **Run request**.
+2. If null/NaN is detected, use the dialog to remove nullish rows (or keep them).
+3. Continue with your analysis.
+
+---
+
+## Distinct Counting (analytics staple)
+
+### What it does in Lychee
+
+Distinct counting is supported in two ways:
+- **Columns** compose flow: set **Summarize** to `Count distinct` (produces `COUNT(DISTINCT ...)` aggregated results)
+- **Meta Table** flow: use the `UNIQUE` operator to dedupe values before counting
+
+### Raw SQL (example)
+
+```sql
+SELECT COUNT(DISTINCT "ticker") AS unique_markets
+FROM "trades"
+```
+
+### No-code UI steps
+1. **Columns compose** option:
+   - Switch to the **Columns** tab
+   - In the card for your target column, set **Summarize** to `Count distinct`
+   - (Optional) add `Where (filter)` predicates
+   - Click **Run request**
+2. **Meta Table** option:
+   - Switch to the **Meta Table** tab.
+   - Choose `count`.
+   - Choose `Filter`.
+   - Pick the column (`ticker`).
+   - Set the operator to **UNIQUE**.
+   - (Optional) add filter predicates, then click **Run request**.
+
+---
+
+## What’s next
+
+Lychee is designed so we can extend the compose system incrementally—each new SQL capability fits into the same “select → filter → compose → run” workflow without turning it into a scripting experience.
+
+If you want, tell me which *two* SQL constructs you want next (window functions vs CTEs vs UNIONs), and I’ll help map them into Lychee’s existing UI flow.
+

@@ -144,6 +144,31 @@ export async function startAthenaBoundedQuery({
   const predicateToSql = (p) => {
     const colSql = `"${p.column}"`;
 
+    if (p.op === "in" || p.op === "not_in") {
+      const opSql = p.op === "in" ? "IN" : "NOT IN";
+
+      if (p.kind === "number") {
+        const values = Array.isArray(p.value) ? p.value : [];
+        if (!values.length) return "TRUE";
+        const list = values.map((v) => Number(v)).map((n) => (Number.isFinite(n) ? String(n) : "NULL")).join(", ");
+        return `${colSql} ${opSql} (${list})`;
+      }
+
+      if (p.kind === "string") {
+        const values = Array.isArray(p.value) ? p.value : [];
+        if (!values.length) return "TRUE";
+        const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
+        const lits = values.map((v) => {
+          const s = String(v);
+          return caseSensitive ? `'${escapeSqlString(s)}'` : `LOWER('${escapeSqlString(s)}')`;
+        });
+        return `${colMaybeLower} ${opSql} (${lits.join(", ")})`;
+      }
+
+      // date IN/NOT IN not supported in this composer.
+      return "TRUE";
+    }
+
     if (p.kind === "date") {
       const colMs = `CASE WHEN ${colSql} < 1000000000000 THEN ${colSql} * 1000 ELSE ${colSql} END`;
       const opSql = p.op === "gt" ? ">" : p.op === "lt" ? "<" : p.op === "eq" ? "=" : "<>";

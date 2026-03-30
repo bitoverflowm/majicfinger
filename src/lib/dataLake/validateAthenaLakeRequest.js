@@ -151,18 +151,74 @@ export function validateAthenaLakeQueryBody(body) {
         throw new AthenaLakeRequestError(`Invalid filter column: ${column}`, { statusCode: 400, code: "BAD_REQUEST" });
       }
 
+      const isInListOp = op === "in" || op === "not_in";
+
       if (kind === "date") {
         if (!["gt", "lt", "eq", "neq"].includes(op)) {
           throw new AthenaLakeRequestError("Invalid date filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       } else if (kind === "number") {
-        if (!["gt", "lt", "eq", "neq"].includes(op)) {
+        if (!["gt", "lt", "eq", "neq", "in", "not_in"].includes(op)) {
           throw new AthenaLakeRequestError("Invalid number filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       } else if (kind === "string") {
-        if (!["contains", "not_contains", "eq", "neq"].includes(op)) {
+        if (!["contains", "not_contains", "eq", "neq", "in", "not_in"].includes(op)) {
           throw new AthenaLakeRequestError("Invalid string filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
+      }
+
+      const parseInList = (rawValue, listKind) => {
+        const raw = String(rawValue ?? "");
+        const tokens = raw
+          .split(",")
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
+        if (tokens.length === 0) {
+          throw new AthenaLakeRequestError("IN list must include at least one value", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+
+        if (listKind === "string") {
+          const values = [];
+          for (const tok of tokens) {
+            const m = tok.match(/^"(.*)"$/) || tok.match(/^'(.*)'$/);
+            if (!m) {
+              throw new AthenaLakeRequestError(
+                'Strings in IN lists must be wrapped in double quotes (e.g. "yes", "no")',
+                { statusCode: 400, code: "BAD_REQUEST" },
+              );
+            }
+            values.push(m[1]);
+          }
+          return values;
+        }
+
+        // number
+        const values = [];
+        for (const tok of tokens) {
+          if ((tok.startsWith('"') && tok.endsWith('"')) || (tok.startsWith("'") && tok.endsWith("'"))) {
+            throw new AthenaLakeRequestError("Numbers in IN lists must not be wrapped in quotes (e.g. 1, 2, 3)", {
+              statusCode: 400,
+              code: "BAD_REQUEST",
+            });
+          }
+          const n = Number(tok);
+          if (!Number.isFinite(n)) {
+            throw new AthenaLakeRequestError(`Invalid numeric value in IN list: ${tok}`, { statusCode: 400, code: "BAD_REQUEST" });
+          }
+          values.push(n);
+        }
+        return values;
+      };
+
+      if (isInListOp) {
+        if (kind !== "string" && kind !== "number") {
+          throw new AthenaLakeRequestError("IN/NOT IN is only supported for string and number columns", {
+            statusCode: 400,
+            code: "BAD_REQUEST",
+          });
+        }
+        const values = parseInList(p.value, kind);
+        return { column, kind, op, value: values };
       }
 
       const value =
@@ -271,7 +327,7 @@ export function validateAthenaLakeQueryBody(body) {
       throw new AthenaLakeRequestError("compose.select must be a non-empty array", { statusCode: 400, code: "BAD_REQUEST" });
     }
 
-    /** @type {Array<{ column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: string | null; dateFormat: string | null; numberScale: string; decimals: number | null; treatAsDate: boolean; columnType: string }>} */
+    /** @type {Array<{ column: string; alias: string; aggregate: null | string; dateBucket: string | null; dateFormat: string | null; numberScale: string; decimals: number | null; treatAsDate: boolean; columnType: string }>} */
     const normalizedSelect = [];
 
     for (const row of selectIn) {
@@ -296,7 +352,14 @@ export function validateAthenaLakeQueryBody(body) {
       }
 
       const aggRaw = row.aggregate == null || row.aggregate === "" ? null : String(row.aggregate).toLowerCase().trim();
-      const aggregate = aggRaw === "sum" ? "sum" : aggRaw === "count" ? "count" : null;
+      const aggregate = (() => {
+        if (!aggRaw) return null;
+        const numericAggs = new Set(["sum", "avg", "min", "max", "median", "stddev", "variance"]);
+        const countAggs = new Set(["count", "count_distinct"]);
+        if (numericAggs.has(aggRaw)) return aggRaw;
+        if (countAggs.has(aggRaw)) return aggRaw;
+        throw new AthenaLakeRequestError(`Invalid compose.select.aggregate: ${aggRaw}`, { statusCode: 400, code: "BAD_REQUEST" });
+      })();
 
       const db = row.dateBucket != null && String(row.dateBucket).trim() !== "" ? String(row.dateBucket).trim().toLowerCase() : null;
       const dateBucket = db && dateBuckets.has(db) ? db : null;
@@ -328,8 +391,16 @@ export function validateAthenaLakeQueryBody(body) {
         });
       }
 
-      if (aggregate === "sum" && !isNumericHiveType(colType)) {
-        throw new AthenaLakeRequestError("SUM applies only to numeric columns", { statusCode: 400, code: "BAD_REQUEST" });
+      if (
+        aggregate &&
+        ["sum", "avg", "min", "max", "median", "stddev", "variance"].includes(String(aggregate))
+      ) {
+        if (!isNumericHiveType(colType)) {
+          throw new AthenaLakeRequestError(`${String(aggregate).toUpperCase()} applies only to numeric columns`, {
+            statusCode: 400,
+            code: "BAD_REQUEST",
+          });
+        }
       }
 
       const scaleRaw = row.numberScale != null ? String(row.numberScale).toLowerCase().trim() : "none";
@@ -370,13 +441,13 @@ export function validateAthenaLakeQueryBody(body) {
       });
     }
 
-    const hasAggInSelect = normalizedSelect.some((r) => r.aggregate === "sum" || r.aggregate === "count");
+    const hasAggInSelect = normalizedSelect.some((r) => r.aggregate != null);
     const dimensionAliases = normalizedSelect.filter((r) => !r.aggregate).map((r) => r.alias);
     const allSelectAliases = new Set(normalizedSelect.map((r) => r.alias));
 
     if (hasAggInSelect && dimensionAliases.length === 0) {
       throw new AthenaLakeRequestError(
-        "With SUM or COUNT, add at least one other field without Sum/Count (e.g. trade time → bucket by quarter) so results can GROUP BY that bucket.",
+        "With aggregate functions, add at least one other non-aggregated field so results can GROUP BY that dimension.",
         { statusCode: 400, code: "BAD_REQUEST" },
       );
     }
@@ -407,11 +478,64 @@ export function validateAthenaLakeQueryBody(body) {
         })
       : [];
 
+    /** @type {{ and: Array<{ alias: string; op: "gt" | "lt" | "eq" | "neq"; value: number }> } | null} */
+    let normalizedHaving = null;
+    if (raw.having != null) {
+      if (typeof raw.having !== "object" || Array.isArray(raw.having)) {
+        throw new AthenaLakeRequestError("compose.having must be an object", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      if (raw.having.or != null) {
+        throw new AthenaLakeRequestError("compose.having.or is not supported yet", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+
+      const aggAliasSet = new Set(normalizedSelect.filter((r) => r.aggregate != null).map((r) => r.alias));
+
+      const havingAnd = Array.isArray(raw.having.and) ? raw.having.and : [];
+      if (havingAnd.length > 0 && !hasAggInSelect) {
+        throw new AthenaLakeRequestError("HAVING requires at least one aggregate in compose.select", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      const normalizedAnd = [];
+      for (const p of havingAnd) {
+        if (!p || typeof p !== "object") {
+          throw new AthenaLakeRequestError("Invalid compose.having.and predicate", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const alias = String(p.alias || "").trim();
+        if (!safeAlias.test(alias) || !allSelectAliases.has(alias)) {
+          throw new AthenaLakeRequestError(`Invalid compose.having.alias: ${alias}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        if (!aggAliasSet.has(alias)) {
+          throw new AthenaLakeRequestError(`HAVING must reference an aggregate SELECT alias: ${alias}`, {
+            statusCode: 400,
+            code: "BAD_REQUEST",
+          });
+        }
+
+        const opRaw = String(p.op || "").trim();
+        const op = opRaw === "gt" || opRaw === "lt" || opRaw === "eq" || opRaw === "neq" ? opRaw : null;
+        if (!op) {
+          throw new AthenaLakeRequestError(`Invalid compose.having.op: ${opRaw}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+
+        const valueNum = Number(p.value);
+        if (!Number.isFinite(valueNum)) {
+          throw new AthenaLakeRequestError("compose.having.value must be a finite number", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        normalizedAnd.push({ alias, op, value: valueNum });
+      }
+
+      normalizedHaving = normalizedAnd.length > 0 ? { and: normalizedAnd } : null;
+    }
+
     validatedCompose = {
       select: normalizedSelect,
       groupByAliases,
       orderBy,
       ...(joinPresetValidated ? { join: { preset: joinPresetValidated } } : {}),
+      ...(normalizedHaving ? { having: normalizedHaving } : {}),
     };
 
     try {

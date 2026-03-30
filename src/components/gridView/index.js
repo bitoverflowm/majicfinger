@@ -121,6 +121,7 @@ const GridView = ({startNew}) => {
     let connectedData = contextStateV2?.connectedData || []
     let setConnectedData = contextStateV2?.setConnectedData || []
     const replaceCurrentSheetData = contextStateV2?.replaceCurrentSheetData
+    let dataSheets = contextStateV2?.dataSheets || {}
     
     const [columnName, setColumnName] = useState('');
     const [colAddOpen, setColAddOpen] = useState()
@@ -132,6 +133,17 @@ const GridView = ({startNew}) => {
     const [mathColA, setMathColA] = useState("");
     const [mathColB, setMathColB] = useState("");
     const [mathOutCol, setMathOutCol] = useState("result");
+
+    // Combine Sheets (client-side join across already-loaded sheets)
+    const [combineSheetsDialogOpen, setCombineSheetsDialogOpen] = useState(false);
+    const [combineJoinType, setCombineJoinType] = useState("inner"); // inner | left | right | full | cross
+    const [combineLeftSheetId, setCombineLeftSheetId] = useState(null);
+    const [combineRightSheetId, setCombineRightSheetId] = useState(null);
+    const [combineLeftKeyCol, setCombineLeftKeyCol] = useState("");
+    const [combineRightKeyCol, setCombineRightKeyCol] = useState("");
+
+    // Remove duplicates (row-level)
+    const [removeDupsDialogOpen, setRemoveDupsDialogOpen] = useState(false);
     const [filterState, setFilterState] = useState({
       dateColumn: null,
       dateFrom: '',
@@ -180,6 +192,219 @@ const GridView = ({startNew}) => {
       toast.success("Applied calculation to sheet.");
       setMathDialogOpen(false);
     }, [connectedData, mathColA, mathColB, mathOp, mathOutCol, replaceCurrentSheetData, setConnectedData]);
+
+    const collectColumnNames = (rows) => {
+      const set = new Set();
+      for (const r of Array.isArray(rows) ? rows : []) {
+        if (!r || typeof r !== "object") continue;
+        for (const k of Object.keys(r)) {
+          if (k === "_origIndex") continue;
+          set.add(k);
+        }
+      }
+      return Array.from(set).sort();
+    };
+
+    const stableStringify = (v) => {
+      if (v === null) return "null";
+      if (v === undefined) return "undefined";
+      const t = typeof v;
+      if (t === "number") return Number.isFinite(v) ? String(v) : "NaN";
+      if (t === "string" || t === "boolean") return String(v);
+      if (Array.isArray(v)) return `[${v.map(stableStringify).join(",")}]`;
+      if (t === "object") {
+        const keys = Object.keys(v).sort();
+        return `{${keys.map((k) => `${k}:${stableStringify(v[k])}`).join(",")}}`;
+      }
+      return String(v);
+    };
+
+    const applyCombineSheets = useCallback(() => {
+      setCombineSheetsDialogOpen(false);
+      try {
+        const leftSheet = combineLeftSheetId ? dataSheets?.[combineLeftSheetId] : null;
+        const rightSheet = combineRightSheetId ? dataSheets?.[combineRightSheetId] : null;
+
+        const leftData = leftSheet?.data;
+        const rightData = rightSheet?.data;
+
+        if (!leftSheet || !rightSheet) {
+          toast.error("Pick two sheets to combine.");
+          return;
+        }
+        if (!Array.isArray(leftData) || leftData.length === 0 || !Array.isArray(rightData) || rightData.length === 0) {
+          toast.error("Both selected sheets must have loaded data.");
+          return;
+        }
+        if (combineLeftSheetId === combineRightSheetId) {
+          toast.error("Left and right sheets must be different.");
+          return;
+        }
+
+        const joinType = combineJoinType;
+        const leftCols = collectColumnNames(leftData);
+        const rightCols = collectColumnNames(rightData);
+
+        if (leftCols.length === 0 || rightCols.length === 0) {
+          toast.error("Could not infer columns for one of the sheets.");
+          return;
+        }
+
+        const leftKeyCol = String(combineLeftKeyCol || "").trim();
+        const rightKeyCol = String(combineRightKeyCol || "").trim();
+
+        if (joinType !== "cross") {
+          if (!leftKeyCol || !rightKeyCol) {
+            toast.error("Select join keys for both sheets (or use Cross join).");
+            return;
+          }
+          if (!leftCols.includes(leftKeyCol) || !rightCols.includes(rightKeyCol)) {
+            toast.error("Selected join keys must exist in both sheets.");
+            return;
+          }
+        }
+
+        const rightSuffixRaw = rightSheet?.name || combineRightSheetId || "right";
+        const rightSuffix = String(rightSuffixRaw).replace(/[^a-zA-Z0-9_]/g, "_") || "right";
+
+        const getRightOutKey = (col) => {
+          // Only suffix for right-side column name collisions with left columns.
+          return leftCols.includes(col) ? `${col}__${rightSuffix}` : col;
+        };
+
+        const outRows = [];
+
+        if (joinType === "cross") {
+          // Cartesian product; we always include right join keys too (since there is no "ON").
+          const rightOutKeys = rightCols.map((c) => getRightOutKey(c));
+          for (const l of leftData) {
+            const outBase = {};
+            for (const lc of leftCols) outBase[lc] = l?.[lc] ?? null;
+
+            for (const r of rightData) {
+              const row = { ...outBase };
+              for (let i = 0; i < rightCols.length; i++) {
+                const rc = rightCols[i];
+                row[rightOutKeys[i]] = r?.[rc] ?? null;
+              }
+              outRows.push(row);
+            }
+          }
+        } else {
+          const rightKeyIndex = new Map(); // keyStr -> array of { idx, row }
+          for (let i = 0; i < rightData.length; i++) {
+            const r = rightData[i];
+            const v = r?.[rightKeyCol];
+            const keyStr = v === null || v === undefined ? "NULL" : typeof v === "object" ? JSON.stringify(v) : String(v);
+            if (!rightKeyIndex.has(keyStr)) rightKeyIndex.set(keyStr, []);
+            rightKeyIndex.get(keyStr).push({ idx: i, row: r });
+          }
+
+          const rightMatchedIdxs = new Set();
+
+          const rightAddedCols = rightCols.filter((c) => c !== rightKeyCol);
+          const rightAddedOutKeys = rightAddedCols.map((c) => getRightOutKey(c));
+
+          const leftKeyOutCol = leftKeyCol; // left base naming
+
+          const buildLeftBase = (l) => {
+            const out = {};
+            for (const lc of leftCols) out[lc] = l?.[lc] ?? null;
+            return out;
+          };
+
+          const buildLeftNullBaseForKey = (rightRow) => {
+            const out = {};
+            for (const lc of leftCols) out[lc] = null;
+            out[leftKeyOutCol] = rightRow?.[rightKeyCol] ?? null;
+            return out;
+          };
+
+          // LEFT loop: emits matched rows and (if needed) unmatched left rows.
+          for (const l of leftData) {
+            const lKeyVal = l?.[leftKeyCol];
+            const lKeyStr = lKeyVal === null || lKeyVal === undefined ? "NULL" : typeof lKeyVal === "object" ? JSON.stringify(lKeyVal) : String(lKeyVal);
+            const matches = rightKeyIndex.get(lKeyStr) || [];
+
+            if (matches.length > 0) {
+              for (const m of matches) {
+                rightMatchedIdxs.add(m.idx);
+                const row = buildLeftBase(l);
+                for (let i = 0; i < rightAddedCols.length; i++) {
+                  row[rightAddedOutKeys[i]] = m.row?.[rightAddedCols[i]] ?? null;
+                }
+                outRows.push(row);
+              }
+            } else if (joinType === "left" || joinType === "full") {
+              const row = buildLeftBase(l);
+              for (let i = 0; i < rightAddedOutKeys.length; i++) row[rightAddedOutKeys[i]] = null;
+              outRows.push(row);
+            }
+          }
+
+          // RIGHT side unmatched rows: only for RIGHT/FULL.
+          if (joinType === "right" || joinType === "full") {
+            for (let i = 0; i < rightData.length; i++) {
+              if (rightMatchedIdxs.has(i)) continue;
+              const r = rightData[i];
+              const row = buildLeftNullBaseForKey(r);
+              for (let j = 0; j < rightAddedCols.length; j++) row[rightAddedOutKeys[j]] = r?.[rightAddedCols[j]] ?? null;
+              outRows.push(row);
+            }
+          }
+        }
+
+        if (!outRows.length) {
+          toast.error("Join produced no rows.");
+          return;
+        }
+
+        replaceCurrentSheetData?.(outRows);
+        setConnectedData?.(outRows);
+        toast.success("Sheets combined.");
+      } finally {
+        // ensure modal closes even if something throws
+        setCombineSheetsDialogOpen(false);
+      }
+    }, [
+      combineJoinType,
+      combineLeftKeyCol,
+      combineLeftSheetId,
+      combineRightKeyCol,
+      combineRightSheetId,
+      dataSheets,
+      replaceCurrentSheetData,
+      setConnectedData,
+    ]);
+
+    const applyRemoveDuplicates = useCallback(() => {
+      try {
+        const rows = Array.isArray(connectedData) ? [...connectedData] : [];
+        if (!rows.length) {
+          toast.error("Load sheet data before removing duplicates.");
+          return;
+        }
+
+        // Row-level dedupe (JSON-stable signature). Extendable later to dedupe on selected columns.
+        const cols = collectColumnNames(rows);
+        const seen = new Set();
+        const unique = [];
+
+        for (const r of rows) {
+          const sig = cols.map((c) => `${c}:${stableStringify(r?.[c])}`).join("|");
+          if (seen.has(sig)) continue;
+          seen.add(sig);
+          unique.push(r);
+        }
+
+        replaceCurrentSheetData?.(unique);
+        setConnectedData?.(unique);
+        toast.success("Duplicates removed.");
+        setRemoveDupsDialogOpen(false);
+      } catch (e) {
+        toast.error("Failed to remove duplicates.");
+      }
+    }, [connectedData, replaceCurrentSheetData, setConnectedData]);
     const dateColumns = useMemo(() => {
       if (!connectedData.length) return [];
       const first = connectedData[0];
@@ -587,6 +812,223 @@ const GridView = ({startNew}) => {
                       </Button>
                       <Button type="button" onClick={applySheetMathOperation}>
                         Apply to sheet
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Combine sheets */}
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label="Combine Sheets"
+                        onClick={() => {
+                          const entries = Object.entries(dataSheets || {}).filter(([, s]) => Array.isArray(s?.data) && s.data.length > 0);
+                          if (entries.length < 2) {
+                            toast.error("Load at least two sheets before combining.");
+                            return;
+                          }
+                          setCombineSheetsDialogOpen(true);
+                          setCombineLeftSheetId(entries[0][0]);
+                          setCombineRightSheetId(entries[1][0]);
+                          setCombineJoinType("inner");
+                          setCombineLeftKeyCol("");
+                          setCombineRightKeyCol("");
+                        }}
+                      >
+                        <BarChart2 className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Combine Sheets
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <Dialog open={combineSheetsDialogOpen} onOpenChange={setCombineSheetsDialogOpen}>
+                  <DialogContent className="sm:max-w-[520px]">
+                    <DialogHeader>
+                      <DialogTitle>Combine Sheets</DialogTitle>
+                      <DialogDescription>
+                        Join multiple already-loaded sheets (like SQL JOIN) to create a new combined sheet.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    {(() => {
+                      const leftSheet = combineLeftSheetId ? dataSheets?.[combineLeftSheetId] : null;
+                      const rightSheet = combineRightSheetId ? dataSheets?.[combineRightSheetId] : null;
+                      const leftRows = Array.isArray(leftSheet?.data) ? leftSheet.data : [];
+                      const rightRows = Array.isArray(rightSheet?.data) ? rightSheet.data : [];
+
+                      const leftCols = collectColumnNames(leftRows);
+                      const rightCols = collectColumnNames(rightRows);
+                      const suffix = String(rightSheet?.name || combineRightSheetId || "right").replace(/[^a-zA-Z0-9_]/g, "_") || "right";
+
+                      const leftKeyValue = combineLeftKeyCol;
+                      const rightKeyValue = combineRightKeyCol;
+
+                      return (
+                        <div className="space-y-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Join type</Label>
+                            <Select value={combineJoinType} onValueChange={setCombineJoinType}>
+                              <SelectTrigger className="h-9 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="inner">Inner</SelectItem>
+                                <SelectItem value="left">Left</SelectItem>
+                                <SelectItem value="right">Right</SelectItem>
+                                <SelectItem value="full">Full</SelectItem>
+                                <SelectItem value="cross">Cross</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">Left sheet</Label>
+                              <Select value={combineLeftSheetId || ""} onValueChange={setCombineLeftSheetId}>
+                                <SelectTrigger className="h-9 text-xs">
+                                  <SelectValue placeholder="Left sheet" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(dataSheets || {})
+                                    .filter(([, s]) => Array.isArray(s?.data) && s.data.length > 0)
+                                    .map(([id, s]) => (
+                                      <SelectItem key={id} value={id}>
+                                        {s?.name || id}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">Right sheet</Label>
+                              <Select value={combineRightSheetId || ""} onValueChange={setCombineRightSheetId}>
+                                <SelectTrigger className="h-9 text-xs">
+                                  <SelectValue placeholder="Right sheet" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(dataSheets || {})
+                                    .filter(([, s]) => Array.isArray(s?.data) && s.data.length > 0)
+                                    .map(([id, s]) => (
+                                      <SelectItem key={id} value={id}>
+                                        {s?.name || id}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {combineJoinType !== "cross" && (
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Left join key</Label>
+                                <Select
+                                  value={leftKeyValue || ""}
+                                  onValueChange={(v) => setCombineLeftKeyCol(v)}
+                                >
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue placeholder="Pick key" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {leftCols.map((c) => (
+                                      <SelectItem key={c} value={c}>
+                                        {c}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Right join key</Label>
+                                <Select
+                                  value={rightKeyValue || ""}
+                                  onValueChange={(v) => setCombineRightKeyCol(v)}
+                                >
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue placeholder="Pick key" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {rightCols.map((c) => (
+                                      <SelectItem key={c} value={c}>
+                                        {c}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="text-xs text-muted-foreground leading-snug">
+                            {combineJoinType === "cross"
+                              ? "Cross join creates every pair of rows (Cartesian product)."
+                              : `Match rows where ${combineLeftKeyCol || "leftKey"} = ${combineRightKeyCol || "rightKey"}. (Right-side overlapping column names will be suffixed like name__${suffix}.)`}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setCombineSheetsDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="button" onClick={applyCombineSheets}>
+                        Combine
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Remove duplicates */}
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label="Remove duplicates"
+                        onClick={() => setRemoveDupsDialogOpen(true)}
+                      >
+                        <RotateCcw className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Remove duplicates
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <Dialog open={removeDupsDialogOpen} onOpenChange={setRemoveDupsDialogOpen}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Remove duplicates</DialogTitle>
+                      <DialogDescription>
+                        Deduplicate rows in the current sheet (row-level, like SQL DISTINCT).
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button type="button" variant="outline" onClick={() => setRemoveDupsDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="button" onClick={applyRemoveDuplicates}>
+                        Remove duplicates
                       </Button>
                     </DialogFooter>
                   </DialogContent>

@@ -29,7 +29,7 @@ export function composeUnboundedSelectShouldCapRows(compose) {
   const joinPreset = compose.join && typeof compose.join === "object" ? String(compose.join.preset || "").trim() : "";
   if (joinPreset) return false;
   const rows = Array.isArray(compose.select) ? compose.select : [];
-  const hasAgg = rows.some((r) => r.aggregate === "sum" || r.aggregate === "count");
+  const hasAgg = rows.some((r) => r && r.aggregate != null);
   return !hasAgg;
 }
 
@@ -223,13 +223,16 @@ function buildSelectExpression(opts) {
   const { column, columnType, treatAsDate, dateBucket, dateFormat, aggregate, numberScale, decimals } = opts;
 
   if (column === KALSHI_VIRTUAL_CATEGORY) {
-    if (aggregate === "sum") {
-      const err = new Error("Cannot SUM the computed event-ticker category column");
+    if (aggregate && aggregate !== "count" && aggregate !== "count_distinct") {
+      const err = new Error(`Cannot ${String(aggregate).toUpperCase()} the computed event-ticker category column`);
       err.code = "BAD_REQUEST";
       throw err;
     }
     if (aggregate === "count") {
       return { innerSql: `COUNT(${KALSHI_EVENT_TICKER_CATEGORY_SQL})`, isAggregate: true };
+    }
+    if (aggregate === "count_distinct") {
+      return { innerSql: `COUNT(DISTINCT ${KALSHI_EVENT_TICKER_CATEGORY_SQL})`, isAggregate: true };
     }
     return { innerSql: KALSHI_EVENT_TICKER_CATEGORY_SQL, isAggregate: false };
   }
@@ -261,8 +264,38 @@ function buildSelectExpression(opts) {
     const base = `SUM(CAST("${column}" AS DOUBLE))`;
     return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
   }
+  if (aggregate === "avg") {
+    const base = `AVG(CAST("${column}" AS DOUBLE))`;
+    return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
+  }
+  if (aggregate === "min") {
+    const base = `MIN(CAST("${column}" AS DOUBLE))`;
+    return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
+  }
+  if (aggregate === "max") {
+    const base = `MAX(CAST("${column}" AS DOUBLE))`;
+    return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
+  }
+  if (aggregate === "median") {
+    const base = `approx_percentile(CAST("${column}" AS DOUBLE), 0.5)`;
+    return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
+  }
+  if (aggregate === "stddev") {
+    const base = `stddev_samp(CAST("${column}" AS DOUBLE))`;
+    return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
+  }
+  if (aggregate === "variance") {
+    const base = `variance_samp(CAST("${column}" AS DOUBLE))`;
+    if (div === 1) return { innerSql: wrapRound(base), isAggregate: true };
+    // If we scale values by 1/div, variance scales by 1/(div^2).
+    return { innerSql: wrapRound(`(${base}) / (${div}.0) / (${div}.0)`), isAggregate: true };
+  }
   if (aggregate === "count") {
     const base = `COUNT("${column}")`;
+    return { innerSql: base, isAggregate: true };
+  }
+  if (aggregate === "count_distinct") {
+    const base = `COUNT(DISTINCT "${column}")`;
     return { innerSql: base, isAggregate: true };
   }
 
@@ -408,7 +441,7 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
       decimals: row.decimals != null ? Number(row.decimals) : null,
     }).innerSql;
 
-    const isAggregate = !!(row.aggregate === "sum" || row.aggregate === "count");
+    const isAggregate = row.aggregate != null;
     const groupExpr = buildGroupExpression({
       column: row.column,
       columnType: row.columnType || null,
@@ -471,11 +504,44 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
     orderSql = ` ORDER BY ${obParts.join(", ")}`;
   }
 
+  const havingAnd = Array.isArray(compose?.having?.and) ? compose.having.and : [];
+  let havingSql = "";
+  if (havingAnd.length > 0) {
+    if (!groupSql) {
+      const err = new Error("HAVING requires GROUP BY in compose queries");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    const parts = havingAnd.map((p) => {
+      const alias = String(p.alias || "").trim();
+      if (!SAFE_ALIAS.test(alias)) {
+        const err = new Error(`Invalid HAVING alias: ${alias}`);
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      const op = String(p.op || "").trim();
+      const opSql = op === "eq" ? "=" : op === "neq" ? "!=" : op === "gt" ? ">" : op === "lt" ? "<" : null;
+      if (!opSql) {
+        const err = new Error(`Invalid HAVING operator: ${op}`);
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      const v = Number(p.value);
+      if (!Number.isFinite(v)) {
+        const err = new Error("HAVING value must be a finite number");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      return `"${alias}" ${opSql} ${v}`;
+    });
+    havingSql = ` HAVING ${parts.join(" AND ")}`;
+  }
+
   const lim =
     limit != null && Number.isFinite(Number(limit))
       ? Math.min(1000, Math.max(1, Math.floor(Number(limit))))
       : null;
   const limitSql = lim != null ? ` LIMIT ${lim}` : "";
   const w = typeof whereSql === "string" ? whereSql : "";
-  return `SELECT ${selectParts.join(", ")} ${fromClause}${w}${groupSql}${orderSql}${limitSql}`;
+  return `SELECT ${selectParts.join(", ")} ${fromClause}${w}${groupSql}${havingSql}${orderSql}${limitSql}`;
 }

@@ -3,6 +3,12 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
 import { MDXContent } from "@/lib/content/mdx";
+import {
+  buildArticleJsonLd,
+  buildBreadcrumbJsonLd,
+  buildContentMetadata,
+  buildOrganizationJsonLd,
+} from "@/lib/content/metadata";
 import Header from "@/components/landingPageV2/Header";
 import Footer from "@/components/landingPageV2/Footer";
 
@@ -19,10 +25,7 @@ export async function generateMetadata({ params }) {
   const { slug } = await params;
   const data = getContentBySlug("blog", slug);
   if (!data) return { title: "Post Not Found" };
-  return {
-    title: `${data.frontmatter.title} | Lychee`,
-    description: data.frontmatter.description || data.frontmatter.summary,
-  };
+  return buildContentMetadata(data.frontmatter, "blog", slug);
 }
 
 export default async function BlogPostPage({ params }) {
@@ -34,10 +37,39 @@ export default async function BlogPostPage({ params }) {
   }
 
   const { frontmatter, content } = data;
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
+  const articleJsonLd = buildArticleJsonLd(frontmatter, "blog", slug);
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { label: "Home", href: "/" },
+      { label: "Blog", href: "/landingpage_v2#blog" },
+      { label: frontmatter.title },
+    ],
+    SITE_URL
+  );
+  const organizationJsonLd = buildOrganizationJsonLd();
 
   return (
     <main className="min-h-screen bg-background">
       <Header />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(articleJsonLd),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(organizationJsonLd),
+        }}
+      />
       <article className="max-w-3xl mx-auto px-4 py-16">
         <Link
           href="/landingpage_v2#blog"

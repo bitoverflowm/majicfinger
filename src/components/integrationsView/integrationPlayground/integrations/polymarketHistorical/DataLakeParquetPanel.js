@@ -57,6 +57,7 @@ import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META,
 } from "@/lib/dataLake/lakeTableColumns";
+import { toast } from "sonner";
 
 /** Shown in the column picker / compose cards for server-computed Kalshi fields. */
 const KALSHI_VIRTUAL_COMPOSE_LABELS = {
@@ -273,6 +274,8 @@ function operatorSymbol(op) {
   if (op === "lt") return "<";
   if (op === "eq" || op === "contains") return "=";
   if (op === "neq" || op === "not_contains") return "!=";
+  if (op === "in") return "IN";
+  if (op === "not_in") return "NOT IN";
   return "=";
 }
 
@@ -291,9 +294,7 @@ function composeSourceColumnLabel(col) {
 
 /** @param {{ aggregate: null | string }} item */
 function composeRollUpSelectValue(item) {
-  if (item.aggregate === "sum") return "sum";
-  if (item.aggregate === "count") return "count";
-  return "none";
+  return item.aggregate || "none";
 }
 
 /** @param {{ dateBucket: null | string; dateFormat: null | string }} item */
@@ -450,6 +451,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [columnComposeOrderBy, setColumnComposeOrderBy] = useState([]);
   /** @type {Array<{ id: string; column: string; kind: "date" | "string" | "number"; op: string; value: any }>} */
   const [composeWhereFilters, setComposeWhereFilters] = useState([]);
+  /** @type {Array<{ id: string; havingAlias: string; op: string; value: any }>} */
+  const [composeHavingFilters, setComposeHavingFilters] = useState([]);
   /** After Athena returns rows grouped by event-ticker prefix, merge into Sports / Politics / … (client-side, matches pandas get_group). */
   const [kalshiTaxonomyRollup, setKalshiTaxonomyRollup] = useState(false);
   /** Kalshi trades compose: optional INNER JOIN to finalized yes/no markets (Athena subquery). */
@@ -523,7 +526,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [availableColumnTypesByName, isDateLikeName]);
 
   const hasComposeAggregates = useMemo(
-    () => columnComposeItems.some((i) => i.aggregate === "sum" || i.aggregate === "count"),
+    () => columnComposeItems.some((i) => i.aggregate != null),
     [columnComposeItems],
   );
 
@@ -545,7 +548,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const composeDimensionAliases = useMemo(
     () =>
       columnComposeItems
-        .filter((i) => i.aggregate !== "sum" && i.aggregate !== "count")
+        .filter((i) => i.aggregate == null)
         .map((i) => String(i.alias || i.column).trim()),
     [columnComposeItems],
   );
@@ -556,6 +559,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       column: i.column,
       label: i.alias === i.column ? i.alias : `${i.alias} (${i.column})`,
     }));
+  }, [columnComposeItems]);
+
+  const composeAggregateAliasChoices = useMemo(() => {
+    return columnComposeItems
+      .filter((i) => i.aggregate != null)
+      .map((i) => ({
+        alias: String(i.alias || i.column).trim(),
+        label: i.aggregate ? `${String(i.alias)} = ${i.aggregate.toUpperCase()}` : String(i.alias),
+      }));
   }, [columnComposeItems]);
 
   const buildServerComposePayload = useCallback(() => {
@@ -574,6 +586,17 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       groupByAliases: hasComposeAggregates ? composeDimensionAliases : [],
       orderBy: columnComposeOrderBy,
     };
+
+    if (composeHavingFilters.length > 0) {
+      payload.having = {
+        and: composeHavingFilters.map((f) => ({
+          alias: f.havingAlias,
+          op: f.op,
+          value: Number(f.value),
+        })),
+      };
+    }
+
     if (dataset === "kalshi" && selected?.table === "trades" && KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
       payload.join = { preset: kalshiTradesJoinPreset };
     }
@@ -581,6 +604,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [
     columnComposeItems,
     columnComposeOrderBy,
+    composeHavingFilters,
     hasComposeAggregates,
     composeDimensionAliases,
     dataset,
@@ -600,6 +624,27 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       }
       if (it.aggregate === "count") {
         return `“${title}” = count of ${it.column}`;
+      }
+      if (it.aggregate === "count_distinct") {
+        return `“${title}” = count distinct of ${it.column}`;
+      }
+      if (it.aggregate === "avg") {
+        return `“${title}” = average of ${it.column}`;
+      }
+      if (it.aggregate === "min") {
+        return `“${title}” = min of ${it.column}`;
+      }
+      if (it.aggregate === "max") {
+        return `“${title}” = max of ${it.column}`;
+      }
+      if (it.aggregate === "median") {
+        return `“${title}” = median (approx) of ${it.column}`;
+      }
+      if (it.aggregate === "stddev") {
+        return `“${title}” = stddev (volatility) of ${it.column}`;
+      }
+      if (it.aggregate === "variance") {
+        return `“${title}” = variance of ${it.column}`;
       }
       if (it.column === "kalshi_event_ticker_category") {
         return `“${title}” = leading A–Z/0–9 token from event_ticker (Athena regexp_extract)`;
@@ -653,6 +698,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setColumnComposeItems([]);
     setColumnComposeOrderBy([]);
     setComposeWhereFilters([]);
+    setComposeHavingFilters([]);
     setMetaQueryMode("all");
     setMetaOperationKind("count");
     setMetaOperationColumn("");
@@ -1470,11 +1516,26 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         composeWhereFilters.length > 0 &&
         composeWhereFilters.some((f) => {
           if (!f?.column || !f?.op || !f?.kind) return true;
+          if (f.op === "in" || f.op === "not_in") return !String(f.value ?? "").trim();
           if (f.kind === "string") return !String(f.value ?? "").trim();
           return !Number.isFinite(Number(f.value));
         });
       if (hasIncompleteComposeWhereFilters) {
         setError("Enter a value for each WHERE filter before running.");
+        return;
+      }
+
+      const hasIncompleteComposeHavingFilters =
+        Array.isArray(composeHavingFilters) &&
+        composeHavingFilters.length > 0 &&
+        composeHavingFilters.some((f) => {
+          if (!f?.havingAlias || !f?.op) return true;
+          if (f.value === "" || f.value == null) return true;
+          return !Number.isFinite(Number(f.value));
+        });
+
+      if (hasIncompleteComposeHavingFilters) {
+        setError("Enter a value for each HAVING filter before running.");
         return;
       }
       const safeAlias = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -1603,11 +1664,28 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       composeWhereFilters.length > 0 &&
       composeWhereFilters.some((f) => {
         if (!f?.column || !f?.op || !f?.kind) return true;
+        if (f.op === "in" || f.op === "not_in") return !String(f.value ?? "").trim();
         if (f.kind === "string") return !String(f.value ?? "").trim();
         return !Number.isFinite(Number(f.value));
       });
     if ((selectionTab === "columns" || selectionTab === "recipes") && hasIncompleteComposeWhereFilters) {
       reasons.push("Enter a value for each WHERE filter.");
+    }
+
+    const hasIncompleteComposeHavingFilters =
+      Array.isArray(composeHavingFilters) &&
+      composeHavingFilters.length > 0 &&
+      composeHavingFilters.some((f) => {
+        if (!f?.havingAlias || !f?.op) return true;
+        if (f.value === "" || f.value == null) return true;
+        return !Number.isFinite(Number(f.value));
+      });
+
+    if (
+      (selectionTab === "columns" || selectionTab === "recipes") &&
+      hasIncompleteComposeHavingFilters
+    ) {
+      reasons.push("Enter a value for each HAVING filter.");
     }
     if (selectionTab === "meta") {
       const allSpecs = buildAllMetaOpSpecsForRun();
@@ -1622,7 +1700,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       }
     }
     return reasons;
-  }, [selected?.table, selectionTab, columnComposeItems.length, composeWhereFilters, buildAllMetaOpSpecsForRun]);
+  }, [
+    selected?.table,
+    selectionTab,
+    columnComposeItems.length,
+    composeWhereFilters,
+    composeHavingFilters,
+    buildAllMetaOpSpecsForRun,
+  ]);
 
   const canRunRequest = runRequestReasons.length === 0;
 
@@ -1729,7 +1814,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       setError(null);
       const kind = kindForColumn(column);
       const id = `w-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const defaultValue = kind === "date" ? Date.now() : kind === "number" ? 0 : "";
+      const defaultValue =
+        op === "in" || op === "not_in"
+          ? kind === "number"
+            ? "1, 2, 3"
+            : kind === "string"
+              ? '"yes", "no"'
+              : String(Date.now())
+          : kind === "date"
+            ? Date.now()
+            : kind === "number"
+              ? 0
+              : "";
       const predicate = { id, column, kind, op, value: defaultValue };
       setComposeWhereFilters((prev) => [...prev, predicate]);
     },
@@ -1742,6 +1838,21 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   const removeComposeWhereFilter = useCallback((id) => {
     setComposeWhereFilters((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
+  const addComposeHavingFilter = useCallback((havingAlias) => {
+    setError(null);
+    const id = `h-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const predicate = { id, havingAlias, op: "gt", value: 0 };
+    setComposeHavingFilters((prev) => [...prev, predicate]);
+  }, []);
+
+  const updateComposeHavingFilter = useCallback((id, patch) => {
+    setComposeHavingFilters((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  }, []);
+
+  const removeComposeHavingFilter = useCallback((id) => {
+    setComposeHavingFilters((prev) => prev.filter((f) => f.id !== id));
   }, []);
 
   const addMetaFilterPreset = useCallback(
@@ -1842,6 +1953,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                   e.preventDefault();
                                   resetComposeToAllColumns();
                                   setComposeWhereFilters([]);
+                                    setComposeHavingFilters([]);
                                 }}
                               >
                                 * all
@@ -1903,12 +2015,16 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                         ? [
                                             { id: "contains", label: "contains" },
                                             { id: "not_contains", label: "not contains" },
+                                            { id: "in", label: "in set" },
+                                            { id: "not_in", label: "not in set" },
                                           ]
                                         : [
                                             { id: "gt", label: "greater than" },
                                             { id: "lt", label: "less than" },
                                             { id: "eq", label: "is equal to" },
                                             { id: "neq", label: "not equal to" },
+                                            { id: "in", label: "in set" },
+                                            { id: "not_in", label: "not in set" },
                                           ];
 
                                     return (
@@ -1964,6 +2080,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               setColumnComposeItems([]);
                               setColumnComposeOrderBy([]);
                               setComposeWhereFilters([]);
+                              setComposeHavingFilters([]);
                             }}
                           >
                           </Button>
@@ -1982,7 +2099,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       const k = kindForColumn(item.column);
                       const isDateCol = k === "date";
                       const isNumericCol = k === "number";
-                      const canNumberFormat = isNumericCol && item.aggregate !== "count";
+                      const canNumberFormat = isNumericCol && !["count", "count_distinct"].includes(String(item.aggregate || ""));
                       const rollVal = composeRollUpSelectValue(item);
                       const dateShapeVal = composeDateShapeSelectValue(item);
                       const scaleVal = item.numberScale || "none";
@@ -2027,15 +2144,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                 onValueChange={(v) => {
                                   if (v === "none") {
                                     updateComposeItem(item.id, { aggregate: null });
-                                  } else if (v === "sum") {
+                                  } else {
                                     updateComposeItem(item.id, {
-                                      aggregate: "sum",
-                                      dateBucket: null,
-                                      dateFormat: null,
-                                    });
-                                  } else if (v === "count") {
-                                    updateComposeItem(item.id, {
-                                      aggregate: "count",
+                                      aggregate: v,
                                       dateBucket: null,
                                       dateFormat: null,
                                     });
@@ -2052,8 +2163,29 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                   <SelectItem value="sum" className="text-xs" disabled={!isNumericCol}>
                                     Sum numbers
                                   </SelectItem>
+                                  <SelectItem value="avg" className="text-xs" disabled={!isNumericCol}>
+                                    Average
+                                  </SelectItem>
+                                  <SelectItem value="min" className="text-xs" disabled={!isNumericCol}>
+                                    Min
+                                  </SelectItem>
+                                  <SelectItem value="max" className="text-xs" disabled={!isNumericCol}>
+                                    Max
+                                  </SelectItem>
+                                  <SelectItem value="median" className="text-xs" disabled={!isNumericCol}>
+                                    Median (approx)
+                                  </SelectItem>
+                                  <SelectItem value="stddev" className="text-xs" disabled={!isNumericCol}>
+                                    Stddev (volatility)
+                                  </SelectItem>
+                                  <SelectItem value="variance" className="text-xs" disabled={!isNumericCol}>
+                                    Variance
+                                  </SelectItem>
                                   <SelectItem value="count" className="text-xs">
                                     Count (non-empty)
+                                  </SelectItem>
+                                  <SelectItem value="count_distinct" className="text-xs">
+                                    Count distinct
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
@@ -2179,9 +2311,33 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                           value={f.column}
                           onValueChange={(val) => {
                             const kind = kindForColumn(val);
-                            const defaultValue = kind === "date" ? Date.now() : kind === "number" ? 0 : "";
+                            const isInListOp = f.op === "in" || f.op === "not_in";
+                            const defaultValue = isInListOp
+                              ? kind === "number"
+                                ? "1, 2, 3"
+                                : kind === "string"
+                                  ? '"yes", "no"'
+                                  : String(Date.now())
+                              : kind === "date"
+                                ? Date.now()
+                                : kind === "number"
+                                  ? 0
+                                  : "";
+
                             const nextOp =
-                              kind === "string" ? (f.op === "neq" ? "neq" : "eq") : ["gt", "lt", "eq", "neq"].includes(f.op) ? f.op : "gt";
+                              kind === "string"
+                                ? isInListOp
+                                  ? f.op
+                                  : f.op === "neq"
+                                    ? "neq"
+                                    : "eq"
+                                : kind === "number"
+                                  ? ["gt", "lt", "eq", "neq", "in", "not_in"].includes(f.op)
+                                    ? f.op
+                                    : "gt"
+                                  : // date (epoch ms): keep scalar ops; map IN list to eq
+                                    ["gt", "lt", "eq", "neq"].includes(f.op) ? f.op : "eq";
+
                             updateComposeWhereFilter(f.id, { column: val, kind, op: nextOp, value: defaultValue });
                           }}
                         >
@@ -2204,17 +2360,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start" className="w-44">
-                            {(f.kind === "string"
-                              ? [
-                                  { id: "eq", label: "is equal to" },
-                                  { id: "neq", label: "not equal to" },
-                                ]
-                              : [
-                                  { id: "gt", label: "greater than" },
-                                  { id: "lt", label: "less than" },
-                                  { id: "eq", label: "is equal to" },
-                                  { id: "neq", label: "not equal to" },
-                                ]
+                            {(
+                              f.kind === "string"
+                                ? [
+                                    { id: "eq", label: "is equal to" },
+                                    { id: "neq", label: "not equal to" },
+                                    { id: "in", label: "in set" },
+                                    { id: "not_in", label: "not in set" },
+                                  ]
+                                : [
+                                    { id: "gt", label: "greater than" },
+                                    { id: "lt", label: "less than" },
+                                    { id: "eq", label: "is equal to" },
+                                    { id: "neq", label: "not equal to" },
+                                    { id: "in", label: "in set" },
+                                    { id: "not_in", label: "not in set" },
+                                  ]
                             ).map((op) => (
                               <DropdownMenuItem
                                 key={op.id}
@@ -2248,6 +2409,25 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               updateComposeWhereFilter(f.id, { value: Number.isFinite(ms) ? ms : "" });
                             }}
                             placeholder="Value"
+                          />
+                        ) : f.op === "in" || f.op === "not_in" ? (
+                          <Input
+                            type="text"
+                            className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
+                              !String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""
+                            }`}
+                            value={String(f.value ?? "")}
+                            onClick={() => {
+                              if (f.kind === "string") {
+                                toast(
+                                  'Strings: use double quotes, e.g. "yes", "no" (comma-separated).'
+                                );
+                              } else {
+                                toast('Numbers: use raw numbers (no quotes), e.g. 1, 2, 3 (comma-separated).');
+                              }
+                            }}
+                            onChange={(e) => updateComposeWhereFilter(f.id, { value: e.target.value })}
+                            placeholder={f.kind === "string" ? '"yes", "no"' : "1, 2, 3"}
                           />
                         ) : f.kind === "number" ? (
                           <Input
@@ -2293,6 +2473,127 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {composeAggregateAliasChoices.length > 0 && (
+                <div className="space-y-2 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs text-muted-foreground">Having (filter aggregated results)</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          disabled={composeAggregateAliasChoices.length === 0}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Add
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        {composeAggregateAliasChoices.map((a) => (
+                          <DropdownMenuItem
+                            key={a.alias}
+                            className="text-xs"
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              addComposeHavingFilter(a.alias);
+                            }}
+                          >
+                            {a.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {composeHavingFilters.length > 0 ? (
+                    <div className="space-y-2">
+                      {composeHavingFilters.map((f) => (
+                        <div key={f.id} className="flex items-center gap-1 min-w-0">
+                          <Select
+                            value={f.havingAlias}
+                            onValueChange={(val) => updateComposeHavingFilter(f.id, { havingAlias: val })}
+                          >
+                            <SelectTrigger className="h-7 text-[11px] min-w-0 w-24">
+                              <SelectValue placeholder="Alias" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {composeAggregateAliasChoices.map((a) => (
+                                <SelectItem key={a.alias} value={a.alias} className="text-[13px]">
+                                  {a.alias}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] min-w-8">
+                                {operatorSymbol(f.op)}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-44">
+                              {[
+                                { id: "gt", label: "greater than" },
+                                { id: "lt", label: "less than" },
+                                { id: "eq", label: "is equal to" },
+                                { id: "neq", label: "not equal to" },
+                              ].map((op) => (
+                                <DropdownMenuItem
+                                  key={op.id}
+                                  className="text-[13px]"
+                                  onSelect={() => updateComposeHavingFilter(f.id, { op: op.id })}
+                                >
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                      {operatorSymbol(op.id)}
+                                    </span>
+                                    <span>{op.label}</span>
+                                  </span>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+
+                          <Input
+                            type="number"
+                            step="1"
+                            className="h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px]"
+                            value={f.value}
+                            onChange={(e) =>
+                              updateComposeHavingFilter(f.id, {
+                                value: e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            placeholder="Value"
+                          />
+
+                          <TooltipProvider delayDuration={250}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                  onClick={() => removeComposeHavingFilter(f.id)}
+                                >
+                                  <Minus className="h-2 w-2" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                remove filter
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Add one or more HAVING filters to keep only matching aggregated rows.</p>
+                  )}
                 </div>
               )}
 
