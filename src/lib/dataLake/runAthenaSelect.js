@@ -137,31 +137,6 @@ export async function startAthenaBoundedQuery({
 
   const lim = Math.min(Math.max(1, Math.floor(Number(limit) || 1)), 1000);
 
-  if (queryType === "compose") {
-    if (!compose || typeof compose !== "object") {
-      const err = new Error("compose query missing compose spec");
-      err.code = "BAD_REQUEST";
-      throw err;
-    }
-    const capRows = composeUnboundedSelectShouldCapRows(compose) ? COMPOSE_UNCONSTRAINED_ROW_CAP : null;
-    const sql = buildComposeAthenaSelectSql({
-      physicalTableName: safeTable,
-      limit: capRows,
-      compose,
-      lake,
-    });
-    const athena = new AWS.Athena({ region: getRegion() });
-    const { QueryExecutionId } = await athena
-      .startQueryExecution({
-        QueryString: sql,
-        WorkGroup: workGroup,
-        ResultConfiguration: { OutputLocation: output },
-        QueryExecutionContext: { Catalog: catalog, Database: db },
-      })
-      .promise();
-    return { queryExecutionId: QueryExecutionId, sql, rowLimit: capRows };
-  }
-
   const escapeSqlString = (s) => String(s).replace(/'/g, "''");
   const escapeLike = (s) => String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 
@@ -181,24 +156,30 @@ export async function startAthenaBoundedQuery({
     }
 
     // string
-    const pattern = `%${escapeLike(p.value)}%`;
     const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
-    const litMaybeLower = caseSensitive ? `'${escapeSqlString(pattern)}'` : `LOWER('${escapeSqlString(pattern)}')`;
-    const opSql = p.op === "contains" ? "LIKE" : "NOT LIKE";
-    // Use backslash as ESCAPE char so escaped %/_ are treated literally.
-    return `${colMaybeLower} ${opSql} ${litMaybeLower} ESCAPE '\\\\'`;
+    if (p.op === "contains" || p.op === "not_contains") {
+      const pattern = `%${escapeLike(p.value)}%`;
+      const litMaybeLower = caseSensitive ? `'${escapeSqlString(pattern)}'` : `LOWER('${escapeSqlString(pattern)}')`;
+      const opSql = p.op === "contains" ? "LIKE" : "NOT LIKE";
+      // Use backslash as ESCAPE char so escaped %/_ are treated literally.
+      return `${colMaybeLower} ${opSql} ${litMaybeLower} ESCAPE '\\\\'`;
+    }
+
+    const litMaybeLower = caseSensitive ? `'${escapeSqlString(p.value)}'` : `LOWER('${escapeSqlString(p.value)}')`;
+    const opSql = p.op === "eq" ? "=" : "!=";
+    return `${colMaybeLower} ${opSql} ${litMaybeLower}`;
   };
 
   let whereSql = "";
-  if ((queryType === "count" || queryType === "sum") && filters) {
+  if ((queryType === "count" || queryType === "sum" || queryType === "compose") && filters) {
     const andPreds = Array.isArray(filters.and) ? filters.and : [];
     const orPreds = Array.isArray(filters.or) ? filters.or : [];
     const mergeAndPreds = Array.isArray(filters.mergeAnd) ? filters.mergeAnd : [];
     const mergeOrBranchPreds = Array.isArray(filters.mergeOrBranch) ? filters.mergeOrBranch : [];
 
-    const andExpr = andPreds.length ? andPreds.map(predicateToSql).join(" AND ") : "TRUE";
-    const orExpr = orPreds.length ? orPreds.map(predicateToSql).join(" OR ") : "TRUE";
-    const baseExpr = `(${andExpr}) AND (${orExpr})`;
+    const andExpr = andPreds.length ? andPreds.map(predicateToSql).join(" AND ") : null;
+    const orExpr = orPreds.length ? orPreds.map(predicateToSql).join(" OR ") : null;
+    const baseExpr = andExpr && orExpr ? `(${andExpr}) AND (${orExpr})` : andExpr ? `(${andExpr})` : orExpr ? `(${orExpr})` : "TRUE";
 
     if (mergeAndPreds.length > 0 || mergeOrBranchPreds.length > 0) {
       const baseWithAnd =
@@ -211,6 +192,32 @@ export async function startAthenaBoundedQuery({
     } else if (andPreds.length > 0 || orPreds.length > 0) {
       whereSql = ` WHERE ${baseExpr}`;
     }
+  }
+
+  if (queryType === "compose") {
+    if (!compose || typeof compose !== "object") {
+      const err = new Error("compose query missing compose spec");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    const capRows = composeUnboundedSelectShouldCapRows(compose) ? COMPOSE_UNCONSTRAINED_ROW_CAP : null;
+    const sql = buildComposeAthenaSelectSql({
+      physicalTableName: safeTable,
+      limit: capRows,
+      compose,
+      lake,
+      whereSql,
+    });
+    const athena = new AWS.Athena({ region: getRegion() });
+    const { QueryExecutionId } = await athena
+      .startQueryExecution({
+        QueryString: sql,
+        WorkGroup: workGroup,
+        ResultConfiguration: { OutputLocation: output },
+        QueryExecutionContext: { Catalog: catalog, Database: db },
+      })
+      .promise();
+    return { queryExecutionId: QueryExecutionId, sql, rowLimit: capRows };
   }
 
   const sql =

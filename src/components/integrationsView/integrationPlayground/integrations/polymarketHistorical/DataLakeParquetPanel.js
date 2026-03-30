@@ -448,6 +448,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [columnComposeItems, setColumnComposeItems] = useState([]);
   /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
   const [columnComposeOrderBy, setColumnComposeOrderBy] = useState([]);
+  /** @type {Array<{ id: string; column: string; kind: "date" | "string" | "number"; op: string; value: any }>} */
+  const [composeWhereFilters, setComposeWhereFilters] = useState([]);
   /** After Athena returns rows grouped by event-ticker prefix, merge into Sports / Politics / … (client-side, matches pandas get_group). */
   const [kalshiTaxonomyRollup, setKalshiTaxonomyRollup] = useState(false);
   /** Kalshi trades compose: optional INNER JOIN to finalized yes/no markets (Athena subquery). */
@@ -650,6 +652,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     if (!selected?.table) return;
     setColumnComposeItems([]);
     setColumnComposeOrderBy([]);
+    setComposeWhereFilters([]);
     setMetaQueryMode("all");
     setMetaOperationKind("count");
     setMetaOperationColumn("");
@@ -806,7 +809,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, []);
 
   const runIngestWithProgress = useCallback(
-    async (lakeVal, table, sid, mode, composeSpec, metaQueryMode, metaFilters, metaOpSpecs, kalshiIngestExtras = null) => {
+    async (lakeVal, table, sid, mode, composeSpec, composeFilters, metaQueryMode, metaFilters, metaOpSpecs, kalshiIngestExtras = null) => {
       return runParquetSheetLoadWithProgress({
         onLabel: setLoadLabel,
         onProgress: setLoadProgress,
@@ -876,6 +879,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               table,
               queryType: "compose",
               compose: composeSpec,
+              filters: composeFilters || null,
+              caseSensitive: true,
             },
             { maxWaitMs: 900000 },
           );
@@ -921,7 +926,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const executeIngestReplace = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs, kalshiIngestExtras } =
+    const {
+      mode,
+      lake: lk,
+      table,
+      sampleId: sid,
+      composeSpec,
+      composeFilters,
+      metaQueryMode,
+      metaFilters,
+      metaOpSpecs,
+      kalshiIngestExtras,
+    } =
       pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
@@ -937,6 +953,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         sid,
         mode,
         composeSpec,
+        composeFilters,
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
@@ -965,6 +982,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       table,
       sampleId: sid,
       composeSpec,
+      composeFilters,
       metaQueryMode,
       metaFilters,
       metaOpSpecs,
@@ -985,6 +1003,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         sid,
         mode,
         composeSpec,
+        composeFilters,
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
@@ -1028,8 +1047,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const executeIngestNewSheet = useCallback(async () => {
     const pending = pendingIngestRef.current;
     if (!pending) return;
-    const { mode, lake: lk, table, sampleId: sid, composeSpec, metaQueryMode, metaFilters, metaOpSpecs, kalshiIngestExtras } =
-      pending;
+    const {
+      mode,
+      lake: lk,
+      table,
+      sampleId: sid,
+      composeSpec,
+      composeFilters,
+      metaQueryMode,
+      metaFilters,
+      metaOpSpecs,
+      kalshiIngestExtras,
+    } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
     setError(null);
@@ -1048,6 +1077,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         sid,
         mode,
         composeSpec,
+        composeFilters,
         metaQueryMode,
         metaFilters,
         metaOpSpecs,
@@ -1435,6 +1465,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         setError("Add at least one column to SELECT.");
         return;
       }
+      const hasIncompleteComposeWhereFilters =
+        Array.isArray(composeWhereFilters) &&
+        composeWhereFilters.length > 0 &&
+        composeWhereFilters.some((f) => {
+          if (!f?.column || !f?.op || !f?.kind) return true;
+          if (f.kind === "string") return !String(f.value ?? "").trim();
+          return !Number.isFinite(Number(f.value));
+        });
+      if (hasIncompleteComposeWhereFilters) {
+        setError("Enter a value for each WHERE filter before running.");
+        return;
+      }
       const safeAlias = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
       const seen = new Set();
       for (const i of columnComposeItems) {
@@ -1493,6 +1535,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       table: selected.table,
       sampleId: selected.id,
       composeSpec: isComposeTab ? buildServerComposePayload() : undefined,
+      composeFilters: isComposeTab ? (composeWhereFilters.length ? { and: composeWhereFilters, or: [] } : null) : undefined,
       kalshiIngestExtras:
         isComposeTab && dataset === "kalshi" && selected.table === "markets"
           ? {
@@ -1555,6 +1598,17 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     if ((selectionTab === "columns" || selectionTab === "recipes") && columnComposeItems.length === 0) {
       reasons.push("Add at least one column to SELECT.");
     }
+    const hasIncompleteComposeWhereFilters =
+      Array.isArray(composeWhereFilters) &&
+      composeWhereFilters.length > 0 &&
+      composeWhereFilters.some((f) => {
+        if (!f?.column || !f?.op || !f?.kind) return true;
+        if (f.kind === "string") return !String(f.value ?? "").trim();
+        return !Number.isFinite(Number(f.value));
+      });
+    if ((selectionTab === "columns" || selectionTab === "recipes") && hasIncompleteComposeWhereFilters) {
+      reasons.push("Enter a value for each WHERE filter.");
+    }
     if (selectionTab === "meta") {
       const allSpecs = buildAllMetaOpSpecsForRun();
       if (allSpecs.length === 0) reasons.push("Select Count → All or add filters.");
@@ -1568,7 +1622,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       }
     }
     return reasons;
-  }, [selected?.table, selectionTab, columnComposeItems.length, buildAllMetaOpSpecsForRun]);
+  }, [selected?.table, selectionTab, columnComposeItems.length, composeWhereFilters, buildAllMetaOpSpecsForRun]);
 
   const canRunRequest = runRequestReasons.length === 0;
 
@@ -1578,22 +1632,38 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       const t = availableColumnTypesByName[col];
       const typeNorm = String(t || "").toLowerCase();
       const isDate = (typeNorm === "bigint" || typeNorm === "int") && isDateLikeName(col);
-      setColumnComposeItems((prev) => [
-        ...prev,
-        {
-          id: genComposeRowId(),
-          column: col,
-          alias: col,
-          aggregate: null,
-          dateBucket: null,
-          dateFormat: null,
-          numberScale: "none",
-          decimals: null,
-          treatAsDate: isDate,
-        },
-      ]);
+      setColumnComposeItems((prev) => {
+        if (prev.some((i) => i.column === col)) return prev;
+        return [
+          ...prev,
+          {
+            id: genComposeRowId(),
+            column: col,
+            alias: col,
+            aggregate: null,
+            dateBucket: null,
+            dateFormat: null,
+            numberScale: "none",
+            decimals: null,
+            treatAsDate: isDate,
+          },
+        ];
+      });
     },
     [availableColumnTypesByName, isDateLikeName],
+  );
+
+  const removeComposeColumnByName = useCallback(
+    (col) => {
+      setError(null);
+      const victim = columnComposeItems.find((i) => i.column === col);
+      if (!victim) return;
+      setColumnComposeItems((prev) => prev.filter((i) => i.column !== col));
+      if (victim.alias) {
+        setColumnComposeOrderBy((prev) => prev.filter((o) => o.alias !== victim.alias));
+      }
+    },
+    [columnComposeItems],
   );
 
   const resetComposeToAllColumns = useCallback(() => {
@@ -1653,6 +1723,26 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     if (!first) return;
     setColumnComposeOrderBy((prev) => [...prev, { alias: first.alias, direction: "asc" }]);
   }, [composeSelectAliasChoices]);
+
+  const addComposeWhereFilterPreset = useCallback(
+    (column, op) => {
+      setError(null);
+      const kind = kindForColumn(column);
+      const id = `w-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const defaultValue = kind === "date" ? Date.now() : kind === "number" ? 0 : "";
+      const predicate = { id, column, kind, op, value: defaultValue };
+      setComposeWhereFilters((prev) => [...prev, predicate]);
+    },
+    [kindForColumn],
+  );
+
+  const updateComposeWhereFilter = useCallback((id, patch) => {
+    setComposeWhereFilters((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  }, []);
+
+  const removeComposeWhereFilter = useCallback((id) => {
+    setComposeWhereFilters((prev) => prev.filter((f) => f.id !== id));
+  }, []);
 
   const addMetaFilterPreset = useCallback(
     (column, op) => {
@@ -1724,52 +1814,138 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 <div className="flex w-full min-w-0 items-center justify-between gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 text-xs" type="button">
-                        Add Column
-                        <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs flex-1 min-w-0 justify-between"
+                        type="button"
+                      >
+                        Select
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="max-h-96 overflow-y-auto" align="start">
-                      <DropdownMenuItem className="text-xs font-medium" onSelect={resetComposeToAllColumns}>
-                        * all
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                    <DropdownMenuContent className="w-[30rem] p-0 overflow-hidden" align="start">
                       {(() => {
-                        const pending = availableColumns.filter(
-                          (c) => !columnComposeItems.some((i) => i.column === c),
-                        );
-                        if (pending.length === 0) {
-                          return (
-                            <DropdownMenuItem disabled className="text-xs">
-                              Every column is already in the list
-                            </DropdownMenuItem>
-                          );
-                        }
-                        const composeCols = Object.keys(KALSHI_VIRTUAL_COMPOSE_LABELS).filter((c) =>
-                          pending.includes(c),
-                        );
-                        const restCols = pending.filter(
-                          (c) => !Object.prototype.hasOwnProperty.call(KALSHI_VIRTUAL_COMPOSE_LABELS, c),
-                        );
+                        const selectedSet = new Set(columnComposeItems.map((i) => i.column));
+                        const selectedCount = selectedSet.size;
+                        const composeCols = Object.keys(KALSHI_VIRTUAL_COMPOSE_LABELS).filter((c) => availableColumns.includes(c));
+                        const restCols = availableColumns.filter((c) => !Object.prototype.hasOwnProperty.call(KALSHI_VIRTUAL_COMPOSE_LABELS, c));
+                        const filterCandidates = availableColumns.filter((c) => !selectedSet.has(c));
                         return (
-                          <>
-                            {composeCols.length > 0 ? (
-                              <>
-                                <DropdownMenuLabel className="text-[10px] font-thin">Lychee Custom</DropdownMenuLabel>
-                                {composeCols.map((col) => (
-                                  <DropdownMenuItem key={col} className="text-xs" onSelect={() => addComposeColumn(col)}>
-                                    {composeSourceColumnLabel(col)}
-                                  </DropdownMenuItem>
-                                ))}
-                              </>
-                            ) : null}
-                            {composeCols.length > 0 && restCols.length > 0 ? <DropdownMenuSeparator /> : null}
-                            {restCols.map((col) => (
-                              <DropdownMenuItem key={col} className="text-xs" onSelect={() => addComposeColumn(col)}>
-                                {composeSourceColumnLabel(col)}
+                          <div className="flex max-h-96">
+                            <div className="flex-1 min-w-0 overflow-y-auto p-1">
+                              <DropdownMenuLabel className="text-xs">Select</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+
+                              <DropdownMenuItem
+                                className="text-xs font-medium"
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  resetComposeToAllColumns();
+                                  setComposeWhereFilters([]);
+                                }}
+                              >
+                                * all
                               </DropdownMenuItem>
-                            ))}
-                          </>
+
+                              <DropdownMenuSeparator />
+
+                              {composeCols.length > 0 ? (
+                                <>
+                                  <DropdownMenuLabel className="text-[10px] font-thin">Lychee Custom</DropdownMenuLabel>
+                                  {composeCols.map((col) => (
+                                    <DropdownMenuCheckboxItem
+                                      key={col}
+                                      className="text-xs"
+                                      checked={selectedSet.has(col)}
+                                      onSelect={(e) => {
+                                        e.preventDefault();
+                                        if (!selectedSet.has(col)) addComposeColumn(col);
+                                        else removeComposeColumnByName(col);
+                                      }}
+                                    >
+                                      {composeSourceColumnLabel(col)}
+                                    </DropdownMenuCheckboxItem>
+                                  ))}
+                                  {restCols.length > 0 ? <DropdownMenuSeparator /> : null}
+                                </>
+                              ) : null}
+
+                              {restCols.map((col) => (
+                                <DropdownMenuCheckboxItem
+                                  key={col}
+                                  className="text-xs"
+                                  checked={selectedSet.has(col)}
+                                  onSelect={(e) => {
+                                    e.preventDefault();
+                                    if (!selectedSet.has(col)) addComposeColumn(col);
+                                    else removeComposeColumnByName(col);
+                                  }}
+                                >
+                                  {composeSourceColumnLabel(col)}
+                                </DropdownMenuCheckboxItem>
+                              ))}
+                            </div>
+
+                            {selectedCount > 0 ? (
+                              <div className="w-64 min-w-64 overflow-y-auto p-1 border-l border-border/60">
+                                <DropdownMenuLabel className="text-xs">Where (filter)</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+
+                                {filterCandidates.length === 0 ? (
+                                  <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                                    No other columns available
+                                  </DropdownMenuItem>
+                                ) : (
+                                  filterCandidates.map((filterCol) => {
+                                    const filterKind = kindForColumn(filterCol);
+                                    const ops =
+                                      filterKind === "string"
+                                        ? [
+                                            { id: "contains", label: "contains" },
+                                            { id: "not_contains", label: "not contains" },
+                                          ]
+                                        : [
+                                            { id: "gt", label: "greater than" },
+                                            { id: "lt", label: "less than" },
+                                            { id: "eq", label: "is equal to" },
+                                            { id: "neq", label: "not equal to" },
+                                          ];
+
+                                    return (
+                                      <DropdownMenuSub key={filterCol}>
+                                        <DropdownMenuSubTrigger className="text-xs">
+                                          {composeSourceColumnLabel(filterCol)}
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuPortal>
+                                          <DropdownMenuSubContent className="w-56 max-h-[280px] overflow-y-auto">
+                                            <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            {ops.map((op) => (
+                                              <DropdownMenuItem
+                                                key={op.id}
+                                                className="text-[13px]"
+                                                onSelect={(e) => {
+                                                  e.preventDefault();
+                                                  addComposeWhereFilterPreset(filterCol, op.id);
+                                                }}
+                                              >
+                                                <span className="inline-flex items-center gap-2">
+                                                  <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                                    {operatorSymbol(op.id)}
+                                                  </span>
+                                                  <span>{op.label}</span>
+                                                </span>
+                                              </DropdownMenuItem>
+                                            ))}
+                                          </DropdownMenuSubContent>
+                                        </DropdownMenuPortal>
+                                      </DropdownMenuSub>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
                         );
                       })()}
                     </DropdownMenuContent>
@@ -1787,6 +1963,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             onClick={() => {
                               setColumnComposeItems([]);
                               setColumnComposeOrderBy([]);
+                              setComposeWhereFilters([]);
                             }}
                           >
                           </Button>
@@ -1991,6 +2168,133 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   </div>
                 )}
               </div>
+
+              {composeWhereFilters.length > 0 && (
+                <div className="space-y-2 min-w-0">
+                  <Label className="text-xs text-muted-foreground">Where (filter)</Label>
+                  <div className="space-y-2">
+                    {composeWhereFilters.map((f) => (
+                      <div key={f.id} className="flex items-center gap-1">
+                        <Select
+                          value={f.column}
+                          onValueChange={(val) => {
+                            const kind = kindForColumn(val);
+                            const defaultValue = kind === "date" ? Date.now() : kind === "number" ? 0 : "";
+                            const nextOp =
+                              kind === "string" ? (f.op === "neq" ? "neq" : "eq") : ["gt", "lt", "eq", "neq"].includes(f.op) ? f.op : "gt";
+                            updateComposeWhereFilter(f.id, { column: val, kind, op: nextOp, value: defaultValue });
+                          }}
+                        >
+                          <SelectTrigger className="h-7 text-[11px] min-w-0 w-16">
+                            <SelectValue placeholder="Column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableColumns.map((c) => (
+                              <SelectItem key={c} value={c} className="text-[13px]">
+                                {composeSourceColumnLabel(c)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] min-w-8">
+                              {operatorSymbol(f.op)}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-44">
+                            {(f.kind === "string"
+                              ? [
+                                  { id: "eq", label: "is equal to" },
+                                  { id: "neq", label: "not equal to" },
+                                ]
+                              : [
+                                  { id: "gt", label: "greater than" },
+                                  { id: "lt", label: "less than" },
+                                  { id: "eq", label: "is equal to" },
+                                  { id: "neq", label: "not equal to" },
+                                ]
+                            ).map((op) => (
+                              <DropdownMenuItem
+                                key={op.id}
+                                className="text-[13px]"
+                                onSelect={() => updateComposeWhereFilter(f.id, { op: op.id })}
+                              >
+                                <span className="inline-flex items-center gap-2">
+                                  <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                    {operatorSymbol(op.id)}
+                                  </span>
+                                  <span>{op.label}</span>
+                                </span>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {f.kind === "date" ? (
+                          <Input
+                            type="datetime-local"
+                            className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
+                              !Number.isFinite(Number(f.value)) ? "border-destructive focus-visible:ring-destructive" : ""
+                            }`}
+                            value={
+                              Number.isFinite(Number(f.value))
+                                ? new Date(Number(f.value)).toISOString().slice(0, 16)
+                                : ""
+                            }
+                            onChange={(e) => {
+                              const ms = new Date(String(e.target.value)).getTime();
+                              updateComposeWhereFilter(f.id, { value: Number.isFinite(ms) ? ms : "" });
+                            }}
+                            placeholder="Value"
+                          />
+                        ) : f.kind === "number" ? (
+                          <Input
+                            type="number"
+                            step="1"
+                            className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
+                              f.value === "" ? "border-destructive focus-visible:ring-destructive" : ""
+                            }`}
+                            value={f.value}
+                            onChange={(e) =>
+                              updateComposeWhereFilter(f.id, { value: e.target.value === "" ? "" : Number(e.target.value) })
+                            }
+                            placeholder="Value"
+                          />
+                        ) : (
+                          <Input
+                            type="text"
+                            className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
+                              !String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""
+                            }`}
+                            value={String(f.value ?? "")}
+                            onChange={(e) => updateComposeWhereFilter(f.id, { value: e.target.value })}
+                            placeholder="Value"
+                          />
+                        )}
+
+                        <TooltipProvider delayDuration={250}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                onClick={() => removeComposeWhereFilter(f.id)}
+                              >
+                                <Minus className="h-2 w-2" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              remove filter
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {showComposeGroupingSection ? (
                 <div className="rounded-md border border-border/70 bg-muted/25 px-3 py-2 space-y-1.5">

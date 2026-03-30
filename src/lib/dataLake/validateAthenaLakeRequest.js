@@ -87,7 +87,7 @@ export function validateAthenaLakeQueryBody(body) {
   let validatedCompose = null;
 
   const filtersInput =
-    (queryType === "count" || queryType === "sum") && body.filters && typeof body.filters === "object"
+    (queryType === "count" || queryType === "sum" || queryType === "compose") && body.filters && typeof body.filters === "object"
       ? body.filters
       : null;
   let validatedFilters = null;
@@ -160,7 +160,7 @@ export function validateAthenaLakeQueryBody(body) {
           throw new AthenaLakeRequestError("Invalid number filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       } else if (kind === "string") {
-        if (!["contains", "not_contains"].includes(op)) {
+        if (!["contains", "not_contains", "eq", "neq"].includes(op)) {
           throw new AthenaLakeRequestError("Invalid string filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       }
@@ -439,7 +439,7 @@ export function validateAthenaLakeQueryBody(body) {
     sumColumn: queryType === "sum" ? sumColumn : null,
     sumAlias: queryType === "sum" ? sumAlias : null,
     caseSensitive,
-    filters: queryType === "count" || queryType === "sum" ? validatedFilters : null,
+    filters: queryType === "count" || queryType === "sum" || queryType === "compose" ? validatedFilters : null,
     physical,
     database,
     compose: validatedCompose,

@@ -335,7 +335,7 @@ function buildGroupExpression(opts) {
  * @param {{ physicalTableName: string; limit?: number | null; compose: object; lake?: string | null }} params
  * @returns {string}
  */
-export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose, lake = null }) {
+export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose, lake = null, whereSql = "" }) {
   const safeTable = String(physicalTableName).trim();
   if (!/^[a-zA-Z0-9_]+$/.test(safeTable)) {
     const err = new Error("Invalid table name");
@@ -476,5 +476,6 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
       ? Math.min(1000, Math.max(1, Math.floor(Number(limit))))
       : null;
   const limitSql = lim != null ? ` LIMIT ${lim}` : "";
-  return `SELECT ${selectParts.join(", ")} ${fromClause}${groupSql}${orderSql}${limitSql}`;
+  const w = typeof whereSql === "string" ? whereSql : "";
+  return `SELECT ${selectParts.join(", ")} ${fromClause}${w}${groupSql}${orderSql}${limitSql}`;
 }
