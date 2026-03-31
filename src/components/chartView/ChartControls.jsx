@@ -62,12 +62,6 @@ export default function ChartControls() {
     availableYOptions,
     handleSelectY,
     removeY,
-    lineSeriesColumn,
-    setLineSeriesColumn,
-    lineSeriesColumnOptions,
-    lineSeriesCandidates,
-    lineSeriesValues,
-    setLineSeriesValues,
 
     selZ,
     setSelZ,
@@ -171,8 +165,8 @@ export default function ChartControls() {
 
   // Only one section open at a time; default to Chart Type.
   const [openSection, setOpenSection] = useState("chartType");
-  const addableLineSeriesValues = (lineSeriesCandidates || []).filter((v) => !(lineSeriesValues || []).includes(v));
-  const addLineLabel = `+ Line ${((lineSeriesValues?.length || 0) + 1)}`;
+  const [lineAddValue, setLineAddValue] = useState("");
+  const addableLineColumns = (xOptions || []).filter((c) => c !== selX && !(selY || []).includes(c));
   const palettePreview = selectedPalette && selectedPalette.length
     ? selectedPalette
     : (selectedCategory && masterPalette?.[selectedCategory]?.[0]) || [];
@@ -331,7 +325,7 @@ export default function ChartControls() {
                     <>
                       <div className="py-2 space-y-2">
                         <div className="flex min-w-0 items-center gap-2 text-black">
-                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>x:</span>
+                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>index:</span>
                           <Select value={selX} onValueChange={(value) => setSelX(value)}>
                             <SelectTrigger className="min-w-0 flex-1">
                               <SelectValue placeholder="x axis" className="text-xs" />
@@ -344,79 +338,63 @@ export default function ChartControls() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>y:</span>
-                          <Select
-                            value={selY?.[0] || ""}
-                            onValueChange={(val) => {
-                              setSelY([val]);
-                            }}
-                          >
-                            <SelectTrigger className="min-w-0 flex-1">
-                              <SelectValue placeholder="y axis" className="text-xs" />
-                            </SelectTrigger>
-                            <SelectContent className="text-xs">
-                              {(availableYOptions || []).map((i) => (
-                                <SelectItem key={i} value={i} className="text-xs">
-                                  {i}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
                         </div>
-                        <div className="flex min-w-0 items-center gap-2 text-black">
-                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>series:</span>
-                          <Select value={lineSeriesColumn || ""} onValueChange={(v) => setLineSeriesColumn(v)}>
-                            <SelectTrigger className="min-w-0 flex-1">
-                              <SelectValue placeholder="series column" className="text-xs" />
-                            </SelectTrigger>
-                            <SelectContent className="text-xs">
-                              {(lineSeriesColumnOptions || []).map((i) => (
-                                <SelectItem key={i} value={i} className="text-xs">
-                                  {i}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+                        <div className="pt-2">
+                          <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} mb-1`}>Lines</p>
 
-                      <div className="py-2 flex flex-wrap gap-2">
-                        {(lineSeriesValues || []).map((lineValue, index) => (
-                          <Badge key={`${lineValue}-${index}`} variant="secondary" className="text-xs gap-2 pr-1 pl-2 py-1">
-                            <span className="inline-flex items-center gap-1">
-                              <span
-                                className="inline-block h-2 w-2 rounded-full"
-                                style={{ backgroundColor: selectedPalette?.[index] || selectedPalette?.[3] || (dark ? "#ffffff" : "#000000") }}
-                              />
-                              {`Line ${index + 1}: ${lineValue}`}
-                            </span>
-                            <button
-                              type="button"
-                              className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
-                              aria-label={`Remove Line ${index + 1}`}
-                              onClick={() => setLineSeriesValues((prev) => (prev || []).filter((_, i) => i !== index))}
+                          <div className="py-2 flex flex-wrap gap-2">
+                            {(selY || []).map((lineColumn, index) => (
+                              <Badge key={`${lineColumn}-${index}`} variant="secondary" className="text-xs gap-2 pr-1 pl-2 py-1">
+                                <span className="inline-flex items-center gap-1">
+                                  <span
+                                    className="inline-block h-2 w-2 rounded-full"
+                                    style={{ backgroundColor: palettePreview?.[index] || palettePreview?.[3] || (dark ? "#ffffff" : "#000000") }}
+                                  />
+                                  {`Line ${index + 1}: ${lineColumn}`}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
+                                  aria-label={`Remove Line ${index + 1}`}
+                                  onClick={() => removeY(lineColumn, index)}
+                                >
+                                  x
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={lineAddValue}
+                              onValueChange={(val) => {
+                                if (!val) return;
+                                handleSelectY(val);
+                                setLineAddValue("");
+                              }}
                             >
-                              x
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
+                              <SelectTrigger
+                                className="min-w-[140px] h-8 bg-black text-white rounded-md text-xs disabled:opacity-50"
+                                disabled={!addableLineColumns.length}
+                              >
+                                <SelectValue placeholder="+ Add Line" className="text-xs" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                {(addableLineColumns || []).map((c) => (
+                                  <SelectItem key={c} value={c} className="text-xs">
+                                    {c}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="p-2 bg-black text-white rounded-md text-xs disabled:opacity-50"
-                          onClick={() => {
-                            if (!addableLineSeriesValues.length) return;
-                            const next = addableLineSeriesValues[0];
-                            setLineSeriesValues((prev) => [...(prev || []), next]);
-                          }}
-                          disabled={!addableLineSeriesValues.length}
-                        >
-                          {addLineLabel}
-                        </button>
-                        {!addableLineSeriesValues.length && (
-                          <span className={`text-[10px] ${dark ? "text-slate-300" : "text-muted-foreground"}`}>No more category values</span>
-                        )}
+                            {!addableLineColumns.length && (
+                              <span className={`text-[10px] ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+                                No more columns to plot
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </>
                   ) : (selChartType === "area") ? (

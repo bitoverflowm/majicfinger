@@ -45,6 +45,15 @@ export function getDataLakeDatasetConfig(dataset) {
   };
 }
 
+/**
+ * Glue table names available for joins / Athena in the UI (Kalshi has no blocks table).
+ * @param {DataLakeDataset} dataset
+ * @returns {("markets" | "trades" | "blocks")[]}
+ */
+export function glueTableNamesForDataset(dataset) {
+  return dataset === "kalshi" ? ["markets", "trades"] : ["markets", "trades", "blocks"];
+}
+
 // --- Optional: direct Parquet URLs (other features / docs) ---
 
 export function getDataLakeBaseUrl() {

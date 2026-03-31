@@ -225,7 +225,10 @@ export async function startAthenaBoundedQuery({
       err.code = "BAD_REQUEST";
       throw err;
     }
-    const capRows = composeUnboundedSelectShouldCapRows(compose) ? COMPOSE_UNCONSTRAINED_ROW_CAP : null;
+    // TEMP: cap compose results for UX/testing.
+    // Large compose result sets can stall the browser ingest pipeline (Athena → JSON → DuckDB → sheet).
+    // We'll make this user-configurable later; for now keep it small to validate correctness end-to-end.
+    const capRows = 100;
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
       limit: capRows,

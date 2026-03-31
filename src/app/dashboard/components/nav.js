@@ -676,7 +676,11 @@ const Nav = () => {
               </div>
             ) : (
               <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:ml-auto">
-                {connectedData && <span className="text-xs text-muted-foreground hidden sm:inline">Register to save your work</span>}
+                {connectedData && (
+                  <span className="flex-1 text-right text-xs text-muted-foreground hidden sm:inline whitespace-nowrap">
+                    Register to save your work
+                  </span>
+                )}
                 <Button variant="default" size="sm" onClick={()=>setViewing('register')}>Log In</Button>
                 <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
               </div>

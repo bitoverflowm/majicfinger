@@ -236,6 +236,19 @@ export function ChartBuilderProvider({ demo, children }) {
     });
   }, [selChartType]);
 
+  // For the new multi-column line model, avoid plotting the X/index column as a line.
+  useEffect(() => {
+    if (selChartType !== "line") return;
+    if (!selX || !Array.isArray(xOptions) || !xOptions.length) return;
+    setSelY((prev) => {
+      const curr = Array.isArray(prev) ? prev : [];
+      const filtered = curr.filter((v) => v !== selX);
+      if (filtered.length) return filtered;
+      const fallback = xOptions.find((c) => c !== selX);
+      return fallback ? [fallback] : [];
+    });
+  }, [selChartType, selX, xOptions]);
+
   useEffect(() => {
     if (!demo) return;
     setSelX('month');
@@ -306,34 +319,11 @@ export function ChartBuilderProvider({ demo, children }) {
   const lineIsTemporalX = useMemo(() => isLikelyTemporalKey(selX, dataTypes, chartData), [selX, dataTypes, chartData]);
 
   const lineChartData = useMemo(() => {
-    if (!chartData?.length || !selX || !selY?.[0]) return chartData || dfltChartData;
-    if (!lineSeriesColumn || !lineSeriesValues?.length) return chartData;
-    const yKey = selY[0];
-    const selectedSet = new Set(lineSeriesValues);
-    const rowsByX = new Map();
-    (chartData || []).forEach((row) => {
-      const seriesValue = row?.[lineSeriesColumn];
-      if (seriesValue == null || !selectedSet.has(String(seriesValue))) return;
-      const xVal = row?.[selX];
-      const xMapKey = xVal == null ? "__null__" : String(xVal);
-      const existing = rowsByX.get(xMapKey) || { [selX]: xVal };
-      const vNum = Number(row?.[yKey]);
-      if (!Number.isNaN(vNum) && Number.isFinite(vNum)) {
-        existing[String(seriesValue)] = vNum;
-      }
-      rowsByX.set(xMapKey, existing);
-    });
-    const rows = Array.from(rowsByX.values());
-    const xType = getAxisType(selX, dataTypes, chartData);
-    if (xType === "date" || xType === "number") {
-      rows.sort((a, b) => {
-        const av = toSortableXAxisValue(a?.[selX], xType);
-        const bv = toSortableXAxisValue(b?.[selX], xType);
-        return av - bv;
-      });
-    }
-    return rows;
-  }, [chartData, selX, selY, lineSeriesColumn, lineSeriesValues, lineIsTemporalX, dataTypes]);
+    // New model: line charts plot `selY` columns directly (each column becomes one Line).
+    // So we just return the sheet rows as-is.
+    if (!chartData?.length) return chartData || dfltChartData;
+    return chartData;
+  }, [chartData]);
 
   const selectedPaletteHandler = (index) => {
     const cat = selectedCategory || categories?.[0];
@@ -599,7 +589,6 @@ export function ChartCanvas() {
     dataTypes,
     selX,
     selY,
-    lineSeriesValues,
     lineStyle,
     expanded,
     legendVisible,
@@ -641,9 +630,7 @@ export function ChartCanvas() {
       return av - bv;
     });
   }, [selChartType, renderedData, sortedData, xAxisType, xKey]);
-  const yKeys = selChartType === "line"
-    ? ((lineSeriesValues && lineSeriesValues.length) ? lineSeriesValues : ((selY && selY.length) ? selY : ["desktop"]))
-    : ((selY && selY.length) ? selY : ["desktop"]);
+  const yKeys = (selY && selY.length) ? selY : ["desktop"];
   /** Recharts Treemap: one synthetic root whose children are sheet rows (name ← X, value ← Y). */
   const treemapData = useMemo(() => {
     if (selChartType !== "treemap" || !Array.isArray(finalRenderedData) || !yKeys[0]) {

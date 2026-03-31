@@ -31,8 +31,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Toggle } from "@/components/ui/toggle";
 import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
-import { getDataLakeDatasetConfig, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { getDataLakeDatasetConfig, glueTableNamesForDataset, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
@@ -287,6 +288,10 @@ function genComposeRowId() {
   return `cs-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
 }
 
+function genComposeJoinId() {
+  return `cj-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
 /** @param {string} col */
 function composeSourceColumnLabel(col) {
   return KALSHI_VIRTUAL_COMPOSE_LABELS[col] || col;
@@ -433,6 +438,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const addNewSheetAndActivate = ctx?.addNewSheetAndActivate;
   const setSheetData = ctx?.setSheetData;
   const setDataSheets = ctx?.setDataSheets;
+  const dataSheets = ctx?.dataSheets || {};
   const liveStreamState = ctx?.liveStreamState;
   const activeSheetId = ctx?.activeSheetId;
 
@@ -442,6 +448,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     !!streamsBySheetId[activeSheetId]?.isRunning;
 
   const { sampleOptions, lake } = useMemo(() => getDataLakeDatasetConfig(dataset), [dataset]);
+  const glueJoinTableOptions = useMemo(() => glueTableNamesForDataset(dataset), [dataset]);
 
   const canUseSamples = true;
   const [sampleId, setSampleId] = useState("");
@@ -453,6 +460,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [composeWhereFilters, setComposeWhereFilters] = useState([]);
   /** @type {Array<{ id: string; havingAlias: string; op: string; value: any }>} */
   const [composeHavingFilters, setComposeHavingFilters] = useState([]);
+  /** @type {Array<{ id: string; targetKind: "table" | "sheet"; targetTable: string; targetSheetId: string; joinType: "inner" | "left"; leftColumn: string; rightColumn: string }>} */
+  const [composeJoins, setComposeJoins] = useState([]);
   /** After Athena returns rows grouped by event-ticker prefix, merge into Sports / Politics / … (client-side, matches pandas get_group). */
   const [kalshiTaxonomyRollup, setKalshiTaxonomyRollup] = useState(false);
   /** Kalshi trades compose: optional INNER JOIN to finalized yes/no markets (Athena subquery). */
@@ -510,6 +519,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     for (const c of availableColumnMeta) map[c.name] = c.type;
     return map;
   }, [availableColumnMeta]);
+  const numericColumns = useMemo(() => {
+    return availableColumns.filter((c) => {
+      const t = String(availableColumnTypesByName[c] || "").toLowerCase();
+      return t === "double" || t === "bigint" || t === "int";
+    });
+  }, [availableColumns, availableColumnTypesByName]);
 
   const isDateLikeName = useCallback((name) => {
     return /(^timestamp$)|(_at$)|(_time$)|(^created_)|(_date$)|date|time/i.test(String(name || ""));
@@ -543,6 +558,35 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   );
 
   const showComposeGroupingSection = hasComposeAggregates || hasComposeBucketOrDateFormat;
+
+  const sheetJoinCandidates = useMemo(() => {
+    const entries = Object.entries(dataSheets || {});
+    return entries.map(([id, sheet]) => ({
+      id,
+      name: String(sheet?.name || id),
+      rowCount: Array.isArray(sheet?.data) ? sheet.data.length : 0,
+    }));
+  }, [dataSheets]);
+
+  const addComposeJoinRule = useCallback(() => {
+    setComposeJoins((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      const baseLeft = availableColumns?.[0] || "";
+      const defaultTargetTable = selected?.table === "markets" ? "trades" : "markets";
+      return [
+        ...list,
+        {
+          id: genComposeJoinId(),
+          targetKind: "table",
+          targetTable: defaultTargetTable,
+          targetSheetId: "",
+          joinType: "inner",
+          leftColumn: baseLeft,
+          rightColumn: "",
+        },
+      ];
+    });
+  }, [availableColumns, selected?.table]);
 
   /** Non-aggregate SELECT aliases — these are the GROUP BY keys when Sum/Count is used (e.g. one row per quarter). */
   const composeDimensionAliases = useMemo(
@@ -581,6 +625,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         numberScale: i.numberScale || "none",
         decimals: i.decimals != null ? Number(i.decimals) : null,
         treatAsDate: i.treatAsDate === true,
+          ...(i.aggregate === "sum" && i.sumCase && i.sumCase.enabled ? { sumCase: i.sumCase } : {}),
       })),
       // Server normalizes too: with Sum/Count, GROUP BY is every non-aggregate field (e.g. quarter) so many trades in Q1 2024 become one row.
       groupByAliases: hasComposeAggregates ? composeDimensionAliases : [],
@@ -600,6 +645,16 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     if (dataset === "kalshi" && selected?.table === "trades" && KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
       payload.join = { preset: kalshiTradesJoinPreset };
     }
+
+    const tableJoins = (composeJoins || [])
+      .filter((j) => j && j.targetKind === "table")
+      .map((j) => ({
+        joinType: j.joinType || "inner",
+        table: String(j.targetTable || "").trim().toLowerCase(),
+        on: { leftColumn: String(j.leftColumn || "").trim(), rightColumn: String(j.rightColumn || "").trim() },
+      }))
+      .filter((j) => j.table && j.on.leftColumn && j.on.rightColumn);
+    if (tableJoins.length) payload.joins = tableJoins;
     return payload;
   }, [
     columnComposeItems,
@@ -610,6 +665,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     dataset,
     selected?.table,
     kalshiTradesJoinPreset,
+    composeJoins,
   ]);
 
   const composeFriendlySummary = useMemo(() => {
@@ -855,7 +911,19 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, []);
 
   const runIngestWithProgress = useCallback(
-    async (lakeVal, table, sid, mode, composeSpec, composeFilters, metaQueryMode, metaFilters, metaOpSpecs, kalshiIngestExtras = null) => {
+    async (
+      lakeVal,
+      table,
+      sid,
+      mode,
+      composeSpec,
+      composeFilters,
+      metaQueryMode,
+      metaFilters,
+      metaOpSpecs,
+      kalshiIngestExtras = null,
+      sheetJoinSpec = null,
+    ) => {
       return runParquetSheetLoadWithProgress({
         onLabel: setLoadLabel,
         onProgress: setLoadProgress,
@@ -919,17 +987,49 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           if (!composeSpec || typeof composeSpec !== "object") {
             throw new Error("Missing compose query spec.");
           }
-          const { columns: resultColumns, rows } = await fetchAthenaLakeSample(
-            {
-              lake: lakeVal,
-              table,
-              queryType: "compose",
-              compose: composeSpec,
-              filters: composeFilters || null,
-              caseSensitive: true,
-            },
-            { maxWaitMs: 900000 },
-          );
+          const sheetJoin = sheetJoinSpec && typeof sheetJoinSpec === "object" ? sheetJoinSpec : null;
+          const joinEnabled =
+            sheetJoin &&
+            Array.isArray(sheetJoin.sheetRows) &&
+            sheetJoin.sheetRows.length > 0 &&
+            sheetJoin.join &&
+            typeof sheetJoin.join === "object";
+
+          const { columns: resultColumns, rows } = joinEnabled
+            ? await (async () => {
+                const res = await fetch("/api/data-lake/join-sheet", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "same-origin",
+                  body: JSON.stringify({
+                    lake: lakeVal,
+                    table,
+                    compose: composeSpec,
+                    filters: composeFilters || null,
+                    sheetRows: sheetJoin.sheetRows,
+                    join: sheetJoin.join,
+                  }),
+                });
+                let j = {};
+                try {
+                  j = await res.json();
+                } catch {
+                  /* ignore */
+                }
+                if (!res.ok) throw new Error(j.error || res.statusText || `Join ${res.status}`);
+                return { columns: j.columns || [], rows: j.rows || [] };
+              })()
+            : await fetchAthenaLakeSample(
+                {
+                  lake: lakeVal,
+                  table,
+                  queryType: "compose",
+                  compose: composeSpec,
+                  filters: composeFilters || null,
+                  caseSensitive: true,
+                },
+                { maxWaitMs: 900000 },
+              );
 
           let outRows = rows;
           const kr = kalshiIngestExtras?.taxonomyRollup;
@@ -983,6 +1083,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaFilters,
       metaOpSpecs,
       kalshiIngestExtras,
+      sheetJoinSpec,
     } =
       pending;
     pendingIngestRef.current = null;
@@ -1004,6 +1105,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaFilters,
         metaOpSpecs,
         kalshiIngestExtras,
+        sheetJoinSpec,
       );
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         applyRowsToActiveSheet(finalRows);
@@ -1597,6 +1699,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       sampleId: selected.id,
       composeSpec: isComposeTab ? buildServerComposePayload() : undefined,
       composeFilters: isComposeTab ? (composeWhereFilters.length ? { and: composeWhereFilters, or: [] } : null) : undefined,
+      sheetJoinSpec: (() => {
+        const joins = Array.isArray(composeJoins) ? composeJoins : [];
+        const sheetJoin = joins.find((j) => j && j.targetKind === "sheet" && j.targetSheetId && j.leftColumn && j.rightColumn);
+        if (!sheetJoin) return null;
+        const sheet = dataSheets?.[sheetJoin.targetSheetId];
+        const sheetRows = Array.isArray(sheet?.data) ? sheet.data : [];
+        if (!sheetRows.length) return null;
+        return {
+          sheetRows,
+          join: {
+            sheetColumn: sheetJoin.rightColumn,
+            pullColumn: sheetJoin.leftColumn,
+            joinType: sheetJoin.joinType || "left",
+          },
+        };
+      })(),
       kalshiIngestExtras:
         isComposeTab && dataset === "kalshi" && selected.table === "markets"
           ? {
@@ -1731,6 +1849,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             numberScale: "none",
             decimals: null,
             treatAsDate: isDate,
+            sumCase: { enabled: false, branches: [], elseColumn: "" },
           },
         ];
       });
@@ -1768,6 +1887,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           numberScale: "none",
           decimals: null,
           treatAsDate: isDate,
+          sumCase: { enabled: false, branches: [], elseColumn: "" },
         };
       }),
     );
@@ -1940,7 +2060,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                         const selectedCount = selectedSet.size;
                         const composeCols = Object.keys(KALSHI_VIRTUAL_COMPOSE_LABELS).filter((c) => availableColumns.includes(c));
                         const restCols = availableColumns.filter((c) => !Object.prototype.hasOwnProperty.call(KALSHI_VIRTUAL_COMPOSE_LABELS, c));
-                        const filterCandidates = availableColumns.filter((c) => !selectedSet.has(c));
+                        // WHERE filters are statement-level: you can filter on any column,
+                        // including columns that are also selected in the output.
+                        const filterCandidates = availableColumns;
                         return (
                           <div className="flex max-h-96">
                             <div className="flex-1 min-w-0 overflow-y-auto p-1">
@@ -2143,12 +2265,13 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                 value={rollVal}
                                 onValueChange={(v) => {
                                   if (v === "none") {
-                                    updateComposeItem(item.id, { aggregate: null });
+                                    updateComposeItem(item.id, { aggregate: null, sumCase: { enabled: false, branches: [], elseColumn: "" } });
                                   } else {
                                     updateComposeItem(item.id, {
                                       aggregate: v,
                                       dateBucket: null,
                                       dateFormat: null,
+                                      ...(v !== "sum" ? { sumCase: { enabled: false, branches: [], elseColumn: "" } } : {}),
                                     });
                                   }
                                 }}
@@ -2191,6 +2314,244 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               </Select>
                             </div>
                           </div>
+
+                          {item.aggregate === "sum" ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Toggle
+                                  variant="outline"
+                                  size="sm"
+                                  pressed={!!item.sumCase?.enabled}
+                                  onPressedChange={(pressed) => {
+                                    const enabled = !!pressed;
+                                    const current = item.sumCase && typeof item.sumCase === "object" ? item.sumCase : null;
+                                    const hasBranch = Array.isArray(current?.branches) && current.branches.length > 0;
+                                    const defaultBranch = {
+                                      when: {
+                                        column: availableColumns[0] || "",
+                                        op: "eq",
+                                        value: "",
+                                      },
+                                      thenColumn: numericColumns[0] || "",
+                                    };
+                                    updateComposeItem(item.id, {
+                                      sumCase: enabled
+                                        ? {
+                                            enabled: true,
+                                            branches: hasBranch ? current.branches : [defaultBranch],
+                                            elseColumn: typeof current?.elseColumn === "string" ? current.elseColumn : "",
+                                          }
+                                        : { enabled: false, branches: [], elseColumn: "" },
+                                    });
+                                  }}
+                                >
+                                  if else
+                                </Toggle>
+                                <p className="text-[11px] text-muted-foreground">
+                                  SUM of this column times a CASE expression.
+                                </p>
+                              </div>
+
+                              {item.sumCase?.enabled ? (
+                                <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2">
+                                  {(item.sumCase?.branches || []).map((b, idx) => {
+                                    const whenCol = String(b?.when?.column || "");
+                                    const whenKind = kindForColumn(whenCol);
+                                    const whenOp = String(b?.when?.op || "eq");
+                                    const whenVal = b?.when?.value ?? "";
+                                    const thenCol = String(b?.thenColumn || "");
+                                    const ops =
+                                      whenKind === "string"
+                                        ? [
+                                            { id: "eq", label: "=" },
+                                            { id: "neq", label: "!=" },
+                                          ]
+                                        : [
+                                            { id: "gt", label: ">" },
+                                            { id: "lt", label: "<" },
+                                            { id: "eq", label: "=" },
+                                            { id: "neq", label: "!=" },
+                                          ];
+
+                                    return (
+                                      <div key={`sumcase-${item.id}-${idx}`} className="flex flex-wrap items-center gap-1">
+                                        <span className="text-[11px] font-medium text-muted-foreground min-w-8">
+                                          {idx === 0 ? "if" : "else if"}
+                                        </span>
+                                        <Select
+                                          value={whenCol}
+                                          onValueChange={(v) => {
+                                            const next = (item.sumCase?.branches || []).map((x, j) =>
+                                              j === idx ? { ...x, when: { ...(x.when || {}), column: v } } : x,
+                                            );
+                                            updateComposeItem(item.id, { sumCase: { ...item.sumCase, branches: next } });
+                                          }}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] w-28">
+                                            <SelectValue placeholder="Column" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {availableColumns.map((c) => (
+                                              <SelectItem key={`sumcase-when-${idx}-${c}`} value={c} className="text-[13px]">
+                                                {composeSourceColumnLabel(c)}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+
+                                        <Select
+                                          value={whenOp}
+                                          onValueChange={(v) => {
+                                            const next = (item.sumCase?.branches || []).map((x, j) =>
+                                              j === idx ? { ...x, when: { ...(x.when || {}), op: v } } : x,
+                                            );
+                                            updateComposeItem(item.id, { sumCase: { ...item.sumCase, branches: next } });
+                                          }}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] w-16">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {ops.map((o) => (
+                                              <SelectItem key={`sumcase-op-${idx}-${o.id}`} value={o.id} className="text-[13px]">
+                                                {o.label}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+
+                                        <Input
+                                          type={whenKind === "number" ? "number" : "text"}
+                                          className="h-7 text-[11px] w-24"
+                                          value={String(whenVal)}
+                                          onChange={(e) => {
+                                            const raw = e.target.value;
+                                            const nextVal = whenKind === "number" ? (raw === "" ? "" : Number(raw)) : raw;
+                                            const next = (item.sumCase?.branches || []).map((x, j) =>
+                                              j === idx ? { ...x, when: { ...(x.when || {}), value: nextVal } } : x,
+                                            );
+                                            updateComposeItem(item.id, { sumCase: { ...item.sumCase, branches: next } });
+                                          }}
+                                          placeholder="value"
+                                        />
+
+                                        <span className="text-[11px] text-muted-foreground">then</span>
+                                        <Select
+                                          value={thenCol}
+                                          onValueChange={(v) => {
+                                            const next = (item.sumCase?.branches || []).map((x, j) =>
+                                              j === idx ? { ...x, thenColumn: v } : x,
+                                            );
+                                            updateComposeItem(item.id, { sumCase: { ...item.sumCase, branches: next } });
+                                          }}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] w-28">
+                                            <SelectValue placeholder="Column" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {numericColumns.map((c) => (
+                                              <SelectItem key={`sumcase-then-${idx}-${c}`} value={c} className="text-[13px]">
+                                                {composeSourceColumnLabel(c)}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+
+                                        {idx > 0 ? (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={() => {
+                                              const next = (item.sumCase?.branches || []).filter((_, j) => j !== idx);
+                                              updateComposeItem(item.id, { sumCase: { ...item.sumCase, branches: next } });
+                                            }}
+                                            aria-label="remove else if"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </Button>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })}
+
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]">
+                                          <Plus className="h-3 w-3 mr-1" />
+                                          add else
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="start" className="w-44">
+                                        <DropdownMenuItem
+                                          className="text-[13px]"
+                                          disabled={!!item.sumCase?.elseColumn}
+                                          onSelect={() => {
+                                            const nextElse = numericColumns[0] || "";
+                                            updateComposeItem(item.id, { sumCase: { ...item.sumCase, elseColumn: nextElse } });
+                                          }}
+                                        >
+                                          else
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          className="text-[13px]"
+                                          onSelect={() => {
+                                            const next = [
+                                              ...(item.sumCase?.branches || []),
+                                              {
+                                                when: { column: availableColumns[0] || "", op: "eq", value: "" },
+                                                thenColumn: numericColumns[0] || "",
+                                              },
+                                            ];
+                                            updateComposeItem(item.id, { sumCase: { ...item.sumCase, branches: next } });
+                                          }}
+                                        >
+                                          else if
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+
+                                    {item.sumCase?.elseColumn ? (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[11px] font-medium text-muted-foreground min-w-8">else</span>
+                                        <Select
+                                          value={String(item.sumCase.elseColumn || "")}
+                                          onValueChange={(v) => updateComposeItem(item.id, { sumCase: { ...item.sumCase, elseColumn: v } })}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] w-28">
+                                            <SelectValue placeholder="Column" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {numericColumns.map((c) => (
+                                              <SelectItem key={`sumcase-else-${item.id}-${c}`} value={c} className="text-[13px]">
+                                                {composeSourceColumnLabel(c)}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7"
+                                          onClick={() => updateComposeItem(item.id, { sumCase: { ...item.sumCase, elseColumn: "" } })}
+                                          aria-label="remove else"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <p className="text-[11px] text-muted-foreground">
+                                        Add an <span className="font-medium">else</span> branch to avoid nulls.
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
 
                           {isDateCol && !item.aggregate ? (
                             <div className="space-y-1 min-w-0">
@@ -2632,6 +2993,17 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     variant="outline"
                     size="sm"
                     className="h-8 text-xs shrink-0"
+                    disabled={!selected?.table || availableColumns.length === 0}
+                    onClick={addComposeJoinRule}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Join
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs shrink-0"
                     disabled={composeSelectAliasChoices.length === 0}
                     onClick={addComposeOrderByClause}
                   >
@@ -2639,6 +3011,185 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     Add sort rule
                   </Button>
                 </div>
+                {composeJoins.length > 0 && (
+                  <div className="space-y-2">
+                    {composeJoins.map((jr, idx) => {
+                      const targetIsSheet = jr.targetKind === "sheet";
+                      const targetTable = String(jr.targetTable || "").trim().toLowerCase();
+                      const rightCols = targetIsSheet
+                        ? (() => {
+                            const sheet = dataSheets?.[jr.targetSheetId];
+                            const row0 = Array.isArray(sheet?.data) ? sheet.data[0] : null;
+                            return row0 && typeof row0 === "object" ? Object.keys(row0) : [];
+                          })()
+                        : getColumnMetaForTable(dataset, targetTable || "markets").map((c) => c.name);
+
+                      return (
+                        <div
+                          key={jr.id}
+                          className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/80 p-2"
+                        >
+                          <Select
+                            value={jr.targetKind}
+                            onValueChange={(v) => {
+                              const kind = v === "sheet" ? "sheet" : "table";
+                              setComposeJoins((prev) =>
+                                (prev || []).map((r) =>
+                                  r.id === jr.id
+                                    ? {
+                                        ...r,
+                                        targetKind: kind,
+                                        targetTable: kind === "table" ? (r.targetTable || "markets") : "",
+                                        targetSheetId: kind === "sheet" ? (r.targetSheetId || activeSheetId || "") : "",
+                                        rightColumn: "",
+                                      }
+                                    : r,
+                                ),
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs w-[9rem] min-w-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="table" className="text-xs">
+                                Glue table
+                              </SelectItem>
+                              <SelectItem value="sheet" className="text-xs">
+                                Sheet
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          {jr.targetKind === "table" ? (
+                            <Select
+                              value={jr.targetTable || ""}
+                              onValueChange={(v) =>
+                                setComposeJoins((prev) =>
+                                  (prev || []).map((r) => (r.id === jr.id ? { ...r, targetTable: v, rightColumn: "" } : r)),
+                                )
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs w-[10rem] min-w-0">
+                                <SelectValue placeholder="Table" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {glueJoinTableOptions.map((t) => (
+                                  <SelectItem key={t} value={t} className="text-xs">
+                                    {t}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Select
+                              value={jr.targetSheetId || ""}
+                              onValueChange={(v) =>
+                                setComposeJoins((prev) =>
+                                  (prev || []).map((r) => (r.id === jr.id ? { ...r, targetSheetId: v, rightColumn: "" } : r)),
+                                )
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
+                                <SelectValue placeholder="Pick sheet" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {sheetJoinCandidates.map((s) => (
+                                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                                    {s.name} ({s.rowCount})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+
+                          <Select
+                            value={jr.joinType}
+                            onValueChange={(v) => {
+                              const jt = v === "left" ? "left" : "inner";
+                              setComposeJoins((prev) =>
+                                (prev || []).map((r) => (r.id === jr.id ? { ...r, joinType: jt } : r)),
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs w-[7rem] min-w-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="inner" className="text-xs">
+                                Inner
+                              </SelectItem>
+                              <SelectItem value="left" className="text-xs">
+                                Left
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          <span className="text-xs text-muted-foreground">on</span>
+
+                          <Select
+                            value={jr.leftColumn || ""}
+                            onValueChange={(v) =>
+                              setComposeJoins((prev) =>
+                                (prev || []).map((r) => (r.id === jr.id ? { ...r, leftColumn: v } : r)),
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
+                              <SelectValue placeholder="Left column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableColumns.map((c) => (
+                                <SelectItem key={c} value={c} className="text-xs">
+                                  {c}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <span className="text-xs text-muted-foreground">=</span>
+
+                          <Select
+                            value={jr.rightColumn || ""}
+                            onValueChange={(v) =>
+                              setComposeJoins((prev) =>
+                                (prev || []).map((r) => (r.id === jr.id ? { ...r, rightColumn: v } : r)),
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
+                              <SelectValue placeholder="Right column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(rightCols || []).map((c) => (
+                                <SelectItem key={c} value={c} className="text-xs">
+                                  {c}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() => setComposeJoins((prev) => (prev || []).filter((r) => r.id !== jr.id))}
+                            aria-label="Remove join"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+
+                          {targetIsSheet && (
+                            <p className="w-full text-[11px] text-muted-foreground leading-snug">
+                              Sheet joins run server-side and may take longer for large sheets.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {columnComposeOrderBy.length !== 0 && (
                   <div className="space-y-2">
                     {columnComposeOrderBy.map((ob, obIdx) => (
@@ -2759,7 +3310,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
       <div className="px-2 pb-2  space-y-1 min-w-0 max-w-full border-b border-gray-100 dark:border-gray-800">
         <Select value={sampleId || undefined} onValueChange={setSampleId} disabled={!canUseSamples || loading}>
-          <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full">
+          <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
             <SelectValue placeholder="Select Data Source" />
           </SelectTrigger>
           <SelectContent>

@@ -28,6 +28,8 @@ export function composeUnboundedSelectShouldCapRows(compose) {
   if (!compose || typeof compose !== "object") return false;
   const joinPreset = compose.join && typeof compose.join === "object" ? String(compose.join.preset || "").trim() : "";
   if (joinPreset) return false;
+  const joins = Array.isArray(compose.joins) ? compose.joins : [];
+  if (joins.length) return false;
   const rows = Array.isArray(compose.select) ? compose.select : [];
   const hasAgg = rows.some((r) => r && r.aggregate != null);
   return !hasAgg;
@@ -220,7 +222,7 @@ function isNumericHiveType(hiveType) {
  * @returns {{ innerSql: string; isAggregate: boolean }}
  */
 function buildSelectExpression(opts) {
-  const { column, columnType, treatAsDate, dateBucket, dateFormat, aggregate, numberScale, decimals } = opts;
+  const { column, columnType, treatAsDate, dateBucket, dateFormat, aggregate, numberScale, decimals, sumCase } = opts;
 
   if (column === KALSHI_VIRTUAL_CATEGORY) {
     if (aggregate && aggregate !== "count" && aggregate !== "count_distinct") {
@@ -261,6 +263,62 @@ function buildSelectExpression(opts) {
 
   // Aggregates
   if (aggregate === "sum") {
+    if (sumCase && typeof sumCase === "object" && sumCase.enabled) {
+      const branchesIn = Array.isArray(sumCase.branches) ? sumCase.branches : [];
+      const elseCol = String(sumCase.elseColumn || "").trim();
+      if (branchesIn.length === 0) {
+        const err = new Error("SUM if/else requires at least one IF branch");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      if (!elseCol || !isValidColumnIdentifier(elseCol)) {
+        const err = new Error("SUM if/else requires an ELSE column");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+
+      const condToSql = (w) => {
+        const c = String(w?.column || "").trim();
+        const op = String(w?.op || "").toLowerCase().trim();
+        const v = w?.value;
+        if (!c || !isValidColumnIdentifier(c)) {
+          const err = new Error("Invalid IF column");
+          err.code = "BAD_REQUEST";
+          throw err;
+        }
+        // We keep it simple: string comparisons are case-insensitive, numeric comparisons are numeric.
+        const colSql = `"${c}"`;
+        const opSql = op === "gt" ? ">" : op === "lt" ? "<" : op === "eq" ? "=" : op === "neq" ? "!=" : null;
+        if (!opSql) {
+          const err = new Error(`Invalid IF operator: ${op}`);
+          err.code = "BAD_REQUEST";
+          throw err;
+        }
+        if (typeof v === "number" && Number.isFinite(v)) {
+          return `CAST(${colSql} AS DOUBLE) ${opSql} ${v}`;
+        }
+        const lit = String(v ?? "");
+        const esc = lit.replace(/'/g, "''");
+        return `LOWER(CAST(${colSql} AS VARCHAR)) ${opSql} LOWER('${esc}')`;
+      };
+
+      const caseParts = branchesIn.map((b) => {
+        const whenSql = condToSql(b?.when);
+        const thenCol = String(b?.thenColumn || "").trim();
+        if (!thenCol || !isValidColumnIdentifier(thenCol)) {
+          const err = new Error("Invalid THEN column");
+          err.code = "BAD_REQUEST";
+          throw err;
+        }
+        return `WHEN ${whenSql} THEN CAST("${thenCol}" AS DOUBLE)`;
+      });
+
+      const caseSql = `CASE ${caseParts.join(" ")} ELSE CAST("${elseCol}" AS DOUBLE) END`;
+      // SUM(baseColumn * CASE ...)
+      const base = `SUM(CAST("${column}" AS DOUBLE) * (${caseSql}))`;
+      return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
+    }
+
     const base = `SUM(CAST("${column}" AS DOUBLE))`;
     return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
   }
@@ -403,7 +461,36 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
     err.code = "BAD_REQUEST";
     throw err;
   } else {
-    fromClause = `FROM "${safeTable}"`;
+    const joins = Array.isArray(compose?.joins) ? compose.joins : [];
+    const baseAlias = "t0";
+    fromClause = `FROM "${safeTable}" ${baseAlias}`;
+    if (joins.length > 0) {
+      const joinSqlParts = [];
+      for (let i = 0; i < joins.length; i++) {
+        const j = joins[i];
+        const jtRaw = String(j?.joinType || "inner").toLowerCase().trim();
+        const jt = jtRaw === "left" ? "LEFT" : "INNER";
+        const phys = String(j?.physical || "").trim();
+        if (!/^[a-zA-Z0-9_]+$/.test(phys)) {
+          const err = new Error("Invalid join physical table name");
+          err.code = "BAD_REQUEST";
+          throw err;
+        }
+        const alias = `j${i + 1}`;
+        const leftCol = String(j?.on?.leftColumn || "").trim();
+        const rightCol = String(j?.on?.rightColumn || "").trim();
+        if (!isValidColumnIdentifier(leftCol) || !isValidColumnIdentifier(rightCol)) {
+          const err = new Error("Invalid join column identifier");
+          err.code = "BAD_REQUEST";
+          throw err;
+        }
+        // Cast to VARCHAR for a forgiving equijoin across mixed Glue types.
+        joinSqlParts.push(
+          `${jt} JOIN "${phys}" ${alias} ON CAST(${baseAlias}."${leftCol}" AS VARCHAR) = CAST(${alias}."${rightCol}" AS VARCHAR)`
+        );
+      }
+      fromClause = `${fromClause} ${joinSqlParts.join(" ")}`;
+    }
   }
 
   const rows = compose?.select;
@@ -439,6 +526,7 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
       aggregate: row.aggregate || null,
       numberScale: row.numberScale || null,
       decimals: row.decimals != null ? Number(row.decimals) : null,
+      sumCase: row.sumCase || null,
     }).innerSql;
 
     const isAggregate = row.aggregate != null;

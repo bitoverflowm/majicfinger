@@ -61,6 +61,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const setViewing = contextStateV2?.setViewing;
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
+  const connectedData = contextStateV2?.connectedData ?? [];
   const setConnectedData = contextStateV2?.setConnectedData;
   const rightPanelOpen = contextStateV2?.rightPanelOpen;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
@@ -72,6 +73,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const [drawerExpanded, setDrawerExpanded] = useState(false);
   const closeTimeoutRef = useRef(null);
   const wasOpenRef = useRef(false);
+  const autoExpandedEmptySheetRef = useRef(false);
 
   // When arriving to charts view, default the panel tab to charts (don't override if user chose Export)
   useEffect(() => {
@@ -116,6 +118,24 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   useEffect(() => {
     if (!rightPanelOpen) setDrawerExpanded(false);
   }, [rightPanelOpen]);
+
+  // If there is no data loaded into the active sheet, default Integrations panel to full expanded
+  // (but only once per "empty sheet" session so we don't fight the user).
+  useEffect(() => {
+    if (!rightPanelOpen) return;
+    if (rightPanelTab !== "integrations") return;
+    if (drawerExpanded) return;
+    const isEmpty = !Array.isArray(connectedData) || connectedData.length === 0;
+    if (!isEmpty) return;
+    if (autoExpandedEmptySheetRef.current) return;
+    autoExpandedEmptySheetRef.current = true;
+    setDrawerExpanded(true);
+  }, [rightPanelOpen, rightPanelTab, drawerExpanded, connectedData]);
+
+  useEffect(() => {
+    const isEmpty = !Array.isArray(connectedData) || connectedData.length === 0;
+    if (!isEmpty) autoExpandedEmptySheetRef.current = false;
+  }, [connectedData]);
 
   const closePanel = useCallback(() => {
     if (isPanelClosing) return;
@@ -263,28 +283,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                     className="flex h-full flex-col"
                   >
                     <div className="relative flex items-center gap-2 p-2">
-                      {panelAnimatingOpen && !drawerExpanded && (
-                        <TooltipProvider delayDuration={250}>
-                          <div className="absolute left-0 top-0 z-30 h-11 w-11 group/expandcorner">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => setDrawerExpanded(true)}
-                                  className="flex h-11 w-11 items-start justify-start rounded-br-lg rounded-tl-md p-1.5 text-muted-foreground/0 opacity-0 transition-opacity duration-200 group-hover/expandcorner:opacity-100 hover:!opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                                  aria-label="Expand panel"
-                                >
-                                  <ChevronLeft className="h-4 w-4 text-muted-foreground/70 drop-shadow-sm" strokeWidth={2} />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" sideOffset={6} className="text-xs">
-                                Expand
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TooltipProvider>
-                      )}
-                      <TabsList className={cn("h-9", !drawerExpanded && "pl-5")}>
+                      <TabsList className="h-9">
                         <TabsTrigger value="integrations" className="text-xs">
                           Integrations
                         </TabsTrigger>
@@ -316,15 +315,35 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                             </Tooltip>
                           </TooltipProvider>
                         ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            onClick={closePanel}
-                            aria-label="Close panel"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    onClick={() => setDrawerExpanded(true)}
+                                    aria-label="Expand panel"
+                                  >
+                                    <ChevronLeft className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                  Expand
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={closePanel}
+                              aria-label="Close panel"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>

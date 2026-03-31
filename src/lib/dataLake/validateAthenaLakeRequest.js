@@ -309,6 +309,60 @@ export function validateAthenaLakeQueryBody(body) {
       joinPresetValidated = jp;
     }
 
+    /** @type {Array<{ joinType: "inner" | "left"; table: string; physical: string; on: { leftColumn: string; rightColumn: string } }>} */
+    const validatedJoins = [];
+    if (raw.joins != null) {
+      if (!Array.isArray(raw.joins)) {
+        throw new AthenaLakeRequestError("compose.joins must be an array", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      for (const j of raw.joins) {
+        if (!j || typeof j !== "object") {
+          throw new AthenaLakeRequestError("Invalid compose.joins entry", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const joinTypeRaw = String(j.joinType || "inner").toLowerCase().trim();
+        const joinType = joinTypeRaw === "left" ? "left" : "inner";
+        const joinTable = String(j.table || "").toLowerCase().trim();
+        if (!["markets", "trades", "blocks"].includes(joinTable)) {
+          throw new AthenaLakeRequestError(`Invalid join table: ${joinTable}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const on = j.on;
+        if (!on || typeof on !== "object" || Array.isArray(on)) {
+          throw new AthenaLakeRequestError("compose.joins[].on must be an object", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const leftColumn = String(on.leftColumn || "").trim();
+        const rightColumn = String(on.rightColumn || "").trim();
+        const safeIdent = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+        if (!safeIdent.test(leftColumn)) {
+          throw new AthenaLakeRequestError(`Invalid join leftColumn: ${leftColumn}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        if (!safeIdent.test(rightColumn)) {
+          throw new AthenaLakeRequestError(`Invalid join rightColumn: ${rightColumn}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+
+        const joinPhysical = resolveAthenaTableName(lake, joinTable);
+        if (!joinPhysical) {
+          throw new AthenaLakeRequestError(`Join table not configured: ${joinTable}`, { statusCode: 404, code: "NOT_FOUND" });
+        }
+
+        // Ensure join columns exist in their respective tables.
+        const allowedLeft = new Set(allowedColumnsForLakeTable(lake, table));
+        const allowedRight = new Set(allowedColumnsForLakeTable(lake, joinTable));
+        if (!allowedLeft.has(leftColumn)) {
+          throw new AthenaLakeRequestError(`Unknown join left column: ${leftColumn}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        if (!allowedRight.has(rightColumn)) {
+          throw new AthenaLakeRequestError(`Unknown join right column: ${rightColumn}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+
+        validatedJoins.push({
+          joinType,
+          table: joinTable,
+          physical: joinPhysical,
+          on: { leftColumn, rightColumn },
+        });
+      }
+    }
+
     const allowed =
       joinPresetValidated && KALSHI_TRADES_JOIN_PRESETS.has(joinPresetValidated)
         ? new Set(KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META.map((c) => c.name))
@@ -327,7 +381,7 @@ export function validateAthenaLakeQueryBody(body) {
       throw new AthenaLakeRequestError("compose.select must be a non-empty array", { statusCode: 400, code: "BAD_REQUEST" });
     }
 
-    /** @type {Array<{ column: string; alias: string; aggregate: null | string; dateBucket: string | null; dateFormat: string | null; numberScale: string; decimals: number | null; treatAsDate: boolean; columnType: string }>} */
+    /** @type {Array<{ column: string; alias: string; aggregate: null | string; dateBucket: string | null; dateFormat: string | null; numberScale: string; decimals: number | null; treatAsDate: boolean; columnType: string; sumCase?: any }>} */
     const normalizedSelect = [];
 
     for (const row of selectIn) {
@@ -360,6 +414,102 @@ export function validateAthenaLakeQueryBody(body) {
         if (countAggs.has(aggRaw)) return aggRaw;
         throw new AthenaLakeRequestError(`Invalid compose.select.aggregate: ${aggRaw}`, { statusCode: 400, code: "BAD_REQUEST" });
       })();
+
+      /** @type {null | { enabled: true; branches: Array<{ when: { column: string; op: "gt"|"lt"|"eq"|"neq"; value: string|number }; thenColumn: string }>; elseColumn: string }} */
+      let normalizedSumCase = null;
+      if (aggregate === "sum" && row.sumCase != null) {
+        if (typeof row.sumCase !== "object" || Array.isArray(row.sumCase)) {
+          throw new AthenaLakeRequestError("compose.select.sumCase must be an object", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const enabled = row.sumCase.enabled === true;
+        if (enabled) {
+          const branchesIn = Array.isArray(row.sumCase.branches) ? row.sumCase.branches : [];
+          const elseColumn = String(row.sumCase.elseColumn || "").trim();
+          if (!branchesIn.length) {
+            throw new AthenaLakeRequestError("SUM if/else requires at least one IF branch", { statusCode: 400, code: "BAD_REQUEST" });
+          }
+          if (!elseColumn || !allowed.has(elseColumn)) {
+            throw new AthenaLakeRequestError("SUM if/else requires a valid ELSE column", { statusCode: 400, code: "BAD_REQUEST" });
+          }
+          const elseType = columnHiveTypeForLakeTable(lake, table, elseColumn);
+          if (!isNumericHiveType(elseType)) {
+            throw new AthenaLakeRequestError("SUM if/else ELSE column must be numeric", { statusCode: 400, code: "BAD_REQUEST" });
+          }
+
+          // Validate base SUM column is numeric (already enforced by numericAggs check), but keep explicit message.
+          if (!isNumericHiveType(colType)) {
+            throw new AthenaLakeRequestError("SUM if/else base SUM column must be numeric", { statusCode: 400, code: "BAD_REQUEST" });
+          }
+
+          const normBranches = [];
+          for (const b of branchesIn) {
+            if (!b || typeof b !== "object") {
+              throw new AthenaLakeRequestError("Invalid SUM if/else branch", { statusCode: 400, code: "BAD_REQUEST" });
+            }
+            const when = b.when;
+            if (!when || typeof when !== "object" || Array.isArray(when)) {
+              throw new AthenaLakeRequestError("SUM if/else branch.when must be an object", { statusCode: 400, code: "BAD_REQUEST" });
+            }
+            const whenColumn = String(when.column || "").trim();
+            if (!whenColumn || !allowed.has(whenColumn)) {
+              throw new AthenaLakeRequestError("SUM if/else WHEN column must be a valid column", { statusCode: 400, code: "BAD_REQUEST" });
+            }
+            const whenType = columnHiveTypeForLakeTable(lake, table, whenColumn);
+            if (!whenType) {
+              throw new AthenaLakeRequestError(`Unknown column type: ${whenColumn}`, { statusCode: 400, code: "BAD_REQUEST" });
+            }
+            const whenTypeNorm = String(whenType).toLowerCase();
+            const whenIsString = whenTypeNorm === "string";
+            const whenIsNumeric = isNumericHiveType(whenType);
+
+            const opRaw = String(when.op || "").toLowerCase().trim();
+            const opAllowed = whenIsString ? ["eq", "neq"] : whenIsNumeric ? ["gt", "lt", "eq", "neq"] : ["eq", "neq"];
+            if (!opAllowed.includes(opRaw)) {
+              throw new AthenaLakeRequestError("SUM if/else WHEN operator is not valid for this column type", {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+              });
+            }
+
+            let whenValue;
+            if (whenIsString) {
+              whenValue = String(when.value ?? "");
+              if (!whenValue.trim()) {
+                throw new AthenaLakeRequestError("SUM if/else WHEN value is required", { statusCode: 400, code: "BAD_REQUEST" });
+              }
+            } else if (whenIsNumeric) {
+              const n = Number(when.value);
+              if (!Number.isFinite(n)) {
+                throw new AthenaLakeRequestError("SUM if/else numeric WHEN value must be a number", { statusCode: 400, code: "BAD_REQUEST" });
+              }
+              whenValue = n;
+            } else {
+              whenValue = String(when.value ?? "");
+              if (!whenValue.trim()) {
+                throw new AthenaLakeRequestError("SUM if/else WHEN value is required", { statusCode: 400, code: "BAD_REQUEST" });
+              }
+            }
+
+            const thenColumn = String(b.thenColumn || "").trim();
+            if (!thenColumn || !allowed.has(thenColumn)) {
+              throw new AthenaLakeRequestError("SUM if/else THEN column must be a valid column", { statusCode: 400, code: "BAD_REQUEST" });
+            }
+            const thenType = columnHiveTypeForLakeTable(lake, table, thenColumn);
+            if (!isNumericHiveType(thenType)) {
+              throw new AthenaLakeRequestError("SUM if/else THEN column must be numeric", { statusCode: 400, code: "BAD_REQUEST" });
+            }
+            normBranches.push({ when: { column: whenColumn, op: opRaw, value: whenValue }, thenColumn });
+          }
+
+          normalizedSumCase = {
+            enabled: true,
+            branches: normBranches,
+            elseColumn,
+          };
+        }
+      } else if (row.sumCase != null && aggregate !== "sum") {
+        throw new AthenaLakeRequestError("sumCase is only supported when aggregate is SUM", { statusCode: 400, code: "BAD_REQUEST" });
+      }
 
       const db = row.dateBucket != null && String(row.dateBucket).trim() !== "" ? String(row.dateBucket).trim().toLowerCase() : null;
       const dateBucket = db && dateBuckets.has(db) ? db : null;
@@ -438,6 +588,7 @@ export function validateAthenaLakeQueryBody(body) {
         decimals,
         treatAsDate,
         columnType: colType,
+        ...(normalizedSumCase ? { sumCase: normalizedSumCase } : {}),
       });
     }
 
@@ -535,6 +686,7 @@ export function validateAthenaLakeQueryBody(body) {
       groupByAliases,
       orderBy,
       ...(joinPresetValidated ? { join: { preset: joinPresetValidated } } : {}),
+      ...(validatedJoins.length ? { joins: validatedJoins } : {}),
       ...(normalizedHaving ? { having: normalizedHaving } : {}),
     };
 
