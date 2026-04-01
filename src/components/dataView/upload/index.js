@@ -32,13 +32,10 @@ const Upload = ({user}) => {
     const dataConnected = contextStateV2?.dataConnected
     const setDataConnected = contextStateV2?.setDataConnected
 
-    const multiSheetFlag = contextStateV2?.multiSheetFlag
-    const setMultiSheetFlag = contextStateV2?.setMultiSheetFlag
-    const multiSheetData = contextStateV2?.multiSheetData
-    const setMultiSheetData = contextStateV2?.setMultiSheetData
     const dataTypes = contextStateV2?.dataTypes
     const setDataTypes = contextStateV2?.setDataTypes
-    const setSheetNames = contextStateV2?.setSheetNames
+    const setDataSheets = contextStateV2?.setDataSheets
+    const setActiveSheetId = contextStateV2?.setActiveSheetId
 
 
     const [loading, setLoading] = useState()
@@ -84,38 +81,26 @@ const Upload = ({user}) => {
                 const { rows, dataTypes } = parseSheet(sheet);
                 console.log('rows', rows)
                 console.log('datatypes', dataTypes)
-                setMultiSheetFlag(false);
-                setMultiSheetData(null); // No multi-sheet data
-                setConnectedData(rows);
+                setDataSheets?.({ 'sheet-1': { name: workbook.SheetNames?.[0] || 'Sheet 1', data: rows } });
+                setActiveSheetId?.('sheet-1');
                 setDataTypes(dataTypes);
                 setDataConnected(true);
             } else if (fileType === 'xlsx') {
                 const workbook = XLSX.read(data, { type: 'binary' });
-                const allSheetsData = {};
                 const allSheetsDataTypes = {};
 
-                workbook.SheetNames.forEach(sheetName => {
+                const nextSheets = {};
+                workbook.SheetNames.forEach((sheetName, idx) => {
                     const worksheet = workbook.Sheets[sheetName];
                     const { rows, dataTypes } = parseSheet(worksheet);
-                    allSheetsData[sheetName] = rows;
+                    nextSheets[`sheet-${idx + 1}`] = { name: sheetName || `Sheet ${idx + 1}`, data: rows };
                     allSheetsDataTypes[sheetName] = dataTypes;
                 });
 
-                const sheetNames = workbook.SheetNames;
-                setSheetNames(sheetNames)
-
-                if (sheetNames.length > 1) {
-                    console.log("we do have multiple sheets")
-                    setMultiSheetFlag(true);
-                    setMultiSheetData(allSheetsData);
-                    setConnectedData(allSheetsData[sheetNames[0]]);
-                    setDataTypes(allSheetsDataTypes[sheetNames[0]]);
-                } else {
-                    setMultiSheetFlag(false);
-                    setMultiSheetData(null);
-                    setConnectedData(allSheetsData[sheetNames[0]]);
-                    setDataTypes(allSheetsDataTypes[sheetNames[0]]);
-                }
+                const firstName = workbook.SheetNames?.[0];
+                setDataSheets?.(nextSheets);
+                setActiveSheetId?.('sheet-1');
+                if (firstName) setDataTypes(allSheetsDataTypes[firstName]);
                 setDataConnected(true);
             }
         };

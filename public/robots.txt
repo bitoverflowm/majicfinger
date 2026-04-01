@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+
+# Block Next.js internals / build artifacts
+Disallow: /_next/
+
+# Block API routes
+Disallow: /api/
+
+# Block common private/auth/admin areas (adjust as needed)
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /account/
+Disallow: /settings/
+Disallow: /login
+Disallow: /logout
+Disallow: /signup
+Disallow: /auth/
+
+# Optional: add a sitemap at /sitemap.xml and keep this line
+Sitemap: /sitemap.xml

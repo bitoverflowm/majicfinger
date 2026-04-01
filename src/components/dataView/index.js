@@ -16,8 +16,6 @@ import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integra
 const DataView = ({ user }) => {
   const contextStateV2 = useMyStateV2();
 
-  const [sheetId, setSheetId] = useState(0);
-
   const connectedData = contextStateV2?.connectedData;
   const setConnectedData = contextStateV2?.setConnectedData;
   const setViewing = contextStateV2?.setViewing;
@@ -25,9 +23,6 @@ const DataView = ({ user }) => {
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
   const setRightPanelTab = contextStateV2?.setRightPanelTab;
-  const multiSheetFlag = contextStateV2?.multiSheetFlag;
-  const multiSheetData = contextStateV2?.multiSheetData;
-  const sheetNames = contextStateV2?.sheetNames;
   const dataSheets = contextStateV2?.dataSheets;
   const activeSheetId = contextStateV2?.activeSheetId;
   const setActiveSheetId = contextStateV2?.setActiveSheetId;
@@ -36,11 +31,6 @@ const DataView = ({ user }) => {
   const hasChainlinkStream = Object.values(liveStreamState?.streamsBySheetId || {}).some(
     (s) => s?.type === "chainlink"
   );
-
-  const sheetSwitchHandler = (sheetName, id) => {
-    setConnectedData(multiSheetData[sheetName]);
-    setSheetId(id);
-  };
 
   const dataSheetIds = dataSheets ? Object.keys(dataSheets) : [];
   const hasMultipleDataSheets = dataSheetIds.length > 1;
@@ -97,32 +87,17 @@ const DataView = ({ user }) => {
 
   return (
     <div className="min-w-0 max-w-full min-h-0 px-2 sm:px-4 md:px-6">
-      {hasMultipleDataSheets && (
-        <div className="flex flex-wrap gap-1 mb-2">
-          {dataSheetIds.map((id) => (
-            <code
-              key={id}
-              className={`${id === activeSheetId ? "bg-lychee_blue/30" : "bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
-              onClick={() => setActiveSheetId?.(id)}
-            >
-              {dataSheets[id]?.name || id}
-            </code>
-          ))}
-        </div>
-      )}
-      {multiSheetFlag && (
-        <div className="flex flex-wrap gap-1 mb-2">
-          {Object.keys(multiSheetData).map((sheetName, index) => (
-            <code
-              key={index}
-              className={`${sheetName === sheetNames[sheetId] ? "bg-lychee_blue/30" : "bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
-              onClick={() => sheetSwitchHandler(sheetName, index)}
-            >
-              {sheetName}
-            </code>
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap gap-1 mb-2">
+        {dataSheetIds.map((id) => (
+          <code
+            key={id}
+            className={`${id === activeSheetId ? "bg-lychee_blue/30" : "bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
+            onClick={() => setActiveSheetId?.(id)}
+          >
+            {dataSheets[id]?.name || id}
+          </code>
+        ))}
+      </div>
 
       {showGrid ? (
         <div className="relative min-h-0 flex flex-col gap-3">

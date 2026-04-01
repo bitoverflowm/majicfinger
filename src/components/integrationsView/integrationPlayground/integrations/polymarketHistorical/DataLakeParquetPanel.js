@@ -514,6 +514,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   /** Kalshi trades compose: optional INNER JOIN to finalized yes/no markets (Athena subquery). */
   const [kalshiTradesJoinPreset, setKalshiTradesJoinPreset] = useState("");
   const [selectionTab, setSelectionTab] = useState("columns"); // "columns" | "meta" | "recipes"
+  const [tabSlideDir, setTabSlideDir] = useState("forward"); // "forward" | "back"
   const [showRequestComposer, setShowRequestComposer] = useState(true);
   const [expandedRequestCardId, setExpandedRequestCardId] = useState(null);
   const [nullishAlertOpen, setNullishAlertOpen] = useState(false);
@@ -588,6 +589,35 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     },
     [lake, sampleOptions],
   );
+
+  const onSelectionTabChange = useCallback(
+    (next) => {
+      const order = ["columns", "meta", "recipes"];
+      const currIdx = order.indexOf(selectionTab);
+      const nextIdx = order.indexOf(next);
+      if (currIdx >= 0 && nextIdx >= 0) {
+        setTabSlideDir(nextIdx >= currIdx ? "forward" : "back");
+      }
+      setSelectionTab(next);
+    },
+    [selectionTab],
+  );
+
+  // Radix Tabs keeps the old and new panels mounted briefly, so "out" and "in" can overlap.
+  // We delay the "in" animation and use fill-mode: backwards so the incoming panel stays invisible/offscreen
+  // until the outgoing animation completes.
+  const tabAnimClass =
+    tabSlideDir === "back"
+      ? [
+          "data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:slide-out-to-right-4",
+          "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-left-4",
+          "data-[state=active]:[animation-delay:220ms] data-[state=active]:[animation-fill-mode:backwards]",
+        ].join(" ")
+      : [
+          "data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:slide-out-to-left-4",
+          "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-right-4",
+          "data-[state=active]:[animation-delay:220ms] data-[state=active]:[animation-fill-mode:backwards]",
+        ].join(" ");
   const availableColumnMeta = useMemo(() => {
     if (!selected?.table) return [];
     if (dataset === "kalshi" && selected.table === "trades" && KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
@@ -4215,7 +4245,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       </div>
 
       <div className="min-w-0 max-w-full px-2">
-        <Tabs value={selectionTab} onValueChange={setSelectionTab} className="w-full">
+        <Tabs value={selectionTab} onValueChange={onSelectionTabChange} className="w-full">
             <div className="flex items-center gap-2 mb-2">
               <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
                 <TabsTrigger value="columns" className="h-7 px-2 text-xs">
@@ -4230,7 +4260,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               </TabsList>
             </div>
 
-            <TabsContent value="columns" className="space-y-4 min-w-0">
+            <TabsContent value="columns" className={`space-y-4 min-w-0 ${tabAnimClass}`}>
               {/* No empty-state tip here by request. */}
               {showRequestComposer ? (
                 <div className="space-y-3">
@@ -4335,7 +4365,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               ) : null}
             </TabsContent>
 
-            <TabsContent value="meta" className="space-y-2">
+            <TabsContent value="meta" className={`space-y-2 ${tabAnimClass}`}>
               <div className="space-y-4">
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">
@@ -5020,7 +5050,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   </div>
             </TabsContent>
 
-            <TabsContent value="recipes" className="space-y-4 min-w-0">
+            <TabsContent value="recipes" className={`space-y-4 min-w-0 ${tabAnimClass}`}>
               {dataset === "kalshi" && selected?.table === "markets" && (
                 <div className="rounded-md border border-border/70 bg-muted/25 p-3 space-y-3 min-w-0">
                   <p className="text-xs font-medium">Kalshi · markets</p>
