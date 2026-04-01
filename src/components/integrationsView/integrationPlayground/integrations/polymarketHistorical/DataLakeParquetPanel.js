@@ -491,6 +491,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   const canUseSamples = true;
   const [sampleId, setSampleId] = useState("");
+  const [athenaPingBySampleId, setAthenaPingBySampleId] = useState({}); // { [sampleId]: "idle" | "loading" | "ok" | "error" }
   /** @type {Array<{ id: string; column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: null | string; dateFormat: null | string; numberScale: string; decimals: null | number; treatAsDate: boolean; sumCase?: any; equation?: any }>} */
   const [columnComposeItems, setColumnComposeItems] = useState([]);
   /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
@@ -554,6 +555,39 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [dataset, sampleOptions]);
 
   const selected = sampleOptions.find((s) => s.id === sampleId);
+  const pingState = sampleId ? athenaPingBySampleId?.[sampleId] || "idle" : "idle";
+
+  const pingAthenaForSource = useCallback(
+    async (nextSampleId) => {
+      const id = String(nextSampleId || "").trim();
+      const snap = sampleOptions.find((s) => s.id === id);
+      const table = snap?.table;
+      if (!id || !table) return;
+      setAthenaPingBySampleId((prev) => ({ ...(prev || {}), [id]: "loading" }));
+      try {
+        const res = await fetch("/api/data-lake/athena-query/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            lake,
+            table,
+            queryType: "count",
+            countAlias: "count",
+            limit: 1,
+            caseSensitive: true,
+            filters: null,
+          }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || res.statusText || `Ping ${res.status}`);
+        setAthenaPingBySampleId((prev) => ({ ...(prev || {}), [id]: "ok" }));
+      } catch (e) {
+        setAthenaPingBySampleId((prev) => ({ ...(prev || {}), [id]: "error" }));
+      }
+    },
+    [lake, sampleOptions],
+  );
   const availableColumnMeta = useMemo(() => {
     if (!selected?.table) return [];
     if (dataset === "kalshi" && selected.table === "trades" && KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
@@ -4087,44 +4121,101 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         onComplete={handleMetaAddOperationComplete}
       />
 
-      <div className="px-2 pb-2  space-y-1 min-w-0 max-w-full border-b border-gray-100 dark:border-gray-800">
-        <Select value={sampleId || undefined} onValueChange={setSampleId} disabled={!canUseSamples || loading}>
-          <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
-            <SelectValue placeholder="Select Data Source" />
-          </SelectTrigger>
-          <SelectContent>
-            {sampleOptions.map((s) => (
-              <SelectItem key={s.id} value={s.id} className="text-xs">
-                {s.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {!!activeSheetId && (
-          <div className="pt-2 space-y-1">
-            <Label className="text-[11px] text-muted-foreground">Sheet name (CTE)</Label>
-            <Input
-              className="h-8 text-xs"
-              value={String(dataSheets?.[activeSheetId]?.name || "")}
-              onChange={(e) => {
-                const next = e.target.value;
-                setDataSheets?.((prev) => {
-                  const p = prev || {};
-                  const sheet = p[activeSheetId] || { name: "Sheet", data: [] };
-                  return { ...p, [activeSheetId]: { ...sheet, name: next } };
-                });
-              }}
-              placeholder="e.g. resolved_markets"
-              spellCheck={false}
-              disabled={!setDataSheets}
-            />
+      <div className="px-2 pb-2 space-y-2 min-w-0 max-w-full border-b border-gray-100 dark:border-gray-800">
+        <div className="pt-2 flex items-end gap-2 min-w-0">
+          {!!activeSheetId ? (
+            <div className="flex-1 space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Sheet name</Label>
+              <Input
+                className="h-8 text-xs w-full"
+                value={String(dataSheets?.[activeSheetId]?.name || "")}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setDataSheets?.((prev) => {
+                    const p = prev || {};
+                    const sheet = p[activeSheetId] || { name: "Sheet", data: [] };
+                    return { ...p, [activeSheetId]: { ...sheet, name: next } };
+                  });
+                }}
+                placeholder="e.g. resolved_markets"
+                spellCheck={false}
+                disabled={!setDataSheets}
+              />
+            </div>
+          ) : null}
+
+          <div className="flex-1 space-y-1">
+            <Label className="text-[11px] text-muted-foreground">Data source</Label>
+            <div className="flex items-center gap-2 min-w-0">
+              <Select
+                value={sampleId || undefined}
+                onValueChange={(v) => {
+                  setSampleId(v);
+                  void pingAthenaForSource(v);
+                }}
+                disabled={!canUseSamples || loading}
+              >
+                <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+                  <SelectValue placeholder="Select Data Source" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sampleOptions.map((s) => {
+                    const state = athenaPingBySampleId?.[s.id] || "idle";
+                    const isSel = s.id === sampleId;
+                    const dot =
+                      state === "loading" ? (
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+                      ) : state === "ok" ? (
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      ) : state === "error" ? (
+                        <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                      ) : isSel ? (
+                        <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+                      ) : null;
+
+                    return (
+                      <SelectItem
+                        key={s.id}
+                        value={s.id}
+                        className="text-xs"
+                        left={<span className="inline-flex items-center">{dot}</span>}
+                      >
+                        {s.label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+
+              <span
+                className={[
+                  "h-2.5 w-2.5 rounded-full shrink-0",
+                  pingState === "loading"
+                    ? "bg-amber-500 animate-pulse"
+                    : pingState === "ok"
+                      ? "bg-emerald-500"
+                      : pingState === "error"
+                        ? "bg-red-500"
+                        : "bg-slate-300 dark:bg-slate-700",
+                ].join(" ")}
+                aria-label="Athena connection status"
+                title={
+                  pingState === "loading"
+                    ? "Checking connection…"
+                    : pingState === "ok"
+                      ? "Connected"
+                      : pingState === "error"
+                        ? "Connection issue"
+                        : "Not checked"
+                }
+              />
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {selected?.table && availableColumns.length > 0 && (
-        <div className="min-w-0 max-w-full px-2">
-          <Tabs value={selectionTab} onValueChange={setSelectionTab} className="w-full">
+      <div className="min-w-0 max-w-full px-2">
+        <Tabs value={selectionTab} onValueChange={setSelectionTab} className="w-full">
             <div className="flex items-center gap-2 mb-2">
               <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
                 <TabsTrigger value="columns" className="h-7 px-2 text-xs">
@@ -4137,14 +4228,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   Recipes
                 </TabsTrigger>
               </TabsList>
-              {sheetsCount >= 2 ? (
-                <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={openSheetJoinDialog}>
-                  Joins
-                </Button>
-              ) : null}
             </div>
 
             <TabsContent value="columns" className="space-y-4 min-w-0">
+              {/* No empty-state tip here by request. */}
               {showRequestComposer ? (
                 <div className="space-y-3">
                   {activeSheetId && activeSheetRequestCards.length > 0 ? (
@@ -4172,7 +4259,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       </Button>
                     </div>
                   ) : null}
-                  {renderColumnsComposeSection()}
+                  {selected?.table && availableColumns.length > 0 ? renderColumnsComposeSection() : null}
                 </div>
               ) : null}
 
@@ -4227,7 +4314,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             expanded ? "max-h-[2400px] opacity-100 mt-3" : "max-h-0 opacity-0",
                           ].join(" ")}
                         >
-                          {expanded ? renderColumnsComposeSection() : null}
+                          {expanded && selected?.table && availableColumns.length > 0 ? renderColumnsComposeSection() : null}
                         </div>
                       </div>
                     );
@@ -4241,7 +4328,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 </div>
               ) : null}
 
-              {!showRequestComposer && (!activeSheetId || activeSheetRequestCards.length === 0) ? (
+              {!showRequestComposer && (!activeSheetId || activeSheetRequestCards.length === 0) && selected?.table && availableColumns.length > 0 ? (
                 <div className="space-y-3">
                   {renderColumnsComposeSection()}
                 </div>
@@ -4993,8 +5080,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               </div>
             </TabsContent>
           </Tabs>
-        </div>
-      )}
+      </div>
 
       {loading ? (
         <div className="px-2">

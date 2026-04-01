@@ -63,6 +63,7 @@ import {
   Download,
   BarChart2,
   Sigma,
+  ChevronDown,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import * as XLSX from 'xlsx';
@@ -121,6 +122,7 @@ const GridView = ({startNew}) => {
     let connectedData = contextStateV2?.connectedData || []
     let setConnectedData = contextStateV2?.setConnectedData || []
     const replaceCurrentSheetData = contextStateV2?.replaceCurrentSheetData
+    const dataTypes = contextStateV2?.dataTypes || {}
     let dataSheets = contextStateV2?.dataSheets || {}
     
     const [columnName, setColumnName] = useState('');
@@ -144,6 +146,15 @@ const GridView = ({startNew}) => {
 
     // Remove duplicates (row-level)
     const [removeDupsDialogOpen, setRemoveDupsDialogOpen] = useState(false);
+    const [sheetPropsDialogOpen, setSheetPropsDialogOpen] = useState(false);
+
+    const sheetColumnsForProps = useMemo(() => {
+      const row0 = Array.isArray(connectedData) && connectedData.length ? connectedData[0] : null;
+      if (!row0 || typeof row0 !== "object") return [];
+      return Object.keys(row0)
+        .filter((k) => k !== "_origIndex")
+        .sort();
+    }, [connectedData]);
     const [filterState, setFilterState] = useState({
       dateColumn: null,
       dateFrom: '',
@@ -687,13 +698,47 @@ const GridView = ({startNew}) => {
                 </TabsList>
                 <div className="h-4 w-px bg-border shrink-0" />
                 <Menu compact />
-                <Dialog open={colAddOpen} onOpenChange={setColAddOpen}>
-                  <DialogTrigger asChild>
+                {/* Sheet Properties dropdown (keeps existing Add Column dialog code) */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                      <PlusIcon className="h-3.5 w-3.5" />
-                      Add Column
+                      Sheet Properties
+                      <ChevronDown className="h-3.5 w-3.5" />
                     </Button>
-                  </DialogTrigger>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    <DropdownMenuItem
+                      className="text-xs"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setColAddOpen(true);
+                      }}
+                    >
+                      + Add Column
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-xs"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        handleAddRow?.();
+                      }}
+                    >
+                      + Add Row
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-xs"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setSheetPropsDialogOpen(true);
+                      }}
+                    >
+                      Sheet Properties
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Dialog open={colAddOpen} onOpenChange={setColAddOpen}>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle>Add Column</DialogTitle>
@@ -716,10 +761,45 @@ const GridView = ({startNew}) => {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleAddRow}>
-                  <PlusIcon className="h-3.5 w-3.5" />
-                  Add Row
-                </Button>
+
+                <Dialog open={sheetPropsDialogOpen} onOpenChange={setSheetPropsDialogOpen}>
+                  <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Sheet Properties</DialogTitle>
+                      <DialogDescription>
+                        Column names and detected types for the current sheet.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+                        {sheetColumnsForProps.map((col) => {
+                          const t = dataTypes?.[col] || "text";
+                          return (
+                            <div key={col} className="rounded-md border bg-muted/20 px-3 py-2">
+                              <p className="font-mono text-xs font-medium truncate" title={col}>
+                                {col}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                type: {String(t)}
+                              </p>
+                            </div>
+                          );
+                        })}
+                        {sheetColumnsForProps.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            No columns found.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button type="button" variant="outline" onClick={() => setSheetPropsDialogOpen(false)}>
+                        Close
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>
