@@ -13,7 +13,7 @@
  *   sumAlias?: string | null;
  * }} opts
  * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number }} [pollOpts]
- * @returns {Promise<{ columns: string[]; rows: string[][]; rowCount: number; dataScannedBytes: number | null; queryExecutionId: string }>}
+ * @returns {Promise<{ columns: string[]; rows: string[][]; rowCount: number; dataScannedBytes: number | null; queryExecutionId: string; sql?: string }>}
  */
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
@@ -132,6 +132,7 @@ export async function fetchAthenaLakeSample(
         rowCount: j.rowCount ?? (j.rows?.length ?? 0),
         dataScannedBytes: j.dataScannedBytes ?? null,
         queryExecutionId,
+        sql: startJson.sql || undefined,
       };
     }
 

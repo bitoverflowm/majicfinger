@@ -225,10 +225,9 @@ export async function startAthenaBoundedQuery({
       err.code = "BAD_REQUEST";
       throw err;
     }
-    // TEMP: cap compose results for UX/testing.
-    // Large compose result sets can stall the browser ingest pipeline (Athena → JSON → DuckDB → sheet).
-    // We'll make this user-configurable later; for now keep it small to validate correctness end-to-end.
-    const capRows = 100;
+    // For now we hard-cap all compose queries to keep requests compact (Free plan UX).
+    // Server-side "CTE workflow" still re-queries the full lake logically, but we only return up to this cap.
+    const capRows = COMPOSE_UNCONSTRAINED_ROW_CAP;
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
       limit: capRows,

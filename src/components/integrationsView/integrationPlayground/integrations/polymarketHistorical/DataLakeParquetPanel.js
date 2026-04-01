@@ -39,7 +39,17 @@ import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
 import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
+import EquationExprBuilder from "./EquationExprBuilder";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -292,6 +302,34 @@ function genComposeJoinId() {
   return `cj-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
 }
 
+function genRequestCardId() {
+  return `req-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
+function fmtSeconds(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n < 0) return "—";
+  return `${(n / 1000).toFixed(2)}s`;
+}
+
+function summarizeWhereFilters(filters) {
+  const and = Array.isArray(filters?.and) ? filters.and : [];
+  if (!and.length) return { hasWhere: false, text: "" };
+  const parts = and
+    .map((f) => {
+      const c = String(f?.column || "").trim();
+      const op = String(f?.op || "").trim();
+      const v = f?.value;
+      if (!c || !op) return "";
+      if (op === "in" || op === "not_in") return `${c} ${op} (…)`;
+      if (typeof v === "string") return `${c} ${op} "${v}"`;
+      if (typeof v === "number" && Number.isFinite(v)) return `${c} ${op} ${v}`;
+      return `${c} ${op}`;
+    })
+    .filter(Boolean);
+  return { hasWhere: true, text: parts.join(" AND ") };
+}
+
 /** @param {string} col */
 function composeSourceColumnLabel(col) {
   return KALSHI_VIRTUAL_COMPOSE_LABELS[col] || col;
@@ -299,6 +337,7 @@ function composeSourceColumnLabel(col) {
 
 /** @param {{ aggregate: null | string }} item */
 function composeRollUpSelectValue(item) {
+  if (item.aggregate === "sum" && item.equation?.enabled) return "equation";
   return item.aggregate || "none";
 }
 
@@ -452,7 +491,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   const canUseSamples = true;
   const [sampleId, setSampleId] = useState("");
-  /** @type {Array<{ id: string; column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: null | string; dateFormat: null | string; numberScale: string; decimals: null | number; treatAsDate: boolean }>} */
+  /** @type {Array<{ id: string; column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: null | string; dateFormat: null | string; numberScale: string; decimals: null | number; treatAsDate: boolean; sumCase?: any; equation?: any }>} */
   const [columnComposeItems, setColumnComposeItems] = useState([]);
   /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
   const [columnComposeOrderBy, setColumnComposeOrderBy] = useState([]);
@@ -460,13 +499,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [composeWhereFilters, setComposeWhereFilters] = useState([]);
   /** @type {Array<{ id: string; havingAlias: string; op: string; value: any }>} */
   const [composeHavingFilters, setComposeHavingFilters] = useState([]);
-  /** @type {Array<{ id: string; targetKind: "table" | "sheet"; targetTable: string; targetSheetId: string; joinType: "inner" | "left"; leftColumn: string; rightColumn: string }>} */
+  /** @type {Array<{ id: string; targetKind: "table" | "sheet"; targetTable: string; targetSheetId: string; joinType: "inner" | "left"; mergeStrategy?: "browser" | "server"; leftColumn: string; rightColumn: string }>} */
   const [composeJoins, setComposeJoins] = useState([]);
+  const [sheetJoinDialogOpen, setSheetJoinDialogOpen] = useState(false);
+  const [sheetJoinMode, setSheetJoinMode] = useState("sheet"); // "sheet" | "source"
+  const [sheetJoinLeftId, setSheetJoinLeftId] = useState("");
+  const [sheetJoinRightId, setSheetJoinRightId] = useState("");
+  const [sheetJoinType, setSheetJoinType] = useState("inner"); // "inner" | "left"
+  const [sheetJoinLeftColumn, setSheetJoinLeftColumn] = useState("");
+  const [sheetJoinRightColumn, setSheetJoinRightColumn] = useState("");
   /** After Athena returns rows grouped by event-ticker prefix, merge into Sports / Politics / … (client-side, matches pandas get_group). */
   const [kalshiTaxonomyRollup, setKalshiTaxonomyRollup] = useState(false);
   /** Kalshi trades compose: optional INNER JOIN to finalized yes/no markets (Athena subquery). */
   const [kalshiTradesJoinPreset, setKalshiTradesJoinPreset] = useState("");
   const [selectionTab, setSelectionTab] = useState("columns"); // "columns" | "meta" | "recipes"
+  const [showRequestComposer, setShowRequestComposer] = useState(true);
+  const [expandedRequestCardId, setExpandedRequestCardId] = useState(null);
   const [nullishAlertOpen, setNullishAlertOpen] = useState(false);
   const [nullishColumnList, setNullishColumnList] = useState([]);
   const nullishPendingRowsRef = useRef(null);
@@ -498,7 +546,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
   const [beckerViews, setBeckerViews] = useState(() => listBeckerParquetViews());
 
-  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
+  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; composeFilters?: any; sheetJoinSpec?: any; sheetProvenance?: any; requestCard?: any; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
 
   useEffect(() => {
@@ -568,6 +616,204 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     }));
   }, [dataSheets]);
 
+  const sheetsCount = sheetJoinCandidates.length;
+
+  const openSheetJoinDialog = useCallback(() => {
+    const candidates = sheetJoinCandidates.filter((s) => s.rowCount > 0);
+    const left = candidates[0]?.id || sheetJoinCandidates[0]?.id || "";
+    const right = candidates.find((s) => s.id !== left)?.id || "";
+
+    setSheetJoinMode("sheet");
+    setSheetJoinLeftId(left);
+    setSheetJoinRightId(right);
+    setSheetJoinType("inner");
+
+    const leftCols = left ? Object.keys((dataSheets?.[left]?.data || [])[0] || {}) : [];
+    const rightCols = right ? Object.keys((dataSheets?.[right]?.data || [])[0] || {}) : [];
+    setSheetJoinLeftColumn(leftCols[0] || "");
+    setSheetJoinRightColumn(rightCols[0] || "");
+
+    setSheetJoinDialogOpen(true);
+  }, [sheetJoinCandidates, dataSheets]);
+
+  const runSheetJoinIntoNewSheet = useCallback(async () => {
+    const leftId = String(sheetJoinLeftId || "").trim();
+    const rightId = String(sheetJoinRightId || "").trim();
+    if (!leftId || !rightId || leftId === rightId) {
+      toast.error("Pick two different sheets to join.");
+      return;
+    }
+    const leftSheet = dataSheets?.[leftId];
+    const rightSheet = dataSheets?.[rightId];
+    const leftRows = Array.isArray(leftSheet?.data) ? leftSheet.data : [];
+    const rightRows = Array.isArray(rightSheet?.data) ? rightSheet.data : [];
+    if (!leftRows.length || !rightRows.length) {
+      toast.error("Both sheets must have rows.");
+      return;
+    }
+
+    const joinType = sheetJoinType === "left" ? "left" : "inner";
+    const leftKey = String(sheetJoinLeftColumn || "").trim();
+    const rightKey = String(sheetJoinRightColumn || "").trim();
+    if (!leftKey || !rightKey) {
+      toast.error("Pick join columns.");
+      return;
+    }
+
+    if (sheetJoinMode === "sheet") {
+      // Browser join (preview rows only).
+      const rightByKey = new Map();
+      for (const r of rightRows) {
+        const k = r?.[rightKey];
+        const kk = k == null ? "" : String(k);
+        if (!kk) continue;
+        if (!rightByKey.has(kk)) rightByKey.set(kk, r);
+      }
+      const out = [];
+      for (const l of leftRows) {
+        const lk = l?.[leftKey];
+        const lks = lk == null ? "" : String(lk);
+        const r = lks ? rightByKey.get(lks) : null;
+        if (!r && joinType === "inner") continue;
+        const row = { ...(l || {}) };
+        if (r) {
+          for (const [k, v] of Object.entries(r)) {
+            const outKey = Object.prototype.hasOwnProperty.call(row, k) ? `${String(rightSheet?.name || rightId)}_${k}` : k;
+            row[outKey] = v;
+          }
+        }
+        out.push(row);
+        if (out.length >= ATHENA_SAMPLE_ROW_LIMIT) break;
+      }
+
+      addNewSheetAndActivate?.((newId) => {
+        setSheetData?.(newId, out);
+        setDataSheets?.((prev) => {
+          const p = prev || {};
+          const sheet = p[newId];
+          if (!sheet) return prev;
+          return {
+            ...p,
+            [newId]: {
+              ...sheet,
+              name: `Join · ${String(leftSheet?.name || leftId)} ⟕ ${String(rightSheet?.name || rightId)}`.slice(0, 80),
+              provenance: null,
+            },
+          };
+        });
+      });
+
+      setSheetJoinDialogOpen(false);
+      toast.success("Joined sheets into a new sheet.");
+      return;
+    }
+
+    // Source join (Athena/CTE): use left sheet provenance as the base query and join to right sheet CTE.
+    const leftProv = leftSheet?.provenance;
+    const rightProv = rightSheet?.provenance;
+    if (!leftProv || !rightProv || leftProv.kind !== "compose" || rightProv.kind !== "compose") {
+      toast.error("Both sheets must be CTE-rebuildable (provenance kind: compose).");
+      return;
+    }
+    if (String(leftProv.lake || "") !== String(rightProv.lake || "")) {
+      toast.error("Sheets must be from the same lake to join in the original data source.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setLoadLabel("Joining in the data source…");
+      setLoadProgress(10);
+
+      const sheetGraph = {};
+      const collect = (id) => {
+        const s = dataSheets?.[id];
+        const prov = s?.provenance;
+        if (!s || !prov || prov.kind !== "compose") return;
+        if (sheetGraph[id]) return;
+        sheetGraph[id] = { name: String(s?.name || id), provenance: prov };
+        const deps = Array.isArray(prov.serverSheetJoins) ? prov.serverSheetJoins : [];
+        deps.forEach((d) => d?.targetSheetId && collect(d.targetSheetId));
+      };
+      collect(leftId);
+      collect(rightId);
+
+      const res = await fetch("/api/data-lake/join-sheets-cte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          lake: leftProv.lake,
+          table: leftProv.table,
+          compose: leftProv.composeSpec,
+          filters: leftProv.composeFilters || null,
+          joins: [
+            {
+              targetSheetId: rightId,
+              joinType,
+              leftColumn: leftKey, // must be a base-table column name
+              rightColumn: rightKey, // must be a column produced by the right CTE
+            },
+          ],
+          sheetGraph,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || res.statusText || `Join ${res.status}`);
+
+      const outRows = Array.isArray(j.rows) ? j.rows.slice(0, ATHENA_SAMPLE_ROW_LIMIT) : [];
+
+      const newProv = {
+        kind: "compose",
+        lake: leftProv.lake,
+        table: leftProv.table,
+        composeSpec: leftProv.composeSpec,
+        composeFilters: leftProv.composeFilters || null,
+        serverSheetJoins: [
+          ...(Array.isArray(leftProv.serverSheetJoins) ? leftProv.serverSheetJoins : []),
+          { targetSheetId: rightId, joinType, leftColumn: leftKey, rightColumn: rightKey },
+        ],
+        browserSheetJoins: [],
+      };
+
+      addNewSheetAndActivate?.((newId) => {
+        setSheetData?.(newId, outRows);
+        setDataSheets?.((prev) => {
+          const p = prev || {};
+          const sheet = p[newId];
+          if (!sheet) return prev;
+          return {
+            ...p,
+            [newId]: {
+              ...sheet,
+              name: `Join · ${String(leftSheet?.name || leftId)} ⟕ ${String(rightSheet?.name || rightId)} (lake)`.slice(0, 80),
+              provenance: newProv,
+            },
+          };
+        });
+      });
+
+      setSheetJoinDialogOpen(false);
+      toast.success("Joined via Athena into a new sheet.");
+    } catch (e) {
+      toast.error(e?.message || String(e));
+    } finally {
+      setLoading(false);
+      setLoadProgress(0);
+    }
+  }, [
+    sheetJoinLeftId,
+    sheetJoinRightId,
+    sheetJoinMode,
+    sheetJoinType,
+    sheetJoinLeftColumn,
+    sheetJoinRightColumn,
+    dataSheets,
+    addNewSheetAndActivate,
+    setSheetData,
+    setDataSheets,
+  ]);
+
   const addComposeJoinRule = useCallback(() => {
     setComposeJoins((prev) => {
       const list = Array.isArray(prev) ? prev : [];
@@ -581,6 +827,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           targetTable: defaultTargetTable,
           targetSheetId: "",
           joinType: "inner",
+          mergeStrategy: "server",
           leftColumn: baseLeft,
           rightColumn: "",
         },
@@ -625,7 +872,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         numberScale: i.numberScale || "none",
         decimals: i.decimals != null ? Number(i.decimals) : null,
         treatAsDate: i.treatAsDate === true,
-          ...(i.aggregate === "sum" && i.sumCase && i.sumCase.enabled ? { sumCase: i.sumCase } : {}),
+        ...(i.aggregate === "sum" && i.sumCase && i.sumCase.enabled ? { sumCase: i.sumCase } : {}),
+        ...(i.aggregate === "sum" && i.equation && i.equation.enabled ? { equation: i.equation } : {}),
       })),
       // Server normalizes too: with Sum/Count, GROUP BY is every non-aggregate field (e.g. quarter) so many trades in Q1 2024 become one row.
       groupByAliases: hasComposeAggregates ? composeDimensionAliases : [],
@@ -676,6 +924,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     const bits = columnComposeItems.map((it) => {
       const title = String(it.alias || it.column).trim();
       if (it.aggregate === "sum") {
+        if (it.equation?.enabled) {
+          return `“${title}” = SUM( custom expression )`;
+        }
         return `“${title}” = sum of ${it.column}`;
       }
       if (it.aggregate === "count") {
@@ -784,11 +1035,23 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, []);
 
   const applyRowsToActiveSheet = useCallback(
-    (rows) => {
+    (rows, provenance) => {
       replaceCurrentSheetData?.(rows);
       setConnectedData?.(rows);
+      if (provenance && setDataSheets && activeSheetId) {
+        setDataSheets((prev) => {
+          const cur = prev?.[activeSheetId];
+          return {
+            ...(prev || {}),
+            [activeSheetId]: {
+              ...(cur || { name: `Sheet`, data: [] }),
+              provenance,
+            },
+          };
+        });
+      }
     },
-    [replaceCurrentSheetData, setConnectedData],
+    [replaceCurrentSheetData, setConnectedData, setDataSheets, activeSheetId],
   );
 
   const finalizeIngestSheetRows = useCallback((rows, rowCountHint, applyWithCount) => {
@@ -988,36 +1251,69 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             throw new Error("Missing compose query spec.");
           }
           const sheetJoin = sheetJoinSpec && typeof sheetJoinSpec === "object" ? sheetJoinSpec : null;
-          const joinEnabled =
-            sheetJoin &&
-            Array.isArray(sheetJoin.sheetRows) &&
-            sheetJoin.sheetRows.length > 0 &&
-            sheetJoin.join &&
-            typeof sheetJoin.join === "object";
 
-          const { columns: resultColumns, rows } = joinEnabled
+          const { columns: resultColumns, rows } = sheetJoin
             ? await (async () => {
-                const res = await fetch("/api/data-lake/join-sheet", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  credentials: "same-origin",
-                  body: JSON.stringify({
-                    lake: lakeVal,
-                    table,
-                    compose: composeSpec,
-                    filters: composeFilters || null,
-                    sheetRows: sheetJoin.sheetRows,
-                    join: sheetJoin.join,
-                  }),
-                });
-                let j = {};
-                try {
-                  j = await res.json();
-                } catch {
-                  /* ignore */
+                if (sheetJoin.error) throw new Error(sheetJoin.error);
+
+                if (sheetJoin.mode === "browser") {
+                  const joinEnabled =
+                    Array.isArray(sheetJoin.sheetRows) &&
+                    sheetJoin.sheetRows.length > 0 &&
+                    sheetJoin.join &&
+                    typeof sheetJoin.join === "object";
+                  if (!joinEnabled) {
+                    throw new Error("Browser join selected, but target sheet has no preview rows.");
+                  }
+
+                  const res = await fetch("/api/data-lake/join-sheet", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify({
+                      lake: lakeVal,
+                      table,
+                      compose: composeSpec,
+                      filters: composeFilters || null,
+                      sheetRows: sheetJoin.sheetRows,
+                      join: sheetJoin.join,
+                    }),
+                  });
+                  let j = {};
+                  try {
+                    j = await res.json();
+                  } catch {
+                    /* ignore */
+                  }
+                  if (!res.ok) throw new Error(j.error || res.statusText || `Join ${res.status}`);
+                  return { columns: j.columns || [], rows: j.rows || [] };
                 }
-                if (!res.ok) throw new Error(j.error || res.statusText || `Join ${res.status}`);
-                return { columns: j.columns || [], rows: j.rows || [] };
+
+                if (sheetJoin.mode === "server") {
+                  const res = await fetch("/api/data-lake/join-sheets-cte", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify({
+                      lake: lakeVal,
+                      table,
+                      compose: composeSpec,
+                      filters: composeFilters || null,
+                      joins: sheetJoin.joins || [],
+                      sheetGraph: sheetJoin.sheetGraph || {},
+                    }),
+                  });
+                  let j = {};
+                  try {
+                    j = await res.json();
+                  } catch {
+                    /* ignore */
+                  }
+                  if (!res.ok) throw new Error(j.error || res.statusText || `Server join ${res.status}`);
+                  return { columns: j.columns || [], rows: j.rows || [] };
+                }
+
+                throw new Error(`Unknown join mode: ${String(sheetJoin.mode || "")}`);
               })()
             : await fetchAthenaLakeSample(
                 {
@@ -1056,12 +1352,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             }
           }
 
+          const cappedColumns = Array.isArray(resultColumns) ? resultColumns : [];
+          const cappedRows = Array.isArray(outRows) ? outRows.slice(0, ATHENA_SAMPLE_ROW_LIMIT) : [];
           return ingestAthenaResultAsView({
             dataset,
             sampleId: `${sid}-compose`,
-            columns: resultColumns,
-            rows: outRows,
-            ingestFullResult: true,
+            columns: cappedColumns,
+            rows: cappedRows,
+            limit: ATHENA_SAMPLE_ROW_LIMIT,
+            ingestFullResult: false,
           });
         },
       });
@@ -1084,6 +1383,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaOpSpecs,
       kalshiIngestExtras,
       sheetJoinSpec,
+      sheetProvenance,
+      requestStartMs,
+      requestCard,
     } =
       pending;
     pendingIngestRef.current = null;
@@ -1108,7 +1410,26 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         sheetJoinSpec,
       );
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
-        applyRowsToActiveSheet(finalRows);
+        applyRowsToActiveSheet(finalRows, sheetProvenance);
+        if (mode === "columns" && requestCard && activeSheetId && setDataSheets) {
+          const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+          const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
+          const card = { ...requestCard, sheetId: activeSheetId, elapsedMs };
+          setDataSheets((prev) => {
+            const p = prev || {};
+            const sheet = p[activeSheetId];
+            if (!sheet) return prev;
+            return {
+              ...p,
+              [activeSheetId]: {
+                ...sheet,
+                requestCards: [card],
+              },
+            };
+          });
+          setExpandedRequestCardId(card.id);
+          setShowRequestComposer(false);
+        }
         setLastRowCount(n);
         refreshBeckerViews();
       });
@@ -1136,6 +1457,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaOpSpecs,
       metaAppendTargetIndex,
       kalshiIngestExtras,
+      sheetJoinSpec,
     } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
@@ -1156,6 +1478,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaFilters,
         metaOpSpecs,
         kalshiIngestExtras,
+        sheetJoinSpec,
       );
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         if (mode === "meta") {
@@ -1202,6 +1525,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       sampleId: sid,
       composeSpec,
       composeFilters,
+      sheetProvenance,
+      sheetJoinSpec,
+      requestStartMs,
+      requestCard,
       metaQueryMode,
       metaFilters,
       metaOpSpecs,
@@ -1230,14 +1557,19 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaFilters,
         metaOpSpecs,
         kalshiIngestExtras,
+        sheetJoinSpec,
       );
 
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
+        const newCardId = requestCard ? genRequestCardId() : null;
         addNewSheetAndActivate?.((newId) => {
           setSheetData?.(newId, finalRows);
           setDataSheets?.((prev) => {
             const sheet = prev[newId];
             if (!sheet) return prev;
+            const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+            const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
+            const card = requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: newId, elapsedMs } : null;
             return {
               ...prev,
               [newId]: {
@@ -1246,10 +1578,16 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   0,
                   80,
                 ),
+                ...(sheetProvenance ? { provenance: sheetProvenance } : {}),
+                ...(card && mode === "columns" ? { requestCards: [card] } : {}),
               },
             };
           });
         });
+        if (mode === "columns" && requestCard) {
+          if (newCardId) setExpandedRequestCardId(newCardId);
+          setShowRequestComposer(false);
+        }
         setLastRowCount(n);
         refreshBeckerViews();
       });
@@ -1692,29 +2030,162 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       templateRowCount <= 1;
 
     const effectiveIngestMode = selectionTab === "meta" ? "meta" : "columns";
+    const composeSpecForRun = isComposeTab ? buildServerComposePayload() : undefined;
+    const composeFiltersForRun = isComposeTab
+      ? composeWhereFilters.length
+        ? { and: composeWhereFilters, or: [] }
+        : null
+      : undefined;
+
+    const requestStartMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+    const whereSummary = summarizeWhereFilters(composeFiltersForRun);
+    const requestCard =
+      effectiveIngestMode === "columns" && isComposeTab
+        ? {
+            id: genRequestCardId(),
+            createdAt: Date.now(),
+            elapsedMs: null,
+            lake,
+            table: selected.table,
+            sheetId: activeSheetId || null,
+            sheetLabel: activeSheetId ? String(dataSheets?.[activeSheetId]?.name || activeSheetId) : "",
+            selectAliases: Array.isArray(columnComposeItems)
+              ? columnComposeItems.map((i) => String(i.alias || i.column).trim()).filter(Boolean)
+              : [],
+            selectColumns: Array.isArray(columnComposeItems)
+              ? columnComposeItems.map((i) => String(i.column || "").trim()).filter(Boolean)
+              : [],
+            hasWhere: whereSummary.hasWhere,
+            whereText: whereSummary.text,
+          }
+        : null;
     pendingIngestRef.current = {
       mode: effectiveIngestMode,
       lake,
       table: selected.table,
       sampleId: selected.id,
-      composeSpec: isComposeTab ? buildServerComposePayload() : undefined,
-      composeFilters: isComposeTab ? (composeWhereFilters.length ? { and: composeWhereFilters, or: [] } : null) : undefined,
+      composeSpec: composeSpecForRun,
+      composeFilters: composeFiltersForRun,
+      requestStartMs,
+      requestCard,
       sheetJoinSpec: (() => {
         const joins = Array.isArray(composeJoins) ? composeJoins : [];
-        const sheetJoin = joins.find((j) => j && j.targetKind === "sheet" && j.targetSheetId && j.leftColumn && j.rightColumn);
-        if (!sheetJoin) return null;
-        const sheet = dataSheets?.[sheetJoin.targetSheetId];
-        const sheetRows = Array.isArray(sheet?.data) ? sheet.data : [];
-        if (!sheetRows.length) return null;
-        return {
-          sheetRows,
-          join: {
-            sheetColumn: sheetJoin.rightColumn,
-            pullColumn: sheetJoin.leftColumn,
-            joinType: sheetJoin.joinType || "left",
-          },
-        };
+        const sheetJoins = joins.filter((j) => j && j.targetKind === "sheet" && j.targetSheetId && j.leftColumn && j.rightColumn);
+
+        const browserJoins = sheetJoins.filter((j) => String(j.mergeStrategy || "server") !== "server");
+        const serverJoins = sheetJoins.filter((j) => String(j.mergeStrategy || "server") === "server");
+
+        // Browser merge: use preview rows from the target sheet.
+        if (browserJoins.length > 0) {
+          const j = browserJoins[0];
+          const sheet = dataSheets?.[j.targetSheetId];
+          const sheetRows = Array.isArray(sheet?.data) ? sheet.data : [];
+          if (!sheetRows.length) return null;
+          return {
+            mode: "browser",
+            sheetRows,
+            join: {
+              sheetColumn: j.rightColumn,
+              pullColumn: j.leftColumn,
+              joinType: j.joinType || "left",
+            },
+          };
+        }
+
+        // Server merge: recompute using CTEs from stored sheet provenance.
+        if (serverJoins.length > 0) {
+          const targetIds = Array.from(new Set(serverJoins.map((j) => j.targetSheetId).filter(Boolean)));
+          const sheetGraph = {};
+          const seen = new Set();
+          const stack = [...targetIds];
+          while (stack.length > 0) {
+            const id = stack.pop();
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+
+            const s = dataSheets?.[id];
+            const prov = s?.provenance;
+            if (!prov) {
+              return {
+                mode: "server",
+                error: `Missing provenance for sheet ${id}. Create the sheet via a server merge or a compose pull first.`,
+              };
+            }
+            if (prov.kind !== "compose") {
+              return {
+                mode: "server",
+                error: `Sheet ${id} cannot be used as a CTE input (kind: ${prov.kind}). Re-create it using a server merge or a plain compose pull.`,
+              };
+            }
+
+            sheetGraph[id] = { name: String(s?.name || id), provenance: prov };
+
+            const deps = Array.isArray(prov?.serverSheetJoins) ? prov.serverSheetJoins : [];
+            for (const d of deps) {
+              if (d?.targetSheetId) stack.push(d.targetSheetId);
+            }
+          }
+          return {
+            mode: "server",
+            joins: serverJoins.map((j) => ({
+              targetSheetId: j.targetSheetId,
+              joinType: j.joinType || "left",
+              leftColumn: j.leftColumn,
+              rightColumn: j.rightColumn,
+            })),
+            sheetGraph,
+          };
+        }
+
+        return null;
       })(),
+      sheetProvenance:
+        effectiveIngestMode === "columns" && isComposeTab
+          ? (() => {
+              const joins = Array.isArray(composeJoins) ? composeJoins : [];
+              const sheetJoins = joins.filter((j) => j && j.targetKind === "sheet" && j.targetSheetId && j.leftColumn && j.rightColumn);
+              const serverSheetJoins = sheetJoins
+                .filter((j) => String(j.mergeStrategy || "server") === "server")
+                .map((j) => ({
+                  targetSheetId: j.targetSheetId,
+                  joinType: j.joinType || "left",
+                  leftColumn: j.leftColumn,
+                  rightColumn: j.rightColumn,
+                }));
+              const browserSheetJoins = sheetJoins
+                .filter((j) => String(j.mergeStrategy || "server") !== "server")
+                .map((j) => ({
+                  targetSheetId: j.targetSheetId,
+                  joinType: j.joinType || "left",
+                  leftColumn: j.leftColumn,
+                  rightColumn: j.rightColumn,
+                }));
+
+              const hasBrowser = browserSheetJoins.length > 0;
+              if (hasBrowser) {
+                return {
+                  kind: "compose_browser_join",
+                  lake,
+                  table: selected.table,
+                  composeSpec: composeSpecForRun,
+                  composeFilters: composeFiltersForRun,
+                  serverSheetJoins,
+                  browserSheetJoins,
+                };
+              }
+
+              // Default: server join / compose only (CTE rebuildable).
+              return {
+                kind: "compose",
+                lake,
+                table: selected.table,
+                composeSpec: composeSpecForRun,
+                composeFilters: composeFiltersForRun,
+                serverSheetJoins,
+                browserSheetJoins,
+              };
+            })()
+          : null,
       kalshiIngestExtras:
         isComposeTab && dataset === "kalshi" && selected.table === "markets"
           ? {
@@ -1829,6 +2300,64 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   const canRunRequest = runRequestReasons.length === 0;
 
+  const activeSheetRequestCards = useMemo(() => {
+    if (!activeSheetId) return [];
+    const cards = dataSheets?.[activeSheetId]?.requestCards;
+    return Array.isArray(cards) ? cards : [];
+  }, [dataSheets, activeSheetId]);
+
+  useEffect(() => {
+    // Collapse composer after a request exists for this sheet.
+    if (!activeSheetId) return;
+    if (activeSheetRequestCards.length > 0) {
+      setShowRequestComposer(false);
+      if (!expandedRequestCardId) {
+        setExpandedRequestCardId(activeSheetRequestCards[0]?.id || null);
+      }
+    }
+  }, [activeSheetId, activeSheetRequestCards, expandedRequestCardId]);
+
+  const deleteRequestCardAndClearSheet = useCallback(
+    (sheetId, cardId) => {
+      if (!sheetId) return;
+      setSheetData?.(sheetId, []);
+      setConnectedData?.([]);
+      setDataSheets?.((prev) => {
+        const p = prev || {};
+        const sheet = p[sheetId];
+        if (!sheet) return prev;
+        const list = Array.isArray(sheet.requestCards) ? sheet.requestCards : [];
+        const next = list.filter((c) => c?.id !== cardId);
+        const out = {
+          ...p,
+          [sheetId]: {
+            ...sheet,
+            requestCards: next,
+            provenance: null,
+          },
+        };
+        return out;
+      });
+      setExpandedRequestCardId(null);
+      setShowRequestComposer(true);
+    },
+    [setSheetData, setConnectedData, setDataSheets],
+  );
+
+  const startNewRequestDraft = useCallback(() => {
+    setShowRequestComposer(true);
+    setExpandedRequestCardId(null);
+    // We keep the previous card; we just reset the draft editor state.
+    setError(null);
+    // Keep the sheet data intact; only reset the draft builder controls.
+    setColumnComposeItems([]);
+    setColumnComposeOrderBy([]);
+    setComposeWhereFilters([]);
+    setComposeHavingFilters([]);
+    setComposeJoins([]);
+    setSelectionTab("columns");
+  }, []);
+
   const addComposeColumn = useCallback(
     (col) => {
       setError(null);
@@ -1850,6 +2379,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             decimals: null,
             treatAsDate: isDate,
             sumCase: { enabled: false, branches: [], elseColumn: "" },
+            equation: { enabled: false },
           },
         ];
       });
@@ -1888,6 +2418,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           decimals: null,
           treatAsDate: isDate,
           sumCase: { enabled: false, branches: [], elseColumn: "" },
+          equation: { enabled: false },
         };
       }),
     );
@@ -2265,13 +2796,31 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                 value={rollVal}
                                 onValueChange={(v) => {
                                   if (v === "none") {
-                                    updateComposeItem(item.id, { aggregate: null, sumCase: { enabled: false, branches: [], elseColumn: "" } });
+                                    updateComposeItem(item.id, {
+                                      aggregate: null,
+                                      sumCase: { enabled: false, branches: [], elseColumn: "" },
+                                      equation: { enabled: false },
+                                    });
+                                  } else if (v === "equation") {
+                                    const base = String(item.column || "").trim();
+                                    updateComposeItem(item.id, {
+                                      aggregate: "sum",
+                                      dateBucket: null,
+                                      dateFormat: null,
+                                      sumCase: { enabled: false, branches: [], elseColumn: "" },
+                                      equation: {
+                                        enabled: true,
+                                        agg: "sum",
+                                        root: { type: "col", name: base || numericColumns[0] || "" },
+                                      },
+                                    });
                                   } else {
                                     updateComposeItem(item.id, {
                                       aggregate: v,
                                       dateBucket: null,
                                       dateFormat: null,
                                       ...(v !== "sum" ? { sumCase: { enabled: false, branches: [], elseColumn: "" } } : {}),
+                                      equation: { enabled: false },
                                     });
                                   }
                                 }}
@@ -2286,6 +2835,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                   <SelectItem value="sum" className="text-xs" disabled={!isNumericCol}>
                                     Sum numbers
                                   </SelectItem>
+                                <SelectItem value="equation" className="text-xs" disabled={!isNumericCol}>
+                                  Equation (SUM of expression)
+                                </SelectItem>
                                   <SelectItem value="avg" className="text-xs" disabled={!isNumericCol}>
                                     Average
                                   </SelectItem>
@@ -2342,15 +2894,29 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                             elseColumn: typeof current?.elseColumn === "string" ? current.elseColumn : "",
                                           }
                                         : { enabled: false, branches: [], elseColumn: "" },
+                                      equation: { enabled: false },
                                     });
                                   }}
                                 >
                                   if else
                                 </Toggle>
                                 <p className="text-[11px] text-muted-foreground">
-                                  SUM of this column times a CASE expression.
+                                  Use <span className="font-medium">Equation</span> in Summarize for a full expression tree; use{" "}
+                                  <span className="font-medium">if else</span> for the simpler SUM×CASE shortcut.
                                 </p>
                               </div>
+
+                              {item.equation?.enabled ? (
+                                <EquationExprBuilder
+                                  baseColumn={String(item.column || "").trim()}
+                                  equation={item.equation}
+                                  onEquationChange={(next) => updateComposeItem(item.id, { equation: next })}
+                                  availableColumns={availableColumns}
+                                  numericColumns={numericColumns}
+                                  kindForColumn={kindForColumn}
+                                  composeSourceColumnLabel={composeSourceColumnLabel}
+                                />
+                              ) : null}
 
                               {item.sumCase?.enabled ? (
                                 <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2">
@@ -2615,6 +3181,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                   <SelectContent>
                                     <SelectItem value="none" className="text-xs">
                                       No scaling
+                                    </SelectItem>
+                                    <SelectItem value="ten" className="text-xs">
+                                      Divide by 10
+                                    </SelectItem>
+                                    <SelectItem value="hundred" className="text-xs">
+                                      Divide by 100
                                     </SelectItem>
                                     <SelectItem value="thousand" className="text-xs">
                                       Divide by 1,000
@@ -3125,6 +3697,33 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             </SelectContent>
                           </Select>
 
+                          {targetIsSheet && (
+                            <>
+                              <span className="text-xs text-muted-foreground">merge</span>
+                              <Select
+                                value={jr.mergeStrategy || "server"}
+                                onValueChange={(v) => {
+                                  const ms = v === "server" ? "server" : "browser";
+                                  setComposeJoins((prev) =>
+                                    (prev || []).map((r) => (r.id === jr.id ? { ...r, mergeStrategy: ms } : r)),
+                                  );
+                                }}
+                              >
+                                <SelectTrigger className="h-8 text-xs w-[11rem] min-w-0">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="browser" className="text-xs">
+                                    Browser (100-row preview)
+                                  </SelectItem>
+                                  <SelectItem value="server" className="text-xs">
+                                    Server (full dataset via CTE)
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </>
+                          )}
+
                           <span className="text-xs text-muted-foreground">on</span>
 
                           <Select
@@ -3182,7 +3781,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
                           {targetIsSheet && (
                             <p className="w-full text-[11px] text-muted-foreground leading-snug">
-                              Sheet joins run server-side and may take longer for large sheets.
+                              Browser merges your current sheet preview rows; Server recomputes the join on the full dataset using Athena/Glue (CTE).
                             </p>
                           )}
                         </div>
@@ -3266,6 +3865,186 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         onAddNewSheet={onDialogAddNewSheet}
       />
 
+      <Dialog
+        open={sheetJoinDialogOpen}
+        onOpenChange={(open) => {
+          setSheetJoinDialogOpen(open);
+          if (!open) return;
+        }}
+      >
+        <DialogContent className="max-w-[min(760px,calc(100vw-2rem))]">
+          <DialogHeader>
+            <DialogTitle>Join sheets</DialogTitle>
+            <DialogDescription>
+              Choose whether to join the current <span className="font-medium">sheet previews</span> in the browser, or re-run a{" "}
+              <span className="font-medium">full lake join</span> in Athena and write results into a new sheet (capped to{" "}
+              {ATHENA_SAMPLE_ROW_LIMIT} rows).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Join mode</Label>
+              <Select value={sheetJoinMode} onValueChange={(v) => setSheetJoinMode(v === "source" ? "source" : "sheet")}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sheet" className="text-xs">
+                    Join between these sheets (browser)
+                  </SelectItem>
+                  <SelectItem value="source" className="text-xs">
+                    Join in original data source (Athena)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Left sheet</Label>
+                <Select value={sheetJoinLeftId} onValueChange={setSheetJoinLeftId}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Pick sheet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sheetJoinCandidates.map((s) => (
+                      <SelectItem key={`sj-left-${s.id}`} value={s.id} className="text-xs">
+                        {s.name} ({s.rowCount})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Right sheet</Label>
+                <Select value={sheetJoinRightId} onValueChange={setSheetJoinRightId}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Pick sheet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sheetJoinCandidates
+                      .filter((s) => s.id !== sheetJoinLeftId)
+                      .map((s) => (
+                        <SelectItem key={`sj-right-${s.id}`} value={s.id} className="text-xs">
+                          {s.name} ({s.rowCount})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Join type</Label>
+                <Select value={sheetJoinType} onValueChange={(v) => setSheetJoinType(v === "left" ? "left" : "inner")}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="inner" className="text-xs">
+                      Inner
+                    </SelectItem>
+                    <SelectItem value="left" className="text-xs">
+                      Left
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">{sheetJoinMode === "source" ? "Left key (base column)" : "Left key (sheet column)"}</Label>
+                {sheetJoinMode === "source" ? (
+                  <Select
+                    value={sheetJoinLeftColumn}
+                    onValueChange={setSheetJoinLeftColumn}
+                    disabled={!sheetJoinLeftId || !dataSheets?.[sheetJoinLeftId]?.provenance?.table}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Pick column" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64 overflow-y-auto">
+                      {(() => {
+                        const prov = dataSheets?.[sheetJoinLeftId]?.provenance;
+                        const t = String(prov?.table || "").trim();
+                        if (!t) return null;
+                        const cols = getColumnMetaForTable(dataset, t).map((c) => c.name);
+                        return cols.map((c) => (
+                          <SelectItem key={`sj-src-left-${c}`} value={c} className="text-xs">
+                            {c}
+                          </SelectItem>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select
+                    value={sheetJoinLeftColumn}
+                    onValueChange={setSheetJoinLeftColumn}
+                    disabled={!sheetJoinLeftId || !Array.isArray(dataSheets?.[sheetJoinLeftId]?.data) || !dataSheets?.[sheetJoinLeftId]?.data?.length}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Pick column" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64 overflow-y-auto">
+                      {Object.keys((dataSheets?.[sheetJoinLeftId]?.data || [])[0] || {}).map((c) => (
+                        <SelectItem key={`sj-sheet-left-${c}`} value={c} className="text-xs">
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Right key (sheet column)</Label>
+                <Select
+                  value={sheetJoinRightColumn}
+                  onValueChange={setSheetJoinRightColumn}
+                  disabled={!sheetJoinRightId || !Array.isArray(dataSheets?.[sheetJoinRightId]?.data) || !dataSheets?.[sheetJoinRightId]?.data?.length}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Pick column" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64 overflow-y-auto">
+                    {Object.keys((dataSheets?.[sheetJoinRightId]?.data || [])[0] || {}).map((c) => (
+                      <SelectItem key={`sj-right-${c}`} value={c} className="text-xs">
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {sheetJoinMode === "source" ? (
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Data-source joins require both sheets to have <span className="font-medium text-foreground">provenance</span> (created via
+                compose pulls / server joins). The left join key must be a <span className="font-medium text-foreground">base table</span>{" "}
+                column; the right key is a column produced by the right sheet’s CTE.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Sheet joins happen entirely in the browser using the currently loaded sheet rows (usually 100-row previews).
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="button" onClick={runSheetJoinIntoNewSheet} disabled={loading}>
+              Create joined sheet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={nullishAlertOpen} onOpenChange={onNullishAlertOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -3321,25 +4100,152 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             ))}
           </SelectContent>
         </Select>
+        {!!activeSheetId && (
+          <div className="pt-2 space-y-1">
+            <Label className="text-[11px] text-muted-foreground">Sheet name (CTE)</Label>
+            <Input
+              className="h-8 text-xs"
+              value={String(dataSheets?.[activeSheetId]?.name || "")}
+              onChange={(e) => {
+                const next = e.target.value;
+                setDataSheets?.((prev) => {
+                  const p = prev || {};
+                  const sheet = p[activeSheetId] || { name: "Sheet", data: [] };
+                  return { ...p, [activeSheetId]: { ...sheet, name: next } };
+                });
+              }}
+              placeholder="e.g. resolved_markets"
+              spellCheck={false}
+              disabled={!setDataSheets}
+            />
+          </div>
+        )}
       </div>
 
       {selected?.table && availableColumns.length > 0 && (
         <div className="min-w-0 max-w-full px-2">
           <Tabs value={selectionTab} onValueChange={setSelectionTab} className="w-full">
-            <TabsList className=" w-fit flex-wrap p-0.5 mb-2 h-auto bg-slate-100 dark:bg-slate-800">
-              <TabsTrigger value="columns" className="h-7 px-2 text-xs">
-                Columns
-              </TabsTrigger>
-              <TabsTrigger value="meta" className="h-7 px-2 text-xs">
-                Meta Table
-              </TabsTrigger>
-              <TabsTrigger value="recipes" className="h-7 px-2 text-xs">
-                Recipes
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex items-center gap-2 mb-2">
+              <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
+                <TabsTrigger value="columns" className="h-7 px-2 text-xs">
+                  Columns
+                </TabsTrigger>
+                <TabsTrigger value="meta" className="h-7 px-2 text-xs">
+                  Meta Table
+                </TabsTrigger>
+                <TabsTrigger value="recipes" className="h-7 px-2 text-xs">
+                  Recipes
+                </TabsTrigger>
+              </TabsList>
+              {sheetsCount >= 2 ? (
+                <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={openSheetJoinDialog}>
+                  Joins
+                </Button>
+              ) : null}
+            </div>
 
             <TabsContent value="columns" className="space-y-4 min-w-0">
-              {renderColumnsComposeSection()}
+              {showRequestComposer ? (
+                <div className="space-y-3">
+                  {activeSheetId && activeSheetRequestCards.length > 0 ? (
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 dark:bg-slate-800/40 border border-border/60 p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {`New request for Sheet ${String(activeSheetId).replace("sheet-", "")}: ${String(
+                            dataSheets?.[activeSheetId]?.name || activeSheetId,
+                          )}`}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          When you click <span className="font-medium text-foreground">Load</span>, you’ll be prompted to{" "}
+                          <span className="font-medium text-foreground">Replace</span> or{" "}
+                          <span className="font-medium text-foreground">Create new sheet</span>.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs shrink-0"
+                        onClick={() => setShowRequestComposer(false)}
+                      >
+                        Back to summary
+                      </Button>
+                    </div>
+                  ) : null}
+                  {renderColumnsComposeSection()}
+                </div>
+              ) : null}
+
+              {activeSheetId && activeSheetRequestCards.length > 0 ? (
+                <div className="space-y-3">
+                  {activeSheetRequestCards.map((card, idx) => {
+                    const sheetLabel = `Sheet ${String(activeSheetId).replace("sheet-", "") || idx + 1}`;
+                    const title = String(card?.sheetLabel || dataSheets?.[activeSheetId]?.name || sheetLabel || "Sheet").trim();
+                    const tableLabel = String(card?.table || selected?.table || "").trim();
+                    const cols = Array.isArray(card?.selectAliases) && card.selectAliases.length ? card.selectAliases : [];
+                    const elapsed = fmtSeconds(card?.elapsedMs);
+                    const expanded = expandedRequestCardId === card?.id;
+                    return (
+                      <div key={card?.id || idx} className="rounded-lg bg-slate-100 dark:bg-slate-800/40 border border-border/60 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">
+                              {sheetLabel}: {title}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {tableLabel ? `table: ${tableLabel}` : "table: —"} ·{" "}
+                              {cols.length ? `columns: ${cols.join(", ")}` : "columns: —"}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">created in {elapsed}</p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => setExpandedRequestCardId((prev) => (prev === card?.id ? null : card?.id))}
+                            >
+                              {expanded ? "Collapse" : "Expand"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => deleteRequestCardAndClearSheet(activeSheetId, card?.id)}
+                              aria-label="Delete request"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div
+                          className={[
+                            "overflow-hidden transition-all duration-300 ease-in-out",
+                            expanded ? "max-h-[2400px] opacity-100 mt-3" : "max-h-0 opacity-0",
+                          ].join(" ")}
+                        >
+                          {expanded ? renderColumnsComposeSection() : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div>
+                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={startNewRequestDraft}>
+                      Create new request
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {!showRequestComposer && (!activeSheetId || activeSheetRequestCards.length === 0) ? (
+                <div className="space-y-3">
+                  {renderColumnsComposeSection()}
+                </div>
+              ) : null}
             </TabsContent>
 
             <TabsContent value="meta" className="space-y-2">

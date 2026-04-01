@@ -264,7 +264,8 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [sheetNames, setSheetNames] = useState()
 
     // Data sheets: user can have multiple sheets (Sheet 1, Sheet 2, ...); each can have its own data and optional live stream
-    const [dataSheets, setDataSheets] = useState(() => ({ 'sheet-1': { name: 'Sheet 1', data: [] } }));
+    // `provenance` stores the structured query that produced the sheet (so we can re-run it server-side as a CTE).
+    const [dataSheets, setDataSheets] = useState(() => ({ 'sheet-1': { name: 'Sheet 1', data: [], provenance: null } }));
     const [activeSheetId, setActiveSheetId] = useState('sheet-1');
 
     //Connected Data is active working data (derived from active sheet)

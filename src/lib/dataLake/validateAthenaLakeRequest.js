@@ -22,6 +22,7 @@ import {
   composeUnboundedSelectShouldCapRows,
   COMPOSE_UNCONSTRAINED_ROW_CAP,
 } from "./buildComposeAthenaSql";
+import { validateAndNormalizeEquation } from "./composeEquationAst";
 
 export class AthenaLakeRequestError extends Error {
   /**
@@ -363,6 +364,54 @@ export function validateAthenaLakeQueryBody(body) {
       }
     }
 
+    /** @type {Array<{ joinType: "inner" | "left"; cteName: string; on: { leftColumn: string; rightColumn: string } }>} */
+    const validatedCteJoins = [];
+    if (raw.cteJoins != null) {
+      if (!Array.isArray(raw.cteJoins)) {
+        throw new AthenaLakeRequestError("compose.cteJoins must be an array", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      const allowedLeft = new Set(allowedColumnsForLakeTable(lake, table));
+      const safeAlias = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+      for (const j of raw.cteJoins) {
+        if (!j || typeof j !== "object") {
+          throw new AthenaLakeRequestError("Invalid compose.cteJoins entry", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const joinTypeRaw = String(j.joinType || "inner").toLowerCase().trim();
+        const joinType = joinTypeRaw === "left" ? "left" : "inner";
+        const cteName = String(j.cteName || "").trim();
+        if (!safeAlias.test(cteName)) {
+          throw new AthenaLakeRequestError(`Invalid cteName: ${cteName}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const on = j.on;
+        if (!on || typeof on !== "object" || Array.isArray(on)) {
+          throw new AthenaLakeRequestError("compose.cteJoins[].on must be an object", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const leftColumn = String(on.leftColumn || "").trim();
+        const rightColumn = String(on.rightColumn || "").trim();
+        if (!safeAlias.test(leftColumn)) {
+          throw new AthenaLakeRequestError(`Invalid join leftColumn: ${leftColumn}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        if (!safeAlias.test(rightColumn)) {
+          throw new AthenaLakeRequestError(`Invalid join rightColumn: ${rightColumn}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        if (!allowedLeft.has(leftColumn)) {
+          throw new AthenaLakeRequestError(`Unknown join left column: ${leftColumn}`, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        validatedCteJoins.push({
+          joinType,
+          cteName,
+          on: { leftColumn, rightColumn },
+        });
+      }
+    }
+
+    if (joinPresetValidated && validatedCteJoins.length > 0) {
+      throw new AthenaLakeRequestError("compose.cteJoins are not supported with compose.join presets yet", {
+        statusCode: 400,
+        code: "BAD_REQUEST",
+      });
+    }
+
     const allowed =
       joinPresetValidated && KALSHI_TRADES_JOIN_PRESETS.has(joinPresetValidated)
         ? new Set(KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META.map((c) => c.name))
@@ -373,7 +422,7 @@ export function validateAthenaLakeQueryBody(body) {
 
     const dateBuckets = new Set(["day", "week", "month", "quarter", "year"]);
     const dateFormats = new Set(["dmy", "ym", "dm"]);
-    const scales = new Set(["none", "thousand", "million", "billion"]);
+    const scales = new Set(["none", "ten", "hundred", "thousand", "million", "billion"]);
     const safeAlias = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
     const selectIn = Array.isArray(raw.select) ? raw.select : [];
@@ -381,7 +430,7 @@ export function validateAthenaLakeQueryBody(body) {
       throw new AthenaLakeRequestError("compose.select must be a non-empty array", { statusCode: 400, code: "BAD_REQUEST" });
     }
 
-    /** @type {Array<{ column: string; alias: string; aggregate: null | string; dateBucket: string | null; dateFormat: string | null; numberScale: string; decimals: number | null; treatAsDate: boolean; columnType: string; sumCase?: any }>} */
+    /** @type {Array<{ column: string; alias: string; aggregate: null | string; dateBucket: string | null; dateFormat: string | null; numberScale: string; decimals: number | null; treatAsDate: boolean; columnType: string; sumCase?: any; equation?: any }>} */
     const normalizedSelect = [];
 
     for (const row of selectIn) {
@@ -511,6 +560,28 @@ export function validateAthenaLakeQueryBody(body) {
         throw new AthenaLakeRequestError("sumCase is only supported when aggregate is SUM", { statusCode: 400, code: "BAD_REQUEST" });
       }
 
+      /** @type {null | { enabled: true; agg: "sum"; root: any }} */
+      let normalizedEquation = null;
+      if (aggregate === "sum" && row.equation != null) {
+        if (typeof row.equation !== "object" || Array.isArray(row.equation)) {
+          throw new AthenaLakeRequestError("compose.select.equation must be an object", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        try {
+          normalizedEquation = validateAndNormalizeEquation(row.equation, { allowed, lake, table });
+        } catch (e) {
+          throw new AthenaLakeRequestError(e?.message || "Invalid equation expression", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+      } else if (row.equation != null && aggregate !== "sum") {
+        throw new AthenaLakeRequestError("equation is only supported when aggregate is SUM", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+
+      if (normalizedEquation && normalizedSumCase) {
+        throw new AthenaLakeRequestError("Only one of sumCase or equation may be enabled for a SUM column", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+
       const db = row.dateBucket != null && String(row.dateBucket).trim() !== "" ? String(row.dateBucket).trim().toLowerCase() : null;
       const dateBucket = db && dateBuckets.has(db) ? db : null;
 
@@ -589,6 +660,7 @@ export function validateAthenaLakeQueryBody(body) {
         treatAsDate,
         columnType: colType,
         ...(normalizedSumCase ? { sumCase: normalizedSumCase } : {}),
+        ...(normalizedEquation ? { equation: normalizedEquation } : {}),
       });
     }
 
@@ -687,6 +759,7 @@ export function validateAthenaLakeQueryBody(body) {
       orderBy,
       ...(joinPresetValidated ? { join: { preset: joinPresetValidated } } : {}),
       ...(validatedJoins.length ? { joins: validatedJoins } : {}),
+      ...(validatedCteJoins.length ? { cteJoins: validatedCteJoins } : {}),
       ...(normalizedHaving ? { having: normalizedHaving } : {}),
     };
 

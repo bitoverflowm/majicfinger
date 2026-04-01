@@ -12,8 +12,115 @@ import {
 
 const SAFE_ALIAS = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+function escapeSqlString(s) {
+  return String(s).replace(/'/g, "''");
+}
+
+/**
+ * Predicate for CASE / IF branches (matches SUM if/else semantics).
+ * @param {{ column: string; op: string; value: string | number }} w
+ * @param {(c: string) => string} colRef
+ */
+function buildComposeWhenPredicateSql(w, colRef) {
+  const c = String(w?.column || "").trim();
+  const op = String(w?.op || "eq").toLowerCase().trim();
+  const v = w?.value;
+  if (!c || !isValidColumnIdentifier(c)) {
+    const err = new Error("Invalid WHEN column");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  const colSql = colRef(c);
+  const opSql = op === "gt" ? ">" : op === "lt" ? "<" : op === "eq" ? "=" : op === "neq" ? "!=" : null;
+  if (!opSql) {
+    const err = new Error(`Invalid WHEN operator: ${op}`);
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  if (typeof v === "number" && Number.isFinite(v)) {
+    return `CAST(${colSql} AS DOUBLE) ${opSql} ${v}`;
+  }
+  const lit = String(v ?? "");
+  const esc = lit.replace(/'/g, "''");
+  return `LOWER(CAST(${colSql} AS VARCHAR)) ${opSql} LOWER('${esc}')`;
+}
+
+/**
+ * @param {any} expr
+ * @param {(c: string) => string} colRef
+ */
+function buildEquationExprSql(expr, colRef) {
+  if (!expr || typeof expr !== "object") {
+    const err = new Error("Invalid equation expression");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  switch (expr.type) {
+    case "col": {
+      const name = String(expr.name || "").trim();
+      if (!isValidColumnIdentifier(name)) {
+        const err = new Error("Invalid equation column");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      return `CAST(${colRef(name)} AS DOUBLE)`;
+    }
+    case "num": {
+      const n = Number(expr.value);
+      if (!Number.isFinite(n)) {
+        const err = new Error("Invalid equation literal");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      return `CAST(${n} AS DOUBLE)`;
+    }
+    case "bin": {
+      const op = String(expr.op || "").trim();
+      if (!["*", "/", "+", "-"].includes(op)) {
+        const err = new Error("Invalid equation operator");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      const left = buildEquationExprSql(expr.left, colRef);
+      const right = buildEquationExprSql(expr.right, colRef);
+      return `(${left} ${op} ${right})`;
+    }
+    case "grp": {
+      const inner = buildEquationExprSql(expr.inner, colRef);
+      return `(${inner})`;
+    }
+    case "case": {
+      const branches = Array.isArray(expr.branches) ? expr.branches : [];
+      if (!branches.length) {
+        const err = new Error("CASE requires branches");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      const parts = branches.map((b) => {
+        const whenSql = buildComposeWhenPredicateSql(b.when, colRef);
+        const thenSql = buildEquationExprSql(b.then, colRef);
+        return `WHEN ${whenSql} THEN ${thenSql}`;
+      });
+      const elseSql = buildEquationExprSql(expr.elseNode, colRef);
+      return `(CASE ${parts.join(" ")} ELSE ${elseSql} END)`;
+    }
+    default: {
+      const err = new Error("Unknown equation node");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+  }
+}
+
 /** Virtual Kalshi markets column: leading token from event_ticker (Athena/Presto regexp_extract). */
-export const KALSHI_EVENT_TICKER_CATEGORY_SQL = `(CASE WHEN "event_ticker" IS NULL OR CAST("event_ticker" AS VARCHAR) = '' THEN 'independent' WHEN regexp_extract(CAST("event_ticker" AS VARCHAR), '^([A-Z0-9]+)', 1) = '' THEN 'independent' ELSE regexp_extract(CAST("event_ticker" AS VARCHAR), '^([A-Z0-9]+)', 1) END)`;
+function kalshiEventTickerCategorySql(eventTickerExpr) {
+  return `(CASE
+    WHEN ${eventTickerExpr} IS NULL
+      OR CAST(${eventTickerExpr} AS VARCHAR) = '' THEN 'independent'
+    WHEN regexp_extract(CAST(${eventTickerExpr} AS VARCHAR), '^([A-Z0-9]+)', 1) = '' THEN 'independent'
+    ELSE regexp_extract(CAST(${eventTickerExpr} AS VARCHAR), '^([A-Z0-9]+)', 1)
+  END)`;
+}
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
 
@@ -30,6 +137,8 @@ export function composeUnboundedSelectShouldCapRows(compose) {
   if (joinPreset) return false;
   const joins = Array.isArray(compose.joins) ? compose.joins : [];
   if (joins.length) return false;
+  const cteJoins = Array.isArray(compose.cteJoins) ? compose.cteJoins : [];
+  if (cteJoins.length) return false;
   const rows = Array.isArray(compose.select) ? compose.select : [];
   const hasAgg = rows.some((r) => r && r.aggregate != null);
   return !hasAgg;
@@ -167,9 +276,11 @@ function buildKalshiTradesResolvedMarketsJoinSubqueryCent(tradesPhysical, market
 
 const DATE_BUCKETS = new Set(["day", "week", "month", "quarter", "year"]);
 const DATE_FORMATS = new Set(["dmy", "ym", "dm"]);
-const SCALES = new Set(["none", "thousand", "million", "billion"]);
+const SCALES = new Set(["none", "ten", "hundred", "thousand", "million", "billion"]);
 
 function divisorForScale(scale) {
+  if (scale === "ten") return 1e1;
+  if (scale === "hundred") return 1e2;
   if (scale === "thousand") return 1e3;
   if (scale === "million") return 1e6;
   if (scale === "billion") return 1e9;
@@ -183,9 +294,9 @@ function divisorForScale(scale) {
  * different epochs (e.g. milliseconds: 1617235200000, nanoseconds: 1748638362006115000).
  *
  * Athena/Presto `from_unixtime` expects seconds.
- * @param {string} col
+ * @param {string} colExpr SQL expression for a column (e.g. `t0."created_at"`)
  */
-function epochBigintToTimestampExpr(col) {
+function epochBigintToTimestampExpr(colExpr) {
   // NOTE: We cast to DOUBLE because Athena doesn't consistently allow integer division on huge bigint epochs.
   // The thresholds are chosen by typical epoch ranges:
   // - seconds: ~1e9-1e10
@@ -193,11 +304,11 @@ function epochBigintToTimestampExpr(col) {
   // - microseconds: ~1e15-1e16
   // - nanoseconds: ~1e18-1e19
   return `from_unixtime(CASE
-    WHEN "${col}" IS NULL THEN NULL
-    WHEN ABS(CAST("${col}" AS DOUBLE)) >= 1e17 THEN CAST("${col}" AS DOUBLE) / 1e9
-    WHEN ABS(CAST("${col}" AS DOUBLE)) >= 1e14 THEN CAST("${col}" AS DOUBLE) / 1e6
-    WHEN ABS(CAST("${col}" AS DOUBLE)) >= 1e11 THEN CAST("${col}" AS DOUBLE) / 1e3
-    ELSE CAST("${col}" AS DOUBLE)
+    WHEN ${colExpr} IS NULL THEN NULL
+    WHEN ABS(CAST(${colExpr} AS DOUBLE)) >= 1e17 THEN CAST(${colExpr} AS DOUBLE) / 1e9
+    WHEN ABS(CAST(${colExpr} AS DOUBLE)) >= 1e14 THEN CAST(${colExpr} AS DOUBLE) / 1e6
+    WHEN ABS(CAST(${colExpr} AS DOUBLE)) >= 1e11 THEN CAST(${colExpr} AS DOUBLE) / 1e3
+    ELSE CAST(${colExpr} AS DOUBLE)
   END)`;
 }
 
@@ -222,7 +333,21 @@ function isNumericHiveType(hiveType) {
  * @returns {{ innerSql: string; isAggregate: boolean }}
  */
 function buildSelectExpression(opts) {
-  const { column, columnType, treatAsDate, dateBucket, dateFormat, aggregate, numberScale, decimals, sumCase } = opts;
+  const {
+    column,
+    columnType,
+    treatAsDate,
+    dateBucket,
+    dateFormat,
+    aggregate,
+    numberScale,
+    decimals,
+    sumCase,
+    equation,
+    baseAlias = null,
+  } = opts;
+
+  const colRef = (c) => (baseAlias ? `${baseAlias}."${c}"` : `"${c}"`);
 
   if (column === KALSHI_VIRTUAL_CATEGORY) {
     if (aggregate && aggregate !== "count" && aggregate !== "count_distinct") {
@@ -231,12 +356,12 @@ function buildSelectExpression(opts) {
       throw err;
     }
     if (aggregate === "count") {
-      return { innerSql: `COUNT(${KALSHI_EVENT_TICKER_CATEGORY_SQL})`, isAggregate: true };
+      return { innerSql: `COUNT(${kalshiEventTickerCategorySql(colRef("event_ticker"))})`, isAggregate: true };
     }
     if (aggregate === "count_distinct") {
-      return { innerSql: `COUNT(DISTINCT ${KALSHI_EVENT_TICKER_CATEGORY_SQL})`, isAggregate: true };
+      return { innerSql: `COUNT(DISTINCT ${kalshiEventTickerCategorySql(colRef("event_ticker"))})`, isAggregate: true };
     }
-    return { innerSql: KALSHI_EVENT_TICKER_CATEGORY_SQL, isAggregate: false };
+    return { innerSql: kalshiEventTickerCategorySql(colRef("event_ticker")), isAggregate: false };
   }
 
   if (!isValidColumnIdentifier(column)) {
@@ -263,6 +388,12 @@ function buildSelectExpression(opts) {
 
   // Aggregates
   if (aggregate === "sum") {
+    if (equation && typeof equation === "object" && equation.enabled && equation.root) {
+      const inner = buildEquationExprSql(equation.root, colRef);
+      const base = `SUM(${inner})`;
+      return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
+    }
+
     if (sumCase && typeof sumCase === "object" && sumCase.enabled) {
       const branchesIn = Array.isArray(sumCase.branches) ? sumCase.branches : [];
       const elseCol = String(sumCase.elseColumn || "").trim();
@@ -287,7 +418,7 @@ function buildSelectExpression(opts) {
           throw err;
         }
         // We keep it simple: string comparisons are case-insensitive, numeric comparisons are numeric.
-        const colSql = `"${c}"`;
+        const colSql = colRef(c);
         const opSql = op === "gt" ? ">" : op === "lt" ? "<" : op === "eq" ? "=" : op === "neq" ? "!=" : null;
         if (!opSql) {
           const err = new Error(`Invalid IF operator: ${op}`);
@@ -310,56 +441,56 @@ function buildSelectExpression(opts) {
           err.code = "BAD_REQUEST";
           throw err;
         }
-        return `WHEN ${whenSql} THEN CAST("${thenCol}" AS DOUBLE)`;
+        return `WHEN ${whenSql} THEN CAST(${colRef(thenCol)} AS DOUBLE)`;
       });
 
-      const caseSql = `CASE ${caseParts.join(" ")} ELSE CAST("${elseCol}" AS DOUBLE) END`;
+      const caseSql = `CASE ${caseParts.join(" ")} ELSE CAST(${colRef(elseCol)} AS DOUBLE) END`;
       // SUM(baseColumn * CASE ...)
-      const base = `SUM(CAST("${column}" AS DOUBLE) * (${caseSql}))`;
+      const base = `SUM(CAST(${colRef(column)} AS DOUBLE) * (${caseSql}))`;
       return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
     }
 
-    const base = `SUM(CAST("${column}" AS DOUBLE))`;
+    const base = `SUM(CAST(${colRef(column)} AS DOUBLE))`;
     return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
   }
   if (aggregate === "avg") {
-    const base = `AVG(CAST("${column}" AS DOUBLE))`;
+    const base = `AVG(CAST(${colRef(column)} AS DOUBLE))`;
     return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
   }
   if (aggregate === "min") {
-    const base = `MIN(CAST("${column}" AS DOUBLE))`;
+    const base = `MIN(CAST(${colRef(column)} AS DOUBLE))`;
     return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
   }
   if (aggregate === "max") {
-    const base = `MAX(CAST("${column}" AS DOUBLE))`;
+    const base = `MAX(CAST(${colRef(column)} AS DOUBLE))`;
     return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
   }
   if (aggregate === "median") {
-    const base = `approx_percentile(CAST("${column}" AS DOUBLE), 0.5)`;
+    const base = `approx_percentile(CAST(${colRef(column)} AS DOUBLE), 0.5)`;
     return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
   }
   if (aggregate === "stddev") {
-    const base = `stddev_samp(CAST("${column}" AS DOUBLE))`;
+    const base = `stddev_samp(CAST(${colRef(column)} AS DOUBLE))`;
     return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
   }
   if (aggregate === "variance") {
-    const base = `variance_samp(CAST("${column}" AS DOUBLE))`;
+    const base = `variance_samp(CAST(${colRef(column)} AS DOUBLE))`;
     if (div === 1) return { innerSql: wrapRound(base), isAggregate: true };
     // If we scale values by 1/div, variance scales by 1/(div^2).
     return { innerSql: wrapRound(`(${base}) / (${div}.0) / (${div}.0)`), isAggregate: true };
   }
   if (aggregate === "count") {
-    const base = `COUNT("${column}")`;
+    const base = `COUNT(${colRef(column)})`;
     return { innerSql: base, isAggregate: true };
   }
   if (aggregate === "count_distinct") {
-    const base = `COUNT(DISTINCT "${column}")`;
+    const base = `COUNT(DISTINCT ${colRef(column)})`;
     return { innerSql: base, isAggregate: true };
   }
 
   // Dimension: date bucket / format (epoch columns only; validated upstream)
   if (treatAsDate && numeric && dateBucket && DATE_BUCKETS.has(dateBucket)) {
-    const ts = epochBigintToTimestampExpr(column);
+    const ts = epochBigintToTimestampExpr(colRef(column));
     const bucketTs = `date_trunc('${dateBucket}', ${ts})`;
 
     // Important: return a *string* for date buckets so the sheet shows labels like
@@ -379,7 +510,7 @@ function buildSelectExpression(opts) {
     return { innerSql: wrapRound(inner), isAggregate: false };
   }
   if (treatAsDate && numeric && dateFormat && DATE_FORMATS.has(dateFormat)) {
-    const ts = epochBigintToTimestampExpr(column);
+    const ts = epochBigintToTimestampExpr(colRef(column));
     const fmt = dateFormat === "dmy" ? "%d-%m-%Y" : dateFormat === "ym" ? "%Y-%m" : "%d-%m";
     const inner = `date_format(${ts}, '${fmt}')`;
     return { innerSql: inner, isAggregate: false };
@@ -387,10 +518,10 @@ function buildSelectExpression(opts) {
 
   // Dimension: pass-through strings / booleans
   if (!numeric) {
-    return { innerSql: `"${column}"`, isAggregate: false };
+    return { innerSql: colRef(column), isAggregate: false };
   }
 
-  const numBase = `CAST("${column}" AS DOUBLE)`;
+  const numBase = `CAST(${colRef(column)} AS DOUBLE)`;
   return { innerSql: wrapRound(applyScale(numBase)), isAggregate: false };
 }
 
@@ -436,6 +567,7 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
 
   const joinPreset = compose?.join && typeof compose.join === "object" ? String(compose.join.preset || "").trim() : "";
   let fromClause;
+  let baseAlias = "t0";
   if (
     joinPreset === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET ||
     joinPreset === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT
@@ -456,16 +588,42 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
         ? buildKalshiTradesResolvedMarketsJoinSubqueryCent(safeTable, marketsPhysical)
         : buildKalshiTradesResolvedMarketsJoinSubqueryDecile(safeTable, marketsPhysical);
     fromClause = `FROM ${nested} AS kalshi_trades_joined`;
+    baseAlias = "kalshi_trades_joined";
   } else if (joinPreset) {
     const err = new Error(`Unknown compose.join.preset: ${joinPreset}`);
     err.code = "BAD_REQUEST";
     throw err;
   } else {
     const joins = Array.isArray(compose?.joins) ? compose.joins : [];
-    const baseAlias = "t0";
+    const cteJoins = Array.isArray(compose?.cteJoins) ? compose.cteJoins : [];
     fromClause = `FROM "${safeTable}" ${baseAlias}`;
-    if (joins.length > 0) {
+
+    if (joins.length > 0 || cteJoins.length > 0) {
       const joinSqlParts = [];
+
+      for (let i = 0; i < cteJoins.length; i++) {
+        const j = cteJoins[i];
+        const jtRaw = String(j?.joinType || "inner").toLowerCase().trim();
+        const jt = jtRaw === "left" ? "LEFT" : "INNER";
+        const cteName = String(j?.cteName || "").trim();
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(cteName)) {
+          const err = new Error("Invalid join CTE name");
+          err.code = "BAD_REQUEST";
+          throw err;
+        }
+        const alias = `c${i + 1}`;
+        const leftCol = String(j?.on?.leftColumn || "").trim();
+        const rightCol = String(j?.on?.rightColumn || "").trim();
+        if (!isValidColumnIdentifier(leftCol) || !isValidColumnIdentifier(rightCol)) {
+          const err = new Error("Invalid join column identifier");
+          err.code = "BAD_REQUEST";
+          throw err;
+        }
+        joinSqlParts.push(
+          `${jt} JOIN ${cteName} ${alias} ON CAST(${baseAlias}."${leftCol}" AS VARCHAR) = CAST(${alias}."${rightCol}" AS VARCHAR)`
+        );
+      }
+
       for (let i = 0; i < joins.length; i++) {
         const j = joins[i];
         const jtRaw = String(j?.joinType || "inner").toLowerCase().trim();
@@ -489,6 +647,7 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
           `${jt} JOIN "${phys}" ${alias} ON CAST(${baseAlias}."${leftCol}" AS VARCHAR) = CAST(${alias}."${rightCol}" AS VARCHAR)`
         );
       }
+
       fromClause = `${fromClause} ${joinSqlParts.join(" ")}`;
     }
   }
@@ -527,6 +686,8 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
       numberScale: row.numberScale || null,
       decimals: row.decimals != null ? Number(row.decimals) : null,
       sumCase: row.sumCase || null,
+      equation: row.equation || null,
+      baseAlias,
     }).innerSql;
 
     const isAggregate = row.aggregate != null;
@@ -539,6 +700,7 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
       aggregate: null,
       numberScale: row.numberScale || null,
       decimals: row.decimals != null ? Number(row.decimals) : null,
+      baseAlias,
     });
 
     byAlias.set(alias, { groupExpr, isAggregate });
