@@ -35,6 +35,10 @@ const DataView = ({ user }) => {
   const dataSheetIds = dataSheets ? Object.keys(dataSheets) : [];
   const hasMultipleDataSheets = dataSheetIds.length > 1;
   const showGrid = (connectedData?.length > 0) || hasMultipleDataSheets || integrationSidebar;
+  const anySheetHasData = Object.values(dataSheets || {}).some(
+    (s) => Array.isArray(s?.data) && s.data.length > 0
+  );
+  const showSheetTabs = hasMultipleDataSheets && anySheetHasData;
 
   const navigatePolymarketHistorical = useCallback(() => {
     if (!API_INTEGRATIONS.includes("polymarketHistorical")) return;
@@ -87,17 +91,19 @@ const DataView = ({ user }) => {
 
   return (
     <div className="min-w-0 max-w-full min-h-0 px-2 sm:px-4 md:px-6">
-      <div className="flex flex-wrap gap-1 mb-2">
-        {dataSheetIds.map((id) => (
-          <code
-            key={id}
-            className={`${id === activeSheetId ? "bg-lychee_blue/30" : "bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
-            onClick={() => setActiveSheetId?.(id)}
-          >
-            {dataSheets[id]?.name || id}
-          </code>
-        ))}
-      </div>
+      {showSheetTabs && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {dataSheetIds.map((id) => (
+            <code
+              key={id}
+              className={`${id === activeSheetId ? "bg-lychee_blue/30" : "bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
+              onClick={() => setActiveSheetId?.(id)}
+            >
+              {dataSheets[id]?.name || id}
+            </code>
+          ))}
+        </div>
+      )}
 
       {showGrid ? (
         <div className="relative min-h-0 flex flex-col gap-3">

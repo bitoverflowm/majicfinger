@@ -357,11 +357,20 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                       <TabsContent value="integrations" className="m-0 h-full w-full min-w-0 max-w-full">
                         <div className="flex h-full w-full min-w-0 max-w-full flex-col gap-3">
                           <div className="flex min-w-0 max-w-full items-center gap-2">
-                            <Select
-                              value={integrationSidebar || ""}
-                              onValueChange={(value) => setIntegrationSidebar?.(value)}
+                            <div
+                              className={cn(
+                                "min-w-0",
+                                // In full-expanded view, keep the dropdown the same width as the semi-collapsed drawer.
+                                // This prevents it from stretching to fill the wider panel.
+                                // Slightly shorter in full-expanded mode.
+                                drawerExpanded ? "w-[14rem] sm:w-[240px] flex-none" : "flex-1",
+                              )}
                             >
-                              <SelectTrigger className="h-9 min-w-0 flex-1 text-sm gap-2 focus:ring-0 focus:ring-offset-0">
+                              <Select
+                                value={integrationSidebar || ""}
+                                onValueChange={(value) => setIntegrationSidebar?.(value)}
+                              >
+                                <SelectTrigger className="h-9 w-full min-w-0 justify-start text-sm gap-2 text-left [&>span]:text-left [&>svg]:ml-auto focus:ring-0 focus:ring-offset-0">
                                 {integrationSidebar &&
                                   renderIntegrationAvatar(
                                     INTEGRATION_OPTIONS.find((o) => o.value === integrationSidebar) || {
@@ -370,20 +379,21 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                       logo: null,
                                     }
                                   )}
-                                <SelectValue placeholder="Select API" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {INTEGRATION_OPTIONS.map((opt) => (
-                                  <SelectItem
-                                    key={opt.value}
-                                    value={opt.value}
-                                    left={renderIntegrationAvatar(opt)}
-                                  >
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                                <SelectValue className="flex-1 min-w-0 text-left" placeholder="Select API" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {INTEGRATION_OPTIONS.map((opt) => (
+                                    <SelectItem
+                                      key={opt.value}
+                                      value={opt.value}
+                                      left={renderIntegrationAvatar(opt)}
+                                    >
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                           <div className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto overflow-x-hidden rounded-md border bg-muted/30 p-3">
                             {integrationSidebar ? (
