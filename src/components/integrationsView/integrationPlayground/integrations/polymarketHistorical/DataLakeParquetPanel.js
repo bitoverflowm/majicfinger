@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import { Play, AlertCircle, HelpCircle, ChevronDown, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
+import { Play, AlertCircle, HelpCircle, ChevronDown, ChevronUp, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
 import { getDataLakeDatasetConfig, glueTableNamesForDataset, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
@@ -521,6 +521,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [showRequestComposer, setShowRequestComposer] = useState(true);
   /** `${sheetId}::${cardId}` — which request summary card is expanded for editing */
   const [expandedRequestKey, setExpandedRequestKey] = useState(null);
+  const [deleteSheetDialogOpen, setDeleteSheetDialogOpen] = useState(false);
+  const [deleteSheetTargetId, setDeleteSheetTargetId] = useState(null);
   const [newRequestDialogOpen, setNewRequestDialogOpen] = useState(false);
   const [nullishAlertOpen, setNullishAlertOpen] = useState(false);
   const [nullishColumnList, setNullishColumnList] = useState([]);
@@ -761,12 +763,30 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           const p = prev || {};
           const sheet = p[newId];
           if (!sheet) return prev;
+          const joinCard = {
+            id: genRequestCardId(),
+            kind: "join",
+            createdAt: Date.now(),
+            elapsedMs: null,
+            loadedRowCount: out.length,
+            join: {
+              mode: "browser",
+              joinType,
+              leftSheetId: leftId,
+              rightSheetId: rightId,
+              leftSheetLabel: String(leftSheet?.name || leftId),
+              rightSheetLabel: String(rightSheet?.name || rightId),
+              leftColumn: leftKey,
+              rightColumn: rightKey,
+            },
+          };
           return {
             ...p,
             [newId]: {
               ...sheet,
               name: `Join · ${String(leftSheet?.name || leftId)} ⟕ ${String(rightSheet?.name || rightId)}`.slice(0, 80),
               provenance: null,
+              requestCards: [joinCard],
             },
           };
         });
@@ -855,12 +875,30 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           const p = prev || {};
           const sheet = p[newId];
           if (!sheet) return prev;
+          const joinCard = {
+            id: genRequestCardId(),
+            kind: "join",
+            createdAt: Date.now(),
+            elapsedMs: null,
+            loadedRowCount: outRows.length,
+            join: {
+              mode: "server",
+              joinType,
+              leftSheetId: leftId,
+              rightSheetId: rightId,
+              leftSheetLabel: String(leftSheet?.name || leftId),
+              rightSheetLabel: String(rightSheet?.name || rightId),
+              leftColumn: leftKey,
+              rightColumn: rightKey,
+            },
+          };
           return {
             ...p,
             [newId]: {
               ...sheet,
               name: `Join · ${String(leftSheet?.name || leftId)} ⟕ ${String(rightSheet?.name || rightId)} (lake)`.slice(0, 80),
               provenance: newProv,
+              requestCards: [joinCard],
             },
           };
         });
@@ -2478,6 +2516,20 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     },
     [setDataSheets, setActiveSheetId, setConnectedData, activeSheetId, dataSheets],
   );
+
+  const openDeleteSheetDialog = useCallback((sheetId) => {
+    if (!sheetId) return;
+    setDeleteSheetTargetId(sheetId);
+    setDeleteSheetDialogOpen(true);
+  }, []);
+
+  const confirmDeleteSheet = useCallback(() => {
+    const id = deleteSheetTargetId;
+    setDeleteSheetDialogOpen(false);
+    setDeleteSheetTargetId(null);
+    if (!id) return;
+    removeSheetFromView(id);
+  }, [deleteSheetTargetId, removeSheetFromView]);
 
   const startNewRequestDraft = useCallback(() => {
     setShowRequestComposer(true);
@@ -4366,8 +4418,95 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={deleteSheetDialogOpen} onOpenChange={setDeleteSheetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete sheet?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const sheetId = deleteSheetTargetId;
+                const sheetNum = String(sheetId || "").replace("sheet-", "") || "—";
+                const sheetName = String(dataSheets?.[sheetId]?.name || `Sheet ${sheetNum}`).trim();
+                return `This will delete all data in Sheet ${sheetNum}: ${sheetName}.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              type="button"
+              onClick={() => {
+                setDeleteSheetDialogOpen(false);
+                setDeleteSheetTargetId(null);
+              }}
+            >
+              No
+            </AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmDeleteSheet} className="bg-destructive text-destructive-foreground">
+              Yes, delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {(showRequestComposer || allRequestCardEntries.length === 0) && (
         <div className="px-2 pb-2 space-y-2 min-w-0 max-w-full border-b border-gray-100 dark:border-gray-800">
+          {showRequestComposer && allRequestCardEntries.length > 0 ? (
+            <div className="pt-2 space-y-2">
+              {allRequestCardEntries.map(({ sheetId: cardSheetId, card }, idx) => {
+                const sheetNum = String(cardSheetId || "").replace("sheet-", "") || String(idx + 1);
+                const sheetDisplayName = String(
+                  dataSheets?.[cardSheetId]?.name || card?.sheetLabel || `Sheet ${sheetNum}`,
+                ).trim();
+                const elapsed = fmtSeconds(card?.elapsedMs);
+                const loadedN = card?.loadedRowCount;
+                const tableLabel = String(card?.table || selected?.table || "").trim();
+                const cols =
+                  Array.isArray(card?.selectAliases) && card.selectAliases.length ? card.selectAliases : [];
+
+                const joinSummary =
+                  card?.kind === "join"
+                    ? (() => {
+                        const left = String(card?.join?.leftSheetLabel || "").trim();
+                        const right = String(card?.join?.rightSheetLabel || "").trim();
+                        const lc = String(card?.join?.leftColumn || "").trim();
+                        const rc = String(card?.join?.rightColumn || "").trim();
+                        const jt = String(card?.join?.joinType || "").trim();
+                        const mode = String(card?.join?.mode || "").trim();
+                        if (!left || !right || !lc || !rc) return "";
+                        return `join: ${jt || "left"} (${mode || "server"}) · ${left} ⟕ ${right} on ${lc} = ${rc}`;
+                      })()
+                    : "";
+
+                return (
+                  <button
+                    key={`${cardSheetId}::composer-card`}
+                    type="button"
+                    className="w-full text-left rounded-lg border border-border/60 bg-slate-100/70 dark:bg-slate-800/30 px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-colors"
+                    onClick={() => {
+                      setActiveSheetId?.(cardSheetId);
+                      const rows = dataSheets?.[cardSheetId]?.data;
+                      setConnectedData?.(Array.isArray(rows) ? rows : []);
+                    }}
+                  >
+                    <p className="text-xs font-semibold truncate">
+                      Sheet {sheetNum}: {sheetDisplayName}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {joinSummary
+                        ? joinSummary
+                        : `${tableLabel ? `table: ${tableLabel}` : "table: —"} · ${
+                            cols.length ? `columns: ${cols.join(", ")}` : "columns: —"
+                          }`}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      created in {elapsed}
+                      {loadedN != null ? ` · loaded ${loadedN} rows` : ""}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="pt-2 flex items-end gap-2 min-w-0">
             {!!activeSheetId ? (
               <div className="flex-1 space-y-1">
@@ -4512,7 +4651,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 </div>
               ) : null}
 
-              {allRequestCardEntries.length > 0 ? (
+              {allRequestCardEntries.length > 0 && !showRequestComposer ? (
                 <div className="space-y-3">
                   {allRequestCardEntries.map(({ sheetId: cardSheetId, card }, idx) => {
                     const sheetNum = String(cardSheetId || "").replace("sheet-", "") || String(idx + 1);
@@ -4533,8 +4672,20 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               Sheet {sheetNum}: {sheetDisplayName}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
-                              {tableLabel ? `table: ${tableLabel}` : "table: —"} ·{" "}
-                              {cols.length ? `columns: ${cols.join(", ")}` : "columns: —"}
+                              {card?.kind === "join"
+                                ? (() => {
+                                    const left = String(card?.join?.leftSheetLabel || "").trim();
+                                    const right = String(card?.join?.rightSheetLabel || "").trim();
+                                    const lc = String(card?.join?.leftColumn || "").trim();
+                                    const rc = String(card?.join?.rightColumn || "").trim();
+                                    const jt = String(card?.join?.joinType || "").trim();
+                                    const mode = String(card?.join?.mode || "").trim();
+                                    if (!left || !right || !lc || !rc) return "join: —";
+                                    return `Join ${left} ⟕ ${right} on ${lc} = ${rc} (${jt || "left"}, ${mode || "server"})`;
+                                  })()
+                                : `${tableLabel ? `table: ${tableLabel}` : "table: —"} · ${
+                                    cols.length ? `columns: ${cols.join(", ")}` : "columns: —"
+                                  }`}
                             </p>
                             <p className="text-[11px] text-muted-foreground">created in {elapsed}</p>
                             {loadedN != null ? (
@@ -4544,29 +4695,50 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             ) : null}
                           </div>
                           <div className="flex flex-col items-stretch gap-1 shrink-0">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs"
-                              onClick={() => {
-                                setExpandedRequestKey((prev) => (prev === rowKey ? null : rowKey));
-                                setActiveSheetId?.(cardSheetId);
-                                const rows = dataSheets?.[cardSheetId]?.data;
-                                setConnectedData?.(Array.isArray(rows) ? rows : []);
-                              }}
-                            >
-                              {expanded ? "Collapse" : "Expand"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
-                              onClick={() => removeSheetFromView(cardSheetId)}
-                            >
-                              Delete sheet
-                            </Button>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    aria-label="Expand"
+                                    onClick={() => {
+                                      setExpandedRequestKey((prev) => (prev === rowKey ? null : rowKey));
+                                      setActiveSheetId?.(cardSheetId);
+                                      const rows = dataSheets?.[cardSheetId]?.data;
+                                      setConnectedData?.(Array.isArray(rows) ? rows : []);
+                                    }}
+                                  >
+                                    {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="text-xs">
+                                  Expand
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive border-destructive/40 hover:bg-destructive/10"
+                                    aria-label="Delete"
+                                    onClick={() => openDeleteSheetDialog(cardSheetId)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="text-xs">
+                                  Delete
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </div>
 

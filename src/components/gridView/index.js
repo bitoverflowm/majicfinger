@@ -153,6 +153,8 @@ const GridView = ({startNew}) => {
     const [combineLeftKeyCol, setCombineLeftKeyCol] = useState("");
     const [combineRightKeyCol, setCombineRightKeyCol] = useState("");
     const [combineMergeMode, setCombineMergeMode] = useState("browser"); // browser | athena
+    const [combineDestination, setCombineDestination] = useState("new_sheet"); // replace | new_sheet
+    const [combineOutputName, setCombineOutputName] = useState("");
     const [combineBusy, setCombineBusy] = useState(false);
     const [combineProgress, setCombineProgress] = useState(0);
     const [combineProgressLabel, setCombineProgressLabel] = useState("");
@@ -410,29 +412,41 @@ const GridView = ({startNew}) => {
             browserSheetJoins: [],
           };
 
-          addNewSheetAndActivate((newId) => {
-            setSheetData(newId, outRows);
+          const defaultName = `Combine · ${String(leftSheet?.name || combineLeftSheetId)} ⟕ ${String(rightSheet?.name || combineRightSheetId)}`;
+          const outName = String(combineOutputName || "").trim() || defaultName;
+
+          if (combineDestination === "replace") {
+            if (!activeSheetId) throw new Error("Missing active sheet.");
+            replaceCurrentSheetData?.(outRows);
+            setConnectedData?.(outRows);
             setDataSheets?.((prev) => {
               const p = prev || {};
-              const sheet = p[newId];
-              if (!sheet) return prev;
-              return {
-                ...p,
-                [newId]: {
-                  ...sheet,
-                  name: `Combine · ${String(leftSheet?.name || combineLeftSheetId)} ⟕ ${String(rightSheet?.name || combineRightSheetId)}`.slice(
-                    0,
-                    80,
-                  ),
-                  provenance: newProv,
-                },
-              };
+              const sheet = p[activeSheetId] || { name: outName, data: [] };
+              return { ...p, [activeSheetId]: { ...sheet, name: outName.slice(0, 80), provenance: newProv } };
             });
-          });
+            toast.success(`Combined on Athena (up to ${ATHENA_SAMPLE_ROW_LIMIT} rows).`);
+          } else {
+            addNewSheetAndActivate((newId) => {
+              setSheetData(newId, outRows);
+              setDataSheets?.((prev) => {
+                const p = prev || {};
+                const sheet = p[newId];
+                if (!sheet) return prev;
+                return {
+                  ...p,
+                  [newId]: {
+                    ...sheet,
+                    name: outName.slice(0, 80),
+                    provenance: newProv,
+                  },
+                };
+              });
+            });
+            toast.success(`Combined on Athena into a new sheet (up to ${ATHENA_SAMPLE_ROW_LIMIT} rows).`);
+          }
 
           setCombineProgress(100);
           setCombineProgressLabel("Done");
-          toast.success(`Combined on Athena into a new sheet (up to ${ATHENA_SAMPLE_ROW_LIMIT} rows).`);
           setCombineSheetsDialogOpen(false);
         } catch (e) {
           toast.error(e?.message || "Full dataset combine failed.");
@@ -538,19 +552,47 @@ const GridView = ({startNew}) => {
           return;
         }
 
-        replaceCurrentSheetData?.(outRows);
-        setConnectedData?.(outRows);
-        toast.success("Sheets combined in the grid (loaded rows only).");
+        const defaultName = `Combine · ${String(leftSheet?.name || combineLeftSheetId)} ⟕ ${String(rightSheet?.name || combineRightSheetId)}`;
+        const outName = String(combineOutputName || "").trim() || defaultName;
+        if (combineDestination === "new_sheet") {
+          if (!addNewSheetAndActivate || !setSheetData) {
+            toast.error("Sheet actions are unavailable.");
+            return;
+          }
+          addNewSheetAndActivate((newId) => {
+            setSheetData(newId, outRows);
+            setDataSheets?.((prev) => {
+              const p = prev || {};
+              const sh = p[newId];
+              if (!sh) return prev;
+              return { ...p, [newId]: { ...sh, name: outName.slice(0, 80), provenance: null } };
+            });
+          });
+          toast.success("Sheets combined into a new sheet (loaded rows only).");
+        } else {
+          replaceCurrentSheetData?.(outRows);
+          setConnectedData?.(outRows);
+          setDataSheets?.((prev) => {
+            if (!activeSheetId) return prev;
+            const p = prev || {};
+            const sh = p[activeSheetId] || { name: outName, data: [] };
+            return { ...p, [activeSheetId]: { ...sh, name: outName.slice(0, 80) } };
+          });
+          toast.success("Sheets combined in the current sheet (loaded rows only).");
+        }
         setCombineSheetsDialogOpen(false);
       } catch (e) {
         toast.error("Combine failed.");
       }
     }, [
       addNewSheetAndActivate,
+      activeSheetId,
+      combineDestination,
       combineJoinType,
       combineLeftKeyCol,
       combineLeftSheetId,
       combineMergeMode,
+      combineOutputName,
       combineRightKeyCol,
       combineRightSheetId,
       dataSheets,
@@ -1289,9 +1331,11 @@ const GridView = ({startNew}) => {
                           }
                           setCombineSheetsDialogOpen(true);
                           setCombineMergeMode("browser");
+                          setCombineDestination("new_sheet");
                           setCombineBusy(false);
                           setCombineProgress(0);
                           setCombineProgressLabel("");
+                          setCombineOutputName("");
                           setCombineLeftSheetId(entries[0][0]);
                           setCombineRightSheetId(entries[1][0]);
                           setCombineJoinType("inner");
@@ -1360,8 +1404,44 @@ const GridView = ({startNew}) => {
                             <p className="text-[10px] text-muted-foreground leading-snug">
                               {combineMergeMode === "browser"
                                 ? "Merges the rows already shown in each sheet. No Athena query."
-                                : "Rebuilds SQL from saved lake provenance on the server. Inner or Left only; opens a new sheet."}
+                                : "Rebuilds SQL from saved lake provenance on the server. Inner or Left only."}
                             </p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Save result to</Label>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 text-xs"
+                                variant={combineDestination === "replace" ? "default" : "outline"}
+                                disabled={combineBusy}
+                                onClick={() => setCombineDestination("replace")}
+                              >
+                                Replace current sheet ({String(dataSheets?.[activeSheetId]?.name || activeSheetId || "—")})
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 text-xs"
+                                variant={combineDestination === "new_sheet" ? "default" : "outline"}
+                                disabled={combineBusy}
+                                onClick={() => setCombineDestination("new_sheet")}
+                              >
+                                Create new sheet
+                              </Button>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground">Output sheet name</Label>
+                              <Input
+                                className="h-8 text-xs"
+                                value={combineOutputName}
+                                onChange={(e) => setCombineOutputName(e.target.value)}
+                                placeholder="e.g. joined_markets_trades"
+                                spellCheck={false}
+                                disabled={combineBusy}
+                              />
+                            </div>
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-xs">Join type</Label>
