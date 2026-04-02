@@ -480,6 +480,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const dataSheets = ctx?.dataSheets || {};
   const liveStreamState = ctx?.liveStreamState;
   const activeSheetId = ctx?.activeSheetId;
+  const setActiveSheetId = ctx?.setActiveSheetId;
 
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
   const hasLiveConnection =
@@ -502,6 +503,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [composeHavingFilters, setComposeHavingFilters] = useState([]);
   /** @type {Array<{ id: string; targetKind: "table" | "sheet"; targetTable: string; targetSheetId: string; joinType: "inner" | "left"; mergeStrategy?: "browser" | "server"; leftColumn: string; rightColumn: string }>} */
   const [composeJoins, setComposeJoins] = useState([]);
+  const [selectColumnsMenuOpen, setSelectColumnsMenuOpen] = useState(false);
+  const [addWhereFilterMenuOpen, setAddWhereFilterMenuOpen] = useState(false);
   const [sheetJoinDialogOpen, setSheetJoinDialogOpen] = useState(false);
   const [sheetJoinMode, setSheetJoinMode] = useState("sheet"); // "sheet" | "source"
   const [sheetJoinLeftId, setSheetJoinLeftId] = useState("");
@@ -516,7 +519,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [selectionTab, setSelectionTab] = useState("columns"); // "columns" | "meta" | "recipes"
   const [tabSlideDir, setTabSlideDir] = useState("forward"); // "forward" | "back"
   const [showRequestComposer, setShowRequestComposer] = useState(true);
-  const [expandedRequestCardId, setExpandedRequestCardId] = useState(null);
+  /** `${sheetId}::${cardId}` — which request summary card is expanded for editing */
+  const [expandedRequestKey, setExpandedRequestKey] = useState(null);
+  const [newRequestDialogOpen, setNewRequestDialogOpen] = useState(false);
   const [nullishAlertOpen, setNullishAlertOpen] = useState(false);
   const [nullishColumnList, setNullishColumnList] = useState([]);
   const nullishPendingRowsRef = useRef(null);
@@ -825,7 +830,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || res.statusText || `Join ${res.status}`);
 
-      const outRows = Array.isArray(j.rows) ? j.rows.slice(0, ATHENA_SAMPLE_ROW_LIMIT) : [];
+      const rawJoinRows = Array.isArray(j.rows) ? j.rows : [];
+      const outRows = athenaRowsToObjects(Array.isArray(j.columns) ? j.columns : [], rawJoinRows).slice(
+        0,
+        ATHENA_SAMPLE_ROW_LIMIT,
+      );
 
       const newProv = {
         kind: "compose",
@@ -1478,7 +1487,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         if (mode === "columns" && requestCard && activeSheetId && setDataSheets) {
           const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
           const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
-          const card = { ...requestCard, sheetId: activeSheetId, elapsedMs };
+          const card = { ...requestCard, sheetId: activeSheetId, elapsedMs, loadedRowCount: n };
           setDataSheets((prev) => {
             const p = prev || {};
             const sheet = p[activeSheetId];
@@ -1491,7 +1500,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               },
             };
           });
-          setExpandedRequestCardId(card.id);
+          setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
         setLastRowCount(n);
@@ -1633,7 +1642,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             if (!sheet) return prev;
             const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
             const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
-            const card = requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: newId, elapsedMs } : null;
+            const card =
+              requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: newId, elapsedMs, loadedRowCount: n } : null;
             return {
               ...prev,
               [newId]: {
@@ -1649,7 +1659,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           });
         });
         if (mode === "columns" && requestCard) {
-          if (newCardId) setExpandedRequestCardId(newCardId);
+          setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
         setLastRowCount(n);
@@ -2370,16 +2380,44 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     return Array.isArray(cards) ? cards : [];
   }, [dataSheets, activeSheetId]);
 
+  /** All saved request summaries across sheets (stacked in one panel view). */
+  const allRequestCardEntries = useMemo(() => {
+    const keys = Object.keys(dataSheets || {}).sort((a, b) => {
+      const na = parseInt(String(a).replace(/\D/g, ""), 10) || 0;
+      const nb = parseInt(String(b).replace(/\D/g, ""), 10) || 0;
+      return na - nb;
+    });
+    const out = [];
+    for (const sid of keys) {
+      const cards = dataSheets[sid]?.requestCards;
+      if (!Array.isArray(cards)) continue;
+      for (const c of cards) {
+        if (c?.id) out.push({ sheetId: sid, card: c });
+      }
+    }
+    return out;
+  }, [dataSheets]);
+
   useEffect(() => {
-    // Collapse composer after a request exists for this sheet.
     if (!activeSheetId) return;
     if (activeSheetRequestCards.length > 0) {
       setShowRequestComposer(false);
-      if (!expandedRequestCardId) {
-        setExpandedRequestCardId(activeSheetRequestCards[0]?.id || null);
-      }
     }
-  }, [activeSheetId, activeSheetRequestCards, expandedRequestCardId]);
+  }, [activeSheetId, activeSheetRequestCards.length]);
+
+  useEffect(() => {
+    if (!expandedRequestKey || !activeSheetId) return;
+    const prefix = `${activeSheetId}::`;
+    if (!expandedRequestKey.startsWith(prefix)) {
+      setExpandedRequestKey(null);
+    }
+  }, [activeSheetId, expandedRequestKey]);
+
+  useEffect(() => {
+    if (allRequestCardEntries.length > 0 && !showRequestComposer) {
+      setSelectionTab("columns");
+    }
+  }, [allRequestCardEntries.length, showRequestComposer]);
 
   const deleteRequestCardAndClearSheet = useCallback(
     (sheetId, cardId) => {
@@ -2402,15 +2440,48 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         };
         return out;
       });
-      setExpandedRequestCardId(null);
+      setExpandedRequestKey(null);
       setShowRequestComposer(true);
     },
     [setSheetData, setConnectedData, setDataSheets],
   );
 
+  const removeSheetFromView = useCallback(
+    (sheetId) => {
+      if (!sheetId || !setDataSheets) return;
+      const sortIds = (ids) =>
+        [...ids].sort((a, b) => {
+          const na = parseInt(String(a).replace(/\D/g, ""), 10) || 0;
+          const nb = parseInt(String(b).replace(/\D/g, ""), 10) || 0;
+          return na - nb;
+        });
+      const prev = dataSheets || {};
+      const next = { ...prev };
+      delete next[sheetId];
+      const remainingKeys = sortIds(Object.keys(next));
+      if (remainingKeys.length === 0) {
+        setDataSheets({
+          "sheet-1": { name: "Sheet 1", data: [], provenance: null, requestCards: [] },
+        });
+        setActiveSheetId?.("sheet-1");
+        setConnectedData?.([]);
+      } else {
+        setDataSheets(next);
+        if (activeSheetId === sheetId) {
+          setActiveSheetId?.(remainingKeys[0]);
+          const rows = next[remainingKeys[0]]?.data;
+          setConnectedData?.(Array.isArray(rows) ? rows : []);
+        }
+      }
+      setExpandedRequestKey(null);
+      setShowRequestComposer(true);
+    },
+    [setDataSheets, setActiveSheetId, setConnectedData, activeSheetId, dataSheets],
+  );
+
   const startNewRequestDraft = useCallback(() => {
     setShowRequestComposer(true);
-    setExpandedRequestCardId(null);
+    setExpandedRequestKey(null);
     // We keep the previous card; we just reset the draft editor state.
     setError(null);
     // Keep the sheet data intact; only reset the draft builder controls.
@@ -2421,6 +2492,26 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setComposeJoins([]);
     setSelectionTab("columns");
   }, []);
+
+  const promptCreateAnotherRequest = useCallback(() => {
+    setNewRequestDialogOpen(true);
+  }, []);
+
+  const confirmReplaceForAnotherRequest = useCallback(() => {
+    setNewRequestDialogOpen(false);
+    if (activeSheetId && activeSheetRequestCards.length > 0) {
+      const first = activeSheetRequestCards[0];
+      deleteRequestCardAndClearSheet(activeSheetId, first?.id);
+    }
+    startNewRequestDraft();
+  }, [activeSheetId, activeSheetRequestCards, deleteRequestCardAndClearSheet, startNewRequestDraft]);
+
+  const confirmNewSheetForAnotherRequest = useCallback(() => {
+    setNewRequestDialogOpen(false);
+    addNewSheetAndActivate?.(() => {
+      startNewRequestDraft();
+    });
+  }, [addNewSheetAndActivate, startNewRequestDraft]);
 
   const addComposeColumn = useCallback(
     (col) => {
@@ -2638,7 +2729,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     <>
               <div className="space-y-2 min-w-0">
                 <div className="flex w-full min-w-0 items-center justify-between gap-2">
-                  <DropdownMenu>
+                  <DropdownMenu open={selectColumnsMenuOpen} onOpenChange={setSelectColumnsMenuOpen}>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
@@ -2760,6 +2851,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                                 onSelect={(e) => {
                                                   e.preventDefault();
                                                   addComposeWhereFilterPreset(filterCol, op.id);
+                                                  setSelectColumnsMenuOpen(false);
                                                 }}
                                               >
                                                 <span className="inline-flex items-center gap-2">
@@ -3470,6 +3562,70 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       </div>
                     ))}
                   </div>
+                  <div className="flex justify-start">
+                    <DropdownMenu open={addWhereFilterMenuOpen} onOpenChange={setAddWhereFilterMenuOpen}>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]">
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add another filter
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64 max-h-[320px] overflow-y-auto">
+                        <DropdownMenuLabel className="text-xs">Column</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {availableColumns.map((filterCol) => {
+                          const filterKind = kindForColumn(filterCol);
+                          const ops =
+                            filterKind === "string"
+                              ? [
+                                  { id: "eq", label: "is equal to" },
+                                  { id: "neq", label: "not equal to" },
+                                  { id: "in", label: "in set" },
+                                  { id: "not_in", label: "not in set" },
+                                ]
+                              : [
+                                  { id: "gt", label: "greater than" },
+                                  { id: "lt", label: "less than" },
+                                  { id: "eq", label: "is equal to" },
+                                  { id: "neq", label: "not equal to" },
+                                  { id: "in", label: "in set" },
+                                  { id: "not_in", label: "not in set" },
+                                ];
+                          return (
+                            <DropdownMenuSub key={`where-add-${filterCol}`}>
+                              <DropdownMenuSubTrigger className="text-xs">
+                                {composeSourceColumnLabel(filterCol)}
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="w-56 max-h-[280px] overflow-y-auto">
+                                  <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  {ops.map((op) => (
+                                    <DropdownMenuItem
+                                      key={`${filterCol}-${op.id}`}
+                                      className="text-[13px]"
+                                      onSelect={(e) => {
+                                        e.preventDefault();
+                                        addComposeWhereFilterPreset(filterCol, op.id);
+                                        setAddWhereFilterMenuOpen(false);
+                                      }}
+                                    >
+                                      <span className="inline-flex items-center gap-2">
+                                        <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                          {operatorSymbol(op.id)}
+                                        </span>
+                                        <span>{op.label}</span>
+                                      </span>
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuSubContent>
+                              </DropdownMenuPortal>
+                            </DropdownMenuSub>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               )}
 
@@ -3623,7 +3779,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               ) : null}
 
               <div className="space-y-2 min-w-0">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <Button
                     type="button"
                     variant="outline"
@@ -3646,7 +3802,46 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     <Plus className="h-3 w-3 mr-1" />
                     Add sort rule
                   </Button>
+                  <div className="flex-1 min-w-2" />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 text-xs shrink-0"
+                      onClick={handleLoad}
+                      disabled={!canRunRequest || loading}
+                    >
+                      <Play className="h-3.5 w-3.5 shrink-0" />
+                      <span className="ml-1.5">Run request</span>
+                    </Button>
+                    {!canRunRequest && (
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-border/60 bg-background/60 text-muted-foreground cursor-help select-none"
+                              aria-label="Run request disabled reasons"
+                            >
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[260px]">
+                            <div className="space-y-1">
+                              {runRequestReasons.map((r) => (
+                                <div key={r} className="text-xs">
+                                  {r}
+                                </div>
+                              ))}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
                 </div>
+                {loading && (selectionTab === "columns" || selectionTab === "recipes") ? (
+                  <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pt-1" />
+                ) : null}
                 {composeJoins.length > 0 && (
                   <div className="space-y-2">
                     {composeJoins.map((jr, idx) => {
@@ -4151,71 +4346,92 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         onComplete={handleMetaAddOperationComplete}
       />
 
-      <div className="px-2 pb-2 space-y-2 min-w-0 max-w-full border-b border-gray-100 dark:border-gray-800">
-        <div className="pt-2 flex items-end gap-2 min-w-0">
-          {!!activeSheetId ? (
+      <AlertDialog open={newRequestDialogOpen} onOpenChange={setNewRequestDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create another request</AlertDialogTitle>
+            <AlertDialogDescription>
+              Do you want to replace this sheet, or add a new sheet for the next request?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmNewSheetForAnotherRequest}>
+              Add new sheet
+            </AlertDialogAction>
+            <AlertDialogAction type="button" onClick={confirmReplaceForAnotherRequest}>
+              Replace this sheet
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {(showRequestComposer || allRequestCardEntries.length === 0) && (
+        <div className="px-2 pb-2 space-y-2 min-w-0 max-w-full border-b border-gray-100 dark:border-gray-800">
+          <div className="pt-2 flex items-end gap-2 min-w-0">
+            {!!activeSheetId ? (
+              <div className="flex-1 space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Sheet name</Label>
+                <Input
+                  className="h-8 text-xs w-full"
+                  value={String(dataSheets?.[activeSheetId]?.name || "")}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setDataSheets?.((prev) => {
+                      const p = prev || {};
+                      const sheet = p[activeSheetId] || { name: "Sheet", data: [] };
+                      return { ...p, [activeSheetId]: { ...sheet, name: next } };
+                    });
+                  }}
+                  placeholder="e.g. resolved_markets"
+                  spellCheck={false}
+                  disabled={!setDataSheets}
+                />
+              </div>
+            ) : null}
+
             <div className="flex-1 space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Sheet name</Label>
-              <Input
-                className="h-8 text-xs w-full"
-                value={String(dataSheets?.[activeSheetId]?.name || "")}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setDataSheets?.((prev) => {
-                    const p = prev || {};
-                    const sheet = p[activeSheetId] || { name: "Sheet", data: [] };
-                    return { ...p, [activeSheetId]: { ...sheet, name: next } };
-                  });
-                }}
-                placeholder="e.g. resolved_markets"
-                spellCheck={false}
-                disabled={!setDataSheets}
-              />
-            </div>
-          ) : null}
+              <Label className="text-[11px] text-muted-foreground">Data source</Label>
+              <div className="flex items-center gap-2 min-w-0">
+                <Select
+                  value={sampleId || undefined}
+                  onValueChange={(v) => {
+                    setSampleId(v);
+                    void pingAthenaForSource(v);
+                  }}
+                  disabled={!canUseSamples || loading}
+                >
+                  <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+                    <SelectValue placeholder="Select Data Source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sampleOptions.map((s) => {
+                      const state = athenaPingBySampleId?.[s.id] || "idle";
+                      const isSel = s.id === sampleId;
+                      const dot =
+                        state === "loading" ? (
+                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+                        ) : state === "ok" ? (
+                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                        ) : state === "error" ? (
+                          <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                        ) : isSel ? (
+                          <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+                        ) : null;
 
-          <div className="flex-1 space-y-1">
-            <Label className="text-[11px] text-muted-foreground">Data source</Label>
-            <div className="flex items-center gap-2 min-w-0">
-              <Select
-                value={sampleId || undefined}
-                onValueChange={(v) => {
-                  setSampleId(v);
-                  void pingAthenaForSource(v);
-                }}
-                disabled={!canUseSamples || loading}
-              >
-                <SelectTrigger className="h-8 text-xs min-w-0 w-full max-w-full focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
-                  <SelectValue placeholder="Select Data Source" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sampleOptions.map((s) => {
-                    const state = athenaPingBySampleId?.[s.id] || "idle";
-                    const isSel = s.id === sampleId;
-                    const dot =
-                      state === "loading" ? (
-                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
-                      ) : state === "ok" ? (
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                      ) : state === "error" ? (
-                        <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-                      ) : isSel ? (
-                        <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
-                      ) : null;
-
-                    return (
-                      <SelectItem
-                        key={s.id}
-                        value={s.id}
-                        className="text-xs"
-                        left={<span className="inline-flex items-center">{dot}</span>}
-                      >
-                        {s.label}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+                      return (
+                        <SelectItem
+                          key={s.id}
+                          value={s.id}
+                          className="text-xs"
+                          left={<span className="inline-flex items-center">{dot}</span>}
+                        >
+                          {s.label}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
 
               <span
                 className={[
@@ -4243,9 +4459,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           </div>
         </div>
       </div>
+      )}
 
       <div className="min-w-0 max-w-full px-2">
         <Tabs value={selectionTab} onValueChange={onSelectionTabChange} className="w-full">
+            {!(allRequestCardEntries.length > 0 && !showRequestComposer) && (
             <div className="flex items-center gap-2 mb-2">
               <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
                 <TabsTrigger value="columns" className="h-7 px-2 text-xs">
@@ -4259,16 +4477,17 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 </TabsTrigger>
               </TabsList>
             </div>
+            )}
 
             <TabsContent value="columns" className={`space-y-4 min-w-0 ${tabAnimClass}`}>
               {/* No empty-state tip here by request. */}
               {showRequestComposer ? (
                 <div className="space-y-3">
-                  {activeSheetId && activeSheetRequestCards.length > 0 ? (
+                  {allRequestCardEntries.length > 0 ? (
                     <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 dark:bg-slate-800/40 border border-border/60 p-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate">
-                          {`New request for Sheet ${String(activeSheetId).replace("sheet-", "")}: ${String(
+                          {`New request for Sheet ${String(activeSheetId || "").replace("sheet-", "")}: ${String(
                             dataSheets?.[activeSheetId]?.name || activeSheetId,
                           )}`}
                         </p>
@@ -4293,47 +4512,60 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 </div>
               ) : null}
 
-              {activeSheetId && activeSheetRequestCards.length > 0 ? (
+              {allRequestCardEntries.length > 0 ? (
                 <div className="space-y-3">
-                  {activeSheetRequestCards.map((card, idx) => {
-                    const sheetLabel = `Sheet ${String(activeSheetId).replace("sheet-", "") || idx + 1}`;
-                    const title = String(card?.sheetLabel || dataSheets?.[activeSheetId]?.name || sheetLabel || "Sheet").trim();
+                  {allRequestCardEntries.map(({ sheetId: cardSheetId, card }, idx) => {
+                    const sheetNum = String(cardSheetId || "").replace("sheet-", "") || String(idx + 1);
+                    const sheetDisplayName = String(
+                      dataSheets?.[cardSheetId]?.name || card?.sheetLabel || `Sheet ${sheetNum}`,
+                    ).trim();
                     const tableLabel = String(card?.table || selected?.table || "").trim();
                     const cols = Array.isArray(card?.selectAliases) && card.selectAliases.length ? card.selectAliases : [];
                     const elapsed = fmtSeconds(card?.elapsedMs);
-                    const expanded = expandedRequestCardId === card?.id;
+                    const rowKey = `${cardSheetId}::${card?.id}`;
+                    const expanded = expandedRequestKey === rowKey;
+                    const loadedN = card?.loadedRowCount;
                     return (
-                      <div key={card?.id || idx} className="rounded-lg bg-slate-100 dark:bg-slate-800/40 border border-border/60 p-3">
+                      <div key={rowKey} className="rounded-lg bg-slate-100 dark:bg-slate-800/40 border border-border/60 p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="text-sm font-semibold truncate">
-                              {sheetLabel}: {title}
+                              Sheet {sheetNum}: {sheetDisplayName}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
                               {tableLabel ? `table: ${tableLabel}` : "table: —"} ·{" "}
                               {cols.length ? `columns: ${cols.join(", ")}` : "columns: —"}
                             </p>
                             <p className="text-[11px] text-muted-foreground">created in {elapsed}</p>
+                            {loadedN != null ? (
+                              <p className="text-[11px] text-muted-foreground">
+                                Loaded <strong>{loadedN}</strong> rows into the sheet.
+                              </p>
+                            ) : null}
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex flex-col items-stretch gap-1 shrink-0">
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
                               className="h-8 text-xs"
-                              onClick={() => setExpandedRequestCardId((prev) => (prev === card?.id ? null : card?.id))}
+                              onClick={() => {
+                                setExpandedRequestKey((prev) => (prev === rowKey ? null : rowKey));
+                                setActiveSheetId?.(cardSheetId);
+                                const rows = dataSheets?.[cardSheetId]?.data;
+                                setConnectedData?.(Array.isArray(rows) ? rows : []);
+                              }}
                             >
                               {expanded ? "Collapse" : "Expand"}
                             </Button>
                             <Button
                               type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => deleteRequestCardAndClearSheet(activeSheetId, card?.id)}
-                              aria-label="Delete request"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
+                              onClick={() => removeSheetFromView(cardSheetId)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              Delete sheet
                             </Button>
                           </div>
                         </div>
@@ -4344,21 +4576,39 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             expanded ? "max-h-[2400px] opacity-100 mt-3" : "max-h-0 opacity-0",
                           ].join(" ")}
                         >
-                          {expanded && selected?.table && availableColumns.length > 0 ? renderColumnsComposeSection() : null}
+                          {expanded ? (
+                            <div className="space-y-2 min-w-0">
+                              <div className="flex justify-end">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 text-xs gap-1 text-destructive"
+                                  onClick={() => deleteRequestCardAndClearSheet(cardSheetId, card?.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Remove this pull
+                                </Button>
+                              </div>
+                              {selected?.table && availableColumns.length > 0 ? renderColumnsComposeSection() : null}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     );
                   })}
 
-                  <div>
-                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={startNewRequestDraft}>
-                      Create new request
-                    </Button>
-                  </div>
+                  {showRequestComposer ? null : (
+                    <div>
+                      <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={promptCreateAnotherRequest}>
+                        Create another request
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : null}
 
-              {!showRequestComposer && (!activeSheetId || activeSheetRequestCards.length === 0) && selected?.table && availableColumns.length > 0 ? (
+              {!showRequestComposer && allRequestCardEntries.length === 0 && selected?.table && availableColumns.length > 0 ? (
                 <div className="space-y-3">
                   {renderColumnsComposeSection()}
                 </div>
@@ -5112,49 +5362,51 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           </Tabs>
       </div>
 
-      {loading ? (
+      {loading && selectionTab === "meta" ? (
         <div className="px-2">
           <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="pt-0.5" />
         </div>
       ) : (
-        <div className="flex gap-2 items-end flex-wrap min-w-0 max-w-full px-2">
-          <div className="flex gap-2 items-center">
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 text-xs shrink-0"
-              onClick={handleLoad}
-              disabled={!canRunRequest}
-            >
-              <Play className="h-3.5 w-3.5 shrink-0" />
-              <span className="ml-1.5">Run request</span>
-            </Button>
+        selectionTab === "meta" && (
+          <div className="flex gap-2 items-end flex-wrap min-w-0 max-w-full px-2">
+            <div className="flex gap-2 items-center">
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 text-xs shrink-0"
+                onClick={handleLoad}
+                disabled={!canRunRequest}
+              >
+                <Play className="h-3.5 w-3.5 shrink-0" />
+                <span className="ml-1.5">Run request</span>
+              </Button>
 
-            {!canRunRequest && (
-              <TooltipProvider delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-border/60 bg-background/60 text-muted-foreground cursor-help select-none"
-                      aria-label="Run request disabled reasons"
-                    >
-                      <HelpCircle className="h-3.5 w-3.5" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[260px]">
-                    <div className="space-y-1">
-                      {runRequestReasons.map((r) => (
-                        <div key={r} className="text-xs">
-                          {r}
-                        </div>
-                      ))}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+              {!canRunRequest && (
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-border/60 bg-background/60 text-muted-foreground cursor-help select-none"
+                        aria-label="Run request disabled reasons"
+                      >
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[260px]">
+                      <div className="space-y-1">
+                        {runRequestReasons.map((r) => (
+                          <div key={r} className="text-xs">
+                            {r}
+                          </div>
+                        ))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {error && (
@@ -5164,7 +5416,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         </p>
       )}
 
-      {lastRowCount != null && !error && (
+      {lastRowCount != null && !error && allRequestCardEntries.length === 0 && (
         <p className="text-[10px] text-muted-foreground px-2">
           Loaded <strong>{lastRowCount}</strong> rows into the sheet.
         </p>

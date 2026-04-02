@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { SummarizeDrawer } from "@/components/summarizationView";
 import {
   ArrowDownFromLine,
@@ -64,8 +65,12 @@ import {
   BarChart2,
   Sigma,
   ChevronDown,
+  Database,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
+import { ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { athenaRowsToObjects } from "@/lib/duckdb/duckdbWasmClient";
 import * as XLSX from 'xlsx';
 
 
@@ -122,8 +127,12 @@ const GridView = ({startNew}) => {
     let connectedData = contextStateV2?.connectedData || []
     let setConnectedData = contextStateV2?.setConnectedData || []
     const replaceCurrentSheetData = contextStateV2?.replaceCurrentSheetData
+    const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate
+    const setSheetData = contextStateV2?.setSheetData
+    const setDataSheets = contextStateV2?.setDataSheets
     const dataTypes = contextStateV2?.dataTypes || {}
     let dataSheets = contextStateV2?.dataSheets || {}
+    const activeSheetId = contextStateV2?.activeSheetId
     
     const [columnName, setColumnName] = useState('');
     const [colAddOpen, setColAddOpen] = useState()
@@ -143,10 +152,26 @@ const GridView = ({startNew}) => {
     const [combineRightSheetId, setCombineRightSheetId] = useState(null);
     const [combineLeftKeyCol, setCombineLeftKeyCol] = useState("");
     const [combineRightKeyCol, setCombineRightKeyCol] = useState("");
+    const [combineMergeMode, setCombineMergeMode] = useState("browser"); // browser | athena
+    const [combineBusy, setCombineBusy] = useState(false);
+    const [combineProgress, setCombineProgress] = useState(0);
+    const [combineProgressLabel, setCombineProgressLabel] = useState("");
 
     // Remove duplicates (row-level)
     const [removeDupsDialogOpen, setRemoveDupsDialogOpen] = useState(false);
     const [sheetPropsDialogOpen, setSheetPropsDialogOpen] = useState(false);
+
+    /** Refine / filter current sheet (preview) or re-query full lake via provenance CTE (Athena). */
+    const [refineQueryOpen, setRefineQueryOpen] = useState(false);
+    const [refineScope, setRefineScope] = useState("preview"); // preview | athena
+    const [refineDestination, setRefineDestination] = useState("replace"); // replace | new_sheet
+    const [refineSelectedCols, setRefineSelectedCols] = useState(() => new Set());
+    const [refineWhereCol, setRefineWhereCol] = useState("");
+    const [refineWhereOp, setRefineWhereOp] = useState("gte");
+    const [refineWhereVal, setRefineWhereVal] = useState("");
+    const [refineBusy, setRefineBusy] = useState(false);
+    const [refineProgress, setRefineProgress] = useState(0);
+    const [refineProgressLabel, setRefineProgressLabel] = useState("");
 
     const sheetColumnsForProps = useMemo(() => {
       const row0 = Array.isArray(connectedData) && connectedData.length ? connectedData[0] : null;
@@ -230,63 +255,207 @@ const GridView = ({startNew}) => {
       return String(v);
     };
 
-    const applyCombineSheets = useCallback(() => {
-      setCombineSheetsDialogOpen(false);
+    const applyCombineSheets = useCallback(async () => {
+      const leftSheet = combineLeftSheetId ? dataSheets?.[combineLeftSheetId] : null;
+      const rightSheet = combineRightSheetId ? dataSheets?.[combineRightSheetId] : null;
+      const leftData = leftSheet?.data;
+      const rightData = rightSheet?.data;
+
+      if (!leftSheet || !rightSheet) {
+        toast.error("Pick two sheets to combine.");
+        return;
+      }
+      if (!Array.isArray(leftData) || leftData.length === 0 || !Array.isArray(rightData) || rightData.length === 0) {
+        toast.error("Both selected sheets must have loaded data.");
+        return;
+      }
+      if (combineLeftSheetId === combineRightSheetId) {
+        toast.error("Left and right sheets must be different.");
+        return;
+      }
+
+      const joinType = combineJoinType;
+      const leftCols = collectColumnNames(leftData);
+      const rightCols = collectColumnNames(rightData);
+
+      if (leftCols.length === 0 || rightCols.length === 0) {
+        toast.error("Could not infer columns for one of the sheets.");
+        return;
+      }
+
+      const leftKeyCol = String(combineLeftKeyCol || "").trim();
+      const rightKeyCol = String(combineRightKeyCol || "").trim();
+
+      if (joinType !== "cross") {
+        if (!leftKeyCol || !rightKeyCol) {
+          toast.error("Select join keys for both sheets (or use Cross join).");
+          return;
+        }
+        if (!leftCols.includes(leftKeyCol) || !rightCols.includes(rightKeyCol)) {
+          toast.error("Selected join keys must exist on each sheet.");
+          return;
+        }
+      }
+
+      if (combineMergeMode === "athena") {
+        if (joinType === "cross") {
+          toast.error("Full dataset does not support cross join. Choose “Loaded sheets only” or use Inner/Left.");
+          return;
+        }
+        if (joinType !== "inner" && joinType !== "left") {
+          toast.error(
+            "Full dataset supports Inner and Left only. Choose “Loaded sheets only” for Right/Full, or change join type.",
+          );
+          return;
+        }
+        const leftProv = leftSheet?.provenance;
+        const rightProv = rightSheet?.provenance;
+        if (!leftProv || !rightProv || leftProv.kind !== "compose" || rightProv.kind !== "compose") {
+          toast.error("Full dataset combine needs both sheets built from Data Lake pulls (saved compose provenance).");
+          return;
+        }
+        if (String(leftProv.lake || "") !== String(rightProv.lake || "")) {
+          toast.error("Sheets must be from the same lake for full dataset combine.");
+          return;
+        }
+        if (!addNewSheetAndActivate || !setSheetData) {
+          toast.error("Sheet actions are unavailable.");
+          return;
+        }
+
+        const joinTypeApi = joinType === "left" ? "left" : "inner";
+
+        const cteSafeName = (name, id) => {
+          let t = String(name || id || "sheet").replace(/[^a-zA-Z0-9_]+/g, "_");
+          if (/^[0-9]/.test(t)) t = `s_${t}`;
+          const u = t.slice(0, 60);
+          return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(u) ? u : `sheet_${String(id).replace(/\W/g, "")}`.slice(0, 60);
+        };
+
+        const sheetGraph = {};
+        const walk = (id) => {
+          if (sheetGraph[id]) return;
+          const s = dataSheets[id];
+          const prov = s?.provenance;
+          if (!s || !prov || prov.kind !== "compose") return;
+          sheetGraph[id] = { name: cteSafeName(s.name, id), provenance: prov };
+          for (const d of prov.serverSheetJoins || []) {
+            if (d?.targetSheetId && dataSheets[d.targetSheetId]) walk(d.targetSheetId);
+          }
+        };
+        walk(combineLeftSheetId);
+        walk(combineRightSheetId);
+
+        if (!sheetGraph[combineLeftSheetId] || !sheetGraph[combineRightSheetId]) {
+          toast.error("Could not build a CTE graph for the selected sheets.");
+          return;
+        }
+
+        setCombineBusy(true);
+        let tick = null;
+        try {
+          setCombineProgressLabel("Submitting join to Athena…");
+          setCombineProgress(10);
+          tick = setInterval(() => {
+            setCombineProgress((p) => Math.min(p + 2, 92));
+          }, 500);
+
+          const res = await fetch("/api/data-lake/join-sheets-cte", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({
+              lake: leftProv.lake,
+              table: leftProv.table,
+              compose: leftProv.composeSpec,
+              filters: leftProv.composeFilters || null,
+              joins: [
+                {
+                  targetSheetId: combineRightSheetId,
+                  joinType: joinTypeApi,
+                  leftColumn: leftKeyCol,
+                  rightColumn: rightKeyCol,
+                },
+              ],
+              sheetGraph,
+            }),
+          });
+          const j = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(j.error || res.statusText || "Join failed");
+
+          if (tick) clearInterval(tick);
+          tick = null;
+          setCombineProgressLabel("Mapping results…");
+          setCombineProgress(96);
+
+          const rawRows = Array.isArray(j.rows) ? j.rows : [];
+          const colNames = Array.isArray(j.columns) ? j.columns : [];
+          const outRows = athenaRowsToObjects(colNames, rawRows).slice(0, ATHENA_SAMPLE_ROW_LIMIT);
+
+          const newProv = {
+            kind: "compose",
+            lake: leftProv.lake,
+            table: leftProv.table,
+            composeSpec: leftProv.composeSpec,
+            composeFilters: leftProv.composeFilters || null,
+            serverSheetJoins: [
+              ...(Array.isArray(leftProv.serverSheetJoins) ? leftProv.serverSheetJoins : []),
+              {
+                targetSheetId: combineRightSheetId,
+                joinType: joinTypeApi,
+                leftColumn: leftKeyCol,
+                rightColumn: rightKeyCol,
+              },
+            ],
+            browserSheetJoins: [],
+          };
+
+          addNewSheetAndActivate((newId) => {
+            setSheetData(newId, outRows);
+            setDataSheets?.((prev) => {
+              const p = prev || {};
+              const sheet = p[newId];
+              if (!sheet) return prev;
+              return {
+                ...p,
+                [newId]: {
+                  ...sheet,
+                  name: `Combine · ${String(leftSheet?.name || combineLeftSheetId)} ⟕ ${String(rightSheet?.name || combineRightSheetId)}`.slice(
+                    0,
+                    80,
+                  ),
+                  provenance: newProv,
+                },
+              };
+            });
+          });
+
+          setCombineProgress(100);
+          setCombineProgressLabel("Done");
+          toast.success(`Combined on Athena into a new sheet (up to ${ATHENA_SAMPLE_ROW_LIMIT} rows).`);
+          setCombineSheetsDialogOpen(false);
+        } catch (e) {
+          toast.error(e?.message || "Full dataset combine failed.");
+        } finally {
+          if (tick) clearInterval(tick);
+          setCombineBusy(false);
+          setCombineProgress(0);
+          setCombineProgressLabel("");
+        }
+        return;
+      }
+
       try {
-        const leftSheet = combineLeftSheetId ? dataSheets?.[combineLeftSheetId] : null;
-        const rightSheet = combineRightSheetId ? dataSheets?.[combineRightSheetId] : null;
-
-        const leftData = leftSheet?.data;
-        const rightData = rightSheet?.data;
-
-        if (!leftSheet || !rightSheet) {
-          toast.error("Pick two sheets to combine.");
-          return;
-        }
-        if (!Array.isArray(leftData) || leftData.length === 0 || !Array.isArray(rightData) || rightData.length === 0) {
-          toast.error("Both selected sheets must have loaded data.");
-          return;
-        }
-        if (combineLeftSheetId === combineRightSheetId) {
-          toast.error("Left and right sheets must be different.");
-          return;
-        }
-
-        const joinType = combineJoinType;
-        const leftCols = collectColumnNames(leftData);
-        const rightCols = collectColumnNames(rightData);
-
-        if (leftCols.length === 0 || rightCols.length === 0) {
-          toast.error("Could not infer columns for one of the sheets.");
-          return;
-        }
-
-        const leftKeyCol = String(combineLeftKeyCol || "").trim();
-        const rightKeyCol = String(combineRightKeyCol || "").trim();
-
-        if (joinType !== "cross") {
-          if (!leftKeyCol || !rightKeyCol) {
-            toast.error("Select join keys for both sheets (or use Cross join).");
-            return;
-          }
-          if (!leftCols.includes(leftKeyCol) || !rightCols.includes(rightKeyCol)) {
-            toast.error("Selected join keys must exist in both sheets.");
-            return;
-          }
-        }
-
         const rightSuffixRaw = rightSheet?.name || combineRightSheetId || "right";
         const rightSuffix = String(rightSuffixRaw).replace(/[^a-zA-Z0-9_]/g, "_") || "right";
 
         const getRightOutKey = (col) => {
-          // Only suffix for right-side column name collisions with left columns.
           return leftCols.includes(col) ? `${col}__${rightSuffix}` : col;
         };
 
         const outRows = [];
 
         if (joinType === "cross") {
-          // Cartesian product; we always include right join keys too (since there is no "ON").
           const rightOutKeys = rightCols.map((c) => getRightOutKey(c));
           for (const l of leftData) {
             const outBase = {};
@@ -302,7 +471,7 @@ const GridView = ({startNew}) => {
             }
           }
         } else {
-          const rightKeyIndex = new Map(); // keyStr -> array of { idx, row }
+          const rightKeyIndex = new Map();
           for (let i = 0; i < rightData.length; i++) {
             const r = rightData[i];
             const v = r?.[rightKeyCol];
@@ -316,7 +485,7 @@ const GridView = ({startNew}) => {
           const rightAddedCols = rightCols.filter((c) => c !== rightKeyCol);
           const rightAddedOutKeys = rightAddedCols.map((c) => getRightOutKey(c));
 
-          const leftKeyOutCol = leftKeyCol; // left base naming
+          const leftKeyOutCol = leftKeyCol;
 
           const buildLeftBase = (l) => {
             const out = {};
@@ -331,10 +500,10 @@ const GridView = ({startNew}) => {
             return out;
           };
 
-          // LEFT loop: emits matched rows and (if needed) unmatched left rows.
           for (const l of leftData) {
             const lKeyVal = l?.[leftKeyCol];
-            const lKeyStr = lKeyVal === null || lKeyVal === undefined ? "NULL" : typeof lKeyVal === "object" ? JSON.stringify(lKeyVal) : String(lKeyVal);
+            const lKeyStr =
+              lKeyVal === null || lKeyVal === undefined ? "NULL" : typeof lKeyVal === "object" ? JSON.stringify(lKeyVal) : String(lKeyVal);
             const matches = rightKeyIndex.get(lKeyStr) || [];
 
             if (matches.length > 0) {
@@ -353,7 +522,6 @@ const GridView = ({startNew}) => {
             }
           }
 
-          // RIGHT side unmatched rows: only for RIGHT/FULL.
           if (joinType === "right" || joinType === "full") {
             for (let i = 0; i < rightData.length; i++) {
               if (rightMatchedIdxs.has(i)) continue;
@@ -372,20 +540,24 @@ const GridView = ({startNew}) => {
 
         replaceCurrentSheetData?.(outRows);
         setConnectedData?.(outRows);
-        toast.success("Sheets combined.");
-      } finally {
-        // ensure modal closes even if something throws
+        toast.success("Sheets combined in the grid (loaded rows only).");
         setCombineSheetsDialogOpen(false);
+      } catch (e) {
+        toast.error("Combine failed.");
       }
     }, [
+      addNewSheetAndActivate,
       combineJoinType,
       combineLeftKeyCol,
       combineLeftSheetId,
+      combineMergeMode,
       combineRightKeyCol,
       combineRightSheetId,
       dataSheets,
       replaceCurrentSheetData,
       setConnectedData,
+      setDataSheets,
+      setSheetData,
     ]);
 
     const applyRemoveDuplicates = useCallback(() => {
@@ -416,6 +588,208 @@ const GridView = ({startNew}) => {
         toast.error("Failed to remove duplicates.");
       }
     }, [connectedData, replaceCurrentSheetData, setConnectedData]);
+
+    useEffect(() => {
+      if (!refineQueryOpen) return;
+      const cols = sheetColumnsForProps;
+      setRefineSelectedCols(new Set(cols));
+      setRefineWhereCol(cols[0] || "");
+      setRefineWhereVal("");
+    }, [refineQueryOpen, sheetColumnsForProps]);
+
+    const applyRefineQuery = useCallback(async () => {
+      const cols = Array.from(refineSelectedCols).filter(Boolean);
+      if (!cols.length) {
+        toast.error("Select at least one column.");
+        return;
+      }
+      const rows = Array.isArray(connectedData) ? connectedData : [];
+      if (!rows.length) {
+        toast.error("Load sheet data first.");
+        return;
+      }
+
+      if (refineScope === "preview") {
+        let out = rows;
+        const wCol = String(refineWhereCol || "").trim();
+        const wVal = Number(refineWhereVal);
+        if (wCol && Number.isFinite(wVal)) {
+          const op = refineWhereOp;
+          out = out.filter((r) => {
+            const raw = r?.[wCol];
+            const n = typeof raw === "number" ? raw : Number(raw);
+            if (!Number.isFinite(n)) return false;
+            if (op === "gte") return n >= wVal;
+            if (op === "lte") return n <= wVal;
+            if (op === "gt") return n > wVal;
+            if (op === "lt") return n < wVal;
+            if (op === "eq") return n === wVal;
+            if (op === "neq") return n !== wVal;
+            return true;
+          });
+        }
+        const projected = out.map((r) => {
+          const o = {};
+          for (const c of cols) {
+            if (r && typeof r === "object" && c in r) o[c] = r[c];
+          }
+          return o;
+        });
+        if (refineDestination === "new_sheet") {
+          if (!addNewSheetAndActivate || !setSheetData) {
+            toast.error("Sheet actions are unavailable.");
+            return;
+          }
+          const baseSheet = dataSheets[activeSheetId];
+          addNewSheetAndActivate((newId) => {
+            setSheetData(newId, projected);
+            setDataSheets?.((prev) => {
+              const p = prev || {};
+              const sh = p[newId];
+              if (!sh) return prev;
+              return {
+                ...p,
+                [newId]: {
+                  ...sh,
+                  name: `Refined · ${String(baseSheet?.name || activeSheetId)}`.slice(0, 80),
+                  provenance: baseSheet?.provenance ?? null,
+                },
+              };
+            });
+          });
+          toast.success(`Created new sheet (${projected.length} rows).`);
+        } else {
+          replaceCurrentSheetData?.(projected);
+          setConnectedData?.(projected);
+          toast.success(`Updated sheet (${projected.length} rows).`);
+        }
+        setRefineQueryOpen(false);
+        return;
+      }
+
+      if (!activeSheetId) {
+        toast.error("Missing active sheet.");
+        return;
+      }
+      const sheet = dataSheets[activeSheetId];
+      const prov = sheet?.provenance;
+      if (!prov || prov.kind !== "compose") {
+        toast.error("Full-dataset refine needs a sheet created from a Data Lake pull (saved provenance).");
+        return;
+      }
+
+      function cteSafeName(name, id) {
+        let t = String(name || id || "sheet").replace(/[^a-zA-Z0-9_]+/g, "_");
+        if (/^[0-9]/.test(t)) t = `s_${t}`;
+        const u = t.slice(0, 60);
+        return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(u) ? u : `sheet_${String(id).replace(/\W/g, "")}`.slice(0, 60);
+      }
+
+      const graph = {};
+      const walk = (id) => {
+        if (graph[id]) return;
+        const s = dataSheets[id];
+        if (!s?.provenance) return;
+        graph[id] = { name: cteSafeName(s.name, id), provenance: s.provenance };
+        for (const d of s.provenance.serverSheetJoins || []) {
+          if (d?.targetSheetId && dataSheets[d.targetSheetId]) walk(d.targetSheetId);
+        }
+      };
+      walk(activeSheetId);
+
+      if (!graph[activeSheetId]) {
+        toast.error("Could not build sheet graph for Athena.");
+        return;
+      }
+
+      const refineFilters = { and: [] };
+      const wCol = String(refineWhereCol || "").trim();
+      const wVal = Number(refineWhereVal);
+      if (wCol && Number.isFinite(wVal)) {
+        refineFilters.and.push({ column: wCol, op: refineWhereOp, value: wVal });
+      }
+
+      setRefineBusy(true);
+      setRefineProgressLabel("Sending query to Athena…");
+      setRefineProgress(8);
+      let tick = setInterval(() => {
+        setRefineProgress((p) => Math.min(p + 2, 90));
+      }, 450);
+      try {
+        const res = await fetch("/api/data-lake/sheet-refine-athena", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sheetGraph: graph,
+            rootSheetId: activeSheetId,
+            selectColumns: cols,
+            refineFilters,
+          }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || res.statusText || "Request failed");
+        if (tick) clearInterval(tick);
+        tick = null;
+        setRefineProgressLabel("Mapping column names…");
+        setRefineProgress(96);
+        const rawRows = Array.isArray(j.rows) ? j.rows : [];
+        const colNames = Array.isArray(j.columns) ? j.columns : [];
+        const outRows = athenaRowsToObjects(colNames, rawRows);
+        if (refineDestination === "new_sheet") {
+          if (!addNewSheetAndActivate || !setSheetData) {
+            throw new Error("Sheet actions are unavailable.");
+          }
+          const baseSheet = dataSheets[activeSheetId];
+          addNewSheetAndActivate((newId) => {
+            setSheetData(newId, outRows);
+            setDataSheets?.((prev) => {
+              const p = prev || {};
+              const sh = p[newId];
+              if (!sh) return prev;
+              return {
+                ...p,
+                [newId]: {
+                  ...sh,
+                  name: `Refined · ${String(baseSheet?.name || activeSheetId)}`.slice(0, 80),
+                  provenance: baseSheet?.provenance ?? null,
+                },
+              };
+            });
+          });
+          toast.success(`New sheet: ${outRows.length} rows from Athena (capped at ${ATHENA_SAMPLE_ROW_LIMIT}).`);
+        } else {
+          replaceCurrentSheetData?.(outRows);
+          setConnectedData?.(outRows);
+          toast.success(`Loaded ${outRows.length} rows from Athena (capped at ${ATHENA_SAMPLE_ROW_LIMIT}).`);
+        }
+        setRefineProgress(100);
+        setRefineProgressLabel("Done");
+        setRefineQueryOpen(false);
+      } catch (e) {
+        toast.error(e?.message || "Refine query failed.");
+      } finally {
+        if (tick) clearInterval(tick);
+        setRefineBusy(false);
+        setRefineProgress(0);
+        setRefineProgressLabel("");
+      }
+    }, [
+      addNewSheetAndActivate,
+      refineDestination,
+      refineSelectedCols,
+      connectedData,
+      refineScope,
+      refineWhereCol,
+      refineWhereOp,
+      refineWhereVal,
+      activeSheetId,
+      dataSheets,
+      replaceCurrentSheetData,
+      setConnectedData,
+      setDataSheets,
+      setSheetData,
+    ]);
+
     const dateColumns = useMemo(() => {
       if (!connectedData.length) return [];
       const first = connectedData[0];
@@ -914,6 +1288,10 @@ const GridView = ({startNew}) => {
                             return;
                           }
                           setCombineSheetsDialogOpen(true);
+                          setCombineMergeMode("browser");
+                          setCombineBusy(false);
+                          setCombineProgress(0);
+                          setCombineProgressLabel("");
                           setCombineLeftSheetId(entries[0][0]);
                           setCombineRightSheetId(entries[1][0]);
                           setCombineJoinType("inner");
@@ -935,7 +1313,8 @@ const GridView = ({startNew}) => {
                     <DialogHeader>
                       <DialogTitle>Combine Sheets</DialogTitle>
                       <DialogDescription>
-                        Join multiple already-loaded sheets (like SQL JOIN) to create a new combined sheet.
+                        Join two sheets. Use loaded rows only for any join type, or run Inner/Left on the full dataset in Athena
+                        (same lake, compose provenance; result capped at {ATHENA_SAMPLE_ROW_LIMIT} rows in a new sheet).
                       </DialogDescription>
                     </DialogHeader>
 
@@ -954,6 +1333,36 @@ const GridView = ({startNew}) => {
 
                       return (
                         <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Combine using</Label>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={combineMergeMode === "browser" ? "default" : "outline"}
+                                className="h-8 text-xs"
+                                disabled={combineBusy}
+                                onClick={() => setCombineMergeMode("browser")}
+                              >
+                                Loaded sheets only
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={combineMergeMode === "athena" ? "default" : "outline"}
+                                className="h-8 text-xs"
+                                disabled={combineBusy}
+                                onClick={() => setCombineMergeMode("athena")}
+                              >
+                                Full dataset (Athena)
+                              </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground leading-snug">
+                              {combineMergeMode === "browser"
+                                ? "Merges the rows already shown in each sheet. No Athena query."
+                                : "Rebuilds SQL from saved lake provenance on the server. Inner or Left only; opens a new sheet."}
+                            </p>
+                          </div>
                           <div className="space-y-1.5">
                             <Label className="text-xs">Join type</Label>
                             <Select value={combineJoinType} onValueChange={setCombineJoinType}>
@@ -1055,6 +1464,13 @@ const GridView = ({startNew}) => {
                               ? "Cross join creates every pair of rows (Cartesian product)."
                               : `Match rows where ${combineLeftKeyCol || "leftKey"} = ${combineRightKeyCol || "rightKey"}. (Right-side overlapping column names will be suffixed like name__${suffix}.)`}
                           </div>
+                          {combineBusy ? (
+                            <ConnectProgressWithLabel
+                              label={combineProgressLabel || "Working…"}
+                              progress={combineProgress}
+                              className="pt-1"
+                            />
+                          ) : null}
                         </div>
                       );
                     })()}
@@ -1064,11 +1480,12 @@ const GridView = ({startNew}) => {
                         type="button"
                         variant="outline"
                         onClick={() => setCombineSheetsDialogOpen(false)}
+                        disabled={combineBusy}
                       >
                         Cancel
                       </Button>
-                      <Button type="button" onClick={applyCombineSheets}>
-                        Combine
+                      <Button type="button" onClick={() => void applyCombineSheets()} disabled={combineBusy}>
+                        {combineBusy ? "Running…" : "Combine"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -1094,6 +1511,194 @@ const GridView = ({startNew}) => {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label="Refine query"
+                        onClick={() => {
+                          if (!Array.isArray(connectedData) || connectedData.length === 0) {
+                            toast.error("Load sheet data before refining.");
+                            return;
+                          }
+                          setRefineScope("preview");
+                          setRefineDestination("replace");
+                          setRefineQueryOpen(true);
+                        }}
+                      >
+                        <Database className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Refine query
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <Dialog open={refineQueryOpen} onOpenChange={setRefineQueryOpen}>
+                  <DialogContent className="sm:max-w-lg max-h-[min(90dvh,640px)] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Refine query</DialogTitle>
+                      <DialogDescription>
+                        Select columns and an optional numeric filter. Run on loaded rows only, or re-query the full dataset in
+                        Athena using this sheet&apos;s provenance (results capped at {ATHENA_SAMPLE_ROW_LIMIT} rows). Choose
+                        whether to replace the active sheet or open a new one with the result.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Apply result to</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={refineDestination === "replace" ? "default" : "outline"}
+                            className="h-8 text-xs"
+                            disabled={refineBusy}
+                            onClick={() => setRefineDestination("replace")}
+                          >
+                            This sheet
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={refineDestination === "new_sheet" ? "default" : "outline"}
+                            className="h-8 text-xs"
+                            disabled={refineBusy}
+                            onClick={() => setRefineDestination("new_sheet")}
+                          >
+                            New sheet
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Run against</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={refineScope === "preview" ? "default" : "outline"}
+                            className="h-8 text-xs"
+                            onClick={() => setRefineScope("preview")}
+                          >
+                            This sheet only
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={refineScope === "athena" ? "default" : "outline"}
+                            className="h-8 text-xs"
+                            onClick={() => setRefineScope("athena")}
+                          >
+                            Full dataset (Athena)
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Columns to keep</Label>
+                        <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 p-2 space-y-2">
+                          {sheetColumnsForProps.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">No columns found.</p>
+                          ) : (
+                            sheetColumnsForProps.map((col) => (
+                              <label key={col} className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                                <Checkbox
+                                  checked={refineSelectedCols.has(col)}
+                                  onCheckedChange={() => {
+                                    setRefineSelectedCols((prev) => {
+                                      const n = new Set(prev);
+                                      if (n.has(col)) n.delete(col);
+                                      else n.add(col);
+                                      return n;
+                                    });
+                                  }}
+                                />
+                                <span className="font-mono">{col}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Optional numeric filter (WHERE)</Label>
+                        <div className="flex flex-wrap gap-2 items-end">
+                          <div className="space-y-1 min-w-[7rem] flex-1">
+                            <Label className="text-[10px] text-muted-foreground">Column</Label>
+                            <Select value={refineWhereCol || ""} onValueChange={setRefineWhereCol}>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Column" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {sheetColumnsForProps.map((c) => (
+                                  <SelectItem key={c} value={c} className="text-xs font-mono">
+                                    {c}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1 min-w-[8rem]">
+                            <Label className="text-[10px] text-muted-foreground">Operator</Label>
+                            <Select value={refineWhereOp} onValueChange={setRefineWhereOp}>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="gte" className="text-xs">
+                                  ≥
+                                </SelectItem>
+                                <SelectItem value="lte" className="text-xs">
+                                  ≤
+                                </SelectItem>
+                                <SelectItem value="gt" className="text-xs">
+                                  &gt;
+                                </SelectItem>
+                                <SelectItem value="lt" className="text-xs">
+                                  &lt;
+                                </SelectItem>
+                                <SelectItem value="eq" className="text-xs">
+                                  =
+                                </SelectItem>
+                                <SelectItem value="neq" className="text-xs">
+                                  ≠
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1 min-w-[6rem] flex-1">
+                            <Label className="text-[10px] text-muted-foreground">Value</Label>
+                            <Input
+                              className="h-8 text-xs"
+                              type="number"
+                              value={refineWhereVal}
+                              onChange={(e) => setRefineWhereVal(e.target.value)}
+                              placeholder="e.g. 100"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Leave value empty to skip the WHERE clause (all rows pass).
+                        </p>
+                      </div>
+                      {refineBusy ? (
+                        <ConnectProgressWithLabel label={refineProgressLabel || "Working…"} progress={refineProgress} />
+                      ) : null}
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button type="button" variant="outline" onClick={() => setRefineQueryOpen(false)} disabled={refineBusy}>
+                        Cancel
+                      </Button>
+                      <Button type="button" onClick={() => void applyRefineQuery()} disabled={refineBusy}>
+                        {refineBusy ? "Running…" : "Run"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 <Dialog open={removeDupsDialogOpen} onOpenChange={setRemoveDupsDialogOpen}>
                   <DialogContent className="sm:max-w-md">

@@ -1,39 +1,19 @@
 /**
- * Join active-sheet compose results to one or more named sheet CTEs (server-side, full dataset).
+ * Run a bounded SELECT over the *full* Athena dataset by wrapping an existing sheet's
+ * provenance as a CTE (no LIMIT on the CTE), then applying an outer SELECT + optional
+ * numeric WHERE + LIMIT 100 on the final result.
  *
- * This endpoint is intentionally *not* generic SQL execution:
- * it rebuilds Athena SQL from validated compose specs + validated join keys.
- *
- * POST JSON body:
+ * POST JSON:
  * {
- *   lake: "polymarket" | "kalshi",
- *   table: "markets" | "trades" | "blocks",
- *   compose: object,           // compose spec for the *main* query
- *   filters?: object | null,  // compose WHERE filters (same shape as /athena-query compose)
- *   joins: Array<{
- *     targetSheetId: string,  // key into sheetGraph
- *     joinType?: "left"|"inner",
- *     leftColumn: string,     // column from the main base table
- *     rightColumn: string     // column from the target sheet CTE output
- *   }>,
- *   sheetGraph: {
- *     [sheetId: string]: {
- *       name: string,          // CTE name to use in SQL
- *       provenance: {
- *         kind: "compose" | "compose_browser_join",
- *         lake: string,
- *         table: string,
- *         composeSpec: object,
- *         composeFilters: object | null,
- *         serverSheetJoins?: Array<{ targetSheetId: string, joinType?: "left"|"inner", leftColumn: string, rightColumn: string }>
- *       }
- *     }
- *   }
+ *   sheetGraph: { [sheetId]: { name: string, provenance: { kind: "compose", ... } } },
+ *   rootSheetId: string,
+ *   selectColumns: string[],
+ *   refineFilters?: { and: Array<{ column: string, op: string, value: number }> }
  * }
  */
 import AWS from "aws-sdk";
 import { validateAthenaLakeQueryBody, AthenaLakeRequestError } from "../../../lib/dataLake/validateAthenaLakeRequest";
-import { buildComposeAthenaSelectSql, COMPOSE_UNCONSTRAINED_ROW_CAP } from "../../../lib/dataLake/buildComposeAthenaSql";
+import { buildComposeAthenaSelectSql } from "../../../lib/dataLake/buildComposeAthenaSql";
 import { getAthenaQueryState, fetchAthenaQueryResultRows } from "../../../lib/dataLake/runAthenaSelect";
 
 function parseBody(req) {
@@ -48,6 +28,11 @@ function parseBody(req) {
 }
 
 function safeIdentifier(s) {
+  const t = String(s || "").trim();
+  return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(t) ? t : "";
+}
+
+function safeColumnName(s) {
   const t = String(s || "").trim();
   return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(t) ? t : "";
 }
@@ -73,24 +58,15 @@ function assertAthenaConfig() {
   return output;
 }
 
-function escapeSqlString(s) {
-  return String(s).replace(/'/g, "''");
-}
-
-function escapeLike(s) {
-  return String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-}
-
-/**
- * Build Athena WHERE clause from already-normalized filter predicates.
- * Matches the filter->SQL behavior used by `runAthenaSelect`.
- */
 function buildComposeWhereSql({ filters, caseSensitive, baseAlias = null }) {
   if (!filters) return "";
   const andPreds = Array.isArray(filters.and) ? filters.and : [];
   const orPreds = Array.isArray(filters.or) ? filters.or : [];
   const mergeAndPreds = Array.isArray(filters.mergeAnd) ? filters.mergeAnd : [];
   const mergeOrBranchPreds = Array.isArray(filters.mergeOrBranch) ? filters.mergeOrBranch : [];
+
+  const escapeSqlString = (s) => String(s).replace(/'/g, "''");
+  const escapeLike = (s) => String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 
   const predicateToSql = (p) => {
     const colSql = baseAlias ? `${baseAlias}."${p.column}"` : `"${p.column}"`;
@@ -106,7 +82,6 @@ function buildComposeWhereSql({ filters, caseSensitive, baseAlias = null }) {
           .join(", ");
         return `${colSql} ${opSql} (${list})`;
       }
-
       if (p.kind === "string") {
         const values = Array.isArray(p.value) ? p.value : [];
         if (!values.length) return "TRUE";
@@ -117,8 +92,6 @@ function buildComposeWhereSql({ filters, caseSensitive, baseAlias = null }) {
         });
         return `${colMaybeLower} ${opSql} (${lits.join(", ")})`;
       }
-
-      // date IN/NOT IN not supported
       return "TRUE";
     }
 
@@ -133,7 +106,6 @@ function buildComposeWhereSql({ filters, caseSensitive, baseAlias = null }) {
       return `${colSql} ${opSql} ${Number(p.value)}`;
     }
 
-    // string
     const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
     if (p.op === "contains" || p.op === "not_contains") {
       const pattern = `%${escapeLike(p.value)}%`;
@@ -167,6 +139,28 @@ function buildComposeWhereSql({ filters, caseSensitive, baseAlias = null }) {
   }
 
   return "";
+}
+
+function buildRefineOuterWhereSql(baseAlias, refineFilters) {
+  const andPreds = Array.isArray(refineFilters?.and) ? refineFilters.and : [];
+  if (!andPreds.length) return "";
+  const parts = [];
+  for (const p of andPreds) {
+    const col = safeColumnName(p.column);
+    if (!col) continue;
+    const v = Number(p.value);
+    if (!Number.isFinite(v)) continue;
+    const csql = `${baseAlias}."${col}"`;
+    const cast = `CAST(${csql} AS DOUBLE)`;
+    const op = String(p.op || "eq").toLowerCase();
+    if (op === "gte" || op === "ge") parts.push(`${cast} >= ${v}`);
+    else if (op === "lte" || op === "le") parts.push(`${cast} <= ${v}`);
+    else if (op === "gt") parts.push(`${cast} > ${v}`);
+    else if (op === "lt") parts.push(`${cast} < ${v}`);
+    else if (op === "eq") parts.push(`${cast} = ${v}`);
+    else if (op === "neq" || op === "ne") parts.push(`${cast} <> ${v}`);
+  }
+  return parts.length ? ` WHERE ${parts.join(" AND ")}` : "";
 }
 
 async function executeAthenaSql({ database, sql, maxWaitMs }) {
@@ -236,19 +230,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Invalid JSON body", code: "BAD_REQUEST" });
   }
 
-  const lake = body.lake;
-  const table = body.table;
-  const composeIn = body.compose && typeof body.compose === "object" ? body.compose : null;
-  const filtersIn = body.filters && typeof body.filters === "object" ? body.filters : null;
+  const sheetGraph = body.sheetGraph && typeof body.sheetGraph === "object" ? body.sheetGraph : null;
+  const rootSheetId = String(body.rootSheetId || "").trim();
+  const selectColumnsIn = Array.isArray(body.selectColumns) ? body.selectColumns : [];
+  const refineFilters = body.refineFilters && typeof body.refineFilters === "object" ? body.refineFilters : { and: [] };
 
-  if (!lake || !table || !composeIn) {
-    return res.status(400).json({ error: "Missing lake/table/compose", code: "BAD_REQUEST" });
+  if (!sheetGraph || !rootSheetId || !sheetGraph[rootSheetId]) {
+    return res.status(400).json({ error: "Missing sheetGraph/rootSheetId", code: "BAD_REQUEST" });
   }
 
-  const joins = Array.isArray(body.joins) ? body.joins : [];
-  const sheetGraph = body.sheetGraph && typeof body.sheetGraph === "object" ? body.sheetGraph : {};
-  if (!joins.length) {
-    return res.status(400).json({ error: "Missing joins", code: "BAD_REQUEST" });
+  const selectColumns = selectColumnsIn.map((c) => safeColumnName(String(c))).filter(Boolean);
+  if (!selectColumns.length) {
+    return res.status(400).json({ error: "selectColumns required", code: "BAD_REQUEST" });
   }
 
   const MAX_WAIT_MS = Math.min(
@@ -257,17 +250,11 @@ export default async function handler(req, res) {
   );
 
   try {
-    const sheetIds = Array.from(new Set(joins.map((j) => j?.targetSheetId).filter(Boolean)));
-    for (const id of sheetIds) {
-      if (!sheetGraph[id]) {
-        return res.status(400).json({ error: `Unknown sheetGraph id: ${id}`, code: "BAD_REQUEST" });
-      }
-    }
-
     const SAFE_ALIAS = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
     const cteSqlById = new Map();
     const cteDefsInOrder = [];
     const visiting = new Set();
+    let rootDatabase = "";
 
     const buildSheetCte = async (sheetId) => {
       if (cteSqlById.has(sheetId)) return;
@@ -299,7 +286,6 @@ export default async function handler(req, res) {
         throw err;
       }
 
-      // Build dependency CTEs first.
       const deps = Array.isArray(prov.serverSheetJoins) ? prov.serverSheetJoins : [];
       const depCteJoins = [];
       for (const d of deps) {
@@ -337,6 +323,10 @@ export default async function handler(req, res) {
         caseSensitive: true,
       });
 
+      if (sheetId === rootSheetId) {
+        rootDatabase = validated.database;
+      }
+
       const whereSql = buildComposeWhereSql({
         filters: validated.filters,
         caseSensitive: validated.caseSensitive,
@@ -356,51 +346,26 @@ export default async function handler(req, res) {
       visiting.delete(sheetId);
     };
 
-    for (const id of sheetIds) {
-      await buildSheetCte(id);
+    await buildSheetCte(rootSheetId);
+
+    const rootEntry = sheetGraph[rootSheetId];
+    const rootCteName = safeIdentifier(rootEntry?.name);
+    if (!rootCteName) {
+      return res.status(400).json({ error: "Invalid root CTE name", code: "BAD_REQUEST" });
     }
 
     const cteDefsSql = cteDefsInOrder.map((id) => `${safeIdentifier(sheetGraph[id]?.name)} AS (${cteSqlById.get(id).cteSql})`);
 
-    const mainCteJoins = joins.map((j) => {
-      const depId = j?.targetSheetId;
-      const depName = safeIdentifier(sheetGraph[depId]?.name);
-      return {
-        joinType: String(j?.joinType || "left").toLowerCase().trim() === "inner" ? "inner" : "left",
-        cteName: depName,
-        on: { leftColumn: String(j?.leftColumn || "").trim(), rightColumn: String(j?.rightColumn || "").trim() },
-      };
-    });
+    const selectList = selectColumns.map((c) => `"${c}"`).join(", ");
+    const outerWhere = buildRefineOuterWhereSql(rootCteName, refineFilters);
+    const fullSql = `WITH ${cteDefsSql.join(", ")} SELECT ${selectList} FROM ${rootCteName}${outerWhere} LIMIT 100`;
 
-    const mainCompose = { ...(composeIn || {}), ...(mainCteJoins.length ? { cteJoins: mainCteJoins } : {}) };
-
-    const validatedMain = validateAthenaLakeQueryBody({
-      lake,
-      table,
-      queryType: "compose",
-      compose: mainCompose,
-      filters: filtersIn,
-      caseSensitive: true,
-    });
-
-    const mainWhereSql = buildComposeWhereSql({
-      filters: validatedMain.filters,
-      caseSensitive: validatedMain.caseSensitive,
-      baseAlias: "t0",
-    });
-
-    const mainSql = buildComposeAthenaSelectSql({
-      physicalTableName: validatedMain.physical,
-      limit: COMPOSE_UNCONSTRAINED_ROW_CAP,
-      compose: validatedMain.compose,
-      lake: validatedMain.lake,
-      whereSql: mainWhereSql,
-    });
-
-    const fullSql = cteDefsSql.length ? `WITH ${cteDefsSql.join(", ")} ${mainSql}` : mainSql;
+    if (!String(rootDatabase || "").trim()) {
+      return res.status(400).json({ error: "Could not resolve Athena database for root sheet", code: "BAD_REQUEST" });
+    }
 
     const { columns, rows, rowCount, queryExecutionId, dataScannedBytes } = await executeAthenaSql({
-      database: validatedMain.database,
+      database: rootDatabase,
       sql: fullSql,
       maxWaitMs: MAX_WAIT_MS,
     });
@@ -411,8 +376,6 @@ export default async function handler(req, res) {
       rowCount,
       queryExecutionId,
       dataScannedBytes,
-      lake: validatedMain.lake,
-      table: validatedMain.table,
     });
   } catch (e) {
     if (e instanceof AthenaLakeRequestError) {
@@ -434,4 +397,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e?.message || "Internal error", code: code || "INTERNAL" });
   }
 }
-
