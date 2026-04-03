@@ -7,7 +7,15 @@ const nextConfig = {
   experimental: {
     esmExternals: 'loose',
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
+    // Dev-only: mitigate intermittent ChunkLoadError on first open (layout chunk requested
+    // before compile finishes). See https://github.com/vercel/next.js/issues/66526
+    if (dev && !isServer) {
+      config.output = {
+        ...config.output,
+        chunkLoadTimeout: 300000,
+      }
+    }
     // One Yjs module instance: @blocknote/core nests y-prosemirror; duplicate copies break
     // instanceof / constructor checks (https://github.com/yjs/yjs/issues/438).
     config.resolve.alias = {

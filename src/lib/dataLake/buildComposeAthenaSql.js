@@ -386,6 +386,69 @@ function buildSelectExpression(opts) {
 
   const numeric = isNumericHiveType(columnType);
 
+  /**
+   * Shared IF/ELSE → CASE … END (THEN/ELSE branches as DOUBLE), used by SUM×CASE and standalone CASE columns.
+   * @param {any} sumCaseIn
+   * @param {(c: string) => string} colRefFn
+   */
+  const buildIfElseCaseDoubleSql = (sumCaseIn, colRefFn) => {
+    const sc = sumCaseIn && typeof sumCaseIn === "object" ? sumCaseIn : null;
+    if (!sc || !sc.enabled) {
+      const err = new Error("if/else CASE is not enabled");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    const branchesIn = Array.isArray(sc.branches) ? sc.branches : [];
+    const elseCol = String(sc.elseColumn || "").trim();
+    if (branchesIn.length === 0) {
+      const err = new Error("if/else requires at least one IF branch");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    if (!elseCol || !isValidColumnIdentifier(elseCol)) {
+      const err = new Error("if/else requires an ELSE column");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+
+    const condToSql = (w) => {
+      const c = String(w?.column || "").trim();
+      const op = String(w?.op || "").toLowerCase().trim();
+      const v = w?.value;
+      if (!c || !isValidColumnIdentifier(c)) {
+        const err = new Error("Invalid IF column");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      const colSql = colRefFn(c);
+      const opSql = op === "gt" ? ">" : op === "lt" ? "<" : op === "eq" ? "=" : op === "neq" ? "!=" : null;
+      if (!opSql) {
+        const err = new Error(`Invalid IF operator: ${op}`);
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      if (typeof v === "number" && Number.isFinite(v)) {
+        return `CAST(${colSql} AS DOUBLE) ${opSql} ${v}`;
+      }
+      const lit = String(v ?? "");
+      const esc = lit.replace(/'/g, "''");
+      return `LOWER(CAST(${colSql} AS VARCHAR)) ${opSql} LOWER('${esc}')`;
+    };
+
+    const caseParts = branchesIn.map((b) => {
+      const whenSql = condToSql(b?.when);
+      const thenCol = String(b?.thenColumn || "").trim();
+      if (!thenCol || !isValidColumnIdentifier(thenCol)) {
+        const err = new Error("Invalid THEN column");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      return `WHEN ${whenSql} THEN CAST(${colRefFn(thenCol)} AS DOUBLE)`;
+    });
+
+    return `CASE ${caseParts.join(" ")} ELSE CAST(${colRefFn(elseCol)} AS DOUBLE) END`;
+  };
+
   // Aggregates
   if (aggregate === "sum") {
     if (equation && typeof equation === "object" && equation.enabled && equation.root) {
@@ -395,57 +458,7 @@ function buildSelectExpression(opts) {
     }
 
     if (sumCase && typeof sumCase === "object" && sumCase.enabled) {
-      const branchesIn = Array.isArray(sumCase.branches) ? sumCase.branches : [];
-      const elseCol = String(sumCase.elseColumn || "").trim();
-      if (branchesIn.length === 0) {
-        const err = new Error("SUM if/else requires at least one IF branch");
-        err.code = "BAD_REQUEST";
-        throw err;
-      }
-      if (!elseCol || !isValidColumnIdentifier(elseCol)) {
-        const err = new Error("SUM if/else requires an ELSE column");
-        err.code = "BAD_REQUEST";
-        throw err;
-      }
-
-      const condToSql = (w) => {
-        const c = String(w?.column || "").trim();
-        const op = String(w?.op || "").toLowerCase().trim();
-        const v = w?.value;
-        if (!c || !isValidColumnIdentifier(c)) {
-          const err = new Error("Invalid IF column");
-          err.code = "BAD_REQUEST";
-          throw err;
-        }
-        // We keep it simple: string comparisons are case-insensitive, numeric comparisons are numeric.
-        const colSql = colRef(c);
-        const opSql = op === "gt" ? ">" : op === "lt" ? "<" : op === "eq" ? "=" : op === "neq" ? "!=" : null;
-        if (!opSql) {
-          const err = new Error(`Invalid IF operator: ${op}`);
-          err.code = "BAD_REQUEST";
-          throw err;
-        }
-        if (typeof v === "number" && Number.isFinite(v)) {
-          return `CAST(${colSql} AS DOUBLE) ${opSql} ${v}`;
-        }
-        const lit = String(v ?? "");
-        const esc = lit.replace(/'/g, "''");
-        return `LOWER(CAST(${colSql} AS VARCHAR)) ${opSql} LOWER('${esc}')`;
-      };
-
-      const caseParts = branchesIn.map((b) => {
-        const whenSql = condToSql(b?.when);
-        const thenCol = String(b?.thenColumn || "").trim();
-        if (!thenCol || !isValidColumnIdentifier(thenCol)) {
-          const err = new Error("Invalid THEN column");
-          err.code = "BAD_REQUEST";
-          throw err;
-        }
-        return `WHEN ${whenSql} THEN CAST(${colRef(thenCol)} AS DOUBLE)`;
-      });
-
-      const caseSql = `CASE ${caseParts.join(" ")} ELSE CAST(${colRef(elseCol)} AS DOUBLE) END`;
-      // SUM(baseColumn * CASE ...)
+      const caseSql = buildIfElseCaseDoubleSql(sumCase, colRef);
       const base = `SUM(CAST(${colRef(column)} AS DOUBLE) * (${caseSql}))`;
       return { innerSql: wrapRound(applyScale(base)), isAggregate: true };
     }
@@ -486,6 +499,13 @@ function buildSelectExpression(opts) {
   if (aggregate === "count_distinct") {
     const base = `COUNT(DISTINCT ${colRef(column)})`;
     return { innerSql: base, isAggregate: true };
+  }
+
+  // Non-aggregate IF/ELSE → CASE (one output DOUBLE per source row; no implicit SUM)
+  if (!aggregate && sumCase && typeof sumCase === "object" && sumCase.enabled) {
+    const caseSql = buildIfElseCaseDoubleSql(sumCase, colRef);
+    const innerSql = wrapRound(applyScale(caseSql));
+    return { innerSql, isAggregate: false };
   }
 
   // Dimension: date bucket / format (epoch columns only; validated upstream)
@@ -700,6 +720,8 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
       aggregate: null,
       numberScale: row.numberScale || null,
       decimals: row.decimals != null ? Number(row.decimals) : null,
+      sumCase: row.sumCase || null,
+      equation: row.equation || null,
       baseAlias,
     });
 

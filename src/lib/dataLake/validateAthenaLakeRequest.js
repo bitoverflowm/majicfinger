@@ -466,7 +466,7 @@ export function validateAthenaLakeQueryBody(body) {
 
       /** @type {null | { enabled: true; branches: Array<{ when: { column: string; op: "gt"|"lt"|"eq"|"neq"; value: string|number }; thenColumn: string }>; elseColumn: string }} */
       let normalizedSumCase = null;
-      if (aggregate === "sum" && row.sumCase != null) {
+      if ((aggregate === "sum" || aggregate === null) && row.sumCase != null) {
         if (typeof row.sumCase !== "object" || Array.isArray(row.sumCase)) {
           throw new AthenaLakeRequestError("compose.select.sumCase must be an object", { statusCode: 400, code: "BAD_REQUEST" });
         }
@@ -475,33 +475,32 @@ export function validateAthenaLakeQueryBody(body) {
           const branchesIn = Array.isArray(row.sumCase.branches) ? row.sumCase.branches : [];
           const elseColumn = String(row.sumCase.elseColumn || "").trim();
           if (!branchesIn.length) {
-            throw new AthenaLakeRequestError("SUM if/else requires at least one IF branch", { statusCode: 400, code: "BAD_REQUEST" });
+            throw new AthenaLakeRequestError("if/else requires at least one IF branch", { statusCode: 400, code: "BAD_REQUEST" });
           }
           if (!elseColumn || !allowed.has(elseColumn)) {
-            throw new AthenaLakeRequestError("SUM if/else requires a valid ELSE column", { statusCode: 400, code: "BAD_REQUEST" });
+            throw new AthenaLakeRequestError("if/else requires a valid ELSE column", { statusCode: 400, code: "BAD_REQUEST" });
           }
           const elseType = columnHiveTypeForLakeTable(lake, table, elseColumn);
           if (!isNumericHiveType(elseType)) {
-            throw new AthenaLakeRequestError("SUM if/else ELSE column must be numeric", { statusCode: 400, code: "BAD_REQUEST" });
+            throw new AthenaLakeRequestError("if/else ELSE column must be numeric", { statusCode: 400, code: "BAD_REQUEST" });
           }
 
-          // Validate base SUM column is numeric (already enforced by numericAggs check), but keep explicit message.
-          if (!isNumericHiveType(colType)) {
+          if (aggregate === "sum" && !isNumericHiveType(colType)) {
             throw new AthenaLakeRequestError("SUM if/else base SUM column must be numeric", { statusCode: 400, code: "BAD_REQUEST" });
           }
 
           const normBranches = [];
           for (const b of branchesIn) {
             if (!b || typeof b !== "object") {
-              throw new AthenaLakeRequestError("Invalid SUM if/else branch", { statusCode: 400, code: "BAD_REQUEST" });
+              throw new AthenaLakeRequestError("Invalid if/else branch", { statusCode: 400, code: "BAD_REQUEST" });
             }
             const when = b.when;
             if (!when || typeof when !== "object" || Array.isArray(when)) {
-              throw new AthenaLakeRequestError("SUM if/else branch.when must be an object", { statusCode: 400, code: "BAD_REQUEST" });
+              throw new AthenaLakeRequestError("if/else branch.when must be an object", { statusCode: 400, code: "BAD_REQUEST" });
             }
             const whenColumn = String(when.column || "").trim();
             if (!whenColumn || !allowed.has(whenColumn)) {
-              throw new AthenaLakeRequestError("SUM if/else WHEN column must be a valid column", { statusCode: 400, code: "BAD_REQUEST" });
+              throw new AthenaLakeRequestError("if/else WHEN column must be a valid column", { statusCode: 400, code: "BAD_REQUEST" });
             }
             const whenType = columnHiveTypeForLakeTable(lake, table, whenColumn);
             if (!whenType) {
@@ -514,7 +513,7 @@ export function validateAthenaLakeQueryBody(body) {
             const opRaw = String(when.op || "").toLowerCase().trim();
             const opAllowed = whenIsString ? ["eq", "neq"] : whenIsNumeric ? ["gt", "lt", "eq", "neq"] : ["eq", "neq"];
             if (!opAllowed.includes(opRaw)) {
-              throw new AthenaLakeRequestError("SUM if/else WHEN operator is not valid for this column type", {
+              throw new AthenaLakeRequestError("if/else WHEN operator is not valid for this column type", {
                 statusCode: 400,
                 code: "BAD_REQUEST",
               });
@@ -524,28 +523,28 @@ export function validateAthenaLakeQueryBody(body) {
             if (whenIsString) {
               whenValue = String(when.value ?? "");
               if (!whenValue.trim()) {
-                throw new AthenaLakeRequestError("SUM if/else WHEN value is required", { statusCode: 400, code: "BAD_REQUEST" });
+                throw new AthenaLakeRequestError("if/else WHEN value is required", { statusCode: 400, code: "BAD_REQUEST" });
               }
             } else if (whenIsNumeric) {
               const n = Number(when.value);
               if (!Number.isFinite(n)) {
-                throw new AthenaLakeRequestError("SUM if/else numeric WHEN value must be a number", { statusCode: 400, code: "BAD_REQUEST" });
+                throw new AthenaLakeRequestError("if/else numeric WHEN value must be a number", { statusCode: 400, code: "BAD_REQUEST" });
               }
               whenValue = n;
             } else {
               whenValue = String(when.value ?? "");
               if (!whenValue.trim()) {
-                throw new AthenaLakeRequestError("SUM if/else WHEN value is required", { statusCode: 400, code: "BAD_REQUEST" });
+                throw new AthenaLakeRequestError("if/else WHEN value is required", { statusCode: 400, code: "BAD_REQUEST" });
               }
             }
 
             const thenColumn = String(b.thenColumn || "").trim();
             if (!thenColumn || !allowed.has(thenColumn)) {
-              throw new AthenaLakeRequestError("SUM if/else THEN column must be a valid column", { statusCode: 400, code: "BAD_REQUEST" });
+              throw new AthenaLakeRequestError("if/else THEN column must be a valid column", { statusCode: 400, code: "BAD_REQUEST" });
             }
             const thenType = columnHiveTypeForLakeTable(lake, table, thenColumn);
             if (!isNumericHiveType(thenType)) {
-              throw new AthenaLakeRequestError("SUM if/else THEN column must be numeric", { statusCode: 400, code: "BAD_REQUEST" });
+              throw new AthenaLakeRequestError("if/else THEN column must be numeric", { statusCode: 400, code: "BAD_REQUEST" });
             }
             normBranches.push({ when: { column: whenColumn, op: opRaw, value: whenValue }, thenColumn });
           }
@@ -556,8 +555,14 @@ export function validateAthenaLakeQueryBody(body) {
             elseColumn,
           };
         }
-      } else if (row.sumCase != null && aggregate !== "sum") {
-        throw new AthenaLakeRequestError("sumCase is only supported when aggregate is SUM", { statusCode: 400, code: "BAD_REQUEST" });
+      } else if (row.sumCase != null && aggregate != null && aggregate !== "sum") {
+        const scEnabled = row.sumCase && typeof row.sumCase === "object" && row.sumCase.enabled === true;
+        if (scEnabled) {
+          throw new AthenaLakeRequestError(
+            "if/else (sumCase) is only supported with Summarize = Sum or with no aggregate (CASE column)",
+            { statusCode: 400, code: "BAD_REQUEST" },
+          );
+        }
       }
 
       /** @type {null | { enabled: true; agg: "sum"; root: any }} */
@@ -612,6 +617,14 @@ export function validateAthenaLakeQueryBody(body) {
         });
       }
 
+      const caseOnlyDimension = aggregate == null && normalizedSumCase?.enabled === true;
+      if (normalizedSumCase?.enabled && (dateBucket || dateFormat)) {
+        throw new AthenaLakeRequestError("Do not combine if/else CASE with date bucket/format on the same row", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+
       if (
         aggregate &&
         ["sum", "avg", "min", "max", "median", "stddev", "variance"].includes(String(aggregate))
@@ -626,7 +639,7 @@ export function validateAthenaLakeQueryBody(body) {
 
       const scaleRaw = row.numberScale != null ? String(row.numberScale).toLowerCase().trim() : "none";
       const numberScale = scales.has(scaleRaw) ? scaleRaw : "none";
-      if (numberScale !== "none" && !isNumericHiveType(colType)) {
+      if (numberScale !== "none" && !isNumericHiveType(colType) && !caseOnlyDimension) {
         throw new AthenaLakeRequestError("Scaling applies only to numeric columns", { statusCode: 400, code: "BAD_REQUEST" });
       }
 
@@ -638,7 +651,7 @@ export function validateAthenaLakeQueryBody(body) {
         }
         decimals = d;
       }
-      if (decimals != null && !isNumericHiveType(colType)) {
+      if (decimals != null && !isNumericHiveType(colType) && !caseOnlyDimension) {
         throw new AthenaLakeRequestError("decimals apply only to numeric columns", { statusCode: 400, code: "BAD_REQUEST" });
       }
 

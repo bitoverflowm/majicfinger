@@ -1,7 +1,10 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { masterPalette } from '@/components/chartView/panels/masterPalette';
+import {
+  SHADCN_CHART_BASE_ORDER,
+  getShadcnChartPaletteArray,
+} from '@/components/chartView/panels/shadcnChartPalettes';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, Treemap, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -150,8 +153,7 @@ export function ChartBuilderProvider({ demo, children }) {
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
   const [yAxisCompact, setYAxisCompact] = useState(true);
 
-  const categories = Object.keys(masterPalette || {});
-  const [selectedCategory, setSelectedCategory] = useState(categories?.[0]);
+  const [selectedShadBaseId, setSelectedShadBaseId] = useState(SHADCN_CHART_BASE_ORDER[0]);
   const [selectedPalette, setSelectedPalette] = useState([]);
   const [colorVisible, setColorVisible] = useState(false);
 
@@ -194,12 +196,11 @@ export function ChartBuilderProvider({ demo, children }) {
 
   useEffect(() => {
     if (selectedPalette?.length) return;
-    const firstCategory = categories?.[0];
-    const firstPalette = firstCategory ? masterPalette?.[firstCategory]?.[0] : null;
+    const firstPalette = getShadcnChartPaletteArray(SHADCN_CHART_BASE_ORDER[0]);
     if (Array.isArray(firstPalette) && firstPalette.length) {
       setSelectedPalette(firstPalette);
     }
-  }, [categories, selectedPalette]);
+  }, [selectedPalette]);
 
   useEffect(() => {
     if (!effectiveCols?.length) return;
@@ -325,13 +326,24 @@ export function ChartBuilderProvider({ demo, children }) {
     return chartData;
   }, [chartData]);
 
-  const selectedPaletteHandler = (index) => {
-    const cat = selectedCategory || categories?.[0];
-    const pal = masterPalette?.[cat]?.[index];
+  const selectedPaletteHandler = (baseId) => {
+    const id = String(baseId || "").trim();
+    if (!id) return;
+    setSelectedShadBaseId(id);
+    const pal = getShadcnChartPaletteArray(id);
     if (pal && pal.length) setSelectedPalette(pal);
   };
 
-  const shufflePalette = () => setSelectedPalette((p) => [...p].reverse());
+  /** Rotate palette stops (cycle) so series colors shift without changing the base ramp. */
+  const shufflePalette = () =>
+    setSelectedPalette((p) => {
+      if (!p?.length) return p;
+      const next = [...p];
+      const first = next.shift();
+      if (first == null) return p;
+      next.push(first);
+      return next;
+    });
 
   const handleSelectY = (value, index = -1) => {
     if (!value) return;
@@ -485,9 +497,9 @@ export function ChartBuilderProvider({ demo, children }) {
 
     selectedPalette,
     shufflePalette,
-    categories,
-    selectedCategory,
-    setSelectedCategory,
+    shadcnChartBases: SHADCN_CHART_BASE_ORDER,
+    selectedShadBaseId,
+    setSelectedShadBaseId,
     selectedPaletteHandler,
     handleToggleDark,
 
@@ -655,13 +667,34 @@ export function ChartCanvas() {
     const leaves = treemapData?.[0]?.children;
     const n = Array.isArray(leaves) ? leaves.length : 0;
     if (!n || !hasSelectedPalette) return null;
-    return extrapolateColorsFromPalette(selectedPalette, n);
+    // Anchor extrapolation from the dark end of the ramp (Shadcn order: 50 → 950).
+    const reversed = [...selectedPalette].reverse();
+    return extrapolateColorsFromPalette(reversed, n);
   }, [treemapData, hasSelectedPalette, selectedPalette]);
   const defaultPalette = dark
     ? ["#ffffff", "#000000", "#000000", "#ffffff"]
     : ["#000000", "#ffffff", "#ffffff", "#000000"];
   const activePalette = hasSelectedPalette ? selectedPalette : defaultPalette;
-  const seriesColorAt = (idx) => activePalette?.[idx] || activePalette?.[3] || activePalette?.[0] || (dark ? "#ffffff" : "#000000");
+  const fallbackSeriesColor = dark ? "#ffffff" : "#000000";
+  /**
+   * Shadcn palettes are ordered light → dark (50 … 950). Outer chrome uses the first stops; series
+   * should read from the dark end so lines/bars read on light card backgrounds.
+   */
+  const seriesColorAt = (idx) => {
+    const p = activePalette;
+    const n = p?.length || 0;
+    if (!n) return fallbackSeriesColor;
+    if (!hasSelectedPalette) {
+      return p[idx] ?? p[3] ?? p[0] ?? fallbackSeriesColor;
+    }
+    const chromeSlots = 3;
+    if (n <= chromeSlots) {
+      return p[Math.max(0, n - 1 - (idx % Math.max(1, n)))] ?? fallbackSeriesColor;
+    }
+    const fromEnd = n - 1 - idx;
+    const pick = Math.min(n - 1, Math.max(chromeSlots, fromEnd));
+    return p[pick] ?? p[n - 1] ?? fallbackSeriesColor;
+  };
   const yAxisFormatter = (raw) => {
     const n = Number(raw);
     if (!Number.isFinite(n)) return raw;

@@ -6,11 +6,10 @@ import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
 import "ag-grid-community/styles/ag-theme-quartz.css"; // Theme
 
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 import { PlusIcon } from "@radix-ui/react-icons"
 import { toast } from "sonner"
-
-import { Menu } from './menu'
 
 import { Button } from "@/components/ui/button"
 import {
@@ -64,7 +63,10 @@ import {
   Download,
   BarChart2,
   Sigma,
+  GripVertical,
   ChevronDown,
+  Pencil,
+  Trash,
   Database,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -118,6 +120,10 @@ function getColKeys(connectedCols) {
   return (connectedCols || []).map((c) => (c && typeof c === 'object' && 'field' in c ? c.field : c)).filter(Boolean);
 }
 
+function genRequestCardId() {
+  return `req-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
 const GridView = ({startNew}) => {
 
     const contextStateV2 = useMyStateV2()
@@ -130,6 +136,7 @@ const GridView = ({startNew}) => {
     const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate
     const setSheetData = contextStateV2?.setSheetData
     const setDataSheets = contextStateV2?.setDataSheets
+    const setDataTypes = contextStateV2?.setDataTypes
     const dataTypes = contextStateV2?.dataTypes || {}
     let dataSheets = contextStateV2?.dataSheets || {}
     const activeSheetId = contextStateV2?.activeSheetId
@@ -162,11 +169,21 @@ const GridView = ({startNew}) => {
     // Remove duplicates (row-level)
     const [removeDupsDialogOpen, setRemoveDupsDialogOpen] = useState(false);
     const [sheetPropsDialogOpen, setSheetPropsDialogOpen] = useState(false);
+    const [editingColIndex, setEditingColIndex] = useState(null);
+    const [editingColName, setEditingColName] = useState("");
+
+    useEffect(() => {
+      if (!sheetPropsDialogOpen) {
+        setEditingColIndex(null);
+        setEditingColName("");
+      }
+    }, [sheetPropsDialogOpen]);
 
     /** Refine / filter current sheet (preview) or re-query full lake via provenance CTE (Athena). */
     const [refineQueryOpen, setRefineQueryOpen] = useState(false);
     const [refineScope, setRefineScope] = useState("preview"); // preview | athena
     const [refineDestination, setRefineDestination] = useState("replace"); // replace | new_sheet
+    const [refineNewSheetName, setRefineNewSheetName] = useState("");
     const [refineSelectedCols, setRefineSelectedCols] = useState(() => new Set());
     const [refineWhereCol, setRefineWhereCol] = useState("");
     const [refineWhereOp, setRefineWhereOp] = useState("gte");
@@ -182,6 +199,144 @@ const GridView = ({startNew}) => {
         .filter((k) => k !== "_origIndex")
         .sort();
     }, [connectedData]);
+
+    const getColField = (col) => (col && typeof col === "object" && "field" in col ? col.field : col);
+    const setColField = (col, nextField) =>
+      col && typeof col === "object" && "field" in col ? { ...col, field: nextField } : nextField;
+
+    const convertDataType = (data, column, newType) => {
+      return (data || []).map((row) => {
+        let newValue = row?.[column];
+        switch (newType) {
+          case "number":
+            newValue = parseFloat(newValue);
+            if (isNaN(newValue)) newValue = null;
+            break;
+          case "boolean":
+            newValue = Boolean(newValue);
+            break;
+          case "dateString":
+            newValue = new Date(newValue).toISOString();
+            break;
+          case "object":
+            try {
+              newValue = JSON.parse(newValue);
+            } catch {
+              newValue = null;
+            }
+            break;
+          case "text":
+          default:
+            newValue = String(newValue);
+            break;
+        }
+        return { ...row, [column]: newValue };
+      });
+    };
+
+    const handleDeleteColumn = (index) => {
+      const col = connectedCols?.[index];
+      const colName = String(getColField(col) || "");
+      if (!colName) return;
+
+      const nextCols = (connectedCols || []).filter((_, colIndex) => colIndex !== index);
+      setConnectedCols?.(nextCols);
+
+      setConnectedData?.((prevData) =>
+        (prevData || []).map((item) => {
+          const newItem = { ...(item || {}) };
+          delete newItem[colName];
+          return newItem;
+        }),
+      );
+
+      if (setDataTypes) {
+        setDataTypes((prevTypes) => {
+          const newTypes = { ...(prevTypes || {}) };
+          delete newTypes[colName];
+          return newTypes;
+        });
+      }
+
+      if (editingColIndex === index) {
+        setEditingColIndex(null);
+        setEditingColName("");
+      }
+      toast(`Column "${colName}" deleted!`, { duration: 5000 });
+    };
+
+    const handleSaveColumnName = (index) => {
+      const col = connectedCols?.[index];
+      const oldColName = String(getColField(col) || "");
+      const nextName = String(editingColName || "").trim();
+
+      if (!oldColName || !nextName) return;
+      if (nextName === oldColName) {
+        setEditingColIndex(null);
+        setEditingColName("");
+        return;
+      }
+
+      const existing = new Set((connectedCols || []).map((c) => String(getColField(c) || "")));
+      if (existing.has(nextName)) {
+        toast(`Column "${nextName}" already exists.`, { duration: 5000 });
+        return;
+      }
+
+      const nextCols = (connectedCols || []).map((c, colIndex) =>
+        colIndex === index ? setColField(c, nextName) : c,
+      );
+      setConnectedCols?.(nextCols);
+
+      setConnectedData?.((prevData) =>
+        (prevData || []).map((item) => {
+          const newItem = { ...(item || {}) };
+          newItem[nextName] = newItem[oldColName];
+          delete newItem[oldColName];
+          return newItem;
+        }),
+      );
+
+      if (setDataTypes) {
+        setDataTypes((prevTypes) => {
+          const newTypes = { ...(prevTypes || {}) };
+          newTypes[nextName] = newTypes[oldColName] || "text";
+          delete newTypes[oldColName];
+          return newTypes;
+        });
+      }
+
+      setEditingColIndex(null);
+      setEditingColName("");
+      toast(`Column name updated to "${nextName}"`, { duration: 5000 });
+    };
+
+    const handleTypeChange = (index, newType) => {
+      const col = connectedCols?.[index];
+      const colName = String(getColField(col) || "");
+      if (!colName) return;
+
+      const updatedData = convertDataType(connectedData, colName, newType);
+      setConnectedData?.(updatedData);
+
+      if (setDataTypes) {
+        setDataTypes((prevTypes) => ({
+          ...(prevTypes || {}),
+          [colName]: newType,
+        }));
+      }
+
+      toast(`Column "${colName}" type updated to "${newType}"`, { duration: 5000 });
+    };
+
+    const onDragEnd = (result) => {
+      if (!result.destination) return;
+      const reorderedCols = Array.from(connectedCols || []);
+      const [removed] = reorderedCols.splice(result.source.index, 1);
+      reorderedCols.splice(result.destination.index, 0, removed);
+      setConnectedCols?.(reorderedCols);
+    };
+
     const [filterState, setFilterState] = useState({
       dateColumn: null,
       dateFrom: '',
@@ -355,6 +510,8 @@ const GridView = ({startNew}) => {
 
         setCombineBusy(true);
         let tick = null;
+        const joinAthenaStarted =
+          typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
         try {
           setCombineProgressLabel("Submitting join to Athena…");
           setCombineProgress(10);
@@ -393,6 +550,30 @@ const GridView = ({startNew}) => {
           const rawRows = Array.isArray(j.rows) ? j.rows : [];
           const colNames = Array.isArray(j.columns) ? j.columns : [];
           const outRows = athenaRowsToObjects(colNames, rawRows).slice(0, ATHENA_SAMPLE_ROW_LIMIT);
+          const joinAthenaElapsedMs = Math.max(
+            0,
+            (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - joinAthenaStarted,
+          );
+
+          const joinCard = {
+            id: genRequestCardId(),
+            kind: "join",
+            createdAt: Date.now(),
+            elapsedMs: joinAthenaElapsedMs,
+            table: String(leftProv.table || ""),
+            lake: String(leftProv.lake || ""),
+            loadedRowCount: outRows.length,
+            join: {
+              mode: "server",
+              joinType: joinTypeApi,
+              leftSheetId: combineLeftSheetId,
+              rightSheetId: combineRightSheetId,
+              leftSheetLabel: String(leftSheet?.name || combineLeftSheetId),
+              rightSheetLabel: String(rightSheet?.name || combineRightSheetId),
+              leftColumn: leftKeyCol,
+              rightColumn: rightKeyCol,
+            },
+          };
 
           const newProv = {
             kind: "compose",
@@ -422,7 +603,16 @@ const GridView = ({startNew}) => {
             setDataSheets?.((prev) => {
               const p = prev || {};
               const sheet = p[activeSheetId] || { name: outName, data: [] };
-              return { ...p, [activeSheetId]: { ...sheet, name: outName.slice(0, 80), provenance: newProv } };
+              const existing = Array.isArray(sheet.requestCards) ? sheet.requestCards : [];
+              return {
+                ...p,
+                [activeSheetId]: {
+                  ...sheet,
+                  name: outName.slice(0, 80),
+                  provenance: newProv,
+                  requestCards: [...existing, joinCard],
+                },
+              };
             });
             toast.success(`Combined on Athena (up to ${ATHENA_SAMPLE_ROW_LIMIT} rows).`);
           } else {
@@ -438,6 +628,7 @@ const GridView = ({startNew}) => {
                     ...sheet,
                     name: outName.slice(0, 80),
                     provenance: newProv,
+                    requestCards: [joinCard],
                   },
                 };
               });
@@ -460,6 +651,8 @@ const GridView = ({startNew}) => {
       }
 
       try {
+        const combineBrowserStarted =
+          typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
         const rightSuffixRaw = rightSheet?.name || combineRightSheetId || "right";
         const rightSuffix = String(rightSuffixRaw).replace(/[^a-zA-Z0-9_]/g, "_") || "right";
 
@@ -552,6 +745,31 @@ const GridView = ({startNew}) => {
           return;
         }
 
+        const combineBrowserElapsedMs = Math.max(
+          0,
+          (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - combineBrowserStarted,
+        );
+        const joinCard = {
+          id: genRequestCardId(),
+          kind: "join",
+          createdAt: Date.now(),
+          elapsedMs: combineBrowserElapsedMs,
+          table: "",
+          lake: "",
+          loadedRowCount: outRows.length,
+          join: {
+            mode: "browser",
+            crossJoin: joinType === "cross",
+            joinType,
+            leftSheetId: combineLeftSheetId,
+            rightSheetId: combineRightSheetId,
+            leftSheetLabel: String(leftSheet?.name || combineLeftSheetId),
+            rightSheetLabel: String(rightSheet?.name || combineRightSheetId),
+            leftColumn: joinType === "cross" ? "" : leftKeyCol,
+            rightColumn: joinType === "cross" ? "" : rightKeyCol,
+          },
+        };
+
         const defaultName = `Combine · ${String(leftSheet?.name || combineLeftSheetId)} ⟕ ${String(rightSheet?.name || combineRightSheetId)}`;
         const outName = String(combineOutputName || "").trim() || defaultName;
         if (combineDestination === "new_sheet") {
@@ -565,7 +783,10 @@ const GridView = ({startNew}) => {
               const p = prev || {};
               const sh = p[newId];
               if (!sh) return prev;
-              return { ...p, [newId]: { ...sh, name: outName.slice(0, 80), provenance: null } };
+              return {
+                ...p,
+                [newId]: { ...sh, name: outName.slice(0, 80), provenance: null, requestCards: [joinCard] },
+              };
             });
           });
           toast.success("Sheets combined into a new sheet (loaded rows only).");
@@ -576,7 +797,15 @@ const GridView = ({startNew}) => {
             if (!activeSheetId) return prev;
             const p = prev || {};
             const sh = p[activeSheetId] || { name: outName, data: [] };
-            return { ...p, [activeSheetId]: { ...sh, name: outName.slice(0, 80) } };
+            const existing = Array.isArray(sh.requestCards) ? sh.requestCards : [];
+            return {
+              ...p,
+              [activeSheetId]: {
+                ...sh,
+                name: outName.slice(0, 80),
+                requestCards: [...existing, joinCard],
+              },
+            };
           });
           toast.success("Sheets combined in the current sheet (loaded rows only).");
         }
@@ -637,6 +866,7 @@ const GridView = ({startNew}) => {
       setRefineSelectedCols(new Set(cols));
       setRefineWhereCol(cols[0] || "");
       setRefineWhereVal("");
+      setRefineNewSheetName("");
     }, [refineQueryOpen, sheetColumnsForProps]);
 
     const applyRefineQuery = useCallback(async () => {
@@ -652,6 +882,8 @@ const GridView = ({startNew}) => {
       }
 
       if (refineScope === "preview") {
+        const refinePreviewStarted =
+          typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
         let out = rows;
         const wCol = String(refineWhereCol || "").trim();
         const wVal = Number(refineWhereVal);
@@ -677,12 +909,34 @@ const GridView = ({startNew}) => {
           }
           return o;
         });
+        const baseSheet = dataSheets[activeSheetId];
+        const refineElapsedMs = Math.max(
+          0,
+          (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - refinePreviewStarted,
+        );
+        const refineCard = {
+          id: genRequestCardId(),
+          kind: "refine",
+          createdAt: Date.now(),
+          elapsedMs: refineElapsedMs,
+          table: String(baseSheet?.provenance?.table || ""),
+          lake: String(baseSheet?.provenance?.lake || ""),
+          selectAliases: cols,
+          selectColumns: cols,
+          loadedRowCount: projected.length,
+          refine: {
+            scope: "preview",
+            sourceSheetId: activeSheetId,
+            sourceSheetLabel: String(baseSheet?.name || activeSheetId),
+          },
+        };
         if (refineDestination === "new_sheet") {
           if (!addNewSheetAndActivate || !setSheetData) {
             toast.error("Sheet actions are unavailable.");
             return;
           }
-          const baseSheet = dataSheets[activeSheetId];
+          const defaultNm = `Refined · ${String(baseSheet?.name || activeSheetId)}`;
+          const nm = String(refineNewSheetName || "").trim() || defaultNm;
           addNewSheetAndActivate((newId) => {
             setSheetData(newId, projected);
             setDataSheets?.((prev) => {
@@ -693,8 +947,9 @@ const GridView = ({startNew}) => {
                 ...p,
                 [newId]: {
                   ...sh,
-                  name: `Refined · ${String(baseSheet?.name || activeSheetId)}`.slice(0, 80),
+                  name: nm.slice(0, 80),
                   provenance: baseSheet?.provenance ?? null,
+                  requestCards: [refineCard],
                 },
               };
             });
@@ -703,6 +958,16 @@ const GridView = ({startNew}) => {
         } else {
           replaceCurrentSheetData?.(projected);
           setConnectedData?.(projected);
+          setDataSheets?.((prev) => {
+            if (!activeSheetId) return prev;
+            const p = prev || {};
+            const sh = p[activeSheetId] || {};
+            const existing = Array.isArray(sh.requestCards) ? sh.requestCards : [];
+            return {
+              ...p,
+              [activeSheetId]: { ...sh, requestCards: [...existing, refineCard] },
+            };
+          });
           toast.success(`Updated sheet (${projected.length} rows).`);
         }
         setRefineQueryOpen(false);
@@ -754,6 +1019,8 @@ const GridView = ({startNew}) => {
       setRefineBusy(true);
       setRefineProgressLabel("Sending query to Athena…");
       setRefineProgress(8);
+      const refineAthenaStarted =
+        typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
       let tick = setInterval(() => {
         setRefineProgress((p) => Math.min(p + 2, 90));
       }, 450);
@@ -777,11 +1044,33 @@ const GridView = ({startNew}) => {
         const rawRows = Array.isArray(j.rows) ? j.rows : [];
         const colNames = Array.isArray(j.columns) ? j.columns : [];
         const outRows = athenaRowsToObjects(colNames, rawRows);
+        const refineAthenaElapsedMs = Math.max(
+          0,
+          (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - refineAthenaStarted,
+        );
+        const baseSheet = dataSheets[activeSheetId];
+        const refineCard = {
+          id: genRequestCardId(),
+          kind: "refine",
+          createdAt: Date.now(),
+          elapsedMs: refineAthenaElapsedMs,
+          table: String(baseSheet?.provenance?.table || ""),
+          lake: String(baseSheet?.provenance?.lake || ""),
+          selectAliases: cols,
+          selectColumns: cols,
+          loadedRowCount: outRows.length,
+          refine: {
+            scope: "athena",
+            sourceSheetId: activeSheetId,
+            sourceSheetLabel: String(baseSheet?.name || activeSheetId),
+          },
+        };
         if (refineDestination === "new_sheet") {
           if (!addNewSheetAndActivate || !setSheetData) {
             throw new Error("Sheet actions are unavailable.");
           }
-          const baseSheet = dataSheets[activeSheetId];
+          const defaultNm = `Refined · ${String(baseSheet?.name || activeSheetId)}`;
+          const nm = String(refineNewSheetName || "").trim() || defaultNm;
           addNewSheetAndActivate((newId) => {
             setSheetData(newId, outRows);
             setDataSheets?.((prev) => {
@@ -792,8 +1081,9 @@ const GridView = ({startNew}) => {
                 ...p,
                 [newId]: {
                   ...sh,
-                  name: `Refined · ${String(baseSheet?.name || activeSheetId)}`.slice(0, 80),
+                  name: nm.slice(0, 80),
                   provenance: baseSheet?.provenance ?? null,
+                  requestCards: [refineCard],
                 },
               };
             });
@@ -802,6 +1092,16 @@ const GridView = ({startNew}) => {
         } else {
           replaceCurrentSheetData?.(outRows);
           setConnectedData?.(outRows);
+          setDataSheets?.((prev) => {
+            if (!activeSheetId) return prev;
+            const p = prev || {};
+            const sh = p[activeSheetId] || {};
+            const existing = Array.isArray(sh.requestCards) ? sh.requestCards : [];
+            return {
+              ...p,
+              [activeSheetId]: { ...sh, requestCards: [...existing, refineCard] },
+            };
+          });
           toast.success(`Loaded ${outRows.length} rows from Athena (capped at ${ATHENA_SAMPLE_ROW_LIMIT}).`);
         }
         setRefineProgress(100);
@@ -818,6 +1118,7 @@ const GridView = ({startNew}) => {
     }, [
       addNewSheetAndActivate,
       refineDestination,
+      refineNewSheetName,
       refineSelectedCols,
       connectedData,
       refineScope,
@@ -1102,7 +1403,7 @@ const GridView = ({startNew}) => {
                     </div>
                 </div>
             </Alert>  
-            {connectedData && connectedData.length > 0 && (
+            {activeSheetId && (
             <Tabs defaultValue="table" className="w-full min-w-0">
               <div className="flex flex-wrap items-center gap-2 py-2 border-b">
                 <TabsList className="h-9">
@@ -1113,7 +1414,6 @@ const GridView = ({startNew}) => {
                   </TabsTrigger>
                 </TabsList>
                 <div className="h-4 w-px bg-border shrink-0" />
-                <Menu compact />
                 {/* Sheet Properties dropdown (keeps existing Add Column dialog code) */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1149,7 +1449,7 @@ const GridView = ({startNew}) => {
                         setSheetPropsDialogOpen(true);
                       }}
                     >
-                      Sheet Properties
+                      Column Properties
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1181,32 +1481,114 @@ const GridView = ({startNew}) => {
                 <Dialog open={sheetPropsDialogOpen} onOpenChange={setSheetPropsDialogOpen}>
                   <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
-                      <DialogTitle>Sheet Properties</DialogTitle>
+                      <DialogTitle>Column Properties</DialogTitle>
                       <DialogDescription>
-                        Column names and detected types for the current sheet.
+                        Manage column order, names, types, and deletes.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="max-h-[60vh] overflow-y-auto pr-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
-                        {sheetColumnsForProps.map((col) => {
-                          const t = dataTypes?.[col] || "text";
-                          return (
-                            <div key={col} className="rounded-md border bg-muted/20 px-3 py-2">
-                              <p className="font-mono text-xs font-medium truncate" title={col}>
-                                {col}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                type: {String(t)}
-                              </p>
+                      <DragDropContext onDragEnd={onDragEnd}>
+                        <Droppable droppableId="columns">
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.droppableProps}
+                              className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2"
+                            >
+                              {(connectedCols || []).length ? (
+                                (connectedCols || []).map((col, index) => {
+                                  const colName = String(getColField(col) || "");
+                                  const t = dataTypes?.[colName] || "text";
+                                  const isEditing = editingColIndex === index;
+
+                                  return (
+                                    <Draggable key={`${colName}::${index}`} draggableId={String(colName)} index={index}>
+                                      {(dragProvided) => (
+                                        <div
+                                          ref={dragProvided.innerRef}
+                                          {...dragProvided.draggableProps}
+                                          className="rounded-md border bg-muted/20 px-3 py-2"
+                                        >
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                              <GripVertical
+                                                className="text-slate-400 w-4 h-4 shrink-0"
+                                                {...dragProvided.dragHandleProps}
+                                              />
+                                              <div className="min-w-0">
+                                                {isEditing ? (
+                                                  <Input
+                                                    className="h-7 text-xs font-mono"
+                                                    value={editingColName}
+                                                    onChange={(e) => setEditingColName(e.target.value)}
+                                                    onKeyDown={(e) => e.key === "Enter" && handleSaveColumnName(index)}
+                                                  />
+                                                ) : (
+                                                  <p className="font-mono text-xs font-medium truncate" title={colName}>
+                                                    {colName}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                              {isEditing ? (
+                                                <div
+                                                  className="bg-lychee_green/30 p-2 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                                  onClick={() => handleSaveColumnName(index)}
+                                                >
+                                                  Save
+                                                </div>
+                                              ) : (
+                                                <div
+                                                  className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                                  onClick={() => {
+                                                    setEditingColIndex(index);
+                                                    setEditingColName(colName);
+                                                  }}
+                                                  title="Rename column"
+                                                >
+                                                  <Pencil className="w-3 h-3" />
+                                                </div>
+                                              )}
+                                              <div
+                                                className="bg-red-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                                onClick={() => handleDeleteColumn(index)}
+                                                title="Delete column"
+                                              >
+                                                <Trash className="w-3 h-3" />
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="mt-2 flex items-center justify-between gap-2">
+                                            <p className="text-[11px] text-muted-foreground shrink-0">type</p>
+                                            <select
+                                              value={t}
+                                              onChange={(e) => handleTypeChange(index, e.target.value)}
+                                              className="h-7 text-xs rounded-md border bg-background px-2"
+                                            >
+                                              <option value="text">Text</option>
+                                              <option value="number">Number</option>
+                                              <option value="boolean">Boolean</option>
+                                              <option value="date">Date</option>
+                                              <option value="dateString">DateString</option>
+                                              <option value="object">Object</option>
+                                            </select>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  );
+                                })
+                              ) : (
+                                <p className="text-xs text-muted-foreground col-span-2">No columns found.</p>
+                              )}
+                              {provided.placeholder}
                             </div>
-                          );
-                        })}
-                        {sheetColumnsForProps.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">
-                            No columns found.
-                          </p>
-                        ) : null}
-                      </div>
+                          )}
+                        </Droppable>
+                      </DragDropContext>
                     </div>
                     <DialogFooter className="gap-2 sm:gap-0">
                       <Button type="button" variant="outline" onClick={() => setSheetPropsDialogOpen(false)}>
@@ -1655,6 +2037,19 @@ const GridView = ({startNew}) => {
                             New sheet
                           </Button>
                         </div>
+                        {refineDestination === "new_sheet" ? (
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">New sheet name</Label>
+                            <Input
+                              className="h-8 text-xs"
+                              value={refineNewSheetName}
+                              onChange={(e) => setRefineNewSheetName(e.target.value)}
+                              placeholder="e.g. priced_trades_refined"
+                              spellCheck={false}
+                              disabled={refineBusy}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Run against</Label>

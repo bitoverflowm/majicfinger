@@ -338,6 +338,7 @@ function composeSourceColumnLabel(col) {
 /** @param {{ aggregate: null | string }} item */
 function composeRollUpSelectValue(item) {
   if (item.aggregate === "sum" && item.equation?.enabled) return "equation";
+  if (!item.aggregate && item.sumCase?.enabled) return "if_else_case";
   return item.aggregate || "none";
 }
 
@@ -732,6 +733,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     }
 
     if (sheetJoinMode === "sheet") {
+      const joinStartedMs = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
       // Browser join (preview rows only).
       const rightByKey = new Map();
       for (const r of rightRows) {
@@ -757,6 +759,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         if (out.length >= ATHENA_SAMPLE_ROW_LIMIT) break;
       }
 
+      const joinElapsedMs = (() => {
+        const t1 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+        return Math.max(0, t1 - joinStartedMs);
+      })();
+
       addNewSheetAndActivate?.((newId) => {
         setSheetData?.(newId, out);
         setDataSheets?.((prev) => {
@@ -767,7 +774,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             id: genRequestCardId(),
             kind: "join",
             createdAt: Date.now(),
-            elapsedMs: null,
+            elapsedMs: joinElapsedMs,
+            table: String(selected?.table || "").trim(),
+            lake: String(lake || "").trim(),
             loadedRowCount: out.length,
             join: {
               mode: "browser",
@@ -809,6 +818,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       return;
     }
 
+    const joinServerStartedMs = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
     try {
       setLoading(true);
       setLoadLabel("Joining in the data source…");
@@ -856,6 +866,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         ATHENA_SAMPLE_ROW_LIMIT,
       );
 
+      const joinServerElapsedMs = (() => {
+        const t1 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+        return Math.max(0, t1 - joinServerStartedMs);
+      })();
+
       const newProv = {
         kind: "compose",
         lake: leftProv.lake,
@@ -879,7 +894,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             id: genRequestCardId(),
             kind: "join",
             createdAt: Date.now(),
-            elapsedMs: null,
+            elapsedMs: joinServerElapsedMs,
+            table: String(leftProv.table || "").trim(),
+            lake: String(leftProv.lake || "").trim(),
             loadedRowCount: outRows.length,
             join: {
               mode: "server",
@@ -923,6 +940,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     addNewSheetAndActivate,
     setSheetData,
     setDataSheets,
+    selected?.table,
+    lake,
   ]);
 
   const addComposeJoinRule = useCallback(() => {
@@ -983,7 +1002,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         numberScale: i.numberScale || "none",
         decimals: i.decimals != null ? Number(i.decimals) : null,
         treatAsDate: i.treatAsDate === true,
-        ...(i.aggregate === "sum" && i.sumCase && i.sumCase.enabled ? { sumCase: i.sumCase } : {}),
+        ...((i.aggregate === "sum" || i.aggregate == null) && i.sumCase && i.sumCase.enabled ? { sumCase: i.sumCase } : {}),
         ...(i.aggregate === "sum" && i.equation && i.equation.enabled ? { equation: i.equation } : {}),
       })),
       // Server normalizes too: with Sum/Count, GROUP BY is every non-aggregate field (e.g. quarter) so many trades in Q1 2024 become one row.
@@ -1038,7 +1057,13 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         if (it.equation?.enabled) {
           return `“${title}” = SUM( custom expression )`;
         }
+        if (it.sumCase?.enabled) {
+          return `“${title}” = SUM( weighted CASE on ${it.column} )`;
+        }
         return `“${title}” = sum of ${it.column}`;
+      }
+      if (!it.aggregate && it.sumCase?.enabled) {
+        return `“${title}” = CASE column (IF/ELSE, no aggregate)`;
       }
       if (it.aggregate === "count") {
         return `“${title}” = count of ${it.column}`;
@@ -3022,6 +3047,27 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                         root: { type: "col", name: base || numericColumns[0] || "" },
                                       },
                                     });
+                                  } else if (v === "if_else_case") {
+                                    const firstStr =
+                                      availableColumns.find((c) => kindForColumn(c) === "string") || availableColumns[0] || "";
+                                    const n0 = numericColumns[0] || availableColumns[0] || "";
+                                    const n1 = numericColumns[1] || n0;
+                                    updateComposeItem(item.id, {
+                                      aggregate: null,
+                                      dateBucket: null,
+                                      dateFormat: null,
+                                      equation: { enabled: false },
+                                      sumCase: {
+                                        enabled: true,
+                                        branches: [
+                                          {
+                                            when: { column: firstStr, op: "eq", value: "" },
+                                            thenColumn: n0,
+                                          },
+                                        ],
+                                        elseColumn: n1,
+                                      },
+                                    });
                                   } else {
                                     updateComposeItem(item.id, {
                                       aggregate: v,
@@ -3039,6 +3085,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                 <SelectContent>
                                   <SelectItem value="none" className="text-xs">
                                     Show values (no total)
+                                  </SelectItem>
+                                  <SelectItem value="if_else_case" className="text-xs">
+                                    If / else (CASE column)
                                   </SelectItem>
                                   <SelectItem value="sum" className="text-xs" disabled={!isNumericCol}>
                                     Sum numbers
@@ -3075,46 +3124,53 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             </div>
                           </div>
 
-                          {item.aggregate === "sum" ? (
+                          {item.aggregate === "sum" || item.sumCase?.enabled ? (
                             <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Toggle
-                                  variant="outline"
-                                  size="sm"
-                                  pressed={!!item.sumCase?.enabled}
-                                  onPressedChange={(pressed) => {
-                                    const enabled = !!pressed;
-                                    const current = item.sumCase && typeof item.sumCase === "object" ? item.sumCase : null;
-                                    const hasBranch = Array.isArray(current?.branches) && current.branches.length > 0;
-                                    const defaultBranch = {
-                                      when: {
-                                        column: availableColumns[0] || "",
-                                        op: "eq",
-                                        value: "",
-                                      },
-                                      thenColumn: numericColumns[0] || "",
-                                    };
-                                    updateComposeItem(item.id, {
-                                      sumCase: enabled
-                                        ? {
-                                            enabled: true,
-                                            branches: hasBranch ? current.branches : [defaultBranch],
-                                            elseColumn: typeof current?.elseColumn === "string" ? current.elseColumn : "",
-                                          }
-                                        : { enabled: false, branches: [], elseColumn: "" },
-                                      equation: { enabled: false },
-                                    });
-                                  }}
-                                >
-                                  if else
-                                </Toggle>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Use <span className="font-medium">Equation</span> in Summarize for a full expression tree; use{" "}
-                                  <span className="font-medium">if else</span> for the simpler SUM×CASE shortcut.
+                              {item.aggregate === "sum" ? (
+                                <div className="flex items-center gap-2">
+                                  <Toggle
+                                    variant="outline"
+                                    size="sm"
+                                    pressed={!!item.sumCase?.enabled}
+                                    onPressedChange={(pressed) => {
+                                      const enabled = !!pressed;
+                                      const current = item.sumCase && typeof item.sumCase === "object" ? item.sumCase : null;
+                                      const hasBranch = Array.isArray(current?.branches) && current.branches.length > 0;
+                                      const defaultBranch = {
+                                        when: {
+                                          column: availableColumns[0] || "",
+                                          op: "eq",
+                                          value: "",
+                                        },
+                                        thenColumn: numericColumns[0] || "",
+                                      };
+                                      updateComposeItem(item.id, {
+                                        sumCase: enabled
+                                          ? {
+                                              enabled: true,
+                                              branches: hasBranch ? current.branches : [defaultBranch],
+                                              elseColumn: typeof current?.elseColumn === "string" ? current.elseColumn : "",
+                                            }
+                                          : { enabled: false, branches: [], elseColumn: "" },
+                                        equation: { enabled: false },
+                                      });
+                                    }}
+                                  >
+                                    if else
+                                  </Toggle>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    Use <span className="font-medium">Equation</span> in Summarize for a full expression tree; use{" "}
+                                    <span className="font-medium">if else</span> for the simpler SUM×CASE shortcut.
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-muted-foreground leading-snug">
+                                  <span className="font-medium text-foreground">CASE column</span> (no aggregate): one output row per
+                                  table row. Choose <span className="font-medium">Summarize → Show values</span> to clear IF/ELSE.
                                 </p>
-                              </div>
+                              )}
 
-                              {item.equation?.enabled ? (
+                              {item.aggregate === "sum" && item.equation?.enabled ? (
                                 <EquationExprBuilder
                                   baseColumn={String(item.column || "").trim()}
                                   equation={item.equation}
@@ -3327,7 +3383,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             </div>
                           ) : null}
 
-                          {isDateCol && !item.aggregate ? (
+                          {isDateCol && !item.aggregate && !item.sumCase?.enabled ? (
                             <div className="space-y-1 min-w-0">
                               <Label className="text-xs">Date / time shape</Label>
                               <Select
@@ -4463,19 +4519,35 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 const cols =
                   Array.isArray(card?.selectAliases) && card.selectAliases.length ? card.selectAliases : [];
 
-                const joinSummary =
-                  card?.kind === "join"
-                    ? (() => {
-                        const left = String(card?.join?.leftSheetLabel || "").trim();
-                        const right = String(card?.join?.rightSheetLabel || "").trim();
-                        const lc = String(card?.join?.leftColumn || "").trim();
-                        const rc = String(card?.join?.rightColumn || "").trim();
-                        const jt = String(card?.join?.joinType || "").trim();
-                        const mode = String(card?.join?.mode || "").trim();
-                        if (!left || !right || !lc || !rc) return "";
-                        return `join: ${jt || "left"} (${mode || "server"}) · ${left} ⟕ ${right} on ${lc} = ${rc}`;
-                      })()
-                    : "";
+                const secondLine = (() => {
+                  if (card?.kind === "join") {
+                    const left = String(card?.join?.leftSheetLabel || "").trim();
+                    const right = String(card?.join?.rightSheetLabel || "").trim();
+                    const lc = String(card?.join?.leftColumn || "").trim();
+                    const rc = String(card?.join?.rightColumn || "").trim();
+                    const jt = String(card?.join?.joinType || "").trim();
+                    const mode = String(card?.join?.mode || "").trim();
+                    const tb = tableLabel ? `table: ${tableLabel}` : "table: —";
+                    if (card?.join?.crossJoin) {
+                      const lr = left && right ? `${left} × ${right}` : "cross join";
+                      return `${tb} · Cross join: ${lr} (${mode || "browser"})`;
+                    }
+                    const jn =
+                      !left || !right || !lc || !rc
+                        ? "join: —"
+                        : `Join ${left} ⟕ ${right} on ${lc} = ${rc} (${jt || "left"}, ${mode || "server"})`;
+                    return `${tb} · ${jn}`;
+                  }
+                  if (card?.kind === "refine") {
+                    const tb = tableLabel ? `table: ${tableLabel}` : "table: —";
+                    const sc = String(card?.refine?.scope || "").trim();
+                    const cc = cols.length ? cols.join(", ") : "—";
+                    return `${tb} · refined (${sc || "—"}): ${cc}`;
+                  }
+                  return `${tableLabel ? `table: ${tableLabel}` : "table: —"} · ${
+                    cols.length ? `columns: ${cols.join(", ")}` : "columns: —"
+                  }`;
+                })();
 
                 return (
                   <button
@@ -4492,11 +4564,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       Sheet {sheetNum}: {sheetDisplayName}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {joinSummary
-                        ? joinSummary
-                        : `${tableLabel ? `table: ${tableLabel}` : "table: —"} · ${
-                            cols.length ? `columns: ${cols.join(", ")}` : "columns: —"
-                          }`}
+                      {secondLine}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       created in {elapsed}
@@ -4672,20 +4740,35 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               Sheet {sheetNum}: {sheetDisplayName}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
-                              {card?.kind === "join"
-                                ? (() => {
-                                    const left = String(card?.join?.leftSheetLabel || "").trim();
-                                    const right = String(card?.join?.rightSheetLabel || "").trim();
-                                    const lc = String(card?.join?.leftColumn || "").trim();
-                                    const rc = String(card?.join?.rightColumn || "").trim();
-                                    const jt = String(card?.join?.joinType || "").trim();
-                                    const mode = String(card?.join?.mode || "").trim();
-                                    if (!left || !right || !lc || !rc) return "join: —";
-                                    return `Join ${left} ⟕ ${right} on ${lc} = ${rc} (${jt || "left"}, ${mode || "server"})`;
-                                  })()
-                                : `${tableLabel ? `table: ${tableLabel}` : "table: —"} · ${
-                                    cols.length ? `columns: ${cols.join(", ")}` : "columns: —"
-                                  }`}
+                              {(() => {
+                                if (card?.kind === "join") {
+                                  const left = String(card?.join?.leftSheetLabel || "").trim();
+                                  const right = String(card?.join?.rightSheetLabel || "").trim();
+                                  const lc = String(card?.join?.leftColumn || "").trim();
+                                  const rc = String(card?.join?.rightColumn || "").trim();
+                                  const jt = String(card?.join?.joinType || "").trim();
+                                  const mode = String(card?.join?.mode || "").trim();
+                                  const tb = tableLabel ? `table: ${tableLabel}` : "table: —";
+                                  if (card?.join?.crossJoin) {
+                                    const lr = left && right ? `${left} × ${right}` : "cross join";
+                                    return `${tb} · Cross join: ${lr} (${mode || "browser"})`;
+                                  }
+                                  const jn =
+                                    !left || !right || !lc || !rc
+                                      ? "join: —"
+                                      : `Join ${left} ⟕ ${right} on ${lc} = ${rc} (${jt || "left"}, ${mode || "server"})`;
+                                  return `${tb} · ${jn}`;
+                                }
+                                if (card?.kind === "refine") {
+                                  const tb = tableLabel ? `table: ${tableLabel}` : "table: —";
+                                  const sc = String(card?.refine?.scope || "").trim();
+                                  const cc = cols.length ? cols.join(", ") : "—";
+                                  return `${tb} · refined (${sc || "—"}): ${cc}`;
+                                }
+                                return `${tableLabel ? `table: ${tableLabel}` : "table: —"} · ${
+                                  cols.length ? `columns: ${cols.join(", ")}` : "columns: —"
+                                }`;
+                              })()}
                             </p>
                             <p className="text-[11px] text-muted-foreground">created in {elapsed}</p>
                             {loadedN != null ? (

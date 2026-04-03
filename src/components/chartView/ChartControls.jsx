@@ -32,7 +32,10 @@ import {
 } from "@/components/ui/tooltip";
 
 import { useChartBuilder } from "@/components/chartView";
-import { masterPalette } from "@/components/chartView/panels/masterPalette";
+import {
+  getShadcnChartPaletteArray,
+  getShadcnChartBaseSwatch950,
+} from "@/components/chartView/panels/shadcnChartPalettes";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function ChartControls() {
@@ -117,9 +120,8 @@ export default function ChartControls() {
 
     selectedPalette,
     shufflePalette,
-    categories,
-    selectedCategory,
-    setSelectedCategory,
+    shadcnChartBases,
+    selectedShadBaseId,
     selectedPaletteHandler,
     handleToggleDark,
 
@@ -167,9 +169,10 @@ export default function ChartControls() {
   const [openSection, setOpenSection] = useState("chartType");
   const [lineAddValue, setLineAddValue] = useState("");
   const addableLineColumns = (xOptions || []).filter((c) => c !== selX && !(selY || []).includes(c));
-  const palettePreview = selectedPalette && selectedPalette.length
-    ? selectedPalette
-    : (selectedCategory && masterPalette?.[selectedCategory]?.[0]) || [];
+  const palettePreview =
+    selectedPalette && selectedPalette.length
+      ? selectedPalette
+      : getShadcnChartPaletteArray(selectedShadBaseId || "");
 
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
@@ -978,41 +981,108 @@ export default function ChartControls() {
                   <div key={`${color}-${idx}`} className="p-3" style={{ backgroundColor: color }} />
                 ))}
               </button>
-              <div className="p-1 cursor-pointer" onClick={() => shufflePalette()}>
-                <IoShuffleOutline className="h-4 w-4 text-slate-600" />
-              </div>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-md border border-border/60 hover:bg-muted/60 text-slate-600 dark:text-slate-300"
+                      aria-label="Rotate palette colors"
+                      onClick={() => shufflePalette()}
+                    >
+                      <IoShuffleOutline className="h-4 w-4" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs max-w-[220px]">
+                    Rotate the palette array: each shade moves to the next slot. Frame tints use the light end; lines and
+                    bars use the dark end of the ramp.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Toggle area-label="Toggle Expand" pressed={dark} onPressedChange={handleToggleDark}>
                 {dark ? <Lightbulb className="h-4 w-4 text-slate-800" /> : <Moon className="h-4 w-4 text-slate-800" />}
               </Toggle>
             </div>
             <div>
               {colorVisible && (
-                <div>
-                  <div className="cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40  text-xs pl-1 my-2" onClick={() => setColorVisible(false)}>
+                <div className="space-y-3">
+                  <div
+                    className="cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40 text-xs pl-1 my-2"
+                    onClick={() => setColorVisible(false)}
+                  >
                     close
                   </div>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {categories.map((category, index) => (
-                      <code
-                        className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono cursor-pointer text-xs hover:bg-lychee_green"
-                        key={index}
-                        onClick={() => setSelectedCategory(category)}
-                      >
-                        {category}
-                      </code>
-                    ))}
+                  <p className={`text-[11px] ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
+                    Shadcn-style palettes: each option is the full Tailwind shade ramp (50–950) for that base. See{" "}
+                    <a
+                      href="https://ui.shadcn.com/colors#colors"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline underline-offset-2"
+                    >
+                      Tailwind colors (shadcn)
+                    </a>
+                    .
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(shadcnChartBases || []).map((id) => {
+                      const active = selectedShadBaseId === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs capitalize transition-colors ${
+                            active
+                              ? "border-primary bg-primary/10 text-foreground"
+                              : "border-border bg-background hover:bg-muted/60"
+                          }`}
+                          onClick={() => selectedPaletteHandler(id)}
+                        >
+                          <span
+                            className="inline-block h-3 w-3 shrink-0 rounded-sm border border-border/60"
+                            style={{ backgroundColor: getShadcnChartBaseSwatch950(id) }}
+                            aria-hidden
+                          />
+                          {id}
+                        </button>
+                      );
+                    })}
                   </div>
-                  {selectedCategory && (
-                    <div className="flex flex-wrap place-items-center place-content-center gap-3">
-                      {masterPalette[selectedCategory].map((palette, index) => (
-                        <div key={index} className="flex cursor-pointer rounded-full hover:shadow-inner hover:bg-slate-100 p-1" onClick={() => selectedPaletteHandler(index)}>
-                          {palette.map((color, colorIndex) => (
-                            <div key={colorIndex} className="p-2 rounded-full" style={{ backgroundColor: color }} />
-                          ))}
-                        </div>
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className={`text-xs font-medium ${dark ? "text-slate-200" : "text-muted-foreground"}`}>
+                        Shades in this palette
+                      </p>
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background hover:bg-muted/60 text-slate-600 dark:text-slate-300"
+                              aria-label="Rotate palette colors"
+                              onClick={() => shufflePalette()}
+                            >
+                              <IoShuffleOutline className="h-4 w-4" aria-hidden />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="text-xs max-w-[220px]">
+                            Rotate palette: shift each shade forward. Outer frame uses the lightest stops; chart series
+                            stay mapped to the darker stops for contrast.
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/20 p-2">
+                      {(palettePreview || []).map((color, idx) => (
+                        <div
+                          key={`${color}-${idx}`}
+                          className="h-9 w-9 shrink-0 rounded-sm border border-border/40"
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
                       ))}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
