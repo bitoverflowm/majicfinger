@@ -12,6 +12,16 @@ import { ContentImage } from "./content-image";
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
   return {
+    table: ({ children, ...props }) => (
+      <div className="my-6 overflow-x-auto rounded-lg border border-border">
+        <table
+          {...props}
+          className="w-full border-collapse text-left text-sm"
+        >
+          {children}
+        </table>
+      </div>
+    ),
     img: ({ src, alt }) => {
       if (!src) return null;
       const isExternal = src.startsWith("http");

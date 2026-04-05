@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { IntegrationLayout } from "@/components/content/IntegrationLayout";
 import { MDXContent } from "@/lib/content/mdx";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
+import { extractMdxHeadingsForToc } from "@/lib/content/extract-mdx-headings";
 import {
   buildContentMetadata,
   buildArticleJsonLd,
@@ -35,6 +36,7 @@ export default async function IntegrationPage({
   if (!data) notFound();
 
   const { frontmatter, content } = data;
+  const tocItems = extractMdxHeadingsForToc(content);
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
   const articleJsonLd = buildArticleJsonLd(frontmatter, "integrations", slug);
@@ -68,7 +70,7 @@ export default async function IntegrationPage({
           __html: JSON.stringify(organizationJsonLd),
         }}
       />
-      <IntegrationLayout slug={slug} frontmatter={frontmatter}>
+      <IntegrationLayout slug={slug} frontmatter={frontmatter} tocItems={tocItems}>
         <MDXContent source={content} />
       </IntegrationLayout>
     </>

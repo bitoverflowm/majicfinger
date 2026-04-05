@@ -12,7 +12,9 @@ import {
   KnowledgeCard,
 } from "@/components/ui";
 import { getRelatedContent } from "@/lib/content/related";
+import type { TocItem } from "@/lib/content/extract-mdx-headings";
 import type { BaseContent, ContentType } from "@/lib/content/types";
+import { ContentTocNav } from "./ContentTocNav";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -25,12 +27,14 @@ function formatDate(dateStr: string) {
 interface IntegrationLayoutProps {
   slug: string;
   frontmatter: BaseContent;
+  tocItems?: TocItem[];
   children: React.ReactNode;
 }
 
 export function IntegrationLayout({
   slug,
   frontmatter,
+  tocItems = [],
   children,
 }: IntegrationLayoutProps) {
   const contentType: ContentType = "integrations";
@@ -44,6 +48,7 @@ export function IntegrationLayout({
 
   return (
     <Container>
+      <ContentTocNav items={tocItems} />
       <ContentWrapper>
         <Breadcrumb items={breadcrumbItems} />
         <Section>
@@ -72,7 +77,7 @@ export function IntegrationLayout({
         )}
 
         <Section>
-          <div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-8 prose-headings:font-semibold prose-headings:tracking-tight prose-a:no-underline prose-p:tracking-tight">
+          <div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-24 prose-headings:font-semibold prose-headings:tracking-tight prose-a:no-underline prose-p:tracking-tight">
             {children}
           </div>
         </Section>

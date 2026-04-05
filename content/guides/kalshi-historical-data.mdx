@@ -18,13 +18,15 @@ twitterCard: "summary_large_image"
 
 Kalshi is "the first CFTC regulated exchange dedicated to trading on the outcome of future events". In short, Kalshi is a prediction market where traders buy and sell contracts on anything from politics to weather.
 
-Whether you're a trader, quant, or researcher, accessing Kalshi historical data is essential for backtesting strategies, analyzing market behavior, and studying pricing inefficiencies.
+Whether you're a trader, quant, or researcher, accessing Kalshi historical data is essential for **backtesting strategies, analyzing market behavior, and studying pricing inefficiencies**.
 
-In a deeper sense, historical Kalshi data isn't just transactional trade data; it's a record of sentiment, every emotional shift as new information entered the market.
+In a deeper sense, historical Kalshi data isn't just transactional trade data; it's a record of sentiment, a ledge of every emotional shift and opinion change on any given event outcome.
 
-To make this easier, we provide 36GB of Kalshi historical trade data — every transaction since the first market — available instantly through Lychee, with no setup required.
+To make this easier, we collated every trade and every market since the first market was created on Kalshi. We provide **36GB of Kalshi historical trade data** — available instantly through Lychee, with no setup and **no coding required**.
 
-In this guide, you'll learn how to access Kalshi historical data, query it, and export it to CSV, Excel, or JSON — all without writing a single line of code.
+In this guide, you'll learn how to access Kalshi historical data, **query it, visualize it and export it to CSV, Excel, or JSON** all within a matter of seconds. 
+
+If you want to skip straight to how to start working with Lychee's Kalshi historical data set, [click here](#download-kalshi-historical-data-csv-excel-json).
 
 ---
 # Does Kalshi Provide Historical Data?
@@ -47,21 +49,61 @@ The challenge isn’t whether the data exists — it’s how much work is requir
 
 # Kalshi Historical Data API Limitations
 
-The Kalshi API provides access to markets, events, and trades, but there are several limitations when working with historical datasets:
+The Kalshi API provides access to markets, events, trades, fills and orders, but there are several limitations when working with historical datasets:
 
-- Pagination limits require multiple requests for full history  
-- Trades, markets, and order books live in separate endpoints  
-- No single endpoint for complete historical datasets  
-- Rate limits slow large data pulls  
-- Requires scripting to combine data  
+## Pagination limits 
 
-This means pulling a full dataset often involves:
+First you need to understand pagination. Kalshi uses cursor-based pagination. This means when you make a request, Kalshi API returns results in bite sized pieces to keep response size managable. 
+
+According to Kalshi API docs, the maximum number of items per page is <a href="https://docs.kalshi.com/getting_started/pagination" target="_blank" rel="noopener noreferrer">100</a>. Which means to get 700,000 rows of trade data, you need to make 7000 requests to get the full history 
+
+## Rate Limits
+
+Now even if you are able to setup your code to pull effectively with pagination, you need to be aware of rate limits.
+
+| Tier     | Read Requests   | Write Requests  |
+| :------: | :-------------: | :-------------: |
+| Basic    | 20 per second   | 10 per second   |
+| Advanced | 30 per second   | 30 per second   |
+| Premier  | 100 per second  | 100 per second  |
+| Prime    | 400 per second  | 400 per second  |
+
+There are also <a href="https://docs.kalshi.com/getting_started/rate_limits" target="_blank" rel="noopener noreferrer">specific criteria</a> to qualify for different Tiers, the pricing however is unclear.
+
+## No single endpoint
+
+Trades, markets, and order books live in separate endpoints. And therefore securing meaningful data using solely the API requires a robust system architecture to poll data consistently, oragnize, clean and execute the necessary joins to derive value.
+
+## Requires scripting to combine data
+
+Pulling a full dataset often involves:
 
 - Writing scripts  
-- Handling pagination  
+- Handling pagination
 - Joining datasets manually  
 - Cleaning inconsistent fields  
-- Exporting to usable formats  
+- Exporting to usable formats
+
+Here is Python script to handle pagination. 
+
+```python
+cursor = None
+all_markets = []
+
+while True:
+    url = f"{base_url}?series_ticker={series_ticker}&limit=100"
+    if cursor:
+        url += f"&cursor={cursor}"
+
+    data = requests.get(url).json()
+    all_markets.extend(data["markets"])
+
+    cursor = data.get("cursor")
+    if not cursor:
+        break
+```
+
+More complete example for pagination <a href="https://docs.kalshi.com/getting_started/pagination" target="_blank" rel="noopener noreferrer">here</a>
 
 For many users, this creates unnecessary friction — especially if the goal is simply to analyze or backtest.
 
@@ -69,7 +111,7 @@ For many users, this creates unnecessary friction — especially if the goal is 
 
 # Download Kalshi Historical Data (CSV, Excel, JSON)
 
-If your goal is to quickly download Kalshi historical data, exporting to common formats like CSV or Excel is usually the easiest path.
+If your goal is to quickly download Kalshi historical data, you can quickly query and export to common formats like CSV or Excel.
 
 You may want to export:
 
@@ -81,11 +123,51 @@ You may want to export:
 
 Typical workflow:
 
-Step 1  
-Step 2  
-Step 3  
+## 1. Connect to Kalshi Historical Data
 
-Once exported, you can use the data in:
+Navigate to the **Integrations** section and select **Connect** under the Kalshi Historical integration.
+
+![Create API connection screen](/images/guides/kalshi-historical-data/1.png)
+
+---
+## 2. Select data source
+
+In the integrations panel on the right select which data source you want to query.
+
+![Select your data source](/images/guides/kalshi-historical-data/2.png)
+
+---
+## 3. Query the data
+
+To get exactly what you want. Select the columnms that you are interested in. Then apply any filters you may be interested in. Anything you are used to in Python or SQL has been extrapolated into a nocode interface. Filter your data however you want. Here we are:
+
+- Selecting all Markets
+- Selecting ticker, market_type, title and volume
+- And filtering all markets where volume is greater than $100
+
+![Query your data by selecting columns and filters](/images/guides/kalshi-historical-data/3.png)
+
+---
+
+## 4. Run the request
+
+Click Run request to initiate the data pull. Your data will be loaded into the data sheet in a matter of seconds.
+
+![Run the request](/images/guides/kalshi-historical-data/4.png)
+![Loaded Data Sheet](/images/guides/kalshi-historical-data/5.png)
+
+---
+
+## 5. Export to CSV, JSON, XLSX (EXCEL)
+
+Click on exports in the right side panel, and select the file format you are interested in downloading. 
+
+![Export to your favorite file formats](/images/guides/kalshi-historical-data/6.png)
+
+---
+
+
+Once exported, you can use the data however you want in:
 
 - Excel  
 - Google Sheets  
@@ -114,13 +196,7 @@ This allows you to analyze:
 - Liquidity patterns  
 - Event category performance  
 
-Typical workflow:
-
-Step 1  
-Step 2  
-Step 3  
-
-Having a complete dataset removes the need to manually merge multiple sources and significantly speeds up analysis.
+Lychee gives you access to the entire 36GB worth of data within a few queries. Having a complete dataset removes the need to manually merge multiple sources and significantly speeds up analysis.
 
 ---
 

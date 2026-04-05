@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ConceptLayout } from "@/components/content/ConceptLayout";
 import { MDXContent } from "@/lib/content/mdx";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
+import { extractMdxHeadingsForToc } from "@/lib/content/extract-mdx-headings";
 import {
   buildContentMetadata,
   buildArticleJsonLd,
@@ -35,6 +36,7 @@ export default async function ConceptPage({
   if (!data) notFound();
 
   const { frontmatter, content } = data;
+  const tocItems = extractMdxHeadingsForToc(content);
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
   const articleJsonLd = buildArticleJsonLd(frontmatter, "concepts", slug);
@@ -68,7 +70,7 @@ export default async function ConceptPage({
           __html: JSON.stringify(organizationJsonLd),
         }}
       />
-      <ConceptLayout slug={slug} frontmatter={frontmatter}>
+      <ConceptLayout slug={slug} frontmatter={frontmatter} tocItems={tocItems}>
         <MDXContent source={content} />
       </ConceptLayout>
     </>

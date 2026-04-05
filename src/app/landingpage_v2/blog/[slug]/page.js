@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { ContentTocNav } from "@/components/content/ContentTocNav";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
+import { extractMdxHeadingsForToc } from "@/lib/content/extract-mdx-headings";
 import { MDXContent } from "@/lib/content/mdx";
 import {
   buildArticleJsonLd,
@@ -38,6 +40,7 @@ export default async function BlogPostPage({ params }) {
   }
 
   const { frontmatter, content } = data;
+  const tocItems = extractMdxHeadingsForToc(content);
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
   const publicPath = `/landingpage_v2/blog/${slug}`;
   const articleJsonLd = buildArticleJsonLd(frontmatter, "blog", slug, {
@@ -56,6 +59,7 @@ export default async function BlogPostPage({ params }) {
   return (
     <main className="min-h-screen bg-background">
       <Header />
+      <ContentTocNav items={tocItems} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -88,7 +92,7 @@ export default async function BlogPostPage({ params }) {
             new Date(frontmatter.publishedAt).toLocaleDateString("en-us")}{" "}
           • {frontmatter.author}
         </p>
-        <div className="prose prose-slate dark:prose-invert max-w-none">
+        <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:scroll-mt-24">
           <MDXContent source={content} />
         </div>
       </article>

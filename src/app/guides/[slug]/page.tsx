@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { GuideLayout } from "@/components/content/GuideLayout";
 import { MDXContent } from "@/lib/content/mdx";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
+import { extractMdxHeadingsForToc } from "@/lib/content/extract-mdx-headings";
 import {
   buildContentMetadata,
   buildArticleJsonLd,
@@ -45,6 +46,7 @@ export default async function GuidePage({
   if (!data) notFound();
 
   const { frontmatter, content } = data;
+  const tocItems = extractMdxHeadingsForToc(content);
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
   const publicPath = `/guides/${slug}`;
 
@@ -81,7 +83,12 @@ export default async function GuidePage({
           __html: JSON.stringify(organizationJsonLd),
         }}
       />
-      <GuideLayout slug={slug} frontmatter={frontmatter} contentType={contentType}>
+      <GuideLayout
+        slug={slug}
+        frontmatter={frontmatter}
+        contentType={contentType}
+        tocItems={tocItems}
+      >
         <MDXContent source={content} />
       </GuideLayout>
     </>

@@ -12,7 +12,9 @@ import {
   KnowledgeCard,
 } from "@/components/ui";
 import { getRelatedContent } from "@/lib/content/related";
+import type { TocItem } from "@/lib/content/extract-mdx-headings";
 import type { BaseContent, ContentType } from "@/lib/content/types";
+import { ContentTocNav } from "./ContentTocNav";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -26,10 +28,17 @@ interface GuideLayoutProps {
   slug: string;
   frontmatter: BaseContent;
   contentType?: ContentType;
+  tocItems?: TocItem[];
   children: React.ReactNode;
 }
 
-export function GuideLayout({ slug, frontmatter, contentType = "guides", children }: GuideLayoutProps) {
+export function GuideLayout({
+  slug,
+  frontmatter,
+  contentType = "guides",
+  tocItems = [],
+  children,
+}: GuideLayoutProps) {
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
 
   const breadcrumbItems = [
@@ -40,6 +49,7 @@ export function GuideLayout({ slug, frontmatter, contentType = "guides", childre
 
   return (
     <Container>
+      <ContentTocNav items={tocItems} />
       <ContentWrapper>
         <Breadcrumb items={breadcrumbItems} />
 
