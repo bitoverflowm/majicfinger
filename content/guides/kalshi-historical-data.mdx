@@ -1,7 +1,7 @@
 ---
 title: "How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)"
 description: "Learn how to access, query, and download Kalshi historical data instantly — no coding skills required. Perfect for backtesting prediction markets, visualizing trades, and exporting CSV, Excel, or JSON files."
-publishedAt: "2026-04-4"
+publishedAt: "2026-04-05"
 author: "misterrpink"
 topics: ["kalshi", "prediction markets", "market data", "no-code", "backtesting", "historical data"]
 integration: ["Kalshi"]
@@ -20,9 +20,9 @@ Kalshi is "the first CFTC regulated exchange dedicated to trading on the outcome
 
 Whether you're a trader, quant, or researcher, accessing Kalshi historical data is essential for **backtesting strategies, analyzing market behavior, and studying pricing inefficiencies**.
 
-In a deeper sense, historical Kalshi data isn't just transactional trade data; it's a record of sentiment, a ledge of every emotional shift and opinion change on any given event outcome.
+In a deeper sense, historical Kalshi data isn't just transactional trade data; it's a record of sentiment, a ledger of every emotional shift and opinion change on any given event outcome.
 
-To make this easier, we collated every trade and every market since the first market was created on Kalshi. We provide **36GB of Kalshi historical trade data** — available instantly through Lychee, with no setup and **no coding required**.
+To make this easier, we collated every trade and market since Kalshi launched — a **36GB historical dataset** available instantly through Lychee, with no setup and **no coding required**.
 
 In this guide, you'll learn how to access Kalshi historical data, **query it, visualize it and export it to CSV, Excel, or JSON** all within a matter of seconds. 
 
@@ -121,8 +121,6 @@ You may want to export:
 - Event outcomes  
 - Volume data  
 
-Typical workflow:
-
 ## 1. Connect to Kalshi Historical Data
 
 Navigate to the **Integrations** section and select **Connect** under the Kalshi Historical integration.
@@ -200,9 +198,9 @@ Lychee gives you access to the entire 36GB worth of data within a few queries. H
 
 ---
 
-# How to Query Kalshi Historical Market Data with SQL
+# How to Query Kalshi Historical Market Data with SQL and Python
 
-Once you have access to structured historical data, SQL becomes one of the most powerful ways to analyze it.
+Once you have access to structured historical data, Python and SQL becomes one of the most powerful ways to analyze it.
 
 You can run queries like:
 
@@ -219,13 +217,83 @@ Example analyses include:
 - Measuring spread changes over time  
 - Aggregating volume by day or week  
 
-Typical workflow:
+Lets say you want to see the historical volume distribution of Kalshi categories.
 
-Step 1  
-Step 2  
-Step 3  
+Using pure Python and SQL, your code might look something like this after downloading the dataset onto your local machine.
 
-SQL queries make it possible to test hypotheses quickly without writing complex scripts.
+This example loads Kalshi market data from parquet files, groups markets by category, and calculates total trading volume for each category. The SQL query aggregates volume across all markets and sorts the results to show which categories have the highest activity:
+
+```python
+import duckdb
+
+con = duckdb.connect()
+
+df = con.execute("""
+SELECT
+    category,
+    SUM(volume) AS total_volume
+FROM 'kalshi_markets/*.parquet'
+GROUP BY category
+ORDER BY total_volume DESC
+""").df()
+```
+
+To run this yourself, you would need to install DuckDB, download the Kalshi dataset, load the parquet files locally, and execute the SQL query. You can find the full code and setup instructions on <a href="https://github.com/misterrPink1/prediction-market-analysis/blob/main/src/analysis/kalshi/market_types.py" target="_blank" rel="noopener noreferrer">GitHub</a>.
+
+While this approach works, it involves installing dependencies, handling datasets, and writing queries just to answer a simple question.
+
+Lychee removes this overhead by letting you analyze Kalshi historical data instantly all in your browser — without writing code or managing files.
+
+Here’s how to do it. 
+
+## 1. Select your data source and recipes
+
+Navigate to the **Integrations** section and select **Connect** under the Kalshi Historical integration; select Markets as the data source and **Recipes** for prebuilt workflows.
+
+![Head to recipes in Kalshi Historical Markets data source](/images/guides/kalshi-historical-data/7.png)
+
+---
+## 2. Roll up into taxonomy
+
+We have provided helper tools such as "Roll up into taxonomy" selection. This parses 36 GB worth of Kalshi historical data and arranges the categories into usable buckets, that make sense for analysis.
+
+Select "Roll up..." option and **Run Request**
+
+![Roll up ](/images/guides/kalshi-historical-data/8.png)
+
+---
+
+## 3. Inspect and visualize the data
+
+It takes 4.5 seconds for Lychee to execute on this analysis over the entire Kalshi Market History since 2021.
+
+Your data set is loaded into sheet
+
+![View summary data ](/images/guides/kalshi-historical-data/9.png)
+
+Select Charts in the sidebar to visualize your analysis
+
+![Head to charts ](/images/guides/kalshi-historical-data/10.png)
+
+Select Tree map to gain deeper insight
+
+![Generate Tree map ](/images/guides/kalshi-historical-data/11.png)
+
+Format your chart design as you wish, and export as a png, svg or jpg.
+
+![Export your chart as png ](/images/guides/kalshi-historical-data/12.png)
+
+Your chart is ready to be shared
+
+![Your volume by category tree map](/images/guides/kalshi-historical-data/13.png)
+
+---
+
+Lychee makes it possible to test hypotheses quickly without writing complex scripts.
+
+We can draw interesting conclusions and gain in-depth understanding of what is going on in the markets.
+
+In this case, since the legal victory over the CFTC secured the right to list political contracts, and the 2024 election cycle triggered explosive growth. Sports markets, introduced in 2025, now dominate trading activity.
 
 ---
 
@@ -247,12 +315,6 @@ With this data you can:
 - Calculate volatility  
 - Track liquidity changes  
 - Analyze momentum strategies  
-
-Typical workflow:
-
-Step 1  
-Step 2  
-Step 3  
 
 This is the foundation for most backtesting and strategy development.
 
@@ -279,12 +341,6 @@ When available, this data can be used to:
 - Study liquidity gaps  
 - Model execution strategies  
 - Evaluate spread behavior  
-
-Typical workflow:
-
-Step 1  
-Step 2  
-Step 3  
 
 ---
 
@@ -326,10 +382,5 @@ Backtesting helps answer questions like:
 - Does liquidity predict outcomes?  
 - Are spreads wider at specific times?  
 
-Typical workflow:
-
-Step 1  
-Step 2  
-Step 3  
 
 With historical data and repeatable queries, you can test ideas quickly and refine strategies before deploying them.

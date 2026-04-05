@@ -196,7 +196,7 @@ export async function startAthenaBoundedQuery({
   };
 
   let whereSql = "";
-  if ((queryType === "count" || queryType === "sum" || queryType === "compose") && filters) {
+  if (filters) {
     const andPreds = Array.isArray(filters.and) ? filters.and : [];
     const orPreds = Array.isArray(filters.or) ? filters.or : [];
     const mergeAndPreds = Array.isArray(filters.mergeAnd) ? filters.mergeAnd : [];

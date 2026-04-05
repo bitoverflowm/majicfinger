@@ -55,6 +55,9 @@ export function databaseForLake(lake) {
  *   countDistinctColumn: string | null;
  *   sumColumn: string | null;
  *   sumAlias: string | null;
+ *   caseSensitive: boolean;
+ *   filters: { and: any[]; or: any[]; mergeAnd?: any[]; mergeOrBranch?: any[] } | null;
+ *   compose: object | null;
  *   physical: string;
  *   database: string
  * }}
@@ -87,10 +90,7 @@ export function validateAthenaLakeQueryBody(body) {
   /** @type {object | null} */
   let validatedCompose = null;
 
-  const filtersInput =
-    (queryType === "count" || queryType === "sum" || queryType === "compose") && body.filters && typeof body.filters === "object"
-      ? body.filters
-      : null;
+  const filtersInput = body.filters && typeof body.filters === "object" ? body.filters : null;
   let validatedFilters = null;
 
   if (lake !== "polymarket" && lake !== "kalshi") {
@@ -122,17 +122,16 @@ export function validateAthenaLakeQueryBody(body) {
         throw new AthenaLakeRequestError("Invalid sumAlias", { statusCode: 400, code: "BAD_REQUEST" });
       }
     }
+  }
 
-    /** @type {{ and: any[]; or: any[]; mergeAnd?: any[]; mergeOrBranch?: any[] } | null} */
-    const normalizedFilters =
-      filtersInput == null
-        ? null
-        : {
-            and: Array.isArray(filtersInput.and) ? filtersInput.and : [],
-            or: Array.isArray(filtersInput.or) ? filtersInput.or : [],
-            mergeAnd: Array.isArray(filtersInput.mergeAnd) ? filtersInput.mergeAnd : [],
-            mergeOrBranch: Array.isArray(filtersInput.mergeOrBranch) ? filtersInput.mergeOrBranch : [],
-          };
+  if (filtersInput != null) {
+    /** @type {{ and: any[]; or: any[]; mergeAnd?: any[]; mergeOrBranch?: any[] }} */
+    const normalizedFilters = {
+      and: Array.isArray(filtersInput.and) ? filtersInput.and : [],
+      or: Array.isArray(filtersInput.or) ? filtersInput.or : [],
+      mergeAnd: Array.isArray(filtersInput.mergeAnd) ? filtersInput.mergeAnd : [],
+      mergeOrBranch: Array.isArray(filtersInput.mergeOrBranch) ? filtersInput.mergeOrBranch : [],
+    };
 
     const safeIdent = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
     /**
@@ -239,25 +238,17 @@ export function validateAthenaLakeQueryBody(body) {
       return { column, kind, op, value };
     };
 
-    const normalizedValidatedFilters =
-      normalizedFilters == null
-        ? null
-        : (() => {
-            const mergeAnd = normalizedFilters.mergeAnd.map(normalizePredicate);
-            const mergeOrBranch = normalizedFilters.mergeOrBranch.map(normalizePredicate);
-            const base = {
-              and: normalizedFilters.and.map(normalizePredicate),
-              or: normalizedFilters.or.map(normalizePredicate),
-            };
-            return {
-              ...base,
-              ...(mergeAnd.length ? { mergeAnd } : {}),
-              ...(mergeOrBranch.length ? { mergeOrBranch } : {}),
-            };
-          })();
-
-    // Store on closure so return statement can include it.
-    validatedFilters = normalizedValidatedFilters;
+    const mergeAnd = normalizedFilters.mergeAnd.map(normalizePredicate);
+    const mergeOrBranch = normalizedFilters.mergeOrBranch.map(normalizePredicate);
+    const base = {
+      and: normalizedFilters.and.map(normalizePredicate),
+      or: normalizedFilters.or.map(normalizePredicate),
+    };
+    validatedFilters = {
+      ...base,
+      ...(mergeAnd.length ? { mergeAnd } : {}),
+      ...(mergeOrBranch.length ? { mergeOrBranch } : {}),
+    };
   }
 
   const physical = resolveAthenaTableName(lake, table);
@@ -801,7 +792,7 @@ export function validateAthenaLakeQueryBody(body) {
     sumColumn: queryType === "sum" ? sumColumn : null,
     sumAlias: queryType === "sum" ? sumAlias : null,
     caseSensitive,
-    filters: queryType === "count" || queryType === "sum" || queryType === "compose" ? validatedFilters : null,
+    filters: validatedFilters,
     physical,
     database,
     compose: validatedCompose,
