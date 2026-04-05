@@ -16,7 +16,21 @@ type SearchIndexItem = {
   tags: string[];
 };
 
-const CONTENT_TYPES = ["guides", "integrations", "concepts", "playbooks"] as const;
+const CONTENT_TYPES = [
+  "guides",
+  "blog",
+  "integrations",
+  "concepts",
+  "playbooks",
+] as const;
+
+function hrefForSearchItem(item: SearchIndexItem): string {
+  // Blog MDX is rendered under /guides/[slug] (same route as guides); /blog/[slug] has no app route.
+  if (item.contentType === "blog") {
+    return `/guides/${item.slug}`;
+  }
+  return `/${item.contentType}/${item.slug}`;
+}
 
 export default function SearchPage() {
   const [searchIndex, setSearchIndex] = useState<SearchIndexItem[]>([]);
@@ -92,7 +106,7 @@ export default function SearchPage() {
         <Section>
           <H1>Search</H1>
           <P className="text-muted-foreground">
-            Search across guides, integrations, concepts, and playbooks.
+            Search across guides, blog posts, integrations, concepts, and playbooks.
           </P>
         </Section>
 
@@ -179,7 +193,7 @@ export default function SearchPage() {
               {results.map((item) => (
                 <Link
                   key={`${item.contentType}-${item.slug}`}
-                  href={`/${item.contentType}/${item.slug}`}
+                  href={hrefForSearchItem(item)}
                   className="block"
                 >
                   <KnowledgeCard>

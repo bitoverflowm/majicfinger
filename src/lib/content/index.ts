@@ -8,12 +8,52 @@ const CONTENT_TYPES: ContentType[] = ["guides", "integrations", "concepts", "pla
 
 function normalizeFrontmatter(data: Record<string, unknown>): BaseContent {
   const d = data as Record<string, unknown>;
+  const canonicalRaw = d.canonical ?? d.canonicalUrl;
+  const canonicalUrl =
+    typeof canonicalRaw === "string" && canonicalRaw.trim()
+      ? canonicalRaw.trim()
+      : undefined;
+
+  const slugRaw = d.slug;
+  const slug =
+    typeof slugRaw === "string" && slugRaw.trim()
+      ? slugRaw.replace(/^\/+|\/+$/g, "").trim() || undefined
+      : undefined;
+
+  const twitterCardRaw = d.twitterCard;
+  const validTwitterCards = new Set([
+    "summary",
+    "summary_large_image",
+    "player",
+    "app",
+  ]);
+  const twitterCard =
+    typeof twitterCardRaw === "string" && validTwitterCards.has(twitterCardRaw)
+      ? (twitterCardRaw as BaseContent["twitterCard"])
+      : undefined;
+
+  const {
+    canonical: _canonical,
+    canonicalUrl: _canonicalUrlField,
+    slug: _slugField,
+    twitterCard: _twitterCardField,
+    date,
+    publishedAt: pub,
+    integration,
+    topics,
+    tags,
+    ...rest
+  } = d;
+
   return {
-    ...d,
-    publishedAt: (d.publishedAt as string) || (d.date as string) || "",
-    integration: (d.integration as string[]) || [],
-    topics: (d.topics as string[]) || (d.tags as string[]) || [],
-    tags: (d.tags as string[]) || [],
+    ...rest,
+    publishedAt: (pub as string) || (date as string) || "",
+    integration: (integration as string[]) || [],
+    topics: (topics as string[]) || ((tags as string[]) || []),
+    tags: (tags as string[]) || [],
+    ...(canonicalUrl && { canonicalUrl }),
+    ...(slug && { slug }),
+    ...(twitterCard && { twitterCard }),
   } as BaseContent;
 }
 

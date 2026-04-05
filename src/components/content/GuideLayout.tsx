@@ -50,6 +50,9 @@ export function GuideLayout({ slug, frontmatter, contentType = "guides", childre
           )}
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <Muted>{formatDate(frontmatter.publishedAt)}</Muted>
+            {frontmatter.readingTime?.trim() && (
+              <Muted>{frontmatter.readingTime.trim()} read</Muted>
+            )}
             <Muted>By {frontmatter.author}</Muted>
           </div>
         </Section>

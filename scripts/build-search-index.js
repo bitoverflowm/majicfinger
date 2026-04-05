@@ -2,7 +2,13 @@ const fs = require("fs");
 const path = require("path");
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
-const CONTENT_TYPES = ["guides", "integrations", "concepts", "playbooks"];
+const CONTENT_TYPES = [
+  "guides",
+  "blog",
+  "integrations",
+  "concepts",
+  "playbooks",
+];
 
 function getAllContent() {
   const items = [];

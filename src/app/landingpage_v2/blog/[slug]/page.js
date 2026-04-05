@@ -25,7 +25,8 @@ export async function generateMetadata({ params }) {
   const { slug } = await params;
   const data = getContentBySlug("blog", slug);
   if (!data) return { title: "Post Not Found" };
-  return buildContentMetadata(data.frontmatter, "blog", slug);
+  const publicPath = `/landingpage_v2/blog/${slug}`;
+  return buildContentMetadata(data.frontmatter, "blog", slug, { publicPath });
 }
 
 export default async function BlogPostPage({ params }) {
@@ -38,7 +39,10 @@ export default async function BlogPostPage({ params }) {
 
   const { frontmatter, content } = data;
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
-  const articleJsonLd = buildArticleJsonLd(frontmatter, "blog", slug);
+  const publicPath = `/landingpage_v2/blog/${slug}`;
+  const articleJsonLd = buildArticleJsonLd(frontmatter, "blog", slug, {
+    publicPath,
+  });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(
     [
       { label: "Home", href: "/" },

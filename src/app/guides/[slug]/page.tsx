@@ -24,7 +24,10 @@ export async function generateMetadata({
   let data = getContentBySlug("guides", slug);
   if (!data) data = getContentBySlug("blog", slug);
   if (!data) return {};
-  return buildContentMetadata(data.frontmatter, "guides", slug);
+  const publicPath = `/guides/${slug}`;
+  return buildContentMetadata(data.frontmatter, "guides", slug, {
+    publicPath,
+  });
 }
 
 export default async function GuidePage({
@@ -43,8 +46,11 @@ export default async function GuidePage({
 
   const { frontmatter, content } = data;
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
+  const publicPath = `/guides/${slug}`;
 
-  const articleJsonLd = buildArticleJsonLd(frontmatter, contentType, slug);
+  const articleJsonLd = buildArticleJsonLd(frontmatter, contentType, slug, {
+    publicPath,
+  });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(
     [
       { label: "Home", href: "/" },
