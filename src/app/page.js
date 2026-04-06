@@ -1,8 +1,6 @@
 import Script from 'next/script'
 import { GoogleAnalytics } from '@next/third-parties/google'
 
-import 'tailwindcss/tailwind.css';
-
 import { StateProvider } from '@/context/stateContext'
 
 import LandingPageV2 from '@/app/landingpage_v2/page'

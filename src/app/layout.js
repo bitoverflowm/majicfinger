@@ -1,52 +1,69 @@
-// import Nav from '@/components/nav';
 import './globals.css'
-import { Toaster } from "@/components/ui/toaster"
 
-// import { StateProvider } from '@/context/stateContext'
+import { GeistMono } from 'geist/font/mono'
+import { GeistSans } from 'geist/font/sans'
+import { siteConfig } from '@/lib/site'
+import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/toaster'
+
+const defaultTitle = `${siteConfig.name}: Your Quant in a Box`
+const defaultDescription =
+  'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.'
 
 export const metadata = {
-  title: 'Lychee: Your Quant in a Box',
-  description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: defaultTitle,
+    template: `%s - ${siteConfig.name}`,
+  },
+  description: defaultDescription,
   verification: {
     other: { _foundr: ['973f2a49e12fad2ad799756c823a6d3b'] },
   },
   openGraph: {
-    url: 'https://lycheedata.com',
+    url: siteConfig.url,
     type: 'website',
-    title: 'Lychee: Your Quant in a Box',
-    description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
-    siteName: 'Lychee',
+    title: defaultTitle,
+    description: defaultDescription,
+    siteName: siteConfig.name,
     images: [
       {
         url: 'https://lycheedata.com/ogImage2.png',
         width: 1200,
         height: 630,
-        alt: 'Lychee OG Image'
-      }
-    ]
+        alt: 'Lychee OG Image',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     domain: 'lycheedata.com',
-    url: 'https://lycheedata.com',
-    title: 'Lychee: Your Quant in a Box',
-    description: 'No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.',
-    image: 'https://lycheedata.com/ogImage2.png'
-  }
-};
+    url: siteConfig.url,
+    title: defaultTitle,
+    description: defaultDescription,
+    image: 'https://lycheedata.com/ogImage2.png',
+  },
+}
+
+export const viewport = {
+  themeColor: 'black',
+}
 
 export default function RootLayout({ children }) {
+  const fontVariables = `${GeistSans.variable} ${GeistMono.variable}`
+
   return (
-    <html lang="en">
-      {/*
-        <head /> will contain the components returned by the nearest parent
-        head.js. Find out more at https://beta.nextjs.org/docs/api-reference/file-conventions/head
-      */}
-      <body>
-        <div className=''>
+    <html lang="en" suppressHydrationWarning className={fontVariables}>
+      <body className="antialiased font-sans bg-background">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           {children}
-        </div>
-        <Toaster />
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )

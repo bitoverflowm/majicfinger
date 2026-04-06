@@ -65,6 +65,7 @@
     "debug": "^4.3.4",
     "embla-carousel-react": "^8.6.0",
     "fuse.js": "^7.1.0",
+    "geist": "^1.7.0",
     "github-slugger": "^2.0.0",
     "gray-matter": "^4.0.3",
     "html-react-parser": "^5.1.0",

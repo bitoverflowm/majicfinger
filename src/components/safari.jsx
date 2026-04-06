@@ -36,7 +36,7 @@ export default function Safari({ src, url = "https://lychee.com", width = 1203, 
           fill="#F5F5F5"
         />
         <g className="mix-blend-luminosity">
-          <text x="580" y="30" fill="#A3A3A3" fontSize="12" fontFamily="Arial, sans-serif">
+          <text x="580" y="30" fill="#A3A3A3" fontSize="12" fontFamily="var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif">
             {url}
           </text>
         </g>

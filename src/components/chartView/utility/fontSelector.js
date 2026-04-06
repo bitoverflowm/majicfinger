@@ -7,21 +7,15 @@ import {
 } from "@/components/ui/select";
 
 const options = [
-  { fontFamily: 'times, Times New Roman, times-roman, georgia, serif', label: 'Times New Roman' },
-  { fontFamily: 'Roboto, sans-serif', label: 'Roboto' },
-  { fontFamily: 'Open Sans, sans-serif', label: 'Open Sans' },
-  { fontFamily: 'SpaceGrotesk-Light', label: 'SpaceGrotesk-Light' },
-  { fontFamily: 'SpaceGrotesk-Medium', label: 'SpaceGrotesk-Medium' },
-  { fontFamily: 'oswald', label: 'oswald' },
-  { fontFamily: 'Inter', label: 'Inter' },
-  { fontFamily: 'Montserrat', label: 'Montserrat'}
-  // Add more options as needed
+  { fontFamily: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif', label: 'Geist Sans' },
+  { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace', label: 'Geist Mono' },
 ];
 
-const FontSelector = ({ font, setFont }) => {
+const FontSelector = ({ font, titleFont, setFont }) => {
+  const value = font ?? titleFont;
   return (
-      <Select value={font} onValueChange={(value) => setFont(value)}>
-        <SelectTrigger className="w-3/4 text-xs p-2 border rounded" style={{ fontFamily: font }}>
+      <Select value={value} onValueChange={(next) => setFont(next)}>
+        <SelectTrigger className="w-3/4 text-xs p-2 border rounded" style={{ fontFamily: value }}>
           <SelectValue placeholder="Select Font" />
         </SelectTrigger>
         <SelectContent>

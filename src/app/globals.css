@@ -36,9 +36,10 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-    --font-sans: "Rubik", sans-serif;
-    --font-heading: "Rubik", sans-serif;
-    --font-mono: ui-monospace, monospace;
+    /* Geist variables are set on <html> via geist/font; fallbacks keep font-family valid if vars are late */
+    --font-sans: var(--font-geist-sans, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
+    --font-heading: var(--font-geist-sans, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-geist-mono, ui-monospace), ui-monospace, monospace;
     --radius: 0.75rem;
     --shadow-2xs: 0 1px 0 0 oklch(0.55 0.033 17.6 / 0.05);
     --shadow-xs: 0 1px 2px 0 oklch(0.55 0.033 17.6 / 0.05);
@@ -147,23 +148,6 @@ body {
 .transition-all {
   transition: all 0.3s ease-in-out;
 }
-
-@font-face {
-  font-family: 'SpaceGrotesk-Light';
-  src: url('/fonts/SpaceGrotesk-Light.ttf') format('truetype');
-  font-weight: 300;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'SpaceGrotesk-Medium';
-  src: url('/fonts/SpaceGrotesk-Medium.ttf') format('truetype');
-  font-weight: 500;
-  font-style: normal;
-}
-
-@import url('https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Roboto:wght@400;700&family=Oswald:wght@400;700&family=Space+Grotesk:wght@300;500&display=swap');
-@import url('https://rsms.me/inter/inter.css');
 
 ::view-transition-old(root), ::view-transition-new(root) {
   animation: none;
