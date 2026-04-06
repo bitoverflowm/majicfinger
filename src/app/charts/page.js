@@ -7,9 +7,6 @@ import EasyCharts from './easyCharts';
 export const metadata = {
   title: 'Lychee: Your Quant in a Box',
   description: 'Stop juggling CSVs, Python scripts, and messy charts. Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser. Zero coding. Zero friction. Real results.',
-  verification: {
-    other: { _foundr: ['973f2a49e12fad2ad799756c823a6d3b'] },
-  },
   openGraph: {
     url: 'https://lycheedata.com',
     type: 'website',

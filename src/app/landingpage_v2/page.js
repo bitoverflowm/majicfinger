@@ -14,12 +14,6 @@ import CTA from "@/components/landingPageV2/CTA";
 import Footer from "@/components/landingPageV2/Footer";
 import { getAllContent } from "@/lib/content";
 
-export const metadata = {
-  title: "Lychee: Your Quant in a Box",
-  description:
-    "No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.",
-};
-
 export default function LandingPageV2() {
   let articles = [];
   try {
