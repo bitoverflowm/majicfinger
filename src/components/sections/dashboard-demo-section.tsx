@@ -15,10 +15,11 @@ export function DashboardDemoSection() {
           <StateProviderV2
             initialSettings={{
               demo: true,
-              viewing: "charts",
+              // Match first-time dashboard: data workspace + integrations panel, no API pre-selected.
+              viewing: "dataStart",
               rightPanelOpen: true,
               rightPanelTab: "integrations",
-              integrationSidebar: "polymarket",
+              integrationSidebar: null,
             }}
           >
             <LiveStreamManager />

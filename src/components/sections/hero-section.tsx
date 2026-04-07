@@ -1,5 +1,6 @@
 import { siteConfig } from "@/lib/config";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { DashboardDemoSection } from "./dashboard-demo-section";
 
 export function HeroSection() {
@@ -14,6 +15,9 @@ export function HeroSection() {
       hero.badgeIcon
     );
 
+  const badgeClassName =
+    "border border-border bg-accent rounded-full text-sm h-8 px-3 inline-flex items-center gap-2 max-w-full text-center";
+
   return (
     <section id="hero" className="w-full relative">
       <div className="relative isolate flex flex-col items-center w-full px-6">
@@ -21,10 +25,23 @@ export function HeroSection() {
           <div className="hero-aura-gradient absolute inset-0 z-0 h-[600px] md:h-[800px] w-full rounded-b-xl" />
         </div>
         <div className="relative z-10 pt-32 max-w-3xl mx-auto h-full w-full flex flex-col gap-10 items-center justify-center">
-          <p className="border border-border bg-accent rounded-full text-sm h-8 px-3 flex items-center gap-2">
-            {badgeIcon}
-            {hero.badge}
-          </p>
+          {hero.badgeHref ? (
+            <Link
+              href={hero.badgeHref}
+              className={cn(
+                badgeClassName,
+                "text-foreground transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              )}
+            >
+              {badgeIcon}
+              <span className="leading-tight">{hero.badge}</span>
+            </Link>
+          ) : (
+            <p className={cn(badgeClassName, "text-foreground")}>
+              {badgeIcon}
+              {hero.badge}
+            </p>
+          )}
           <div className="flex flex-col items-center justify-center gap-5">
             <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium tracking-tighter text-balance text-center text-primary">
               {hero.title}

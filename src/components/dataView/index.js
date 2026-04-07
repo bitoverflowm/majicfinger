@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { HardDriveUpload, FilePlus2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,7 +12,6 @@ import { VscCircleFilled } from "react-icons/vsc";
 import { API_INTEGRATIONS, integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
-
 const DataView = ({ user }) => {
   const contextStateV2 = useMyStateV2();
   const isDemo = contextStateV2?.isDemo;
@@ -140,7 +139,6 @@ const DataView = ({ user }) => {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 py-6">
-            {/* Top row: 2 cells (1 col each), then 2 empty columns */}
             <Card
               className="flex flex-col h-full cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md"
               onClick={() => setViewing("upload")}
@@ -169,15 +167,6 @@ const DataView = ({ user }) => {
               </CardContent>
             </Card>
 
-            {/* Empty cells so integrations start on row 2 */}
-            <div className="hidden lg:block" aria-hidden />
-            <div className="hidden lg:block" aria-hidden />
-            {/* Section label - vertically centered in grid cell */}
-            <div className="flex items-center text-xl font-bold text-left min-h-[3rem]">
-              Connect directly to an external data source
-            </div>
-
-            {/* Integration cards - same UI as integrationsView, 4-column grid */}
             {integrations_list.map((integration, index) => (
               <Card key={index} className="flex flex-col h-full">
                 <CardHeader
