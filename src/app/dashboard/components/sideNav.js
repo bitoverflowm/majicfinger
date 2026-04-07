@@ -51,6 +51,7 @@ const SideNav = () => {
   const contextStateV2 = useMyStateV2();
   const viewing = contextStateV2?.viewing;
   const setViewing = contextStateV2?.setViewing;
+  const isDemo = contextStateV2?.isDemo;
   const { state: sidebarState, toggleSidebar } = useSidebar();
 
   const viewHandler = (key) => {
@@ -169,80 +170,84 @@ const SideNav = () => {
         </SidebarGroup>
 
         {/* Dashboard */}
-        <SidebarGroup className="py-0.5">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={isDashboardActive}
-                  onClick={() => viewHandler("dashboard")}
-                  tooltip="Dashboard"
-                >
-                  <LayoutDashboard className="h-5 w-5" />
-                  <span>Dashboard</span>
-                </SidebarMenuButton>
-                <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      isActive={viewing === "presentation"}
-                      onClick={() => viewHandler("presentation")}
-                    >
-                      <Camera className="h-4 w-4" />
-                      <span>Presentation</span>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                </SidebarMenuSub>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {!isDemo && (
+          <SidebarGroup className="py-0.5">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={isDashboardActive}
+                    onClick={() => viewHandler("dashboard")}
+                    tooltip="Dashboard"
+                  >
+                    <LayoutDashboard className="h-5 w-5" />
+                    <span>Dashboard</span>
+                  </SidebarMenuButton>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        isActive={viewing === "presentation"}
+                        onClick={() => viewHandler("presentation")}
+                      >
+                        <Camera className="h-4 w-4" />
+                        <span>Presentation</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Under construction */}
-        <SidebarGroup className="py-0.5">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={isUnderConstructionActive}
-                  tooltip="Under construction"
-                  className="pointer-events-none opacity-70"
-                >
-                  <Construction className="h-5 w-5" />
-                  <span>Under construction</span>
-                </SidebarMenuButton>
-                <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      isActive={viewing === "scrape"}
-                      onClick={() => viewHandler("scrape")}
-                    >
-                      <Shovel className="h-4 w-4" />
-                      <span>Scrape</span>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      isActive={viewing === "generate"}
-                      onClick={() => viewHandler("generate")}
-                    >
-                      <BadgePlus className="h-4 w-4" />
-                      <span>Generate Data</span>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      isActive={viewing === "ai"}
-                      onClick={() => viewHandler("ai")}
-                    >
-                      <Bot className="h-4 w-4" />
-                      <span>AI</span>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                </SidebarMenuSub>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {!isDemo && (
+          <SidebarGroup className="py-0.5">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={isUnderConstructionActive}
+                    tooltip="Under construction"
+                    className="pointer-events-none opacity-70"
+                  >
+                    <Construction className="h-5 w-5" />
+                    <span>Under construction</span>
+                  </SidebarMenuButton>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        isActive={viewing === "scrape"}
+                        onClick={() => viewHandler("scrape")}
+                      >
+                        <Shovel className="h-4 w-4" />
+                        <span>Scrape</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        isActive={viewing === "generate"}
+                        onClick={() => viewHandler("generate")}
+                      >
+                        <BadgePlus className="h-4 w-4" />
+                        <span>Generate Data</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        isActive={viewing === "ai"}
+                        onClick={() => viewHandler("ai")}
+                      >
+                        <Bot className="h-4 w-4" />
+                        <span>AI</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

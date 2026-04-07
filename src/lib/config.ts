@@ -20,8 +20,8 @@ export const siteConfig = {
     ],
   },
   hero: {
-    badgeIcon: "✨",
-    badge: "Your quant in a box",
+    badgeIcon: "dot",
+    badge: "36GB of every Kalshi & Polymarket trade ever",
     title: "Analyze real-time prediction market data in <0.69 seconds— no coding, no setup",
     description:
       "500+ endpoints including Polymarket, Kalshi, Chainlink, and Twitter – all in one visual tool, built for traders, analysts, and data enthusiasts.",

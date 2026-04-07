@@ -16,10 +16,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [userHandle, setUserHandle] = useState()
     const [isLifeTimeMember, setIsLifeTimeMember] = useState()
     const [settings, setSettings] = useState(initialSettings)
-    const [viewing, setViewing] = useState('dataStart')
-    const [integrationSidebar, setIntegrationSidebar] = useState(null) // 'polymarket' | 'polymarketHistorical' | 'kalshiHistorical' | 'coinGecko' | etc.
-    const [rightPanelOpen, setRightPanelOpen] = useState(false) // unified right-side panel (integrations/charts)
-    const [rightPanelTab, setRightPanelTab] = useState('integrations') // 'integrations' | 'charts'
+    const [isDemo, setIsDemo] = useState(!!initialSettings?.demo)
+    const [viewing, setViewing] = useState(initialSettings?.viewing || 'dataStart')
+    const [integrationSidebar, setIntegrationSidebar] = useState(initialSettings?.integrationSidebar ?? null) // 'polymarket' | 'polymarketHistorical' | 'kalshiHistorical' | 'coinGecko' | etc.
+    const [rightPanelOpen, setRightPanelOpen] = useState(!!initialSettings?.rightPanelOpen) // unified right-side panel (integrations/charts)
+    const [rightPanelTab, setRightPanelTab] = useState(initialSettings?.rightPanelTab || 'integrations') // 'integrations' | 'charts' | 'export'
 
     
     /* Dashboard and bento state */
@@ -407,7 +408,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
 
     return (
-        <StateContextV2.Provider value={{providerValue, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, rightPanelOpen, setRightPanelOpen, rightPanelTab, setRightPanelTab, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, userHandle, setUserHandle, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions, dataSheets, setDataSheets, activeSheetId, setActiveSheetId, addNewSheetAndActivate, replaceCurrentSheetData, setSheetData}}>
+        <StateContextV2.Provider value={{providerValue, isDemo, setIsDemo, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, rightPanelOpen, setRightPanelOpen, rightPanelTab, setRightPanelTab, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, userHandle, setUserHandle, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions, dataSheets, setDataSheets, activeSheetId, setActiveSheetId, addNewSheetAndActivate, replaceCurrentSheetData, setSheetData}}>
             {children}
         </StateContextV2.Provider>
     )

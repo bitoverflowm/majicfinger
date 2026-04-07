@@ -57,6 +57,7 @@ const PANEL_CLOSE_MS = 300;
 
 export default function DataSheetWithIntegration({ user, startNew, setStartNew, chartMode }) {
   const contextStateV2 = useMyStateV2();
+  const isDemo = !!contextStateV2?.isDemo;
   const viewing = contextStateV2?.viewing;
   const setViewing = contextStateV2?.setViewing;
   const integrationSidebar = contextStateV2?.integrationSidebar;
@@ -122,6 +123,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   // If there is no data loaded into the active sheet, default Integrations panel to full expanded
   // (but only once per "empty sheet" session so we don't fight the user).
   useEffect(() => {
+    // Demo should start semi-collapsed, never auto-expand.
+    if (isDemo) return;
     if (!rightPanelOpen) return;
     if (rightPanelTab !== "integrations") return;
     if (drawerExpanded) return;
@@ -130,7 +133,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     if (autoExpandedEmptySheetRef.current) return;
     autoExpandedEmptySheetRef.current = true;
     setDrawerExpanded(true);
-  }, [rightPanelOpen, rightPanelTab, drawerExpanded, connectedData]);
+  }, [isDemo, rightPanelOpen, rightPanelTab, drawerExpanded, connectedData]);
 
   useEffect(() => {
     const isEmpty = !Array.isArray(connectedData) || connectedData.length === 0;
@@ -217,12 +220,18 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     : drawerWidthCollapsed;
 
   const layout = (
-    <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-4 overflow-x-hidden px-2 py-2 sm:gap-6 sm:px-4">
+    <div className={cn(
+      "flex min-h-0 w-full max-w-full flex-1 flex-col gap-4 overflow-x-hidden px-2 py-2 sm:gap-6 sm:px-4",
+      // In demo embeds, treat this component as the "viewport" for the right panel.
+      // The parent container should clip overflow; we still set relative here so `absolute` works.
+      isDemo && "relative",
+    )}>
       <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 sm:gap-6">
         {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
         <main className="min-w-0 flex-1 overflow-auto relative">
           {!showSidebar && !isPanelClosing && (
             <OpenApiPanelTab
+              contained={isDemo}
               onOpen={() => {
                 if (chartMode) {
                   setRightPanelTab?.("charts");
@@ -258,7 +267,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
             />
             <aside
               className={cn(
-                "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out",
+                isDemo
+                  ? "absolute inset-y-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
+                  : "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out",
                 drawerExpanded
                   ? "max-md:left-0 max-md:right-0 md:right-4"
                   : "right-2 sm:right-4",

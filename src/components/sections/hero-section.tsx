@@ -1,8 +1,18 @@
 import { siteConfig } from "@/lib/config";
 import Link from "next/link";
+import { DashboardDemoSection } from "./dashboard-demo-section";
 
 export function HeroSection() {
   const { hero } = siteConfig;
+  const badgeIcon =
+    hero.badgeIcon === "dot" ? (
+      <span className="relative flex h-2.5 w-2.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+      </span>
+    ) : (
+      hero.badgeIcon
+    );
 
   return (
     <section id="hero" className="w-full relative">
@@ -12,7 +22,7 @@ export function HeroSection() {
         </div>
         <div className="relative z-10 pt-32 max-w-3xl mx-auto h-full w-full flex flex-col gap-10 items-center justify-center">
           <p className="border border-border bg-accent rounded-full text-sm h-8 px-3 flex items-center gap-2">
-            {hero.badgeIcon}
+            {badgeIcon}
             {hero.badge}
           </p>
           <div className="flex flex-col items-center justify-center gap-5">
@@ -39,6 +49,7 @@ export function HeroSection() {
           </div>
         </div>
       </div>
+      <DashboardDemoSection />
     </section>
   );
 }

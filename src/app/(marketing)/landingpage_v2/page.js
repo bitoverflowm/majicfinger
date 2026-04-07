@@ -33,7 +33,6 @@ export default function LandingPageV2() {
     <main className="theme-landing min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
       <HeroSection />
       <CompanyShowcase />
-      <Logos />
       <Problem />
       <Solution />
       <HowItWorks />

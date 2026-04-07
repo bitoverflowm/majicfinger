@@ -29,8 +29,9 @@ import { Separator } from "@/components/ui/separator";
 
 import { debounce } from "@/lib/debounce";
 
-const DashBody = ({user}) => {
+const DashBody = ({ user }) => {
     const contextStateV2 = useMyStateV2()
+    const isDemo = contextStateV2?.isDemo
     const setViewing = contextStateV2?.setViewing
 
     const viewing = contextStateV2?.viewing
@@ -61,7 +62,7 @@ const DashBody = ({user}) => {
     const [usernameExists, setUsernameExists] = useState(false);
 
     useEffect(() => {
-        if(user){
+        if(user && !isDemo){
             fetch(`/api/dataSets?uid=${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -83,10 +84,10 @@ const DashBody = ({user}) => {
                 setRefetchData(0)
             })
         }
-    }, [user, refetchData])
+    }, [user, refetchData, isDemo])
 
     useEffect(() => {
-        if(user){
+        if(user && !isDemo){
             fetch(`/api/charts?uid=${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -108,12 +109,12 @@ const DashBody = ({user}) => {
                 setRefetchChart(0)
             })
         }
-    }, [user, refetchChart])
+    }, [user, refetchChart, isDemo])
 
 
 
     useEffect(() => {
-        if(user){
+        if(user && !isDemo){
             fetch(`/api/presentations?uid=${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -136,11 +137,11 @@ const DashBody = ({user}) => {
                 setRefetchPresentations(0)
             })
         }
-    }, [user, refetchPresentations])
+    }, [user, refetchPresentations, isDemo])
 
 
     useEffect(() => {
-        if (user) {
+        if (user && !isDemo) {
             fetch(`/api/users/${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -160,7 +161,7 @@ const DashBody = ({user}) => {
                 console.error('Error fetching user info:', error);
             });
         }
-    }, [user]);
+    }, [user, isDemo]);
 
     const checkUsernameAvailability = useCallback(
         debounce((value) => {
@@ -224,16 +225,16 @@ const DashBody = ({user}) => {
     };
 
 
-    return(
-        <SidebarProvider defaultOpen={false}>
-            <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
-            <SidebarInset>
-                <header className="sticky top-0 z-30 w-full shrink-0 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none">
-                    <Nav />
-                </header>
-                {rightPanelOpen && <Separator className="shrink-0" />}
-                <div className="relative z-0 flex min-h-0 flex-1 flex-col py-1">
-                { viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
+    const content = (
+      <>
+        {!isDemo && (
+          <header className="sticky top-0 z-30 w-full shrink-0 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none">
+            <Nav />
+          </header>
+        )}
+        {rightPanelOpen && <Separator className="shrink-0" />}
+        <div className="relative z-0 flex min-h-0 flex-1 flex-col py-1">
+                {!isDemo && viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
                 { viewing === 'dataStart' && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} />
@@ -247,13 +248,13 @@ const DashBody = ({user}) => {
                   </div>
                 ) }
                 { viewing === 'integrations' && <div className="py-10"><IntegrationsView/></div> }
-                { viewing === 'ai' && <AiView/> }
-                { viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
-                { viewing === 'presentation' && <div className="py-20"><EasyLychee /></div> }
-                { viewing === 'scrape' && <ScraperView />}
-                { viewing === 'register' && <div className="flex place-items-center place-content-center"><div><Login/></div></div>}
-                { viewing === 'pricing' && <div className="py-10"><Pricing /></div>}
-                { viewing === 'profilePage' && <div className="p-56 text-black">
+                {!isDemo && viewing === 'ai' && <AiView/> }
+                {!isDemo && viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
+                {!isDemo && viewing === 'presentation' && <div className="py-20"><EasyLychee /></div> }
+                {!isDemo && viewing === 'scrape' && <ScraperView />}
+                {!isDemo && viewing === 'register' && <div className="flex place-items-center place-content-center"><div><Login/></div></div>}
+                {!isDemo && viewing === 'pricing' && <div className="py-10"><Pricing /></div>}
+                {!isDemo && viewing === 'profilePage' && <div className="p-56 text-black">
                     <div className="">
                         <div className="grid flex-1 gap-2 max-w-64 py-4">
                             <Label htmlFor="user_handle">
@@ -285,16 +286,26 @@ const DashBody = ({user}) => {
                     <div>For now I have enabled managed billing using Stripe click here: </div>
                     <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
                 </div>}
-                <button
-                    type="button"
-                    onClick={() => setViewing?.('pricing')}
-                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-border shadow-lg hover:shadow-xl transition-shadow text-xs font-medium opacity-70 hover:opacity-100"
-                >
-                    Deal for you
-                </button>
-                </div>
-            </SidebarInset>
-        </SidebarProvider>
+                {!isDemo && (
+                  <button
+                      type="button"
+                      onClick={() => setViewing?.('pricing')}
+                      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-border shadow-lg hover:shadow-xl transition-shadow text-xs font-medium opacity-70 hover:opacity-100"
+                  >
+                      Deal for you
+                  </button>
+                )}
+        </div>
+      </>
+    );
+
+    return isDemo ? (
+      <div className="min-h-0 flex flex-1 flex-col">{content}</div>
+    ) : (
+      <SidebarProvider defaultOpen={false}>
+        <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
+        <SidebarInset>{content}</SidebarInset>
+      </SidebarProvider>
     )
 
 }

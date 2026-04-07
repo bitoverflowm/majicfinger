@@ -8,7 +8,7 @@ const ENTRANCE_MS = 280;
 const EXIT_MS = 150;
 const RIPPLE_VISIBLE_MS = 2400;
 
-export default function OpenApiPanelTab({ onOpen }) {
+export default function OpenApiPanelTab({ onOpen, contained = false }) {
   const [entered, setEntered] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const [showRipple, setShowRipple] = useState(false);
@@ -58,7 +58,7 @@ export default function OpenApiPanelTab({ onOpen }) {
   return (
     <div
       className={`
-        fixed right-0 top-20 z-40 transition ease-out md:top-[4.5rem]
+        ${contained ? "absolute" : "fixed"} right-0 top-20 z-40 transition ease-out md:top-[4.5rem]
         ${isExiting ? "duration-150" : "duration-300"}
         ${entered && !isExiting ? "translate-x-0" : "translate-x-full"}
       `}

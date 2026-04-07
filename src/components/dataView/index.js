@@ -15,6 +15,7 @@ import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integra
 
 const DataView = ({ user }) => {
   const contextStateV2 = useMyStateV2();
+  const isDemo = contextStateV2?.isDemo;
 
   const connectedData = contextStateV2?.connectedData;
   const setConnectedData = contextStateV2?.setConnectedData;
@@ -128,7 +129,7 @@ const DataView = ({ user }) => {
         </div>
       ) : (
         <div className="relative">
-          {!(user) && (
+          {!(user) && !isDemo && (
             <div className="w-full max-w-md mx-auto py-4">
               <Alert onClick={() => setViewing("register")} className="cursor-pointer">
                 <VscCircleFilled className="h-5 w-5" />

@@ -131,9 +131,9 @@ export function Navbar() {
                 <Image
                   src="/logo.png"
                   alt="Lychee"
-                  width={24}
-                  height={24}
-                  className="grayscale object-contain block"
+                  width={30}
+                  height={30}
+                  className="grayscale object-contain block rounded-full"
                   priority
                 />
               </span>

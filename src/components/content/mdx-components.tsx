@@ -12,16 +12,17 @@ import { ContentImage } from "./content-image";
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
   return {
-    table: ({ children, ...props }) => (
-      <div className="my-6 overflow-x-auto rounded-lg border border-border">
-        <table
-          {...props}
-          className="w-full border-collapse text-left text-sm"
-        >
-          {children}
-        </table>
-      </div>
-    ),
+    table: ({ children, ...props }: any) => {
+      // MDX may pass legacy `ref` (string refs) which are invalid for <table> in React 19 types.
+      const { ref: _ref, ...rest } = props || {};
+      return (
+        <div className="my-6 overflow-x-auto rounded-lg border border-border">
+          <table {...rest} className="w-full border-collapse text-left text-sm">
+            {children}
+          </table>
+        </div>
+      );
+    },
     img: ({ src, alt }) => {
       if (!src) return null;
       const isExternal = src.startsWith("http");
