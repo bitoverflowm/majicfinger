@@ -122,7 +122,7 @@ const Binance = ({ setConnectedData }) => {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <p className="font-medium text-foreground">Binance</p>
-          <Badge className="bg-lychee_red text-white">Live</Badge>
+          <Badge className="bg-secondary text-secondary-foreground">Live</Badge>
         </div>
         <div className="flex items-center gap-2">
           {isConnected ? (

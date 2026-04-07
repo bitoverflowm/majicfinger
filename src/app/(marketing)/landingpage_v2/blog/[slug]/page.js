@@ -52,7 +52,7 @@ export default async function BlogPostPage({ params }) {
       { label: "Blog", href: "/landingpage_v2#blog" },
       { label: frontmatter.title },
     ],
-    SITE_URL
+    SITE_URL,
   );
   const organizationJsonLd = buildOrganizationJsonLd();
 
@@ -100,3 +100,4 @@ export default async function BlogPostPage({ params }) {
     </main>
   );
 }
+

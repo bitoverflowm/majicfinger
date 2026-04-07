@@ -80,7 +80,7 @@ const Twitter = ({ setConnectedData }) => {
                     {tweetActions.map(action => (
                     <div
                         key={action.query}
-                        className={`text-[10px] px-3 py-1 border rounded-md hover:bg-lychee_red hover:text-white cursor-pointer`}
+                        className={`text-[10px] px-3 py-1 border rounded-md hover:bg-secondary hover:text-secondary-foreground cursor-pointer`}
                         onClick={() => fetchHandler(action.query, action.params)}
                         title={action.description}
                     >
@@ -97,7 +97,7 @@ const Twitter = ({ setConnectedData }) => {
                     {userActions.map(action => (
                     <div
                         key={action.query}
-                        className={`text-[10px] px-3 py-1 border rounded-md hover:bg-lychee_red hover:text-white cursor-pointer`}
+                        className={`text-[10px] px-3 py-1 border rounded-md hover:bg-secondary hover:text-secondary-foreground cursor-pointer`}
                         onClick={() => fetchHandler(action.query, action.params)}
                         title={action.description}
                     >

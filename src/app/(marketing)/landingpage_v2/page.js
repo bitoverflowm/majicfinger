@@ -1,4 +1,5 @@
 import Header from "@/components/landingPageV2/Header";
+import { HeroSection } from "@/components/sections/hero-section";
 import Hero from "@/components/landingPageV2/Hero";
 import Logos from "@/components/landingPageV2/Logos";
 import Problem from "@/components/landingPageV2/Problem";
@@ -13,6 +14,7 @@ import GuidesSection from "@/components/landingPageV2/GuidesSection";
 import CTA from "@/components/landingPageV2/CTA";
 import Footer from "@/components/landingPageV2/Footer";
 import { getAllContent } from "@/lib/content";
+import { CompanyShowcase } from "@/components/sections/company-showcase";
 
 export default function LandingPageV2() {
   let articles = [];
@@ -21,16 +23,16 @@ export default function LandingPageV2() {
     const blog = getAllContent("blog") || [];
     articles = [...guides, ...blog];
     articles.sort((a, b) =>
-      (b.frontmatter?.publishedAt || "").localeCompare(a.frontmatter?.publishedAt || "")
+      (b.frontmatter?.publishedAt || "").localeCompare(a.frontmatter?.publishedAt || ""),
     );
   } catch (e) {
     console.warn("Content could not be loaded:", e);
   }
 
   return (
-    <main className="min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
-      <Header />
-      <Hero />
+    <main className="theme-landing min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
+      <HeroSection />
+      <CompanyShowcase />
       <Logos />
       <Problem />
       <Solution />
@@ -45,3 +47,4 @@ export default function LandingPageV2() {
     </main>
   );
 }
+

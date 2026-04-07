@@ -19,7 +19,6 @@ module.exports = {
   	extend: {
   		colors: {
   			lychee_black: '#151515',
-  			lychee_red: '#A91D3A',
   			lychee_blue: '#4A5899',
   			lychee_white: '#EEEEEE',
   			lychee_green: '#C9F2C7',

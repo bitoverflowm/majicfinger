@@ -269,7 +269,7 @@ const CoinGecko = ({setConnectedData}) => {
                             {coinData.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -286,7 +286,7 @@ const CoinGecko = ({setConnectedData}) => {
                             {trendingActions.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -303,7 +303,7 @@ const CoinGecko = ({setConnectedData}) => {
                             {adminActions.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -320,7 +320,7 @@ const CoinGecko = ({setConnectedData}) => {
                         {marketData.map(action => (
                             <div
                                 key={action.query}
-                                className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                 onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                 title={action.description}
                             >
@@ -337,7 +337,7 @@ const CoinGecko = ({setConnectedData}) => {
                             {exchangeData.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -354,7 +354,7 @@ const CoinGecko = ({setConnectedData}) => {
                             {derivativesData.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -371,7 +371,7 @@ const CoinGecko = ({setConnectedData}) => {
                             {nftsData.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -388,7 +388,7 @@ const CoinGecko = ({setConnectedData}) => {
                             {exchangeRatesData.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >

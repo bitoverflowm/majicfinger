@@ -183,7 +183,7 @@ const GeckoDex = ({setConnectedData}) => {
                             {exploratory.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -200,7 +200,7 @@ const GeckoDex = ({setConnectedData}) => {
                             {simple.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -217,7 +217,7 @@ const GeckoDex = ({setConnectedData}) => {
                             {network.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -234,7 +234,7 @@ const GeckoDex = ({setConnectedData}) => {
                             {dexes.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -251,7 +251,7 @@ const GeckoDex = ({setConnectedData}) => {
                             {pools.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -268,7 +268,7 @@ const GeckoDex = ({setConnectedData}) => {
                             {tokens.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -285,7 +285,7 @@ const GeckoDex = ({setConnectedData}) => {
                             {ohlcvs.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >
@@ -302,7 +302,7 @@ const GeckoDex = ({setConnectedData}) => {
                             {trades.map(action => (
                                 <div
                                     key={action.query}
-                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-lychee_red hover:text-white cursor-pointer' }`}
+                                    className={`text-[10px] px-3 py-1 border rounded-md ${action.broken ? 'disabled bg-slate-100' : 'hover:bg-secondary hover:text-secondary-foreground cursor-pointer' }`}
                                     onClick={() => clickHandler(action.query, action.requires, action.broken)}
                                     title={action.description}
                                 >

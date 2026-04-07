@@ -15,7 +15,7 @@ export default function OpenApiPanelTab({ onOpen }) {
   const exitTimeoutRef = useRef(null);
   const rippleTimeoutRef = useRef(null);
 
-  // Slide-in + red→white: start off-screen with lychee_red, then animate in
+  // Slide-in: start off-screen, then animate in
   useEffect(() => {
     const id = requestAnimationFrame(() =>
       requestAnimationFrame(() => setEntered(true))
@@ -70,7 +70,7 @@ export default function OpenApiPanelTab({ onOpen }) {
         className={`
           relative flex h-9 w-7 items-center justify-center overflow-visible rounded-l-md border border-r-0 border-border shadow-sm
           focus:outline-none focus-visible:ring-2 focus-visible:ring-ring
-          ${entered && !isExiting ? "bg-background hover:bg-muted/80" : "bg-lychee_red"}
+          ${entered && !isExiting ? "bg-background hover:bg-muted/80" : "bg-secondary"}
         `}
       >
         {/* Ripple behind the icon, inside the button so it stays visible */}
@@ -82,7 +82,7 @@ export default function OpenApiPanelTab({ onOpen }) {
               numCircles={4}
               circleSizeStep={14}
               className="[mask-image:none]"
-              circleClassName="!border-lychee_red/35 !bg-lychee_red/12"
+              circleClassName="!border-secondary/35 !bg-secondary/12"
             />
           </span>
         )}

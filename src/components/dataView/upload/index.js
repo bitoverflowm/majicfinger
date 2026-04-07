@@ -158,7 +158,7 @@ const Upload = ({user}) => {
                 </div>
             </Alert>
             <Alert className="mt-1 sm:mx-auto max-w-[700px]">
-                <div className="flex gap-2 place-items-center"><Citrus className="w-8 h-8 text-lychee_red"/><div className="">
+                <div className="flex gap-2 place-items-center"><Citrus className="w-8 h-8 text-secondary"/><div className="">
                     <p className="text-xs"> Multi-Sheets</p>
                     <p className="text-xs text-muted-foreground">We now handle multi-sheets! So go ahead, and upload all the sheets you want</p>
                 </div>
