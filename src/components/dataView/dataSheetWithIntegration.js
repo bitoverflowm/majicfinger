@@ -226,9 +226,14 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       // The parent container should clip overflow; we still set relative here so `absolute` works.
       isDemo && "relative",
     )}>
-      <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 sm:gap-6">
+      <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:gap-6">
         {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
-        <main className="min-w-0 flex-1 overflow-auto relative">
+        <main
+          className={cn(
+            "relative min-w-0 flex-1",
+            chartMode ? "flex min-h-0 flex-col overflow-hidden" : "overflow-auto",
+          )}
+        >
           {!showSidebar && !isPanelClosing && (
             <OpenApiPanelTab
               contained={isDemo}
@@ -246,7 +251,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
             />
           )}
           {chartMode ? (
-            <div className="py-6 sm:py-10">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <ChartCanvas />
             </div>
           ) : (
@@ -448,5 +453,5 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       </div>
     </div>
   );
-  return <ChartBuilderProvider demo={false}>{layout}</ChartBuilderProvider>;
+  return <ChartBuilderProvider demo={isDemo}>{layout}</ChartBuilderProvider>;
 }

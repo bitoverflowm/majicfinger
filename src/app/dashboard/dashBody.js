@@ -233,7 +233,7 @@ const DashBody = ({ user }) => {
           </header>
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
-        <div className="relative z-0 flex min-h-0 flex-1 flex-col py-1">
+        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
                 {!isDemo && viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
                 { viewing === 'dataStart' && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -300,11 +300,11 @@ const DashBody = ({ user }) => {
     );
 
     return isDemo ? (
-      <div className="min-h-0 flex flex-1 flex-col">{content}</div>
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
     ) : (
       <SidebarProvider defaultOpen={false}>
         <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
-        <SidebarInset>{content}</SidebarInset>
+        <SidebarInset className="min-h-0">{content}</SidebarInset>
       </SidebarProvider>
     )
 

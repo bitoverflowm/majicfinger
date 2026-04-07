@@ -22,7 +22,7 @@ export function DashboardDemoSection() {
             }}
           >
             <LiveStreamManager />
-            <div className="h-[80vh] min-h-[680px] w-full">
+            <div className="flex h-[80vh] min-h-[680px] w-full flex-col overflow-hidden">
               <DashBody user={null} />
             </div>
           </StateProviderV2>

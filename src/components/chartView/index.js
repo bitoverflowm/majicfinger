@@ -17,6 +17,7 @@ import { TreemapCategoryRect } from '@/components/chartView/treemapCategoryConte
 import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtrapolation';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const ChartBuilderContext = createContext(null);
 
@@ -704,9 +705,9 @@ export function ChartCanvas() {
   };
 
   return (
-    <div className={`gradualEffect relative xl:flex p-10`}>
+    <div className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-out">
       {showWsFeedControl && (
-        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-lg border px-3 py-2 ${dark ? "bg-slate-800/90 border-slate-600" : "bg-white/95 border-slate-200"} shadow-lg`}>
+        <div className={`absolute top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-lg border px-3 py-2 ${dark ? "border-slate-600 bg-slate-800/90" : "border-slate-200 bg-white/95"} shadow-lg`}>
           <span className="text-xs font-medium">{wsRunning ? "Live feed" : "Feed paused"}</span>
           {wsRunning && wsStop && (
             <button type="button" onClick={wsStop} className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium">
@@ -723,17 +724,27 @@ export function ChartCanvas() {
         </div>
       )}
 
-      <div className="gradualEffect lg:py-10 lg:px-10">
-        <div className="gradualEffect py-12 px-12 rounded-xl" ref={chartRef} style={{ backgroundColor: activePalette?.[0] || (dark ? "#ffffff" : "#000000") }}>
-          <div className="py-4 px-4 rounded-xl shadow-xl bg-opacity-50" style={{ backgroundColor: activePalette?.[1] || (dark ? "#000000" : "#ffffff") }}>
-            <Card className={`py-4 border-0`} style={{ backgroundColor: activePalette?.[2] || (dark ? "#000000" : "#ffffff") }}>
-              <CardHeader>
+      <div className="flex min-h-0 flex-1 flex-col px-2 py-4 sm:px-4 sm:py-6 lg:px-8">
+        <div
+          className="relative flex min-h-0 flex-1 flex-col rounded-xl p-3 transition-[padding] duration-300 ease-out sm:p-5"
+          ref={chartRef}
+          style={{ backgroundColor: activePalette?.[0] || (dark ? "#ffffff" : "#000000") }}
+        >
+          <div
+            className="flex min-h-0 flex-1 flex-col rounded-xl px-2 py-3 shadow-xl transition-[padding] duration-300 ease-out sm:px-4 sm:py-4"
+            style={{ backgroundColor: activePalette?.[1] || (dark ? "#000000" : "#ffffff") }}
+          >
+            <Card
+              className="flex min-h-0 flex-1 flex-col gap-0 border-0 py-4"
+              style={{ backgroundColor: activePalette?.[2] || (dark ? "#000000" : "#ffffff") }}
+            >
+              <CardHeader className="shrink-0 pb-2">
                 {titleHidden && <CardTitle>{title}</CardTitle>}
                 {subTitleHidden && <CardDescription>{subTitle}</CardDescription>}
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-2 pt-0">
                 {selChartType === "liveline" ? (
-                  <div style={{ height: 200 }} className="w-full flex items-center justify-center">
+                  <div className="flex min-h-[180px] w-full flex-1 flex-col items-center justify-center">
                     {livelineData && livelineData.length > 0 ? (
                       <Liveline
                         data={livelineData}
@@ -756,7 +767,14 @@ export function ChartCanvas() {
                     )}
                   </div>
                 ) : (
-                  <ChartContainer config={chartConfig || dfltChartConfig} className={`h-[300px] lg:h-[500px] w-[calc(100%-8px)] mx-auto ${dark && "text-slate-200"}`}>
+                  <ChartContainer
+                    config={chartConfig || dfltChartConfig}
+                    className={cn(
+                      // Fill the card; override default `aspect-video` from ChartContainer so height follows the flex layout.
+                      "flex flex-col aspect-auto h-full min-h-[200px] w-full max-w-full flex-1 transition-[min-height] duration-300 ease-out md:min-h-[240px]",
+                      dark && "text-slate-200",
+                    )}
+                  >
                     {selChartType === "area" && (
                       <AreaChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }} stackOffset={expanded ? "expand" : false}>
                         <CartesianGrid vertical={false} />
@@ -826,7 +844,7 @@ export function ChartCanvas() {
                   </ChartContainer>
                 )}
               </CardContent>
-              <CardFooter>
+              <CardFooter className="shrink-0">
                 <div className="flex w-full items-start gap-2 text-sm">
                   <div className="grid gap-2">
                     <div className="flex items-center gap-2 font-medium leading-none">{bodyHeading}</div>
