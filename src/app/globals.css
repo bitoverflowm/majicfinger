@@ -118,6 +118,63 @@ body {
   transition: background 0.3s ease, backdrop-filter 0.1s ease, box-shadow 0.3s ease, backgroundColor 0.3s ease, width 0.3s ease, height 0.3s ease, padding 0.3s ease, border-width 0.3s ease, border-color 0.3s ease, border-radius 0.7s ease;
 }
 
+/* Hero: morph radial gradient geometry only (no transform/scale on the layer). */
+@property --hero-aura-inner {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 10%;
+}
+
+@property --hero-aura-rx {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 125%;
+}
+
+@property --hero-aura-ry {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 125%;
+}
+
+@property --hero-aura-at-y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 10%;
+}
+
+/* Morph the radial only: first stop moves along each ray (10% → 40% → 10%); ellipse radii + focal
+   drift slightly so the “shape” shifts without scaling the layer. */
+@keyframes heroAuraGeometry {
+  0%,
+  100% {
+    --hero-aura-inner: 10%;
+    --hero-aura-rx: 118%;
+    --hero-aura-ry: 132%;
+    --hero-aura-at-y: 9%;
+    /* Coverage low → stronger read */
+    opacity: 0.98;
+  }
+  50% {
+    --hero-aura-inner: 40%;
+    --hero-aura-rx: 132%;
+    --hero-aura-ry: 118%;
+    --hero-aura-at-y: 11%;
+    /* Coverage high → softer read */
+    opacity: 0.52;
+  }
+}
+
+.hero-aura-gradient {
+  background: radial-gradient(
+    var(--hero-aura-rx) var(--hero-aura-ry) at 50% var(--hero-aura-at-y),
+    var(--background) var(--hero-aura-inner),
+    var(--secondary) 100%
+  );
+  opacity: 0.98;
+  animation: heroAuraGeometry 28s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
 .internalGradualEffect {
     transition:
         background 0.3s ease, 
