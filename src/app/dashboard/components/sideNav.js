@@ -74,7 +74,7 @@ const SideNav = () => {
           }`}
         >
           <div className={`flex min-w-0 shrink-0 items-center ${!isExpanded ? "w-full justify-center" : "gap-2"}`}>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white overflow-hidden">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted overflow-hidden ring-1 ring-sidebar-border">
               <Image src="/logo.png" width={32} height={32} alt="Lychee" className="object-cover rounded-full" />
             </div>
             <span

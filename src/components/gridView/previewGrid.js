@@ -2,14 +2,17 @@ import { useMyStateV2  } from '@/context/stateContextV2'
 
 import { useMemo }  from 'react'
 
+import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
-import "ag-grid-community/styles/ag-theme-quartz.css"; // Theme
+import "ag-grid-community/styles/ag-theme-balham.css"; // Theme
 
 
 const PreviewGrid = ({h, w}) => {
 
     const contextStateV2 = useMyStateV2()
+    const isDark = useHtmlDarkClass();
+    const agThemeClass = isDark ? "ag-theme-balham-dark" : "ag-theme-balham";
     
     // we expect the following columns to be present
     let connectedCols = contextStateV2?.connectedCols || [];
@@ -26,7 +29,7 @@ const PreviewGrid = ({h, w}) => {
     }))
 
     return (
-        <div className={`ag-theme-quartz text-xs px-4 ${h ? h: 'h-[300px]'} ${ w ? w: 'w-[300px] min-[300px]:w-[370px] min-[510px]:w-[400px] min-[520px]:w-[480px] sm:w-[500px] min-[800px]:w-[520px] lg:w-[600px] xl:w-[800px] 2xl:w-[900px]'}`}>
+        <div className={`${agThemeClass} text-xs px-4 ${h ? h: 'h-[300px]'} ${ w ? w: 'w-[300px] min-[300px]:w-[370px] min-[510px]:w-[400px] min-[520px]:w-[480px] sm:w-[500px] min-[800px]:w-[520px] lg:w-[600px] xl:w-[800px] 2xl:w-[900px]'}`}>
             <AgGridReact 
                 defaultColDef={defaultColDef}
                 rowData={connectedData.slice(0, Math.min(connectedData.length, 10))} 

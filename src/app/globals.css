@@ -48,6 +48,7 @@
     --shadow-lg: 0 10px 15px -3px oklch(0.55 0.033 17.6 / 0.1), 0 4px 6px -4px oklch(0.55 0.033 17.6 / 0.1);
     --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.1), 0 8px 10px -6px oklch(0.55 0.033 17.6 / 0.1);
     --shadow-2xl: 0 25px 50px -12px oklch(0.55 0.033 17.6 / 0.15);
+    /* Legacy HSL triple for older hsl(var(--sidebar-background)) utilities; prefer --sidebar (OKLCH) */
     --sidebar-background: 0 0% 98%;
   }
 
@@ -84,6 +85,7 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.269 0 0);
     --sidebar-ring: oklch(0.439 0 0);
+    --sidebar-background: 220 14% 12%;
     --shadow-2xs: 0 1px 3px 0 hsl(0 0% 0% / 0.05);
     --shadow-xs: 0 1px 3px 0 hsl(0 0% 0% / 0.05);
     --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);

@@ -17,6 +17,9 @@ module.exports = {
   		}
   	},
   	extend: {
+  			transitionTimingFunction: {
+  				'landing-smooth': 'cubic-bezier(0.165, 0.84, 0.44, 1)',
+  			},
   		colors: {
   			lychee_black: '#151515',
   			lychee_blue: '#4A5899',
@@ -64,16 +67,15 @@ module.exports = {
   				'5': 'var(--chart-5)'
   			},
   			sidebar: {
-  				DEFAULT: 'hsl(var(--sidebar-background))',
-  				foreground: 'hsl(var(--sidebar-foreground))',
-  				primary: 'hsl(var(--sidebar-primary))',
+  				// Match globals.css --sidebar* (OKLCH); do not use hsl(var(--sidebar-background)) — that legacy token stayed light in .dark
+  				DEFAULT: 'var(--sidebar)',
+  				foreground: 'var(--sidebar-foreground)',
+  				primary: 'var(--sidebar-primary)',
   				'primary-foreground': 'var(--sidebar-primary-foreground)',
-  				accent: 'hsl(var(--sidebar-accent))',
+  				accent: 'var(--sidebar-accent)',
   				'accent-foreground': 'var(--sidebar-accent-foreground)',
-  				border: 'hsl(var(--sidebar-border))',
-  				ring: 'hsl(var(--sidebar-ring))',
-  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))'
+  				border: 'var(--sidebar-border)',
+  				ring: 'var(--sidebar-ring)'
   			}
   		},
   		fontFamily: {
@@ -120,6 +122,22 @@ module.exports = {
   				},
   				to: {
   					height: '0'
+  				}
+  			},
+  			'slide-down': {
+  				from: {
+  					height: '0px'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			'slide-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0px'
   				}
   			},
   			marquee: {
@@ -208,6 +226,8 @@ module.exports = {
   			meteor: 'meteor 5s linear infinite',
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'slide-down': 'slide-down 0.2s ease-out',
+  			'slide-up': 'slide-up 0.2s ease-out',
   			marquee: 'marquee var(--duration) linear infinite',
   			'marquee-vertical': 'marquee-vertical var(--duration) linear infinite',
   			grid: 'grid 15s linear infinite',

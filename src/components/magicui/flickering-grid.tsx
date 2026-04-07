@@ -36,6 +36,12 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   const [isInView, setIsInView] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
+  const isDark =
+    typeof document !== "undefined" &&
+    document.documentElement.classList.contains("dark");
+
+  const effectiveMaxOpacity = isDark ? Math.min(maxOpacity, 0.22) : maxOpacity;
+
   const memoizedColor = useMemo(() => {
     const toRGBA = (c: string) => {
       if (typeof window === "undefined") return "rgba(0, 0, 0,";
@@ -62,22 +68,22 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
       const rows = Math.floor(h / (squareSize + gridGap));
       const squares = new Float32Array(cols * rows);
       for (let i = 0; i < squares.length; i++) {
-        squares[i] = Math.random() * maxOpacity;
+        squares[i] = Math.random() * effectiveMaxOpacity;
       }
       return { cols, rows, squares, dpr };
     },
-    [squareSize, gridGap, maxOpacity]
+    [squareSize, gridGap, effectiveMaxOpacity]
   );
 
   const updateSquares = useCallback(
     (squares: Float32Array, deltaTime: number) => {
       for (let i = 0; i < squares.length; i++) {
         if (Math.random() < flickerChance * deltaTime) {
-          squares[i] = Math.random() * maxOpacity;
+          squares[i] = Math.random() * effectiveMaxOpacity;
         }
       }
     },
-    [flickerChance, maxOpacity]
+    [flickerChance, effectiveMaxOpacity]
   );
 
   const drawGrid = useCallback(

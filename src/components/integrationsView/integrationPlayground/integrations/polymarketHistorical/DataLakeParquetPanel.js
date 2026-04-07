@@ -4671,18 +4671,23 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       <div className="min-w-0 max-w-full px-2">
         <Tabs value={selectionTab} onValueChange={onSelectionTabChange} className="w-full">
             {!(allRequestCardEntries.length > 0 && !showRequestComposer) && (
-            <div className="flex items-center gap-2 mb-2">
-              <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
-                <TabsTrigger value="columns" className="h-7 px-2 text-xs">
-                  Columns
-                </TabsTrigger>
-                <TabsTrigger value="meta" className="h-7 px-2 text-xs">
-                  Meta Table
-                </TabsTrigger>
-                <TabsTrigger value="recipes" className="h-7 px-2 text-xs">
-                  Recipes
-                </TabsTrigger>
-              </TabsList>
+            <div className="sticky top-0 z-20 mb-2 space-y-2 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+              <div className="flex items-center gap-2">
+                <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
+                  <TabsTrigger value="columns" className="h-7 px-2 text-xs">
+                    Columns
+                  </TabsTrigger>
+                  <TabsTrigger value="meta" className="h-7 px-2 text-xs">
+                    Meta Table
+                  </TabsTrigger>
+                  <TabsTrigger value="recipes" className="h-7 px-2 text-xs">
+                    Recipes
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              {loading ? (
+                <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pb-1" />
+              ) : null}
             </div>
             )}
 

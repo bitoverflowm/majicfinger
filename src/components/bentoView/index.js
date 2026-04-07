@@ -4,7 +4,7 @@ import { useMyState  } from '@/context/stateContext'
 
 import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
-import "ag-grid-community/styles/ag-theme-quartz.css"; // Theme
+import "ag-grid-community/styles/ag-theme-balham.css"; // Theme
 import { useEffect } from 'react';
 
 const BentoView = () => {

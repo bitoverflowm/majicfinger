@@ -12,6 +12,7 @@ const GLOBE_CONFIG = {
     devicePixelRatio: 2,
     phi: 0,
     theta: 0.3,
+    // We'll override `dark` dynamically based on the app theme.
     dark: 0,
     diffuse: 0.4,
     mapSamples: 16000,
@@ -69,10 +70,18 @@ const GLOBE_CONFIG = {
    
     const onRender = useCallback(
     (state) => {
+        const isDark =
+          typeof document !== "undefined" &&
+          document.documentElement.classList.contains("dark");
         if (!pointerInteracting.current) phi += 0.005;
         state.phi = phi + r.get();
         state.width = width * 2;
         state.height = width * 2;
+
+        // Match template: darker globe in dark mode.
+        state.dark = isDark ? 1 : 0;
+        state.baseColor = isDark ? [0.05, 0.05, 0.05] : config.baseColor;
+        state.glowColor = isDark ? [0.08, 0.08, 0.08] : config.glowColor;
     },
     [pointerInteracting, phi, r],
     );

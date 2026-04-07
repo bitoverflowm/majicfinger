@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
+import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 
 import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
-import "ag-grid-community/styles/ag-theme-quartz.css"; // Theme
+import "ag-grid-community/styles/ag-theme-balham.css"; // Theme
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -127,6 +128,8 @@ function genRequestCardId() {
 const GridView = ({startNew}) => {
 
     const contextStateV2 = useMyStateV2()
+    const isDark = useHtmlDarkClass();
+    const agThemeClass = isDark ? "ag-theme-balham-dark" : "ag-theme-balham";
 
     let connectedCols = contextStateV2?.connectedCols || []
     let setConnectedCols = contextStateV2?.setConnectedCols || []
@@ -1394,7 +1397,7 @@ const GridView = ({startNew}) => {
     }, [startNew])
 
     return (
-        <div className="ag-theme-quartz" style={{ height: '100%', width: '100%' }}>
+        <div className="h-full w-full min-w-0 text-foreground" style={{ height: '100%', width: '100%' }}>
             <Alert className="mt-4 sm:hidden">
                 <div className="flex gap-2 place-items-center"><TrafficCone className="w-8 h-8"/>
                     <div className="">
@@ -1534,14 +1537,14 @@ const GridView = ({startNew}) => {
                                             <div className="flex items-center gap-2">
                                               {isEditing ? (
                                                 <div
-                                                  className="bg-lychee_green/30 p-2 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                                  className="bg-lychee_green/30 p-2 rounded-full flex place-items-center place-content-center text-foreground cursor-pointer hover:bg-lychee_green/40 hover:text-muted-foreground"
                                                   onClick={() => handleSaveColumnName(index)}
                                                 >
                                                   Save
                                                 </div>
                                               ) : (
                                                 <div
-                                                  className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                                  className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-foreground cursor-pointer hover:bg-lychee_green/40 hover:text-muted-foreground"
                                                   onClick={() => {
                                                     setEditingColIndex(index);
                                                     setEditingColName(colName);
@@ -1552,7 +1555,7 @@ const GridView = ({startNew}) => {
                                                 </div>
                                               )}
                                               <div
-                                                className="bg-red-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+                                                className="bg-red-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-foreground cursor-pointer hover:bg-lychee_green/40 hover:text-muted-foreground"
                                                 onClick={() => handleDeleteColumn(index)}
                                                 title="Delete column"
                                               >
@@ -2328,7 +2331,7 @@ const GridView = ({startNew}) => {
               <TabsContent value="table" className="mt-0" />
             </Tabs>
             )}
-            <div className={gridExpanded ? 'h-[750px]' :'h-[550px]'}>
+            <div className={`${agThemeClass} ${gridExpanded ? 'h-[750px]' : 'h-[550px]'}`}>
                 <AgGridReact 
                     defaultColDef={defaultColDef} 
                     rowData={displayData} 
