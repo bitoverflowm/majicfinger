@@ -10,6 +10,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BorderBeam } from "@/components/magicui/border-beam";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { API_INTEGRATIONS, integrations_list } from "./integrationsConfig";
@@ -195,6 +196,7 @@ const IntegrationsView = () => {
             {/* Featured Polymarket card - full width, image left, text right */}
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+              <TooltipProvider>
               {integrations_list
                 .filter(integration => !selectedTag || integration.tags.includes(selectedTag))
                 .map((integration, index) => (
@@ -210,10 +212,24 @@ const IntegrationsView = () => {
                   </CardHeader>
                   <CardContent className="py-4 grow">
                     <small className="text-sm font-medium leading-none">{integration.name}</small>
-                    <p className="text-sm pt-1 text-muted-foreground pb-2">{integration.description}</p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-sm pt-1 text-muted-foreground pb-2 line-clamp-2 cursor-help">
+                          {integration.description}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-sm whitespace-pre-wrap">
+                        {integration.description}
+                      </TooltipContent>
+                    </Tooltip>
                   </CardContent>
                   <CardFooter className="flex flex-col items-stretch gap-2 place-content-end">
                     {(() => {
+                      const guide = integration?.guide && typeof integration.guide === "object" ? integration.guide : null;
+                      const guideHref = guide?.href ? String(guide.href) : "";
+                      const guideTitle = guide?.title ? String(guide.title) : "";
+                      const guideLabel = guide?.label ? String(guide.label) : "Guide";
+
                       const warmConnect =
                         integration.clickHandler === "polymarketHistorical"
                           ? polymarketHistoricalConnect
@@ -229,25 +245,53 @@ const IntegrationsView = () => {
                         ) : warmConnect.error ? (
                           <>
                             <p className="text-xs text-destructive break-words">{warmConnect.error}</p>
-                            <Button type="button" onClick={() => warmConnect.start()} className="w-full sm:w-auto self-end">
-                              Try again
-                            </Button>
+                            <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+                              {guideHref ? (
+                                <Link href={guideHref} title={guideTitle || undefined}>
+                                  <Button type="button" variant="outline">
+                                    {guideLabel}
+                                  </Button>
+                                </Link>
+                              ) : null}
+                              <Button type="button" onClick={() => warmConnect.start()} className="w-full sm:w-auto self-end">
+                                Try again
+                              </Button>
+                            </div>
                           </>
                         ) : (
-                          <Button type="button" onClick={() => warmConnect.start()} className="self-end">
-                            Connect
-                          </Button>
+                          <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+                            {guideHref ? (
+                              <Link href={guideHref} title={guideTitle || undefined}>
+                                <Button type="button" variant="outline">
+                                  {guideLabel}
+                                </Button>
+                              </Link>
+                            ) : null}
+                            <Button type="button" onClick={() => warmConnect.start()} className="self-end">
+                              Connect
+                            </Button>
+                          </div>
                         );
                       }
                       return (
-                        <Button onClick={() => clickHandler(integration.clickHandler)} className="self-end">
-                          Connect
-                        </Button>
+                        <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+                          {guideHref ? (
+                            <Link href={guideHref} title={guideTitle || undefined}>
+                              <Button type="button" variant="outline">
+                                {guideLabel}
+                              </Button>
+                            </Link>
+                          ) : null}
+                          <Button onClick={() => clickHandler(integration.clickHandler)} className="self-end">
+                            Connect
+                          </Button>
+                        </div>
                       );
                     })()}
                   </CardFooter>
                 </Card>
               ))}
+              </TooltipProvider>
             </div>
       </div>
     </div>

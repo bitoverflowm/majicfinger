@@ -18,23 +18,23 @@ export type BentoSectionConfig = {
 };
 
 export const bentoSection: BentoSectionConfig = {
-  title: "Empower Your Workflow with AI",
+  title: "Turn Data Into Action — No Code Required",
   description:
-    "Ask your AI Agent for real-time collaboration, seamless integrations, and actionable insights to streamline your operations.",
+    "Lychee makes it effortless to connect data, visualize insights, and automate workflows — all from one simple platform, no coding needed.",
   items: [
     {
       id: "1",
       content: <FirstBentoAnimation />,
-      title: "Real-time AI Collaboration",
+      title: "Connect Your Data Instantly",
       description:
-        "Experience real-time assistance. Ask your AI Agent to coordinate tasks, answer questions, and maintain team alignment.",
+        "Bring together spreadsheets, APIs, and social data in one place. No setup, no headaches — just a unified view of your information.",
     },
     {
       id: "2",
       content: <SecondBentoAnimation />,
-      title: "Seamless Integrations",
+      title: "Visual Dashboards in Seconds",
       description:
-        "Unite your favorite tools for effortless connectivity. Boost productivity through interconnected workflows.",
+        "Create charts, tables, and interactive dashboards in minutes. Spot trends and track metrics without writing a single formula.",
     },
     {
       id: "3",
@@ -46,16 +46,16 @@ export const bentoSection: BentoSectionConfig = {
           ]}
         />
       ),
-      title: "Instant Insight Reporting",
+      title: "Instant Insights at Your Fingertips",
       description:
-        "Transform raw data into clear insights in seconds. Empower smarter decisions with real-time, always-learning intelligence.",
+        "Turn raw numbers into clear, actionable insights. Make smarter decisions faster with always-ready visualizations.",
     },
     {
       id: "4",
       content: <FourthBentoAnimation once={false} />,
-      title: "Smart Automation",
+      title: "Automate Routine Updates",
       description:
-        "Set it, forget it. Your AI Agent tackles repetitive tasks so you can focus on strategy, innovation, and growth.",
+        "Set up refreshes, schedule reports, and reduce repetitive tasks. Keep your data current without lifting a finger.",
     },
   ],
 } as const;

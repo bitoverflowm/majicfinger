@@ -4,9 +4,9 @@ import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { Globe } from "@/components/ui/globe";
 
 export const growthSection = {
-  title: "Built for Secure Growth",
+  title: "Turn Data Into Action",
   description:
-    "Where advanced security meets seamless scalability—designed to protect your data and empower your growth.",
+    "Lychee isn’t just about seeing numbers — it’s about making decisions, testing ideas, and discovering insights faster than ever.",
   items: [
     {
       id: 1,
@@ -256,9 +256,9 @@ export const growthSection = {
           </motion.div>
         </div>
       ),
-      title: "Advanced Task Security",
+      title: "Spot Trends Instantly",
       description:
-        "Safeguard your tasks with state-of-art encryption and secure access to your workflow data.",
+        "From markets to social sentiment, see patterns emerge in real time. Make informed moves before others even notice the shift.",
     },
     {
       id: 2,
@@ -267,9 +267,9 @@ export const growthSection = {
           <Globe className="top-28" />
         </div>
       ),
-      title: "Scalable for Teams",
+      title: "Test Ideas Quickly",
       description:
-        "Grow with your team. Track tasks across multiple workspaces and all team members.",
+        "Run what-if scenarios, backtest strategies, or explore historical data — all without writing a line of code. Validate your decisions fast.",
     },
   ],
 } as const;

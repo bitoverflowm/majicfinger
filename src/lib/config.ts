@@ -48,29 +48,29 @@ export const siteConfig = {
     })),
   },
   featureSection: {
-    title: "Everything you need to move faster",
+    title: "Everything You Need to Move Fast",
     description:
-      "Connect sources, explore visually, and export—without leaving one workspace.",
+      "Connect data sources, explore trends visually, and export insights — all from a single workspace.",
     items: [
       {
         id: 1,
-        title: "Visual exploration",
+        title: "Visual Exploration",
         content:
-          "Build charts from prediction-market and on-chain data without writing queries.",
+          "Create charts and tables from prediction-market and on-chain data instantly — no queries required.",
         image: "/landing_dashboard.png",
       },
       {
         id: 2,
-        title: "Polymarket & Kalshi",
+        title: "Live Market Feeds",
         content:
-          "Tap curated endpoints for live prices, events, and historical series in one place.",
+          "Access Polymarket and Kalshi endpoints for real-time prices, events, and historical data — curated for speed.",
         image: "/polymarket.png",
       },
       {
         id: 3,
-        title: "Chainlink & more",
+        title: "Reference Data & Signals",
         content:
-          "Layer in reference feeds and social signals when you need broader context.",
+          "Layer in Chainlink feeds, social signals, and other contextual data to see the full picture quickly.",
         image: "/chainlink.png",
       },
     ],

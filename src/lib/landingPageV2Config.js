@@ -5,7 +5,7 @@ export const landingPageV2Config = {
   url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   keywords: ["PolyMarket", "quant", "Data Analysis", "Prediction Markets", "No-Code API", "Charts", "Data Visualization"],
   links: {
-    email: "support@bitoverflow.org",
+    email: "",
     twitter: "https://x.com/misterrpink1",
     discord: "#",
     github: "https://github.com",
@@ -77,10 +77,41 @@ export const landingPageV2Config = {
     },
   ],
   faqs: [
-    { question: "What is Lychee?", answer: "Lychee is your quant in a box. Built for Polymarket, powerful for anyone who works with data. No CSVs, no Python, no copy-pasting. Just raw data to analysis, charts and actionable insights in seconds. Real quantitative edge. 0 lines of code." },
-    { question: "How can I get started?", answer: "Sign up for a free account. You get instant access to Easy Charts, Scraper, AI, website builder, and integrations. No credit card required for the trial." },
-    { question: "What data sources can I connect to?", answer: "Lychee connects directly to Polymarket, Twitter, Instagram, CoinGecko, and more. Not a single line of code required on your end." },
-    { question: "What's the lifetime deal?", answer: "Pay $39.99 once and get full access for life. Everything in the free tier plus all experimental features, unlimited website launches, unlimited custom domains, and almost unlimited API and AI usage. No add-on fees ever." },
+    {
+      question: "What is Lychee?",
+      answer:
+        "Lychee is a no-code data analysis platform built for prediction markets, traders, and researchers. Connect live and historical data from sources like Polymarket, Kalshi, and on-chain feeds, then visualize trends and build dashboards in seconds. No Python, no CSV wrangling — just fast insights from real data.",
+    },
+    {
+      question: "Who is Lychee for?",
+      answer:
+        "Lychee is designed for traders, analysts, researchers, and data enthusiasts who want to explore prediction market and financial data quickly. Whether you're backtesting strategies, tracking market sentiment, or building dashboards, Lychee helps you work with data without writing code.",
+    },
+    {
+      question: "How do I get started?",
+      answer:
+        "Try the free demo we have above, no credit card required no sign up required. Remember this is a demo so it has nowhere near the capabilities of the full platform. Then sign up and start exploring immediately. Choose a data source, create a chart, and build your first dashboard in minutes. No installation, no setup.",
+    },
+    {
+      question: "What data sources does Lychee support?",
+      answer:
+        "Lychee provides access to prediction market, crypto, financial, and social data sources. This includes Polymarket, Kalshi, Chainlink feeds, CoinGecko, Twitter, Reddit, Product Hunt, SEC Edgar and additional APIs. You can also upload CSV or Excel files to combine your own data with live feeds.",
+    },
+    {
+      question: "Do I need to know how to code?",
+      answer:
+        "No. Lychee is fully no-code. You can connect data, create charts, and analyze trends using a visual interface — no SQL, Python, or manual data processing required.",
+    },
+    {
+      question: "What makes Lychee different from other data tools?",
+      answer:
+        "Lychee focuses on prediction market and alternative data in one place. Instead of stitching together APIs, spreadsheets, and scripts, you can explore real-time and historical datasets, visualize trends, and export insights from a single workspace.",
+    },
+    {
+      question: "Can I use Lychee for backtesting and research?",
+      answer:
+        "Yes. Lychee includes historical datasets and visual exploration tools that make it easy to analyze trends, compare markets, and test ideas without building custom pipelines.",
+    },
   ],
   footer: [
     {

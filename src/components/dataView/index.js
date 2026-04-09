@@ -6,6 +6,7 @@ import { ArrowUpFromLine, FilePlus2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Tooltip,
   TooltipContent,
@@ -168,6 +169,7 @@ const DataView = ({ user }) => {
           {isDemo && (
             <div className="mb-3 max-w-2xl text-center sm:text-left">
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                <h1 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">Connect to 15+ real-time trading and market data APIs, 1000+ endpoints and 2TB worth of data.</h1>
                 <h2 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">
                   Pick one of your favorite data sources
                 </h2>
@@ -264,14 +266,21 @@ const DataView = ({ user }) => {
                   >
                     {integration.name}
                   </small>
-                  <p
-                    className={cn(
-                      "text-muted-foreground line-clamp-2",
-                      isDemo ? "pt-0.5 text-[11px] leading-snug" : "pt-1 text-sm",
-                    )}
-                  >
-                    {integration.description}
-                  </p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p
+                        className={cn(
+                          "text-muted-foreground line-clamp-2 cursor-help",
+                          isDemo ? "pt-0.5 text-[11px] leading-snug" : "pt-1 text-sm",
+                        )}
+                      >
+                        {integration.description}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-sm whitespace-pre-wrap">
+                      {integration.description}
+                    </TooltipContent>
+                  </Tooltip>
                 </CardContent>
                 <CardFooter
                   className={cn(
@@ -280,6 +289,11 @@ const DataView = ({ user }) => {
                   )}
                 >
                   {(() => {
+                    const guide = integration?.guide && typeof integration.guide === "object" ? integration.guide : null;
+                    const guideHref = guide?.href ? String(guide.href) : "";
+                    const guideTitle = guide?.title ? String(guide.title) : "";
+                    const guideLabel = guide?.label ? String(guide.label) : "Guide";
+
                     const warmConnect =
                       integration.clickHandler === "polymarketHistorical"
                         ? polymarketHistoricalConnect
@@ -329,31 +343,58 @@ const DataView = ({ user }) => {
                           >
                             {warmConnect.error}
                           </p>
+                          <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+                            {guideHref ? (
+                              <Link href={guideHref} title={guideTitle || undefined}>
+                                <Button type="button" variant="outline" className={cn(isDemo && "h-8 text-xs")}>
+                                  {guideLabel}
+                                </Button>
+                              </Link>
+                            ) : null}
+                            <Button
+                              type="button"
+                              onClick={() => warmConnect.start()}
+                              className={cn("w-full sm:w-auto self-end", isDemo && "h-8 text-xs")}
+                            >
+                              Try again
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+                          {guideHref ? (
+                            <Link href={guideHref} title={guideTitle || undefined}>
+                              <Button type="button" variant="outline" className={cn(isDemo && "h-8 text-xs")}>
+                                {guideLabel}
+                              </Button>
+                            </Link>
+                          ) : null}
                           <Button
                             type="button"
                             onClick={() => warmConnect.start()}
-                            className={cn("w-full sm:w-auto self-end", isDemo && "h-8 text-xs")}
+                            className={startBtnClass}
                           >
-                            Try again
+                            {isDemo ? "Start" : "Connect"}
                           </Button>
-                        </>
-                      ) : (
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+                        {guideHref ? (
+                          <Link href={guideHref} title={guideTitle || undefined}>
+                            <Button type="button" variant="outline" className={cn(isDemo && "h-8 text-xs")}>
+                              {guideLabel}
+                            </Button>
+                          </Link>
+                        ) : null}
                         <Button
-                          type="button"
-                          onClick={() => warmConnect.start()}
+                          onClick={() => openIntegrationPlayground(integration.clickHandler)}
                           className={startBtnClass}
                         >
                           {isDemo ? "Start" : "Connect"}
                         </Button>
-                      );
-                    }
-                    return (
-                      <Button
-                        onClick={() => openIntegrationPlayground(integration.clickHandler)}
-                        className={startBtnClass}
-                      >
-                        {isDemo ? "Start" : "Connect"}
-                      </Button>
+                      </div>
                     );
                   })()}
                 </CardFooter>
