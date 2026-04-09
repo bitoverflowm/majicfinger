@@ -148,20 +148,20 @@ body {
 @keyframes heroAuraGeometry {
   0%,
   100% {
-    --hero-aura-inner: 10%;
-    --hero-aura-rx: 118%;
-    --hero-aura-ry: 132%;
-    --hero-aura-at-y: 9%;
-    /* Coverage low → stronger read */
-    opacity: 0.98;
-  }
-  50% {
-    --hero-aura-inner: 40%;
+    --hero-aura-inner: 60%;
     --hero-aura-rx: 132%;
     --hero-aura-ry: 118%;
     --hero-aura-at-y: 11%;
     /* Coverage high → softer read */
     opacity: 0.52;
+  }
+  50% {
+    --hero-aura-inner: 40%;
+    --hero-aura-rx: 118%;
+    --hero-aura-ry: 132%;
+    --hero-aura-at-y: 9%;
+    /* Coverage low → stronger read */
+    opacity: 0.72;
   }
 }
 

@@ -169,7 +169,7 @@ const DataView = ({ user }) => {
           {isDemo && (
             <div className="mb-3 max-w-2xl text-center sm:text-left">
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <h1 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">Connect to 15+ real-time trading and market data APIs, 1000+ endpoints and 2TB worth of data.</h1>
+                <h1 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">Connect to 15+ real-time trading and market data APIs, 500+ endpoints and 2TB worth of data.</h1>
                 <h2 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">
                   Pick one of your favorite data sources
                 </h2>

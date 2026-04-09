@@ -30,19 +30,23 @@ export const siteConfig = {
     title: "Pricing that scales with you",
     description:
       "Start weekly, switch anytime. Pay annually when you’re ready to commit.",
-    pricingItems: landingPageV2Config.pricing.map((plan) => ({
+    pricingItems: (landingPageV2Config.pricing as any[]).map((plan: any) => ({
       name: plan.name,
       description: plan.description,
       features: plan.features,
       isPopular: Boolean(plan.isPopular),
       badgeLabel: plan.badgeLabel ?? null,
       buttonText: plan.buttonText,
-      hrefWeekly: plan.period === "one-time" ? plan.href : plan.hrefMonthly,
+      hrefWeekly:
+        plan.period === "one-time"
+          ? plan.href
+          : ("hrefWeekly" in plan && plan.hrefWeekly ? plan.hrefWeekly : plan.hrefMonthly),
       hrefMonthly: plan.period === "one-time" ? plan.href : plan.hrefMonthly,
       hrefAnnual: plan.period === "one-time" ? plan.href : plan.hrefYearly,
       period: plan.period,
-      priceMonthly: plan.price,
-      priceYearlyEffectiveMonthly: plan.yearlyPrice ?? plan.price,
+      priceWeekly: plan.priceWeekly ?? null,
+      priceMonthly: plan.priceMonthly ?? null,
+      priceAnnual: plan.priceAnnual ?? null,
       yearlyNote: plan.yearlyNote ?? null,
       trial: plan.trial ?? null,
     })),
@@ -132,7 +136,7 @@ export const siteConfig = {
     title: "Go from raw markets to charts in seconds—no code, no CSVs.",
     subtext: "Free to explore · Polymarket, Kalshi, Chainlink & more",
     button: {
-      href: "/dashboard",
+      href: "/#pricing",
       text: "Open Lychee",
     },
   },

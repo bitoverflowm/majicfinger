@@ -16,6 +16,10 @@ interface TabsProps {
 
 function PricingTabs({ activeTab, setActiveTab, className }: TabsProps) {
   const tabs: BillingCycle[] = ["weekly", "monthly", "annual"];
+  const discounts: Partial<Record<BillingCycle, string>> = {
+    monthly: "-10%",
+    annual: "-25%",
+  };
 
   return (
     <div
@@ -54,9 +58,9 @@ function PricingTabs({ activeTab, setActiveTab, className }: TabsProps) {
             )}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            {tab === "annual" && (
+            {discounts[tab] && (
               <span className="ml-2 text-xs font-semibold text-secondary bg-secondary/15 py-0.5 w-[calc(100%+1rem)] px-1 rounded-full">
-                -20%
+                {discounts[tab]}
               </span>
             )}
           </span>
@@ -64,15 +68,6 @@ function PricingTabs({ activeTab, setActiveTab, className }: TabsProps) {
       ))}
     </div>
   );
-}
-
-function parsePriceDollars(price: string): number | null {
-  const n = Number(String(price).replace(/[^0-9.]/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
-
-function formatDollars(n: number): string {
-  return `$${n.toFixed(2).replace(/\\.00$/, "")}`;
 }
 
 export function PricingSection() {
@@ -85,7 +80,7 @@ export function PricingSection() {
         return {
           ...tier,
           display: {
-            price: tier.priceMonthly,
+            price: tier.priceMonthly ?? "",
             suffix: "one-time",
             note: null as string | null,
             href: tier.hrefMonthly,
@@ -93,37 +88,23 @@ export function PricingSection() {
         };
       }
 
-      const monthly = parsePriceDollars(tier.priceMonthly);
-      const yearlyEffectiveMonthly = parsePriceDollars(
-        tier.priceYearlyEffectiveMonthly,
-      );
-
-      const weeklyPrice =
-        monthly !== null ? formatDollars(monthly / 4) : tier.priceMonthly;
-      const monthlyPrice = tier.priceMonthly;
-
-      const annualTotal =
-        yearlyEffectiveMonthly !== null
-          ? formatDollars(yearlyEffectiveMonthly * 12)
-          : tier.priceYearlyEffectiveMonthly;
-
       const display =
         billingCycle === "weekly"
           ? {
-              price: weeklyPrice,
+              price: tier.priceWeekly ?? tier.priceMonthly ?? "",
               suffix: "week",
               note: null,
               href: tier.hrefWeekly,
             }
           : billingCycle === "monthly"
             ? {
-                price: monthlyPrice,
+                price: tier.priceMonthly ?? "",
                 suffix: "month",
                 note: "billed monthly",
                 href: tier.hrefMonthly,
               }
             : {
-                price: annualTotal,
+                price: tier.priceAnnual ?? "",
                 suffix: "year",
                 note: tier.yearlyNote ?? "billed annually",
                 href: tier.hrefAnnual,
