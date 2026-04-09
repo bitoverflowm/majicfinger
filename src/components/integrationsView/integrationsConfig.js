@@ -15,27 +15,41 @@ export const API_INTEGRATIONS = [
   "chainlink",
 ];
 
+/** Fixed visual size for every integration logo (data picker + integrations views). */
+const LOGO_PX = 56;
+
+/**
+ * @param {{ src: string; className?: string; imageClassName?: string }} props
+ */
+function IntegrationLogoImage({ src, className = "", imageClassName = "" }) {
+  return (
+    <div
+      className={`integration-logo-avatar relative mx-auto flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--integration-card-bg)] shadow-md ${className}`}
+    >
+      <Image
+        src={src}
+        alt=""
+        fill
+        className={`object-contain p-1.5 ${imageClassName}`}
+        sizes={`${LOGO_PX}px`}
+      />
+    </div>
+  );
+}
+
 export const integrations_list = [
   {
     color: "#2E5CFF",
-    icon: (
-      <div className="relative mx-auto h-[60px] w-[60px] shrink-0 overflow-hidden rounded-full shadow-2xl">
-        <Image src="/polymarket.png" alt="" fill className="object-cover" sizes="60px" />
-      </div>
-    ),
+    icon: <IntegrationLogoImage src="/polymarket.png" />,
     clickHandler: "polymarket",
     name: "Polymarket",
     description: "All the data you could want on the world's largest prediction market.",
-    tags: ['featured', 'crypto', 'finance', 'trading', 'prediction'],
+    tags: ["featured", "crypto", "finance", "trading", "prediction"],
     live: true,
   },
   {
     color: "#0f172a",
-    icon: (
-      <div className="relative mx-auto h-[60px] w-[60px] shrink-0 overflow-hidden rounded-full shadow-2xl ring-2 ring-slate-600/50">
-        <Image src="/polymarket.png" alt="" fill className="object-cover" sizes="60px" />
-      </div>
-    ),
+    icon: <IntegrationLogoImage src="/polymarket.png" />,
     clickHandler: "polymarketHistorical",
     name: "Polymarket Historical",
     description:
@@ -46,8 +60,14 @@ export const integrations_list = [
   {
     color: "#28CC95",
     icon: (
-      <div className="relative mx-auto flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-black shadow-2xl">
-        <Image src="/kalshi.png" alt="" fill className="object-contain p-1.5" sizes="60px" />
+      <div className="integration-logo-avatar relative mx-auto flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--integration-card-bg)] shadow-md">
+        <Image
+          src="/kalshi.png"
+          alt=""
+          fill
+          className="object-contain p-1.5"
+          sizes={`${LOGO_PX}px`}
+        />
       </div>
     ),
     clickHandler: "kalshiHistorical",
@@ -58,122 +78,149 @@ export const integrations_list = [
   },
   {
     color: "#E7F0DC",
-    icon: <div className="p-1 rounded-full shadow-2xl"><Image src={'/coinGecko.png'} height={60} width={60} /></div>,
+    icon: <IntegrationLogoImage src="/coinGecko.png" />,
     clickHandler: "coinGecko",
     name: "CoinGecko",
     description: "Connect to the most reliable and comprehensive cryptocurrency data API for traders and developers.",
-    tags: ['featured', 'crypto', 'finance', 'trading', 'coming soon'],
+    tags: ["featured", "crypto", "finance", "trading", "coming soon"],
     live: false,
   },
   {
     color: "#000",
     icon: (
-      <div className="w-full h-full flex items-center justify-center bg-black">
-        <Image src={'/binance.jpeg'} height={60} width={60} className="rounded-full object-contain" />
+      <div className="integration-logo-avatar relative mx-auto flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--integration-card-bg)] shadow-md">
+        <Image
+          src="/binance.jpeg"
+          alt=""
+          fill
+          className="rounded-full object-contain p-1.5"
+          sizes={`${LOGO_PX}px`}
+        />
       </div>
     ),
     clickHandler: "binance",
     name: "Binance",
     description: "Real-time cryptocurrency price data from: Binance",
-    tags: ['crypto', 'finance', 'trading'],
+    tags: ["crypto", "finance", "trading"],
     live: true,
   },
   {
     color: "#375BD2",
     icon: (
-      <div className="w-full h-full flex items-center justify-center bg-[#375BD2]">
-        <Image src={'/chainlink.png'} height={60} width={60} className="rounded-full object-contain" />
+      <div className="integration-logo-avatar relative mx-auto flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--integration-card-bg)] shadow-md">
+        <Image
+          src="/chainlink.png"
+          alt=""
+          fill
+          className="rounded-full object-contain p-1.5"
+          sizes={`${LOGO_PX}px`}
+        />
       </div>
     ),
     clickHandler: "chainlink",
     name: "Chainlink",
     description: "Real-time cryptocurrency price data from Chainlink — the world's #1 oracle",
     playgroundDescription: "Select a trading pair to start pulling live prices",
-    tags: ['crypto', 'finance', 'oracles'],
+    tags: ["crypto", "finance", "oracles"],
     live: true,
   },
   {
     color: "#000",
-    icon: <Image src={'/geckoDex1.png'} height={75} width={75} />,
+    icon: <IntegrationLogoImage src="/geckoDex1.png" />,
     clickHandler: "geckoDex",
     name: "GeckoTerminal from CoinGecko",
-    description: "GeckoTerminal is a DeFi and DEX aggregator. Explore the market data & prices of any tokens traded across 110+ blockchain networks across 900+ DEXes – brought to you by the same team behind CoinGecko.",
-    tags: ['featured', 'crypto', 'finance', 'trading', 'coming soon'],
+    description:
+      "GeckoTerminal is a DeFi and DEX aggregator. Explore the market data & prices of any tokens traded across 110+ blockchain networks across 900+ DEXes – brought to you by the same team behind CoinGecko.",
+    tags: ["featured", "crypto", "finance", "trading", "coming soon"],
     live: false,
   },
   {
     color: "#AE82FE",
-    icon: <Image src={'/productHunt.png'} height={80} width={80} />,
+    icon: <IntegrationLogoImage src="/productHunt.png" />,
     clickHandler: "productHunt",
     name: "Product Hunt",
     description: "Discover the latest tech products, startups, and trends with real-time updates from Product Hunt.",
-    tags: ['indieHackers', 'coming July 24', 'coming soon']
+    tags: ["indieHackers", "coming July 24", "coming soon"],
   },
   {
     color: "#000",
-    icon: <Image src={'/x.png'} height={60} width={60} />,
+    icon: <IntegrationLogoImage src="/x.png" />,
     clickHandler: "twitter",
     name: "Twitter",
     description: "Access and analyze a wealth of Twitter data, from tweets and user profiles to trends and hashtags.",
-    tags: ['social', 'marketing', 'coming soon'],
+    tags: ["social", "marketing", "coming soon"],
     live: false,
   },
   {
     color: "#3572EF",
-    icon: <Image src={'/wallStreetBets.png'} height={80} width={80} />,
+    icon: <IntegrationLogoImage src="/wallStreetBets.png" />,
     clickHandler: "wallStreetBets",
     name: "Wall Street Bets",
     description: "Sentiment analysis on the top 50 stocks discussed on Reddit sub- wallStreetBets.",
-    tags: ['finance', 'trading', 'coming soon'],
+    tags: ["finance", "trading", "coming soon"],
     live: false,
   },
   {
     color: "#FF4500",
-    icon: <Image src={'/shortSqueeze.png'} height={60} width={60} />,
+    icon: <IntegrationLogoImage src="/shortSqueeze.png" />,
     clickHandler: "shortSqueeze",
     name: "Short Squeeze Stock Scanner",
     description: "Get a list of stocks that are in TTM Squeeze or out of squeeze.",
-    tags: ['finance', 'trading', 'coming soon'],
+    tags: ["finance", "trading", "coming soon"],
     live: false,
   },
   {
     color: "#3AA6B9",
-    icon: <Image src={'/sec.png'} height={60} width={60} />,
+    icon: <IntegrationLogoImage src="/sec.png" />,
     clickHandler: "secEdgar",
     name: "SEC EDGAR",
     description: "Access comprehensive financial statements, filings, and disclosures from the SEC's EDGAR database.",
-    tags: ['finance', 'regulation', 'compliance','coming soon', 'coming July 24']
+    tags: ["finance", "regulation", "compliance", "coming soon", "coming July 24"],
   },
   {
     color: "#004080",
-    icon: <Image src={'/censusGov.png'} height={60} width={60} />,
+    icon: <IntegrationLogoImage src="/censusGov.png" />,
     clickHandler: "censusGov",
     name: "Census.gov",
     description: "Retrieve detailed demographic, economic, and population data from the U.S. Census Bureau.",
-    tags: ['data', 'demographics', 'population', 'coming soon', 'coming July 24']
+    tags: ["data", "demographics", "population", "coming soon", "coming July 24"],
   },
   {
     color: "#0099CC",
-    icon: <Image src={'/crunchbase.png'} height={60} width={60} className="rounded-md shadow-2xl"/>,
+    icon: <IntegrationLogoImage src="/crunchbase.png" imageClassName="rounded-md" />,
     clickHandler: "crunchbase",
     name: "Crunchbase",
     description: "Get access to comprehensive information about companies, startups, investments, and industry trends.",
-    tags: ['business', 'startups', 'investment', 'coming soon', 'coming July 24']
+    tags: ["business", "startups", "investment", "coming soon", "coming July 24"],
   },
   {
     color: "#FF6600",
-    icon: <div className="bg-white p-1 rounded-md shadow-2xl"><Image src={'/hackerNews.png'} height={50} width={50} /></div>,
+    icon: (
+      <div className="integration-logo-avatar relative mx-auto flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--integration-card-bg)] shadow-md">
+        <Image
+          src="/hackerNews.png"
+          alt=""
+          fill
+          className="object-contain p-1"
+          sizes={`${LOGO_PX}px`}
+        />
+      </div>
+    ),
     clickHandler: "hackerNews",
     name: "Hacker News",
     description: "Stay updated with the latest tech news, discussions, and trends from the Hacker News community.",
-    tags: ['tech', 'news', 'community', 'coming soon', 'coming July 24']
+    tags: ["tech", "news", "community", "coming soon", "coming July 24"],
   },
   {
     color: "#000080",
-    icon: <div className="text-white">USTreasuries</div>,
+    icon: (
+      <div className="integration-logo-avatar flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[var(--integration-card-bg)] px-1 text-center text-[10px] font-semibold leading-tight text-white shadow-md [text-shadow:0_1px_2px_rgba(0,0,0,0.4)]">
+        US Treasuries
+      </div>
+    ),
     clickHandler: "usTreasuries",
     name: "US Treasuries",
     description: "Access real-time and historical data on U.S. Treasury securities, yields, and auctions.",
-    tags: ['finance', 'government', 'coming soon', 'coming July 24']
-  }
+    tags: ["finance", "government", "coming soon", "coming July 24"],
+  },
 ];

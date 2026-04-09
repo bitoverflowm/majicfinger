@@ -89,6 +89,7 @@ export default async function handler(req, res) {
     compose: { ...composeIn, select: injectedSelect },
     filters: body.filters && typeof body.filters === "object" ? body.filters : null,
     caseSensitive: true,
+    demo: body.demo === true,
   };
 
   let validated;
@@ -122,6 +123,7 @@ export default async function handler(req, res) {
       caseSensitive: validated.caseSensitive,
       limit: validated.limit,
       maxWaitMs,
+      demo: validated.demo,
     });
 
     const pullObjects = athenaRowsToObjects(result.columns, result.rows);

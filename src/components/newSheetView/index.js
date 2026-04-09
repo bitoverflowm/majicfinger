@@ -5,13 +5,23 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 //import Image from 'next/image'
 import GridView from '@/components/gridView'
 import { VscCircleFilled } from 'react-icons/vsc'
+import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge"
 
 const NewSheetView = ({user, startNew}) => {
     const contextStateV2 = useMyStateV2()
     const setViewing = contextStateV2?.setViewing
+    const isDemo = contextStateV2?.isDemo
 
     return(
         <div className='w-full px-10'>
+            {isDemo ? (
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <h2 className="text-sm font-semibold leading-snug tracking-tight sm:text-base">
+                        New sheet
+                    </h2>
+                    <DemoSignUpBadge />
+                </div>
+            ) : null}
             {
                 !(user) && 
                     <Alert onClick={()=>setViewing('register')} className="cursor-pointer">

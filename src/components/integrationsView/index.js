@@ -15,6 +15,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { API_INTEGRATIONS, integrations_list } from "./integrationsConfig";
 import { ConnectProgressWithLabel } from "./integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { useBeckerHistoricalWarmIntegrationsConnect } from "./integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
+import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 
 // Extract tags categories
 const tags_categories = [...new Set(integrations_list.flatMap(integration => integration.tags))];
@@ -22,6 +23,7 @@ const tags_categories = [...new Set(integrations_list.flatMap(integration => int
 const IntegrationsView = () => {
   const [selectedTag, setSelectedTag] = useState(null);
   const context = useMyStateV2();
+  const isDemo = context?.isDemo;
   const setViewing = context?.setViewing;
   const setIntegrationSidebar = context?.setIntegrationSidebar;
   const setConnectedData = context?.setConnectedData;
@@ -85,6 +87,12 @@ const IntegrationsView = () => {
   return (
     <div className="">
       <div className="pt-4 p-10 md:p-12 lg:p-16 xl:p-32">
+            {isDemo ? (
+              <div className="mb-6 flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold tracking-tight">Integrations</h2>
+                <DemoSignUpBadge />
+              </div>
+            ) : null}
             <div className="w-full pb-20 grid gap-6 lg:grid-cols-2">
               <Card className="relative overflow-hidden flex flex-row w-full min-h-[180px]">
                 <BorderBeam size={250} duration={12} colorFrom="#2E5CFF" colorTo="#60a5fa" className="pointer-events-none" />
@@ -191,7 +199,13 @@ const IntegrationsView = () => {
                 .filter(integration => !selectedTag || integration.tags.includes(selectedTag))
                 .map((integration, index) => (
                 <Card key={index} className="flex flex-col h-full">
-                  <CardHeader className={`w-full items-center rounded-md py-20`} style={{backgroundColor: integration.color}}>
+                  <CardHeader
+                    className={`w-full items-center rounded-md py-20`}
+                    style={{
+                      backgroundColor: integration.color,
+                      "--integration-card-bg": integration.color,
+                    }}
+                  >
                     {integration.icon}
                   </CardHeader>
                   <CardContent className="py-4 grow">

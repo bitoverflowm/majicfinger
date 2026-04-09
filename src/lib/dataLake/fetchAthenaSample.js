@@ -44,6 +44,7 @@ export async function fetchAthenaLakeSample(
     compose = null,
     filters = null,
     caseSensitive = false,
+    demo = false,
   },
   pollOpts = {},
 ) {
@@ -70,6 +71,7 @@ export async function fetchAthenaLakeSample(
       compose: isCompose && compose && typeof compose === "object" ? compose : undefined,
       filters,
       caseSensitive,
+      demo: demo === true,
     }),
   });
 

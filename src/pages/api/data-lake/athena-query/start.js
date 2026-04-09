@@ -57,6 +57,7 @@ export default async function handler(req, res) {
       filters: validated.filters,
       caseSensitive: validated.caseSensitive,
       limit: validated.limit,
+      demo: validated.demo,
     });
 
     return res.status(202).json({

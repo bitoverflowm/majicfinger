@@ -63,6 +63,7 @@ export default async function handler(req, res) {
       caseSensitive: validated.caseSensitive,
       limit: validated.limit,
       maxWaitMs,
+      demo: validated.demo,
     });
 
     return res.status(200).json({

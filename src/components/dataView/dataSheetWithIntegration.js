@@ -34,6 +34,7 @@ import {
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 
 const INTEGRATION_OPTIONS = [
   { value: "binance", label: "Binance", logo: "/binance.jpeg" },
@@ -252,6 +253,14 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
           )}
           {chartMode ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {isDemo ? (
+                <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 pb-2 sm:justify-start">
+                  <h2 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">
+                    Charts
+                  </h2>
+                  <DemoSignUpBadge />
+                </div>
+              ) : null}
               <ChartCanvas />
             </div>
           ) : (

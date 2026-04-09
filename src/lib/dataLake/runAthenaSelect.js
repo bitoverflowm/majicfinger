@@ -3,6 +3,7 @@
  * Supports: start-only, single poll, full result fetch, or sync wait (compose).
  */
 import AWS from "aws-sdk";
+import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { isValidColumnIdentifier } from "./athenaTableMap";
 import {
   buildComposeAthenaSelectSql,
@@ -50,6 +51,7 @@ function assertAthenaConfig() {
  * @param {string | null | undefined} [opts.sumAlias]
  * @param {{ and: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }>; or: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }> } | null | undefined} [opts.filters]
  * @param {boolean} [opts.caseSensitive]
+ * @param {boolean} [opts.demo] — when true, compose queries use ATHENA_DEMO_ROW_LIMIT as SQL row cap
  * @param {number} opts.limit
  * @returns {Promise<{ queryExecutionId: string; sql: string; rowLimit: number | null }>}
  */
@@ -67,6 +69,7 @@ export async function startAthenaBoundedQuery({
   filters = null,
   caseSensitive = false,
   limit,
+  demo = false,
 }) {
   const output = assertAthenaConfig();
 
@@ -226,8 +229,8 @@ export async function startAthenaBoundedQuery({
       throw err;
     }
     // For now we hard-cap all compose queries to keep requests compact (Free plan UX).
-    // Server-side "CTE workflow" still re-queries the full lake logically, but we only return up to this cap.
-    const capRows = COMPOSE_UNCONSTRAINED_ROW_CAP;
+    // Demo embeds use a smaller cap so marketing visitors see a tiny sample only.
+    const capRows = demo ? ATHENA_DEMO_ROW_LIMIT : COMPOSE_UNCONSTRAINED_ROW_CAP;
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
       limit: capRows,
@@ -384,6 +387,7 @@ export async function runAthenaBoundedSelect({
   caseSensitive = false,
   limit,
   maxWaitMs,
+  demo = false,
 }) {
   const { queryExecutionId, sql, rowLimit } = await startAthenaBoundedQuery({
     physicalTableName,
@@ -399,6 +403,7 @@ export async function runAthenaBoundedSelect({
     filters,
     caseSensitive,
     limit,
+    demo,
   });
 
   const deadline = Date.now() + maxWaitMs;

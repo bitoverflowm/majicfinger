@@ -19,10 +19,12 @@ import { Carrot, Citrus, Ghost, Hexagon, Pickaxe, Sprout } from "lucide-react"
 
 import { Alert } from '@/components/ui/alert'
 import { Progress } from "@/components/ui/progress"
+import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge"
 
 
 const Upload = ({user}) => {
     const contextStateV2 = useMyStateV2()
+    const isDemo = contextStateV2?.isDemo
 
     const connectedData = contextStateV2?.connectedData
     const setConnectedData = contextStateV2?.setConnectedData
@@ -120,7 +122,10 @@ const Upload = ({user}) => {
         <div className='pr-10 pl-4 pb-10 sm:w-full'>
             <Card className="my-10 sm:mx-auto max-w-[700px]">
                 <CardHeader>
-                    <CardTitle>Upload Your Data</CardTitle>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <CardTitle>Upload Your Data</CardTitle>
+                        {isDemo ? <DemoSignUpBadge /> : null}
+                    </div>
                     <CardDescription>
                         *must be csv or excel
                     </CardDescription>

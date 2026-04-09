@@ -27,6 +27,9 @@ export const ATHENA_KALSHI_SAMPLE_OPTIONS = [
 /** Fixed server row cap for integration samples (matches product expectation). */
 export const ATHENA_SAMPLE_ROW_LIMIT = 100;
 
+/** Row cap for embedded demo (`body.demo` / `isDemo`) — Polymarket & Kalshi historical pulls only. */
+export const ATHENA_DEMO_ROW_LIMIT = 10;
+
 /**
  * @typedef {"polymarket" | "kalshi"} DataLakeDataset
  */

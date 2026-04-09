@@ -33,7 +33,12 @@ import {
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { Play, AlertCircle, HelpCircle, ChevronDown, ChevronUp, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
-import { getDataLakeDatasetConfig, glueTableNamesForDataset, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import {
+  getDataLakeDatasetConfig,
+  glueTableNamesForDataset,
+  ATHENA_SAMPLE_ROW_LIMIT,
+  ATHENA_DEMO_ROW_LIMIT,
+} from "@/config/dataLakeParquetSamples";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
@@ -482,6 +487,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const liveStreamState = ctx?.liveStreamState;
   const activeSheetId = ctx?.activeSheetId;
   const setActiveSheetId = ctx?.setActiveSheetId;
+  const isDemo = !!ctx?.isDemo;
+  const athenaRowLimit = isDemo ? ATHENA_DEMO_ROW_LIMIT : ATHENA_SAMPLE_ROW_LIMIT;
 
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
   const hasLiveConnection =
@@ -756,7 +763,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           }
         }
         out.push(row);
-        if (out.length >= ATHENA_SAMPLE_ROW_LIMIT) break;
+        if (out.length >= athenaRowLimit) break;
       }
 
       const joinElapsedMs = (() => {
@@ -855,6 +862,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             },
           ],
           sheetGraph,
+          demo: isDemo,
         }),
       });
       const j = await res.json().catch(() => ({}));
@@ -863,7 +871,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       const rawJoinRows = Array.isArray(j.rows) ? j.rows : [];
       const outRows = athenaRowsToObjects(Array.isArray(j.columns) ? j.columns : [], rawJoinRows).slice(
         0,
-        ATHENA_SAMPLE_ROW_LIMIT,
+        athenaRowLimit,
       );
 
       const joinServerElapsedMs = (() => {
@@ -942,6 +950,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setDataSheets,
     selected?.table,
     lake,
+    isDemo,
+    athenaRowLimit,
   ]);
 
   const addComposeJoinRule = useCallback(() => {
@@ -1337,7 +1347,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 const { columns: resultColumns, rows } = await fetchAthenaLakeSample({
                   lake: lakeVal,
                   table,
-                  limit: ATHENA_SAMPLE_ROW_LIMIT,
+                  limit: athenaRowLimit,
                   queryType: op.kind === "sum" ? "sum" : "count",
                   countAlias: "count",
                   countDistinctColumn: op.kind === "count_distinct" ? op.aggregateColumn : null,
@@ -1345,6 +1355,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   sumAlias: "sum",
                   caseSensitive: true,
                   filters,
+                  demo: isDemo,
                 });
                 const resultKey = op.kind === "sum" ? "sum" : "count";
                 const valueIdx = resultColumns.indexOf(resultKey);
@@ -1356,7 +1367,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 sampleId: `${sid}-meta-multi`,
                 columns: ["meta query", "value"],
                 rows: tableRows,
-                limit: ATHENA_SAMPLE_ROW_LIMIT,
+                limit: athenaRowLimit,
               });
             }
             // Meta table (count): a single-cell COUNT(*) result (optionally with filters).
@@ -1364,7 +1375,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             const { columns: resultColumns, rows } = await fetchAthenaLakeSample({
               lake: lakeVal,
               table,
-              limit: ATHENA_SAMPLE_ROW_LIMIT,
+              limit: athenaRowLimit,
               queryType: metaOperationKind === "sum" ? "sum" : "count",
               countAlias: "count",
               countDistinctColumn: metaOperationKind === "count_distinct" ? metaOperationColumn : null,
@@ -1372,13 +1383,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               sumAlias: "sum",
               caseSensitive: true,
               filters: isFilterMode ? metaFilters : null,
+              demo: isDemo,
             });
             return ingestAthenaResultAsView({
               dataset,
               sampleId: `${sid}-meta-count`,
               columns: resultColumns,
               rows,
-              limit: ATHENA_SAMPLE_ROW_LIMIT,
+              limit: athenaRowLimit,
             });
           }
 
@@ -1413,6 +1425,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       filters: composeFilters || null,
                       sheetRows: sheetJoin.sheetRows,
                       join: sheetJoin.join,
+                      demo: isDemo,
                     }),
                   });
                   let j = {};
@@ -1437,6 +1450,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       filters: composeFilters || null,
                       joins: sheetJoin.joins || [],
                       sheetGraph: sheetJoin.sheetGraph || {},
+                      demo: isDemo,
                     }),
                   });
                   let j = {};
@@ -1459,6 +1473,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   compose: composeSpec,
                   filters: composeFilters || null,
                   caseSensitive: true,
+                  demo: isDemo,
                 },
                 { maxWaitMs: 900000 },
               );
@@ -1489,19 +1504,19 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           }
 
           const cappedColumns = Array.isArray(resultColumns) ? resultColumns : [];
-          const cappedRows = Array.isArray(outRows) ? outRows.slice(0, ATHENA_SAMPLE_ROW_LIMIT) : [];
+          const cappedRows = Array.isArray(outRows) ? outRows.slice(0, athenaRowLimit) : [];
           return ingestAthenaResultAsView({
             dataset,
             sampleId: `${sid}-compose`,
             columns: cappedColumns,
             rows: cappedRows,
-            limit: ATHENA_SAMPLE_ROW_LIMIT,
+            limit: athenaRowLimit,
             ingestFullResult: false,
           });
         },
       });
     },
-    [dataset, metaOperationColumn, metaOperationKind],
+    [dataset, metaOperationColumn, metaOperationKind, isDemo, athenaRowLimit],
   );
 
   const executeIngestReplace = useCallback(async () => {
@@ -4081,7 +4096,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="browser" className="text-xs">
-                                    Browser (100-row preview)
+                                    Browser ({athenaRowLimit}-row preview)
                                   </SelectItem>
                                   <SelectItem value="server" className="text-xs">
                                     Server (full dataset via CTE)
@@ -4245,7 +4260,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             <DialogDescription>
               Choose whether to join the current <span className="font-medium">sheet previews</span> in the browser, or re-run a{" "}
               <span className="font-medium">full lake join</span> in Athena and write results into a new sheet (capped to{" "}
-              {ATHENA_SAMPLE_ROW_LIMIT} rows).
+              {athenaRowLimit} rows).
             </DialogDescription>
           </DialogHeader>
 
@@ -4394,7 +4409,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               </p>
             ) : (
               <p className="text-[11px] text-muted-foreground leading-snug">
-                Sheet joins happen entirely in the browser using the currently loaded sheet rows (usually 100-row previews).
+                Sheet joins happen entirely in the browser using the currently loaded sheet rows (usually {athenaRowLimit}-row previews).
               </p>
             )}
           </div>

@@ -22,6 +22,7 @@ import {
   composeUnboundedSelectShouldCapRows,
   COMPOSE_UNCONSTRAINED_ROW_CAP,
 } from "./buildComposeAthenaSql";
+import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { validateAndNormalizeEquation } from "./composeEquationAst";
 
 export class AthenaLakeRequestError extends Error {
@@ -69,6 +70,7 @@ export function validateAthenaLakeQueryBody(body) {
 
   const lake = String(body.lake || "").toLowerCase().trim();
   const table = String(body.table || "").toLowerCase().trim();
+  const demo = body.demo === true;
   const limit = body.limit != null ? Number(body.limit) : 100;
   const queryTypeRaw = String(body.queryType || "select").toLowerCase().trim();
   const queryType =
@@ -269,7 +271,8 @@ export function validateAthenaLakeQueryBody(body) {
     );
   }
 
-  const limClamped = Math.min(1000, Math.max(1, Math.floor(Number(limit) || 100)));
+  let limClamped = Math.min(1000, Math.max(1, Math.floor(Number(limit) || 100)));
+  if (demo) limClamped = Math.min(limClamped, ATHENA_DEMO_ROW_LIMIT);
 
   if (queryType === "compose") {
     const raw = body.compose;
@@ -785,6 +788,7 @@ export function validateAthenaLakeQueryBody(body) {
     lake,
     table,
     limit: limClamped,
+    demo,
     columns: queryType === "compose" ? null : columns && columns.length ? columns : null,
     queryType,
     countAlias: queryType === "count" ? countAlias : null,
