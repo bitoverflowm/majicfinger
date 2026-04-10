@@ -9,9 +9,9 @@ interface BoxConfig {
 }
 
 const boxConfigs: BoxConfig[] = [
-  { title: "Bento grid", className: "bg-secondary text-secondary-foreground" },
-  { title: "Landing Page", className: "bg-secondary/40 text-secondary-foreground" },
-  { title: "Add Task", className: "bg-secondary/10 border border-secondary border-dashed text-secondary" },
+  { title: "Data Source", className: "bg-secondary text-secondary-foreground" },
+  { title: "Analyze and Visualize", className: "bg-secondary/40 text-secondary-foreground" },
+  { title: "Share, Automate, and Dashboard", className: "bg-secondary/10 border border-secondary border-dashed text-secondary" },
 ];
 
 export function FourthBentoAnimation({

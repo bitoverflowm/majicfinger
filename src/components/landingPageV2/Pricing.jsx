@@ -34,7 +34,7 @@ export default function Pricing() {
           >
             <span>{t.label}</span>
             {t.badge && (
-              <span className="ml-2 text-xs font-semibold text-secondary bg-secondary/15 py-0.5 w-[calc(100%+1rem)] px-1 rounded-full">
+              <span className="ml-2 text-xs font-semibold text-secondary bg-secondary/40 py-0.5 w-[calc(100%+1rem)] px-1 rounded-full">
                 {t.badge}
               </span>
             )}

@@ -28,7 +28,7 @@ export const metadata = {
     url: 'https://lycheedata.com',
     title: 'Lychee: Your Quant in a Box',
     description: 'One operator. Full pipeline. Real edge. Stop juggling CSVs, Python scripts, and messy charts. Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser. Zero coding. Zero friction. Real results.',
-    image: 'https://lycheedata.com/ogImage2.png'
+    images: ['https://lycheedata.com/ogImage2.png']
   }
 };
 

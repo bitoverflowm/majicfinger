@@ -96,15 +96,6 @@ export function StickyHeader() {
                     Home
                   </a>
                 </li>
-                <li className="hidden items-center justify-center px-2 py-0.5 lg:flex">
-                  <a href="#">Features</a>
-                </li>
-                <li className="hidden items-center justify-center px-2 py-0.5 lg:flex">
-                  <a href="#">Pricing</a>
-                </li>
-                <li className="hidden items-center justify-center px-2 py-0.5 lg:flex">
-                  <a href="#">Contact</a>
-                </li>
                 <AnimatePresence>
                   <motion.div
                     initial={{ width: 0 }}

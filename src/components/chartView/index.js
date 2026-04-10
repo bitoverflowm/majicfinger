@@ -18,6 +18,7 @@ import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtr
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { ATHENA_DEMO_ROW_LIMIT } from '@/config/dataLakeParquetSamples';
 
 const ChartBuilderContext = createContext(null);
 
@@ -574,6 +575,7 @@ export function ChartBuilderProvider({ demo, children }) {
 
 export function ChartCanvas() {
   const {
+    demo,
     dark,
     showWsFeedControl,
     wsRunning,
@@ -856,6 +858,14 @@ export function ChartCanvas() {
           </div>
         </div>
       </div>
+      {demo ? (
+        <p
+          className="shrink-0 border-t border-red-200/90 bg-red-50 px-3 py-2 text-center text-[11px] font-semibold leading-snug text-red-600 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-400 sm:text-xs"
+          role="status"
+        >
+          Demo: you can only pull up to {ATHENA_DEMO_ROW_LIMIT} rows per request. Sign up for the full dataset.
+        </p>
+      ) : null}
     </div>
   );
 }

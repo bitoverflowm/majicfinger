@@ -1,6 +1,6 @@
 "use client";
 
-import { Icons } from "@/components/icons";
+import Image from "next/image";
 import { OrbitingCircles } from "@/components/ui/orbiting-circle";
 import {
   Figma,
@@ -29,7 +29,13 @@ export function SecondBentoAnimation() {
       <div className="pointer-events-none absolute top-0 left-0 h-20 w-full bg-gradient-to-b from-background to-transparent z-20"></div>
 
       <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 size-16 bg-secondary p-2 rounded-full z-30 md:bottom-0 md:top-auto">
-        <Icons.logo className="fill-white size-10" />
+        <Image
+          src="/logo.png"
+          alt="Lychee"
+          width={40}
+          height={40}
+          className="block size-10 rounded-full object-contain grayscale"
+        />
       </div>
 
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden">

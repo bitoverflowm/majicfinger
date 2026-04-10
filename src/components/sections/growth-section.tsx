@@ -24,17 +24,19 @@ export function GrowthSection() {
           </p>
         </SectionHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-x md:divide-y-0">
+        <div className="grid grid-cols-1 items-stretch divide-y md:grid-cols-2 md:divide-x md:divide-y-0">
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex flex-col items-start justify-end gap-2 p-6 min-h-[500px]"
+              className="flex min-h-[560px] w-full min-w-0 flex-col items-center justify-end gap-2 p-6"
             >
-              {item.content}
-              <h3 className="text-lg tracking-tighter font-semibold">
+              <div className="flex min-h-[380px] w-full flex-1 flex-col items-center justify-center">
+                {item.content}
+              </div>
+              <h3 className="w-full text-lg tracking-tighter font-semibold">
                 {item.title}
               </h3>
-              <p className="text-muted-foreground">{item.description}</p>
+              <p className="w-full text-muted-foreground">{item.description}</p>
             </div>
           ))}
         </div>

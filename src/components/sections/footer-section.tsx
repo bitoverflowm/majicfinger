@@ -1,11 +1,11 @@
 "use client";
 
-import { Icons } from "@/components/icons";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { siteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { ChevronRightIcon } from "@radix-ui/react-icons";
+import Image from "next/image";
 import Link from "next/link";
 
 function isExternal(url: string) {
@@ -20,7 +20,7 @@ export function FooterSection() {
       <div className="flex flex-col md:flex-row md:items-start md:justify-between p-10 gap-8 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-start justify-start gap-y-5 max-w-md mx-0">
           <Link href="/" className="flex items-center gap-2">
-            <Icons.logo className="size-8 text-primary" />
+            <Image src="/logo.png" alt="" width={32} height={32} className="size-8 object-contain" />
             <p className="text-xl font-semibold text-primary">{siteConfig.name}</p>
           </Link>
           <p className="tracking-tight text-muted-foreground font-medium text-sm leading-relaxed">

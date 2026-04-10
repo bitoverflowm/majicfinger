@@ -81,12 +81,12 @@ const SelectLabel = React.forwardRef(({ className, ...props }, ref) => (
 ))
 SelectLabel.displayName = SelectPrimitive.Label.displayName
 
-const SelectItem = React.forwardRef(({ className, children, left, ...props }, ref) => (
+const SelectItem = React.forwardRef(({ className, children, left, suffix, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
       "relative flex w-full cursor-default select-none items-center gap-2 rounded-sm py-1.5 text-sm outline-none focus:bg-slate-100 focus:text-slate-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:focus:bg-slate-800 dark:focus:text-slate-50",
-      left ? "pl-2 pr-8" : "pl-8 pr-2",
+      left ? cn("pl-2", suffix ? "pr-20" : "pr-8") : cn("pl-8", suffix ? "pr-20" : "pr-2"),
       className
     )}
     {...props}>
@@ -94,6 +94,7 @@ const SelectItem = React.forwardRef(({ className, children, left, ...props }, re
       <>
         {left}
         <SelectPrimitive.ItemText className="flex-1 min-w-0 truncate">{children}</SelectPrimitive.ItemText>
+        {suffix ? <span className="shrink-0">{suffix}</span> : null}
         <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
           <SelectPrimitive.ItemIndicator>
             <Check className="h-4 w-4" />
@@ -107,7 +108,10 @@ const SelectItem = React.forwardRef(({ className, children, left, ...props }, re
             <Check className="h-4 w-4" />
           </SelectPrimitive.ItemIndicator>
         </span>
-        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        <SelectPrimitive.ItemText className={suffix ? "flex-1 min-w-0 truncate pr-2" : undefined}>
+          {children}
+        </SelectPrimitive.ItemText>
+        {suffix ? <span className="mr-8 shrink-0">{suffix}</span> : null}
       </>
     )}
   </SelectPrimitive.Item>

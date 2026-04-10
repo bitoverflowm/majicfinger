@@ -36,6 +36,9 @@ import ExportPanel from "@/components/dataView/ExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 
+/** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
+const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
+
 const INTEGRATION_OPTIONS = [
   { value: "binance", label: "Binance", logo: "/binance.jpeg" },
   { value: "chainlink", label: "Chainlink", logo: "/chainlink.png" },
@@ -71,10 +74,11 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const setRightPanelTab = contextStateV2?.setRightPanelTab;
 
   const [isPanelClosing, setIsPanelClosing] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  /** Sync with context on mount so remounts (or SSR) don’t replay the slide-in while the panel is already open. */
+  const [isPanelOpen, setIsPanelOpen] = useState(() => !!rightPanelOpen);
   const [drawerExpanded, setDrawerExpanded] = useState(false);
   const closeTimeoutRef = useRef(null);
-  const wasOpenRef = useRef(false);
+  const wasOpenRef = useRef(!!rightPanelOpen);
   const autoExpandedEmptySheetRef = useRef(false);
 
   // When arriving to charts view, default the panel tab to charts (don't override if user chose Export)
@@ -407,15 +411,27 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                 <SelectValue className="flex-1 min-w-0 text-left" placeholder="Select API" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {INTEGRATION_OPTIONS.map((opt) => (
-                                    <SelectItem
-                                      key={opt.value}
-                                      value={opt.value}
-                                      left={renderIntegrationAvatar(opt)}
-                                    >
-                                      {opt.label}
-                                    </SelectItem>
-                                  ))}
+                                  {INTEGRATION_OPTIONS.map((opt) => {
+                                    const isProOnly =
+                                      isDemo && !DEMO_ACTIVE_INTEGRATION_VALUES.has(opt.value);
+                                    return (
+                                      <SelectItem
+                                        key={opt.value}
+                                        value={opt.value}
+                                        disabled={isProOnly}
+                                        left={renderIntegrationAvatar(opt)}
+                                        suffix={
+                                          isProOnly ? (
+                                            <span className="rounded-md border border-border/70 bg-muted/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                              Pro
+                                            </span>
+                                          ) : null
+                                        }
+                                      >
+                                        {opt.label}
+                                      </SelectItem>
+                                    );
+                                  })}
                                 </SelectContent>
                               </Select>
                             </div>

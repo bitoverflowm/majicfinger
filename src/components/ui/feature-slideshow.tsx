@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import React, {
   forwardRef,
   ReactNode,
@@ -12,6 +13,45 @@ import * as Accordion from "@radix-ui/react-accordion";
 import { motion, useInView } from "framer-motion";
 
 import { cn } from "@/lib/utils";
+
+const FeatureChainlinkBtcChart = dynamic(
+  () =>
+    import("@/components/sections/feature-chainlink-btc-chart").then((m) => ({
+      default: m.FeatureChainlinkBtcChart,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full min-h-[280px] w-full animate-pulse items-center justify-center rounded-xl border border-neutral-300/50 bg-muted/50 dark:border-white/10" />
+    ),
+  },
+);
+
+const FeatureExplorationProbabilityTable = dynamic(
+  () =>
+    import("@/components/sections/feature-exploration-probability-table").then(
+      (m) => ({ default: m.FeatureExplorationProbabilityTable }),
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full min-h-0 w-full animate-pulse items-center justify-center rounded-xl border border-neutral-300/50 bg-transparent dark:border-white/10" />
+    ),
+  },
+);
+
+const FeatureSignalsTerminal = dynamic(
+  () =>
+    import("@/components/sections/feature-signals-terminal").then((m) => ({
+      default: m.FeatureSignalsTerminal,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full min-h-0 w-full animate-pulse items-center justify-center rounded-xl border border-neutral-300/50 bg-muted/30 dark:border-white/10" />
+    ),
+  },
+);
 
 type AccordionItemProps = {
   children: React.ReactNode;
@@ -84,6 +124,8 @@ export type FeatureItem = {
   content: string;
   image?: string;
   video?: string;
+  /** Client-only media; omit `image` when set */
+  liveMedia?: "chainlinkBtc" | "explorationTable" | "signalsTerminal";
 };
 
 type FeatureProps = {
@@ -188,6 +230,42 @@ export const Feature = ({
     if (!currentItem) {
       return (
         <div className="aspect-auto h-full w-full rounded-xl border border-neutral-300/50 bg-gray-200 p-1 animate-pulse" />
+      );
+    }
+
+    if (currentItem.liveMedia === "chainlinkBtc") {
+      return (
+        <div className="relative flex h-full min-h-0 max-h-full w-full flex-col overflow-hidden rounded-xl border border-neutral-300/50 bg-transparent p-1 dark:border-white/10">
+          <span
+            className="pointer-events-none absolute right-2 top-2 z-10 rounded-full border border-secondary/40 bg-secondary/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-secondary backdrop-blur-sm dark:bg-secondary/25"
+            aria-hidden
+          >
+            Live
+          </span>
+          <FeatureChainlinkBtcChart />
+        </div>
+      );
+    }
+
+    if (currentItem.liveMedia === "explorationTable") {
+      return (
+        <div className="relative flex h-full min-h-0 max-h-full w-full flex-col overflow-hidden rounded-xl border border-neutral-300/50 bg-transparent p-1 dark:border-white/10">
+          <span
+            className="pointer-events-none absolute right-2 top-2 z-10 rounded-full border border-blue-600/40 bg-blue-50/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-blue-700 backdrop-blur-sm dark:border-blue-400/35 dark:bg-blue-950/30 dark:text-blue-200"
+            aria-hidden
+          >
+            Simulation
+          </span>
+          <FeatureExplorationProbabilityTable />
+        </div>
+      );
+    }
+
+    if (currentItem.liveMedia === "signalsTerminal") {
+      return (
+        <div className="relative flex h-full min-h-0 max-h-full w-full flex-col overflow-hidden rounded-xl border border-neutral-300/50 bg-transparent p-1 dark:border-white/10">
+          <FeatureSignalsTerminal className="h-full min-h-0 border-0 shadow-none" />
+        </div>
       );
     }
 

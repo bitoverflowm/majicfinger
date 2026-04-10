@@ -8,22 +8,39 @@ export const config = {
   },
 };
 
-// Stripe amounts in cents - must match Stripe product prices exactly
-// Lychee Basic - $19.99/month | Lychee Basic Annual - $191.90/year (or $15.99/mo billed annually)
-// Lychee Premium Monthly - $39.99/month | Lychee Premium Annual - $383.90/year (or $31.99/mo billed annually)
-// Lychee Lifetime - $199.99
-// Optional: add PRICE_ID_MAP for bulletproof mapping (price_xxx -> tier/cycle)
-const AMOUNT_MAP = {
-  1999: { tier: "basic", cycle: "monthly" },
-  1599: { tier: "basic", cycle: "annual" }, // $15.99/mo billed annually
-  19188: { tier: "basic", cycle: "annual" },
-  19190: { tier: "basic", cycle: "annual" },
-  3999: { tier: "premium", cycle: "monthly" },
-  3199: { tier: "premium", cycle: "annual" }, // $31.99/mo billed annually
-  38388: { tier: "premium", cycle: "annual" },
-  38390: { tier: "premium", cycle: "annual" },
-  19999: { tier: "lifetime", cycle: "one-time" },
+// Mapping by amount + interval avoids collisions (e.g. 1999 can be monthly Basic or weekly Elite).
+// Keep legacy plans so existing subscribers are not downgraded.
+const PLAN_MAP = {
+  // Current plans
+  "499:week": { tier: "basic", cycle: "weekly" },
+  "1999:month": { tier: "basic", cycle: "monthly" },
+  "19999:year": { tier: "basic", cycle: "annual" },
+
+  "999:week": { tier: "pro", cycle: "weekly" },
+  "3999:month": { tier: "pro", cycle: "monthly" },
+  "39999:year": { tier: "pro", cycle: "annual" },
+
+  "1999:week": { tier: "elite", cycle: "weekly" },
+  "7999:month": { tier: "elite", cycle: "monthly" },
+  "79999:year": { tier: "elite", cycle: "annual" },
+
+  // Existing / legacy recurring
+  "1599:month": { tier: "basic", cycle: "monthly" },
+  "19188:year": { tier: "basic", cycle: "annual" },
+  "19190:year": { tier: "basic", cycle: "annual" },
+  "3199:month": { tier: "premium", cycle: "monthly" },
+  "38388:year": { tier: "premium", cycle: "annual" },
+  "38390:year": { tier: "premium", cycle: "annual" },
+
+  // Existing / legacy one-time lifetime
+  "19999:one-time": { tier: "lifetime", cycle: "one-time" },
 };
+
+function resolvePlan({ amount, interval, mode }) {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
+  const key = `${amount}:${mode === "payment" ? "one-time" : interval || "unknown"}`;
+  return PLAN_MAP[key] || null;
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
@@ -80,11 +97,11 @@ async function handleCheckoutCompleted(session) {
       console.warn("Skipping payment with amount_total 0 (trial may use subscription mode)");
       return;
     }
-    const mapping = AMOUNT_MAP[amount];
+    const mapping = resolvePlan({ amount, mode: "payment" });
     if (!mapping) {
       console.error(
         `[Stripe Webhook] Unrecognized one-time payment amount: ${amount} cents. ` +
-        `Add to AMOUNT_MAP or verify Stripe price. User may not get access.`
+        `Add to PLAN_MAP or verify Stripe price. User may not get access.`
       );
       return;
     }
@@ -99,6 +116,11 @@ async function handleCheckoutCompleted(session) {
       cycle: mapping.cycle,
       status: "active",
       lifetimeMember: mapping.tier === "lifetime",
+      stripeCustomerId: session.customer || null,
+      stripeSubscriptionId: null,
+      stripePriceId: null,
+      nextPaymentDate: null,
+      subscriptionStartedAt: new Date(),
     });
   } else if (session.mode === "subscription" && session.subscription) {
     const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
@@ -114,6 +136,11 @@ async function handleCheckoutCompleted(session) {
         cycle: mapping.cycle,
         status: "active",
         lifetimeMember: false,
+        stripeCustomerId: sub.customer || session.customer || null,
+        stripeSubscriptionId: sub.id || null,
+        stripePriceId: sub.items?.data?.[0]?.price?.id || null,
+        nextPaymentDate: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+        subscriptionStartedAt: sub.start_date ? new Date(sub.start_date * 1000) : new Date(),
       });
     }
   }
@@ -140,6 +167,12 @@ async function handleSubscriptionChange(subscription, eventType) {
       status: status === "canceled" ? "cancelled" : status,
       tier: mapping?.tier,
       cycle: mapping?.cycle,
+      stripeCustomerId: subscription.customer || null,
+      stripeSubscriptionId: subscription.id || null,
+      stripePriceId: subscription.items?.data?.[0]?.price?.id || null,
+      nextPaymentDate: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000)
+        : null,
     });
   }
 }
@@ -161,21 +194,31 @@ async function handlePaymentFailed(invoice) {
 function mapSubscriptionToTier(subscription) {
   const amount = subscription.items?.data?.[0]?.price?.unit_amount;
   const interval = subscription.items?.data?.[0]?.plan?.interval ?? subscription.items?.data?.[0]?.price?.recurring?.interval;
-  const mapping = AMOUNT_MAP[amount];
+  const mapping = resolvePlan({ amount, interval, mode: "subscription" });
   if (mapping) {
     return { tier: mapping.tier, cycle: mapping.cycle };
   }
   // Do NOT guess - unrecognized amounts could wrongly downgrade premium users
   console.error(
     `[Stripe Webhook] Unrecognized subscription amount: ${amount} cents, interval: ${interval}. ` +
-    `Add to AMOUNT_MAP or use price ID mapping. User may not get access.`
+    `Add to PLAN_MAP or use price ID mapping. User may not get access.`
   );
   return null;
 }
 
 async function updateUserPayment(email, name, amount, opts) {
   await dbConnect();
-  const { tier, cycle, status, lifetimeMember } = opts;
+  const {
+    tier,
+    cycle,
+    status,
+    lifetimeMember,
+    stripeCustomerId,
+    stripeSubscriptionId,
+    stripePriceId,
+    nextPaymentDate,
+    subscriptionStartedAt,
+  } = opts;
 
   let user = await User.findOne({ email });
   const update = {
@@ -187,13 +230,17 @@ async function updateUserPayment(email, name, amount, opts) {
     subscriptionType: `${tier}_${cycle}`,
     netPay: user?.netPay ? Number(user.netPay) + Number(amount) : amount,
     token: 100,
-    confirmedAt: new Date(),
+    subscribedAt: subscriptionStartedAt || user?.subscribedAt || new Date(),
+    nextPaymentDate: nextPaymentDate || null,
+    stripeCustomerId: stripeCustomerId || user?.stripeCustomerId || null,
+    stripeSubscriptionId: stripeSubscriptionId || user?.stripeSubscriptionId || null,
+    stripePriceId: stripePriceId || user?.stripePriceId || null,
   };
 
   if (!user) {
     await User.create({ email, ...update });
   } else {
-    await User.findByIdAndUpdate(user._id, update);
+    await User.findByIdAndUpdate(user._id, { $set: update });
   }
 }
 
@@ -206,8 +253,20 @@ async function updateUserSubscriptionStatus(email, opts) {
   if (opts.status) update.subscriptionStatus = opts.status;
   if (opts.tier) update.subscriptionTier = opts.tier;
   if (opts.cycle) update.billingCycle = opts.cycle;
-  if (opts.status === "cancelled" || opts.status === "payment_failed") {
-    update.lifetimeMember = false;
+  if (opts.stripeCustomerId) update.stripeCustomerId = opts.stripeCustomerId;
+  if (opts.stripeSubscriptionId) update.stripeSubscriptionId = opts.stripeSubscriptionId;
+  if (opts.stripePriceId) update.stripePriceId = opts.stripePriceId;
+  if ("nextPaymentDate" in opts) update.nextPaymentDate = opts.nextPaymentDate;
+
+  // Never remove lifetime access from webhook churn.
+  if (!user.lifetimeMember) {
+    if (opts.status === "cancelled" || opts.status === "payment_failed") {
+      update.subscriptionStatus = opts.status;
+    }
+  }
+
+  if ((opts.status === "active" || opts.status === "trialing") && !user.subscribedAt) {
+    update.subscribedAt = new Date();
   }
   await User.findByIdAndUpdate(user._id, { $set: update });
 }

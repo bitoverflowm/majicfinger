@@ -14,6 +14,16 @@ import {
 const WallStreetBets = ({setConnectedData}) => {
     const [date, setDate] = useState()
     
+    const clearHandler = () => {
+        setDate(undefined)
+        // Clear the connected dataset so the sheet/table resets.
+        try {
+            setConnectedData?.([])
+        } catch {
+            // ignore
+        }
+    }
+    
     const fetchHandler = async (date) => {
         if(date){
             let res = await fetch(`https://tradestie.com/api/v1/apps/reddit?date=${date}`, {

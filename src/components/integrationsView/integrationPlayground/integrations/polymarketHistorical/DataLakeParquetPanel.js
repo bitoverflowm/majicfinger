@@ -547,6 +547,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [metaOperationAllSelected, setMetaOperationAllSelected] = useState(false);
   const [metaOperationsMenuOpen, setMetaOperationsMenuOpen] = useState(false);
   const [metaAddOperationDialogOpen, setMetaAddOperationDialogOpen] = useState(false);
+  const [demoUpgradeDialogOpen, setDemoUpgradeDialogOpen] = useState(false);
+  const [demoUpgradeFeature, setDemoUpgradeFeature] = useState("this feature");
   const [editingMetaOpId, setEditingMetaOpId] = useState(null);
   const [editingMetaOpName, setEditingMetaOpName] = useState("");
   const [editingDraftMetaName, setEditingDraftMetaName] = useState(false);
@@ -685,6 +687,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   );
 
   const showComposeGroupingSection = hasComposeAggregates || hasComposeBucketOrDateFormat;
+
+  const openDemoUpgradeDialog = useCallback((featureName) => {
+    setDemoUpgradeFeature(featureName || "this feature");
+    setDemoUpgradeDialogOpen(true);
+  }, []);
 
   const sheetJoinCandidates = useMemo(() => {
     const entries = Object.entries(dataSheets || {});
@@ -1176,6 +1183,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setColumnComposeItems((items) => items.filter((i) => !String(i.column || "").startsWith("kalshi_resolved_")));
   }, [kalshiTradesJoinPreset]);
 
+  useEffect(() => {
+    if (!isDemo) return;
+    setComposeWhereFilters([]);
+    setAddWhereFilterMenuOpen(false);
+    setMetaQueryMode("all");
+    setMetaAndFilters([]);
+    setMetaOrFilters([]);
+    setMetaPriorOperations((prev) =>
+      prev.map((op) =>
+        op.mode === "filter"
+          ? { ...op, mode: "all", filters: { and: [], or: [] }, merge: null }
+          : op,
+      ),
+    );
+  }, [isDemo]);
+
   const refreshBeckerViews = useCallback(() => {
     setBeckerViews(listBeckerParquetViews());
   }, []);
@@ -1337,13 +1360,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         onLabel: setLoadLabel,
         onProgress: setLoadProgress,
         loadFn: async () => {
+          const safeComposeFilters = isDemo ? null : composeFilters;
           if (mode === "meta") {
             if (Array.isArray(metaOpSpecs) && metaOpSpecs.length > 0) {
               /** @type {string[][]} */
               const tableRows = [];
               for (let i = 0; i < metaOpSpecs.length; i++) {
                 const op = metaOpSpecs[i];
-                const filters = resolveFiltersForMetaSpec(op);
+                const filters = isDemo ? null : resolveFiltersForMetaSpec(op);
                 const { columns: resultColumns, rows } = await fetchAthenaLakeSample({
                   lake: lakeVal,
                   table,
@@ -1371,7 +1395,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               });
             }
             // Meta table (count): a single-cell COUNT(*) result (optionally with filters).
-            const isFilterMode = metaQueryMode === "filter";
+            const isFilterMode = metaQueryMode === "filter" && !isDemo;
             const { columns: resultColumns, rows } = await fetchAthenaLakeSample({
               lake: lakeVal,
               table,
@@ -1422,7 +1446,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       lake: lakeVal,
                       table,
                       compose: composeSpec,
-                      filters: composeFilters || null,
+                      filters: safeComposeFilters || null,
                       sheetRows: sheetJoin.sheetRows,
                       join: sheetJoin.join,
                       demo: isDemo,
@@ -1447,7 +1471,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       lake: lakeVal,
                       table,
                       compose: composeSpec,
-                      filters: composeFilters || null,
+                      filters: safeComposeFilters || null,
                       joins: sheetJoin.joins || [],
                       sheetGraph: sheetJoin.sheetGraph || {},
                       demo: isDemo,
@@ -1471,7 +1495,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   table,
                   queryType: "compose",
                   compose: composeSpec,
-                  filters: composeFilters || null,
+                  filters: safeComposeFilters || null,
                   caseSensitive: true,
                   demo: isDemo,
                 },
@@ -1910,7 +1934,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setDraftMetaOpName(String(spec.label || ""));
     setEditingDraftMetaName(false);
 
-    if (spec.mode === "all") {
+    if (spec.mode === "all" || isDemo) {
       setMetaQueryMode("all");
       setMetaAndFilters([]);
       setMetaOrFilters([]);
@@ -1927,7 +1951,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setMetaAndFilters(JSON.parse(JSON.stringify([...baseAnd, ...mergeAnd])));
     setMetaOrFilters(JSON.parse(JSON.stringify([...baseOr, ...mergeOr])));
     setMetaOperationAllSelected(false);
-  }, []);
+  }, [isDemo]);
 
   const handleEditPriorOperation = useCallback(
     (opId) => {
@@ -2010,6 +2034,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       }
 
       if (result.intent === "merge_and" || result.intent === "merge_or") {
+        if (isDemo) return;
         const m = result.merge;
         if (!m?.targetId || !m.predicates?.length) return;
         const combinator = result.intent === "merge_and" ? "AND" : "OR";
@@ -2034,7 +2059,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         setMetaAddOperationDialogOpen(false);
       }
     },
-    [commitCurrentEditorAsOperation, resetMetaEditor, setError, snapshotEditorToSpec],
+    [commitCurrentEditorAsOperation, isDemo, resetMetaEditor, setError, snapshotEditorToSpec],
   );
 
   const onMetaOperationsMenuOpenChange = useCallback(
@@ -2104,6 +2129,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         return;
       }
       const hasIncompleteComposeWhereFilters =
+        !isDemo &&
         Array.isArray(composeWhereFilters) &&
         composeWhereFilters.length > 0 &&
         composeWhereFilters.some((f) => {
@@ -2184,9 +2210,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     const effectiveIngestMode = selectionTab === "meta" ? "meta" : "columns";
     const composeSpecForRun = isComposeTab ? buildServerComposePayload() : undefined;
     const composeFiltersForRun = isComposeTab
-      ? composeWhereFilters.length
-        ? { and: composeWhereFilters, or: [] }
-        : null
+      ? isDemo
+        ? null
+        : composeWhereFilters.length
+          ? { and: composeWhereFilters, or: [] }
+          : null
       : undefined;
 
     const requestStartMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
@@ -2401,6 +2429,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       reasons.push("Add at least one column to SELECT.");
     }
     const hasIncompleteComposeWhereFilters =
+      !isDemo &&
       Array.isArray(composeWhereFilters) &&
       composeWhereFilters.length > 0 &&
       composeWhereFilters.some((f) => {
@@ -2448,6 +2477,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     composeWhereFilters,
     composeHavingFilters,
     buildAllMetaOpSpecsForRun,
+    isDemo,
   ]);
 
   const canRunRequest = runRequestReasons.length === 0;
@@ -2898,7 +2928,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               ))}
                             </div>
 
-                            {selectedCount > 0 ? (
+                            {selectedCount > 0 && !isDemo ? (
                               <div className="w-64 min-w-64 overflow-y-auto p-1 border-l border-border/60">
                                 <DropdownMenuLabel className="text-xs">Where (filter)</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
@@ -3043,6 +3073,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               <Select
                                 value={rollVal}
                                 onValueChange={(v) => {
+                                  if (isDemo && (v === "if_else_case" || v === "equation")) {
+                                    openDemoUpgradeDialog(v === "equation" ? "Equation math operations" : "IF / ELSE column logic");
+                                    return;
+                                  }
                                   if (v === "none") {
                                     updateComposeItem(item.id, {
                                       aggregate: null,
@@ -3513,7 +3547,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 )}
               </div>
 
-              {composeWhereFilters.length > 0 && (
+              {!isDemo && composeWhereFilters.length > 0 && (
                 <div className="space-y-2 min-w-0">
                   <Label className="text-xs text-muted-foreground">Where (filter)</Label>
                   <div className="space-y-2">
@@ -4451,6 +4485,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       <MetaAddOperationDialog
         open={metaAddOperationDialogOpen}
         onOpenChange={setMetaAddOperationDialogOpen}
+        isDemo={isDemo}
+        onUpgradeRequest={openDemoUpgradeDialog}
         existingOperations={metaPriorOperations.map((o) => ({ id: o.id, label: o.label }))}
         hasDraftOperation={
           metaOperationAllSelected ||
@@ -4468,6 +4504,27 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         isDateLikeName={isDateLikeName}
         onComplete={handleMetaAddOperationComplete}
       />
+
+      <Dialog open={demoUpgradeDialogOpen} onOpenChange={setDemoUpgradeDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Upgrade required</DialogTitle>
+            <DialogDescription>
+              Upgrade to use {demoUpgradeFeature}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <DialogClose asChild>
+              <Button variant="ghost">Cancel</Button>
+            </DialogClose>
+            <DialogClose asChild>
+              <Button asChild>
+                <a href="/#pricing">See options</a>
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={newRequestDialogOpen} onOpenChange={setNewRequestDialogOpen}>
         <AlertDialogContent>
@@ -4934,92 +4991,101 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                   >
                                     All
                                   </DropdownMenuItem>
-                                  <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger className="text-xs">
-                                      Filter
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuPortal>
-                                      <DropdownMenuSubContent className="w-60 max-h-[280px] overflow-y-auto">
-                                        <DropdownMenuLabel className="text-xs">Columns</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        {availableColumns.map((col) => (
-                                          <DropdownMenuSub key={col}>
-                                            <DropdownMenuSubTrigger className="text-xs">
-                                              {col}
-                                            </DropdownMenuSubTrigger>
-                                            <DropdownMenuPortal>
-                                              <DropdownMenuSubContent className="w-44">
-                                                <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                {(String(availableColumnTypesByName[col]).toLowerCase() === "string"
-                                                  ? [
-                                                      { id: "unique", label: "UNIQUE" },
-                                                      { id: "contains", label: "===" },
-                                                      { id: "not_contains", label: "!==" },
-                                                    ]
-                                                  : [
-                                                      { id: "unique", label: "UNIQUE" },
-                                                      { id: "gt", label: ">" },
-                                                      { id: "lt", label: "<" },
-                                                      { id: "eq", label: "===" },
-                                                      { id: "neq", label: "!==" },
-                                                    ]
-                                                ).map((op) => (
-                                                  <DropdownMenuItem
-                                                    key={op.id}
-                                                    className="text-xs"
-                                                    onSelect={() => {
-                                                      if (op.id === "unique") {
-                                                        setMetaOperationKind("count_distinct");
-                                                        setMetaOperationColumn(col);
-                                                        setMetaQueryMode("all");
-                                                        setMetaAndFilters([]);
-                                                        setMetaOrFilters([]);
-                                                        setMetaOperationAllSelected(true);
-                                                      } else {
-                                                        setMetaOperationKind("count");
-                                                        setMetaOperationColumn("");
-                                                        setMetaQueryMode("filter");
-                                                        setMetaOperationAllSelected(false);
-                                                        addMetaFilterPreset(col, op.id);
-                                                      }
-                                                    }}
-                                                  >
-                                                    <span className="inline-flex items-center gap-2">
-                                                      <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
-                                                        {op.id === "unique" ? "*" : operatorSymbol(op.id)}
+                                  {!isDemo ? (
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger className="text-xs">
+                                        Filter
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuPortal>
+                                        <DropdownMenuSubContent className="w-60 max-h-[280px] overflow-y-auto">
+                                          <DropdownMenuLabel className="text-xs">Columns</DropdownMenuLabel>
+                                          <DropdownMenuSeparator />
+                                          {availableColumns.map((col) => (
+                                            <DropdownMenuSub key={col}>
+                                              <DropdownMenuSubTrigger className="text-xs">
+                                                {col}
+                                              </DropdownMenuSubTrigger>
+                                              <DropdownMenuPortal>
+                                                <DropdownMenuSubContent className="w-44">
+                                                  <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
+                                                  <DropdownMenuSeparator />
+                                                  {(String(availableColumnTypesByName[col]).toLowerCase() === "string"
+                                                    ? [
+                                                        { id: "unique", label: "UNIQUE" },
+                                                        { id: "contains", label: "===" },
+                                                        { id: "not_contains", label: "!==" },
+                                                      ]
+                                                    : [
+                                                        { id: "unique", label: "UNIQUE" },
+                                                        { id: "gt", label: ">" },
+                                                        { id: "lt", label: "<" },
+                                                        { id: "eq", label: "===" },
+                                                        { id: "neq", label: "!==" },
+                                                      ]
+                                                  ).map((op) => (
+                                                    <DropdownMenuItem
+                                                      key={op.id}
+                                                      className="text-xs"
+                                                      onSelect={() => {
+                                                        if (op.id === "unique") {
+                                                          setMetaOperationKind("count_distinct");
+                                                          setMetaOperationColumn(col);
+                                                          setMetaQueryMode("all");
+                                                          setMetaAndFilters([]);
+                                                          setMetaOrFilters([]);
+                                                          setMetaOperationAllSelected(true);
+                                                        } else {
+                                                          setMetaOperationKind("count");
+                                                          setMetaOperationColumn("");
+                                                          setMetaQueryMode("filter");
+                                                          setMetaOperationAllSelected(false);
+                                                          addMetaFilterPreset(col, op.id);
+                                                        }
+                                                      }}
+                                                    >
+                                                      <span className="inline-flex items-center gap-2">
+                                                        <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                                          {op.id === "unique" ? "*" : operatorSymbol(op.id)}
+                                                        </span>
+                                                        {op.id === "unique" ? (
+                                                          <span>
+                                                            count <strong>unique</strong> values
+                                                          </span>
+                                                        ) : op.id === "eq" || op.id === "contains" ? (
+                                                          <span>
+                                                            is <strong>equal</strong> to
+                                                          </span>
+                                                        ) : op.id === "neq" || op.id === "not_contains" ? (
+                                                          <span>
+                                                            <strong>not</strong> equal to
+                                                          </span>
+                                                        ) : op.id === "lt" ? (
+                                                          <span>
+                                                            <strong>less</strong> than
+                                                          </span>
+                                                        ) : (
+                                                          <span>
+                                                            <strong>greater</strong> than
+                                                          </span>
+                                                        )}
                                                       </span>
-                                                      {op.id === "unique" ? (
-                                                        <span>
-                                                          count <strong>unique</strong> values
-                                                        </span>
-                                                      ) : op.id === "eq" || op.id === "contains" ? (
-                                                        <span>
-                                                          is <strong>equal</strong> to
-                                                        </span>
-                                                      ) : op.id === "neq" || op.id === "not_contains" ? (
-                                                        <span>
-                                                          <strong>not</strong> equal to
-                                                        </span>
-                                                      ) : op.id === "lt" ? (
-                                                        <span>
-                                                          <strong>less</strong> than
-                                                        </span>
-                                                      ) : (
-                                                        <span>
-                                                          <strong>greater</strong> than
-                                                        </span>
-                                                      )}
-                                                    </span>
-                                                  </DropdownMenuItem>
-                                                ))}
-                                              </DropdownMenuSubContent>
-                                            </DropdownMenuPortal>
-                                          </DropdownMenuSub>
-                                        ))}
-                                      </DropdownMenuSubContent>
-                                    </DropdownMenuPortal>
-                                  </DropdownMenuSub>
+                                                    </DropdownMenuItem>
+                                                  ))}
+                                                </DropdownMenuSubContent>
+                                              </DropdownMenuPortal>
+                                            </DropdownMenuSub>
+                                          ))}
+                                        </DropdownMenuSubContent>
+                                      </DropdownMenuPortal>
+                                    </DropdownMenuSub>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      className="text-xs"
+                                      onSelect={() => openDemoUpgradeDialog("Filtered count operations")}
+                                    >
+                                      Filter (Pro)
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuSubContent>
                               </DropdownMenuPortal>
                             </DropdownMenuSub>
@@ -5051,77 +5117,86 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                           >
                                             All
                                           </DropdownMenuItem>
-                                          <DropdownMenuSub>
-                                            <DropdownMenuSubTrigger className="text-xs">
-                                              Filter
-                                            </DropdownMenuSubTrigger>
-                                            <DropdownMenuPortal>
-                                              <DropdownMenuSubContent className="w-60 max-h-[280px] overflow-y-auto">
-                                                <DropdownMenuLabel className="text-xs">Columns</DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                {availableColumns.map((filterCol) => (
-                                                  <DropdownMenuSub key={`sum-filter-${sumCol}-${filterCol}`}>
-                                                    <DropdownMenuSubTrigger className="text-xs">
-                                                      {filterCol}
-                                                    </DropdownMenuSubTrigger>
-                                                    <DropdownMenuPortal>
-                                                      <DropdownMenuSubContent className="w-44">
-                                                        <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
-                                                        <DropdownMenuSeparator />
-                                                        {(String(availableColumnTypesByName[filterCol]).toLowerCase() === "string"
-                                                          ? [
-                                                              { id: "contains", label: "===" },
-                                                              { id: "not_contains", label: "!==" },
-                                                            ]
-                                                          : [
-                                                              { id: "gt", label: ">" },
-                                                              { id: "lt", label: "<" },
-                                                              { id: "eq", label: "===" },
-                                                              { id: "neq", label: "!==" },
-                                                            ]
-                                                        ).map((op) => (
-                                                          <DropdownMenuItem
-                                                            key={`sum-op-${sumCol}-${filterCol}-${op.id}`}
-                                                            className="text-xs"
-                                                            onSelect={() => {
-                                                              setMetaOperationKind("sum");
-                                                              setMetaOperationColumn(sumCol);
-                                                              setMetaQueryMode("filter");
-                                                              setMetaOperationAllSelected(false);
-                                                              addMetaFilterPreset(filterCol, op.id);
-                                                            }}
-                                                          >
-                                                            <span className="inline-flex items-center gap-2">
-                                                              <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
-                                                                {operatorSymbol(op.id)}
+                                          {!isDemo ? (
+                                            <DropdownMenuSub>
+                                              <DropdownMenuSubTrigger className="text-xs">
+                                                Filter
+                                              </DropdownMenuSubTrigger>
+                                              <DropdownMenuPortal>
+                                                <DropdownMenuSubContent className="w-60 max-h-[280px] overflow-y-auto">
+                                                  <DropdownMenuLabel className="text-xs">Columns</DropdownMenuLabel>
+                                                  <DropdownMenuSeparator />
+                                                  {availableColumns.map((filterCol) => (
+                                                    <DropdownMenuSub key={`sum-filter-${sumCol}-${filterCol}`}>
+                                                      <DropdownMenuSubTrigger className="text-xs">
+                                                        {filterCol}
+                                                      </DropdownMenuSubTrigger>
+                                                      <DropdownMenuPortal>
+                                                        <DropdownMenuSubContent className="w-44">
+                                                          <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
+                                                          <DropdownMenuSeparator />
+                                                          {(String(availableColumnTypesByName[filterCol]).toLowerCase() === "string"
+                                                            ? [
+                                                                { id: "contains", label: "===" },
+                                                                { id: "not_contains", label: "!==" },
+                                                              ]
+                                                            : [
+                                                                { id: "gt", label: ">" },
+                                                                { id: "lt", label: "<" },
+                                                                { id: "eq", label: "===" },
+                                                                { id: "neq", label: "!==" },
+                                                              ]
+                                                          ).map((op) => (
+                                                            <DropdownMenuItem
+                                                              key={`sum-op-${sumCol}-${filterCol}-${op.id}`}
+                                                              className="text-xs"
+                                                              onSelect={() => {
+                                                                setMetaOperationKind("sum");
+                                                                setMetaOperationColumn(sumCol);
+                                                                setMetaQueryMode("filter");
+                                                                setMetaOperationAllSelected(false);
+                                                                addMetaFilterPreset(filterCol, op.id);
+                                                              }}
+                                                            >
+                                                              <span className="inline-flex items-center gap-2">
+                                                                <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                                                  {operatorSymbol(op.id)}
+                                                                </span>
+                                                                {op.id === "eq" || op.id === "contains" ? (
+                                                                  <span>
+                                                                    is <strong>equal</strong> to
+                                                                  </span>
+                                                                ) : op.id === "neq" || op.id === "not_contains" ? (
+                                                                  <span>
+                                                                    <strong>not</strong> equal to
+                                                                  </span>
+                                                                ) : op.id === "lt" ? (
+                                                                  <span>
+                                                                    <strong>less</strong> than
+                                                                  </span>
+                                                                ) : (
+                                                                  <span>
+                                                                    <strong>greater</strong> than
+                                                                  </span>
+                                                                )}
                                                               </span>
-                                                              {op.id === "eq" || op.id === "contains" ? (
-                                                                <span>
-                                                                  is <strong>equal</strong> to
-                                                                </span>
-                                                              ) : op.id === "neq" || op.id === "not_contains" ? (
-                                                                <span>
-                                                                  <strong>not</strong> equal to
-                                                                </span>
-                                                              ) : op.id === "lt" ? (
-                                                                <span>
-                                                                  <strong>less</strong> than
-                                                                </span>
-                                                              ) : (
-                                                                <span>
-                                                                  <strong>greater</strong> than
-                                                                </span>
-                                                              )}
-                                                            </span>
-                                                          </DropdownMenuItem>
-                                                        ))}
-                                                      </DropdownMenuSubContent>
-                                                    </DropdownMenuPortal>
-                                                  </DropdownMenuSub>
-                                                ))}
-                                              </DropdownMenuSubContent>
-                                            </DropdownMenuPortal>
-                                          </DropdownMenuSub>
+                                                            </DropdownMenuItem>
+                                                          ))}
+                                                        </DropdownMenuSubContent>
+                                                      </DropdownMenuPortal>
+                                                    </DropdownMenuSub>
+                                                  ))}
+                                                </DropdownMenuSubContent>
+                                              </DropdownMenuPortal>
+                                            </DropdownMenuSub>
+                                          ) : (
+                                            <DropdownMenuItem
+                                              className="text-xs"
+                                              onSelect={() => openDemoUpgradeDialog("Filtered sum operations")}
+                                            >
+                                              Filter (Pro)
+                                            </DropdownMenuItem>
+                                          )}
                                         </DropdownMenuSubContent>
                                       </DropdownMenuPortal>
                                     </DropdownMenuSub>
@@ -5221,7 +5296,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       </div>
                     )}
 
-                    {(metaOperationAllSelected || metaQueryMode === "filter") && (
+                    {(metaOperationAllSelected || (metaQueryMode === "filter" && !isDemo)) && (
                       <div className="space-y-1 rounded-md border border-border/60 bg-background/50 px-2 py-1.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="space-y-1">
@@ -5315,7 +5390,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       </div>
                     )}
 
-                    {metaQueryMode === "filter" && (
+                    {metaQueryMode === "filter" && !isDemo && (
                       <div className="space-y-4">
                         <div className="space-y-2">
                           {[...metaAndFilters, ...metaOrFilters].map((f) => (

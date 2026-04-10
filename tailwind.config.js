@@ -26,6 +26,7 @@ module.exports = {
   			lychee_white: '#EEEEEE',
   			lychee_green: '#C9F2C7',
   			lychee_go: '#28A745',
+  			lychee_red: '#E63946',
   			border: 'var(--border)',
   			input: 'var(--input)',
   			ring: 'var(--ring)',

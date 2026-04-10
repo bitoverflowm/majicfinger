@@ -39,6 +39,8 @@ function operatorSymbol(op) {
  *   availableColumns: string[];
  *   columnTypeByName: Record<string, string>;
  *   isDateLikeName: (name: string) => boolean;
+ *   isDemo?: boolean;
+ *   onUpgradeRequest?: (featureName: string) => void;
  *   onComplete: (result: {
  *     intent: "new_sheet" | "append_row" | "merge_and" | "merge_or";
  *     merge?: { targetId: string; predicates: { column: string; kind: string; op: string; value: any }[] };
@@ -54,6 +56,8 @@ export function MetaAddOperationDialog({
   availableColumns = [],
   columnTypeByName = {},
   isDateLikeName = () => false,
+  isDemo = false,
+  onUpgradeRequest,
   onComplete,
 }) {
   const [step, setStep] = useState(1);
@@ -330,12 +334,39 @@ export function MetaAddOperationDialog({
           <Button variant="outline" className="justify-start h-auto min-h-10 px-3 py-2 text-left whitespace-normal" onClick={() => handleIntent("append_row")}>
             <span className="text-sm font-medium">2) Add operation result as a row on the current sheet</span>
           </Button>
-          <Button variant="outline" className="justify-start h-auto min-h-10 px-3 py-2 text-left whitespace-normal" onClick={() => handleIntent("merge_and")}>
-            <span className="text-sm font-medium">3) Merge into an existing operation (AND)</span>
-          </Button>
-          <Button variant="outline" className="justify-start h-auto min-h-10 px-3 py-2 text-left whitespace-normal" onClick={() => handleIntent("merge_or")}>
-            <span className="text-sm font-medium">4) Merge into an existing operation (OR)</span>
-          </Button>
+          {!isDemo ? (
+            <>
+              <Button variant="outline" className="justify-start h-auto min-h-10 px-3 py-2 text-left whitespace-normal" onClick={() => handleIntent("merge_and")}>
+                <span className="text-sm font-medium">3) Merge into an existing operation (AND)</span>
+              </Button>
+              <Button variant="outline" className="justify-start h-auto min-h-10 px-3 py-2 text-left whitespace-normal" onClick={() => handleIntent("merge_or")}>
+                <span className="text-sm font-medium">4) Merge into an existing operation (OR)</span>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                className="justify-start h-auto min-h-10 px-3 py-2 text-left whitespace-normal"
+                onClick={() => {
+                  onUpgradeRequest?.("Merge operations (AND)");
+                  onOpenChange(false);
+                }}
+              >
+                <span className="text-sm font-medium">3) Merge into an existing operation (AND) - Pro</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start h-auto min-h-10 px-3 py-2 text-left whitespace-normal"
+                onClick={() => {
+                  onUpgradeRequest?.("Merge operations (OR)");
+                  onOpenChange(false);
+                }}
+              >
+                <span className="text-sm font-medium">4) Merge into an existing operation (OR) - Pro</span>
+              </Button>
+            </>
+          )}
         </div>
 
         <DialogFooter>

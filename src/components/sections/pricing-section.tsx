@@ -59,7 +59,7 @@ function PricingTabs({ activeTab, setActiveTab, className }: TabsProps) {
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
             {discounts[tab] && (
-              <span className="ml-2 text-xs font-semibold text-secondary bg-secondary/15 py-0.5 w-[calc(100%+1rem)] px-1 rounded-full">
+              <span className="ml-2 text-xs font-semibold text-secondary bg-secondary/40 py-0.5 w-[calc(100%+1rem)] px-1 rounded-full">
                 {discounts[tab]}
               </span>
             )}

@@ -17,10 +17,9 @@ export const landingPageV2Config = {
   pricing: [
     {
       name: "Basic",
-      // Stripe weekly links not wired yet; falling back to monthly checkout until available.
-      hrefWeekly: "https://buy.stripe.com/14A9AUcQx0Lc3licrm2ZO0x",
-      hrefMonthly: "https://buy.stripe.com/14A9AUcQx0Lc3licrm2ZO0x",
-      hrefYearly: "https://buy.stripe.com/4gMbJ2g2J8dE9JG2QM2ZO0y",
+      hrefWeekly: "https://buy.stripe.com/14A28s9El79A1da8b62ZO0C",
+      hrefMonthly: "https://buy.stripe.com/5kQ4gAeYF0LcdZW7722ZO0G",
+      hrefYearly: "https://buy.stripe.com/28E00kcQx2Tk096dvq2ZO0J",
       priceWeekly: "$4.99",
       priceMonthly: "$19.99",
       priceAnnual: "$199.99",
@@ -38,10 +37,9 @@ export const landingPageV2Config = {
     },
     {
       name: "Pro",
-      // Stripe weekly links not wired yet; falling back to monthly checkout until available.
-      hrefWeekly: "https://buy.stripe.com/fZu28s3fXfG63libni2ZO0z",
-      hrefMonthly: "https://buy.stripe.com/fZu28s3fXfG63libni2ZO0z",
-      hrefYearly: "https://buy.stripe.com/aFa7sM7wdeC24pm62Y2ZO0A",
+      hrefWeekly: "https://buy.stripe.com/fZu28s03L65wbROcrm2ZO0D",
+      hrefMonthly: "https://buy.stripe.com/00w4gAcQxgKabROezu2ZO0H",
+      hrefYearly: "https://buy.stripe.com/dRmfZi4k165w8FCdvq2ZO0I",
       priceWeekly: "$9.99",
       priceMonthly: "$39.99",
       priceAnnual: "$399.99",
@@ -64,9 +62,9 @@ export const landingPageV2Config = {
     },
     {
       name: "Elite",
-      hrefWeekly: "#",
-      hrefMonthly: "#",
-      hrefYearly: "#",
+      hrefWeekly: "https://buy.stripe.com/00waEY03L8dEg841MI2ZO0E",
+      hrefMonthly: "https://buy.stripe.com/7sY5kEcQxdxYdZW7722ZO0F",
+      hrefYearly: "https://buy.stripe.com/14A9AU2bT65w096gHC2ZO0K",
       priceWeekly: "$19.99",
       priceMonthly: "$79.99",
       priceAnnual: "$799.99",

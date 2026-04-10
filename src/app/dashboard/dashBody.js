@@ -26,6 +26,7 @@ import { Pricing } from "@/components/pricing/lycheePricing";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 
+import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
 
@@ -60,6 +61,12 @@ const DashBody = ({ user }) => {
     const [newUserHandle, setNewUserHandle] = useState("");
     const [isButtonEnabled, setIsButtonEnabled] = useState(false);
     const [usernameExists, setUsernameExists] = useState(false);
+    const [subscriptionTier, setSubscriptionTier] = useState(null);
+    const [billingCycle, setBillingCycle] = useState(null);
+    const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+    const [subscribedAt, setSubscribedAt] = useState(null);
+
+    const isLocked = !isDemo && !user;
 
     useEffect(() => {
         if(user && !isDemo){
@@ -153,6 +160,10 @@ const DashBody = ({ user }) => {
                 if (data.success) {
                     setUserHandle(data.data.user_name);
                     setIsLifeTimeMember(data.data.lifetimeMember);
+                    setSubscriptionTier(data.data.subscriptionTier || null);
+                    setBillingCycle(data.data.billingCycle || null);
+                    setSubscriptionStatus(data.data.subscriptionStatus || null);
+                    setSubscribedAt(data.data.subscribedAt || null);
                 } else {
                     console.error('Failed to fetch user info:', data.message);
                 }
@@ -235,18 +246,18 @@ const DashBody = ({ user }) => {
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
                 {!isDemo && viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
-                { viewing === 'dataStart' && (
+                { (viewing === 'dataStart' || viewing === 'charts') && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} />
+                    <DataSheetWithIntegration
+                      user={user}
+                      startNew={startNew}
+                      setStartNew={setStartNew}
+                      chartMode={viewing === 'charts'}
+                    />
                   </div>
                 ) }
                 { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
                 { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
-                { viewing === 'charts' && (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <DataSheetWithIntegration user={user} startNew={startNew} setStartNew={setStartNew} chartMode />
-                  </div>
-                ) }
                 { viewing === 'integrations' && <div className="py-10"><IntegrationsView/></div> }
                 {!isDemo && viewing === 'ai' && <AiView/> }
                 {!isDemo && viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
@@ -256,6 +267,31 @@ const DashBody = ({ user }) => {
                 {!isDemo && viewing === 'pricing' && <div className="py-10"><Pricing /></div>}
                 {!isDemo && viewing === 'profilePage' && <div className="p-56 text-black">
                     <div className="">
+                        <div className="mb-6 rounded-lg border border-border bg-background p-4 text-sm text-foreground">
+                          <div className="font-semibold">Account plan</div>
+                          <div className="mt-2 text-muted-foreground">
+                            Tier:{" "}
+                            <span className="font-medium text-foreground">
+                              {isLifeTimeMember
+                                ? "Lifetime"
+                                : (subscriptionTier
+                                    ? `${subscriptionTier}${billingCycle ? ` (${billingCycle})` : ""}`
+                                    : "Free / Unassigned")}
+                            </span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            Status:{" "}
+                            <span className="font-medium text-foreground">
+                              {isLifeTimeMember ? "active" : (subscriptionStatus || "none")}
+                            </span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            Subscribed on:{" "}
+                            <span className="font-medium text-foreground">
+                              {subscribedAt ? new Date(subscribedAt).toLocaleDateString() : "N/A"}
+                            </span>
+                          </div>
+                        </div>
                         <div className="grid flex-1 gap-2 max-w-64 py-4">
                             <Label htmlFor="user_handle">
                                 Handle (@{userHandle})
@@ -282,6 +318,19 @@ const DashBody = ({ user }) => {
                     </div>
                 </div>}
                 { viewing === 'manageAccount' && <div className="p-56 text-black">
+                    <div className="mb-6 rounded-lg border border-border bg-background p-4 text-sm text-foreground">
+                        <div className="font-semibold">Current subscription</div>
+                        <div className="mt-2 text-muted-foreground">
+                          {isLifeTimeMember
+                            ? "Lifetime access"
+                            : (subscriptionTier
+                                ? `${subscriptionTier}${billingCycle ? ` (${billingCycle})` : ""} - ${subscriptionStatus || "unknown"}`
+                                : "No active paid tier on file")}
+                        </div>
+                        <div className="text-muted-foreground">
+                          Subscribed on: {subscribedAt ? new Date(subscribedAt).toLocaleDateString() : "N/A"}
+                        </div>
+                    </div>
                     <div>Hi, I am working on making this page more useful</div>
                     <div>For now I have enabled managed billing using Stripe click here: </div>
                     <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
@@ -303,8 +352,40 @@ const DashBody = ({ user }) => {
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
     ) : (
       <SidebarProvider defaultOpen={false}>
-        <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
-        <SidebarInset className="min-h-0">{content}</SidebarInset>
+        <div className="relative flex min-h-0 min-w-0 flex-1">
+          <div className={cn("contents", isLocked && "pointer-events-none select-none")}>
+            <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
+            <SidebarInset className="min-h-0">{content}</SidebarInset>
+          </div>
+
+          {isLocked && (
+            <div className="pointer-events-auto fixed inset-0 z-[999] flex items-center justify-center bg-background/60 backdrop-blur-sm">
+              <div className="mx-4 w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-xl">
+                <div className="flex flex-col gap-2">
+                  <div className="text-base font-semibold">Sign in to use the dashboard</div>
+                  <div className="text-sm text-muted-foreground">
+                    Viewing is available, but all actions are disabled until you’re logged in.
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-col gap-3">
+                  <Link
+                    href="/login"
+                    className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90"
+                  >
+                    Continue to sign in
+                  </Link>
+                  <Link
+                    href="/"
+                    className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                  >
+                    Back to home
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </SidebarProvider>
     )
 

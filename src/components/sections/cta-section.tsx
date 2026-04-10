@@ -1,6 +1,7 @@
-import Image from "next/image";
-import { siteConfig } from "@/lib/config";
 import Link from "next/link";
+
+import { CtaLycheeAsciiArt } from "@/components/cta-lychee-ascii-art";
+import { siteConfig } from "@/lib/config";
 
 export function CTASection() {
   const { ctaSection } = siteConfig;
@@ -8,31 +9,32 @@ export function CTASection() {
   return (
     <section
       id="cta"
-      className="flex flex-col items-center justify-center w-full px-5 md:px-10"
+      className="flex w-full flex-col items-center justify-center px-5 md:px-10"
     >
       <div className="w-full max-w-7xl">
-        <div className="h-[400px] md:h-[400px] overflow-hidden shadow-xl w-full border border-border rounded-xl bg-secondary relative z-20">
-          <Image
-            src={ctaSection.backgroundImage}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover object-right md:object-center"
-            fill
-            priority
-            sizes="(max-width: 768px) 100vw, min(1280px, 100vw)"
+        <div className="relative z-20 w-full overflow-hidden rounded-xl border border-border bg-gradient-to-br from-secondary/35 via-background to-muted shadow-xl">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-transparent via-transparent to-transparent dark:from-black/55 dark:via-black/20"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent md:from-black/50" />
-          <div className="absolute inset-0 -top-32 md:-top-40 flex flex-col items-center justify-center px-4">
-            <h2 className="text-white text-4xl md:text-7xl font-medium tracking-tighter max-w-xs md:max-w-3xl text-center drop-shadow-sm">
+
+          <div className="relative z-10 flex min-h-[520px] flex-col items-center px-4 pb-10 pt-10 md:min-h-[560px] md:pb-12 md:pt-14">
+            <h2 className="max-w-xs shrink-0 text-center text-4xl font-medium tracking-tighter text-foreground md:max-w-3xl md:text-7xl dark:text-white dark:drop-shadow-[0_2px_24px_rgba(0,0,0,0.85)]">
               {ctaSection.title}
             </h2>
-            <div className="absolute bottom-10 flex flex-col items-center justify-center gap-2">
+
+            <div className="flex w-full max-w-lg flex-1 flex-col items-center justify-center py-8 md:py-10">
+              <CtaLycheeAsciiArt className="w-full" />
+            </div>
+
+            <div className="flex shrink-0 flex-col items-center gap-2">
               <Link
                 href={ctaSection.button.href}
-                className="bg-white text-black font-semibold text-sm h-10 w-fit px-6 rounded-full flex items-center justify-center shadow-md hover:opacity-95 transition-opacity"
+                className="flex h-10 w-fit items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-md transition-opacity hover:opacity-95"
               >
                 {ctaSection.button.text}
               </Link>
-              <span className="text-white/90 text-sm text-center max-w-md">
+              <span className="max-w-md text-center text-sm text-muted-foreground dark:text-white/90">
                 {ctaSection.subtext}
               </span>
             </div>

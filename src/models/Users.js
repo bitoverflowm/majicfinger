@@ -31,8 +31,20 @@ const UserSchema = new mongoose.Schema({
     subscriptionType: {
         type: String,
     },
+    subscribedAt: {
+        type: Date,
+    },
     nextPaymentDate: {
         type: Date,
+    },
+    stripeCustomerId: {
+        type: String,
+    },
+    stripeSubscriptionId: {
+        type: String,
+    },
+    stripePriceId: {
+        type: String,
     },
     netPay: {
         type: Number,

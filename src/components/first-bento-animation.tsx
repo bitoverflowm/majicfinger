@@ -1,126 +1,157 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { Icons } from "@/components/icons";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningResponse,
-} from "@/components/ui/reasoning";
-import { AnimatePresence, motion, useInView } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import React, { forwardRef, useRef } from "react";
 
-function ReasoningBasic() {
-  const reasoningText =
-    "Based on your calendar patterns and preferences, I recommend scheduling the team meeting for Tuesday at 2pm. This time slot has historically had the highest attendance rate, and it avoids conflicts with other recurring meetings.";
+import { cn } from "@/lib/utils";
+import { AnimatedBeam } from "@/components/ui/animated-beam";
 
-  return (
-    <Reasoning>
-      <ReasoningContent>
-        <ReasoningResponse text={reasoningText} />
-      </ReasoningContent>
-    </Reasoning>
-  );
-}
+/** Matches integration card header colors in `integrationsConfig.js` (API_INTEGRATIONS). */
+const INTEGRATION_BEAM_COLORS = {
+  polymarket: "#2E5CFF",
+  kalshi: "#28CC95",
+  chainlink: "#375BD2",
+  binance: "#000000",
+} as const;
 
-export function FirstBentoAnimation() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { amount: 0.35 });
-  const [shouldAnimate, setShouldAnimate] = useState(false);
+/** Don’t lower whole-SVG opacity — it washes out the animated gradient stroke. */
+const beamClassName =
+  "text-muted-foreground [&>path:first-of-type]:stroke-current";
 
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    if (isInView) {
-      timeoutId = setTimeout(() => setShouldAnimate(true), 1000);
-    } else {
-      setShouldAnimate(false);
-    }
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [isInView]);
+const Circle = forwardRef<
+  HTMLDivElement,
+  {
+    className?: string;
+    children?: React.ReactNode;
+    /** Integration card header color (hex), or "lychee" for brand red. */
+    variant?: keyof typeof INTEGRATION_BEAM_COLORS | "lychee";
+  }
+>(({ className, children, variant }, ref) => {
+  const bgStyle =
+    variant === "lychee"
+      ? undefined
+      : variant
+        ? { backgroundColor: INTEGRATION_BEAM_COLORS[variant] }
+        : undefined;
 
   return (
     <div
       ref={ref}
-      className="relative w-full h-full p-4 flex flex-col items-center justify-center gap-5"
+      style={bgStyle}
+      className={cn(
+        "z-10 flex size-12 items-center justify-center rounded-full border-2 border-white/25 p-2 shadow-[0_0_20px_-12px_rgba(0,0,0,0.45)] dark:border-white/20 dark:shadow-[0_0_24px_-10px_rgba(0,0,0,0.65)]",
+        variant === "lychee" && "bg-lychee-red border-white/30",
+        className,
+      )}
     >
-      <div className="pointer-events-none absolute bottom-0 left-0 h-20 w-full bg-gradient-to-t from-background to-transparent z-20"></div>
-      <motion.div
-        className="max-w-md mx-auto w-full flex flex-col gap-2"
-        animate={{ y: shouldAnimate ? -75 : 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      >
-        <div className="flex items-end justify-end gap-3">
-          <motion.div
-            className="max-w-[280px] bg-secondary text-secondary-foreground p-4 rounded-2xl ml-auto shadow-[0_0_10px_rgba(0,0,0,0.05)]"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-          >
-            <p className="text-sm">
-              Hey, I need help scheduling a team meeting that works well for
-              everyone. Any suggestions for finding an optimal time slot?
-            </p>
-          </motion.div>
-          <div className="flex items-center bg-background rounded-full w-fit border border-border flex-shrink-0">
-            <img
-              src="https://randomuser.me/api/portraits/women/79.jpg"
-              alt="User Avatar"
-              className="size-8 rounded-full flex-shrink-0"
+      {children}
+    </div>
+  );
+});
+
+Circle.displayName = "Circle";
+
+export function FirstBentoAnimation() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const polymarketRef = useRef<HTMLDivElement>(null);
+  const kalshiRef = useRef<HTMLDivElement>(null);
+  const chainlinkRef = useRef<HTMLDivElement>(null);
+  const binanceRef = useRef<HTMLDivElement>(null);
+  const lycheeRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div className="relative flex h-[300px] w-full items-center justify-center overflow-hidden p-10" ref={containerRef}>
+      {/* Beams: own layer behind logos so they stay visible in gaps (flex items stack above z-0). */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <AnimatedBeam
+          className={beamClassName}
+          containerRef={containerRef}
+          fromRef={polymarketRef}
+          toRef={lycheeRef}
+          curvature={-75}
+          pathWidth={2.5}
+          endYOffset={-10}
+          pathColor="currentColor"
+          gradientStartColor="var(--secondary)"
+          gradientStopColor="var(--primary)"
+          duration={2.8}
+          delay={0}
+        />
+        <AnimatedBeam
+          className={beamClassName}
+          containerRef={containerRef}
+          fromRef={kalshiRef}
+          toRef={lycheeRef}
+          curvature={75}
+          pathWidth={2.5}
+          endYOffset={-10}
+          pathColor="currentColor"
+          gradientStartColor="var(--secondary)"
+          gradientStopColor="var(--primary)"
+          duration={2.8}
+          delay={0.35}
+        />
+        <AnimatedBeam
+          className={beamClassName}
+          containerRef={containerRef}
+          fromRef={chainlinkRef}
+          toRef={lycheeRef}
+          curvature={-75}
+          pathWidth={2.5}
+          endYOffset={10}
+          pathColor="currentColor"
+          gradientStartColor="var(--secondary)"
+          gradientStopColor="var(--primary)"
+          duration={2.8}
+          delay={0.7}
+        />
+        <AnimatedBeam
+          className={beamClassName}
+          containerRef={containerRef}
+          fromRef={binanceRef}
+          toRef={lycheeRef}
+          curvature={75}
+          pathWidth={2.5}
+          endYOffset={10}
+          pathColor="currentColor"
+          gradientStartColor="var(--secondary)"
+          gradientStopColor="var(--primary)"
+          duration={2.8}
+          delay={1.05}
+        />
+      </div>
+
+      <div className="relative z-10 flex size-full max-h-[220px] max-w-lg flex-col items-stretch justify-between gap-10">
+        <div className="flex flex-row items-center justify-between">
+          <Circle ref={polymarketRef} variant="polymarket">
+            <Image src="/polymarket.png" alt="Polymarket" width={32} height={32} className="object-contain drop-shadow-sm" />
+          </Circle>
+          <Circle ref={kalshiRef} variant="kalshi">
+            <Image src="/kalshi.png" alt="Kalshi" width={32} height={32} className="object-contain drop-shadow-sm" />
+          </Circle>
+        </div>
+
+        <div className="flex flex-row items-center justify-center">
+          <Circle ref={lycheeRef} variant="lychee" className="size-16 p-2.5 ring-2 ring-white/35 dark:ring-white/25">
+            <Image
+              src="/logo.png"
+              alt="Lychee"
+              width={40}
+              height={40}
+              className="block size-10 rounded-full object-contain grayscale"
             />
-          </div>
+          </Circle>
         </div>
 
-        <div className="flex items-start gap-2">
-          <div className="flex items-center bg-background rounded-full size-10 flex-shrink-0 justify-center shadow-[0_0_10px_rgba(0,0,0,0.05)] border border-border">
-            <Icons.logo className="size-4" />
-          </div>
-
-          <div className="relative min-h-[120px] min-w-[220px]">
-            <AnimatePresence mode="wait">
-              {!shouldAnimate ? (
-                <motion.div
-                  key="dots"
-                  className="absolute left-0 top-0 bg-background p-4 rounded-2xl border border-border"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                >
-                  <div className="flex gap-1">
-                    {[0, 1, 2].map((index) => (
-                      <motion.div
-                        key={index}
-                        className="w-2 h-2 bg-primary/50 rounded-full"
-                        animate={{ y: [0, -5, 0] }}
-                        transition={{
-                          duration: 0.6,
-                          repeat: Infinity,
-                          delay: index * 0.2,
-                          ease: "easeInOut",
-                        }}
-                      />
-                    ))}
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="response"
-                  layout
-                  className="absolute left-0 top-0 md:min-w-[300px] min-w-[220px] p-4 bg-accent border border-border rounded-xl shadow-[0_0_10px_rgba(0,0,0,0.05)]"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
-                >
-                  <ReasoningBasic />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+        <div className="flex flex-row items-center justify-between">
+          <Circle ref={chainlinkRef} variant="chainlink">
+            <Image src="/chainlink.png" alt="Chainlink" width={32} height={32} className="object-contain drop-shadow-sm" />
+          </Circle>
+          <Circle ref={binanceRef} variant="binance">
+            <Image src="/binance.jpeg" alt="Binance" width={32} height={32} className="object-contain rounded-full ring-1 ring-white/20" />
+          </Circle>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

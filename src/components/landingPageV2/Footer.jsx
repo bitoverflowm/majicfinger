@@ -23,7 +23,9 @@ export default function Footer() {
             <div key={index} className="mb-5">
               <h2 className="font-semibold">{section.title}</h2>
               <ul>
-                {section.links.map((link, linkIndex) => (
+                {section.links
+                  .filter((link) => link?.href && link.href !== "#")
+                  .map((link, linkIndex) => (
                   <li key={linkIndex} className="my-2">
                     <Link
                       href={link.href}

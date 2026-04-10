@@ -61,30 +61,30 @@ export const siteConfig = {
         title: "Visual Exploration",
         content:
           "Create charts and tables from prediction-market and on-chain data instantly — no queries required.",
-        image: "/landing_dashboard.png",
+        liveMedia: "chainlinkBtc",
       },
       {
         id: 2,
         title: "Live Market Feeds",
         content:
           "Access Polymarket and Kalshi endpoints for real-time prices, events, and historical data — curated for speed.",
-        image: "/polymarket.png",
+        liveMedia: "explorationTable",
       },
       {
         id: 3,
         title: "Reference Data & Signals",
         content:
           "Layer in Chainlink feeds, social signals, and other contextual data to see the full picture quickly.",
-        image: "/chainlink.png",
+        liveMedia: "signalsTerminal",
       },
     ],
   },
   growthSection,
   testimonials: socialProofTestimonials,
   testimonialSection: {
-    title: "Empower Your Workflow with AI",
+    title: "Why People Are Switching to Lychee",
     description:
-      "Ask your AI Agent for real-time collaboration, seamless integrations, and actionable insights to streamline your operations.",
+      "Faster insights, cleaner dashboards, and powerful prediction market data — all without the complexity of traditional tools.",
   },
   faqSection: {
     title: "Frequently Asked Questions",
@@ -132,12 +132,11 @@ export const siteConfig = {
     },
   },
   ctaSection: {
-    backgroundImage: "/landing_dashboard.png",
     title: "Go from raw markets to charts in seconds—no code, no CSVs.",
-    subtext: "Free to explore · Polymarket, Kalshi, Chainlink & more",
+    subtext: "Free to explore here · Polymarket, Kalshi, Chainlink & more",
     button: {
       href: "/#pricing",
-      text: "Open Lychee",
+      text: "Get Lychee",
     },
   },
   footerLinks: [
