@@ -117,13 +117,14 @@ export const siteConfig = {
     badge: "36GB of every Kalshi & Polymarket trade ever",
     /** Guides / blog post (MDX slug) */
     badgeHref: "/guides/kalshi-historical-data",
-    title: "Analyze real-time prediction market data in <0.69 seconds— no coding, no setup",
+    title: `Analyze real-time prediction market data.
+In <0.69 seconds. No coding. No setup.`,
     description:
       "500+ endpoints including Polymarket, Kalshi, Chainlink, and Twitter – all in one visual tool, built for traders, analysts, and data enthusiasts.",
     cta: {
       primary: {
-        href: "/dashboard",
-        text: "Get started",
+        href: "#demo",
+        text: "Try it",
       },
       secondary: {
         href: "/#pricing",
