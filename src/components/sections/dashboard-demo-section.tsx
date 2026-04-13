@@ -9,7 +9,7 @@ import LiveStreamManager from "@/app/dashboard/components/liveStreamManager";
 
 export function DashboardDemoSection() {
   return (
-    <section id="demo" className="relative mt-10 px-8 sm:px-10">
+    <section id="demo" className="relative px-8 pb-14 pt-0 sm:px-10 lg:px-14">
       <div className="relative size-full shadow-xl rounded-2xl overflow-hidden border border-border bg-background">
         <StateProvider>
           <StateProviderV2

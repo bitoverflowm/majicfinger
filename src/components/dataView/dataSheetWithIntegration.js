@@ -35,6 +35,7 @@ import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
+import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 
 /** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
 const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
@@ -268,7 +269,18 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
               <ChartCanvas />
             </div>
           ) : (
-            <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
+            <>
+              <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
+              {isDemo &&
+              (integrationSidebar === "polymarketHistorical" || integrationSidebar === "kalshiHistorical") ? (
+                <p
+                  className="shrink-0 border-t border-red-200/90 bg-red-50 px-3 py-2 text-center text-[11px] font-semibold leading-snug text-red-600 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-400 sm:text-xs"
+                  role="status"
+                >
+                  Demo: you can only pull up to {ATHENA_DEMO_ROW_LIMIT} rows per request. Sign up for the full dataset.
+                </p>
+              ) : null}
+            </>
           )}
         </main>
 

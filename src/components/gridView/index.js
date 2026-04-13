@@ -150,10 +150,13 @@ const GridView = ({startNew}) => {
 
     const [summarizeOpen, setSummarizeOpen] = useState(false);
     const [mathDialogOpen, setMathDialogOpen] = useState(false);
-    const [mathOp, setMathOp] = useState("add");
-    const [mathColA, setMathColA] = useState("");
-    const [mathColB, setMathColB] = useState("");
-    const [mathOutCol, setMathOutCol] = useState("result");
+    const [mathBaseCol, setMathBaseCol] = useState("");
+    const [mathReferenceMode, setMathReferenceMode] = useState("row_wise");
+    const [mathCurrentRowRef, setMathCurrentRowRef] = useState("current_row");
+    const [mathOp, setMathOp] = useState("subtract");
+    const [mathRelativeRowRef, setMathRelativeRowRef] = useState("prev_row");
+    const [mathOutCol, setMathOutCol] = useState("");
+    const [mathDestination, setMathDestination] = useState("current_sheet");
 
     // Combine Sheets (client-side join across already-loaded sheets)
     const [combineSheetsDialogOpen, setCombineSheetsDialogOpen] = useState(false);
@@ -359,35 +362,90 @@ const GridView = ({startNew}) => {
         .sort();
     }, [connectedData]);
 
+    const nextFreeResultColumnName = useCallback(() => {
+      const existing = new Set(sheetColumnNamesForMath);
+      let n = 1;
+      while (existing.has(`resultCol${n}`)) n += 1;
+      return `resultCol${n}`;
+    }, [sheetColumnNamesForMath]);
+
+    useEffect(() => {
+      if (!mathDialogOpen) return;
+      if (!mathOutCol || !String(mathOutCol).trim()) {
+        setMathOutCol(nextFreeResultColumnName());
+      }
+      if (!mathBaseCol && sheetColumnNamesForMath.length > 0) {
+        setMathBaseCol(sheetColumnNamesForMath[0]);
+      }
+    }, [mathDialogOpen, mathOutCol, mathBaseCol, nextFreeResultColumnName, sheetColumnNamesForMath]);
+
     const applySheetMathOperation = useCallback(() => {
       const rows = Array.isArray(connectedData) ? [...connectedData] : [];
       if (!rows.length) {
         toast.error("Load sheet data before running a column calculation.");
         return;
       }
-      const a = String(mathColA || "").trim();
-      const b = String(mathColB || "").trim();
-      const out = String(mathOutCol || "").trim();
-      if (!a || !b || !out) {
-        toast.error("Choose two columns and an output column name.");
+      const baseCol = String(mathBaseCol || "").trim();
+      const out = String(mathOutCol || "").trim() || nextFreeResultColumnName();
+      if (!baseCol || !out) {
+        toast.error("Choose a column and output column name.");
         return;
       }
-      const next = rows.map((row) => {
+      const valueOrZero = (v) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      };
+      const next = rows.map((row, idx) => {
         if (!row || typeof row !== "object") return row;
-        const x = Number(row[a]);
-        const y = Number(row[b]);
-        let v = NaN;
-        if (mathOp === "add") v = x + y;
-        else if (mathOp === "subtract") v = x - y;
-        else if (mathOp === "multiply") v = x * y;
-        else if (mathOp === "divide") v = y === 0 ? NaN : x / y;
+        const current = valueOrZero(row[baseCol]);
+        const refIdx = mathRelativeRowRef === "next_row" ? idx + 1 : idx - 1;
+        const refRow = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
+        const relative = valueOrZero(refRow?.[baseCol]);
+        let v = null;
+        if (mathOp === "add") v = current + relative;
+        else if (mathOp === "subtract") v = current - relative;
+        else if (mathOp === "multiply") v = current * relative;
+        else if (mathOp === "divide") v = relative === 0 ? null : current / relative;
         return { ...row, [out]: Number.isFinite(v) ? v : null };
       });
-      replaceCurrentSheetData?.(next);
-      setConnectedData?.(next);
-      toast.success("Applied calculation to sheet.");
+      if (mathDestination === "new_sheet") {
+        const sheetName = `${out} calc`;
+        addNewSheetAndActivate?.((newId) => {
+          setSheetData?.(newId, next);
+          setDataSheets?.((prev) => {
+            const p = prev || {};
+            const sheet = p[newId];
+            if (!sheet) return prev;
+            return {
+              ...p,
+              [newId]: {
+                ...sheet,
+                name: sheetName.slice(0, 80),
+              },
+            };
+          });
+        });
+        toast.success("Applied calculation in a new sheet.");
+      } else {
+        replaceCurrentSheetData?.(next);
+        setConnectedData?.(next);
+        toast.success("Applied calculation to current sheet.");
+      }
       setMathDialogOpen(false);
-    }, [connectedData, mathColA, mathColB, mathOp, mathOutCol, replaceCurrentSheetData, setConnectedData]);
+    }, [
+      connectedData,
+      mathBaseCol,
+      mathDestination,
+      mathOp,
+      mathOutCol,
+      mathRelativeRowRef,
+      nextFreeResultColumnName,
+      addNewSheetAndActivate,
+      replaceCurrentSheetData,
+      setConnectedData,
+      setDataSheets,
+      setSheetData,
+    ]);
 
     const collectColumnNames = (rows) => {
       const set = new Set();
@@ -1625,66 +1683,159 @@ const GridView = ({startNew}) => {
                     <DialogHeader>
                       <DialogTitle>Mathematics Operations</DialogTitle>
                       <DialogDescription>
-                        Row-wise math on the current sheet (like an Excel formula). Pick two numeric columns and an
-                        output column name.
+                        Build a row-wise equation for probability momentum and write the result as a new column.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-3 sm:grid-cols-2 py-2">
+                    <div className="space-y-3 py-2">
+                      <Tabs defaultValue="basic" className="w-full">
+                        <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
+                          <TabsTrigger value="basic" className="h-7 px-2 text-xs">
+                            Basic
+                          </TabsTrigger>
+                          <TabsTrigger value="functions" className="h-7 px-2 text-xs">
+                            Functions
+                          </TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="basic" className="mt-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Operation</Label>
+                            <Select value={mathOp} onValueChange={setMathOp}>
+                              <SelectTrigger className="h-9 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="add">Add (A + B)</SelectItem>
+                                <SelectItem value="subtract">Subtract (A − B)</SelectItem>
+                                <SelectItem value="multiply">Multiply (A × B)</SelectItem>
+                                <SelectItem value="divide">Divide (A ÷ B)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="functions" className="mt-2">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Resulting column name</Label>
+                                <Input
+                                  className="h-9 text-xs"
+                                  value={mathOutCol}
+                                  onChange={(e) => setMathOutCol(e.target.value)}
+                                  spellCheck={false}
+                                  placeholder={nextFreeResultColumnName()}
+                                />
+                              </div>
+                              <div className="h-9 px-2 flex items-center text-sm font-semibold text-muted-foreground">=</div>
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-[1.3fr_0.8fr_1fr_0.6fr_1fr] items-end">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Column</Label>
+                                <Select value={mathBaseCol || "__"} onValueChange={(v) => setMathBaseCol(v === "__" ? "" : v)}>
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue placeholder="Select column" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__">—</SelectItem>
+                                    {sheetColumnNamesForMath.map((c) => (
+                                      <SelectItem key={`math-base-${c}`} value={c} className="font-mono text-xs">
+                                        {c}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {mathBaseCol ? (
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Mode</Label>
+                                  <Select value={mathReferenceMode} onValueChange={setMathReferenceMode}>
+                                    <SelectTrigger className="h-9 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="row_wise">Row-wise</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : null}
+                              {mathBaseCol && mathReferenceMode === "row_wise" ? (
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Anchor</Label>
+                                  <Select value={mathCurrentRowRef} onValueChange={setMathCurrentRowRef}>
+                                    <SelectTrigger className="h-9 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="current_row">Current row</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : null}
+                              {mathBaseCol && mathReferenceMode === "row_wise" && mathCurrentRowRef === "current_row" ? (
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Op</Label>
+                                  <Select value={mathOp} onValueChange={setMathOp}>
+                                    <SelectTrigger className="h-9 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="add">+</SelectItem>
+                                      <SelectItem value="subtract">-</SelectItem>
+                                      <SelectItem value="divide">/</SelectItem>
+                                      <SelectItem value="multiply">x</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : null}
+                              {mathBaseCol && mathReferenceMode === "row_wise" && mathCurrentRowRef === "current_row" ? (
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Relative row</Label>
+                                  <Select value={mathRelativeRowRef} onValueChange={setMathRelativeRowRef}>
+                                    <SelectTrigger className="h-9 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="prev_row">Prev row</SelectItem>
+                                      <SelectItem value="next_row">Next row</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs">Preview equation</Label>
+                              <div className="h-9 rounded-md border border-border/60 bg-muted/20 px-2 text-xs flex items-center font-mono">
+                                {`${mathOutCol || nextFreeResultColumnName()} = ${mathBaseCol || "column"} (current row) ${
+                                  mathOp === "add" ? "+" : mathOp === "subtract" ? "-" : mathOp === "multiply" ? "x" : "/"
+                                } ${mathRelativeRowRef === "next_row" ? "next row" : "prev row"}`}
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
                       <div className="space-y-1">
-                        <Label className="text-xs">Operation</Label>
-                        <Select value={mathOp} onValueChange={setMathOp}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="add">Add (A + B)</SelectItem>
-                            <SelectItem value="subtract">Subtract (A − B)</SelectItem>
-                            <SelectItem value="multiply">Multiply (A × B)</SelectItem>
-                            <SelectItem value="divide">Divide (A ÷ B)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Output column name</Label>
-                        <Input
-                          className="h-9 text-xs"
-                          value={mathOutCol}
-                          onChange={(e) => setMathOutCol(e.target.value)}
-                          spellCheck={false}
-                          placeholder="result"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Column A</Label>
-                        <Select value={mathColA || "__"} onValueChange={(v) => setMathColA(v === "__" ? "" : v)}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue placeholder="Select column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__">—</SelectItem>
-                            {sheetColumnNamesForMath.map((c) => (
-                              <SelectItem key={c} value={c} className="font-mono text-xs">
-                                {c}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Column B</Label>
-                        <Select value={mathColB || "__"} onValueChange={(v) => setMathColB(v === "__" ? "" : v)}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue placeholder="Select column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__">—</SelectItem>
-                            {sheetColumnNamesForMath.map((c) => (
-                              <SelectItem key={`math-b-${c}`} value={c} className="font-mono text-xs">
-                                {c}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label className="text-xs">Apply to</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 text-xs"
+                            variant={mathDestination === "current_sheet" ? "default" : "outline"}
+                            onClick={() => setMathDestination("current_sheet")}
+                          >
+                            Current sheet
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 text-xs"
+                            variant={mathDestination === "new_sheet" ? "default" : "outline"}
+                            onClick={() => setMathDestination("new_sheet")}
+                          >
+                            New sheet
+                          </Button>
+                        </div>
                       </div>
                     </div>
                     <DialogFooter className="gap-2 sm:gap-0">

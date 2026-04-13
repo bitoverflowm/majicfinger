@@ -31,7 +31,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import { useChartBuilder } from "@/components/chartView";
+import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
 import {
   getShadcnChartPaletteArray,
   getShadcnChartBaseSwatch950,
@@ -127,6 +127,10 @@ export default function ChartControls() {
 
     lineStyle,
     setLineStyle,
+    lineHumanReadableTime,
+    setLineHumanReadableTime,
+    xTimeScale,
+    setXTimeScale,
     expanded,
     handleToggleChange,
     legendVisible,
@@ -168,7 +172,20 @@ export default function ChartControls() {
   // Only one section open at a time; default to Chart Type.
   const [openSection, setOpenSection] = useState("chartType");
   const [lineAddValue, setLineAddValue] = useState("");
+  const xAxisSelectValue = selX ?? CHART_X_AXIS_NONE;
+  const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
+
   const addableLineColumns = (xOptions || []).filter((c) => c !== selX && !(selY || []).includes(c));
+  const lineNonNumericColumns = (selY || []).filter((col) => {
+    if (!col || !Array.isArray(chartData) || !chartData.length) return false;
+    for (let i = 0; i < chartData.length; i += 1) {
+      const v = chartData[i]?.[col];
+      if (v == null || v === "") continue;
+      const n = Number(v);
+      return !Number.isFinite(n);
+    }
+    return false;
+  });
   const palettePreview =
     selectedPalette && selectedPalette.length
       ? selectedPalette
@@ -181,7 +198,10 @@ export default function ChartControls() {
             <div className="flex place-items-center text-xs gap-2 place-items-center bg-indigo-500/80 rounded-lg px-4 py-2 mx-8 mb-4">
               <div className="rounded-full bg-white h-2 w-2 mr-1 animate-bounce" />
               <small className="text-xs text-white"> You haven't connected any data yet. </small>
-              <span className="flex place-items-center ml-2 text-[10px] rounded-md bg-white text-black cursor-pointer hover:bg-black hover:text-white px-2" onClick={() => setViewing("dataStart")}>
+              <span
+                className="ml-2 flex cursor-pointer place-items-center rounded-md border border-white/40 bg-background/95 px-2 py-0.5 text-[10px] text-foreground hover:bg-accent hover:text-accent-foreground"
+                onClick={() => setViewing("dataStart")}
+              >
                 Fix<CaretRightIcon />
               </span>
             </div>
@@ -190,7 +210,7 @@ export default function ChartControls() {
             <div className="flex place-items-center text-xs gap-2 place-items-center bg-lychee_blue/80 rounded-lg px-4 py-2 mx-8 mb-4">
               <small className="text-xs text-white"> Viewing summary: {chartDataOverrideMeta.title} </small>
               <span
-                className="flex place-items-center ml-2 text-[10px] rounded-md bg-white text-black cursor-pointer hover:bg-black hover:text-white px-2"
+                className="ml-2 flex cursor-pointer place-items-center rounded-md border border-white/40 bg-background/95 px-2 py-0.5 text-[10px] text-foreground hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {
                   setChartDataOverride?.(null);
                   setChartDataOverrideMeta?.(null);
@@ -327,13 +347,16 @@ export default function ChartControls() {
                   {selChartType === "line" ? (
                     <>
                       <div className="py-2 space-y-2">
-                        <div className="flex min-w-0 items-center gap-2 text-black">
-                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>index:</span>
-                          <Select value={selX} onValueChange={(value) => setSelX(value)}>
+                        <div className="flex min-w-0 items-center gap-2 text-foreground">
+                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Pivot (x-axis):</span>
+                          <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
                             <SelectTrigger className="min-w-0 flex-1">
-                              <SelectValue placeholder="x axis" className="text-xs" />
+                              <SelectValue placeholder="X axis" className="text-xs" />
                             </SelectTrigger>
                             <SelectContent className="text-xs">
+                              <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
+                                — Select X axis —
+                              </SelectItem>
                               {(xOptions || []).map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs">
                                   {i}
@@ -341,6 +364,18 @@ export default function ChartControls() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Time format:</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={lineHumanReadableTime ? "default" : "outline"}
+                            className="h-7 text-xs"
+                            onClick={() => setLineHumanReadableTime((v) => !v)}
+                          >
+                            {lineHumanReadableTime ? "Human readable" : "Unix/raw"}
+                          </Button>
                         </div>
                         <div className="pt-2">
                           <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} mb-1`}>Lines</p>
@@ -355,14 +390,16 @@ export default function ChartControls() {
                                   />
                                   {`Line ${index + 1}: ${lineColumn}`}
                                 </span>
-                                <button
-                                  type="button"
-                                  className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
-                                  aria-label={`Remove Line ${index + 1}`}
-                                  onClick={() => removeY(lineColumn, index)}
-                                >
-                                  x
-                                </button>
+                                {(selY || []).length > 1 ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
+                                    aria-label={`Remove Line ${index + 1}`}
+                                    onClick={() => removeY(lineColumn, index)}
+                                  >
+                                    x
+                                  </button>
+                                ) : null}
                               </Badge>
                             ))}
                           </div>
@@ -377,7 +414,7 @@ export default function ChartControls() {
                               }}
                             >
                               <SelectTrigger
-                                className="min-w-[140px] h-8 bg-black text-white rounded-md text-xs disabled:opacity-50"
+                                className="h-8 min-w-[140px] text-xs disabled:opacity-50"
                                 disabled={!addableLineColumns.length}
                               >
                                 <SelectValue placeholder="+ Add Line" className="text-xs" />
@@ -397,17 +434,25 @@ export default function ChartControls() {
                               </span>
                             )}
                           </div>
+                          {lineNonNumericColumns.length > 0 && (
+                            <p className="pt-2 text-xs text-destructive">
+                              non-numericl vlaue detected this does not work for line cahrt
+                            </p>
+                          )}
                         </div>
                       </div>
                     </>
                   ) : (selChartType === "area") ? (
                     <>
-                      <div className="min-w-0 py-2 text-black">
-                        <Select value={selX} onValueChange={(value) => setSelX(value)}>
+                      <div className="min-w-0 py-2 text-foreground">
+                        <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
                           <SelectTrigger className="min-w-0">
-                            <SelectValue placeholder="x axis" className="text-xs" />
+                            <SelectValue placeholder="X axis" className="text-xs" />
                           </SelectTrigger>
                           <SelectContent className="text-xs">
+                            <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
+                              — Select X axis —
+                            </SelectItem>
                             {xOptions &&
                               xOptions.map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs">
@@ -420,7 +465,7 @@ export default function ChartControls() {
                       <div className="py-2">
                         {selY.length > 0 &&
                           selY.map((yValue, index) => (
-                            <div className="py-1 flex min-w-0 place-items-center gap-2 text-black" key={index}>
+                            <div className="flex min-w-0 place-items-center gap-2 py-1 text-foreground" key={index}>
                               <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
                                 <SelectTrigger className="min-w-0 flex-1">
                                   <SelectValue className="text-xs">{yValue}</SelectValue>
@@ -445,7 +490,7 @@ export default function ChartControls() {
                           <div className="min-w-0">
                             <Select onValueChange={(val) => handleSelectY(val)}>
                               <SelectTrigger className="min-w-0">
-                                <SelectValue placeholder="desktop" className="text-xs" />
+                                <SelectValue placeholder="Y column" className="text-xs" />
                               </SelectTrigger>
                               <SelectContent className="text-xs">
                                 {availableYOptions &&
@@ -462,12 +507,15 @@ export default function ChartControls() {
                     </>
                   ) : (
                     <>
-                      <div className="min-w-0 py-2 text-black">
-                        <Select value={selX} onValueChange={(value) => setSelX(value)}>
+                      <div className="min-w-0 py-2 text-foreground">
+                        <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
                           <SelectTrigger className="min-w-0">
-                            <SelectValue placeholder="x axis" className="text-xs" />
+                            <SelectValue placeholder="X axis" className="text-xs" />
                           </SelectTrigger>
                           <SelectContent className="text-xs">
+                            <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
+                              — Select X axis —
+                            </SelectItem>
                             {xOptions &&
                               xOptions.map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs">
@@ -480,7 +528,7 @@ export default function ChartControls() {
                       <div className="py-2">
                         {selY.length > 0 &&
                           selY.map((yValue, index) => (
-                            <div className="py-1 flex min-w-0 place-items-center gap-2 text-black" key={index}>
+                            <div className="flex min-w-0 place-items-center gap-2 py-1 text-foreground" key={index}>
                               <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
                                 <SelectTrigger className="min-w-0 flex-1">
                                   <SelectValue className="text-xs">{yValue}</SelectValue>
@@ -495,7 +543,7 @@ export default function ChartControls() {
                                 </SelectContent>
                               </Select>
                               {!(selY.length === 1) && (
-                                <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
+                                <div className="cursor-pointer p-1 text-red-400 hover:text-red-700">
                                   <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
                                 </div>
                               )}
@@ -505,7 +553,7 @@ export default function ChartControls() {
                           <div className="min-w-0">
                             <Select onValueChange={(val) => handleSelectY(val)}>
                               <SelectTrigger className="min-w-0">
-                                <SelectValue placeholder="desktop" className="text-xs" />
+                                <SelectValue placeholder="Y column" className="text-xs" />
                               </SelectTrigger>
                               <SelectContent className="text-xs">
                                 {availableYOptions &&
@@ -587,10 +635,39 @@ export default function ChartControls() {
                     </>
                   )}
 
+                  {(selChartType === "line" || selChartType === "area" || selChartType === "bar") && selX ? (
+                    <div className="space-y-1 border-t border-border/60 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-xs font-medium ${dark ? "text-slate-200" : "text-muted-foreground"}`}>
+                          Time series X-axis
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={xTimeScale ? "default" : "outline"}
+                          className="h-7 text-xs"
+                          onClick={() => setXTimeScale((v) => !v)}
+                        >
+                          {xTimeScale ? "On" : "Off"}
+                        </Button>
+                      </div>
+                      <p className={`text-[10px] leading-snug ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
+                        Uses a numeric time scale so each row maps along the full width. Turn off for categorical X (e.g. labels).
+                      </p>
+                    </div>
+                  ) : null}
+
                   {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "line" && selChartType !== "treemap" && (
-                    <button className="p-2 bg-black text-white rounded-md text-xs" onClick={() => handleSelectY(availableYOptions[0])} disabled={availableYOptions && availableYOptions.length === 0}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => handleSelectY(availableYOptions[0])}
+                      disabled={availableYOptions && availableYOptions.length === 0}
+                    >
                       {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
-                    </button>
+                    </Button>
                   )}
                 </AccordionContent>
               </AccordionItem>
@@ -666,9 +743,16 @@ export default function ChartControls() {
                 </>
               )}
               {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "treemap" && (
-                <button className="p-2 bg-black text-white rounded-md text-xs" onClick={() => handleSelectY(availableYOptions[0])} disabled={availableYOptions && availableYOptions.length === 0}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="mt-2 text-xs"
+                  onClick={() => handleSelectY(availableYOptions[0])}
+                  disabled={availableYOptions && availableYOptions.length === 0}
+                >
                   {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
-                </button>
+                </Button>
               )}
               {selChartType === "liveline" && (
                 <div className="mt-3 rounded-lg border p-3 space-y-3">
@@ -1000,7 +1084,7 @@ export default function ChartControls() {
                 </Tooltip>
               </TooltipProvider>
               <Toggle area-label="Toggle Expand" pressed={dark} onPressedChange={handleToggleDark}>
-                {dark ? <Lightbulb className="h-4 w-4 text-slate-800" /> : <Moon className="h-4 w-4 text-slate-800" />}
+                {dark ? <Lightbulb className="h-4 w-4 text-foreground" /> : <Moon className="h-4 w-4 text-foreground" />}
               </Toggle>
             </div>
             <div>
@@ -1091,11 +1175,11 @@ export default function ChartControls() {
             <div className="min-w-0 py-2">
               <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Line Style</p>
               <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"} pt-2`}>How do you want your line</p>
-              <Select className="min-w-0 text-black" value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
-                <SelectTrigger className="min-w-0 text-black">
+              <Select className="min-w-0" value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
+                <SelectTrigger className="min-w-0 text-foreground">
                   <SelectValue placeholder="y axis" className="text-xs" />
                 </SelectTrigger>
-                <SelectContent className="text-xs text-black">
+                <SelectContent className="text-xs">
                   {["natural", "linear", "step"].map((i) => (
                     <SelectItem key={i} value={i} className="text-xs">
                       {i}
@@ -1112,43 +1196,43 @@ export default function ChartControls() {
               </Toggle>
             )}
             <Toggle area-label="Toggle Legend" pressed={legendVisible} onPressedChange={handleToggleLegend}>
-              <IdCardIcon className="h-4 w-4 text-slate-800" />
+              <IdCardIcon className="h-4 w-4 text-foreground" />
             </Toggle>
             {selChartType === "bar" && (
               <>
                 <Toggle area-label="Toggle Horizontal" pressed={horizontal} onPressedChange={handleToggleHorizontal}>
-                  <PiChartBarHorizontalLight className="h-4 w-4 text-slate-800" />
+                  <PiChartBarHorizontalLight className="h-4 w-4 text-foreground" />
                 </Toggle>
                 <Toggle area-label="Toggle Stack" pressed={stackedBar} onPressedChange={handleToggleStack}>
-                  <MdStackedBarChart className="h-4 w-4 text-slate-800" />
+                  <MdStackedBarChart className="h-4 w-4 text-foreground" />
                 </Toggle>
               </>
             )}
             {selChartType === "line" && (
               <>
                 <Toggle area-label="Toggle Dots" pressed={dots} onPressedChange={handleToggleDots}>
-                  <GoDotFill className="h-4 w-4 text-black" />
+                  <GoDotFill className="h-4 w-4 text-foreground" />
                 </Toggle>
                 <Toggle area-label="Toggle label line" pressed={labelLine} onPressedChange={handleToggleLabelLine}>
-                  <Tag className="h-4 w-4 text-black" />
+                  <Tag className="h-4 w-4 text-foreground" />
                 </Toggle>
               </>
             )}
             {(selChartType === "line" || selChartType === "pie") && (
               <Toggle area-label="Toggle label line" pressed={labelLine} onPressedChange={handleToggleLabelLine}>
-                <Tag className="h-4 w-4 text-black" />
+                <Tag className="h-4 w-4 text-foreground" />
               </Toggle>
             )}
             {selChartType === "pie" && (
               <Toggle area-label="Toggle donut" pressed={donut} onPressedChange={handleToggleDonut}>
-                <PiChartDonut className="h-4 w-4 text-black" />
+                <PiChartDonut className="h-4 w-4 text-foreground" />
               </Toggle>
             )}
           </div>
           <div className="flex place-items-center gap-3 text-xs">
             <Input id="title" type="text" placeholder="Give Your Chart a Title" className="text-xs" onChange={(e) => setTitle(e.target.value)} />
             <div
-              className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+              className="flex h-6 w-6 cursor-pointer place-content-center place-items-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40 hover:text-foreground"
               onClick={() => setTitleHidden(!titleHidden)}
             >
               {titleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}
@@ -1157,7 +1241,7 @@ export default function ChartControls() {
           <div className="flex gap-2 place-items-center py-1">
             <Input id="subTitle" type="text" className="text-xs" placeholder="Add a Description" onChange={(e) => setSubTitle(e.target.value)} />
             <div
-              className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+              className="flex h-6 w-6 cursor-pointer place-content-center place-items-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40 hover:text-foreground"
               onClick={() => setSubTitleHidden(!subTitleHidden)}
             >
               {subTitleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}
@@ -1166,7 +1250,7 @@ export default function ChartControls() {
           <div className="flex gap-2 place-items-center py-1">
             <Input id="bodyHeading" type="text" className="text-xs" placeholder="Add a body Heading" onChange={(e) => setBodyHeading(e.target.value)} />
             <div
-              className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+              className="flex h-6 w-6 cursor-pointer place-content-center place-items-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40 hover:text-foreground"
               onClick={() => setHeadingHidden(!bodyHeadingHidden)}
             >
               {bodyHeadingHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}
@@ -1176,7 +1260,7 @@ export default function ChartControls() {
             <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Content</p>
             <Input id="BodyContent" type="text" className="text-xs" placeholder="Add a Description" onChange={(e) => setBodyContent(e.target.value)} />
             <div
-              className="bg-yellow-400/30 p-2 w-6 h-6 rounded-full flex place-items-center place-content-center text-black cursor-pointer hover:bg-lychee_green/40 hover:text-slate-600"
+              className="flex h-6 w-6 cursor-pointer place-content-center place-items-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40 hover:text-foreground"
               onClick={() => setBodyContentHidden(!bodyContentHidden)}
             >
               {bodyContentHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}

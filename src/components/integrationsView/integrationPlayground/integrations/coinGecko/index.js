@@ -168,12 +168,12 @@ const CoinGecko = ({setConnectedData}) => {
                                                 <Button
                                                     variant={"outline"}
                                                     className={cn(
-                                                        "w-[280px] justify-start text-left font-normal",
+                                                        "w-[280px] justify-start text-left text-xs font-normal",
                                                         !date && "text-muted-foreground"
                                                     )}
                                                 >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {date ? format(date, "dd-MM-yyyy") : <span>Pick a date</span>}
+                                                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                                                    {date ? format(date, "dd-MM-yyyy") : <span className="text-[11px] leading-snug">Pick a date</span>}
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-auto p-0">
@@ -198,11 +198,11 @@ const CoinGecko = ({setConnectedData}) => {
                                                     id="date-range"
                                                     variant={"outline"}
                                                     className={cn(
-                                                        "w-[300px] justify-start text-left font-normal",
+                                                        "w-[300px] justify-start text-left text-xs font-normal",
                                                         !dateRange.from && !dateRange.to && "text-muted-foreground"
                                                     )}
                                                 >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                                                     {dateRange.from ? (
                                                         dateRange.to ? (
                                                             <>
@@ -213,7 +213,7 @@ const CoinGecko = ({setConnectedData}) => {
                                                             format(dateRange.from, "dd-MM-yyyy")
                                                         )
                                                     ) : (
-                                                        <span>Pick a date range</span>
+                                                        <span className="text-[11px] leading-snug">Pick a date range</span>
                                                     )}
                                                 </Button>
                                             </PopoverTrigger>

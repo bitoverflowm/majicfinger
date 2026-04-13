@@ -18,7 +18,6 @@ import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtr
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { ATHENA_DEMO_ROW_LIMIT } from '@/config/dataLakeParquetSamples';
 
 const ChartBuilderContext = createContext(null);
 
@@ -57,11 +56,22 @@ export const dfltChartConfig = {
   other: { label: 'Other', color: 'hsl(142 88% 28%)' },
 };
 
+/** Select sentinel: no X axis chosen yet (must not match a real column name). */
+export const CHART_X_AXIS_NONE = "__chart_x_axis_none__";
+
 export function getAxisType(key, dataTypes, data) {
   if (dataTypes && dataTypes[key]) {
     const t = dataTypes[key];
-    if (t === 'number' || t === 'date') return t;
-    return 'string';
+    if (t === "number" || t === "date") return t;
+    // Stale/wrong "string" in context — infer from actual rows so charts sort and scale correctly.
+    if (data?.length) {
+      const v = data[0][key];
+      if (typeof v === "number" && Number.isFinite(v)) return "number";
+      if (v instanceof Date) return "date";
+      const n = Number(v);
+      if (v != null && v !== "" && !Number.isNaN(n) && Number.isFinite(n)) return "number";
+    }
+    return "string";
   }
   if (!data || !data.length) return "string";
   const v = data[0][key];
@@ -74,13 +84,45 @@ export function getAxisType(key, dataTypes, data) {
 }
 
 function isLikelyTemporalKey(key, dataTypes, data) {
-  return getAxisType(key, dataTypes, data) === "date";
+  if (!key) return false;
+  if (getAxisType(key, dataTypes, data) === "date") return true;
+  const keyNorm = String(key).toLowerCase();
+  if (keyNorm === "t") return true;
+  if (/(time|timestamp|date|datetime|createdat|updatedat|ts)/.test(keyNorm)) return true;
+  const rows = Array.isArray(data) ? data : [];
+  for (let i = 0; i < Math.min(rows.length, 50); i += 1) {
+    const raw = rows[i]?.[key];
+    if (raw == null || raw === "") continue;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) break;
+    if (n > 1e9 && n < 1e13) return true; // unix sec/ms-like
+    break;
+  }
+  return false;
 }
 
-function formatXAxisValue(value, temporal) {
-  if (!temporal) return value;
+function temporalToMs(value) {
+  if (value == null || value === "") return NaN;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (value > 1e12) return value; // ms
+    if (value > 1e9) return value * 1000; // sec
+  }
+  const s = String(value).trim();
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    if (n > 1e12) return n;
+    if (n > 1e9) return n * 1000;
+  }
+  return Date.parse(s);
+}
+
+function formatXAxisValue(value, temporal, humanReadable = true) {
+  if (!temporal || !humanReadable) return value;
   if (value == null || value === "") return "";
-  const d = value instanceof Date ? value : new Date(value);
+  const ms = temporalToMs(value);
+  const d = Number.isFinite(ms) ? new Date(ms) : null;
+  if (!d) return String(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return new Intl.DateTimeFormat(undefined, {
     year: "numeric",
@@ -91,7 +133,7 @@ function formatXAxisValue(value, temporal) {
 
 function toSortableXAxisValue(value, axisType) {
   if (axisType === "date") {
-    const ts = Date.parse(String(value));
+    const ts = temporalToMs(value);
     return Number.isFinite(ts) ? ts : Number.POSITIVE_INFINITY;
   }
   if (axisType === "number") {
@@ -99,6 +141,29 @@ function toSortableXAxisValue(value, axisType) {
     return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
   }
   return null;
+}
+
+/**
+ * Recharts line/area/bar need a numeric X scale for time series. Date objects and unix seconds
+ * otherwise fall back to category mode and can collapse to a single visible point.
+ */
+function normalizeCartesianPivotToEpochMs(rows, xKey, xAxisType, lineIsTemporalX, enabled) {
+  if (!enabled || !Array.isArray(rows) || !rows.length || !xKey) return rows;
+  const should = xAxisType === "date" || (xAxisType === "number" && lineIsTemporalX);
+  if (!should) return rows;
+  return rows.map((row) => {
+    const raw = row?.[xKey];
+    let ms = NaN;
+    if (raw instanceof Date) ms = raw.getTime();
+    else if (typeof raw === "number" && Number.isFinite(raw)) {
+      if (raw > 1e12 && raw < 1e15) ms = raw;
+      else if (raw > 1e9 && raw < 1e12) ms = raw * 1000;
+    } else if (raw != null && raw !== "") {
+      ms = temporalToMs(raw);
+    }
+    if (!Number.isFinite(ms)) return { ...row };
+    return { ...row, [xKey]: ms };
+  });
 }
 
 function getDistinctValues(data, colKey) {
@@ -146,10 +211,13 @@ export function ChartBuilderProvider({ demo, children }) {
     setSelChartType((prev) => (prev === "heatmap" ? "treemap" : prev));
   }, []);
   const [selX, setSelX] = useState(undefined);
-  const [selY, setSelY] = useState(["desktop"]);
+  const [selY, setSelY] = useState([]);
   const [xOptions, setXOptions] = useState([]);
-  const [availableYOptions, setAvailableYOptons] = useState(["desktop","mobile","other"]);
+  const [availableYOptions, setAvailableYOptons] = useState([]);
   const [lineStyle, setLineStyle] = useState("natural");
+  const [lineHumanReadableTime, setLineHumanReadableTime] = useState(true);
+  /** When on, pivot X is coerced to epoch ms and drawn on a numeric time scale (line/area/bar). */
+  const [xTimeScale, setXTimeScale] = useState(true);
   const [scaleX, setScaleX] = useState("linear");
   const [scaleY, setScaleY] = useState("linear");
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
@@ -177,7 +245,7 @@ export function ChartBuilderProvider({ demo, children }) {
   const [bodyContentHidden, setBodyContentHidden] = useState(true);
   const [bodyContent, setBodyContent] = useState('...');
 
-  const [chartConfig, setChartConfig] = useState(dfltChartConfig);
+  const [chartConfig, setChartConfig] = useState({});
   const [lineSeriesColumn, setLineSeriesColumn] = useState(null);
   const [lineSeriesValues, setLineSeriesValues] = useState([]);
 
@@ -204,28 +272,38 @@ export function ChartBuilderProvider({ demo, children }) {
     }
   }, [selectedPalette]);
 
+  const areArraysEqual = (a, b) =>
+    Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every((v, i) => v === b[i]);
+
   useEffect(() => {
     if (!effectiveCols?.length) return;
     const cols = effectiveCols.map((c) => c.field);
-    setXOptions(cols);
-    if (!selX) {
-      const temporalCol = cols.find((col) => isLikelyTemporalKey(col, dataTypes, effectiveData));
-      setSelX(temporalCol || cols[0]);
-    }
-    const yOpts = cols.filter((c) => c !== cols[0]);
-    setAvailableYOptons(yOpts);
-    if (!selY?.length) setSelY(yOpts.length ? [yOpts[0]] : []);
-  }, [effectiveCols, selX, selY, dataTypes, effectiveData]);
+    setXOptions((prev) => (areArraysEqual(prev, cols) ? prev : cols));
+    const pivotForStackedY = selX && cols.includes(selX) ? selX : null;
+    const yOpts = pivotForStackedY ? cols.filter((c) => c !== pivotForStackedY) : cols;
+    setAvailableYOptons((prev) => (areArraysEqual(prev, yOpts) ? prev : yOpts));
+  }, [effectiveCols, selX]);
 
+  // Drop axis selections that no longer exist on the sheet (do not auto-pick replacements).
+  // In demo, only enforce this when the sheet has real rows; sample fallback uses synthetic columns.
   useEffect(() => {
+    if (demo) {
+      const live = Array.isArray(effectiveData) ? effectiveData : [];
+      if (!live.length) return;
+    }
     const cols = effectiveCols?.map((c) => c.field) || [];
     if (!cols.length) return;
-    const current = selX && cols.includes(selX) ? selX : null;
-    if (!current) {
-      const temporalCol = cols.find((col) => isLikelyTemporalKey(col, dataTypes, effectiveData));
-      if (temporalCol) setSelX(temporalCol);
-    }
-  }, [effectiveCols, dataTypes, effectiveData, selX]);
+    const colSet = new Set(cols);
+    setSelX((x) => (x && !colSet.has(x) ? undefined : x));
+    setSelY((prev) => {
+      const curr = Array.isArray(prev) ? prev : [];
+      const next = curr.filter((y) => colSet.has(y));
+      return next.length === curr.length && next.every((v, i) => v === curr[i]) ? curr : next;
+    });
+  }, [demo, effectiveData, effectiveCols]);
 
   // Auto-trim Y for single-series chart types (keeps filters/sorts intact).
   useEffect(() => {
@@ -239,31 +317,43 @@ export function ChartBuilderProvider({ demo, children }) {
     });
   }, [selChartType]);
 
-  // For the new multi-column line model, avoid plotting the X/index column as a line.
+  // For line charts, never plot the pivot column as a Y series; do not auto-add a replacement Y.
   useEffect(() => {
     if (selChartType !== "line") return;
     if (!selX || !Array.isArray(xOptions) || !xOptions.length) return;
     setSelY((prev) => {
       const curr = Array.isArray(prev) ? prev : [];
       const filtered = curr.filter((v) => v !== selX);
-      if (filtered.length) return filtered;
-      const fallback = xOptions.find((c) => c !== selX);
-      return fallback ? [fallback] : [];
+      if (filtered.length === curr.length && filtered.every((v, i) => v === curr[i])) return curr;
+      return filtered;
     });
   }, [selChartType, selX, xOptions]);
 
   useEffect(() => {
     if (!demo) return;
+    const live = Array.isArray(effectiveData) ? effectiveData : [];
+    if (live.length) return;
     setSelX('month');
     setSelY(['desktop']);
     setSelChartType('area');
     setXOptions(["month","desktop","mobile","other"]);
     setAvailableYOptons(["desktop","mobile","other"]);
-  }, [demo]);
+    setChartConfig(dfltChartConfig);
+  }, [demo, effectiveData]);
+
+  /** Demo with an empty sheet uses baked-in sample data; otherwise chart the same rows as the grid. */
+  const usingSampleFallback = useMemo(
+    () => demo && !(Array.isArray(effectiveData) && effectiveData.length > 0),
+    [demo, effectiveData],
+  );
 
   const chartData = useMemo(() => {
-    const d = (demo ? dfltChartData : effectiveData) || [];
-    return Array.isArray(d) && d.length ? d : dfltChartData;
+    if (demo) {
+      const live = Array.isArray(effectiveData) ? effectiveData : [];
+      if (live.length) return live;
+      return dfltChartData;
+    }
+    return Array.isArray(effectiveData) ? effectiveData : [];
   }, [demo, effectiveData]);
 
   const lineSeriesColumnOptions = useMemo(() => {
@@ -419,6 +509,7 @@ export function ChartBuilderProvider({ demo, children }) {
   const value = {
     demo,
     effectiveData,
+    usingSampleFallback,
     setViewing,
     dataTypes,
 
@@ -507,6 +598,10 @@ export function ChartBuilderProvider({ demo, children }) {
 
     lineStyle,
     setLineStyle,
+    lineHumanReadableTime,
+    setLineHumanReadableTime,
+    xTimeScale,
+    setXTimeScale,
     expanded,
     handleToggleChange: setExpanded,
     legendVisible,
@@ -576,6 +671,7 @@ export function ChartBuilderProvider({ demo, children }) {
 export function ChartCanvas() {
   const {
     demo,
+    usingSampleFallback,
     dark,
     showWsFeedControl,
     wsRunning,
@@ -605,6 +701,8 @@ export function ChartCanvas() {
     selX,
     selY,
     lineStyle,
+    lineHumanReadableTime,
+    xTimeScale,
     expanded,
     legendVisible,
     stackedBar,
@@ -614,7 +712,6 @@ export function ChartCanvas() {
     bodyHeading,
     bodyContent,
     lineIsTemporalX,
-    lineChartData,
     formatXAxisValue,
     formatCompactNumber,
     scaleY,
@@ -622,37 +719,68 @@ export function ChartCanvas() {
     yAxisCompact,
   } = useChartBuilder();
 
-  const data = chartData && chartData.length ? chartData : dfltChartData;
+  const rawData = chartData || [];
+  const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
+  /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
+  const axesConfigured = usingSampleFallback || (!!selX && yKeys.length > 0);
   const xKey = selX || "month";
-  const xAxisType = getAxisType(xKey, dataTypes, data);
-  const sortedData = useMemo(() => {
-    if (!Array.isArray(data) || data.length <= 1) return data;
-    if (xAxisType !== "date" && xAxisType !== "number") return data;
-    return [...data].sort((a, b) => {
+  const xAxisType = selX ? getAxisType(xKey, dataTypes, rawData) : "string";
+
+  const useTimeSeriesX =
+    xTimeScale && !!selX && (xAxisType === "date" || (xAxisType === "number" && lineIsTemporalX));
+
+  const cartesianChart =
+    selChartType === "line" || selChartType === "area" || selChartType === "bar";
+
+  const plotRows = useMemo(() => {
+    if (!cartesianChart) return rawData;
+    return normalizeCartesianPivotToEpochMs(rawData, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX);
+  }, [rawData, cartesianChart, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX]);
+
+  const sortedPlotRows = useMemo(() => {
+    if (!selX || !Array.isArray(plotRows) || plotRows.length <= 1) return plotRows;
+    if (xAxisType !== "date" && xAxisType !== "number") return plotRows;
+    return [...plotRows].sort((a, b) => {
       const av = toSortableXAxisValue(a?.[xKey], xAxisType);
       const bv = toSortableXAxisValue(b?.[xKey], xAxisType);
       return av - bv;
     });
-  }, [data, xAxisType, xKey]);
-  const renderedData = selChartType === "line" ? (lineChartData?.length ? lineChartData : data) : data;
-  const finalRenderedData = useMemo(() => {
-    if (selChartType !== "line") return sortedData;
-    if (!Array.isArray(renderedData) || renderedData.length <= 1) return renderedData;
-    if (xAxisType !== "date" && xAxisType !== "number") return renderedData;
-    return [...renderedData].sort((a, b) => {
+  }, [plotRows, xAxisType, xKey, selX]);
+
+  /** All cartesian series use the same sorted rows so every line maps the full column. */
+  const finalRenderedData = sortedPlotRows;
+
+  /** Treemap keeps raw pivot labels (not epoch ms). */
+  const treemapRows = useMemo(() => {
+    if (!selX || !Array.isArray(rawData) || rawData.length <= 1) return rawData;
+    if (xAxisType !== "date" && xAxisType !== "number") return rawData;
+    return [...rawData].sort((a, b) => {
       const av = toSortableXAxisValue(a?.[xKey], xAxisType);
       const bv = toSortableXAxisValue(b?.[xKey], xAxisType);
       return av - bv;
     });
-  }, [selChartType, renderedData, sortedData, xAxisType, xKey]);
-  const yKeys = (selY && selY.length) ? selY : ["desktop"];
+  }, [rawData, xAxisType, xKey, selX]);
+
+  const firstPlotX = selX && plotRows.length ? plotRows[0]?.[xKey] : null;
+  /** Recharts: numeric scale for unix / epoch ms; Date objects need normalization (see useTimeSeriesX). */
+  const rechartsXAxisType =
+    cartesianChart &&
+    selX &&
+    plotRows.length &&
+    typeof firstPlotX === "number" &&
+    Number.isFinite(firstPlotX)
+      ? "number"
+      : "category";
+
+  const xAxisNumberDomain = rechartsXAxisType === "number" ? ["dataMin", "dataMax"] : undefined;
+
   /** Recharts Treemap: one synthetic root whose children are sheet rows (name ← X, value ← Y). */
   const treemapData = useMemo(() => {
-    if (selChartType !== "treemap" || !Array.isArray(finalRenderedData) || !yKeys[0]) {
+    if (selChartType !== "treemap" || !Array.isArray(treemapRows) || !yKeys[0]) {
       return [{ name: "root", children: [] }];
     }
     const yk = yKeys[0];
-    const leaves = finalRenderedData
+    const leaves = treemapRows
       .map((row) => {
         const name = String(row?.[xKey] ?? "").trim() || "—";
         const value = Math.max(0, Number(row?.[yk]) || 0);
@@ -664,7 +792,7 @@ export function ChartCanvas() {
       return [{ name: "root", children: [{ name: "No positive values", value: 1 }] }];
     }
     return [{ name: "root", children: leaves }];
-  }, [selChartType, finalRenderedData, xKey, yKeys]);
+  }, [selChartType, treemapRows, xKey, yKeys]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
   const treemapLeafFills = useMemo(() => {
     const leaves = treemapData?.[0]?.children;
@@ -705,6 +833,12 @@ export function ChartCanvas() {
     const adjusted = n / divisor;
     return yAxisCompact ? formatCompactNumber(adjusted) : adjusted.toLocaleString(undefined, { maximumFractionDigits: 2 });
   };
+  const xTickFormatter = (v) =>
+    formatXAxisValue(
+      v,
+      lineIsTemporalX,
+      selChartType === "line" || selChartType === "area" ? lineHumanReadableTime : true,
+    );
 
   return (
     <div className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-out">
@@ -745,7 +879,11 @@ export function ChartCanvas() {
                 {subTitleHidden && <CardDescription>{subTitle}</CardDescription>}
               </CardHeader>
               <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-2 pt-0">
-                {selChartType === "liveline" ? (
+                {!axesConfigured ? (
+                  <div className="flex min-h-[200px] w-full flex-1 flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                    Select an X axis and at least one Y column under Data to plot your sheet.
+                  </div>
+                ) : selChartType === "liveline" ? (
                   <div className="flex min-h-[180px] w-full flex-1 flex-col items-center justify-center">
                     {livelineData && livelineData.length > 0 ? (
                       <Liveline
@@ -780,7 +918,15 @@ export function ChartCanvas() {
                     {selChartType === "area" && (
                       <AreaChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }} stackOffset={expanded ? "expand" : false}>
                         <CartesianGrid vertical={false} />
-                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
+                        <XAxis
+                          type={rechartsXAxisType}
+                          dataKey={xKey}
+                          domain={xAxisNumberDomain}
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          tickFormatter={xTickFormatter}
+                        />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
@@ -793,7 +939,15 @@ export function ChartCanvas() {
                     {selChartType === "bar" && (
                       <BarChart accessibilityLayer data={finalRenderedData} margin={{ left: 24, right: 18 }}>
                         <CartesianGrid vertical={false} />
-                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
+                        <XAxis
+                          type={rechartsXAxisType}
+                          dataKey={xKey}
+                          domain={xAxisNumberDomain}
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          tickFormatter={xTickFormatter}
+                        />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} width={74} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
@@ -824,7 +978,15 @@ export function ChartCanvas() {
                     {selChartType === "line" && (
                       <LineChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }}>
                         <CartesianGrid vertical={false} />
-                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatXAxisValue(v, lineIsTemporalX)} />
+                        <XAxis
+                          type={rechartsXAxisType}
+                          dataKey={xKey}
+                          domain={xAxisNumberDomain}
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          tickFormatter={xTickFormatter}
+                        />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                         {yKeys.map((yKey, idx) => (
@@ -839,7 +1001,7 @@ export function ChartCanvas() {
                     {selChartType === "pie" && (
                       <PieChart accessibilityLayer>
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                        <Pie data={data} dataKey={yKeys[0]} nameKey={xKey} innerRadius={donut ? 120 : 0} strokeWidth={donut ? 5 : 1} />
+                        <Pie data={rawData} dataKey={yKeys[0]} nameKey={xKey} innerRadius={donut ? 120 : 0} strokeWidth={donut ? 5 : 1} />
                         {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
                       </PieChart>
                     )}
@@ -858,14 +1020,6 @@ export function ChartCanvas() {
           </div>
         </div>
       </div>
-      {demo ? (
-        <p
-          className="shrink-0 border-t border-red-200/90 bg-red-50 px-3 py-2 text-center text-[11px] font-semibold leading-snug text-red-600 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-400 sm:text-xs"
-          role="status"
-        >
-          Demo: you can only pull up to {ATHENA_DEMO_ROW_LIMIT} rows per request. Sign up for the full dataset.
-        </p>
-      ) : null}
     </div>
   );
 }

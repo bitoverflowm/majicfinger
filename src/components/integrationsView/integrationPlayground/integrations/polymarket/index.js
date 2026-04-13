@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { format, startOfDay, isAfter, isSameDay, subDays } from "date-fns";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -28,6 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Loader2,
   ListFilter,
@@ -44,8 +48,10 @@ import {
   SquareIcon,
   LineChart,
   Search,
+  CalendarIcon,
 } from "lucide-react";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { cn } from "@/lib/utils";
 import { ENDPOINTS, POLYMARKET_GROUPS, TRADES_RESPONSE_FIELDS } from "./config";
 
 const COOLDOWN_MS = 1500;
@@ -81,6 +87,37 @@ function parseManualIds(input) {
     .filter(Boolean);
 }
 
+function parseOutcomes(market) {
+  let outcomes = market?.outcomes;
+  if (typeof outcomes === "string") {
+    try {
+      outcomes = JSON.parse(outcomes);
+    } catch {
+      outcomes = [];
+    }
+  }
+  return Array.isArray(outcomes) ? outcomes.map((v) => String(v)) : [];
+}
+
+function parseTimeParts(timeString, fallbackHour = 0, fallbackMinute = 0, fallbackSecond = 0) {
+  if (typeof timeString !== "string" || !timeString.trim()) {
+    return [fallbackHour, fallbackMinute, fallbackSecond];
+  }
+  const [hRaw, mRaw, sRaw] = timeString.split(":");
+  const h = Number.isFinite(Number(hRaw)) ? Number(hRaw) : fallbackHour;
+  const m = Number.isFinite(Number(mRaw)) ? Number(mRaw) : fallbackMinute;
+  const s = Number.isFinite(Number(sRaw)) ? Number(sRaw) : fallbackSecond;
+  return [h, m, s];
+}
+
+function toIsoFromLocalDateTime(date, timeString, fallbackHour = 0, fallbackMinute = 0, fallbackSecond = 0) {
+  if (!(date instanceof Date)) return "";
+  const local = new Date(date);
+  const [hour, minute, second] = parseTimeParts(timeString, fallbackHour, fallbackMinute, fallbackSecond);
+  local.setHours(hour, minute, second, 0);
+  return local.toISOString();
+}
+
 const Polymarket = ({ setConnectedData }) => {
   const contextStateV2 = useMyStateV2();
   const setViewing = contextStateV2?.setViewing;
@@ -104,6 +141,11 @@ const Polymarket = ({ setConnectedData }) => {
   const [lastResultKeys, setLastResultKeys] = useState([]);
   const [wsConnecting, setWsConnecting] = useState(false);
   const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
+  const [selectedPriceHistoryMarket, setSelectedPriceHistoryMarket] = useState("");
+  const [selectedPriceHistoryAssetIds, setSelectedPriceHistoryAssetIds] = useState([]);
+  const [priceHistoryDateRange, setPriceHistoryDateRange] = useState(undefined);
+  const [priceHistoryStartTime, setPriceHistoryStartTime] = useState("00:00:00");
+  const [priceHistoryEndTime, setPriceHistoryEndTime] = useState(() => format(new Date(), "HH:mm:ss"));
 
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
   const wsConnected = activeSheetId && streamsBySheetId[activeSheetId]?.type === "polymarket" && streamsBySheetId[activeSheetId]?.isRunning;
@@ -174,11 +216,13 @@ const Polymarket = ({ setConnectedData }) => {
       const options = arr.map((item) => {
         const condId = (item.conditionId ?? item.condition_id ?? "").toString().trim();
         const tokenIds = parseTokenIdsFromMarket(item);
-        const value = condId || tokenIds[0] || String(item.id ?? "");
+        const requestedValue = listValueKey ? item?.[listValueKey] : undefined;
+        const value = String(requestedValue ?? (condId || tokenIds[0] || item.id || "")).trim();
         const question = item[listLabelKey] ?? item.title ?? item.question ?? "";
-        const label = question + (value ? ` (${value})` : "");
+        const slug = item.slug ? ` | slug: ${item.slug}` : "";
+        const label = question + slug + (value ? ` (${value})` : "");
         const opt = { value, label };
-        if (paramKey === "market_token_id") opt.marketData = item;
+        if (paramKey === "market_token_id" || paramKey === "market") opt.marketData = item;
         return opt;
       });
       setListOptions((prev) => ({ ...prev, [paramKey]: options }));
@@ -256,6 +300,38 @@ const Polymarket = ({ setConnectedData }) => {
     if (wsConnected) setWsConnecting(false);
   }, [wsConnected]);
 
+  useEffect(() => {
+    if (selectedAction?.query !== "getPricesHistory") return;
+    const startTs = priceHistoryDateRange?.from
+      ? toIsoFromLocalDateTime(priceHistoryDateRange.from, priceHistoryStartTime, 0, 0, 0)
+      : "";
+    let endTs = priceHistoryDateRange?.to
+      ? toIsoFromLocalDateTime(priceHistoryDateRange.to, priceHistoryEndTime, 23, 59, 59)
+      : "";
+    if (endTs) {
+      const endMs = new Date(endTs).getTime();
+      if (endMs > Date.now()) endTs = new Date().toISOString();
+    }
+    setParamValues((prev) => ({
+      ...prev,
+      startTs,
+      endTs,
+    }));
+  }, [selectedAction?.query, priceHistoryDateRange, priceHistoryStartTime, priceHistoryEndTime]);
+
+  /** End-of-range calendar day cannot be after today; if end is today, end time cannot be after now. */
+  useEffect(() => {
+    if (selectedAction?.query !== "getPricesHistory") return;
+    if (!priceHistoryDateRange?.to || !isSameDay(priceHistoryDateRange.to, new Date())) return;
+    const now = new Date();
+    const endLocal = new Date(priceHistoryDateRange.to);
+    const [h, m, s] = parseTimeParts(priceHistoryEndTime, 23, 59, 59);
+    endLocal.setHours(h, m, s, 0);
+    if (endLocal.getTime() > now.getTime()) {
+      setPriceHistoryEndTime(format(now, "HH:mm:ss"));
+    }
+  }, [selectedAction?.query, priceHistoryDateRange?.to, priceHistoryEndTime]);
+
   const openForm = (action) => {
     setSelectedAction(action);
     setMarketSearch("");
@@ -264,8 +340,44 @@ const Polymarket = ({ setConnectedData }) => {
       initial[p.key] = p.default !== undefined ? String(p.default) : "";
     });
     setParamValues(initial);
+    setSelectedPriceHistoryMarket("");
+    setSelectedPriceHistoryAssetIds([]);
+    if (action.query === "getPricesHistory") {
+      const now = new Date();
+      const todayStart = startOfDay(now);
+      setPriceHistoryDateRange({
+        from: subDays(todayStart, 7),
+        to: todayStart,
+      });
+      setPriceHistoryStartTime("00:00:00");
+      setPriceHistoryEndTime(format(now, "HH:mm:ss"));
+    } else {
+      setPriceHistoryDateRange(undefined);
+      setPriceHistoryStartTime("00:00:00");
+      setPriceHistoryEndTime("23:59:59");
+    }
     setError(null);
   };
+
+  const onPriceHistoryRangeSelect = useCallback((range) => {
+    setPriceHistoryDateRange(range);
+    const to = range?.to;
+    if (to && isSameDay(to, new Date())) {
+      const now = new Date();
+      const day = startOfDay(to);
+      const [h, m, s] = parseTimeParts(priceHistoryEndTime, 23, 59, 59);
+      const candidate = new Date(day);
+      candidate.setHours(h, m, s, 0);
+      if (candidate.getTime() > now.getTime()) setPriceHistoryEndTime(format(now, "HH:mm:ss"));
+    }
+  }, [priceHistoryEndTime]);
+
+  const priceHistoryEndTimeMax = useMemo(() => {
+    if (!priceHistoryDateRange?.to || !isSameDay(priceHistoryDateRange.to, new Date())) {
+      return "23:59:59";
+    }
+    return format(new Date(), "HH:mm:ss");
+  }, [priceHistoryDateRange?.to]);
 
   const propertyOptions = selectedAction?.responseFields?.length
     ? selectedAction.responseFields
@@ -320,6 +432,13 @@ const Polymarket = ({ setConnectedData }) => {
 
   const groups = Object.keys(POLYMARKET_GROUPS);
   const canSubmit = selectedAction && validate(selectedAction) && !loading && throttleRemaining <= 0;
+  const selectedPriceHistoryMarketData = (listOptions.market || []).find((o) => o.value === selectedPriceHistoryMarket)?.marketData;
+  const selectedPriceHistoryOutcomes = selectedPriceHistoryMarketData
+    ? parseOutcomes(selectedPriceHistoryMarketData).map((outcome, idx) => ({
+        outcome,
+        assetId: parseTokenIdsFromMarket(selectedPriceHistoryMarketData)[idx] || "",
+      })).filter((x) => x.assetId)
+    : [];
 
   return (
     <div className="text-sm space-y-3 min-w-0 max-w-full overflow-hidden">
@@ -367,6 +486,8 @@ const Polymarket = ({ setConnectedData }) => {
           <p className="text-muted-foreground text-xs">{selectedAction.description}</p>
           {selectedAction.params?.map((param) => (
             <div key={param.key} className="space-y-1 min-w-0">
+              {selectedAction?.query === "getPricesHistory" && param.key === "endTs" ? null : (
+                <>
               <Label className="text-xs">
                 {param.label}
                 {param.required && <span className="text-destructive ml-0.5">*</span>}
@@ -397,12 +518,12 @@ const Polymarket = ({ setConnectedData }) => {
                       )}
                       <span className="ml-1.5 truncate">Pull list</span>
                     </Button>
-                    {listOptions[param.key]?.length > 0 && param.key === "market_token_id" ? (
+                    {listOptions[param.key]?.length > 0 && (param.key === "market_token_id" || (selectedAction?.query === "getPricesHistory" && param.key === "market")) ? (
                       <div className="relative flex-1 min-w-[140px] max-w-[220px]">
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                         <Input
                           type="text"
-                          placeholder="Search markets (e.g. kamala, bitcoin)"
+                          placeholder="Search market by question or slug"
                           className="h-8 pl-8 text-xs placeholder:text-[10px] w-full"
                           value={marketSearch}
                           onChange={(e) => setMarketSearch(e.target.value)}
@@ -412,14 +533,24 @@ const Polymarket = ({ setConnectedData }) => {
                   </div>
                   {listOptions[param.key]?.length > 0 ? (
                     <Select
-                      value={paramValues[param.key] || ""}
-                      onValueChange={(v) => setParamValues((prev) => ({ ...prev, [param.key]: v }))}
+                      value={param.key === "market" && selectedAction?.query === "getPricesHistory"
+                        ? selectedPriceHistoryMarket
+                        : (paramValues[param.key] || "")}
+                      onValueChange={(v) => {
+                        if (param.key === "market" && selectedAction?.query === "getPricesHistory") {
+                          setSelectedPriceHistoryMarket(v);
+                          setSelectedPriceHistoryAssetIds([]);
+                          setParamValues((prev) => ({ ...prev, [param.key]: "" }));
+                          return;
+                        }
+                        setParamValues((prev) => ({ ...prev, [param.key]: v }));
+                      }}
                     >
-                      <SelectTrigger className="h-8 w-full max-w-full text-xs min-w-0 font-mono">
+                      <SelectTrigger className="h-8 w-full max-w-full min-w-0 font-mono text-[11px] leading-snug [&_span]:text-[11px]">
                         <SelectValue placeholder="Select market or enter token ID below" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {(param.key === "market_token_id" && marketSearch
+                      <SelectContent className="text-[11px] leading-snug max-h-[min(320px,70vh)]">
+                        {((param.key === "market_token_id" || (selectedAction?.query === "getPricesHistory" && param.key === "market")) && marketSearch
                           ? listOptions[param.key].filter((opt) =>
                               (opt.marketData?.question ?? opt.label ?? "")
                                 .toLowerCase()
@@ -427,8 +558,13 @@ const Polymarket = ({ setConnectedData }) => {
                             )
                           : listOptions[param.key]
                         ).map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-xs font-mono" title={opt.value}>
-                            <span className="block truncate max-w-[280px]" title={opt.label}>{opt.label}</span>
+                          <SelectItem
+                            key={opt.value}
+                            value={opt.value}
+                            className="py-1.5 text-[11px] leading-snug font-mono"
+                            title={opt.value}
+                          >
+                            <span className="block max-w-[280px] truncate" title={opt.label}>{opt.label}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -441,8 +577,116 @@ const Polymarket = ({ setConnectedData }) => {
                     value={paramValues[param.key] || ""}
                     onChange={(e) => setParamValues((prev) => ({ ...prev, [param.key]: e.target.value }))}
                   />
+                  {selectedAction?.query === "getPricesHistory" && param.key === "market" && selectedPriceHistoryOutcomes.length > 0 ? (
+                    <div className="rounded-md border p-2 space-y-1.5">
+                      <p className="text-[10px] text-muted-foreground">Select outcome asset IDs (yes/no or buy/sell). Selecting updates the market field automatically.</p>
+                      <div className="space-y-1">
+                        {selectedPriceHistoryOutcomes.map((item) => {
+                          const checked = selectedPriceHistoryAssetIds.includes(item.assetId);
+                          return (
+                            <label key={item.assetId} className="flex items-center gap-2 text-xs">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(nextChecked) => {
+                                  const normalized = nextChecked === true;
+                                  setSelectedPriceHistoryAssetIds((prev) => {
+                                    const next = normalized ? [...prev, item.assetId] : prev.filter((id) => id !== item.assetId);
+                                    setParamValues((curr) => ({ ...curr, market: next.join(",") }));
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <span className="truncate">{item.outcome}: <span className="font-mono">{item.assetId}</span></span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
+              ) : param.type === "select" ? (
+                <Select
+                  value={paramValues[param.key] ?? (param.default !== undefined ? String(param.default) : "")}
+                  onValueChange={(v) => setParamValues((prev) => ({ ...prev, [param.key]: v }))}
+                >
+                  <SelectTrigger className="h-8 w-full max-w-[180px] min-w-0 text-[11px] leading-snug [&_span]:text-[11px]">
+                    <SelectValue placeholder={param.hint || "Select option"} />
+                  </SelectTrigger>
+                  <SelectContent className="text-[11px] leading-snug">
+                    {(Array.isArray(param.options) ? param.options : []).map((opt) => (
+                      <SelectItem key={String(opt)} value={String(opt)} className="py-1.5 text-[11px] leading-snug">
+                        {String(opt)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : param.type === "number" ? (
+                selectedAction?.query === "getPricesHistory" && param.key === "startTs" ? (
+                  <div className="space-y-2 rounded-md border p-2 bg-background/40">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "h-8 w-full justify-start px-2.5 text-xs font-normal",
+                            !priceHistoryDateRange?.from && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0" />
+                          {priceHistoryDateRange?.from ? (
+                            priceHistoryDateRange?.to ? (
+                              <>
+                                {format(priceHistoryDateRange.from, "LLL dd, y")} - {format(priceHistoryDateRange.to, "LLL dd, y")}
+                              </>
+                            ) : (
+                              format(priceHistoryDateRange.from, "LLL dd, y")
+                            )
+                          ) : (
+                            <span className="text-[11px] leading-snug">Pick local date range</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="range"
+                          selected={priceHistoryDateRange}
+                          onSelect={onPriceHistoryRangeSelect}
+                          numberOfMonths={2}
+                          defaultMonth={priceHistoryDateRange?.from}
+                          disabled={(date) => isAfter(startOfDay(date), startOfDay(new Date()))}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Start time (local timezone)</Label>
+                        <Input
+                          type="time"
+                          step="1"
+                          className="h-8 text-xs"
+                          value={priceHistoryStartTime}
+                          onChange={(e) => setPriceHistoryStartTime(e.target.value)}
+                        />
+                      </div>
+                                           <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">End time (local timezone)</Label>
+                        <Input
+                          type="time"
+                          step="1"
+                          max={priceHistoryEndTimeMax}
+                          className="h-8 text-xs"
+                          value={priceHistoryEndTime}
+                          onChange={(e) => setPriceHistoryEndTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      End date cannot be after today; end time cannot be later than now. Converted by backend to Unix
+                      timestamps for Polymarket (`startTs`/`endTs`) using your local timezone.
+                    </p>
+                  </div>
+                ) : (
                 <Input
                   type="number"
                   placeholder={param.default !== undefined ? String(param.default) : param.key}
@@ -450,6 +694,7 @@ const Polymarket = ({ setConnectedData }) => {
                   value={paramValues[param.key] ?? (param.default !== undefined ? String(param.default) : "")}
                   onChange={(e) => setParamValues((prev) => ({ ...prev, [param.key]: e.target.value }))}
                 />
+                )
               ) : param.type === "boolean" ? (
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -471,6 +716,8 @@ const Polymarket = ({ setConnectedData }) => {
               )}
               {param.hint && !param.listQuery && (
                 <p className="text-[10px] text-muted-foreground">{param.hint}</p>
+              )}
+                </>
               )}
             </div>
           ))}
@@ -677,10 +924,19 @@ const Polymarket = ({ setConnectedData }) => {
       )}
 
       {error && (
-        <p className="text-destructive text-xs flex items-center gap-1.5 min-w-0">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span className="truncate">{error}</span>
-        </p>
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="text-destructive text-xs flex items-center gap-1.5 min-w-0 cursor-help">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span className="truncate">{error}</span>
+              </p>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap text-xs">
+              {error}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
 
       <Accordion type="single" collapsible className="w-full min-w-0">

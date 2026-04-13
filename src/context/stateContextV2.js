@@ -357,21 +357,33 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     useEffect(() => {
         if (connectedData && connectedData.length > 0) {
             const detectedDataTypes = determineDataTypes(connectedData);
-            if (Object.keys(dataTypes).length === 0) {
-                setDataTypes(detectedDataTypes);
-            } else {
-                const hasMismatch = checkDataTypeMismatch(detectedDataTypes, dataTypes);
-                setDataTypeMismatch(hasMismatch);
-            }
+            setDataTypes((prev) => {
+                const merged = { ...prev };
+                let changed = false;
+                for (const [k, v] of Object.entries(detectedDataTypes)) {
+                    if (merged[k] !== v) {
+                        merged[k] = v;
+                        changed = true;
+                    }
+                }
+                if (!changed) return prev;
+                return merged;
+            });
 
             const keys = Object.keys(connectedData[0]);
-            const columnsLabels = keys.map(key => ({
-                field: key,
-                cellDataType: dataTypes[key] || 'text'
-            }));
-
-            setConnectedCols(columnsLabels);
+            setConnectedCols(
+                keys.map((key) => ({
+                    field: key,
+                    cellDataType: detectedDataTypes[key] || "text",
+                }))
+            );
         }
+    }, [connectedData]);
+
+    useEffect(() => {
+        if (!connectedData?.length) return;
+        const detectedDataTypes = determineDataTypes(connectedData);
+        setDataTypeMismatch(checkDataTypeMismatch(detectedDataTypes, dataTypes));
     }, [connectedData, dataTypes]);
 
     const detectDataType = (value) => {

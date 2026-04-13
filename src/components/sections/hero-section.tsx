@@ -5,6 +5,7 @@ import { DashboardDemoSection } from "./dashboard-demo-section";
 
 export function HeroSection() {
   const { hero } = siteConfig;
+  const heroTitleLines = hero.title.trim().split(/\n+/);
   const badgeIcon =
     hero.badgeIcon === "dot" ? (
       <span className="relative flex h-2.5 w-2.5">
@@ -20,11 +21,11 @@ export function HeroSection() {
 
   return (
     <section id="hero" className="w-full relative">
-      <div className="relative isolate flex flex-col items-center w-full px-6">
+      <div className="relative isolate flex flex-col items-center w-full px-6 pb-16 md:pb-24 lg:pb-32">
         <div className="absolute inset-0">
           <div className="hero-aura-gradient absolute inset-0 z-0 h-[600px] md:h-[800px] w-full rounded-b-xl" />
         </div>
-        <div className="relative z-10 pt-32 max-w-3xl mx-auto h-full w-full flex flex-col gap-10 items-center justify-center">
+        <div className="relative z-10 pt-32 mx-auto h-full w-full max-w-[65rem] flex flex-col items-center justify-center gap-10">
           {hero.badgeHref ? (
             <Link
               href={hero.badgeHref}
@@ -42,9 +43,13 @@ export function HeroSection() {
               {hero.badge}
             </p>
           )}
-          <div className="flex flex-col items-center justify-center gap-5">
-            <h1 className="whitespace-pre-line text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium tracking-tighter text-balance text-center text-primary">
-              {hero.title}
+          <div className="flex w-full max-w-[65rem] flex-col items-center justify-center gap-5 px-1 sm:px-0">
+            <h1 className="flex w-full max-w-full flex-col gap-2 sm:gap-2.5 text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium tracking-tighter text-center text-primary">
+              {heroTitleLines.map((line, i) => (
+                <span key={i} className="block max-w-full leading-[1.1]">
+                  {line}
+                </span>
+              ))}
             </h1>
             <p className="text-base md:text-lg text-center text-muted-foreground font-medium text-balance leading-relaxed tracking-tight">
               {hero.description}

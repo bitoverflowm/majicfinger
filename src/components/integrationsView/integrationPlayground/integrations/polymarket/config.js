@@ -5,6 +5,7 @@
 export const POLYMARKET_GROUPS = {
   events: "Events",
   markets: "Markets",
+  prices: "Prices",
   trades: "Trades",
   liveDataWebsocket: "Live data - WebSocket",
 };
@@ -72,6 +73,12 @@ export const MARKETS_RESPONSE_FIELDS = [
   "line", "umaResolutionStatuses", "pendingDeployment", "deploying", "deployingTimestamp", "scheduledDeploymentTimestamp",
   "rfqEnabled", "eventStartTime",
   "marketId", "eventId", "outcome", "price", "winner",
+];
+
+export const PRICES_HISTORY_RESPONSE_FIELDS = [
+  "market",
+  "t",
+  "p",
 ];
 
 export const ENDPOINTS = [
@@ -237,6 +244,36 @@ export const ENDPOINTS = [
     group: "markets",
     params: [
       { key: "id", label: "Event ID", required: true, type: "text", listQuery: "listEvents", listLabelKey: "title", listValueKey: "id" },
+    ],
+  },
+  {
+    query: "getPricesHistory",
+    name: "Price history",
+    description: "Retrieve historical prices for one or more CLOB asset IDs. Select a market to pick Yes/No token IDs, or paste IDs directly.",
+    group: "prices",
+    responseFields: PRICES_HISTORY_RESPONSE_FIELDS,
+    params: [
+      {
+        key: "market",
+        label: "Market (asset ID)",
+        required: true,
+        type: "text",
+        listQuery: "listMarkets",
+        listLabelKey: "question",
+        listValueKey: "id",
+        hint: "Select a market then choose Yes/No token IDs, or enter asset ID(s) directly (comma-separated).",
+      },
+      { key: "startTs", label: "Start timestamp", required: false, type: "number", hint: "Unix timestamp (seconds)" },
+      { key: "endTs", label: "End timestamp", required: false, type: "number", hint: "Unix timestamp (seconds)" },
+      {
+        key: "interval",
+        label: "Interval",
+        required: false,
+        type: "select",
+        options: ["max", "all", "1m", "1w", "1d", "6h", "1h"],
+        hint: "Aggregation interval",
+      },
+      { key: "fidelity", label: "Fidelity (minutes)", required: false, type: "number", hint: "Default: 1" },
     ],
   },
   // Trades (Data API: https://data-api.polymarket.com/api-reference/core/get-trades-for-a-user-or-markets) — under construction

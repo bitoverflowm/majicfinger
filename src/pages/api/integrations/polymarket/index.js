@@ -1,5 +1,6 @@
 const GAMMA_BASE = "https://gamma-api.polymarket.com";
 const DATA_API_BASE = "https://data-api.polymarket.com";
+const CLOB_BASE = "https://clob.polymarket.com";
 
 const EVENTS_PARAMS = [
   "limit", "offset", "order", "ascending",
@@ -282,6 +283,35 @@ async function fetchJson(url, opts = {}) {
   return JSON.parse(preserved);
 }
 
+function toUnixSeconds(value) {
+  if (value === undefined || value === null || value === "") return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (/^\d+(\.\d+)?$/.test(raw)) {
+    return String(Math.floor(Number(raw)));
+  }
+  const parsed = new Date(raw).getTime();
+  if (!Number.isFinite(parsed)) return "";
+  return String(Math.floor(parsed / 1000));
+}
+
+function intervalToSeconds(interval) {
+  switch (String(interval || "")) {
+    case "1m":
+      return 60;
+    case "1h":
+      return 60 * 60;
+    case "6h":
+      return 6 * 60 * 60;
+    case "1d":
+      return 24 * 60 * 60;
+    case "1w":
+      return 7 * 24 * 60 * 60;
+    default:
+      return null;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -364,6 +394,59 @@ export default async function handler(req, res) {
         data = await fetchJson(`${DATA_API_BASE}/live-volume?id=${encodeURIComponent(id)}`);
         break;
       }
+      case "getPricesHistory": {
+        const market = req.query.market;
+        if (!market) return res.status(400).json({ message: "Missing required parameter: market (CLOB asset id)" });
+        const marketIds = String(market)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (!marketIds.length) return res.status(400).json({ message: "Missing required parameter: market (CLOB asset id)" });
+
+        const interval = req.query.interval;
+        const startTs = toUnixSeconds(req.query.startTs);
+        const endTs = toUnixSeconds(req.query.endTs);
+        const fidelity = req.query.fidelity;
+        if (startTs !== "" && endTs !== "" && Number(endTs) <= Number(startTs)) {
+          return res.status(400).json({ message: "Invalid time range: end date/time must be after start date/time." });
+        }
+        const intervalSeconds = intervalToSeconds(interval);
+        const fidelityMinutes = Number(fidelity);
+        const bucketSeconds =
+          Number.isFinite(fidelityMinutes) && fidelityMinutes > 0
+            ? fidelityMinutes * 60
+            : intervalSeconds;
+        if (startTs !== "" && endTs !== "" && Number.isFinite(bucketSeconds) && bucketSeconds > 0) {
+          const estimatedPoints = Math.ceil((Number(endTs) - Number(startTs)) / bucketSeconds);
+          if (estimatedPoints > 1000) {
+            return res.status(400).json({
+              message:
+                "Selected time window is too large for the chosen interval/fidelity. Reduce the range or use a coarser interval.",
+            });
+          }
+        }
+
+        const rows = [];
+        for (const marketId of marketIds) {
+          const priceParams = new URLSearchParams();
+          priceParams.set("market", marketId);
+          if (startTs !== "") priceParams.set("startTs", startTs);
+          if (endTs !== "") priceParams.set("endTs", endTs);
+          if (interval !== undefined && interval !== "") priceParams.set("interval", String(interval));
+          if (fidelity !== undefined && fidelity !== "") priceParams.set("fidelity", String(fidelity));
+          const historyResponse = await fetchJson(`${CLOB_BASE}/prices-history?${priceParams.toString()}`);
+          const history = Array.isArray(historyResponse?.history) ? historyResponse.history : [];
+          for (const point of history) {
+            rows.push({
+              market: marketId,
+              t: point?.t ?? "",
+              p: point?.p ?? "",
+            });
+          }
+        }
+        data = rows;
+        break;
+      }
       case "getTradesByMarket": {
         const market = req.query.market;
         if (!market) return res.status(400).json({ message: "Missing required parameter: market (condition ID from List markets)" });
@@ -416,6 +499,11 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
   } catch (err) {
     console.error("[polymarket]", query, err.message);
+    if (query === "getPricesHistory" && /invalid filters/i.test(String(err.message || ""))) {
+      return res.status(400).json({
+        message: "Polymarket rejected this price-history range. Reduce the time window or use a coarser interval.",
+      });
+    }
     return res.status(500).json({
       message: err.message || "Request failed",
     });
