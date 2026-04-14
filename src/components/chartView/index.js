@@ -63,7 +63,10 @@ const CHART_CHROME_TEXT_CLASS = "mf-chart-chrome-text";
 
 /** Recharts Y-axis `width` eats left space; `margin.right` must be larger than `margin.left` so the grid isn’t flush to the SVG edge. */
 const CARTESIAN_MARGIN_AREA_LINE = { left: 20, right: 72, top: 0, bottom: 0 };
-const CARTESIAN_MARGIN_BAR = { left: 24, right: 76 };
+/** Bar only: extra left margin so the first band doesn’t sit on Y-axis tick labels. */
+const CARTESIAN_MARGIN_BAR = { left: 32, right: 76 };
+/** Bar only: Recharts insets the X scale range in px so the first/last bars aren’t flush to the plot edge. */
+const BAR_X_AXIS_PADDING = { left: 28, right: 28 };
 
 /** Select sentinel: no X axis chosen yet (must not match a real column name). */
 export const CHART_X_AXIS_NONE = "__chart_x_axis_none__";
@@ -343,6 +346,7 @@ export function ChartBuilderProvider({ demo, children }) {
   const [innerBoxColor, setInnerBoxColor] = useState(null);
 
   const [gridVisible, setGridVisible] = useState(true);
+  const [yAxisLineVisible, setYAxisLineVisible] = useState(false);
   const [gridLineColor, setGridLineColor] = useState(null);
   const [chartTextColor, setChartTextColor] = useState(null);
   const [xAxisTickColor, setXAxisTickColor] = useState(null);
@@ -772,6 +776,8 @@ export function ChartBuilderProvider({ demo, children }) {
     setInnerBoxColor,
     gridVisible,
     setGridVisible,
+    yAxisLineVisible,
+    setYAxisLineVisible,
     gridLineColor,
     setGridLineColor,
     chartTextColor,
@@ -909,6 +915,7 @@ export function ChartCanvas() {
     outerBoxColor,
     innerBoxColor,
     gridVisible,
+    yAxisLineVisible,
     gridLineColor,
     chartTextColor,
     xAxisTickColor,
@@ -1154,13 +1161,13 @@ export function ChartCanvas() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col px-1 py-3 sm:px-2 sm:py-4 lg:px-3">
+      <div className="flex min-h-0 flex-1 flex-col px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2">
         <div
-          className="relative flex min-h-0 w-full max-w-[min(100%,96rem)] flex-1 flex-col rounded-xl p-2 transition-[padding] duration-300 ease-out sm:p-3"
+          className="relative flex min-h-0 w-full max-w-[min(100%,100rem)] flex-1 flex-col rounded-xl p-1.5 transition-[padding] duration-300 ease-out sm:p-2.5"
           ref={chartRef}
         >
           <div
-            className="flex min-h-0 flex-1 flex-col rounded-xl px-1.5 py-2 shadow-xl transition-[padding] duration-300 ease-out sm:px-3 sm:py-3"
+            className="flex min-h-0 flex-1 flex-col rounded-xl px-1 py-2 shadow-xl transition-[padding] duration-300 ease-out sm:px-2.5 sm:py-3"
             style={{
               backgroundColor: outerBoxColor || activePalette?.[1] || (dark ? "#000000" : "#ffffff"),
             }}
@@ -1179,7 +1186,7 @@ export function ChartCanvas() {
                   ) : null}
                 </CardHeader>
               ) : null}
-              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-2 pt-0 sm:px-4">
+              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-1.5 pb-2 pt-0 sm:px-2">
                 {!axesConfigured ? (
                   <div className="flex min-h-[200px] w-full flex-1 flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
                     Select an X axis and at least one Y column under Data to plot your sheet.
@@ -1214,8 +1221,8 @@ export function ChartCanvas() {
                     id={CHART_BUILDER_DOM_ID}
                     config={chartConfig || dfltChartConfig}
                     className={cn(
-                      // `pr-10`: extra room on the right of the chart block so the Y-axis gutter doesn’t feel heavier than the trailing edge.
-                      "flex flex-col items-center justify-start py-12 aspect-auto mx-auto h-full min-h-[200px] w-full max-w-5xl flex-1 transition-[min-height] duration-300 ease-out md:min-h-[220px]",
+                      // `max-w` only applies when the card is wider than this cap; narrow layouts are widened via CardContent `px-*` above.
+                      "flex flex-col items-center justify-start py-12 aspect-auto mx-auto h-full min-h-[200px] w-full max-w-[min(100%,67.2rem)] flex-1 transition-[min-height] duration-300 ease-out md:min-h-[220px]",
                       dark && !chartTextColor && "text-slate-200",
                     )}
                     style={chartTextColor ? { color: chartTextColor } : undefined}
@@ -1234,7 +1241,16 @@ export function ChartCanvas() {
                           tickFormatter={xTickFormatter}
                           tick={{ fill: tickFillX }}
                         />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} tick={{ fill: tickFillY }} />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
+                          tickMargin={8}
+                          width={72}
+                          tickFormatter={yAxisFormatter}
+                          scale={scaleY === "log" ? "log" : "auto"}
+                          domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                          tick={{ fill: tickFillY }}
+                        />
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
@@ -1268,8 +1284,18 @@ export function ChartCanvas() {
                           tickMargin={8}
                           tickFormatter={xTickFormatter}
                           tick={{ fill: tickFillX }}
+                          padding={BAR_X_AXIS_PADDING}
                         />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={74} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} tick={{ fill: tickFillY }} />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
+                          tickMargin={8}
+                          width={74}
+                          tickFormatter={yAxisFormatter}
+                          scale={scaleY === "log" ? "log" : "auto"}
+                          domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                          tick={{ fill: tickFillY }}
+                        />
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
@@ -1314,7 +1340,16 @@ export function ChartCanvas() {
                           tickFormatter={xTickFormatter}
                           tick={{ fill: tickFillX }}
                         />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} tick={{ fill: tickFillY }} />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
+                          tickMargin={8}
+                          width={72}
+                          tickFormatter={yAxisFormatter}
+                          scale={scaleY === "log" ? "log" : "auto"}
+                          domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                          tick={{ fill: tickFillY }}
+                        />
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}

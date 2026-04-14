@@ -171,6 +171,8 @@ export default function ChartControls() {
     setInnerBoxColor,
     gridVisible,
     setGridVisible,
+    yAxisLineVisible,
+    setYAxisLineVisible,
     gridLineColor,
     setGridLineColor,
     chartTextColor,
@@ -950,6 +952,17 @@ export default function ChartControls() {
                         />
                         <Label htmlFor="chart-design-grid-visible" className="cursor-pointer text-xs text-muted-foreground">
                           Show grid lines
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-design-y-axis-line"
+                          checked={yAxisLineVisible}
+                          onCheckedChange={setYAxisLineVisible}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-design-y-axis-line" className="cursor-pointer text-xs text-muted-foreground">
+                          Show Y-axis line
                         </Label>
                       </div>
                       <div className="flex min-w-0 items-center gap-2">
