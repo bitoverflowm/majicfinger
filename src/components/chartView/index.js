@@ -786,6 +786,7 @@ export function ChartCanvas() {
     bodyHeading,
     bodyContent,
     lineIsTemporalX,
+    lineChartData,
     formatXAxisValue,
     formatCompactNumber,
     scaleY,
