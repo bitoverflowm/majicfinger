@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Alert } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
@@ -125,6 +125,30 @@ function genRequestCardId() {
   return `req-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
 }
 
+/** Collect finite numeric values from a column for statistics (coerces numeric strings). */
+function columnNumericValuesForStats(rows, colKey) {
+  const nums = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row || typeof row !== "object") continue;
+    const v = row[colKey];
+    if (typeof v === "number" && Number.isFinite(v)) nums.push(v);
+    else if (v != null && v !== "") {
+      const n = typeof v === "string" ? Number(String(v).trim()) : Number(v);
+      if (Number.isFinite(n)) nums.push(n);
+    }
+  }
+  return nums;
+}
+
+/** Population standard deviation: sqrt( mean of squared deviations from mean ). */
+function populationStandardDeviation(values) {
+  if (!values.length) return null;
+  const n = values.length;
+  const mean = values.reduce((s, x) => s + x, 0) / n;
+  const variance = values.reduce((s, x) => s + (x - mean) ** 2, 0) / n;
+  return Math.sqrt(variance);
+}
+
 const GridView = ({startNew}) => {
 
     const contextStateV2 = useMyStateV2()
@@ -157,6 +181,10 @@ const GridView = ({startNew}) => {
     const [mathRelativeRowRef, setMathRelativeRowRef] = useState("prev_row");
     const [mathOutCol, setMathOutCol] = useState("");
     const [mathDestination, setMathDestination] = useState("current_sheet");
+    const [mathDialogTab, setMathDialogTab] = useState("basic");
+    const [statsStdDevActive, setStatsStdDevActive] = useState(false);
+    const [statsStdSourceCol, setStatsStdSourceCol] = useState("");
+    const [statsStdOutCol, setStatsStdOutCol] = useState("");
 
     // Combine Sheets (client-side join across already-loaded sheets)
     const [combineSheetsDialogOpen, setCombineSheetsDialogOpen] = useState(false);
@@ -379,6 +407,26 @@ const GridView = ({startNew}) => {
       }
     }, [mathDialogOpen, mathOutCol, mathBaseCol, nextFreeResultColumnName, sheetColumnNamesForMath]);
 
+    useEffect(() => {
+      if (!mathDialogOpen) {
+        setMathDialogTab("basic");
+        setStatsStdDevActive(false);
+        setStatsStdSourceCol("");
+        setStatsStdOutCol("");
+      }
+    }, [mathDialogOpen]);
+
+    const statsStdNumericValues = useMemo(
+      () => columnNumericValuesForStats(connectedData, statsStdSourceCol),
+      [connectedData, statsStdSourceCol],
+    );
+
+    const statsStdCanSubmit =
+      statsStdDevActive &&
+      Boolean(String(statsStdSourceCol || "").trim()) &&
+      Boolean(String(statsStdOutCol || "").trim()) &&
+      statsStdNumericValues.length > 0;
+
     const applySheetMathOperation = useCallback(() => {
       const rows = Array.isArray(connectedData) ? [...connectedData] : [];
       if (!rows.length) {
@@ -444,6 +492,67 @@ const GridView = ({startNew}) => {
       replaceCurrentSheetData,
       setConnectedData,
       setDataSheets,
+      setSheetData,
+    ]);
+
+    const applyStatsStdDev = useCallback(() => {
+      const rows = Array.isArray(connectedData) ? [...connectedData] : [];
+      if (!rows.length) {
+        toast.error("Load sheet data before running a column calculation.");
+        return;
+      }
+      const src = String(statsStdSourceCol || "").trim();
+      const out = String(statsStdOutCol || "").trim() || nextFreeResultColumnName();
+      if (!src || !out) {
+        toast.error("Choose a source column and output column name.");
+        return;
+      }
+      const nums = columnNumericValuesForStats(rows, src);
+      if (!nums.length) {
+        toast.error("Selected column has no numeric values.");
+        return;
+      }
+      const sigma = populationStandardDeviation(nums);
+      const value = Number.isFinite(sigma) ? sigma : null;
+      const next = rows.map((row) => (row && typeof row === "object" ? { ...row, [out]: value } : row));
+      if (setDataTypes) {
+        setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
+      }
+      if (mathDestination === "new_sheet") {
+        const sheetName = `${out} σ`;
+        addNewSheetAndActivate?.((newId) => {
+          setSheetData?.(newId, next);
+          setDataSheets?.((prev) => {
+            const p = prev || {};
+            const sheet = p[newId];
+            if (!sheet) return prev;
+            return {
+              ...p,
+              [newId]: {
+                ...sheet,
+                name: sheetName.slice(0, 80),
+              },
+            };
+          });
+        });
+        toast.success("Added standard deviation column in a new sheet.");
+      } else {
+        replaceCurrentSheetData?.(next);
+        setConnectedData?.(next);
+        toast.success("Added standard deviation column to current sheet.");
+      }
+      setMathDialogOpen(false);
+    }, [
+      connectedData,
+      statsStdSourceCol,
+      statsStdOutCol,
+      mathDestination,
+      nextFreeResultColumnName,
+      addNewSheetAndActivate,
+      replaceCurrentSheetData,
+      setConnectedData,
+      setDataSheets,
+      setDataTypes,
       setSheetData,
     ]);
 
@@ -1687,13 +1796,23 @@ const GridView = ({startNew}) => {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 py-2">
-                      <Tabs defaultValue="basic" className="w-full">
+                      <Tabs
+                        value={mathDialogTab}
+                        onValueChange={(v) => {
+                          setMathDialogTab(v);
+                          if (v !== "stats") setStatsStdDevActive(false);
+                        }}
+                        className="w-full"
+                      >
                         <TabsList className="w-fit flex-wrap p-0.5 h-auto bg-slate-100 dark:bg-slate-800">
                           <TabsTrigger value="basic" className="h-7 px-2 text-xs">
                             Basic
                           </TabsTrigger>
                           <TabsTrigger value="functions" className="h-7 px-2 text-xs">
                             Functions
+                          </TabsTrigger>
+                          <TabsTrigger value="stats" className="h-7 px-2 text-xs">
+                            Stats
                           </TabsTrigger>
                         </TabsList>
                         <TabsContent value="basic" className="mt-2">
@@ -1813,6 +1932,89 @@ const GridView = ({startNew}) => {
                             </div>
                           </div>
                         </TabsContent>
+                        <TabsContent value="stats" className="mt-2 space-y-4">
+                          {!statsStdDevActive ? (
+                            <div className="flex justify-center py-2">
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-14 w-14 rounded-lg"
+                                      aria-label="Standard deviation"
+                                      onClick={() => {
+                                        setStatsStdDevActive(true);
+                                        setStatsStdOutCol((prev) => (String(prev || "").trim() ? prev : nextFreeResultColumnName()));
+                                        if (!statsStdSourceCol && sheetColumnNamesForMath.length > 0) {
+                                          setStatsStdSourceCol(sheetColumnNamesForMath[0]);
+                                        }
+                                      }}
+                                    >
+                                      <Sigma className="h-7 w-7" aria-hidden />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="text-xs">
+                                    standard deviation
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Source column</Label>
+                                <Select
+                                  value={statsStdSourceCol || "__"}
+                                  onValueChange={(v) => setStatsStdSourceCol(v === "__" ? "" : v)}
+                                >
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue placeholder="Select column" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__">—</SelectItem>
+                                    {sheetColumnNamesForMath.map((c) => (
+                                      <SelectItem key={`stats-src-${c}`} value={c} className="font-mono text-xs">
+                                        {c}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {statsStdSourceCol && statsStdNumericValues.length === 0 ? (
+                                <Alert variant="destructive" className="py-2">
+                                  <AlertTitle className="text-xs">Not a numeric column</AlertTitle>
+                                  <AlertDescription className="text-xs">
+                                    This column has no numeric values. Choose a column with numbers to compute standard deviation.
+                                  </AlertDescription>
+                                </Alert>
+                              ) : null}
+                              <div className="space-y-1">
+                                <Label className="text-xs">New column name</Label>
+                                <Input
+                                  className="h-9 text-xs"
+                                  value={statsStdOutCol}
+                                  onChange={(e) => setStatsStdOutCol(e.target.value)}
+                                  spellCheck={false}
+                                  placeholder={nextFreeResultColumnName()}
+                                />
+                              </div>
+                              {statsStdSourceCol && statsStdNumericValues.length > 0 ? (
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Preview</Label>
+                                  <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs font-mono text-muted-foreground">
+                                    σ({statsStdSourceCol}) ={" "}
+                                    {Number(populationStandardDeviation(statsStdNumericValues)).toLocaleString(undefined, {
+                                      maximumFractionDigits: 8,
+                                    })}{" "}
+                                    <span className="text-[11px]">(same value in every row)</span>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                        </TabsContent>
                       </Tabs>
                       <div className="space-y-1">
                         <Label className="text-xs">Apply to</Label>
@@ -1842,7 +2044,11 @@ const GridView = ({startNew}) => {
                       <Button type="button" variant="outline" onClick={() => setMathDialogOpen(false)}>
                         Cancel
                       </Button>
-                      <Button type="button" onClick={applySheetMathOperation}>
+                      <Button
+                        type="button"
+                        onClick={mathDialogTab === "stats" ? applyStatsStdDev : applySheetMathOperation}
+                        disabled={mathDialogTab === "stats" && !statsStdCanSubmit}
+                      >
                         Apply to sheet
                       </Button>
                     </DialogFooter>
