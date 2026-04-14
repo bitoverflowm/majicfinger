@@ -206,15 +206,22 @@ export function temporalIntlFormatOptionsForRange(rangeMs) {
   return { year: "numeric", month: "short" };
 }
 
-export function formatXAxisValue(value, temporal, humanReadable = true, intlOptions = null) {
+const MONTH_ABBREV_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * Local calendar label as dd-mmm (e.g. 08-Apr). Shorter than full datetime so angled ticks fit.
+ * @param {number} _rangeMs reserved for future granularity (unused)
+ */
+export function formatXAxisValue(value, temporal, humanReadable = true, _intlOptions = null, _rangeMs = null) {
   if (!temporal || !humanReadable) return value;
   if (value == null || value === "") return "";
   const ms = temporalToMs(value);
-  const d = Number.isFinite(ms) ? new Date(ms) : null;
-  if (!d) return String(value);
+  if (!Number.isFinite(ms)) return String(value);
+  const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return String(value);
-  const opts = intlOptions ?? temporalIntlFormatOptionsForRange(Number.POSITIVE_INFINITY);
-  return new Intl.DateTimeFormat(undefined, opts).format(d);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mmm = MONTH_ABBREV_EN[d.getMonth()] ?? "";
+  return `${dd}-${mmm}`;
 }
 
 function toSortableXAxisValue(value, axisType, isTemporal) {
@@ -351,6 +358,8 @@ export function ChartBuilderProvider({ demo, children }) {
   const [chartTextColor, setChartTextColor] = useState(null);
   const [xAxisTickColor, setXAxisTickColor] = useState(null);
   const [yAxisTickColor, setYAxisTickColor] = useState(null);
+  /** Slanted X tick labels (Recharts `angle`, degrees; −45 is typical for bottom axis). */
+  const [xAxisTicksAngled, setXAxisTicksAngled] = useState(false);
 
   const [chartConfig, setChartConfig] = useState({});
   const [lineSeriesColumn, setLineSeriesColumn] = useState(null);
@@ -786,6 +795,8 @@ export function ChartBuilderProvider({ demo, children }) {
     setXAxisTickColor,
     yAxisTickColor,
     setYAxisTickColor,
+    xAxisTicksAngled,
+    setXAxisTicksAngled,
     lineColorOverrides,
     setLineColorOverrides,
     handleToggleDark,
@@ -920,6 +931,7 @@ export function ChartCanvas() {
     chartTextColor,
     xAxisTickColor,
     yAxisTickColor,
+    xAxisTicksAngled,
     lineIsTemporalX,
     lineChartData,
     formatXAxisValue,
@@ -929,6 +941,19 @@ export function ChartCanvas() {
     yAxisCompact,
     sortXDir,
   } = useChartBuilder();
+
+  const xAxisTickAngle = xAxisTicksAngled ? -45 : 0;
+  /** Angled labels need extra bottom space inside the SVG; value tuned for dd-mmm at −45°. */
+  const cartesianBottomAngled = xAxisTicksAngled ? 88 : 0;
+  const cartesianMarginWithAngledTicks = useMemo(
+    () => ({ ...CARTESIAN_MARGIN_AREA_LINE, bottom: cartesianBottomAngled }),
+    [cartesianBottomAngled],
+  );
+  const cartesianBarMarginWithAngledTicks = useMemo(
+    () => ({ ...CARTESIAN_MARGIN_BAR, bottom: cartesianBottomAngled }),
+    [cartesianBottomAngled],
+  );
+  const xAxisTickMargin = xAxisTicksAngled ? 12 : 8;
 
   const rawData = (selChartType === "line" ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
@@ -1105,20 +1130,30 @@ export function ChartCanvas() {
   }, [rechartsXAxisType, finalRenderedData, xKey]);
 
   const xTickFormatter = (v) => {
-    if (useTimeSeriesX && Number.isFinite(Number(v))) {
+    // When human-readable is on, never show the stored raw pivot string (often unix seconds);
+    // the map is only for preserving non-formatted labels when the toggle is off.
+    if (useTimeSeriesX && Number.isFinite(Number(v)) && !xHumanReadable) {
       const rawLabel = xOriginalTemporalLabelByMs.get(Number(v));
       if (rawLabel) return rawLabel;
     }
-    return formatXAxisValue(v, effectiveTemporalSort, xHumanReadable, xHumanReadable ? xTickIntlOptions : null);
+    return formatXAxisValue(
+      v,
+      effectiveTemporalSort,
+      xHumanReadable,
+      xHumanReadable ? xTickIntlOptions : null,
+      xPivotSpanMs,
+    );
   };
 
   const xTooltipLabelFormatter = (label) => {
-    if (useTimeSeriesX && Number.isFinite(Number(label))) {
+    if (useTimeSeriesX && Number.isFinite(Number(label)) && !xHumanReadable) {
       const rawLabel = xOriginalTemporalLabelByMs.get(Number(label));
       if (rawLabel) return rawLabel;
     }
     if (!effectiveTemporalSort || !xHumanReadable) return label == null ? "" : String(label);
-    return String(formatXAxisValue(label, true, true, xTickIntlOptions));
+    return String(
+      formatXAxisValue(label, effectiveTemporalSort, true, xTickIntlOptions, xPivotSpanMs),
+    );
   };
 
   const tickFillX = xAxisTickColor || (dark ? "#94a3b8" : "#64748b");
@@ -1222,13 +1257,14 @@ export function ChartCanvas() {
                     config={chartConfig || dfltChartConfig}
                     className={cn(
                       // `max-w` only applies when the card is wider than this cap; narrow layouts are widened via CardContent `px-*` above.
-                      "flex flex-col items-center justify-start py-12 aspect-auto mx-auto h-full min-h-[200px] w-full max-w-[min(100%,67.2rem)] flex-1 transition-[min-height] duration-300 ease-out md:min-h-[220px]",
+                      "flex flex-col items-center justify-start aspect-auto mx-auto h-full min-h-[200px] w-full max-w-[min(100%,67.2rem)] flex-1 transition-[min-height,padding] duration-300 ease-out md:min-h-[220px]",
+                      xAxisTicksAngled ? "py-4 sm:py-5 md:min-h-[240px]" : "py-12",
                       dark && !chartTextColor && "text-slate-200",
                     )}
                     style={chartTextColor ? { color: chartTextColor } : undefined}
                   >
                     {selChartType === "area" && (
-                      <AreaChart accessibilityLayer data={finalRenderedData} margin={CARTESIAN_MARGIN_AREA_LINE} stackOffset={expanded ? "expand" : false}>
+                      <AreaChart accessibilityLayer data={finalRenderedData} margin={cartesianMarginWithAngledTicks} stackOffset={expanded ? "expand" : false}>
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
@@ -1237,7 +1273,8 @@ export function ChartCanvas() {
                           ticks={xAxisTicks}
                           tickLine={false}
                           axisLine={false}
-                          tickMargin={8}
+                          tickMargin={xAxisTickMargin}
+                          angle={xAxisTickAngle}
                           tickFormatter={xTickFormatter}
                           tick={{ fill: tickFillX }}
                         />
@@ -1272,7 +1309,7 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "bar" && (
-                      <BarChart accessibilityLayer data={finalRenderedData} margin={CARTESIAN_MARGIN_BAR}>
+                      <BarChart accessibilityLayer data={finalRenderedData} margin={cartesianBarMarginWithAngledTicks}>
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
@@ -1281,7 +1318,8 @@ export function ChartCanvas() {
                           ticks={xAxisTicks}
                           tickLine={false}
                           axisLine={false}
-                          tickMargin={8}
+                          tickMargin={xAxisTickMargin}
+                          angle={xAxisTickAngle}
                           tickFormatter={xTickFormatter}
                           tick={{ fill: tickFillX }}
                           padding={BAR_X_AXIS_PADDING}
@@ -1327,7 +1365,7 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "line" && (
-                      <LineChart accessibilityLayer data={finalRenderedData} margin={CARTESIAN_MARGIN_AREA_LINE}>
+                      <LineChart accessibilityLayer data={finalRenderedData} margin={cartesianMarginWithAngledTicks}>
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
@@ -1336,7 +1374,8 @@ export function ChartCanvas() {
                           ticks={xAxisTicks}
                           tickLine={false}
                           axisLine={false}
-                          tickMargin={8}
+                          tickMargin={xAxisTickMargin}
+                          angle={xAxisTickAngle}
                           tickFormatter={xTickFormatter}
                           tick={{ fill: tickFillX }}
                         />

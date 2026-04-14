@@ -181,6 +181,8 @@ export default function ChartControls() {
     setXAxisTickColor,
     yAxisTickColor,
     setYAxisTickColor,
+    xAxisTicksAngled,
+    setXAxisTicksAngled,
   } = useChartBuilder();
 
   const chartTypeLabel =
@@ -1000,6 +1002,17 @@ export default function ChartControls() {
                           ariaLabel="Y-axis tick color"
                           onClear={() => setYAxisTickColor(null)}
                         />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-design-x-tick-angle"
+                          checked={xAxisTicksAngled}
+                          onCheckedChange={setXAxisTicksAngled}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-design-x-tick-angle" className="cursor-pointer text-xs text-muted-foreground">
+                          Angle X-axis labels (−45°)
+                        </Label>
                       </div>
                     </div>
                   )}
