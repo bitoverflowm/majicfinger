@@ -11,8 +11,8 @@ import {
   buildContentMetadata,
   buildOrganizationJsonLd,
 } from "@/lib/content/metadata";
-import Header from "@/components/landingPageV2/Header";
-import Footer from "@/components/landingPageV2/Footer";
+import { Navbar } from "@/components/sections/navbar";
+import { FooterSection } from "@/components/sections/footer-section";
 
 export async function generateStaticParams() {
   try {
@@ -58,7 +58,7 @@ export default async function BlogPostPage({ params }) {
 
   return (
     <main className="min-h-screen bg-background">
-      <Header />
+      <Navbar />
       <ContentTocNav items={tocItems} />
       <script
         type="application/ld+json"
@@ -96,7 +96,7 @@ export default async function BlogPostPage({ params }) {
           <MDXContent source={content} />
         </div>
       </article>
-      <Footer />
+      <FooterSection />
     </main>
   );
 }

@@ -1,5 +1,5 @@
-import Header from "@/components/landingPageV2/Header";
-import Footer from "@/components/landingPageV2/Footer";
+import { Navbar } from "@/components/sections/navbar";
+import { FooterSection } from "@/components/sections/footer-section";
 import Link from "next/link";
 
 export const metadata = {
@@ -10,7 +10,7 @@ export const metadata = {
 export default function TermsPage() {
   return (
     <main className="min-h-screen bg-background">
-      <Header />
+      <Navbar />
       <article className="max-w-3xl mx-auto px-4 py-16">
         <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
         <p className="text-muted-foreground mb-6">
@@ -83,7 +83,7 @@ export default function TermsPage() {
           ← Back to Home
         </Link>
       </article>
-      <Footer />
+      <FooterSection />
     </main>
   );
 }

@@ -22,6 +22,9 @@ import { Toggle } from "@/components/ui/toggle";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
+  SelectGroup,
+  SelectLabel,
+  SelectSeparator,
   SelectContent,
   SelectItem,
   SelectTrigger,
@@ -69,6 +72,7 @@ export default function ChartControls() {
     availableYOptions,
     handleSelectY,
     removeY,
+    lineSheetColumnGroups,
 
     selZ,
     setSelZ,
@@ -121,6 +125,7 @@ export default function ChartControls() {
     dataTypes,
     chartData,
     getAxisType,
+    lineIsTemporalX,
 
     selectedPalette,
     lineColorOverrides,
@@ -185,6 +190,24 @@ export default function ChartControls() {
   const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
 
   const addableLineColumns = (xOptions || []).filter((c) => c !== selX && !(selY || []).includes(c));
+  const parseScopedLineKey = (value) => {
+    const raw = String(value || "");
+    const splitIdx = raw.indexOf("::");
+    if (splitIdx <= 0) return { sheetId: "", column: raw, isScoped: false };
+    return { sheetId: raw.slice(0, splitIdx), column: raw.slice(splitIdx + 2), isScoped: true };
+  };
+  const groupedLineOptions = (lineSheetColumnGroups || [])
+    .map((group) => {
+      const options = (group.options || []).filter((opt) => {
+        if ((selY || []).includes(opt.value)) return false;
+        const parsed = parseScopedLineKey(opt.value);
+        if (group.sheetId === parsed.sheetId && opt.column === selX) return false;
+        return true;
+      });
+      return { ...group, options };
+    })
+    .filter((group) => group.options.length > 0);
+  const hasGroupedLineOptions = groupedLineOptions.length > 0;
   const lineNonNumericColumns = (selY || []).filter((col) => {
     if (!col || !Array.isArray(chartData) || !chartData.length) return false;
     for (let i = 0; i < chartData.length; i += 1) {
@@ -200,8 +223,28 @@ export default function ChartControls() {
       ? selectedPalette
       : getShadcnChartPaletteArray(selectedShadBaseId || "");
   const singleColors = getShadcnSingleColors(600);
-  const getLineColor = (lineColumn, index) =>
-    lineColorOverrides?.[lineColumn] || palettePreview?.[index] || palettePreview?.[3] || (dark ? "#ffffff" : "#000000");
+  const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
+  const defaultPalette = dark
+    ? ["#ffffff", "#000000", "#000000", "#ffffff"]
+    : ["#000000", "#ffffff", "#ffffff", "#000000"];
+  const activePalette = hasSelectedPalette ? selectedPalette : defaultPalette;
+  const fallbackSeriesColor = dark ? "#ffffff" : "#000000";
+  const defaultSeriesColorAt = (idx) => {
+    const p = activePalette;
+    const n = p?.length || 0;
+    if (!n) return fallbackSeriesColor;
+    if (!hasSelectedPalette) {
+      return p[idx] ?? p[3] ?? p[0] ?? fallbackSeriesColor;
+    }
+    const chromeSlots = 3;
+    if (n <= chromeSlots) {
+      return p[Math.max(0, n - 1 - (idx % Math.max(1, n)))] ?? fallbackSeriesColor;
+    }
+    const fromEnd = n - 1 - idx;
+    const pick = Math.min(n - 1, Math.max(chromeSlots, fromEnd));
+    return p[pick] ?? p[n - 1] ?? fallbackSeriesColor;
+  };
+  const getLineColor = (lineColumn, index) => lineColorOverrides?.[lineColumn] || defaultSeriesColorAt(index);
 
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
@@ -387,14 +430,14 @@ export default function ChartControls() {
                 <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
                   Data
                 </AccordionTrigger>
-                <AccordionContent className="pt-2">
+                <AccordionContent>
                   {selChartType === "line" ? (
                     <>
                       <div className="py-2 space-y-2">
                         <div className="flex min-w-0 items-center gap-2 text-foreground">
                           <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Pivot (x-axis):</span>
                           <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
-                            <SelectTrigger className="min-w-0 flex-1 text-xs font-normal">
+                            <SelectTrigger className="h-8 min-w-0 flex-1 text-xs font-normal">
                               <SelectValue placeholder="X axis" className="text-xs font-normal" />
                             </SelectTrigger>
                             <SelectContent className="text-xs">
@@ -409,7 +452,39 @@ export default function ChartControls() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="flex items-center gap-2">
+                        {selX ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Sort</span>
+                            {(() => {
+                              const xType = getAxisType(selX, dataTypes, chartData);
+                              const isCategorical = xType === "string" && !lineIsTemporalX;
+                              const ascendingLabel = isCategorical ? "Alphabetical" : lineIsTemporalX ? "Chronological" : "Ascending";
+                              const descendingLabel = isCategorical ? "Reverse-alphabetical" : lineIsTemporalX ? "Reverse chronological" : "Descending";
+                              return (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => setSortXDir((d) => (d === "desc" ? "asc" : "desc"))}
+                            >
+                              {sortXDir === "desc" ? (
+                                <>
+                                  <ArrowDown className="mr-1 h-3 w-3" />
+                                  {descendingLabel}
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowUp className="mr-1 h-3 w-3" />
+                                  {ascendingLabel}
+                                </>
+                              )}
+                            </Button>
+                              );
+                            })()}
+                          </div>
+                        ) : null}
+                        <div className="flex items-center">
                           <Switch
                             id="chart-line-time-series-x-axis"
                             checked={xTimeScale}
@@ -420,7 +495,7 @@ export default function ChartControls() {
                             htmlFor="chart-line-time-series-x-axis"
                             className={`cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"}`}
                           >
-                            Time series X-axis
+                            Set x-axis to timeseries format
                           </Label>
                           <TooltipProvider delayDuration={250}>
                             <Tooltip>
@@ -435,7 +510,7 @@ export default function ChartControls() {
                             </Tooltip>
                           </TooltipProvider>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center">
                           <Switch
                             id="chart-line-human-readable-time"
                             checked={lineHumanReadableTime}
@@ -444,13 +519,25 @@ export default function ChartControls() {
                           />
                           <Label
                             htmlFor="chart-line-human-readable-time"
-                            className={`cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"}`}
+                            className={`pr-1 cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"}`}
                           >
                             Human readable time
                           </Label>
+                          <TooltipProvider delayDuration={250}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
+                                  <CircleHelp className="h-3.5 w-3.5" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                                format time like dd-mm-yyyy instead of unix/ iso time stamp
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                         <div className="pt-2">
-                          <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} mb-1`}>Lines</p>
+                          <p className="text-xs font-bold mb-1 text-muted-foreground">Lines</p>
 
                           <div className="py-2 flex flex-wrap gap-2">
                             {(selY || []).map((lineColumn, index) => (
@@ -461,7 +548,14 @@ export default function ChartControls() {
                                       className="inline-block h-2 w-2 rounded-full"
                                       style={{ backgroundColor: getLineColor(lineColumn, index) }}
                                     />
-                                    {`Line ${index + 1}: ${lineColumn}`}
+                                    {(() => {
+                                      const parsed = parseScopedLineKey(lineColumn);
+                                      const sheetLabel = parsed.isScoped
+                                        ? (lineSheetColumnGroups || []).find((g) => g.sheetId === parsed.sheetId)?.sheetName || parsed.sheetId
+                                        : null;
+                                      const label = parsed.column || lineColumn;
+                                      return `Line ${index + 1}: ${sheetLabel ? `${sheetLabel} • ` : ""}${label}`;
+                                    })()}
                                   </span>
                                   {(selY || []).length > 1 ? (
                                     <button
@@ -508,7 +602,7 @@ export default function ChartControls() {
                             ))}
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="">
                             <Select
                               value={lineAddValue}
                               onValueChange={(val) => {
@@ -519,21 +613,29 @@ export default function ChartControls() {
                             >
                               <SelectTrigger
                                 className="h-8 min-w-[140px] text-xs disabled:opacity-50"
-                                disabled={!addableLineColumns.length}
+                                disabled={!hasGroupedLineOptions}
                               >
                                 <SelectValue placeholder="+ Add Line" className="text-xs" />
                               </SelectTrigger>
                               <SelectContent className="text-xs">
-                                {(addableLineColumns || []).map((c) => (
-                                  <SelectItem key={c} value={c} className="text-xs">
-                                    {c}
-                                  </SelectItem>
+                                {groupedLineOptions.map((group, groupIdx) => (
+                                  <SelectGroup key={group.sheetId}>
+                                    {groupIdx > 0 ? <SelectSeparator /> : null}
+                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                      {group.sheetName}
+                                    </SelectLabel>
+                                    {group.options.map((opt) => (
+                                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                        {opt.column}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
                                 ))}
                               </SelectContent>
                             </Select>
 
-                            {!addableLineColumns.length && (
-                              <span className={`text-[10px] ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+                            {!hasGroupedLineOptions && (
+                              <span className={`pl-2 text-[10px] text-muted-foreground`}>
                                 No more columns to plot
                               </span>
                             )}
@@ -824,18 +926,6 @@ export default function ChartControls() {
                   )}
                 </>
               )}
-              {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "treemap" && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="mt-2 text-xs"
-                  onClick={() => handleSelectY(availableYOptions[0])}
-                  disabled={availableYOptions && availableYOptions.length === 0}
-                >
-                  {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
-                </Button>
-              )}
               {selChartType === "liveline" && (
                 <div className="mt-3 rounded-lg border p-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
@@ -986,7 +1076,7 @@ export default function ChartControls() {
                         value={chartFilterConfig.value ?? ""}
                         onChange={(e) => setChartFilterConfig({ ...chartFilterConfig, value: parseFloat(e.target.value) || 0 })}
                         placeholder="Value"
-                        className="h-7 text-xs"
+                              className="h-8 text-xs"
                         type="number"
                       />
                     </div>
@@ -997,7 +1087,7 @@ export default function ChartControls() {
                         value={chartFilterConfig.from ?? ""}
                         onChange={(e) => setChartFilterConfig({ ...chartFilterConfig, from: e.target.value || undefined })}
                         placeholder="From date"
-                        className="h-7 text-xs"
+                        className="h-8 text-xs"
                         type="date"
                       />
                       <Input
@@ -1011,47 +1101,6 @@ export default function ChartControls() {
                   )}
                 </div>
               )}
-              <div className="py-2 space-y-2">
-                <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Sort axis</p>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className={`text-[10px] ${dark ? "text-slate-400" : "text-muted-foreground"}`}>X:</span>
-                  <button
-                    type="button"
-                    className={`text-xs px-2 py-1 rounded border ${sortXDir === "asc" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border"}`}
-                    onClick={() => setSortXDir((d) => (d === "asc" ? null : "asc"))}
-                    title="X ascending (chronological / alphabetical / low→high)"
-                  >
-                    <ArrowUp className="h-3 w-3 inline mr-0.5" /> Asc
-                  </button>
-                  <button
-                    type="button"
-                    className={`text-xs px-2 py-1 rounded border ${sortXDir === "desc" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border"}`}
-                    onClick={() => setSortXDir((d) => (d === "desc" ? null : "desc"))}
-                    title="X descending (reverse chronological / Z→A / high→low)"
-                  >
-                    <ArrowDown className="h-3 w-3 inline mr-0.5" /> Desc
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className={`text-[10px] ${dark ? "text-slate-400" : "text-muted-foreground"}`}>Y:</span>
-                  <button
-                    type="button"
-                    className={`text-xs px-2 py-1 rounded border ${sortYDir === "asc" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border"}`}
-                    onClick={() => setSortYDir((d) => (d === "asc" ? null : "asc"))}
-                    title="Y ascending"
-                  >
-                    <ArrowUp className="h-3 w-3 inline mr-0.5" /> Asc
-                  </button>
-                  <button
-                    type="button"
-                    className={`text-xs px-2 py-1 rounded border ${sortYDir === "desc" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border"}`}
-                    onClick={() => setSortYDir((d) => (d === "desc" ? null : "desc"))}
-                    title="Y descending"
-                  >
-                    <ArrowDown className="h-3 w-3 inline mr-0.5" /> Desc
-                  </button>
-                </div>
-              </div>
               {(selX && chartData && chartData.length && getAxisType(selX, dataTypes, chartData) === "number") ||
               (selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === "number") ? (
                 <div className="py-2 space-y-2">

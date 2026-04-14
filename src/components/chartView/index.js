@@ -152,8 +152,8 @@ export function formatXAxisValue(value, temporal, humanReadable = true, intlOpti
   return new Intl.DateTimeFormat(undefined, opts).format(d);
 }
 
-function toSortableXAxisValue(value, axisType) {
-  if (axisType === "date") {
+function toSortableXAxisValue(value, axisType, isTemporal) {
+  if (isTemporal || axisType === "date") {
     const ts = temporalToMs(value);
     return Number.isFinite(ts) ? ts : Number.POSITIVE_INFINITY;
   }
@@ -161,7 +161,7 @@ function toSortableXAxisValue(value, axisType) {
     const n = Number(value);
     return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
   }
-  return null;
+  return String(value ?? "").toLowerCase();
 }
 
 /**
@@ -243,6 +243,8 @@ export function ChartBuilderProvider({ demo, children }) {
   const [scaleY, setScaleY] = useState("linear");
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
   const [yAxisCompact, setYAxisCompact] = useState(true);
+  const [sortXDir, setSortXDir] = useState("asc");
+  const [sortYDir, setSortYDir] = useState(null);
 
   const [selectedShadBaseId, setSelectedShadBaseId] = useState(SHADCN_CHART_BASE_ORDER[0]);
   const [selectedPalette, setSelectedPalette] = useState([]);
@@ -436,11 +438,55 @@ export function ChartBuilderProvider({ demo, children }) {
   const lineIsTemporalX = useMemo(() => isLikelyTemporalKey(selX, dataTypes, chartData), [selX, dataTypes, chartData]);
 
   const lineChartData = useMemo(() => {
-    // New model: line charts plot `selY` columns directly (each column becomes one Line).
-    // So we just return the sheet rows as-is.
-    if (!chartData?.length) return chartData || dfltChartData;
-    return chartData;
-  }, [chartData]);
+    // For line charts, allow Y keys from any sheet using scoped keys: `${sheetId}::${column}`.
+    if (selChartType !== "line") return chartData;
+    const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
+    if (!sheetEntries.length) return chartData || dfltChartData;
+    const activeRows = Array.isArray(contextStateV2?.dataSheets?.[contextStateV2?.activeSheetId]?.data)
+      ? contextStateV2.dataSheets[contextStateV2.activeSheetId].data
+      : [];
+    const maxRows = Math.max(0, ...sheetEntries.map(([, sheet]) => sheet.data.length));
+    const rows = [];
+    for (let idx = 0; idx < maxRows; idx += 1) {
+      const row = {};
+      if (selX) {
+        row[selX] = activeRows[idx]?.[selX] ?? idx;
+      }
+      for (const yKey of selY || []) {
+        const raw = String(yKey || "");
+        const splitIdx = raw.indexOf("::");
+        const sheetId = splitIdx > 0 ? raw.slice(0, splitIdx) : contextStateV2?.activeSheetId;
+        const column = splitIdx > 0 ? raw.slice(splitIdx + 2) : raw;
+        const sourceRows = Array.isArray(contextStateV2?.dataSheets?.[sheetId]?.data) ? contextStateV2.dataSheets[sheetId].data : [];
+        row[yKey] = sourceRows[idx]?.[column] ?? "";
+      }
+      rows.push(row);
+    }
+    return rows.length ? rows : chartData || dfltChartData;
+  }, [selChartType, chartData, contextStateV2?.dataSheets, contextStateV2?.activeSheetId, selX, selY]);
+
+  const lineSheetColumnGroups = useMemo(() => {
+    const groups = [];
+    for (const [sheetId, sheet] of Object.entries(contextStateV2?.dataSheets || {})) {
+      const rows = Array.isArray(sheet?.data) ? sheet.data : [];
+      if (!rows.length) continue;
+      const first = rows[0] || {};
+      const cols = Object.keys(first);
+      if (!cols.length) continue;
+      const options = cols.map((column) => ({
+        value: `${sheetId}::${column}`,
+        column,
+        sheetId,
+        sheetName: sheet?.name || sheetId,
+      }));
+      groups.push({
+        sheetId,
+        sheetName: sheet?.name || sheetId,
+        options,
+      });
+    }
+    return groups;
+  }, [contextStateV2?.dataSheets]);
 
   const selectedPaletteHandler = (baseId) => {
     const id = String(baseId || "").trim();
@@ -596,10 +642,10 @@ export function ChartBuilderProvider({ demo, children }) {
     chartFilterConfig,
     setChartFilterConfig,
 
-    sortXDir: null,
-    setSortXDir: () => {},
-    sortYDir: null,
-    setSortYDir: () => {},
+    sortXDir,
+    setSortXDir,
+    sortYDir,
+    setSortYDir,
     scaleX,
     setScaleX,
     scaleY,
@@ -685,6 +731,7 @@ export function ChartBuilderProvider({ demo, children }) {
     lineSeriesCandidates,
     lineSeriesValues,
     setLineSeriesValues,
+    lineSheetColumnGroups,
     lineIsTemporalX,
     lineChartData,
     formatXAxisValue,
@@ -744,9 +791,10 @@ export function ChartCanvas() {
     scaleY,
     yAxisDivisor,
     yAxisCompact,
+    sortXDir,
   } = useChartBuilder();
 
-  const rawData = chartData || [];
+  const rawData = (selChartType === "line" ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
   const axesConfigured = usingSampleFallback || (!!selX && yKeys.length > 0);
@@ -766,13 +814,16 @@ export function ChartCanvas() {
 
   const sortedPlotRows = useMemo(() => {
     if (!selX || !Array.isArray(plotRows) || plotRows.length <= 1) return plotRows;
-    if (xAxisType !== "date" && xAxisType !== "number") return plotRows;
+    if (xAxisType !== "date" && xAxisType !== "number" && xAxisType !== "string") return plotRows;
     return [...plotRows].sort((a, b) => {
-      const av = toSortableXAxisValue(a?.[xKey], xAxisType);
-      const bv = toSortableXAxisValue(b?.[xKey], xAxisType);
-      return av - bv;
+      const av = toSortableXAxisValue(a?.[xKey], xAxisType, lineIsTemporalX);
+      const bv = toSortableXAxisValue(b?.[xKey], xAxisType, lineIsTemporalX);
+      const cmp = typeof av === "string" || typeof bv === "string"
+        ? String(av).localeCompare(String(bv))
+        : av - bv;
+      return sortXDir === "desc" ? -cmp : cmp;
     });
-  }, [plotRows, xAxisType, xKey, selX]);
+  }, [plotRows, xAxisType, xKey, selX, sortXDir, lineIsTemporalX]);
 
   /** All cartesian series use the same sorted rows so every line maps the full column. */
   const finalRenderedData = sortedPlotRows;
@@ -782,11 +833,11 @@ export function ChartCanvas() {
     if (!selX || !Array.isArray(rawData) || rawData.length <= 1) return rawData;
     if (xAxisType !== "date" && xAxisType !== "number") return rawData;
     return [...rawData].sort((a, b) => {
-      const av = toSortableXAxisValue(a?.[xKey], xAxisType);
-      const bv = toSortableXAxisValue(b?.[xKey], xAxisType);
+      const av = toSortableXAxisValue(a?.[xKey], xAxisType, lineIsTemporalX);
+      const bv = toSortableXAxisValue(b?.[xKey], xAxisType, lineIsTemporalX);
       return av - bv;
     });
-  }, [rawData, xAxisType, xKey, selX]);
+  }, [rawData, xAxisType, xKey, selX, lineIsTemporalX]);
 
   const firstPlotX = selX && plotRows.length ? plotRows[0]?.[xKey] : null;
   /** Recharts: numeric scale for unix / epoch ms; Date objects need normalization (see useTimeSeriesX). */

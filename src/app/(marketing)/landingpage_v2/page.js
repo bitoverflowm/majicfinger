@@ -1,5 +1,5 @@
 import { HeroSection } from "@/components/sections/hero-section";
-import GuidesSection from "@/components/landingPageV2/GuidesSection";
+import GuidesSection from "@/components/sections/guides-section";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { getAllContent } from "@/lib/content";
