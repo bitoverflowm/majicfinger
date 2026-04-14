@@ -61,6 +61,10 @@ const CHART_BUILDER_DOM_ID = "mf-chart-builder";
 /** Tooltip / legend root class targeted when `chartTextColor` is set (Tailwind tooltip spans otherwise win). */
 const CHART_CHROME_TEXT_CLASS = "mf-chart-chrome-text";
 
+/** Recharts Y-axis `width` eats left space; `margin.right` must be larger than `margin.left` so the grid isn’t flush to the SVG edge. */
+const CARTESIAN_MARGIN_AREA_LINE = { left: 20, right: 72, top: 0, bottom: 0 };
+const CARTESIAN_MARGIN_BAR = { left: 24, right: 76 };
+
 /** Select sentinel: no X axis chosen yet (must not match a real column name). */
 export const CHART_X_AXIS_NONE = "__chart_x_axis_none__";
 
@@ -1210,14 +1214,14 @@ export function ChartCanvas() {
                     id={CHART_BUILDER_DOM_ID}
                     config={chartConfig || dfltChartConfig}
                     className={cn(
-                      // Fill the card; override default `aspect-video` from ChartContainer so height follows the flex layout.
-                      "flex flex-col aspect-auto h-full min-h-[200px] w-full max-w-full flex-1 transition-[min-height] duration-300 ease-out md:min-h-[240px]",
+                      // `pr-10`: extra room on the right of the chart block so the Y-axis gutter doesn’t feel heavier than the trailing edge.
+                      "flex flex-col items-center justify-start py-12 aspect-auto mx-auto h-full min-h-[200px] w-full max-w-5xl flex-1 transition-[min-height] duration-300 ease-out md:min-h-[220px]",
                       dark && !chartTextColor && "text-slate-200",
                     )}
                     style={chartTextColor ? { color: chartTextColor } : undefined}
                   >
                     {selChartType === "area" && (
-                      <AreaChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }} stackOffset={expanded ? "expand" : false}>
+                      <AreaChart accessibilityLayer data={finalRenderedData} margin={CARTESIAN_MARGIN_AREA_LINE} stackOffset={expanded ? "expand" : false}>
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
@@ -1252,7 +1256,7 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "bar" && (
-                      <BarChart accessibilityLayer data={finalRenderedData} margin={{ left: 24, right: 18 }}>
+                      <BarChart accessibilityLayer data={finalRenderedData} margin={CARTESIAN_MARGIN_BAR}>
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
@@ -1297,7 +1301,7 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "line" && (
-                      <LineChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }}>
+                      <LineChart accessibilityLayer data={finalRenderedData} margin={CARTESIAN_MARGIN_AREA_LINE}>
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
