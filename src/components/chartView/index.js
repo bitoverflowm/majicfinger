@@ -90,13 +90,27 @@ function isLikelyTemporalKey(key, dataTypes, data) {
   if (keyNorm === "t") return true;
   if (/(time|timestamp|date|datetime|createdat|updatedat|ts)/.test(keyNorm)) return true;
   const rows = Array.isArray(data) ? data : [];
+  let temporalLikeCount = 0;
+  let nonEmptyCount = 0;
   for (let i = 0; i < Math.min(rows.length, 50); i += 1) {
     const raw = rows[i]?.[key];
     if (raw == null || raw === "") continue;
+    nonEmptyCount += 1;
     const n = Number(raw);
-    if (!Number.isFinite(n)) break;
-    if (n > 1e9 && n < 1e13) return true; // unix sec/ms-like
-    break;
+    if (Number.isFinite(n)) {
+      if (n > 1e9 && n < 1e13) return true; // unix sec/ms-like
+    } else if (typeof raw === "string") {
+      const s = raw.trim();
+      if (
+        /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\w*(\s+\d{1,2})?(,?\s+\d{4})?$/i.test(s) ||
+        /^\d{4}[-/]\d{1,2}$/.test(s) ||
+        /^\d{1,2}[-/]\d{4}$/.test(s) ||
+        /^\d{4}-\d{2}-\d{2}/.test(s)
+      ) {
+        temporalLikeCount += 1;
+      }
+    }
+    if (nonEmptyCount >= 3 && temporalLikeCount >= 2) return true;
   }
   return false;
 }
@@ -105,14 +119,53 @@ function temporalToMs(value) {
   if (value == null || value === "") return NaN;
   if (value instanceof Date) return value.getTime();
   if (typeof value === "number" && Number.isFinite(value)) {
-    if (value > 1e12) return value; // ms
-    if (value > 1e9) return value * 1000; // sec
+    const abs = Math.abs(value);
+    if (abs >= 1e11) return value; // epoch ms (covers modern dates incl. year 2000)
+    if (abs >= 1e9) return value * 1000; // epoch sec
   }
   const s = String(value).trim();
+  const monthMap = {
+    jan: 0, january: 0,
+    feb: 1, february: 1,
+    mar: 2, march: 2,
+    apr: 3, april: 3,
+    may: 4,
+    jun: 5, june: 5,
+    jul: 6, july: 6,
+    aug: 7, august: 7,
+    sep: 8, sept: 8, september: 8,
+    oct: 9, october: 9,
+    nov: 10, november: 10,
+    dec: 11, december: 11,
+  };
+  const monthYear = s.match(/^([A-Za-z]+)(?:\s+(\d{1,2}))?(?:,?\s+(\d{4}))?$/);
+  if (monthYear) {
+    const monthToken = String(monthYear[1]).toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(monthMap, monthToken)) {
+      const monthIdx = monthMap[monthToken];
+      const day = monthYear[2] ? Math.min(31, Math.max(1, Number(monthYear[2]) || 1)) : 1;
+      const year = monthYear[3] ? Number(monthYear[3]) : 2000;
+      const ms = Date.UTC(year, monthIdx, day);
+      if (Number.isFinite(ms)) return ms;
+    }
+  }
+  const isoYearMonth = s.match(/^(\d{4})[-/](\d{1,2})$/);
+  if (isoYearMonth) {
+    const year = Number(isoYearMonth[1]);
+    const month = Number(isoYearMonth[2]);
+    if (month >= 1 && month <= 12) return Date.UTC(year, month - 1, 1);
+  }
+  const monthYearNumeric = s.match(/^(\d{1,2})[-/](\d{4})$/);
+  if (monthYearNumeric) {
+    const month = Number(monthYearNumeric[1]);
+    const year = Number(monthYearNumeric[2]);
+    if (month >= 1 && month <= 12) return Date.UTC(year, month - 1, 1);
+  }
   if (/^\d+(\.\d+)?$/.test(s)) {
     const n = Number(s);
-    if (n > 1e12) return n;
-    if (n > 1e9) return n * 1000;
+    const abs = Math.abs(n);
+    if (abs >= 1e11) return n;
+    if (abs >= 1e9) return n * 1000;
   }
   return Date.parse(s);
 }
@@ -170,7 +223,10 @@ function toSortableXAxisValue(value, axisType, isTemporal) {
  */
 function normalizeCartesianPivotToEpochMs(rows, xKey, xAxisType, lineIsTemporalX, enabled) {
   if (!enabled || !Array.isArray(rows) || !rows.length || !xKey) return rows;
-  const should = xAxisType === "date" || (xAxisType === "number" && lineIsTemporalX);
+  const should =
+    xAxisType === "date" ||
+    (xAxisType === "number" && lineIsTemporalX) ||
+    (xAxisType === "string" && lineIsTemporalX);
   if (!should) return rows;
   return rows.map((row) => {
     const raw = row?.[xKey];
@@ -803,7 +859,12 @@ export function ChartCanvas() {
   const xAxisType = selX ? getAxisType(xKey, dataTypes, rawData) : "string";
 
   const useTimeSeriesX =
-    xTimeScale && !!selX && (xAxisType === "date" || (xAxisType === "number" && lineIsTemporalX));
+    xTimeScale &&
+    !!selX &&
+    (xAxisType === "date" ||
+      (xAxisType === "number" && lineIsTemporalX) ||
+      (xAxisType === "string" && lineIsTemporalX));
+  const effectiveTemporalSort = lineIsTemporalX || useTimeSeriesX;
 
   const cartesianChart =
     selChartType === "line" || selChartType === "area" || selChartType === "bar";
@@ -817,14 +878,14 @@ export function ChartCanvas() {
     if (!selX || !Array.isArray(plotRows) || plotRows.length <= 1) return plotRows;
     if (xAxisType !== "date" && xAxisType !== "number" && xAxisType !== "string") return plotRows;
     return [...plotRows].sort((a, b) => {
-      const av = toSortableXAxisValue(a?.[xKey], xAxisType, lineIsTemporalX);
-      const bv = toSortableXAxisValue(b?.[xKey], xAxisType, lineIsTemporalX);
+      const av = toSortableXAxisValue(a?.[xKey], xAxisType, effectiveTemporalSort);
+      const bv = toSortableXAxisValue(b?.[xKey], xAxisType, effectiveTemporalSort);
       const cmp = typeof av === "string" || typeof bv === "string"
         ? String(av).localeCompare(String(bv))
         : av - bv;
       return sortXDir === "desc" ? -cmp : cmp;
     });
-  }, [plotRows, xAxisType, xKey, selX, sortXDir, lineIsTemporalX]);
+  }, [plotRows, xAxisType, xKey, selX, sortXDir, effectiveTemporalSort]);
 
   /** All cartesian series use the same sorted rows so every line maps the full column. */
   const finalRenderedData = sortedPlotRows;
@@ -834,11 +895,11 @@ export function ChartCanvas() {
     if (!selX || !Array.isArray(rawData) || rawData.length <= 1) return rawData;
     if (xAxisType !== "date" && xAxisType !== "number") return rawData;
     return [...rawData].sort((a, b) => {
-      const av = toSortableXAxisValue(a?.[xKey], xAxisType, lineIsTemporalX);
-      const bv = toSortableXAxisValue(b?.[xKey], xAxisType, lineIsTemporalX);
+      const av = toSortableXAxisValue(a?.[xKey], xAxisType, effectiveTemporalSort);
+      const bv = toSortableXAxisValue(b?.[xKey], xAxisType, effectiveTemporalSort);
       return av - bv;
     });
-  }, [rawData, xAxisType, xKey, selX, lineIsTemporalX]);
+  }, [rawData, xAxisType, xKey, selX, effectiveTemporalSort]);
 
   const firstPlotX = selX && plotRows.length ? plotRows[0]?.[xKey] : null;
   /** Recharts: numeric scale for unix / epoch ms; Date objects need normalization (see useTimeSeriesX). */
@@ -851,7 +912,10 @@ export function ChartCanvas() {
       ? "number"
       : "category";
 
-  const xAxisNumberDomain = rechartsXAxisType === "number" ? ["dataMin", "dataMax"] : undefined;
+  const xAxisNumberDomain =
+    rechartsXAxisType === "number"
+      ? (useTimeSeriesX && sortXDir === "desc" ? ["dataMax", "dataMin"] : ["dataMin", "dataMax"])
+      : undefined;
 
   /** Recharts Treemap: one synthetic root whose children are sheet rows (name ← X, value ← Y). */
   const treemapData = useMemo(() => {
@@ -936,11 +1000,45 @@ export function ChartCanvas() {
   const xTickIntlOptions = useMemo(() => temporalIntlFormatOptionsForRange(xPivotSpanMs), [xPivotSpanMs]);
 
   const xHumanReadable = selChartType === "line" || selChartType === "area" ? lineHumanReadableTime : true;
+  const xOriginalTemporalLabelByMs = useMemo(() => {
+    if (!useTimeSeriesX || !selX || !Array.isArray(rawData)) return new Map();
+    const map = new Map();
+    for (const row of rawData) {
+      const raw = row?.[xKey];
+      const ms = temporalToMs(raw);
+      if (!Number.isFinite(ms)) continue;
+      if (!map.has(ms)) map.set(ms, String(raw ?? ""));
+    }
+    return map;
+  }, [useTimeSeriesX, selX, rawData, xKey]);
 
-  const xTickFormatter = (v) => formatXAxisValue(v, lineIsTemporalX, xHumanReadable, xHumanReadable ? xTickIntlOptions : null);
+  const xAxisTicks = useMemo(() => {
+    if (rechartsXAxisType !== "number" || !Array.isArray(finalRenderedData)) return undefined;
+    const seen = new Set();
+    const ticks = [];
+    for (const row of finalRenderedData) {
+      const v = Number(row?.[xKey]);
+      if (!Number.isFinite(v) || seen.has(v)) continue;
+      seen.add(v);
+      ticks.push(v);
+    }
+    return ticks.length > 0 ? ticks : undefined;
+  }, [rechartsXAxisType, finalRenderedData, xKey]);
+
+  const xTickFormatter = (v) => {
+    if (useTimeSeriesX && Number.isFinite(Number(v))) {
+      const rawLabel = xOriginalTemporalLabelByMs.get(Number(v));
+      if (rawLabel) return rawLabel;
+    }
+    return formatXAxisValue(v, effectiveTemporalSort, xHumanReadable, xHumanReadable ? xTickIntlOptions : null);
+  };
 
   const xTooltipLabelFormatter = (label) => {
-    if (!lineIsTemporalX || !xHumanReadable) return label == null ? "" : String(label);
+    if (useTimeSeriesX && Number.isFinite(Number(label))) {
+      const rawLabel = xOriginalTemporalLabelByMs.get(Number(label));
+      if (rawLabel) return rawLabel;
+    }
+    if (!effectiveTemporalSort || !xHumanReadable) return label == null ? "" : String(label);
     return String(formatXAxisValue(label, true, true, xTickIntlOptions));
   };
 
@@ -1025,6 +1123,7 @@ export function ChartCanvas() {
                           type={rechartsXAxisType}
                           dataKey={xKey}
                           domain={xAxisNumberDomain}
+                          ticks={xAxisTicks}
                           tickLine={false}
                           axisLine={false}
                           tickMargin={8}
@@ -1058,6 +1157,7 @@ export function ChartCanvas() {
                           type={rechartsXAxisType}
                           dataKey={xKey}
                           domain={xAxisNumberDomain}
+                          ticks={xAxisTicks}
                           tickLine={false}
                           axisLine={false}
                           tickMargin={8}
@@ -1101,6 +1201,7 @@ export function ChartCanvas() {
                           type={rechartsXAxisType}
                           dataKey={xKey}
                           domain={xAxisNumberDomain}
+                          ticks={xAxisTicks}
                           tickLine={false}
                           axisLine={false}
                           tickMargin={8}
