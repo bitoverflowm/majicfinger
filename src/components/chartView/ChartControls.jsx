@@ -194,10 +194,17 @@ export default function ChartControls() {
   };
   const groupedLineOptions = (lineSheetColumnGroups || [])
     .map((group) => {
+      const sx = parseScopedLineKey(selX || "");
       const options = (group.options || []).filter((opt) => {
         if ((selY || []).includes(opt.value)) return false;
-        const parsed = parseScopedLineKey(opt.value);
-        if (group.sheetId === parsed.sheetId && opt.column === selX) return false;
+        const ov = parseScopedLineKey(opt.value);
+        if (selX) {
+          if (sx.isScoped && ov.isScoped) {
+            if (sx.sheetId === ov.sheetId && sx.column === ov.column) return false;
+          } else if (!sx.isScoped) {
+            if (ov.column === selX || (!ov.isScoped && opt.value === selX)) return false;
+          } else if (opt.value === selX) return false;
+        }
         return true;
       });
       return { ...group, options };

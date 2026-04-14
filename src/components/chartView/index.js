@@ -541,8 +541,28 @@ export function ChartBuilderProvider({ demo, children }) {
         options,
       });
     }
+    if (!groups.length) {
+      const rows = Array.isArray(chartData) && chartData.length ? chartData : [];
+      const first = rows[0];
+      if (first && typeof first === "object") {
+        const cols = Object.keys(first);
+        if (cols.length) {
+          const sheetId = "__inline__";
+          groups.push({
+            sheetId,
+            sheetName: "Data",
+            options: cols.map((column) => ({
+              value: column,
+              column,
+              sheetId,
+              sheetName: "Data",
+            })),
+          });
+        }
+      }
+    }
     return groups;
-  }, [contextStateV2?.dataSheets]);
+  }, [contextStateV2?.dataSheets, chartData]);
 
   const selectedPaletteHandler = (baseId) => {
     const id = String(baseId || "").trim();
