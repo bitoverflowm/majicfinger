@@ -149,6 +149,33 @@ function populationStandardDeviation(values) {
   return Math.sqrt(variance);
 }
 
+/** Single finite number from a cell for stats / row-wise math; otherwise null. */
+function parseCellFiniteForStat(row, colKey) {
+  if (!row || typeof row !== "object") return null;
+  const v = row[colKey];
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (v == null || v === "") return null;
+  const n = typeof v === "string" ? Number(String(v).trim()) : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Population σ over a fixed window of consecutive rows ending at rowIndex (inclusive).
+ * Returns null if the window is incomplete or any cell in the window is non-numeric.
+ */
+function rollingPopulationStdDevAtIndex(rows, colKey, rowIndex, windowSize) {
+  if (!Number.isFinite(windowSize) || windowSize < 1) return null;
+  const start = rowIndex - windowSize + 1;
+  if (start < 0) return null;
+  const vals = [];
+  for (let j = start; j <= rowIndex; j++) {
+    const n = parseCellFiniteForStat(rows[j], colKey);
+    if (n == null) return null;
+    vals.push(n);
+  }
+  return populationStandardDeviation(vals);
+}
+
 const GridView = ({startNew}) => {
 
     const contextStateV2 = useMyStateV2()
@@ -180,11 +207,15 @@ const GridView = ({startNew}) => {
     const [mathOp, setMathOp] = useState("subtract");
     const [mathRelativeRowRef, setMathRelativeRowRef] = useState("prev_row");
     const [mathOutCol, setMathOutCol] = useState("");
+    const [mathBasicColA, setMathBasicColA] = useState("");
+    const [mathBasicColB, setMathBasicColB] = useState("");
     const [mathDestination, setMathDestination] = useState("current_sheet");
     const [mathDialogTab, setMathDialogTab] = useState("basic");
     const [statsStdDevActive, setStatsStdDevActive] = useState(false);
     const [statsStdSourceCol, setStatsStdSourceCol] = useState("");
     const [statsStdOutCol, setStatsStdOutCol] = useState("");
+    const [statsStdMode, setStatsStdMode] = useState("full"); // full | rolling
+    const [statsRollCount, setStatsRollCount] = useState("4");
 
     // Combine Sheets (client-side join across already-loaded sheets)
     const [combineSheetsDialogOpen, setCombineSheetsDialogOpen] = useState(false);
@@ -399,13 +430,19 @@ const GridView = ({startNew}) => {
 
     useEffect(() => {
       if (!mathDialogOpen) return;
-      if (!mathOutCol || !String(mathOutCol).trim()) {
-        setMathOutCol(nextFreeResultColumnName());
-      }
-      if (!mathBaseCol && sheetColumnNamesForMath.length > 0) {
-        setMathBaseCol(sheetColumnNamesForMath[0]);
-      }
-    }, [mathDialogOpen, mathOutCol, mathBaseCol, nextFreeResultColumnName, sheetColumnNamesForMath]);
+      setMathOutCol((prev) => (String(prev || "").trim() ? prev : nextFreeResultColumnName()));
+      setMathBaseCol((prev) =>
+        prev && sheetColumnNamesForMath.includes(prev) ? prev : sheetColumnNamesForMath[0] || "",
+      );
+      setMathBasicColA((prev) =>
+        prev && sheetColumnNamesForMath.includes(prev) ? prev : sheetColumnNamesForMath[0] || "",
+      );
+      setMathBasicColB((prev) =>
+        prev && sheetColumnNamesForMath.includes(prev)
+          ? prev
+          : sheetColumnNamesForMath[1] || sheetColumnNamesForMath[0] || "",
+      );
+    }, [mathDialogOpen, sheetColumnNamesForMath, nextFreeResultColumnName]);
 
     useEffect(() => {
       if (!mathDialogOpen) {
@@ -413,6 +450,10 @@ const GridView = ({startNew}) => {
         setStatsStdDevActive(false);
         setStatsStdSourceCol("");
         setStatsStdOutCol("");
+        setStatsStdMode("full");
+        setStatsRollCount("4");
+        setMathBasicColA("");
+        setMathBasicColB("");
       }
     }, [mathDialogOpen]);
 
@@ -421,11 +462,20 @@ const GridView = ({startNew}) => {
       [connectedData, statsStdSourceCol],
     );
 
+    const statsRollCountParsed = useMemo(() => {
+      const s = String(statsRollCount ?? "").trim();
+      if (!/^\d+$/.test(s)) return null;
+      const n = parseInt(s, 10);
+      if (!Number.isFinite(n) || n < 2) return null;
+      return n;
+    }, [statsRollCount]);
+
     const statsStdCanSubmit =
       statsStdDevActive &&
       Boolean(String(statsStdSourceCol || "").trim()) &&
       Boolean(String(statsStdOutCol || "").trim()) &&
-      statsStdNumericValues.length > 0;
+      statsStdNumericValues.length > 0 &&
+      (statsStdMode !== "rolling" || statsRollCountParsed != null);
 
     const applySheetMathOperation = useCallback(() => {
       const rows = Array.isArray(connectedData) ? [...connectedData] : [];
@@ -433,29 +483,65 @@ const GridView = ({startNew}) => {
         toast.error("Load sheet data before running a column calculation.");
         return;
       }
-      const baseCol = String(mathBaseCol || "").trim();
       const out = String(mathOutCol || "").trim() || nextFreeResultColumnName();
-      if (!baseCol || !out) {
-        toast.error("Choose a column and output column name.");
+      if (!out) {
+        toast.error("Enter a name for the new column.");
         return;
       }
       const valueOrZero = (v) => {
         const n = Number(v);
         return Number.isFinite(n) ? n : 0;
       };
-      const next = rows.map((row, idx) => {
-        if (!row || typeof row !== "object") return row;
-        const current = valueOrZero(row[baseCol]);
-        const refIdx = mathRelativeRowRef === "next_row" ? idx + 1 : idx - 1;
-        const refRow = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
-        const relative = valueOrZero(refRow?.[baseCol]);
-        let v = null;
-        if (mathOp === "add") v = current + relative;
-        else if (mathOp === "subtract") v = current - relative;
-        else if (mathOp === "multiply") v = current * relative;
-        else if (mathOp === "divide") v = relative === 0 ? null : current / relative;
-        return { ...row, [out]: Number.isFinite(v) ? v : null };
-      });
+
+      let next;
+      if (mathDialogTab === "basic") {
+        const colA = String(mathBasicColA || "").trim();
+        const colB = String(mathBasicColB || "").trim();
+        if (!colA || !colB) {
+          toast.error("Choose column A and column B for the operation.");
+          return;
+        }
+        next = rows.map((row) => {
+          if (!row || typeof row !== "object") return row;
+          const a = valueOrZero(row[colA]);
+          const b = valueOrZero(row[colB]);
+          let v = null;
+          if (mathOp === "add") v = a + b;
+          else if (mathOp === "subtract") v = a - b;
+          else if (mathOp === "multiply") v = a * b;
+          else if (mathOp === "divide") v = b === 0 ? null : a / b;
+          return { ...row, [out]: Number.isFinite(v) ? v : null };
+        });
+      } else {
+        const baseCol = String(mathBaseCol || "").trim();
+        if (!baseCol) {
+          toast.error("Choose a column for the functions calculation.");
+          return;
+        }
+        next = rows.map((row, idx) => {
+          if (!row || typeof row !== "object") return row;
+          const refIdx = mathRelativeRowRef === "next_row" ? idx + 1 : idx - 1;
+          const refRow = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
+          if (refRow == null) {
+            return { ...row, [out]: null };
+          }
+          const current = parseCellFiniteForStat(row, baseCol);
+          const relative = parseCellFiniteForStat(refRow, baseCol);
+          if (current == null || relative == null) {
+            return { ...row, [out]: null };
+          }
+          let v = null;
+          if (mathOp === "add") v = current + relative;
+          else if (mathOp === "subtract") v = current - relative;
+          else if (mathOp === "multiply") v = current * relative;
+          else if (mathOp === "divide") v = relative === 0 ? null : current / relative;
+          return { ...row, [out]: Number.isFinite(v) ? v : null };
+        });
+      }
+
+      if (setDataTypes) {
+        setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
+      }
       if (mathDestination === "new_sheet") {
         const sheetName = `${out} calc`;
         addNewSheetAndActivate?.((newId) => {
@@ -482,6 +568,9 @@ const GridView = ({startNew}) => {
       setMathDialogOpen(false);
     }, [
       connectedData,
+      mathDialogTab,
+      mathBasicColA,
+      mathBasicColB,
       mathBaseCol,
       mathDestination,
       mathOp,
@@ -492,6 +581,7 @@ const GridView = ({startNew}) => {
       replaceCurrentSheetData,
       setConnectedData,
       setDataSheets,
+      setDataTypes,
       setSheetData,
     ]);
 
@@ -512,14 +602,33 @@ const GridView = ({startNew}) => {
         toast.error("Selected column has no numeric values.");
         return;
       }
-      const sigma = populationStandardDeviation(nums);
-      const value = Number.isFinite(sigma) ? sigma : null;
-      const next = rows.map((row) => (row && typeof row === "object" ? { ...row, [out]: value } : row));
+      let next;
+      if (statsStdMode === "rolling") {
+        const s = String(statsRollCount ?? "").trim();
+        if (!/^\d+$/.test(s)) {
+          toast.error("Roll count must be a whole number (digits only).");
+          return;
+        }
+        const rollN = parseInt(s, 10);
+        if (!Number.isFinite(rollN) || rollN < 2) {
+          toast.error("Roll count must be at least 2.");
+          return;
+        }
+        next = rows.map((row, i) => {
+          if (!row || typeof row !== "object") return row;
+          const v = rollingPopulationStdDevAtIndex(rows, src, i, rollN);
+          return { ...row, [out]: v };
+        });
+      } else {
+        const sigma = populationStandardDeviation(nums);
+        const value = Number.isFinite(sigma) ? sigma : null;
+        next = rows.map((row) => (row && typeof row === "object" ? { ...row, [out]: value } : row));
+      }
       if (setDataTypes) {
         setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
       }
       if (mathDestination === "new_sheet") {
-        const sheetName = `${out} σ`;
+        const sheetName = statsStdMode === "rolling" ? `${out} rolling σ` : `${out} σ`;
         addNewSheetAndActivate?.((newId) => {
           setSheetData?.(newId, next);
           setDataSheets?.((prev) => {
@@ -535,17 +644,27 @@ const GridView = ({startNew}) => {
             };
           });
         });
-        toast.success("Added standard deviation column in a new sheet.");
+        toast.success(
+          statsStdMode === "rolling"
+            ? "Added rolling standard deviation column in a new sheet."
+            : "Added standard deviation column in a new sheet.",
+        );
       } else {
         replaceCurrentSheetData?.(next);
         setConnectedData?.(next);
-        toast.success("Added standard deviation column to current sheet.");
+        toast.success(
+          statsStdMode === "rolling"
+            ? "Added rolling standard deviation column to current sheet."
+            : "Added standard deviation column to current sheet.",
+        );
       }
       setMathDialogOpen(false);
     }, [
       connectedData,
       statsStdSourceCol,
       statsStdOutCol,
+      statsStdMode,
+      statsRollCount,
       mathDestination,
       nextFreeResultColumnName,
       addNewSheetAndActivate,
@@ -1788,7 +1907,7 @@ const GridView = ({startNew}) => {
                   </Tooltip>
                 </TooltipProvider>
                 <Dialog open={mathDialogOpen} onOpenChange={setMathDialogOpen}>
-                  <DialogContent className="sm:max-w-md">
+                  <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                       <DialogTitle>Mathematics Operations</DialogTitle>
                       <DialogDescription>
@@ -1815,7 +1934,7 @@ const GridView = ({startNew}) => {
                             Stats
                           </TabsTrigger>
                         </TabsList>
-                        <TabsContent value="basic" className="mt-2">
+                        <TabsContent value="basic" className="mt-2 space-y-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Operation</Label>
                             <Select value={mathOp} onValueChange={setMathOp}>
@@ -1826,10 +1945,70 @@ const GridView = ({startNew}) => {
                                 <SelectItem value="add">Add (A + B)</SelectItem>
                                 <SelectItem value="subtract">Subtract (A − B)</SelectItem>
                                 <SelectItem value="multiply">Multiply (A × B)</SelectItem>
-                                <SelectItem value="divide">Divide (A ÷ B)</SelectItem>
+                                <SelectItem value="divide">{"Divide (A \u00f7 B)"}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Column A</Label>
+                              <Select
+                                value={mathBasicColA || "__"}
+                                onValueChange={(v) => setMathBasicColA(v === "__" ? "" : v)}
+                              >
+                                <SelectTrigger className="h-9 text-xs">
+                                  <SelectValue placeholder="Select column" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__">—</SelectItem>
+                                  {sheetColumnNamesForMath.map((c) => (
+                                    <SelectItem key={`math-basic-a-${c}`} value={c} className="font-mono text-xs">
+                                      {c}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Column B</Label>
+                              <Select
+                                value={mathBasicColB || "__"}
+                                onValueChange={(v) => setMathBasicColB(v === "__" ? "" : v)}
+                              >
+                                <SelectTrigger className="h-9 text-xs">
+                                  <SelectValue placeholder="Select column" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__">—</SelectItem>
+                                  {sheetColumnNamesForMath.map((c) => (
+                                    <SelectItem key={`math-basic-b-${c}`} value={c} className="font-mono text-xs">
+                                      {c}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">New column name</Label>
+                            <Input
+                              className="h-9 text-xs"
+                              value={mathOutCol}
+                              onChange={(e) => setMathOutCol(e.target.value)}
+                              spellCheck={false}
+                              placeholder={nextFreeResultColumnName()}
+                            />
+                          </div>
+                          {mathBasicColA && mathBasicColB ? (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Preview</Label>
+                              <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs font-mono text-muted-foreground">
+                                {`${mathOutCol || nextFreeResultColumnName()} = ${mathBasicColA} ${
+                                  mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
+                                } ${mathBasicColB} (per row)`}
+                              </div>
+                            </div>
+                          ) : null}
                         </TabsContent>
                         <TabsContent value="functions" className="mt-2">
                           <div className="space-y-3">
@@ -1982,6 +2161,57 @@ const GridView = ({startNew}) => {
                                   </SelectContent>
                                 </Select>
                               </div>
+                              {statsStdSourceCol ? (
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Calculation</Label>
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      variant={statsStdMode === "full" ? "default" : "outline"}
+                                      onClick={() => setStatsStdMode("full")}
+                                    >
+                                      Full column
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      variant={statsStdMode === "rolling" ? "default" : "outline"}
+                                      onClick={() => {
+                                        setStatsStdMode("rolling");
+                                        if (!String(statsRollCount || "").trim()) setStatsRollCount("4");
+                                      }}
+                                    >
+                                      Rolling
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : null}
+                              {statsStdMode === "rolling" && statsStdSourceCol ? (
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="space-y-1 outline-none" tabIndex={0}>
+                                        <Label className="text-xs">(roll count)</Label>
+                                        <Input
+                                          className="h-9 text-xs"
+                                          inputMode="numeric"
+                                          autoComplete="off"
+                                          value={statsRollCount}
+                                          onChange={(e) => setStatsRollCount(e.target.value.replace(/\D/g, ""))}
+                                          spellCheck={false}
+                                          placeholder="e.g. 4"
+                                        />
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="max-w-xs text-xs">
+                                      How many rows to include in rolling
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : null}
                               {statsStdSourceCol && statsStdNumericValues.length === 0 ? (
                                 <Alert variant="destructive" className="py-2">
                                   <AlertTitle className="text-xs">Not a numeric column</AlertTitle>
@@ -2004,11 +2234,25 @@ const GridView = ({startNew}) => {
                                 <div className="space-y-1">
                                   <Label className="text-xs">Preview</Label>
                                   <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs font-mono text-muted-foreground">
-                                    σ({statsStdSourceCol}) ={" "}
-                                    {Number(populationStandardDeviation(statsStdNumericValues)).toLocaleString(undefined, {
-                                      maximumFractionDigits: 8,
-                                    })}{" "}
-                                    <span className="text-[11px]">(same value in every row)</span>
+                                    {statsStdMode === "full" ? (
+                                      <>
+                                        σ({statsStdSourceCol}) ={" "}
+                                        {Number(populationStandardDeviation(statsStdNumericValues)).toLocaleString(undefined, {
+                                          maximumFractionDigits: 8,
+                                        })}{" "}
+                                        <span className="text-[11px]">(same value in every row)</span>
+                                      </>
+                                    ) : statsRollCountParsed ? (
+                                      <span className="text-[11px] leading-snug">
+                                        Rolling σ with N = {statsRollCountParsed}: rows 1–{statsRollCountParsed - 1} are blank;
+                                        from row {statsRollCountParsed}, each value is population σ of the last{" "}
+                                        {statsRollCountParsed} rows in {statsStdSourceCol} (including the current row).
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px]">
+                                        Enter roll count: whole number ≥ 2, digits only.
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               ) : null}
@@ -2047,7 +2291,15 @@ const GridView = ({startNew}) => {
                       <Button
                         type="button"
                         onClick={mathDialogTab === "stats" ? applyStatsStdDev : applySheetMathOperation}
-                        disabled={mathDialogTab === "stats" && !statsStdCanSubmit}
+                        disabled={
+                          (mathDialogTab === "stats" && !statsStdCanSubmit) ||
+                          (mathDialogTab === "basic" &&
+                            (!String(mathBasicColA || "").trim() ||
+                              !String(mathBasicColB || "").trim() ||
+                              !String(mathOutCol || "").trim())) ||
+                          (mathDialogTab === "functions" &&
+                            (!String(mathBaseCol || "").trim() || !String(mathOutCol || "").trim()))
+                        }
                       >
                         Apply to sheet
                       </Button>
