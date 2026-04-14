@@ -263,8 +263,20 @@ export const ENDPOINTS = [
         listValueKey: "id",
         hint: "Select a market then choose Yes/No token IDs, or enter asset ID(s) directly (comma-separated).",
       },
-      { key: "startTs", label: "Start timestamp", required: false, type: "number", hint: "Unix timestamp (seconds)" },
-      { key: "endTs", label: "End timestamp", required: false, type: "number", hint: "Unix timestamp (seconds)" },
+      {
+        key: "startTs",
+        label: "Start timestamp",
+        required: false,
+        type: "number",
+        hint: "Unix seconds (UTC epoch). Playground date+time = wall clock in America/New_York, then converted.",
+      },
+      {
+        key: "endTs",
+        label: "End timestamp",
+        required: false,
+        type: "number",
+        hint: "Unix seconds (UTC epoch). Same Eastern interpretation as startTs.",
+      },
       {
         key: "interval",
         label: "Interval",

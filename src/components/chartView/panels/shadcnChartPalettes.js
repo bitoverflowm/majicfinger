@@ -33,6 +33,20 @@ export const SHADCN_CHART_BASE_ORDER = [
 export const SHADCN_CHART_SHADE_KEYS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
 
 /**
+ * "Single colors" palette: one representative swatch per base color.
+ * Useful for letting users pick an explicit series color, independent of the global ramp palette.
+ * @param {number} shadeKey Tailwind shade (default 600 for good contrast)
+ * @returns {{ baseId: string, color: string }[]}
+ */
+export function getShadcnSingleColors(shadeKey = 600) {
+  const key = String(shadeKey);
+  return SHADCN_CHART_BASE_ORDER.map((baseId) => ({
+    baseId,
+    color: shadcnChartPalettesJson?.[baseId]?.[key] || shadcnChartPalettesJson?.[baseId]?.["600"] || shadcnChartPalettesJson?.[baseId]?.["500"],
+  })).filter((x) => Boolean(x.color));
+}
+
+/**
  * Full chart palette: one stop per Tailwind shade (50 → 950), same order as Shadcn / Tailwind docs.
  * @param {string} baseId
  * @returns {string[]}

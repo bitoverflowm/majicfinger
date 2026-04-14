@@ -124,7 +124,7 @@ In <0.69 seconds. No coding. No setup.`,
     cta: {
       primary: {
         href: "#demo",
-        text: "Try it",
+        text: "Try For Free",
       },
       secondary: {
         href: "/#pricing",

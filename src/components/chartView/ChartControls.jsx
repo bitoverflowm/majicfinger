@@ -9,14 +9,17 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Toggle } from "@/components/ui/toggle";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -35,6 +38,7 @@ import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
 import {
   getShadcnChartPaletteArray,
   getShadcnChartBaseSwatch950,
+  getShadcnSingleColors,
 } from "@/components/chartView/panels/shadcnChartPalettes";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -119,6 +123,8 @@ export default function ChartControls() {
     getAxisType,
 
     selectedPalette,
+    lineColorOverrides,
+    setLineColorOverrides,
     shufflePalette,
     shadcnChartBases,
     selectedShadBaseId,
@@ -169,6 +175,9 @@ export default function ChartControls() {
           ? selChartType.charAt(0).toUpperCase() + selChartType.slice(1)
           : "—";
 
+  /** Selected chart type uses the same color users see on hover (works for light/dark). */
+  const chartTypeSelectedClass = "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50";
+
   // Only one section open at a time; default to Chart Type.
   const [openSection, setOpenSection] = useState("chartType");
   const [lineAddValue, setLineAddValue] = useState("");
@@ -190,6 +199,9 @@ export default function ChartControls() {
     selectedPalette && selectedPalette.length
       ? selectedPalette
       : getShadcnChartPaletteArray(selectedShadBaseId || "");
+  const singleColors = getShadcnSingleColors(600);
+  const getLineColor = (lineColumn, index) =>
+    lineColorOverrides?.[lineColumn] || palettePreview?.[index] || palettePreview?.[3] || (dark ? "#ffffff" : "#000000");
 
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
@@ -251,7 +263,11 @@ export default function ChartControls() {
                       >
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <ToggleGroupItem value="area" aria-label="Area chart">
+                            <ToggleGroupItem
+                              value="area"
+                              aria-label="Area chart"
+                              className={selChartType === "area" ? chartTypeSelectedClass : undefined}
+                            >
                               <MdOutlineAreaChart className="h-4 w-4" />
                             </ToggleGroupItem>
                           </TooltipTrigger>
@@ -261,7 +277,11 @@ export default function ChartControls() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <ToggleGroupItem value="bar" aria-label="Bar chart">
+                            <ToggleGroupItem
+                              value="bar"
+                              aria-label="Bar chart"
+                              className={selChartType === "bar" ? chartTypeSelectedClass : undefined}
+                            >
                               <IoStatsChart className="h-4 w-4" />
                             </ToggleGroupItem>
                           </TooltipTrigger>
@@ -271,7 +291,11 @@ export default function ChartControls() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <ToggleGroupItem value="line" aria-label="Line chart">
+                            <ToggleGroupItem
+                              value="line"
+                              aria-label="Line chart"
+                              className={selChartType === "line" ? chartTypeSelectedClass : undefined}
+                            >
                               <PiChartLine className="h-4 w-4" />
                             </ToggleGroupItem>
                           </TooltipTrigger>
@@ -281,7 +305,11 @@ export default function ChartControls() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <ToggleGroupItem value="pie" aria-label="Pie chart">
+                            <ToggleGroupItem
+                              value="pie"
+                              aria-label="Pie chart"
+                              className={selChartType === "pie" ? chartTypeSelectedClass : undefined}
+                            >
                               <IoPieChartOutline className="h-4 w-4" />
                             </ToggleGroupItem>
                           </TooltipTrigger>
@@ -291,7 +319,11 @@ export default function ChartControls() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <ToggleGroupItem value="radar" aria-label="Radar chart">
+                            <ToggleGroupItem
+                              value="radar"
+                              aria-label="Radar chart"
+                              className={selChartType === "radar" ? chartTypeSelectedClass : undefined}
+                            >
                               <AiOutlineRadarChart className="h-4 w-4" />
                             </ToggleGroupItem>
                           </TooltipTrigger>
@@ -301,7 +333,11 @@ export default function ChartControls() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <ToggleGroupItem value="treemap" aria-label="Treemap">
+                            <ToggleGroupItem
+                              value="treemap"
+                              aria-label="Treemap"
+                              className={selChartType === "treemap" ? chartTypeSelectedClass : undefined}
+                            >
                               <LayoutGrid className="h-4 w-4" />
                             </ToggleGroupItem>
                           </TooltipTrigger>
@@ -312,7 +348,11 @@ export default function ChartControls() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <ToggleGroupItem value="scatter" aria-label="Scatter / bubble chart">
+                            <ToggleGroupItem
+                              value="scatter"
+                              aria-label="Scatter / bubble chart"
+                              className={selChartType === "scatter" ? chartTypeSelectedClass : undefined}
+                            >
                               <CircleDot className="h-4 w-4" />
                             </ToggleGroupItem>
                           </TooltipTrigger>
@@ -322,7 +362,11 @@ export default function ChartControls() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <ToggleGroupItem value="liveline" aria-label="Liveline chart">
+                            <ToggleGroupItem
+                              value="liveline"
+                              aria-label="Liveline chart"
+                              className={selChartType === "liveline" ? chartTypeSelectedClass : undefined}
+                            >
                               <span className="relative inline-flex h-3 w-3">
                                 <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
                                 <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
@@ -330,7 +374,7 @@ export default function ChartControls() {
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[260px] text-xs">
-                            Liveline — compact live canvas for streaming or high-frequency numeric series.
+                            Live compact line for streaming live data series.
                           </TooltipContent>
                         </Tooltip>
                       </ToggleGroup>
@@ -350,15 +394,15 @@ export default function ChartControls() {
                         <div className="flex min-w-0 items-center gap-2 text-foreground">
                           <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Pivot (x-axis):</span>
                           <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
-                            <SelectTrigger className="min-w-0 flex-1">
-                              <SelectValue placeholder="X axis" className="text-xs" />
+                            <SelectTrigger className="min-w-0 flex-1 text-xs font-normal">
+                              <SelectValue placeholder="X axis" className="text-xs font-normal" />
                             </SelectTrigger>
                             <SelectContent className="text-xs">
-                              <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
+                              <SelectItem value={CHART_X_AXIS_NONE} className="text-xs font-normal">
                                 — Select X axis —
                               </SelectItem>
                               {(xOptions || []).map((i) => (
-                                <SelectItem key={i} value={i} className="text-xs">
+                                <SelectItem key={i} value={i} className="text-xs font-normal">
                                   {i}
                                 </SelectItem>
                               ))}
@@ -366,41 +410,101 @@ export default function ChartControls() {
                           </Select>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Time format:</span>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={lineHumanReadableTime ? "default" : "outline"}
-                            className="h-7 text-xs"
-                            onClick={() => setLineHumanReadableTime((v) => !v)}
+                          <Switch
+                            id="chart-line-time-series-x-axis"
+                            checked={xTimeScale}
+                            onCheckedChange={setXTimeScale}
+                            className="scale-75 origin-left"
+                          />
+                          <Label
+                            htmlFor="chart-line-time-series-x-axis"
+                            className={`cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"}`}
                           >
-                            {lineHumanReadableTime ? "Human readable" : "Unix/raw"}
-                          </Button>
+                            Time series X-axis
+                          </Label>
+                          <TooltipProvider delayDuration={250}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
+                                  <CircleHelp className="h-3.5 w-3.5" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                                Uses a numeric time scale so each row maps along the full width. Turn off for categorical X (e.g. labels).
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="chart-line-human-readable-time"
+                            checked={lineHumanReadableTime}
+                            onCheckedChange={setLineHumanReadableTime}
+                            className="scale-75 origin-left"
+                          />
+                          <Label
+                            htmlFor="chart-line-human-readable-time"
+                            className={`cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"}`}
+                          >
+                            Human readable time
+                          </Label>
                         </div>
                         <div className="pt-2">
                           <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} mb-1`}>Lines</p>
 
                           <div className="py-2 flex flex-wrap gap-2">
                             {(selY || []).map((lineColumn, index) => (
-                              <Badge key={`${lineColumn}-${index}`} variant="secondary" className="text-xs gap-2 pr-1 pl-2 py-1">
-                                <span className="inline-flex items-center gap-1">
-                                  <span
-                                    className="inline-block h-2 w-2 rounded-full"
-                                    style={{ backgroundColor: palettePreview?.[index] || palettePreview?.[3] || (dark ? "#ffffff" : "#000000") }}
-                                  />
-                                  {`Line ${index + 1}: ${lineColumn}`}
-                                </span>
-                                {(selY || []).length > 1 ? (
-                                  <button
-                                    type="button"
-                                    className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
-                                    aria-label={`Remove Line ${index + 1}`}
-                                    onClick={() => removeY(lineColumn, index)}
-                                  >
-                                    x
-                                  </button>
-                                ) : null}
-                              </Badge>
+                              <div key={`${lineColumn}-${index}`} className="inline-flex items-center gap-1">
+                                <Badge variant="secondary" className="text-xs gap-2 pr-1 pl-2 py-1">
+                                  <span className="inline-flex items-center gap-1">
+                                    <span
+                                      className="inline-block h-2 w-2 rounded-full"
+                                      style={{ backgroundColor: getLineColor(lineColumn, index) }}
+                                    />
+                                    {`Line ${index + 1}: ${lineColumn}`}
+                                  </span>
+                                  {(selY || []).length > 1 ? (
+                                    <button
+                                      type="button"
+                                      className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
+                                      aria-label={`Remove Line ${index + 1}`}
+                                      onClick={() => removeY(lineColumn, index)}
+                                    >
+                                      x
+                                    </button>
+                                  ) : null}
+                                </Badge>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border"
+                                      style={{ backgroundColor: getLineColor(lineColumn, index) }}
+                                      aria-label={`Pick color for Line ${index + 1}`}
+                                    />
+                                  </PopoverTrigger>
+                                  <PopoverContent align="start" className="w-56 p-2">
+                                    <div className="grid grid-cols-8 gap-1.5">
+                                      {singleColors.map(({ baseId, color }) => (
+                                        <button
+                                          key={`${lineColumn}-${baseId}`}
+                                          type="button"
+                                          className="h-5 w-5 rounded-full border border-border"
+                                          style={{ backgroundColor: color }}
+                                          onClick={() =>
+                                            setLineColorOverrides((prev) => ({
+                                              ...(prev || {}),
+                                              [lineColumn]: color,
+                                            }))
+                                          }
+                                          aria-label={`Use ${baseId} for ${lineColumn}`}
+                                          title={baseId}
+                                        />
+                                      ))}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
                             ))}
                           </div>
 
@@ -634,28 +738,6 @@ export default function ChartControls() {
                       )}
                     </>
                   )}
-
-                  {(selChartType === "line" || selChartType === "area" || selChartType === "bar") && selX ? (
-                    <div className="space-y-1 border-t border-border/60 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`text-xs font-medium ${dark ? "text-slate-200" : "text-muted-foreground"}`}>
-                          Time series X-axis
-                        </span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={xTimeScale ? "default" : "outline"}
-                          className="h-7 text-xs"
-                          onClick={() => setXTimeScale((v) => !v)}
-                        >
-                          {xTimeScale ? "On" : "Off"}
-                        </Button>
-                      </div>
-                      <p className={`text-[10px] leading-snug ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
-                        Uses a numeric time scale so each row maps along the full width. Turn off for categorical X (e.g. labels).
-                      </p>
-                    </div>
-                  ) : null}
 
                   {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "line" && selChartType !== "treemap" && (
                     <Button

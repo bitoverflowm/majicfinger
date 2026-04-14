@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { format, startOfDay, isAfter, isSameDay, subDays } from "date-fns";
+import moment from "moment-timezone";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,12 +111,23 @@ function parseTimeParts(timeString, fallbackHour = 0, fallbackMinute = 0, fallba
   return [h, m, s];
 }
 
-function toIsoFromLocalDateTime(date, timeString, fallbackHour = 0, fallbackMinute = 0, fallbackSecond = 0) {
+/**
+ * Polymarket CLOB docs: startTs/endTs are Unix seconds (UTC epoch). Those are not "in EST" — they are absolute
+ * instants. We still build the *wall clock* the user means from calendar day + time in US Eastern (DST-aware)
+ * so ranges align with how US markets are usually quoted.
+ */
+const POLYMARKET_HISTORY_TZ = "America/New_York";
+
+/** Calendar Y-M-D from `date` + clock from `timeString`, interpreted in POLYMARKET_HISTORY_TZ → Unix seconds string. */
+function calendarWallTimeToUnixSeconds(date, timeString, fallbackHour = 0, fallbackMinute = 0, fallbackSecond = 0) {
   if (!(date instanceof Date)) return "";
-  const local = new Date(date);
   const [hour, minute, second] = parseTimeParts(timeString, fallbackHour, fallbackMinute, fallbackSecond);
-  local.setHours(hour, minute, second, 0);
-  return local.toISOString();
+  const m = moment.tz(
+    [date.getFullYear(), date.getMonth(), date.getDate(), hour, minute, second],
+    POLYMARKET_HISTORY_TZ,
+  );
+  if (!m.isValid()) return "";
+  return String(m.unix());
 }
 
 const Polymarket = ({ setConnectedData }) => {
@@ -303,14 +315,15 @@ const Polymarket = ({ setConnectedData }) => {
   useEffect(() => {
     if (selectedAction?.query !== "getPricesHistory") return;
     const startTs = priceHistoryDateRange?.from
-      ? toIsoFromLocalDateTime(priceHistoryDateRange.from, priceHistoryStartTime, 0, 0, 0)
+      ? calendarWallTimeToUnixSeconds(priceHistoryDateRange.from, priceHistoryStartTime, 0, 0, 0)
       : "";
     let endTs = priceHistoryDateRange?.to
-      ? toIsoFromLocalDateTime(priceHistoryDateRange.to, priceHistoryEndTime, 23, 59, 59)
+      ? calendarWallTimeToUnixSeconds(priceHistoryDateRange.to, priceHistoryEndTime, 23, 59, 59)
       : "";
     if (endTs) {
-      const endMs = new Date(endTs).getTime();
-      if (endMs > Date.now()) endTs = new Date().toISOString();
+      const endSec = Number(endTs);
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (Number.isFinite(endSec) && endSec > nowSec) endTs = String(nowSec);
     }
     setParamValues((prev) => ({
       ...prev,
@@ -643,7 +656,7 @@ const Polymarket = ({ setConnectedData }) => {
                               format(priceHistoryDateRange.from, "LLL dd, y")
                             )
                           ) : (
-                            <span className="text-[11px] leading-snug">Pick local date range</span>
+                            <span className="text-[11px] leading-snug">Pick date range (US Eastern dates)</span>
                           )}
                         </Button>
                       </PopoverTrigger>
@@ -660,7 +673,7 @@ const Polymarket = ({ setConnectedData }) => {
                     </Popover>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">Start time (local timezone)</Label>
+                        <Label className="text-[10px] text-muted-foreground">Start time (US Eastern)</Label>
                         <Input
                           type="time"
                           step="1"
@@ -670,7 +683,7 @@ const Polymarket = ({ setConnectedData }) => {
                         />
                       </div>
                                            <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">End time (local timezone)</Label>
+                        <Label className="text-[10px] text-muted-foreground">End time (US Eastern)</Label>
                         <Input
                           type="time"
                           step="1"
@@ -682,8 +695,9 @@ const Polymarket = ({ setConnectedData }) => {
                       </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      End date cannot be after today; end time cannot be later than now. Converted by backend to Unix
-                      timestamps for Polymarket (`startTs`/`endTs`) using your local timezone.
+                      Dates and times are combined in <span className="font-medium">America/New_York</span> (US Eastern,
+                      DST-aware), then sent as Unix seconds — Polymarket&apos;s API uses UTC epoch seconds (not a
+                      separate &quot;EST Unix&quot;). End cannot be after now (UTC).
                     </p>
                   </div>
                 ) : (

@@ -283,6 +283,7 @@ async function fetchJson(url, opts = {}) {
   return JSON.parse(preserved);
 }
 
+/** Polymarket prices-history: startTs/endTs are Unix epoch seconds (UTC instant); API types them as number (double). */
 function toUnixSeconds(value) {
   if (value === undefined || value === null || value === "") return "";
   const raw = String(value).trim();
@@ -310,6 +311,87 @@ function intervalToSeconds(interval) {
     default:
       return null;
   }
+}
+
+/** Polymarket prices-history: long ranges + `interval=max` + fine fidelity are flaky; chunk by wall time (see py-clob-client#216). */
+const PRICES_HISTORY_MAX_CHUNK_SEC = 15 * 24 * 3600;
+const PRICES_HISTORY_MAX_POINTS = 1000;
+
+function pricesHistoryBucketSeconds(interval, fidelity) {
+  const intervalSeconds = intervalToSeconds(interval);
+  const fidelityMinutes = Number(fidelity);
+  if (Number.isFinite(fidelityMinutes) && fidelityMinutes > 0) {
+    return fidelityMinutes * 60;
+  }
+  return intervalSeconds;
+}
+
+/** Max seconds per upstream request so estimated samples stay under PRICES_HISTORY_MAX_POINTS when bucket is known. */
+function pricesHistoryChunkSpanSec(bucketSeconds) {
+  if (Number.isFinite(bucketSeconds) && bucketSeconds > 0) {
+    const fromPoints = Math.floor((PRICES_HISTORY_MAX_POINTS - 1) * bucketSeconds);
+    return Math.min(PRICES_HISTORY_MAX_CHUNK_SEC, Math.max(60, fromPoints));
+  }
+  return PRICES_HISTORY_MAX_CHUNK_SEC;
+}
+
+/** `interval=max|all` with explicit start/end is unreliable; prefer startTs/endTs + fidelity only (community workaround). */
+function omitPricesHistoryIntervalParam(interval) {
+  const i = String(interval || "").toLowerCase();
+  return i === "max" || i === "all";
+}
+
+function dedupeHistoryByT(history) {
+  const byT = new Map();
+  for (const point of history) {
+    const t = point?.t;
+    const tn = Number(t);
+    if (!Number.isFinite(tn)) continue;
+    byT.set(tn, point);
+  }
+  return Array.from(byT.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([, p]) => p);
+}
+
+async function fetchPolymarketPricesHistoryRaw(marketId, { startTsStr, endTsStr, interval, fidelity }) {
+  const omitInterval = omitPricesHistoryIntervalParam(interval);
+  const priceParams = new URLSearchParams();
+  priceParams.set("market", marketId);
+  if (startTsStr !== "") priceParams.set("startTs", startTsStr);
+  if (endTsStr !== "") priceParams.set("endTs", endTsStr);
+  if (!omitInterval && interval !== undefined && interval !== "") {
+    priceParams.set("interval", String(interval));
+  }
+  if (fidelity !== undefined && fidelity !== "") priceParams.set("fidelity", String(fidelity));
+  const historyResponse = await fetchJson(`${CLOB_BASE}/prices-history?${priceParams.toString()}`);
+  return Array.isArray(historyResponse?.history) ? historyResponse.history : [];
+}
+
+async function fetchPolymarketPricesHistoryForRange(marketId, startSec, endSec, { interval, fidelity }) {
+  return fetchPolymarketPricesHistoryRaw(marketId, {
+    startTsStr: String(startSec),
+    endTsStr: String(endSec),
+    interval,
+    fidelity,
+  });
+}
+
+async function fetchPolymarketPricesHistoryChunked(marketId, startSec, endSec, { interval, fidelity, bucketSeconds }) {
+  const span = endSec - startSec;
+  const chunkSpan = pricesHistoryChunkSpanSec(bucketSeconds);
+  if (span <= chunkSpan) {
+    return fetchPolymarketPricesHistoryForRange(marketId, startSec, endSec, { interval, fidelity });
+  }
+  const merged = [];
+  for (let s = startSec; s < endSec; ) {
+    const e = Math.min(s + chunkSpan, endSec);
+    if (e <= s) break;
+    const part = await fetchPolymarketPricesHistoryForRange(marketId, s, e, { interval, fidelity });
+    merged.push(...part);
+    s = e;
+  }
+  return dedupeHistoryByT(merged);
 }
 
 export default async function handler(req, res) {
@@ -410,15 +492,21 @@ export default async function handler(req, res) {
         if (startTs !== "" && endTs !== "" && Number(endTs) <= Number(startTs)) {
           return res.status(400).json({ message: "Invalid time range: end date/time must be after start date/time." });
         }
-        const intervalSeconds = intervalToSeconds(interval);
-        const fidelityMinutes = Number(fidelity);
-        const bucketSeconds =
-          Number.isFinite(fidelityMinutes) && fidelityMinutes > 0
-            ? fidelityMinutes * 60
-            : intervalSeconds;
-        if (startTs !== "" && endTs !== "" && Number.isFinite(bucketSeconds) && bucketSeconds > 0) {
-          const estimatedPoints = Math.ceil((Number(endTs) - Number(startTs)) / bucketSeconds);
-          if (estimatedPoints > 1000) {
+        const bucketSeconds = pricesHistoryBucketSeconds(interval, fidelity);
+        const startNum = startTs !== "" ? Number(startTs) : NaN;
+        const endNum = endTs !== "" ? Number(endTs) : NaN;
+        if (
+          startTs !== "" &&
+          endTs !== "" &&
+          Number.isFinite(startNum) &&
+          Number.isFinite(endNum) &&
+          Number.isFinite(bucketSeconds) &&
+          bucketSeconds > 0
+        ) {
+          const chunkSpan = pricesHistoryChunkSpanSec(bucketSeconds);
+          const span = endNum - startNum;
+          const estimatedPoints = Math.ceil(span / bucketSeconds);
+          if (span <= chunkSpan && estimatedPoints > PRICES_HISTORY_MAX_POINTS) {
             return res.status(400).json({
               message:
                 "Selected time window is too large for the chosen interval/fidelity. Reduce the range or use a coarser interval.",
@@ -428,14 +516,26 @@ export default async function handler(req, res) {
 
         const rows = [];
         for (const marketId of marketIds) {
-          const priceParams = new URLSearchParams();
-          priceParams.set("market", marketId);
-          if (startTs !== "") priceParams.set("startTs", startTs);
-          if (endTs !== "") priceParams.set("endTs", endTs);
-          if (interval !== undefined && interval !== "") priceParams.set("interval", String(interval));
-          if (fidelity !== undefined && fidelity !== "") priceParams.set("fidelity", String(fidelity));
-          const historyResponse = await fetchJson(`${CLOB_BASE}/prices-history?${priceParams.toString()}`);
-          const history = Array.isArray(historyResponse?.history) ? historyResponse.history : [];
+          let history;
+          if (
+            startTs !== "" &&
+            endTs !== "" &&
+            Number.isFinite(startNum) &&
+            Number.isFinite(endNum)
+          ) {
+            history = await fetchPolymarketPricesHistoryChunked(marketId, startNum, endNum, {
+              interval,
+              fidelity,
+              bucketSeconds,
+            });
+          } else {
+            history = await fetchPolymarketPricesHistoryRaw(marketId, {
+              startTsStr: startTs,
+              endTsStr: endTs,
+              interval,
+              fidelity,
+            });
+          }
           for (const point of history) {
             rows.push({
               market: marketId,

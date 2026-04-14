@@ -117,18 +117,39 @@ function temporalToMs(value) {
   return Date.parse(s);
 }
 
-function formatXAxisValue(value, temporal, humanReadable = true) {
+/** Pick tick label granularity from span so intraday series show time, not only "Apr 13, 2026" on every tick. */
+export function temporalIntlFormatOptionsForRange(rangeMs) {
+  const MS = 1000;
+  const MIN = 60 * MS;
+  const HOUR = 60 * MIN;
+  const DAY = 24 * HOUR;
+  if (!Number.isFinite(rangeMs) || rangeMs < 0) {
+    return { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" };
+  }
+  if (rangeMs < 2 * MIN) {
+    return { hour: "2-digit", minute: "2-digit", second: "2-digit" };
+  }
+  if (rangeMs < DAY) {
+    return { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", year: "numeric" };
+  }
+  if (rangeMs < 7 * DAY) {
+    return { weekday: "short", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", year: "numeric" };
+  }
+  if (rangeMs < 120 * DAY) {
+    return { month: "short", day: "2-digit", year: "numeric" };
+  }
+  return { year: "numeric", month: "short" };
+}
+
+export function formatXAxisValue(value, temporal, humanReadable = true, intlOptions = null) {
   if (!temporal || !humanReadable) return value;
   if (value == null || value === "") return "";
   const ms = temporalToMs(value);
   const d = Number.isFinite(ms) ? new Date(ms) : null;
   if (!d) return String(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-  }).format(d);
+  const opts = intlOptions ?? temporalIntlFormatOptionsForRange(Number.POSITIVE_INFINITY);
+  return new Intl.DateTimeFormat(undefined, opts).format(d);
 }
 
 function toSortableXAxisValue(value, axisType) {
@@ -226,6 +247,9 @@ export function ChartBuilderProvider({ demo, children }) {
   const [selectedShadBaseId, setSelectedShadBaseId] = useState(SHADCN_CHART_BASE_ORDER[0]);
   const [selectedPalette, setSelectedPalette] = useState([]);
   const [colorVisible, setColorVisible] = useState(false);
+
+  /** Explicit per-line series colors (decoupled from the global palette ramp). Keyed by Y column name. */
+  const [lineColorOverrides, setLineColorOverrides] = useState({});
 
   const [expanded, setExpanded] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
@@ -594,6 +618,8 @@ export function ChartBuilderProvider({ demo, children }) {
     selectedShadBaseId,
     setSelectedShadBaseId,
     selectedPaletteHandler,
+    lineColorOverrides,
+    setLineColorOverrides,
     handleToggleDark,
 
     lineStyle,
@@ -679,6 +705,7 @@ export function ChartCanvas() {
     wsStart,
     chartRef,
     selectedPalette,
+    lineColorOverrides,
     titleHidden,
     title,
     subTitleHidden,
@@ -826,6 +853,11 @@ export function ChartCanvas() {
     const pick = Math.min(n - 1, Math.max(chromeSlots, fromEnd));
     return p[pick] ?? p[n - 1] ?? fallbackSeriesColor;
   };
+
+  const seriesColorFor = (yKey, idx) => {
+    const override = yKey ? lineColorOverrides?.[yKey] : null;
+    return override || seriesColorAt(idx);
+  };
   const yAxisFormatter = (raw) => {
     const n = Number(raw);
     if (!Number.isFinite(n)) return raw;
@@ -833,12 +865,32 @@ export function ChartCanvas() {
     const adjusted = n / divisor;
     return yAxisCompact ? formatCompactNumber(adjusted) : adjusted.toLocaleString(undefined, { maximumFractionDigits: 2 });
   };
-  const xTickFormatter = (v) =>
-    formatXAxisValue(
-      v,
-      lineIsTemporalX,
-      selChartType === "line" || selChartType === "area" ? lineHumanReadableTime : true,
-    );
+
+  /** Span of pivot on the plotted rows (ms) — drives tick granularity so same-day series show clock time. */
+  const xPivotSpanMs = useMemo(() => {
+    if (!selX || !Array.isArray(finalRenderedData) || finalRenderedData.length < 2) return 0;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const row of finalRenderedData) {
+      const ms = temporalToMs(row?.[xKey]);
+      if (!Number.isFinite(ms)) continue;
+      if (ms < min) min = ms;
+      if (ms > max) max = ms;
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 0;
+    return max - min;
+  }, [finalRenderedData, xKey, selX]);
+
+  const xTickIntlOptions = useMemo(() => temporalIntlFormatOptionsForRange(xPivotSpanMs), [xPivotSpanMs]);
+
+  const xHumanReadable = selChartType === "line" || selChartType === "area" ? lineHumanReadableTime : true;
+
+  const xTickFormatter = (v) => formatXAxisValue(v, lineIsTemporalX, xHumanReadable, xHumanReadable ? xTickIntlOptions : null);
+
+  const xTooltipLabelFormatter = (label) => {
+    if (!lineIsTemporalX || !xHumanReadable) return label == null ? "" : String(label);
+    return String(formatXAxisValue(label, true, true, xTickIntlOptions));
+  };
 
   return (
     <div className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-out">
@@ -864,7 +916,6 @@ export function ChartCanvas() {
         <div
           className="relative flex min-h-0 flex-1 flex-col rounded-xl p-3 transition-[padding] duration-300 ease-out sm:p-5"
           ref={chartRef}
-          style={{ backgroundColor: activePalette?.[0] || (dark ? "#ffffff" : "#000000") }}
         >
           <div
             className="flex min-h-0 flex-1 flex-col rounded-xl px-2 py-3 shadow-xl transition-[padding] duration-300 ease-out sm:px-4 sm:py-4"
@@ -928,9 +979,21 @@ export function ChartCanvas() {
                           tickFormatter={xTickFormatter}
                         />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                        <ChartTooltip
+                          cursor={false}
+                          labelFormatter={xTooltipLabelFormatter}
+                          content={<ChartTooltipContent indicator="line" />}
+                        />
                         {yKeys.map((yKey, idx) => (
-                          <Area key={yKey + idx} dataKey={yKey} type={lineStyle} fill={seriesColorAt(idx)} fillOpacity={0.4} stroke={seriesColorAt(idx)} stackId={"a"} />
+                          <Area
+                            key={yKey + idx}
+                            dataKey={yKey}
+                            type={lineStyle}
+                            fill={seriesColorFor(yKey, idx)}
+                            fillOpacity={0.4}
+                            stroke={seriesColorFor(yKey, idx)}
+                            stackId={"a"}
+                          />
                         ))}
                         {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
                       </AreaChart>
@@ -949,7 +1012,11 @@ export function ChartCanvas() {
                           tickFormatter={xTickFormatter}
                         />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} width={74} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                        <ChartTooltip
+                          cursor={false}
+                          labelFormatter={xTooltipLabelFormatter}
+                          content={<ChartTooltipContent indicator="line" />}
+                        />
                         {yKeys.map((yKey, idx) => (
                           <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorAt(idx)} radius={4} stackId={stackedBar ? "a" : idx}>
                             {(finalRenderedData || []).map((_, i) => (
@@ -988,9 +1055,20 @@ export function ChartCanvas() {
                           tickFormatter={xTickFormatter}
                         />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                        <ChartTooltip
+                          cursor={false}
+                          labelFormatter={xTooltipLabelFormatter}
+                          content={<ChartTooltipContent indicator="line" />}
+                        />
                         {yKeys.map((yKey, idx) => (
-                          <Line key={yKey + idx} dataKey={yKey} type={lineStyle} stroke={seriesColorAt(idx)} strokeWidth={2} dot={dots && finalRenderedData.length <= 40}>
+                          <Line
+                            key={yKey + idx}
+                            dataKey={yKey}
+                            type={lineStyle}
+                            stroke={seriesColorFor(yKey, idx)}
+                            strokeWidth={2}
+                            dot={dots && finalRenderedData.length <= 40}
+                          >
                             {labelLine && <LabelList position="top" offset={12} className="font-black" fontSize={12} />}
                           </Line>
                         ))}
