@@ -3,23 +3,23 @@
 import Link from "next/link";
 import { useState } from "react";
 import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon } from "@radix-ui/react-icons";
-import { MinusCircle, Moon } from "react-feather";
-import { IoPieChartOutline, IoShuffleOutline, IoStatsChart } from "react-icons/io5";
+import { MinusCircle } from "react-feather";
+import { IoPieChartOutline, IoStatsChart } from "react-icons/io5";
 import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin } from "react-icons/pi";
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, Lightbulb, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Toggle } from "@/components/ui/toggle";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectGroup,
@@ -38,11 +38,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
-import {
-  getShadcnChartPaletteArray,
-  getShadcnChartBaseSwatch950,
-  getShadcnSingleColors,
-} from "@/components/chartView/panels/shadcnChartPalettes";
+import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function ChartControls() {
@@ -56,9 +52,6 @@ export default function ChartControls() {
     chartDataOverrideMeta,
     setChartDataOverride,
     setChartDataOverrideMeta,
-
-    colorVisible,
-    setColorVisible,
 
     selChartType,
     setSelChartType,
@@ -126,11 +119,6 @@ export default function ChartControls() {
     selectedPalette,
     lineColorOverrides,
     setLineColorOverrides,
-    shufflePalette,
-    shadcnChartBases,
-    selectedShadBaseId,
-    selectedPaletteHandler,
-    handleToggleDark,
 
     lineStyle,
     setLineStyle,
@@ -155,16 +143,42 @@ export default function ChartControls() {
 
     titleHidden,
     setTitleHidden,
+    title,
     setTitle,
+    titleColor,
+    setTitleColor,
     subTitleHidden,
     setSubTitleHidden,
+    subTitle,
     setSubTitle,
+    subTitleColor,
+    setSubTitleColor,
     bodyHeadingHidden,
     setHeadingHidden,
+    bodyHeading,
     setBodyHeading,
+    bodyHeadingColor,
+    setBodyHeadingColor,
     bodyContentHidden,
     setBodyContentHidden,
+    bodyContent,
     setBodyContent,
+    bodyContentColor,
+    setBodyContentColor,
+    outerBoxColor,
+    setOuterBoxColor,
+    innerBoxColor,
+    setInnerBoxColor,
+    gridVisible,
+    setGridVisible,
+    gridLineColor,
+    setGridLineColor,
+    chartTextColor,
+    setChartTextColor,
+    xAxisTickColor,
+    setXAxisTickColor,
+    yAxisTickColor,
+    setYAxisTickColor,
   } = useChartBuilder();
 
   const chartTypeLabel =
@@ -221,11 +235,6 @@ export default function ChartControls() {
     }
     return false;
   });
-  const palettePreview =
-    selectedPalette && selectedPalette.length
-      ? selectedPalette
-      : getShadcnChartPaletteArray(selectedShadBaseId || "");
-  const singleColors = getShadcnSingleColors(600);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
   const defaultPalette = dark
     ? ["#ffffff", "#000000", "#000000", "#ffffff"]
@@ -609,36 +618,24 @@ export default function ChartControls() {
                                     </button>
                                   ) : null}
                                 </Badge>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border"
-                                      style={{ backgroundColor: getLineColor(lineColumn, index) }}
-                                      aria-label={`Pick color for Line ${index + 1}`}
-                                    />
-                                  </PopoverTrigger>
-                                  <PopoverContent align="start" className="w-56 p-2">
-                                    <div className="grid grid-cols-8 gap-1.5">
-                                      {singleColors.map(({ baseId, color }) => (
-                                        <button
-                                          key={`${lineColumn}-${baseId}`}
-                                          type="button"
-                                          className="h-5 w-5 rounded-full border border-border"
-                                          style={{ backgroundColor: color }}
-                                          onClick={() =>
-                                            setLineColorOverrides((prev) => ({
-                                              ...(prev || {}),
-                                              [lineColumn]: color,
-                                            }))
-                                          }
-                                          aria-label={`Use ${baseId} for ${lineColumn}`}
-                                          title={baseId}
-                                        />
-                                      ))}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
+                                <ChartColorPalettePopover
+                                  value={lineColorOverrides?.[lineColumn] ?? null}
+                                  swatchColor={getLineColor(lineColumn, index)}
+                                  onChange={(color) =>
+                                    setLineColorOverrides((prev) => ({
+                                      ...(prev || {}),
+                                      [lineColumn]: color,
+                                    }))
+                                  }
+                                  onClear={() =>
+                                    setLineColorOverrides((prev) => {
+                                      const next = { ...(prev || {}) };
+                                      delete next[lineColumn];
+                                      return next;
+                                    })
+                                  }
+                                  ariaLabel={`Pick color for line ${index + 1}`}
+                                />
                               </div>
                             ))}
                           </div>
@@ -904,8 +901,208 @@ export default function ChartControls() {
                 <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
                   Design
                 </AccordionTrigger>
-                {/* Remount when palette picker toggles so height re-measures */}
-                <AccordionContent key={colorVisible ? "palette-open" : "palette-closed"} className="pt-2">
+                <AccordionContent className="pt-2">
+                  <div className="flex min-w-0 items-center gap-2 border-b border-border/60 pb-3">
+                    <Label className="w-24 shrink-0 text-xs text-muted-foreground">Outer box</Label>
+                    <ChartColorPalettePopover
+                      value={outerBoxColor}
+                      onChange={setOuterBoxColor}
+                      ariaLabel="Outer box background"
+                      onClear={() => setOuterBoxColor(null)}
+                    />
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2 border-b border-border/60 pb-3">
+                    <Label className="w-24 shrink-0 text-xs text-muted-foreground">Inner box</Label>
+                    <ChartColorPalettePopover
+                      value={innerBoxColor}
+                      onChange={setInnerBoxColor}
+                      ariaLabel="Inner box background"
+                      onClear={() => setInnerBoxColor(null)}
+                    />
+                  </div>
+
+                  {(selChartType === "area" || selChartType === "line") && (
+                    <div className="min-w-0 border-b border-border/60 pb-3">
+                      <Label className="text-xs font-semibold text-muted-foreground">Line style</Label>
+                      <Select value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
+                        <SelectTrigger className="mt-1 h-8 min-w-0 text-xs">
+                          <SelectValue placeholder="Line style" />
+                        </SelectTrigger>
+                        <SelectContent className="text-xs">
+                          {["natural", "linear", "step"].map((i) => (
+                            <SelectItem key={i} value={i} className="text-xs">
+                              {i}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {(selChartType === "area" || selChartType === "line" || selChartType === "bar") && (
+                    <div className="space-y-2 border-b border-border/60 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-design-grid-visible"
+                          checked={gridVisible}
+                          onCheckedChange={setGridVisible}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-design-grid-visible" className="cursor-pointer text-xs text-muted-foreground">
+                          Show grid lines
+                        </Label>
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Label className="w-28 shrink-0 text-xs text-muted-foreground">Grid lines</Label>
+                        <ChartColorPalettePopover
+                          value={gridLineColor}
+                          onChange={setGridLineColor}
+                          ariaLabel="Grid line color"
+                          onClear={() => setGridLineColor(null)}
+                        />
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Label className="w-28 shrink-0 text-xs text-muted-foreground">Chart text</Label>
+                        <ChartColorPalettePopover
+                          value={chartTextColor}
+                          onChange={setChartTextColor}
+                          ariaLabel="Chart text color"
+                          onClear={() => setChartTextColor(null)}
+                        />
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Label className="w-28 shrink-0 text-xs text-muted-foreground">X-axis text</Label>
+                        <ChartColorPalettePopover
+                          value={xAxisTickColor}
+                          onChange={setXAxisTickColor}
+                          ariaLabel="X-axis tick color"
+                          onClear={() => setXAxisTickColor(null)}
+                        />
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Label className="w-28 shrink-0 text-xs text-muted-foreground">Y-axis text</Label>
+                        <ChartColorPalettePopover
+                          value={yAxisTickColor}
+                          onChange={setYAxisTickColor}
+                          ariaLabel="Y-axis tick color"
+                          onClear={() => setYAxisTickColor(null)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 pb-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Label htmlFor="chart-design-title" className="w-24 shrink-0 text-xs text-muted-foreground">
+                        Title
+                      </Label>
+                      <Input
+                        id="chart-design-title"
+                        type="text"
+                        value={title}
+                        placeholder="Give your chart a title"
+                        className="h-8 min-w-0 flex-1 text-xs"
+                        onChange={(e) => setTitle(e.target.value)}
+                      />
+                      <ChartColorPalettePopover
+                        value={titleColor}
+                        onChange={setTitleColor}
+                        ariaLabel="Title text color"
+                        onClear={() => setTitleColor(null)}
+                      />
+                      <button
+                        type="button"
+                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
+                        onClick={() => setTitleHidden(!titleHidden)}
+                        aria-label={titleHidden ? "Show title on chart" : "Hide title on chart"}
+                      >
+                        {!titleHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Label htmlFor="chart-design-desc" className="w-24 shrink-0 text-xs text-muted-foreground">
+                        Description
+                      </Label>
+                      <Input
+                        id="chart-design-desc"
+                        type="text"
+                        value={subTitle}
+                        placeholder="Description"
+                        className="h-8 min-w-0 flex-1 text-xs"
+                        onChange={(e) => setSubTitle(e.target.value)}
+                      />
+                      <ChartColorPalettePopover
+                        value={subTitleColor}
+                        onChange={setSubTitleColor}
+                        ariaLabel="Description text color"
+                        onClear={() => setSubTitleColor(null)}
+                      />
+                      <button
+                        type="button"
+                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
+                        onClick={() => setSubTitleHidden(!subTitleHidden)}
+                        aria-label={subTitleHidden ? "Show description on chart" : "Hide description on chart"}
+                      >
+                        {!subTitleHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Label htmlFor="chart-design-body-h" className="w-24 shrink-0 text-xs text-muted-foreground">
+                        Body heading
+                      </Label>
+                      <Input
+                        id="chart-design-body-h"
+                        type="text"
+                        value={bodyHeading}
+                        placeholder="Body heading"
+                        className="h-8 min-w-0 flex-1 text-xs"
+                        onChange={(e) => setBodyHeading(e.target.value)}
+                      />
+                      <ChartColorPalettePopover
+                        value={bodyHeadingColor}
+                        onChange={setBodyHeadingColor}
+                        ariaLabel="Body heading color"
+                        onClear={() => setBodyHeadingColor(null)}
+                      />
+                      <button
+                        type="button"
+                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
+                        onClick={() => setHeadingHidden(!bodyHeadingHidden)}
+                        aria-label={bodyHeadingHidden ? "Show body heading on chart" : "Hide body heading on chart"}
+                      >
+                        {!bodyHeadingHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <div className="flex min-w-0 items-start gap-2">
+                      <Label htmlFor="chart-design-content" className="w-24 shrink-0 pt-2 text-xs text-muted-foreground">
+                        Content
+                      </Label>
+                      <Textarea
+                        id="chart-design-content"
+                        value={bodyContent}
+                        placeholder="Content"
+                        className="min-h-[72px] min-w-0 flex-1 resize-y text-xs"
+                        onChange={(e) => setBodyContent(e.target.value)}
+                      />
+                      <div className="flex shrink-0 flex-col items-center gap-1 pt-1">
+                        <ChartColorPalettePopover
+                          value={bodyContentColor}
+                          onChange={setBodyContentColor}
+                          ariaLabel="Content text color"
+                          onClear={() => setBodyContentColor(null)}
+                        />
+                        <button
+                          type="button"
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
+                          onClick={() => setBodyContentHidden(!bodyContentHidden)}
+                          aria-label={bodyContentHidden ? "Show content on chart" : "Hide content on chart"}
+                        >
+                          {!bodyContentHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
               {/* Scatter/bubble: Z (bubble size) and Color column */}
               {selChartType === "scatter" && (
                 <>
@@ -1145,222 +1342,41 @@ export default function ChartControls() {
                   )}
                 </div>
               )}
-          <div className="py-2">
-            <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Palette</p>
-            <div className="flex gap-3 place-items-center">
-              <button
-                type="button"
-                className="flex text-xs rounded-md py-2 cursor-pointer"
-                onClick={() => {
-                  setOpenSection("design");
-                  setColorVisible(true);
-                }}
-              >
-                {palettePreview.map((color, idx) => (
-                  <div key={`${color}-${idx}`} className="p-3" style={{ backgroundColor: color }} />
-                ))}
-              </button>
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-md border border-border/60 hover:bg-muted/60 text-slate-600 dark:text-slate-300"
-                      aria-label="Rotate palette colors"
-                      onClick={() => shufflePalette()}
-                    >
-                      <IoShuffleOutline className="h-4 w-4" aria-hidden />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs max-w-[220px]">
-                    Rotate the palette array: each shade moves to the next slot. Frame tints use the light end; lines and
-                    bars use the dark end of the ramp.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <Toggle area-label="Toggle Expand" pressed={dark} onPressedChange={handleToggleDark}>
-                {dark ? <Lightbulb className="h-4 w-4 text-foreground" /> : <Moon className="h-4 w-4 text-foreground" />}
-              </Toggle>
-            </div>
-            <div>
-              {colorVisible && (
-                <div className="space-y-3">
-                  <div
-                    className="cursor-pointer bg-yellow-300/40 w-16 hover:bg-slate-300/40 text-xs pl-1 my-2"
-                    onClick={() => setColorVisible(false)}
-                  >
-                    close
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+                    {selChartType === "area" && (
+                      <Toggle area-label="Toggle Expand" pressed={expanded} onPressedChange={handleToggleChange}>
+                        <Expand className={`h-4 w-4 font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`} />
+                      </Toggle>
+                    )}
+                    <Toggle area-label="Toggle Legend" pressed={legendVisible} onPressedChange={handleToggleLegend}>
+                      <IdCardIcon className="h-4 w-4 text-foreground" />
+                    </Toggle>
+                    {selChartType === "bar" && (
+                      <>
+                        <Toggle area-label="Toggle Horizontal" pressed={horizontal} onPressedChange={handleToggleHorizontal}>
+                          <PiChartBarHorizontalLight className="h-4 w-4 text-foreground" />
+                        </Toggle>
+                        <Toggle area-label="Toggle Stack" pressed={stackedBar} onPressedChange={handleToggleStack}>
+                          <MdStackedBarChart className="h-4 w-4 text-foreground" />
+                        </Toggle>
+                      </>
+                    )}
+                    {selChartType === "line" && (
+                      <Toggle area-label="Toggle Dots" pressed={dots} onPressedChange={handleToggleDots}>
+                        <GoDotFill className="h-4 w-4 text-foreground" />
+                      </Toggle>
+                    )}
+                    {(selChartType === "line" || selChartType === "pie") && (
+                      <Toggle area-label="Toggle data labels" pressed={labelLine} onPressedChange={handleToggleLabelLine}>
+                        <Tag className="h-4 w-4 text-foreground" />
+                      </Toggle>
+                    )}
+                    {selChartType === "pie" && (
+                      <Toggle area-label="Toggle donut" pressed={donut} onPressedChange={handleToggleDonut}>
+                        <PiChartDonut className="h-4 w-4 text-foreground" />
+                      </Toggle>
+                    )}
                   </div>
-                  <p className={`text-[11px] ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
-                    Shadcn-style palettes: each option is the full Tailwind shade ramp (50–950) for that base. See{" "}
-                    <a
-                      href="https://ui.shadcn.com/colors#colors"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline underline-offset-2"
-                    >
-                      Tailwind colors (shadcn)
-                    </a>
-                    .
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {(shadcnChartBases || []).map((id) => {
-                      const active = selectedShadBaseId === id;
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs capitalize transition-colors ${
-                            active
-                              ? "border-primary bg-primary/10 text-foreground"
-                              : "border-border bg-background hover:bg-muted/60"
-                          }`}
-                          onClick={() => selectedPaletteHandler(id)}
-                        >
-                          <span
-                            className="inline-block h-3 w-3 shrink-0 rounded-sm border border-border/60"
-                            style={{ backgroundColor: getShadcnChartBaseSwatch950(id) }}
-                            aria-hidden
-                          />
-                          {id}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className={`text-xs font-medium ${dark ? "text-slate-200" : "text-muted-foreground"}`}>
-                        Shades in this palette
-                      </p>
-                      <TooltipProvider delayDuration={200}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background hover:bg-muted/60 text-slate-600 dark:text-slate-300"
-                              aria-label="Rotate palette colors"
-                              onClick={() => shufflePalette()}
-                            >
-                              <IoShuffleOutline className="h-4 w-4" aria-hidden />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="left" className="text-xs max-w-[220px]">
-                            Rotate palette: shift each shade forward. Outer frame uses the lightest stops; chart series
-                            stay mapped to the darker stops for contrast.
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <div className="flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/20 p-2">
-                      {(palettePreview || []).map((color, idx) => (
-                        <div
-                          key={`${color}-${idx}`}
-                          className="h-9 w-9 shrink-0 rounded-sm border border-border/40"
-                          style={{ backgroundColor: color }}
-                          title={color}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          {(selChartType === "area" || selChartType === "line") && (
-            <div className="min-w-0 py-2">
-              <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Line Style</p>
-              <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"} pt-2`}>How do you want your line</p>
-              <Select className="min-w-0" value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
-                <SelectTrigger className="min-w-0 text-foreground">
-                  <SelectValue placeholder="y axis" className="text-xs" />
-                </SelectTrigger>
-                <SelectContent className="text-xs">
-                  {["natural", "linear", "step"].map((i) => (
-                    <SelectItem key={i} value={i} className="text-xs">
-                      {i}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div className="py-2 flex gap-2">
-            {selChartType === "area" && (
-              <Toggle area-label="Toggle Expand" pressed={expanded} onPressedChange={handleToggleChange}>
-                <Expand className={`h-4 w-4 font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`} />
-              </Toggle>
-            )}
-            <Toggle area-label="Toggle Legend" pressed={legendVisible} onPressedChange={handleToggleLegend}>
-              <IdCardIcon className="h-4 w-4 text-foreground" />
-            </Toggle>
-            {selChartType === "bar" && (
-              <>
-                <Toggle area-label="Toggle Horizontal" pressed={horizontal} onPressedChange={handleToggleHorizontal}>
-                  <PiChartBarHorizontalLight className="h-4 w-4 text-foreground" />
-                </Toggle>
-                <Toggle area-label="Toggle Stack" pressed={stackedBar} onPressedChange={handleToggleStack}>
-                  <MdStackedBarChart className="h-4 w-4 text-foreground" />
-                </Toggle>
-              </>
-            )}
-            {selChartType === "line" && (
-              <>
-                <Toggle area-label="Toggle Dots" pressed={dots} onPressedChange={handleToggleDots}>
-                  <GoDotFill className="h-4 w-4 text-foreground" />
-                </Toggle>
-                <Toggle area-label="Toggle label line" pressed={labelLine} onPressedChange={handleToggleLabelLine}>
-                  <Tag className="h-4 w-4 text-foreground" />
-                </Toggle>
-              </>
-            )}
-            {(selChartType === "line" || selChartType === "pie") && (
-              <Toggle area-label="Toggle label line" pressed={labelLine} onPressedChange={handleToggleLabelLine}>
-                <Tag className="h-4 w-4 text-foreground" />
-              </Toggle>
-            )}
-            {selChartType === "pie" && (
-              <Toggle area-label="Toggle donut" pressed={donut} onPressedChange={handleToggleDonut}>
-                <PiChartDonut className="h-4 w-4 text-foreground" />
-              </Toggle>
-            )}
-          </div>
-          <div className="flex place-items-center gap-3 text-xs">
-            <Input id="title" type="text" placeholder="Give Your Chart a Title" className="text-xs" onChange={(e) => setTitle(e.target.value)} />
-            <div
-              className="flex h-6 w-6 cursor-pointer place-content-center place-items-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40 hover:text-foreground"
-              onClick={() => setTitleHidden(!titleHidden)}
-            >
-              {titleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}
-            </div>
-          </div>
-          <div className="flex gap-2 place-items-center py-1">
-            <Input id="subTitle" type="text" className="text-xs" placeholder="Add a Description" onChange={(e) => setSubTitle(e.target.value)} />
-            <div
-              className="flex h-6 w-6 cursor-pointer place-content-center place-items-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40 hover:text-foreground"
-              onClick={() => setSubTitleHidden(!subTitleHidden)}
-            >
-              {subTitleHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}
-            </div>
-          </div>
-          <div className="flex gap-2 place-items-center py-1">
-            <Input id="bodyHeading" type="text" className="text-xs" placeholder="Add a body Heading" onChange={(e) => setBodyHeading(e.target.value)} />
-            <div
-              className="flex h-6 w-6 cursor-pointer place-content-center place-items-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40 hover:text-foreground"
-              onClick={() => setHeadingHidden(!bodyHeadingHidden)}
-            >
-              {bodyHeadingHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}
-            </div>
-          </div>
-          <div className="flex gap-2 place-items-center pb-10">
-            <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Content</p>
-            <Input id="BodyContent" type="text" className="text-xs" placeholder="Add a Description" onChange={(e) => setBodyContent(e.target.value)} />
-            <div
-              className="flex h-6 w-6 cursor-pointer place-content-center place-items-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40 hover:text-foreground"
-              onClick={() => setBodyContentHidden(!bodyContentHidden)}
-            >
-              {bodyContentHidden ? <EyeOpenIcon className="w-3 h-3" /> : <EyeClosedIcon className="w-3 h-3" />}
-            </div>
-          </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

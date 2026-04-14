@@ -62,3 +62,17 @@ export function getShadcnChartBaseSwatch950(baseId) {
   const row = shadcnChartPalettesJson[baseId];
   return row?.["950"] || "#737373";
 }
+
+/**
+ * All Tailwind shade stops per base (for full-spectrum color pickers).
+ * @returns {{ baseId: string, shades: { shade: number, color: string }[] }[]}
+ */
+export function getGroupedShadcnPaletteSwatches() {
+  return SHADCN_CHART_BASE_ORDER.map((baseId) => ({
+    baseId,
+    shades: SHADCN_CHART_SHADE_KEYS.map((shade) => {
+      const color = shadcnChartPalettesJson?.[baseId]?.[String(shade)];
+      return color ? { shade, color } : null;
+    }).filter(Boolean),
+  })).filter((g) => g.shades.length > 0);
+}

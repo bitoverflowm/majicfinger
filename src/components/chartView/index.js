@@ -304,7 +304,6 @@ export function ChartBuilderProvider({ demo, children }) {
 
   const [selectedShadBaseId, setSelectedShadBaseId] = useState(SHADCN_CHART_BASE_ORDER[0]);
   const [selectedPalette, setSelectedPalette] = useState([]);
-  const [colorVisible, setColorVisible] = useState(false);
 
   /** Explicit per-line series colors (decoupled from the global palette ramp). Keyed by Y column name. */
   const [lineColorOverrides, setLineColorOverrides] = useState({});
@@ -326,6 +325,19 @@ export function ChartBuilderProvider({ demo, children }) {
   const [bodyHeading, setBodyHeading] = useState('Closing 30X More Deals');
   const [bodyContentHidden, setBodyContentHidden] = useState(true);
   const [bodyContent, setBodyContent] = useState('...');
+
+  const [titleColor, setTitleColor] = useState(null);
+  const [subTitleColor, setSubTitleColor] = useState(null);
+  const [bodyHeadingColor, setBodyHeadingColor] = useState(null);
+  const [bodyContentColor, setBodyContentColor] = useState(null);
+  const [outerBoxColor, setOuterBoxColor] = useState(null);
+  const [innerBoxColor, setInnerBoxColor] = useState(null);
+
+  const [gridVisible, setGridVisible] = useState(true);
+  const [gridLineColor, setGridLineColor] = useState(null);
+  const [chartTextColor, setChartTextColor] = useState(null);
+  const [xAxisTickColor, setXAxisTickColor] = useState(null);
+  const [yAxisTickColor, setYAxisTickColor] = useState(null);
 
   const [chartConfig, setChartConfig] = useState({});
   const [lineSeriesColumn, setLineSeriesColumn] = useState(null);
@@ -667,9 +679,6 @@ export function ChartBuilderProvider({ demo, children }) {
     dark,
     downloadChart,
 
-    colorVisible,
-    setColorVisible,
-
     selChartType,
     setSelChartType,
     selX,
@@ -740,6 +749,28 @@ export function ChartBuilderProvider({ demo, children }) {
     selectedShadBaseId,
     setSelectedShadBaseId,
     selectedPaletteHandler,
+    titleColor,
+    setTitleColor,
+    subTitleColor,
+    setSubTitleColor,
+    bodyHeadingColor,
+    setBodyHeadingColor,
+    bodyContentColor,
+    setBodyContentColor,
+    outerBoxColor,
+    setOuterBoxColor,
+    innerBoxColor,
+    setInnerBoxColor,
+    gridVisible,
+    setGridVisible,
+    gridLineColor,
+    setGridLineColor,
+    chartTextColor,
+    setChartTextColor,
+    xAxisTickColor,
+    setXAxisTickColor,
+    yAxisTickColor,
+    setYAxisTickColor,
     lineColorOverrides,
     setLineColorOverrides,
     handleToggleDark,
@@ -767,15 +798,19 @@ export function ChartBuilderProvider({ demo, children }) {
 
     titleHidden,
     setTitleHidden,
+    title,
     setTitle,
     subTitleHidden,
     setSubTitleHidden,
+    subTitle,
     setSubTitle,
     bodyHeadingHidden,
     setHeadingHidden,
+    bodyHeading,
     setBodyHeading,
     bodyContentHidden,
     setBodyContentHidden,
+    bodyContent,
     setBodyContent,
 
     livelineData,
@@ -786,11 +821,6 @@ export function ChartBuilderProvider({ demo, children }) {
     wsStart,
     wsRunning,
     showWsFeedControl,
-
-    bodyHeading,
-    bodyContent,
-    title,
-    subTitle,
 
     selColor: 'hsl(142 88% 28%)',
     BUBBLE_RADIUS_RANGE: [50, 400],
@@ -831,8 +861,10 @@ export function ChartCanvas() {
     lineColorOverrides,
     titleHidden,
     title,
+    titleColor,
     subTitleHidden,
     subTitle,
+    subTitleColor,
     livelineData,
     livelineColorChoice,
     livelineMomentum,
@@ -859,8 +891,19 @@ export function ChartCanvas() {
     dots,
     labelLine,
     donut,
+    bodyHeadingHidden,
     bodyHeading,
+    bodyHeadingColor,
+    bodyContentHidden,
     bodyContent,
+    bodyContentColor,
+    outerBoxColor,
+    innerBoxColor,
+    gridVisible,
+    gridLineColor,
+    chartTextColor,
+    xAxisTickColor,
+    yAxisTickColor,
     lineIsTemporalX,
     lineChartData,
     formatXAxisValue,
@@ -1062,6 +1105,11 @@ export function ChartCanvas() {
     return String(formatXAxisValue(label, true, true, xTickIntlOptions));
   };
 
+  const tickFillX = xAxisTickColor || (dark ? "#94a3b8" : "#64748b");
+  const tickFillY = yAxisTickColor || (dark ? "#94a3b8" : "#64748b");
+  const gridStroke = gridLineColor || (dark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
+  const labelListFill = chartTextColor || (dark ? "#e2e8f0" : "#0f172a");
+
   return (
     <div className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-out">
       {showWsFeedControl && (
@@ -1082,24 +1130,32 @@ export function ChartCanvas() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col px-2 py-4 sm:px-4 sm:py-6 lg:px-8">
+      <div className="flex min-h-0 flex-1 flex-col px-1 py-3 sm:px-2 sm:py-4 lg:px-3">
         <div
-          className="relative flex min-h-0 flex-1 flex-col rounded-xl p-3 transition-[padding] duration-300 ease-out sm:p-5"
+          className="relative flex min-h-0 w-full max-w-[min(100%,96rem)] flex-1 flex-col rounded-xl p-2 transition-[padding] duration-300 ease-out sm:p-3"
           ref={chartRef}
         >
           <div
-            className="flex min-h-0 flex-1 flex-col rounded-xl px-2 py-3 shadow-xl transition-[padding] duration-300 ease-out sm:px-4 sm:py-4"
-            style={{ backgroundColor: activePalette?.[1] || (dark ? "#000000" : "#ffffff") }}
+            className="flex min-h-0 flex-1 flex-col rounded-xl px-1.5 py-2 shadow-xl transition-[padding] duration-300 ease-out sm:px-3 sm:py-3"
+            style={{
+              backgroundColor: outerBoxColor || activePalette?.[1] || (dark ? "#000000" : "#ffffff"),
+            }}
           >
             <Card
               className="flex min-h-0 flex-1 flex-col gap-0 border-0 py-4"
-              style={{ backgroundColor: activePalette?.[2] || (dark ? "#000000" : "#ffffff") }}
+              style={{
+                backgroundColor: innerBoxColor || activePalette?.[2] || (dark ? "#000000" : "#ffffff"),
+              }}
             >
-              <CardHeader className="shrink-0 pb-2">
-                {titleHidden && <CardTitle>{title}</CardTitle>}
-                {subTitleHidden && <CardDescription>{subTitle}</CardDescription>}
-              </CardHeader>
-              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-2 pt-0">
+              {!titleHidden || !subTitleHidden ? (
+                <CardHeader className="shrink-0 pb-2">
+                  {!titleHidden ? <CardTitle style={{ color: titleColor || undefined }}>{title}</CardTitle> : null}
+                  {!subTitleHidden ? (
+                    <CardDescription style={{ color: subTitleColor || undefined }}>{subTitle}</CardDescription>
+                  ) : null}
+                </CardHeader>
+              ) : null}
+              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-2 pt-0 sm:px-4">
                 {!axesConfigured ? (
                   <div className="flex min-h-[200px] w-full flex-1 flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
                     Select an X axis and at least one Y column under Data to plot your sheet.
@@ -1133,12 +1189,13 @@ export function ChartCanvas() {
                     className={cn(
                       // Fill the card; override default `aspect-video` from ChartContainer so height follows the flex layout.
                       "flex flex-col aspect-auto h-full min-h-[200px] w-full max-w-full flex-1 transition-[min-height] duration-300 ease-out md:min-h-[240px]",
-                      dark && "text-slate-200",
+                      dark && !chartTextColor && "text-slate-200",
                     )}
+                    style={chartTextColor ? { color: chartTextColor } : undefined}
                   >
                     {selChartType === "area" && (
                       <AreaChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }} stackOffset={expanded ? "expand" : false}>
-                        <CartesianGrid vertical={false} />
+                        {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
                           dataKey={xKey}
@@ -1148,8 +1205,9 @@ export function ChartCanvas() {
                           axisLine={false}
                           tickMargin={8}
                           tickFormatter={xTickFormatter}
+                          tick={{ fill: tickFillX }}
                         />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} tick={{ fill: tickFillY }} />
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
@@ -1172,7 +1230,7 @@ export function ChartCanvas() {
 
                     {selChartType === "bar" && (
                       <BarChart accessibilityLayer data={finalRenderedData} margin={{ left: 24, right: 18 }}>
-                        <CartesianGrid vertical={false} />
+                        {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
                           dataKey={xKey}
@@ -1182,8 +1240,9 @@ export function ChartCanvas() {
                           axisLine={false}
                           tickMargin={8}
                           tickFormatter={xTickFormatter}
+                          tick={{ fill: tickFillX }}
                         />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={74} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={74} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} tick={{ fill: tickFillY }} />
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
@@ -1216,7 +1275,7 @@ export function ChartCanvas() {
 
                     {selChartType === "line" && (
                       <LineChart accessibilityLayer data={finalRenderedData} margin={{ left: 20, right: 16, top: 0, bottom: 0 }}>
-                        <CartesianGrid vertical={false} />
+                        {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
                           dataKey={xKey}
@@ -1226,8 +1285,9 @@ export function ChartCanvas() {
                           axisLine={false}
                           tickMargin={8}
                           tickFormatter={xTickFormatter}
+                          tick={{ fill: tickFillX }}
                         />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={72} tickFormatter={yAxisFormatter} scale={scaleY === "log" ? "log" : "auto"} domain={scaleY === "log" ? ["auto", "auto"] : undefined} tick={{ fill: tickFillY }} />
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
@@ -1242,7 +1302,9 @@ export function ChartCanvas() {
                             strokeWidth={2}
                             dot={dots && finalRenderedData.length <= 40}
                           >
-                            {labelLine && <LabelList position="top" offset={12} className="font-black" fontSize={12} />}
+                            {labelLine && (
+                              <LabelList position="top" offset={12} className="font-black" fontSize={12} fill={labelListFill} />
+                            )}
                           </Line>
                         ))}
                         {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
@@ -1259,14 +1321,30 @@ export function ChartCanvas() {
                   </ChartContainer>
                 )}
               </CardContent>
-              <CardFooter className="shrink-0">
-                <div className="flex w-full items-start gap-2 text-sm">
-                  <div className="grid gap-2">
-                    <div className="flex items-center gap-2 font-medium leading-none">{bodyHeading}</div>
-                    <div className={`flex items-center gap-2 leading-none ${dark ? "text-slate-300" : "text-muted-foreground"}`}>{bodyContent}</div>
+              {!bodyHeadingHidden || !bodyContentHidden ? (
+                <CardFooter className="shrink-0">
+                  <div className="flex w-full items-start gap-2 text-sm">
+                    <div className="grid gap-2">
+                      {!bodyHeadingHidden ? (
+                        <div
+                          className="flex items-center gap-2 font-medium leading-none"
+                          style={{ color: bodyHeadingColor || undefined }}
+                        >
+                          {bodyHeading}
+                        </div>
+                      ) : null}
+                      {!bodyContentHidden ? (
+                        <div
+                          className={`flex items-center gap-2 leading-none ${!bodyContentColor && (dark ? "text-slate-300" : "text-muted-foreground")}`}
+                          style={{ color: bodyContentColor || undefined }}
+                        >
+                          {bodyContent}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              </CardFooter>
+                </CardFooter>
+              ) : null}
             </Card>
           </div>
         </div>
@@ -1274,6 +1352,8 @@ export function ChartCanvas() {
     </div>
   );
 }
+
+export { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 
 export default function ChartView({ demo }) {
   return (
