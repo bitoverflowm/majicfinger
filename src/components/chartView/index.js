@@ -56,6 +56,11 @@ export const dfltChartConfig = {
   other: { label: 'Other', color: 'hsl(142 88% 28%)' },
 };
 
+/** Stable ChartContainer `id` → `data-chart="chart-…"` for scoped rules below. */
+const CHART_BUILDER_DOM_ID = "mf-chart-builder";
+/** Tooltip / legend root class targeted when `chartTextColor` is set (Tailwind tooltip spans otherwise win). */
+const CHART_CHROME_TEXT_CLASS = "mf-chart-chrome-text";
+
 /** Select sentinel: no X axis chosen yet (must not match a real column name). */
 export const CHART_X_AXIS_NONE = "__chart_x_axis_none__";
 
@@ -1110,6 +1115,21 @@ export function ChartCanvas() {
   const gridStroke = gridLineColor || (dark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
   const labelListFill = chartTextColor || (dark ? "#e2e8f0" : "#0f172a");
 
+  const chartBuilderRechartsChromeCss = useMemo(() => {
+    const sel = `[data-chart="chart-${CHART_BUILDER_DOM_ID}"]`;
+    const axisRules = [
+      `${sel} .recharts-xAxis .recharts-cartesian-axis-tick-value{fill:${tickFillX}!important;}`,
+      `${sel} .recharts-xAxis .recharts-cartesian-axis-tick-value tspan{fill:${tickFillX}!important;}`,
+      `${sel} .recharts-yAxis .recharts-cartesian-axis-tick-value{fill:${tickFillY}!important;}`,
+      `${sel} .recharts-yAxis .recharts-cartesian-axis-tick-value tspan{fill:${tickFillY}!important;}`,
+    ];
+    if (!chartTextColor) return axisRules.join("");
+    return (
+      axisRules.join("") +
+      `${sel} .${CHART_CHROME_TEXT_CLASS},${sel} .${CHART_CHROME_TEXT_CLASS} span,${sel} .${CHART_CHROME_TEXT_CLASS} div{color:${chartTextColor}!important;}`
+    );
+  }, [tickFillX, tickFillY, chartTextColor]);
+
   return (
     <div className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-out">
       {showWsFeedControl && (
@@ -1184,7 +1204,10 @@ export function ChartCanvas() {
                     )}
                   </div>
                 ) : (
-                  <ChartContainer
+                  <>
+                    <style dangerouslySetInnerHTML={{ __html: chartBuilderRechartsChromeCss }} />
+                    <ChartContainer
+                    id={CHART_BUILDER_DOM_ID}
                     config={chartConfig || dfltChartConfig}
                     className={cn(
                       // Fill the card; override default `aspect-video` from ChartContainer so height follows the flex layout.
@@ -1211,7 +1234,7 @@ export function ChartCanvas() {
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
-                          content={<ChartTooltipContent indicator="line" />}
+                          content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />}
                         />
                         {yKeys.map((yKey, idx) => (
                           <Area
@@ -1224,7 +1247,7 @@ export function ChartCanvas() {
                             stackId={"a"}
                           />
                         ))}
-                        {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
+                        {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}
                       </AreaChart>
                     )}
 
@@ -1246,7 +1269,7 @@ export function ChartCanvas() {
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
-                          content={<ChartTooltipContent indicator="line" />}
+                          content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />}
                         />
                         {yKeys.map((yKey, idx) => (
                           <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorAt(idx)} radius={4} stackId={stackedBar ? "a" : idx}>
@@ -1255,7 +1278,7 @@ export function ChartCanvas() {
                             ))}
                           </Bar>
                         ))}
-                        {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
+                        {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}
                       </BarChart>
                     )}
 
@@ -1269,7 +1292,7 @@ export function ChartCanvas() {
                         isAnimationActive={finalRenderedData.length < 100}
                         content={(nodeProps) => <TreemapCategoryRect {...nodeProps} leafColors={treemapLeafFills ?? undefined} />}
                       >
-                        <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+                        <ChartTooltip content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />} />
                       </Treemap>
                     )}
 
@@ -1291,7 +1314,7 @@ export function ChartCanvas() {
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
-                          content={<ChartTooltipContent indicator="line" />}
+                          content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />}
                         />
                         {yKeys.map((yKey, idx) => (
                           <Line
@@ -1307,18 +1330,19 @@ export function ChartCanvas() {
                             )}
                           </Line>
                         ))}
-                        {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
+                        {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}
                       </LineChart>
                     )}
 
                     {selChartType === "pie" && (
                       <PieChart accessibilityLayer>
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />} />
                         <Pie data={rawData} dataKey={yKeys[0]} nameKey={xKey} innerRadius={donut ? 120 : 0} strokeWidth={donut ? 5 : 1} />
-                        {legendVisible && <ChartLegend content={<ChartLegendContent />} />}
+                        {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}
                       </PieChart>
                     )}
                   </ChartContainer>
+                  </>
                 )}
               </CardContent>
               {!bodyHeadingHidden || !bodyContentHidden ? (
