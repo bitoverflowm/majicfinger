@@ -249,6 +249,44 @@ export default function ChartControls() {
   };
   const getLineColor = (lineColumn, index) => lineColorOverrides?.[lineColumn] || defaultSeriesColorAt(index);
 
+  const showYAxisFormat =
+    selY?.[0] && chartData?.length && getAxisType(selY[0], dataTypes, chartData) === "number";
+  const yAxisFormatControls = showYAxisFormat ? (
+    <div className="py-2 space-y-2">
+      <div className="space-y-2">
+        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Y-axis format</p>
+        <div className="grid grid-cols-2 gap-2">
+          <Select
+            value={String(yAxisDivisor || 1)}
+            onValueChange={(v) => setYAxisDivisor(Number(v) || 1)}
+          >
+            <SelectTrigger className="h-8 min-w-0 text-xs">
+              <SelectValue placeholder="Divide by" />
+            </SelectTrigger>
+            <SelectContent className="text-xs">
+              <SelectItem value="1">No divisor (x1)</SelectItem>
+              <SelectItem value="1000">/ 1,000</SelectItem>
+              <SelectItem value="1000000">/ 1,000,000</SelectItem>
+              <SelectItem value="1000000000">/ 1,000,000,000</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={yAxisCompact ? "compact" : "full"}
+            onValueChange={(v) => setYAxisCompact(v === "compact")}
+          >
+            <SelectTrigger className="h-8 min-w-0 text-xs">
+              <SelectValue placeholder="Label style" />
+            </SelectTrigger>
+            <SelectContent className="text-xs">
+              <SelectItem value="compact">Compact (5m, 1.5b)</SelectItem>
+              <SelectItem value="full">Full numbers</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="gradualEffect flex flex-col min-w-0 max-w-full w-full overflow-x-hidden px-4 py-4 border rounded-lg" style={{ zIndex: 20 }}>
       <>
@@ -649,6 +687,7 @@ export default function ChartControls() {
                             </p>
                           )}
                         </div>
+                        {yAxisFormatControls}
                       </div>
                     </>
                   ) : (selChartType === "area") ? (
@@ -713,6 +752,7 @@ export default function ChartControls() {
                           </div>
                         )}
                       </div>
+                      {yAxisFormatControls}
                     </>
                   ) : (
                     <>
@@ -776,6 +816,7 @@ export default function ChartControls() {
                           </div>
                         )}
                       </div>
+                      {yAxisFormatControls}
                     </>
                   )}
 
@@ -1104,41 +1145,6 @@ export default function ChartControls() {
                   )}
                 </div>
               )}
-              {selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === "number" ? (
-                <div className="py-2 space-y-2">
-                  <div className="space-y-2">
-                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Y-axis format</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select
-                        value={String(yAxisDivisor || 1)}
-                        onValueChange={(v) => setYAxisDivisor(Number(v) || 1)}
-                      >
-                        <SelectTrigger className="h-8 min-w-0 text-xs">
-                          <SelectValue placeholder="Divide by" />
-                        </SelectTrigger>
-                        <SelectContent className="text-xs">
-                          <SelectItem value="1">No divisor (x1)</SelectItem>
-                          <SelectItem value="1000">/ 1,000</SelectItem>
-                          <SelectItem value="1000000">/ 1,000,000</SelectItem>
-                          <SelectItem value="1000000000">/ 1,000,000,000</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={yAxisCompact ? "compact" : "full"}
-                        onValueChange={(v) => setYAxisCompact(v === "compact")}
-                      >
-                        <SelectTrigger className="h-8 min-w-0 text-xs">
-                          <SelectValue placeholder="Label style" />
-                        </SelectTrigger>
-                        <SelectContent className="text-xs">
-                          <SelectItem value="compact">Compact (5m, 1.5b)</SelectItem>
-                          <SelectItem value="full">Full numbers</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
           <div className="py-2">
             <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Palette</p>
             <div className="flex gap-3 place-items-center">
