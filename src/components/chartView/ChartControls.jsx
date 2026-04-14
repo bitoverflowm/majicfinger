@@ -114,10 +114,6 @@ export default function ChartControls() {
     setSortXDir,
     sortYDir,
     setSortYDir,
-    scaleX,
-    setScaleX,
-    scaleY,
-    setScaleY,
     yAxisDivisor,
     setYAxisDivisor,
     yAxisCompact,
@@ -493,7 +489,7 @@ export default function ChartControls() {
                           />
                           <Label
                             htmlFor="chart-line-time-series-x-axis"
-                            className={`cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"}`}
+                            className={`pr-1 cursor-pointer text-xs font-normal text-muted-foreground`}
                           >
                             Set x-axis to timeseries format
                           </Label>
@@ -1101,84 +1097,39 @@ export default function ChartControls() {
                   )}
                 </div>
               )}
-              {(selX && chartData && chartData.length && getAxisType(selX, dataTypes, chartData) === "number") ||
-              (selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === "number") ? (
+              {selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === "number" ? (
                 <div className="py-2 space-y-2">
-                  <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Axis scale</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selX && chartData && chartData.length && getAxisType(selX, dataTypes, chartData) === "number" && (
-                      <TooltipProvider delayDuration={300}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className={`p-1.5 rounded border ${scaleX === "log" ? "bg-muted" : "bg-background"} border-border`}
-                              onClick={() => setScaleX((s) => (s === "log" ? "linear" : "log"))}
-                            >
-                              <LogIn className="h-4 w-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="text-xs max-w-[200px]">
-                            {scaleX === "linear"
-                              ? "Linear scale: values map proportionally (equal spacing per unit)."
-                              : "Log scale: for values spanning orders of magnitude (e.g. 1 → 1000)."}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    {selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === "number" && (
-                      <TooltipProvider delayDuration={300}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className={`p-1.5 rounded border ${scaleY === "log" ? "bg-muted" : "bg-background"} border-border flex items-center gap-1`}
-                              onClick={() => setScaleY((s) => (s === "log" ? "linear" : "log"))}
-                            >
-                              <LogIn className="h-4 w-4" />
-                              <span className="text-[10px]">Y</span>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="text-xs max-w-[200px]">
-                            {scaleY === "linear" ? "Y: Linear scale." : "Y: Log scale (for large ranges)."}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
-                  {selY && selY[0] && chartData && chartData.length && getAxisType(selY[0], dataTypes, chartData) === "number" && (
-                    <div className="space-y-2">
-                      <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Y-axis format</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Select
-                          value={String(yAxisDivisor || 1)}
-                          onValueChange={(v) => setYAxisDivisor(Number(v) || 1)}
-                        >
-                          <SelectTrigger className="h-8 min-w-0 text-xs">
-                            <SelectValue placeholder="Divide by" />
-                          </SelectTrigger>
-                          <SelectContent className="text-xs">
-                            <SelectItem value="1">No divisor (x1)</SelectItem>
-                            <SelectItem value="1000">/ 1,000</SelectItem>
-                            <SelectItem value="1000000">/ 1,000,000</SelectItem>
-                            <SelectItem value="1000000000">/ 1,000,000,000</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select
-                          value={yAxisCompact ? "compact" : "full"}
-                          onValueChange={(v) => setYAxisCompact(v === "compact")}
-                        >
-                          <SelectTrigger className="h-8 min-w-0 text-xs">
-                            <SelectValue placeholder="Label style" />
-                          </SelectTrigger>
-                          <SelectContent className="text-xs">
-                            <SelectItem value="compact">Compact (5m, 1.5b)</SelectItem>
-                            <SelectItem value="full">Full numbers</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  <div className="space-y-2">
+                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Y-axis format</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        value={String(yAxisDivisor || 1)}
+                        onValueChange={(v) => setYAxisDivisor(Number(v) || 1)}
+                      >
+                        <SelectTrigger className="h-8 min-w-0 text-xs">
+                          <SelectValue placeholder="Divide by" />
+                        </SelectTrigger>
+                        <SelectContent className="text-xs">
+                          <SelectItem value="1">No divisor (x1)</SelectItem>
+                          <SelectItem value="1000">/ 1,000</SelectItem>
+                          <SelectItem value="1000000">/ 1,000,000</SelectItem>
+                          <SelectItem value="1000000000">/ 1,000,000,000</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={yAxisCompact ? "compact" : "full"}
+                        onValueChange={(v) => setYAxisCompact(v === "compact")}
+                      >
+                        <SelectTrigger className="h-8 min-w-0 text-xs">
+                          <SelectValue placeholder="Label style" />
+                        </SelectTrigger>
+                        <SelectContent className="text-xs">
+                          <SelectItem value="compact">Compact (5m, 1.5b)</SelectItem>
+                          <SelectItem value="full">Full numbers</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
+                  </div>
                 </div>
               ) : null}
           <div className="py-2">
