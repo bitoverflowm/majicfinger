@@ -1,5 +1,3 @@
-import fs from "fs/promises";
-import path from "path";
 import dbConnect from "@/lib/dbConnect";
 import Chart from "@/models/Charts";
 import { getLoginSession } from "@/lib/auth";
@@ -16,7 +14,7 @@ function parsePngDataUrl(input) {
   if (typeof input !== "string") return null;
   const m = input.match(/^data:image\/png;base64,([A-Za-z0-9+/=\n\r]+)$/);
   if (!m) return null;
-  return Buffer.from(m[1], "base64");
+  return { dataUrl: `data:image/png;base64,${m[1]}`, bytes: Buffer.from(m[1], "base64").length };
 }
 
 export default async function handler(req, res) {
@@ -42,26 +40,20 @@ export default async function handler(req, res) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const imageBuffer = parsePngDataUrl(req.body?.imageDataUrl);
-    if (!imageBuffer || imageBuffer.length === 0) {
+    const parsed = parsePngDataUrl(req.body?.imageDataUrl);
+    if (!parsed || parsed.bytes === 0) {
       return res.status(400).json({ success: false, message: "Invalid PNG data URL" });
     }
+    if (parsed.bytes > 5 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: "Image exceeds 5MB limit" });
+    }
 
-    const relDir = path.join("og", "charts");
-    const absDir = path.join(process.cwd(), "public", relDir);
-    await fs.mkdir(absDir, { recursive: true });
-
-    const ts = Date.now();
-    const fileName = `${id}-${ts}.png`;
-    const absFile = path.join(absDir, fileName);
-    await fs.writeFile(absFile, imageBuffer);
-
-    const imagePath = `/${relDir}/${fileName}`;
-    chart.og_image_url = imagePath;
+    // Serverless-safe: store image payload in DB and serve through a public API route.
+    chart.og_image_data = parsed.dataUrl;
     chart.og_image_updated_at = new Date();
     await chart.save();
 
-    return res.status(200).json({ success: true, data: { og_image_url: imagePath } });
+    return res.status(200).json({ success: true, data: { stored: true } });
   } catch (error) {
     return res.status(500).json({ success: false, message: error?.message || "Upload failed" });
   }

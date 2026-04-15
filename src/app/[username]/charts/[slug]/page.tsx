@@ -17,9 +17,12 @@ export async function generateMetadata({
     : `Interactive chart by @${username} on Lychee Data.`;
   const path = `/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`;
   const canonical = `${SITE}${path}`;
-  const ogImage = meta?.og_image_url
-    ? `${SITE}${meta.og_image_url.startsWith("/") ? meta.og_image_url : `/${meta.og_image_url}`}`
-    : `${SITE}/ogImage2.png`;
+  const dynamicOgImagePath = `/api/public/charts/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/og-image`;
+  const ogImage = meta?.has_og_image_data
+    ? `${SITE}${dynamicOgImagePath}`
+    : meta?.og_image_url
+      ? `${SITE}${meta.og_image_url.startsWith("/") ? meta.og_image_url : `/${meta.og_image_url}`}`
+      : `${SITE}/ogImage2.png`;
   return {
     title,
     description,
@@ -72,9 +75,12 @@ export default async function PublicChartPage({
   const description = meta?.chart_name
     ? `Interactive chart "${meta.chart_name}" by @${username} on Lychee.`
     : `Interactive chart by @${username} on Lychee Data.`;
-  const ogImage = meta?.og_image_url
-    ? `${SITE}${meta.og_image_url.startsWith("/") ? meta.og_image_url : `/${meta.og_image_url}`}`
-    : `${SITE}/ogImage2.png`;
+  const dynamicOgImagePath = `/api/public/charts/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/og-image`;
+  const ogImage = meta?.has_og_image_data
+    ? `${SITE}${dynamicOgImagePath}`
+    : meta?.og_image_url
+      ? `${SITE}${meta.og_image_url.startsWith("/") ? meta.og_image_url : `/${meta.og_image_url}`}`
+      : `${SITE}/ogImage2.png`;
   const chartJsonLd = {
     "@context": "https://schema.org",
     "@type": "Dataset",

@@ -47,6 +47,10 @@ const ChartSchema = new mongoose.Schema({
     og_image_url: {
         type: String,
     },
+    // Stored as data URL for serverless-safe OG snapshots (Vercel filesystem is ephemeral).
+    og_image_data: {
+        type: String,
+    },
     og_image_updated_at: {
         type: Date,
     },
