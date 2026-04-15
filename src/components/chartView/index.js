@@ -492,10 +492,21 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const cols = effectiveCols?.map((c) => c.field) || [];
     if (!cols.length) return;
     const colSet = new Set(cols);
-    setSelX((x) => (x && !colSet.has(x) ? undefined : x));
+    const deScope = (value) => {
+      const raw = String(value || "");
+      const idx = raw.indexOf("::");
+      return idx > -1 ? raw.slice(idx + 2) : raw;
+    };
+    const hasColumn = (value) => {
+      if (!value) return false;
+      if (colSet.has(value)) return true;
+      const plain = deScope(value);
+      return !!plain && colSet.has(plain);
+    };
+    setSelX((x) => (x && !hasColumn(x) ? undefined : x));
     setSelY((prev) => {
       const curr = Array.isArray(prev) ? prev : [];
-      const next = curr.filter((y) => colSet.has(y));
+      const next = curr.filter((y) => hasColumn(y));
       return next.length === curr.length && next.every((v, i) => v === curr[i]) ? curr : next;
     });
   }, [demo, effectiveData, effectiveCols]);
