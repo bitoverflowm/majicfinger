@@ -179,7 +179,7 @@ export default function PublicChartEmbedClient({
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
         className={`mx-auto flex w-full max-w-[1200px] flex-col ${
-          isEmbedded ? "min-h-0 gap-1 px-3 py-2 md:px-4 md:py-3" : "min-h-screen gap-3 px-4 py-5 md:px-6 md:py-6"
+          isEmbedded ? "min-h-screen gap-1 px-2 py-2 md:px-3 md:py-3" : "min-h-screen gap-3 px-4 py-5 md:px-6 md:py-6"
         }`}
         style={{
           backgroundColor: (cp0.bgColor as string) || undefined,
@@ -187,13 +187,13 @@ export default function PublicChartEmbedClient({
         }}
       >
         <DataLoader rows={rows} />
-        <div className={`flex ${isEmbedded ? "mt-0 items-center justify-center" : "mt-2 flex-1 items-center justify-center"}`}>
+        <div className={`mt-0 flex flex-1 items-center justify-center ${isEmbedded ? "" : "md:mt-2"}`}>
           <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
-            <div className="flex h-full min-h-0 w-full items-center justify-center">
+            <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center">
               <div className={`w-full ${isEmbedded ? "max-w-[980px]" : "max-w-[1040px]"}`}>
                 <div
                   className={`flex w-full min-w-0 flex-col ${
-                    isEmbedded ? "h-[400px] min-h-[360px] md:h-[460px]" : "h-[420px] min-h-[320px] md:h-[750px]"
+                    isEmbedded ? "h-[calc(100dvh-96px)] min-h-[420px]" : "h-[420px] min-h-[320px] md:h-[750px]"
                   }`}
                 >
                   <ChartCanvas />

@@ -11,7 +11,7 @@ type PublicChartProps = {
  * MDX: embed a published interactive chart with a visible dofollow-style link for SEO.
  * Usage in MDX: `<PublicChart username="MrPink" slug="my-chart" />`
  */
-export function PublicChart({ username, slug, height = 500 }: PublicChartProps) {
+export function PublicChart({ username, slug, height = 620 }: PublicChartProps) {
   const path = `/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`;
   const src = IS_DEV ? path : `${SITE.replace(/\/$/, "")}${path}`;
   return (
