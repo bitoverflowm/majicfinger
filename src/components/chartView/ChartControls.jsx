@@ -260,7 +260,8 @@ export default function ChartControls() {
     const pick = Math.min(n - 1, Math.max(chromeSlots, fromEnd));
     return p[pick] ?? p[n - 1] ?? fallbackSeriesColor;
   };
-  const getLineColor = (lineColumn, index) => lineColorOverrides?.[lineColumn] || defaultSeriesColorAt(index);
+  const getSeriesColor = (seriesColumn, index) => lineColorOverrides?.[seriesColumn] || defaultSeriesColorAt(index);
+  const getLineColor = (lineColumn, index) => getSeriesColor(lineColumn, index);
 
   const showYAxisFormat =
     selY?.[0] && chartData?.length && getAxisType(selY[0], dataTypes, chartData) === "number";
@@ -817,6 +818,54 @@ export default function ChartControls() {
                           </div>
                         )}
                       </div>
+                      {selChartType === "bar" && selY.length > 0 && (
+                        <div className="pt-2">
+                          <p className="mb-1 text-xs font-bold text-muted-foreground">Bars</p>
+                          <div className="flex flex-wrap gap-2 py-1">
+                            {(selY || []).map((seriesColumn, index) => (
+                              <div key={`${seriesColumn}-${index}`} className="inline-flex items-center gap-1">
+                                <Badge variant="secondary" className="gap-2 py-1 pl-2 pr-1 text-xs">
+                                  <span className="inline-flex items-center gap-1">
+                                    <span
+                                      className="inline-block h-2 w-2 rounded-full"
+                                      style={{ backgroundColor: getSeriesColor(seriesColumn, index) }}
+                                    />
+                                    {`Bar ${index + 1}: ${seriesColumn}`}
+                                  </span>
+                                  {(selY || []).length > 1 ? (
+                                    <button
+                                      type="button"
+                                      className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
+                                      aria-label={`Remove Bar ${index + 1}`}
+                                      onClick={() => removeY(seriesColumn, index)}
+                                    >
+                                      x
+                                    </button>
+                                  ) : null}
+                                </Badge>
+                                <ChartColorPalettePopover
+                                  value={lineColorOverrides?.[seriesColumn] ?? null}
+                                  swatchColor={getSeriesColor(seriesColumn, index)}
+                                  onChange={(color) =>
+                                    setLineColorOverrides((prev) => ({
+                                      ...(prev || {}),
+                                      [seriesColumn]: color,
+                                    }))
+                                  }
+                                  onClear={() =>
+                                    setLineColorOverrides((prev) => {
+                                      const next = { ...(prev || {}) };
+                                      delete next[seriesColumn];
+                                      return next;
+                                    })
+                                  }
+                                  ariaLabel={`Pick color for bar ${index + 1}`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {yAxisFormatControls}
                     </>
                   )}

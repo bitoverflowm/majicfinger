@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ListTree } from "lucide-react";
 import type { TocItem } from "@/lib/content/extract-mdx-headings";
 
 type ContentTocNavProps = {
@@ -47,28 +46,27 @@ export function ContentTocNav({ items }: ContentTocNavProps) {
   return (
     <nav
       aria-label="On this page"
-      className="fixed left-4 top-24 z-40 hidden max-h-[min(70vh,32rem)] w-[min(16rem,calc(100vw-2rem))] flex-col gap-2 overflow-y-auto rounded-xl border border-border bg-background/95 p-3 text-sm shadow-md backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:flex"
+      className="fixed left-[calc(50%+400px)] top-20 z-40 hidden max-h-[70vh] w-56 overflow-y-auto rounded-xl bg-background/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:block"
     >
-        <div className="mb-1 flex items-center gap-2 px-1 font-medium text-foreground">
-          <ListTree className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-          On this page
+        <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Table of Contents
         </div>
         <ul className="space-y-0.5">
           {items.map(({ id, text, depth }) => {
             const padClass =
               depth >= 4
-                ? "pl-6 text-xs"
+                ? "pl-6 text-[13px]"
                 : depth === 3
-                  ? "pl-5 text-xs"
+                  ? "pl-5 text-[13px]"
                   : depth === 2
-                    ? "pl-3"
-                    : "pl-1";
+                    ? "pl-3 text-[13px]"
+                    : "pl-1 text-[13px]";
             return (
             <li key={id}>
               <a
                 href={`#${id}`}
-                className={`block rounded-md py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${padClass} ${
-                  activeId === id ? "bg-muted font-medium text-foreground" : ""
+                className={`block rounded-md py-1.5 leading-snug text-muted-foreground/90 transition-colors hover:text-foreground ${padClass} ${
+                  activeId === id ? "font-medium text-foreground" : ""
                 }`}
                 onClick={(e) => {
                   e.preventDefault();

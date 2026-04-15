@@ -5,6 +5,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { useChartBuilder } from "@/components/chartView";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -131,6 +132,18 @@ function ShareEmbedSection() {
     if (!publicUrl) return "";
     return `<iframe src="${publicUrl}" title="Lychee chart" width="100%" height="480" style="border:0" loading="lazy"></iframe>`;
   }, [publicUrl]);
+  const normalizedSlug = useMemo(() => normalizeChartEmbedSlug(slugInput), [slugInput]);
+  const publishedSlug = useMemo(
+    () => normalizeChartEmbedSlug(loadedChartMeta?.public_slug || ""),
+    [loadedChartMeta?.public_slug],
+  );
+  const isPublishedForCurrentSlug = !!(
+    loadedChartMeta?._id &&
+    loadedChartMeta?.is_public &&
+    publishedSlug &&
+    normalizedSlug &&
+    publishedSlug === normalizedSlug
+  );
 
   const pendingSlug = useMemo(
     () => normalizeChartEmbedSlug((pendingChartName || "").trim() || "chart") || "chart",
@@ -319,6 +332,7 @@ function ShareEmbedSection() {
       return;
     }
     toast.success("Embed link is live");
+    setLoadedChartMeta?.(putJson?.data);
     setRefetchChart?.(1);
   }, [
     user,
@@ -327,6 +341,7 @@ function ShareEmbedSection() {
     loadedChartMeta,
     pendingChartName,
     slugInput,
+    setLoadedChartMeta,
     getBuilderSnapshot,
     uploadOgImage,
     setRefetchChart,
@@ -376,26 +391,50 @@ function ShareEmbedSection() {
         >
           Publish embed
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 px-2 text-[10px]"
-          disabled={!publicUrl}
-          onClick={() => copyText(publicUrl, "Link")}
-        >
-          Copy link
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 px-2 text-[10px]"
-          disabled={!iframeSnippet}
-          onClick={() => copyText(iframeSnippet, "Iframe")}
-        >
-          Copy iframe
-        </Button>
+        <TooltipProvider delayDuration={120}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-[10px]"
+                  disabled={!publicUrl || !isPublishedForCurrentSlug}
+                  onClick={() => copyText(publicUrl, "Link")}
+                >
+                  Copy link
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!isPublishedForCurrentSlug ? (
+              <TooltipContent side="top" className="text-xs">
+                only avail after you publish the chart
+              </TooltipContent>
+            ) : null}
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-[10px]"
+                  disabled={!iframeSnippet || !isPublishedForCurrentSlug}
+                  onClick={() => copyText(iframeSnippet, "Iframe")}
+                >
+                  Copy iframe
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!isPublishedForCurrentSlug ? (
+              <TooltipContent side="top" className="text-xs">
+                only avail after you publish the chart
+              </TooltipContent>
+            ) : null}
+          </Tooltip>
+        </TooltipProvider>
       </div>
       {publicUrl ? (
         <p className="break-all text-[10px] text-muted-foreground">{publicUrl}</p>

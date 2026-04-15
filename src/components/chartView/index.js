@@ -1499,9 +1499,9 @@ export function ChartCanvas() {
                           content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />}
                         />
                         {yKeys.map((yKey, idx) => (
-                          <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorAt(idx)} radius={4} stackId={stackedBar ? "a" : idx}>
+                          <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorFor(yKey, idx)} radius={4} stackId={stackedBar ? "a" : idx}>
                             {(finalRenderedData || []).map((_, i) => (
-                              <Cell key={`cell-${i}`} fill={seriesColorAt(idx)} />
+                              <Cell key={`cell-${i}`} fill={seriesColorFor(yKey, idx)} />
                             ))}
                           </Bar>
                         ))}

@@ -69,14 +69,16 @@ export function GuideLayout({
 
         {frontmatter.coverImage && (
           <Section>
-            <div className="relative w-full aspect-video overflow-hidden rounded-xl border border-border">
-              <Image
-                src={frontmatter.coverImage}
-                alt={frontmatter.title}
-                fill
-                className="object-cover"
-                priority
-              />
+            <div className="px-6">
+              <div className="relative w-full aspect-video overflow-hidden rounded-xl border border-border">
+                <Image
+                  src={frontmatter.coverImage}
+                  alt={frontmatter.title}
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              </div>
             </div>
           </Section>
         )}

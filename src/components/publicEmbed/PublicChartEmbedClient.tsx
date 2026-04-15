@@ -6,7 +6,6 @@ import { StateProviderV2 } from "@/context/stateContextV2";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
@@ -74,6 +73,7 @@ export default function PublicChartEmbedClient({
   const [err, setErr] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState(8);
   const [loadStage, setLoadStage] = useState("Preparing data");
+  const [isEmbedded, setIsEmbedded] = useState(false);
   const rows = payload?.data?.rows ?? [];
   const rb =
     payload?.data?.chart?.rechartsBuilder && payload.data.chart.rechartsBuilder.v === 1
@@ -83,6 +83,11 @@ export default function PublicChartEmbedClient({
     () => normalizeSnapshotForRows(rb, rows),
     [rb, rows],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsEmbedded(window.self !== window.top);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,62 +156,31 @@ export default function PublicChartEmbedClient({
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
-        className="mx-auto flex min-h-screen w-full max-w-[1200px] flex-col gap-3 px-4 py-5 md:px-6 md:py-6"
+        className={`mx-auto flex w-full max-w-[1200px] flex-col ${
+          isEmbedded ? "min-h-0 gap-1 px-3 py-2 md:px-4 md:py-3" : "min-h-screen gap-3 px-4 py-5 md:px-6 md:py-6"
+        }`}
         style={{
           backgroundColor: (cp0.bgColor as string) || undefined,
           color: (cp0.textColor as string) || undefined,
         }}
       >
         <DataLoader rows={rows} />
-        <div className="rounded-lg border bg-background/70 p-2 text-xs text-muted-foreground">
-          {`Rows: ${rows.length} · Columns: ${
-            rows[0] && typeof rows[0] === "object" ? Object.keys(rows[0] as Record<string, unknown>).length : 0
-          } · ChartType: ${chartSnapshot?.selChartType || "n/a"} · X: ${chartSnapshot?.selX || "n/a"} · Y: ${
-            Array.isArray(chartSnapshot?.selY) ? chartSnapshot.selY.join(", ") : "n/a"
-          }`}
-        </div>
-        <Tabs defaultValue="chart" className="flex w-full flex-1 flex-col">
-          <TabsList className="h-9 w-auto self-center">
-            <TabsTrigger value="chart" className="text-xs">Chart</TabsTrigger>
-            <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
-          </TabsList>
-          <TabsContent value="chart" className="mt-2 flex flex-1 items-center justify-center">
-            <ChartBuilderProvider className="py-0" demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
-              <div className="flex h-full min-h-0 w-full items-center justify-center">
-                <div className="w-full max-w-[1040px]">
-                  <div className="flex h-[420px] min-h-[320px] w-full min-w-0 flex-col md:h-[750px]">
-                    <ChartCanvas />
-                  </div>
+        <div className={`flex ${isEmbedded ? "mt-0 items-center justify-center" : "mt-2 flex-1 items-center justify-center"}`}>
+          <ChartBuilderProvider className="py-0" demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
+            <div className="flex h-full min-h-0 w-full items-center justify-center">
+              <div className={`w-full ${isEmbedded ? "max-w-[980px]" : "max-w-[1040px]"}`}>
+                <div
+                  className={`flex w-full min-w-0 flex-col ${
+                    isEmbedded ? "h-[400px] min-h-[360px] md:h-[460px]" : "h-[420px] min-h-[320px] md:h-[750px]"
+                  }`}
+                >
+                  <ChartCanvas />
                 </div>
               </div>
-            </ChartBuilderProvider>
-          </TabsContent>
-          <TabsContent value="data" className="mt-2">
-            <div className="max-h-[520px] overflow-auto rounded-md border">
-              <table className="w-full border-collapse text-left text-xs">
-                <thead className="sticky top-0 bg-muted/80 backdrop-blur">
-                  <tr>
-                    {Object.keys((rows[0] as Record<string, unknown>) || {}).map((k) => (
-                      <th key={k} className="border-b px-2 py-1 font-semibold">{k}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.slice(0, 200).map((row, idx) => (
-                    <tr key={idx} className="odd:bg-muted/20">
-                      {Object.keys((rows[0] as Record<string, unknown>) || {}).map((k) => (
-                        <td key={`${idx}-${k}`} className="border-b px-2 py-1 align-top">
-                          {String((row as Record<string, unknown>)?.[k] ?? "")}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
-          </TabsContent>
-        </Tabs>
-        <footer className="mt-auto w-full border-t border-border/60 pt-3 text-center text-xs text-muted-foreground">
+          </ChartBuilderProvider>
+        </div>
+        <footer className={`w-full border-t border-border/60 text-center text-xs text-muted-foreground ${isEmbedded ? "pt-2" : "mt-auto pt-3"}`}>
           <span>{`Made by @${username} with `}</span>
           <Link href={SITE} className="font-medium text-foreground underline">
             Lychee
