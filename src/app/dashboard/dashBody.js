@@ -67,7 +67,17 @@ const DashBody = ({ user }) => {
     const [subscriptionStatus, setSubscriptionStatus] = useState(null);
     const [subscribedAt, setSubscribedAt] = useState(null);
 
-    const isLocked = !isDemo && !user;
+    const normalizedSubscriptionStatus = String(subscriptionStatus || "").toLowerCase();
+    const hasPaidAccess =
+      !!isDemo ||
+      (!!user && (
+        !!isLifeTimeMember ||
+        normalizedSubscriptionStatus === "active" ||
+        normalizedSubscriptionStatus === "trialing" ||
+        // Backward-compatible: some historical users have tier/cycle populated without status.
+        (!!subscriptionTier && !normalizedSubscriptionStatus)
+      ));
+    const isLocked = !hasPaidAccess;
 
     useEffect(() => {
         if(user && !isDemo){
@@ -369,28 +379,32 @@ const DashBody = ({ user }) => {
           </div>
 
           {isLocked && (
-            <div className="pointer-events-auto fixed inset-0 z-[999] flex items-center justify-center bg-background/60 backdrop-blur-sm">
-              <div className="mx-4 w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-xl">
-                <div className="flex flex-col gap-2">
-                  <div className="text-base font-semibold">Sign in to use the dashboard</div>
-                  <div className="text-sm text-muted-foreground">
-                    Viewing is available, but all actions are disabled until you’re logged in.
+            <div className="pointer-events-auto fixed bottom-5 left-1/2 z-[999] w-[min(94vw,42rem)] -translate-x-1/2 rounded-xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold">
+                    {user ? "Upgrade to access dashboard actions" : "Sign in and choose a plan to use dashboard actions"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    You can look around, but editing, saving, uploads, and integrations are locked until you have an active paid plan.
                   </div>
                 </div>
-
-                <div className="mt-5 flex flex-col gap-3">
-                  <Link
-                    href="/login"
-                    className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90"
+                <div className="flex shrink-0 items-center gap-2">
+                  {!user ? (
+                    <Link
+                      href="/login"
+                      className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-xs font-medium hover:bg-accent"
+                    >
+                      Sign in
+                    </Link>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setViewing?.("pricing")}
+                    className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90"
                   >
-                    Continue to sign in
-                  </Link>
-                  <Link
-                    href="/"
-                    className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-                  >
-                    Back to home
-                  </Link>
+                    View plans
+                  </button>
                 </div>
               </div>
             </div>
