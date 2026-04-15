@@ -49,7 +49,13 @@ export async function generateMetadata({
       index: true,
       follow: true,
     },
-    keywords: ["charts", "interactive charts", "data visualization", username, meta?.chart_name].filter(Boolean),
+    keywords: [
+      "charts",
+      "interactive charts",
+      "data visualization",
+      username,
+      ...(meta?.chart_name ? [meta.chart_name] : []),
+    ],
   };
 }
 

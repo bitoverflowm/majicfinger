@@ -135,7 +135,7 @@ export default function PublicChartEmbedClient({
     );
   }
 
-  if (!payload?.success || !rows.length) {
+  if (!payload || !payload.success || !payload.data || !rows.length) {
     return (
       <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
         <p className="text-center text-sm font-medium">{loadStage}</p>
@@ -166,7 +166,7 @@ export default function PublicChartEmbedClient({
       >
         <DataLoader rows={rows} />
         <div className={`flex ${isEmbedded ? "mt-0 items-center justify-center" : "mt-2 flex-1 items-center justify-center"}`}>
-          <ChartBuilderProvider className="py-0" demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
+          <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
             <div className="flex h-full min-h-0 w-full items-center justify-center">
               <div className={`w-full ${isEmbedded ? "max-w-[980px]" : "max-w-[1040px]"}`}>
                 <div
