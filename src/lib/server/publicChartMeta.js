@@ -6,7 +6,7 @@ import User from "@/models/Users";
  * Lightweight lookup for generateMetadata (title / OG).
  * @param {string} username
  * @param {string} slug
- * @returns {Promise<{ chart_name?: string } | null>}
+ * @returns {Promise<{ chart_name?: string, og_image_url?: string } | null>}
  */
 export async function getPublicChartMeta(username, slug) {
   if (!username || !slug) return null;
@@ -18,8 +18,11 @@ export async function getPublicChartMeta(username, slug) {
     public_slug: String(slug).trim(),
     is_public: true,
   })
-    .select("chart_name")
+    .select("chart_name og_image_url")
     .lean();
   if (!chart) return null;
-  return { chart_name: chart.chart_name || "Chart" };
+  return {
+    chart_name: chart.chart_name || "Chart",
+    og_image_url: chart.og_image_url || undefined,
+  };
 }

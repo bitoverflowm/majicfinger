@@ -30,31 +30,33 @@ export default function GuidesSection({ articles = [] }) {
     );
   }, [articles, searchQuery]);
 
-  return (
-    <section id="guides" className="relative mx-auto w-full min-w-0 max-w-7xl px-4 py-16 sm:px-6">
-      <div className="text-center space-y-4 pb-6 mx-auto">
-        <h2 className="text-sm text-primary font-mono font-medium tracking-wider uppercase">Guides</h2>
-        <h3 className="mx-auto mt-4 max-w-xs text-3xl font-semibold sm:max-w-none sm:text-4xl md:text-5xl">
-          Latest Articles
-        </h3>
-      </div>
-      <div className="mb-8 max-w-md mx-auto">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search guides..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </div>
-      <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-        {filteredArticles.length > 0 ? (
-          filteredArticles.map((item, idx) => {
-            const image = item.frontmatter?.coverImage || item.frontmatter?.image || item.frontmatter?.ogImage;
-            return (
+  const featureReleases = useMemo(
+    () =>
+      filteredArticles.filter((item) => {
+        const section = (item.frontmatter?.section || "").toLowerCase();
+        const topics = Array.isArray(item.frontmatter?.topics)
+          ? item.frontmatter.topics.map((t) => String(t).toLowerCase())
+          : [];
+        return section === "feature-releases" || topics.includes("feature-release") || topics.includes("product-update");
+      }),
+    [filteredArticles],
+  );
+
+  const standardArticles = useMemo(
+    () =>
+      filteredArticles.filter((item) => {
+        const section = (item.frontmatter?.section || "").toLowerCase();
+        return section !== "feature-releases";
+      }),
+    [filteredArticles],
+  );
+
+  const renderGrid = (items) => (
+    <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+      {items.length > 0 ? (
+        items.map((item, idx) => {
+          const image = item.frontmatter?.coverImage || item.frontmatter?.image || item.frontmatter?.ogImage;
+          return (
             <Link
               key={`${item.contentType}-${item.slug}`}
               href={`/guides/${item.slug}`}
@@ -87,13 +89,45 @@ export default function GuidesSection({ articles = [] }) {
                 <p className="text-foreground mb-4">{item.frontmatter?.description || item.frontmatter?.summary}</p>
               </div>
             </Link>
-            );
-          })
-        ) : (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            <p>No guides yet. Check back soon!</p>
-          </div>
-        )}
+          );
+        })
+      ) : (
+        <div className="col-span-full text-center py-12 text-muted-foreground">
+          <p>No guides yet. Check back soon!</p>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <section id="guides" className="relative mx-auto w-full min-w-0 max-w-7xl px-4 py-16 sm:px-6">
+      <div className="text-center space-y-4 pb-6 mx-auto">
+        <h2 className="text-sm text-primary font-mono font-medium tracking-wider uppercase">Guides</h2>
+        <h3 className="mx-auto mt-4 max-w-xs text-3xl font-semibold sm:max-w-none sm:text-4xl md:text-5xl">
+          Latest Articles
+        </h3>
+      </div>
+      <div className="mb-8 max-w-md mx-auto">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search guides..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+      {featureReleases.length > 0 && (
+        <div className="mb-8">
+          <h4 className="mb-4 text-left text-xl font-semibold">Feature Releases</h4>
+          {renderGrid(featureReleases)}
+        </div>
+      )}
+      <div>
+        <h4 className="mb-4 text-left text-xl font-semibold">Guides & Blogs</h4>
+        {renderGrid(standardArticles)}
       </div>
     </section>
   );

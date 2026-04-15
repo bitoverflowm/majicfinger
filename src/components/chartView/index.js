@@ -824,6 +824,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
   };
 
+  const getChartPngDataUrl = useCallback(async () => {
+    const el = chartRef.current;
+    if (!el) return null;
+    try {
+      return await toPng(el, { cacheBust: true, pixelRatio: 2 });
+    } catch {
+      return null;
+    }
+  }, []);
+
   const wsStop = polymarketWsState?.stop ?? chainlinkWsState?.stop;
   const wsStart = polymarketWsState?.start ?? chainlinkWsState?.start;
   const wsRunning = polymarketWsState?.isRunning || chainlinkWsState?.isRunning;
@@ -844,6 +854,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
     dark,
     downloadChart,
+    getChartPngDataUrl,
     getBuilderSnapshot,
 
     selChartType,

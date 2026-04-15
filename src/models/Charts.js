@@ -44,6 +44,12 @@ const ChartSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    og_image_url: {
+        type: String,
+    },
+    og_image_updated_at: {
+        type: Date,
+    },
 })
 
 ChartSchema.index({ user_id: 1, public_slug: 1 }, { unique: true, sparse: true })

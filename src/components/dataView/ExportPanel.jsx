@@ -80,7 +80,22 @@ function ShareEmbedSection() {
   const loadedChartMeta = v2?.loadedChartMeta;
   const setLoadedChartMeta = v2?.setLoadedChartMeta;
   const setRefetchChart = v2?.setRefetchChart;
-  const { getBuilderSnapshot } = useChartBuilder();
+  const { getBuilderSnapshot, getChartPngDataUrl } = useChartBuilder();
+
+  const uploadOgImage = useCallback(async (chartId) => {
+    if (!chartId || typeof getChartPngDataUrl !== "function") return null;
+    const imageDataUrl = await getChartPngDataUrl();
+    if (!imageDataUrl) return null;
+    const ogRes = await fetch(`/api/charts/og-image/${chartId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ imageDataUrl }),
+    });
+    const ogJson = await ogRes.json();
+    if (!ogRes.ok || !ogJson?.success) return null;
+    return ogJson?.data?.og_image_url || null;
+  }, [getChartPngDataUrl]);
 
   const [slugInput, setSlugInput] = useState("");
   const [showSignupDialog, setShowSignupDialog] = useState(false);
@@ -197,6 +212,8 @@ function ShareEmbedSection() {
         return;
       }
 
+      const ogImageUrl = await uploadOgImage(chartId);
+
       const publishRes = await fetch(`/api/charts/chart/${chartId}`, {
         method: "PUT",
         credentials: "include",
@@ -207,6 +224,7 @@ function ShareEmbedSection() {
           labels: ["embed"],
           public_slug: pendingSlug,
           is_public: true,
+          ...(ogImageUrl ? { og_image_url: ogImageUrl } : {}),
         }),
       });
       const publishJson = await publishRes.json();
@@ -230,6 +248,7 @@ function ShareEmbedSection() {
     loadedDataMeta?._id,
     pendingChartName,
     pendingSlug,
+    uploadOgImage,
     setLoadedChartMeta,
     setRefetchChart,
     user,
@@ -279,6 +298,7 @@ function ShareEmbedSection() {
         : {};
     const snapshot = getBuilderSnapshot();
     const chart_properties = [{ ...prev0, rechartsBuilder: snapshot }];
+    const ogImageUrl = await uploadOgImage(loadedChartMeta._id);
 
     const putRes = await fetch(`/api/charts/chart/${loadedChartMeta._id}`, {
       method: "PUT",
@@ -290,6 +310,7 @@ function ShareEmbedSection() {
         labels: full.labels?.length ? full.labels : ["export"],
         public_slug: slug,
         is_public: true,
+        ...(ogImageUrl ? { og_image_url: ogImageUrl } : {}),
       }),
     });
     const putJson = await putRes.json();
@@ -307,6 +328,7 @@ function ShareEmbedSection() {
     pendingChartName,
     slugInput,
     getBuilderSnapshot,
+    uploadOgImage,
     setRefetchChart,
   ]);
 

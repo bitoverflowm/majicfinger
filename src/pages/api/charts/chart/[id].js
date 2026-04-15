@@ -52,6 +52,10 @@ export default async function handler(req, res) {
                     last_saved_date: new Date(),
                     labels: req.body.labels,
                 };
+                if (typeof req.body.og_image_url === "string" && req.body.og_image_url.trim()) {
+                    $set.og_image_url = req.body.og_image_url.trim();
+                    $set.og_image_updated_at = new Date();
+                }
 
                 const updateOp = { $set };
 
