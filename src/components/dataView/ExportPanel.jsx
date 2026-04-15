@@ -75,12 +75,24 @@ function ShareEmbedSection() {
   const isDemo = v2?.isDemo;
   const setViewing = v2?.setViewing;
   const userHandle = v2?.userHandle;
+  const connectedData = v2?.connectedData || [];
+  const loadedDataMeta = v2?.loadedDataMeta;
   const loadedChartMeta = v2?.loadedChartMeta;
+  const setLoadedChartMeta = v2?.setLoadedChartMeta;
   const setRefetchChart = v2?.setRefetchChart;
   const { getBuilderSnapshot } = useChartBuilder();
 
   const [slugInput, setSlugInput] = useState("");
   const [showSignupDialog, setShowSignupDialog] = useState(false);
+  const [showSavePublishDialog, setShowSavePublishDialog] = useState(false);
+  const [pendingChartName, setPendingChartName] = useState("");
+  const [isSavePublishing, setIsSavePublishing] = useState(false);
+  const [runtimeOrigin, setRuntimeOrigin] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setRuntimeOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     if (loadedChartMeta?.public_slug) {
@@ -93,13 +105,136 @@ function ShareEmbedSection() {
   const publicUrl = useMemo(() => {
     const slug = normalizeChartEmbedSlug(slugInput);
     if (!userHandle || !isValidChartEmbedSlug(slug)) return "";
-    return `${SITE.replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/charts/${encodeURIComponent(slug)}`;
-  }, [userHandle, slugInput]);
+    const effectiveSite =
+      process.env.NODE_ENV === "development" && runtimeOrigin
+        ? runtimeOrigin
+        : SITE;
+    return `${effectiveSite.replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/charts/${encodeURIComponent(slug)}`;
+  }, [runtimeOrigin, slugInput, userHandle]);
 
   const iframeSnippet = useMemo(() => {
     if (!publicUrl) return "";
     return `<iframe src="${publicUrl}" title="Lychee chart" width="100%" height="480" style="border:0" loading="lazy"></iframe>`;
   }, [publicUrl]);
+
+  const pendingSlug = useMemo(
+    () => normalizeChartEmbedSlug((pendingChartName || "").trim() || "chart") || "chart",
+    [pendingChartName],
+  );
+
+  const saveAndPublish = useCallback(async () => {
+    if (isSavePublishing) return;
+    if (!user) {
+      toast.error("Sign in to create an embed link");
+      return;
+    }
+    if (!userHandle) {
+      toast.error("Set your user handle under Profile before publishing");
+      return;
+    }
+
+    const chartName = (pendingChartName || "").trim();
+    if (!chartName) {
+      toast.error("Name your chart to proceed");
+      return;
+    }
+    if (!isValidChartEmbedSlug(pendingSlug)) {
+      toast.error("Chart name must produce a valid URL slug");
+      return;
+    }
+
+    try {
+      setIsSavePublishing(true);
+      const snapshot = getBuilderSnapshot();
+
+      let dataSetId = loadedDataMeta?._id;
+      if (!dataSetId) {
+        if (!Array.isArray(connectedData) || connectedData.length === 0) {
+          toast.error("No data found. Add data before saving and publishing.");
+          return;
+        }
+        const dsRes = await fetch("/api/dataSets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            data_set_name: `${chartName} dataset`,
+            data: connectedData,
+            created_date: new Date(),
+            last_saved_date: new Date(),
+            labels: ["embed"],
+            source: "userUpload",
+            user_id: user.userId,
+          }),
+        });
+        const dsJson = await dsRes.json();
+        dataSetId = dsJson?.data?._id || dsJson?._id;
+        if (!dsRes.ok || !dataSetId) {
+          toast.error(dsJson?.message || "Failed to save dataset");
+          return;
+        }
+      }
+
+      const chart_properties = [{ title: chartName, rechartsBuilder: snapshot }];
+      const createRes = await fetch("/api/charts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          chart_name: chartName,
+          chart_properties,
+          created_date: new Date(),
+          last_saved_date: new Date(),
+          labels: ["embed"],
+          user_id: user.userId,
+          data_set_id: dataSetId,
+        }),
+      });
+      const createJson = await createRes.json();
+      const chartId = createJson?.data?._id || createJson?._id;
+      if (!createRes.ok || !chartId) {
+        toast.error(createJson?.message || "Failed to save chart");
+        return;
+      }
+
+      const publishRes = await fetch(`/api/charts/chart/${chartId}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chart_name: chartName,
+          chart_properties,
+          labels: ["embed"],
+          public_slug: pendingSlug,
+          is_public: true,
+        }),
+      });
+      const publishJson = await publishRes.json();
+      if (!publishRes.ok || !publishJson?.success) {
+        toast.error(publishJson?.message || "Publish failed");
+        return;
+      }
+
+      setSlugInput(pendingSlug);
+      setLoadedChartMeta?.(publishJson?.data);
+      setRefetchChart?.(1);
+      setShowSavePublishDialog(false);
+      toast.success("Chart saved and embed published");
+    } finally {
+      setIsSavePublishing(false);
+    }
+  }, [
+    connectedData,
+    getBuilderSnapshot,
+    isSavePublishing,
+    loadedDataMeta?._id,
+    pendingChartName,
+    pendingSlug,
+    setLoadedChartMeta,
+    setRefetchChart,
+    user,
+    userHandle,
+  ]);
 
   const publishEmbed = useCallback(async () => {
     if (isDemo) {
@@ -115,7 +250,12 @@ function ShareEmbedSection() {
       return;
     }
     if (!loadedChartMeta?._id) {
-      toast.error("Save your chart from the nav bar first, then return here");
+      const guessed =
+        (slugInput || "").trim() ||
+        (pendingChartName || "").trim() ||
+        "chart";
+      setPendingChartName(guessed);
+      setShowSavePublishDialog(true);
       return;
     }
     const slug = normalizeChartEmbedSlug(slugInput);
@@ -164,6 +304,7 @@ function ShareEmbedSection() {
     isDemo,
     userHandle,
     loadedChartMeta,
+    pendingChartName,
     slugInput,
     getBuilderSnapshot,
     setRefetchChart,
@@ -258,6 +399,38 @@ function ShareEmbedSection() {
             >
               Sign up
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={showSavePublishDialog} onOpenChange={setShowSavePublishDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Chart needs to be saved to proceed</AlertDialogTitle>
+            <AlertDialogDescription>
+              Name your chart and we will save your data, save the chart, and publish the embed in one step.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="save-publish-chart-name">
+              Name chart
+            </label>
+            <Input
+              id="save-publish-chart-name"
+              value={pendingChartName}
+              onChange={(e) => setPendingChartName(e.target.value)}
+              placeholder="my-chart"
+            />
+            <p className="break-all text-xs text-muted-foreground">
+              {`${SITE.replace(/^https?:\/\//, "").replace(/\/$/, "")}/${
+                userHandle || "handle"
+              }/charts/${pendingSlug}`}
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSavePublishing}>Cancel</AlertDialogCancel>
+            <Button type="button" onClick={saveAndPublish} disabled={isSavePublishing}>
+              {isSavePublishing ? "Saving..." : "Save and publish"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

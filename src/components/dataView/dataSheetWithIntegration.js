@@ -69,6 +69,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const connectedData = contextStateV2?.connectedData ?? [];
   const setConnectedData = contextStateV2?.setConnectedData;
+  const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
   const rightPanelOpen = contextStateV2?.rightPanelOpen;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
   const rightPanelTab = contextStateV2?.rightPanelTab;
@@ -490,5 +491,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       </div>
     </div>
   );
-  return <ChartBuilderProvider demo={isDemo}>{layout}</ChartBuilderProvider>;
+  return (
+    <ChartBuilderProvider demo={isDemo} initialBuilderSnapshot={loadedChartBuilderSnapshot}>
+      {layout}
+    </ChartBuilderProvider>
+  );
 }

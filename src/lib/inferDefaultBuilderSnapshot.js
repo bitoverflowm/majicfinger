@@ -9,6 +9,6 @@ export function inferDefaultBuilderSnapshot(rows) {
   }
   const keys = Object.keys(rows[0]).filter((k) => k != null);
   if (keys.length === 0) return { v: 1, selChartType: "area", selX: undefined, selY: [] };
-  if (keys.length === 1) return { v: 1, selChartType: "area", selX: keys[0], selY: [] };
+  if (keys.length === 1) return { v: 1, selChartType: "area", selX: keys[0], selY: [keys[0]] };
   return { v: 1, selChartType: "line", selX: keys[0], selY: [keys[1]] };
 }

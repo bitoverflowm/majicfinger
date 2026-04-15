@@ -13,6 +13,42 @@ function stripInternalFromRows(rows) {
   });
 }
 
+function normalizeBuilderSnapshot(snapshot, rows) {
+  const fallback = inferDefaultBuilderSnapshot(rows);
+  const s = snapshot && typeof snapshot === "object" ? { ...snapshot } : { ...fallback };
+  const first = Array.isArray(rows) && rows[0] && typeof rows[0] === "object" ? rows[0] : null;
+  const keys = first ? Object.keys(first) : [];
+  if (!keys.length) return fallback;
+
+  const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline"]);
+  const type = String(s.selChartType || "").trim();
+  s.selChartType = allowedTypes.has(type) ? type : fallback.selChartType;
+
+  const deScope = (k) => {
+    const raw = String(k || "");
+    const idx = raw.indexOf("::");
+    return idx > -1 ? raw.slice(idx + 2) : raw;
+  };
+
+  const normalizedX = deScope(s.selX);
+  s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
+
+  const rawY = Array.isArray(s.selY) ? s.selY : [];
+  const cleanY = rawY
+    .map((k) => deScope(k))
+    .filter((k) => keys.includes(k));
+  s.selY = cleanY.length ? [...new Set(cleanY)] : fallback.selY;
+
+  // Guard against blank render when historical snapshots carried unsupported state.
+  if (!s.selX || !Array.isArray(s.selY) || s.selY.length === 0) {
+    s.selX = fallback.selX;
+    s.selY = fallback.selY;
+    s.selChartType = fallback.selChartType;
+  }
+
+  return s;
+}
+
 export default async function handler(req, res) {
   const { username, slug } = req.query;
 
@@ -44,10 +80,11 @@ export default async function handler(req, res) {
     }
 
     const cp = Array.isArray(chart.chart_properties) ? chart.chart_properties[0] : chart.chart_properties;
-    const rechartsBuilder =
+    const rechartsBuilderRaw =
       cp && typeof cp === "object" && cp.rechartsBuilder && cp.rechartsBuilder.v === 1
         ? cp.rechartsBuilder
         : inferDefaultBuilderSnapshot(dataSet.data);
+    const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, dataSet.data);
 
     const publicChart = {
       chart_name: chart.chart_name,

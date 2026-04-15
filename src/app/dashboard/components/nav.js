@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { Pause, Play, RotateCw, Square, ArrowLeft } from "lucide-react"
+import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
 
 
 const Nav = () => {
@@ -61,12 +62,7 @@ const Nav = () => {
   const savedCharts = contextStateV2?.savedCharts
   const setSavedCharts = contextStateV2?.setSavedCharts
 
-  //let system know to conduct refetch
-  const setRefetchData = contextStateV2?.setRefetchData
-  const setRefetchChart = contextStateV2?.setRefetchData
-  const setRefetchPresentations = contextStateV2?.setRefetchPresentations
-
-  //current chart view properties
+  // chart properties used by legacy save flow
   const chartOptions = contextStateV2?.chartOptions
   const chartTheme = contextStateV2?.chartTheme
   const bgColor = contextStateV2?.bgColor
@@ -75,9 +71,15 @@ const Nav = () => {
   const title = contextStateV2?.title
   const subTitle = contextStateV2?.subTitle
 
+  //let system know to conduct refetch
+  const setRefetchData = contextStateV2?.setRefetchData
+  const setRefetchChart = contextStateV2?.setRefetchData
+  const setRefetchPresentations = contextStateV2?.setRefetchPresentations
+
   //loading charts
   const loadedChartMeta = contextStateV2?.loadedChartMeta
   const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta
+  const setLoadedChartBuilderSnapshot = contextStateV2?.setLoadedChartBuilderSnapshot
 
   // summarization: when charting a summary table
   const chartDataOverride = contextStateV2?.chartDataOverride
@@ -94,16 +96,6 @@ const Nav = () => {
   const hasAnyStream = streamSheetIds.length > 0
   const effectiveStreamSheetId = selectedStreamSheetId && streamsBySheetId[selectedStreamSheetId] ? selectedStreamSheetId : (streamSheetIds[0] || null)
   const currentStreamState = effectiveStreamSheetId ? streamsBySheetId[effectiveStreamSheetId] : null
-
-  //setting loaded chart values for viewing
-  const setChartOptions = contextStateV2?.setChartOptions
-  const setChartTheme = contextStateV2?.setChartTheme
-  const setBgColor = contextStateV2?.setBgColor
-  const setTextColor = contextStateV2?.setTextColor
-  const setCardColor = contextStateV2?.setCardColor
-  const setTitle = contextStateV2?.setTitle
-  const setSubTitle = contextStateV2?.setSubTitle
-
 
   const [isOpen, setIsOpen] = useState(false) 
   const [saveIsOpen, setSaveIsOpen] = useState(false)
@@ -317,14 +309,6 @@ const Nav = () => {
 
   const loadChart = async (chartId, chartMeta) => {
     if(loadedChartMeta && chartId === loadedChartMeta._id){
-      //now we construct the chart
-      setChartOptions(chartOptions)
-      setChartTheme(chartTheme)
-      setBgColor(bgColor)
-      setTextColor(textColor)
-      setCardColor(cardColor)
-      setTitle(title)
-      setSubTitle(subTitle)          
       setViewing('charts')
       setIsOpen(false)
     }else{
@@ -338,15 +322,8 @@ const Nav = () => {
           console.log(res.data)
           //letting system know that a new chart has been propogated
           setLoadedChartMeta(chartMeta)
-          //now we construct the chart
-          setChartOptions(res.data.chart_properties[0].chartOptions)
-          setBgColor(res.data.chart_properties[0].bgColor)
-          setTextColor(res.data.chart_properties[0].textColor)
-          setCardColor(res.data.chart_properties[0].cardColor)
-          setTitle(res.data.chart_properties[0].title)
-          setSubTitle(res.data.chart_properties[0].subTitle)
-          setChartTheme(res.data.chart_properties[0].chartTheme)
-          toast.success(`Chart: ${res.data.chart_properties[0].title} loaded`, {
+          const cp0 = Array.isArray(res.data.chart_properties) ? res.data.chart_properties[0] : res.data.chart_properties
+          toast.success(`Chart: ${cp0?.title || res.data.chart_name || chartMeta?.chart_name} loaded`, {
             duration: 99999999
           })
 
@@ -357,7 +334,13 @@ const Nav = () => {
             },
           }).then(response => response.json())
             .then(dataSheetRes =>{
-              setConnectedData(dataSheetRes.data.data)
+              const rows = dataSheetRes?.data?.data || []
+              setConnectedData(rows)
+              const incomingSnapshot = cp0?.rechartsBuilder
+              const normalizedSnapshot = incomingSnapshot?.v === 1
+                ? incomingSnapshot
+                : inferDefaultBuilderSnapshot(rows)
+              setLoadedChartBuilderSnapshot?.(normalizedSnapshot)
               setLoadedDataMeta(savedDataSets.find(ds => ds._id === chartMeta.data_set_id))
           })
           setIsOpen(false)
@@ -474,7 +457,7 @@ const Nav = () => {
                             <DialogTitle>{viewing !== 'presentation' && (viewing === 'charts' ? 'Save Chart' : 'Save Data Set')}</DialogTitle>
                             <DialogDescription>
                               { loadedDataMeta && `You are currently connected to ${loadedDataMeta.data_set_name}`}
-                              { loadedChartMeta && `You are currently connected to ${loadedDataMeta.chart_name}`}
+                              { loadedChartMeta && `You are currently connected to ${loadedChartMeta.chart_name}`}
                             </DialogDescription>
                           </DialogHeader>
                           {
@@ -484,7 +467,7 @@ const Nav = () => {
                                     loadedChartMeta && 
                                       <div className="grid grid-cols-4 items-center gap-4">
                                         <Label htmlFor="overwrite" className="text-right">
-                                          Overwrite {loadedDataMeta.chart_name} ?
+                                          Overwrite {loadedChartMeta.chart_name} ?
                                         </Label>
                                         <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
                                       </div>
