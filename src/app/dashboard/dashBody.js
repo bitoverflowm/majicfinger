@@ -45,8 +45,8 @@ const DashBody = ({ user }) => {
     
     const refetchData = contextStateV2?.refetchData
     const setRefetchData = contextStateV2?.setRefetchData
-    const refetchChart = contextStateV2?.refetchData
-    const setRefetchChart = contextStateV2?.setRefetchData
+    const refetchChart = contextStateV2?.refetchChart
+    const setRefetchChart = contextStateV2?.setRefetchChart
     const refetchPresentations = contextStateV2?.refetchPresentations
     const setRefetchPresentations = contextStateV2?.setRefetchPresentations
     const setUserHandle = contextStateV2?.setUserHandle

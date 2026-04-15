@@ -56,6 +56,28 @@ function normalizeSnapshotForRows(snapshot: any, rows: unknown[]) {
     .filter((k: string) => keys.includes(k));
   s.selY = normalizedY.length ? [...new Set(normalizedY)] : fallback.selY;
 
+  if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
+    const nextOverrides: Record<string, string> = {};
+    for (const [rawKey, color] of Object.entries(s.lineColorOverrides as Record<string, unknown>)) {
+      const key = deScope(rawKey);
+      if (keys.includes(key) && typeof color === "string" && color.trim()) {
+        nextOverrides[key] = color;
+      }
+    }
+    s.lineColorOverrides = nextOverrides;
+  }
+
+  if (s.chartConfig && typeof s.chartConfig === "object") {
+    const nextCfg: Record<string, unknown> = {};
+    for (const [rawKey, cfg] of Object.entries(s.chartConfig as Record<string, unknown>)) {
+      const key = deScope(rawKey);
+      if (keys.includes(key) && cfg && typeof cfg === "object") {
+        nextCfg[key] = cfg;
+      }
+    }
+    s.chartConfig = nextCfg;
+  }
+
   if (!s.selX || !Array.isArray(s.selY) || s.selY.length === 0) {
     return fallback;
   }

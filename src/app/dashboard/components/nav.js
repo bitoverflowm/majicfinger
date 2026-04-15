@@ -73,7 +73,7 @@ const Nav = () => {
 
   //let system know to conduct refetch
   const setRefetchData = contextStateV2?.setRefetchData
-  const setRefetchChart = contextStateV2?.setRefetchData
+  const setRefetchChart = contextStateV2?.setRefetchChart
   const setRefetchPresentations = contextStateV2?.setRefetchPresentations
 
   //loading charts
@@ -123,36 +123,38 @@ const Nav = () => {
   const handleSave = async () => {
       if(overwrite){
         if(viewing === 'charts'){
-          alert('overwrite mode')
           fetch(`/api/charts/chart/${loadedChartMeta._id}`, {
-            method: 'PUT',
+            method: 'GET',
             headers: {
-                'Content-Type': 'application/json',
+              'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 
-                chart_name: loadedChartMeta.chart_name,
-                chart_properties: [{
-                  'chartOptions': chartOptions,
-                  'chartTheme': chartTheme,
-                  'bgColor': bgColor,
-                  'textColor': textColor,
-                  'cardColor': cardColor,
-                  'title': title,
-                  'subTitle': subTitle
-                }],
-                last_saved_date: new Date(),
-                labels: ['test'],
-            }),
           })
-          .then(response => response.json())
-          .then(data => {
+            .then(response => response.json())
+            .then(current => {
+              const existingChartProps = Array.isArray(current?.data?.chart_properties)
+                ? current.data.chart_properties
+                : (current?.data?.chart_properties ? [current.data.chart_properties] : []);
+              return fetch(`/api/charts/chart/${loadedChartMeta._id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                  chart_name: loadedChartMeta.chart_name,
+                  chart_properties: existingChartProps,
+                  last_saved_date: new Date(),
+                  labels: ['test'],
+                }),
+              });
+            })
+            .then(response => response.json())
+            .then(data => {
               toast(`Your Chart has been saved as ${loadedChartMeta.chart_name}`)
               setRefetchChart(1)
-          })
-          .catch(error => {
+            })
+            .catch(error => {
               console.error('Error saving Data:', error);
-              // Handle the error here
-          });
+            });
         }else{
             fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
               method: 'PUT',
@@ -181,20 +183,15 @@ const Nav = () => {
       }else{
         if(viewing === 'charts'){
           const saveChartWithData = async (dataSetId) => {
+            const snapshot =
+              loadedChartMeta?.chart_properties?.[0]?.rechartsBuilder ||
+              inferDefaultBuilderSnapshot(connectedData || []);
             const res = await fetch('/api/charts', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 chart_name: newChartName,
-                chart_properties: [{
-                  'chartOptions': chartOptions,
-                  'chartTheme': chartTheme,
-                  'bgColor': bgColor,
-                  'textColor': textColor,
-                  'cardColor': cardColor,
-                  'title': title,
-                  'subTitle': subTitle
-                }],
+                chart_properties: [{ title: newChartName, rechartsBuilder: snapshot }],
                 created_date: new Date(),
                 last_saved_date: new Date(),
                 labels: ['test'],

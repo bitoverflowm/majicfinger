@@ -39,6 +39,29 @@ function normalizeBuilderSnapshot(snapshot, rows) {
     .filter((k) => keys.includes(k));
   s.selY = cleanY.length ? [...new Set(cleanY)] : fallback.selY;
 
+  // Keep per-series visual config aligned when historical snapshots used scoped keys.
+  if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
+    const nextOverrides = {};
+    for (const [rawKey, color] of Object.entries(s.lineColorOverrides)) {
+      const key = deScope(rawKey);
+      if (keys.includes(key) && typeof color === "string" && color.trim()) {
+        nextOverrides[key] = color;
+      }
+    }
+    s.lineColorOverrides = nextOverrides;
+  }
+
+  if (s.chartConfig && typeof s.chartConfig === "object") {
+    const nextCfg = {};
+    for (const [rawKey, cfg] of Object.entries(s.chartConfig)) {
+      const key = deScope(rawKey);
+      if (keys.includes(key) && cfg && typeof cfg === "object") {
+        nextCfg[key] = cfg;
+      }
+    }
+    s.chartConfig = nextCfg;
+  }
+
   // Guard against blank render when historical snapshots carried unsupported state.
   if (!s.selX || !Array.isArray(s.selY) || s.selY.length === 0) {
     s.selX = fallback.selX;
