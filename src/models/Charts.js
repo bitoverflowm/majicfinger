@@ -33,8 +33,19 @@ const ChartSchema = new mongoose.Schema({
         type: Schema.Types.ObjectId, // Defines the type as ObjectId
         ref: 'DataSet', // References the User model
         required: true // Makes this field mandatory
-    }
+    },
+    /** URL segment for /{user_name}/charts/{public_slug}; unique per owner when set (omit until published) */
+    public_slug: {
+        type: String,
+        maxLength: [120, "public_slug cannot be more than 120 characters"],
+    },
+    /** When true, chart is served by public embed API and public page */
+    is_public: {
+        type: Boolean,
+        default: false,
+    },
 })
 
+ChartSchema.index({ user_id: 1, public_slug: 1 }, { unique: true, sparse: true })
 
 export default mongoose.models.Chart || mongoose.model("Chart", ChartSchema)

@@ -3,6 +3,28 @@ const { withNextVideo } = require('next-video/process')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/:username/charts/:slug*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors *",
+          },
+        ],
+      },
+      {
+        source: '/:username/dashboards/:slug*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors *",
+          },
+        ],
+      },
+    ]
+  },
   transpilePackages: ["@nivo", "@duckdb/duckdb-wasm", "apache-arrow"],
   experimental: {
     esmExternals: 'loose',

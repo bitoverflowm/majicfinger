@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
+import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
 
 const DashBody = ({ user }) => {
     const contextStateV2 = useMyStateV2()
@@ -176,6 +177,11 @@ const DashBody = ({ user }) => {
 
     const checkUsernameAvailability = useCallback(
         debounce((value) => {
+            if (isReservedUserHandle(value)) {
+                setUsernameExists(true);
+                setIsButtonEnabled(false);
+                return;
+            }
             fetch(`/api/users/checkUserhandle?userHandle=${value}`, {
                 method: 'GET',
                 headers: {
@@ -206,6 +212,10 @@ const DashBody = ({ user }) => {
 
 
     const handleUpdateUserHandle = () => {
+        if (isReservedUserHandle(newUserHandle)) {
+            toast.error(reservedUserHandleMessage(newUserHandle));
+            return;
+        }
         fetch(`/api/users/${user.userId}`, {
             method: 'PUT',
             headers: {
@@ -303,7 +313,7 @@ const DashBody = ({ user }) => {
                                 onChange={handleUserHandleChange}
                             />
                         </div>
-                        {usernameExists && <div className="text-red-500 text-xs">Username already taken</div>}
+                        {usernameExists && <div className="text-red-500 text-xs">Handle unavailable (reserved or already taken)</div>}
                         
                         <Button 
                             type="button" 

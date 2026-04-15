@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   SHADCN_CHART_BASE_ORDER,
   getShadcnChartPaletteArray,
@@ -281,7 +281,7 @@ function formatCompactNumber(value) {
   return `${Math.round(value * 100) / 100}`;
 }
 
-export function ChartBuilderProvider({ demo, children }) {
+export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot }) {
   const contextStateV2 = useMyStateV2();
   const chartRef = useRef(null);
 
@@ -379,6 +379,85 @@ export function ChartBuilderProvider({ demo, children }) {
 
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
+
+  const snapshotAppliedRef = useRef(false);
+  const snapshotPayloadRef = useRef(null);
+
+  useEffect(() => {
+    snapshotAppliedRef.current = false;
+    snapshotPayloadRef.current = initialBuilderSnapshot ?? null;
+  }, [initialBuilderSnapshot]);
+
+  useEffect(() => {
+    if (demo) return;
+    const snap = snapshotPayloadRef.current;
+    if (!snap || snap.v !== 1) {
+      return;
+    }
+    const rows = Array.isArray(effectiveData) ? effectiveData : [];
+    if (!rows.length) return;
+    if (snapshotAppliedRef.current) return;
+    snapshotAppliedRef.current = true;
+    const s = snap;
+    if (s.selChartType != null) setSelChartType(s.selChartType);
+    if (s.selX !== undefined) setSelX(s.selX);
+    if (Array.isArray(s.selY)) setSelY(s.selY);
+    if (s.lineStyle != null) setLineStyle(s.lineStyle);
+    if (s.lineHumanReadableTime !== undefined) setLineHumanReadableTime(!!s.lineHumanReadableTime);
+    if (s.xTimeScale !== undefined) setXTimeScale(!!s.xTimeScale);
+    if (s.scaleX != null) setScaleX(s.scaleX);
+    if (s.scaleY != null) setScaleY(s.scaleY);
+    if (s.yAxisDivisor != null) setYAxisDivisor(s.yAxisDivisor);
+    if (s.yAxisCompact !== undefined) setYAxisCompact(!!s.yAxisCompact);
+    if (s.sortXDir != null) setSortXDir(s.sortXDir);
+    if (s.sortYDir !== undefined) setSortYDir(s.sortYDir);
+    if (s.selectedShadBaseId != null) setSelectedShadBaseId(s.selectedShadBaseId);
+    if (Array.isArray(s.selectedPalette) && s.selectedPalette.length) setSelectedPalette(s.selectedPalette);
+    if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") setLineColorOverrides(s.lineColorOverrides);
+    if (s.expanded !== undefined) setExpanded(!!s.expanded);
+    if (s.legendVisible !== undefined) setLegendVisible(!!s.legendVisible);
+    if (s.stackedBar !== undefined) setStackedBar(!!s.stackedBar);
+    if (s.dots !== undefined) setDots(!!s.dots);
+    if (s.labelLine !== undefined) setLabelLine(!!s.labelLine);
+    if (s.donut !== undefined) setDonut(!!s.donut);
+    if (s.dark !== undefined) setDark(!!s.dark);
+    if (s.titleHidden !== undefined) setTitleHidden(!!s.titleHidden);
+    if (s.title != null) setTitle(s.title);
+    if (s.subTitleHidden !== undefined) setSubTitleHidden(!!s.subTitleHidden);
+    if (s.subTitle != null) setSubTitle(s.subTitle);
+    if (s.bodyHeadingHidden !== undefined) setHeadingHidden(!!s.bodyHeadingHidden);
+    if (s.bodyHeading != null) setBodyHeading(s.bodyHeading);
+    if (s.bodyContentHidden !== undefined) setBodyContentHidden(!!s.bodyContentHidden);
+    if (s.bodyContent != null) setBodyContent(s.bodyContent);
+    if (s.titleColor !== undefined) setTitleColor(s.titleColor);
+    if (s.subTitleColor !== undefined) setSubTitleColor(s.subTitleColor);
+    if (s.bodyHeadingColor !== undefined) setBodyHeadingColor(s.bodyHeadingColor);
+    if (s.bodyContentColor !== undefined) setBodyContentColor(s.bodyContentColor);
+    if (s.outerBoxColor !== undefined) setOuterBoxColor(s.outerBoxColor);
+    if (s.innerBoxColor !== undefined) setInnerBoxColor(s.innerBoxColor);
+    if (s.gridVisible !== undefined) setGridVisible(!!s.gridVisible);
+    if (s.yAxisLineVisible !== undefined) setYAxisLineVisible(!!s.yAxisLineVisible);
+    if (s.gridLineColor !== undefined) setGridLineColor(s.gridLineColor);
+    if (s.chartTextColor !== undefined) setChartTextColor(s.chartTextColor);
+    if (s.xAxisTickColor !== undefined) setXAxisTickColor(s.xAxisTickColor);
+    if (s.yAxisTickColor !== undefined) setYAxisTickColor(s.yAxisTickColor);
+    if (s.xAxisTicksAngled !== undefined) setXAxisTicksAngled(!!s.xAxisTicksAngled);
+    if (s.chartConfig && typeof s.chartConfig === "object") setChartConfig(s.chartConfig);
+    if (s.lineSeriesColumn !== undefined) setLineSeriesColumn(s.lineSeriesColumn);
+    if (Array.isArray(s.lineSeriesValues)) setLineSeriesValues(s.lineSeriesValues);
+    if (s.livelineMomentum !== undefined) setLivelineMomentum(!!s.livelineMomentum);
+    if (s.livelineShowValue !== undefined) setLivelineShowValue(!!s.livelineShowValue);
+    if (s.livelineValueMomentumColor !== undefined) setLivelineValueMomentumColor(!!s.livelineValueMomentumColor);
+    if (s.livelineWindowsEnabled !== undefined) setLivelineWindowsEnabled(!!s.livelineWindowsEnabled);
+    if (s.livelineExaggerate !== undefined) setLivelineExaggerate(!!s.livelineExaggerate);
+    if (s.livelineScrub !== undefined) setLivelineScrub(!!s.livelineScrub);
+    if (s.livelineDegen !== undefined) setLivelineDegen(!!s.livelineDegen);
+    if (s.livelineBadge !== undefined) setLivelineBadge(!!s.livelineBadge);
+    if (s.livelineBadgeVariant != null) setLivelineBadgeVariant(s.livelineBadgeVariant);
+    if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
+    if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
+    if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
+  }, [demo, effectiveData, initialBuilderSnapshot]);
 
   useEffect(() => {
     if (selectedPalette?.length) return;
@@ -631,6 +710,70 @@ export function ChartBuilderProvider({ demo, children }) {
 
   const handleToggleDark = (pressed) => setDark(!!pressed);
 
+  const builderStateRef = useRef({});
+  builderStateRef.current = {
+    selChartType,
+    selX,
+    selY,
+    lineStyle,
+    lineHumanReadableTime,
+    xTimeScale,
+    scaleX,
+    scaleY,
+    yAxisDivisor,
+    yAxisCompact,
+    sortXDir,
+    sortYDir,
+    selectedShadBaseId,
+    selectedPalette,
+    lineColorOverrides,
+    expanded,
+    legendVisible,
+    stackedBar,
+    dots,
+    labelLine,
+    donut,
+    dark,
+    titleHidden,
+    title,
+    subTitleHidden,
+    subTitle,
+    bodyHeadingHidden,
+    bodyHeading,
+    bodyContentHidden,
+    bodyContent,
+    titleColor,
+    subTitleColor,
+    bodyHeadingColor,
+    bodyContentColor,
+    outerBoxColor,
+    innerBoxColor,
+    gridVisible,
+    yAxisLineVisible,
+    gridLineColor,
+    chartTextColor,
+    xAxisTickColor,
+    yAxisTickColor,
+    xAxisTicksAngled,
+    chartConfig,
+    lineSeriesColumn,
+    lineSeriesValues,
+    livelineMomentum,
+    livelineShowValue,
+    livelineValueMomentumColor,
+    livelineWindowsEnabled,
+    livelineExaggerate,
+    livelineScrub,
+    livelineDegen,
+    livelineBadge,
+    livelineBadgeVariant,
+    livelineColorChoice,
+    chartFilterColumn,
+    chartFilterConfig,
+  };
+
+  const getBuilderSnapshot = useCallback(() => ({ v: 1, ...builderStateRef.current }), []);
+
   const downloadChart = (format) => {
     const el = chartRef.current;
     if (!el) {
@@ -700,6 +843,7 @@ export function ChartBuilderProvider({ demo, children }) {
 
     dark,
     downloadChart,
+    getBuilderSnapshot,
 
     selChartType,
     setSelChartType,

@@ -2,6 +2,7 @@ import type { MDXComponents } from "mdx/types";
 import Image from "next/image";
 import { VideoEmbed } from "@/components/ui";
 import { ContentImage } from "./content-image";
+import { PublicChart } from "./PublicChart";
 
 /**
  * MDX components for blog/guide content.
@@ -41,6 +42,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     },
     ContentImage,
     VideoEmbed,
+    PublicChart,
     ...components,
   };
 }

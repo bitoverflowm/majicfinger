@@ -1,5 +1,6 @@
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
+import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
 
 export default async function handler(req, res) {
     const {
@@ -23,6 +24,12 @@ export default async function handler(req, res) {
             break;
         case "PUT": /* Edit a model by its ID */
             try {
+                if (req.body?.user_name !== undefined && isReservedUserHandle(String(req.body.user_name || ""))) {
+                    return res.status(400).json({
+                        success: false,
+                        message: reservedUserHandleMessage(req.body.user_name),
+                    });
+                }
                 // Prepare the update object
                 const update = {
                     $set: {

@@ -14,9 +14,9 @@ import { colorPalettes } from '@/components/chartView/panels/colorPalette';
 import { Label } from "@/components/ui/label";
 import { Pause, Play, RotateCw, Shuffle } from "lucide-react";
 
-export function BentoBase({data, dashView, demo, bentoContainer, setDashData, setBentoContainer, viewing, setViewing}) { 
+export function BentoBase({data, dashView, demo, readOnly, bentoContainer, setDashData, setBentoContainer, viewing, setViewing}) { 
 
-  const [pause, setPause] = useState()
+  const [pause, setPause] = useState(() => !!readOnly)
   const [selectedPalette, setSelectedPalette] = useState()
   const [loading, setLoading] = useState()
 
@@ -51,6 +51,7 @@ export function BentoBase({data, dashView, demo, bentoContainer, setDashData, se
   }
 
   useEffect(() => {
+    if (readOnly) return undefined;
     let intervalId;
 
     if (!pause) {
@@ -65,7 +66,7 @@ export function BentoBase({data, dashView, demo, bentoContainer, setDashData, se
         clearInterval(intervalId);
       }
     };
-  }, [pause]); 
+  }, [pause, readOnly]); 
 
   const shufflePalette = () => {
     setLoading(true)  
@@ -124,6 +125,7 @@ export function BentoBase({data, dashView, demo, bentoContainer, setDashData, se
   
   return (
     <>
+        {!readOnly && (
         <div className="gap-2 place-items-center py-2 w-full">
           <blockquote className="mx-auto text-center text-[10px] w-1/2">
             <span className="font-bold">Welcome to your dashboard</span> <br/> 
@@ -149,6 +151,7 @@ export function BentoBase({data, dashView, demo, bentoContainer, setDashData, se
               <p className="text-[8px] text-muted-foreground">click to copy</p>
             </div>
         </div>
+        )}
         <div className={`gradualEffect relative flex w-full items-center justify-center p-10 overflow-hidden rounded-lg border shadow-sm`} style={{ backgroundColor: bentoContainer && bentoContainer.background_color && bentoContainer.background_color}}>  
             <BentoGrid>
                 <DotPattern className={cn(

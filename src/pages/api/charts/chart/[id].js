@@ -1,5 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import Chart from "@/models/Charts";
+import { getLoginSession } from "@/lib/auth";
+import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 
 export default async function handler(req, res) {
     const {
@@ -23,16 +25,62 @@ export default async function handler(req, res) {
             break;
         case "PUT":
             try {
-                // Prepare the update object
-                const update = {
-                    $set: {
-                        chart_name: req.body.chart_name,
-                        chart_properties: req.body.chart_properties,
-                        last_saved_date: new Date(),
-                        labels: req.body.labels,
-                    },
+                const chart = await Chart.findById(id);
+                if (!chart) {
+                    return res.status(400).json({ success: false, message: `No chart found for id: ${id}` });
+                }
+
+                const wantsEmbed =
+                    Object.prototype.hasOwnProperty.call(req.body, "public_slug") ||
+                    Object.prototype.hasOwnProperty.call(req.body, "is_public");
+
+                if (wantsEmbed) {
+                    let session;
+                    try {
+                        session = await getLoginSession(req);
+                    } catch {
+                        session = null;
+                    }
+                    if (!session?.userId || String(chart.user_id) !== String(session.userId)) {
+                        return res.status(401).json({ success: false, message: "Unauthorized" });
+                    }
+                }
+
+                const $set = {
+                    chart_name: req.body.chart_name,
+                    chart_properties: req.body.chart_properties,
+                    last_saved_date: new Date(),
+                    labels: req.body.labels,
                 };
-                const updatedChart = await Chart.findByIdAndUpdate(id, update, {
+
+                const updateOp = { $set };
+
+                if (wantsEmbed) {
+                    const pub = !!req.body.is_public;
+                    $set.is_public = pub;
+                    if (pub) {
+                        const raw = normalizeChartEmbedSlug(req.body.public_slug || req.body.chart_name || "");
+                        if (!isValidChartEmbedSlug(raw)) {
+                            return res.status(400).json({
+                                success: false,
+                                message: "Invalid embed slug (use lowercase letters, numbers, hyphens).",
+                            });
+                        }
+                        const dup = await Chart.findOne({
+                            user_id: chart.user_id,
+                            public_slug: raw,
+                            _id: { $ne: chart._id },
+                        }).lean();
+                        if (dup) {
+                            return res.status(409).json({ success: false, message: "That slug is already used for one of your charts." });
+                        }
+                        $set.public_slug = raw;
+                    } else {
+                        updateOp.$unset = { public_slug: "" };
+                    }
+                }
+
+                const updatedChart = await Chart.findByIdAndUpdate(id, updateOp, {
                     new: true,
                     runValidators: true,
                 });

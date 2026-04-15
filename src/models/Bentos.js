@@ -24,8 +24,17 @@ const BentoSchema = new mongoose.Schema({
         type: Schema.Types.ObjectId, // Defines the type as ObjectId
         ref: 'User', // References the User model
         required: true // Makes this field mandatory
-    }
+    },
+    public_slug: {
+        type: String,
+        maxLength: [120, "public_slug cannot be more than 120 characters"],
+    },
+    is_public: {
+        type: Boolean,
+        default: false,
+    },
 })
 
+BentoSchema.index({ user_id: 1, public_slug: 1 }, { unique: true, sparse: true })
 
 export default mongoose.models.Bento || mongoose.model("Bento", BentoSchema)
