@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
+const IS_DEV = process.env.NODE_ENV === "development";
 
 type PublicChartProps = {
   username: string;
@@ -14,7 +15,9 @@ type PublicChartProps = {
  */
 export function PublicChart({ username, slug, height = 480 }: PublicChartProps) {
   const path = `/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`;
-  const src = `${SITE.replace(/\/$/, "")}${path}`;
+  const src = IS_DEV ? path : `${SITE.replace(/\/$/, "")}${path}`;
+  const homeHref = IS_DEV ? "/" : SITE;
+  const homeLabel = IS_DEV ? "localhost" : "lycheedata.com";
   return (
     <figure className="my-8 space-y-2">
       <div className="overflow-hidden rounded-xl border border-border bg-muted/20">
@@ -25,8 +28,8 @@ export function PublicChart({ username, slug, height = 480 }: PublicChartProps) 
           View this chart on Lychee Data
         </Link>
         {" · "}
-        <Link href={SITE} className="underline">
-          lycheedata.com
+        <Link href={homeHref} className="underline">
+          {homeLabel}
         </Link>
       </figcaption>
     </figure>
