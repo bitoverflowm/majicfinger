@@ -166,15 +166,15 @@ export default function PublicChartEmbedClient({
           }`}
         </div>
         <Tabs defaultValue="chart" className="flex w-full flex-1 flex-col">
-          <TabsList className="h-9">
+          <TabsList className="h-9 w-auto self-center">
             <TabsTrigger value="chart" className="text-xs">Chart</TabsTrigger>
             <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
           </TabsList>
-          <TabsContent value="chart" className="mt-2 flex-1">
-            <ChartBuilderProvider demo={false} initialBuilderSnapshot={chartSnapshot as never}>
-              <div className="flex h-full min-h-[520px] w-full items-center justify-center p-2 md:p-4">
-                <div className="w-full max-w-[1040px] rounded-xl border bg-background/70 p-3 shadow-sm md:p-5">
-                  <div className="flex h-[420px] min-h-[320px] w-full min-w-0 flex-col md:h-[520px]">
+          <TabsContent value="chart" className="mt-2 flex flex-1 items-center justify-center">
+            <ChartBuilderProvider className="py-0" demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
+              <div className="flex h-full min-h-0 w-full items-center justify-center">
+                <div className="w-full max-w-[1040px]">
+                  <div className="flex h-[420px] min-h-[320px] w-full min-w-0 flex-col md:h-[750px]">
                     <ChartCanvas />
                   </div>
                 </div>

@@ -281,7 +281,7 @@ function formatCompactNumber(value) {
   return `${Math.round(value * 100) / 100}`;
 }
 
-export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot }) {
+export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, embedCompact = false }) {
   const contextStateV2 = useMyStateV2();
   const chartRef = useRef(null);
 
@@ -831,6 +831,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot })
 
   const value = {
     demo,
+    embedCompact,
     effectiveData,
     usingSampleFallback,
     setViewing,
@@ -1020,6 +1021,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot })
 export function ChartCanvas() {
   const {
     demo,
+    embedCompact,
     usingSampleFallback,
     dark,
     showWsFeedControl,
@@ -1402,7 +1404,9 @@ export function ChartCanvas() {
                     className={cn(
                       // `max-w` only applies when the card is wider than this cap; narrow layouts are widened via CardContent `px-*` above.
                       "flex flex-col items-center justify-start aspect-auto mx-auto h-full min-h-[200px] w-full max-w-[min(100%,67.2rem)] flex-1 transition-[min-height,padding] duration-300 ease-out md:min-h-[220px]",
-                      xAxisTicksAngled ? "py-4 sm:py-5 md:min-h-[240px]" : "py-12",
+                      xAxisTicksAngled
+                        ? "py-4 sm:py-5 md:min-h-[240px]"
+                        : (embedCompact ? "py-5 sm:py-6" : "py-12"),
                       dark && !chartTextColor && "text-slate-200",
                     )}
                     style={chartTextColor ? { color: chartTextColor } : undefined}
