@@ -72,13 +72,50 @@ export default async function handler(req, res) {
       case "checkout.session.async_payment_succeeded":
         await handleCheckoutCompleted(data);
         break;
+      case "checkout.session.async_payment_failed":
+        await handleCheckoutPaymentFailed(data);
+        break;
+      case "checkout.session.expired":
+        await handleCheckoutExpired(data);
+        break;
+
+      // Customer lifecycle events (mainly to ensure user record exists)
+      case "customer.created":
+        await handleCustomerCreated(data);
+        break;
+      case "customer.updated":
+        await handleCustomerUpdated(data);
+        break;
+      case "customer.deleted":
+        await handleCustomerDeleted(data);
+        break;
+
       case "customer.subscription.deleted":
+      case "customer.subscription.created":
       case "customer.subscription.updated":
+      case "customer.subscription.paused":
+      case "customer.subscription.resumed":
+      case "customer.subscription.pending_update_applied":
+      case "customer.subscription.pending_update_expired":
         await handleSubscriptionChange(data, event.type);
         break;
+
+      // Invoice payment outcomes
       case "invoice.payment_failed":
         await handlePaymentFailed(data);
         break;
+      case "invoice.payment_succeeded":
+      case "invoice.paid":
+      case "invoice_payment.paid":
+        await handleInvoicePaymentSucceeded(data);
+        break;
+      case "invoice.payment_action_required":
+        await handleInvoicePaymentNeedsAction(data, "payment_action_required");
+        break;
+      case "invoice.payment_attempt_required":
+        await handleInvoicePaymentNeedsAction(data, "payment_attempt_required");
+        break;
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -131,10 +168,11 @@ async function handleCheckoutCompleted(session) {
       const mapping = mapSubscriptionToTier(sub);
       if (!mapping) return; // Unrecognized - skip update, error already logged
       const amount = sub.items?.data?.[0]?.plan?.amount ?? sub.items?.data?.[0]?.price?.unit_amount ?? 0;
+      const status = sub.status === "trialing" ? "trialing" : "active";
       await updateUserPayment(email, session.customer_details?.name, amount, {
         tier: mapping.tier,
         cycle: mapping.cycle,
-        status: "active",
+        status,
         lifetimeMember: false,
         stripeCustomerId: sub.customer || session.customer || null,
         stripeSubscriptionId: sub.id || null,
@@ -150,8 +188,6 @@ async function handleSubscriptionChange(subscription, eventType) {
   const status =
     eventType === "customer.subscription.deleted"
       ? "cancelled"
-      : subscription.status === "active" || subscription.status === "trialing"
-      ? "active"
       : subscription.status;
 
   let customerEmail = subscription.customer_email;
@@ -178,17 +214,12 @@ async function handleSubscriptionChange(subscription, eventType) {
 }
 
 async function handlePaymentFailed(invoice) {
-  let customerEmail = invoice.customer_email;
-  if (!customerEmail && invoice.customer) {
-    const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-    const customer = await stripe.customers.retrieve(invoice.customer);
-    customerEmail = customer.email;
-  }
-  if (customerEmail) {
-    await updateUserSubscriptionStatus(customerEmail, {
-      status: "payment_failed",
-    });
-  }
+  const customerEmail = await getEmailFromStripeObject(invoice);
+  if (!customerEmail) return;
+
+  await updateUserSubscriptionStatus(customerEmail, {
+    status: "payment_failed",
+  });
 }
 
 function mapSubscriptionToTier(subscription) {
@@ -204,6 +235,135 @@ function mapSubscriptionToTier(subscription) {
     `Add to PLAN_MAP or use price ID mapping. User may not get access.`
   );
   return null;
+}
+
+async function handleCheckoutPaymentFailed(session) {
+  // Payment links may use delayed payment methods; this is the explicit failure signal.
+  const email = session?.customer_details?.email;
+  if (!email) return;
+
+  // Best-effort tier/cycle mapping; we do not grant access on failure.
+  try {
+    if (session.mode === "subscription" && session.subscription) {
+      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const sub = await stripe.subscriptions.retrieve(session.subscription);
+      const mapping = mapSubscriptionToTier(sub);
+      await updateUserSubscriptionStatus(email, {
+        status: "payment_failed",
+        tier: mapping?.tier,
+        cycle: mapping?.cycle,
+        stripeCustomerId: sub.customer || session.customer || null,
+        stripeSubscriptionId: sub.id || null,
+        stripePriceId: sub.items?.data?.[0]?.price?.id || null,
+        nextPaymentDate: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+      });
+      return;
+    }
+
+    if (session.mode === "payment") {
+      const amount = session.amount_total;
+      if (typeof amount === "number" && Number.isFinite(amount)) {
+        const mapping = resolvePlan({ amount, mode: "payment" });
+        await updateUserSubscriptionStatus(email, {
+          status: "payment_failed",
+          tier: mapping?.tier,
+          cycle: mapping?.cycle,
+          stripeCustomerId: session.customer || null,
+          stripeSubscriptionId: null,
+          stripePriceId: null,
+          nextPaymentDate: null,
+        });
+      } else {
+        await updateUserSubscriptionStatus(email, { status: "payment_failed" });
+      }
+      return;
+    }
+  } catch (err) {
+    console.error("[Stripe Webhook] Failed to process async_payment_failed mapping:", err);
+  }
+
+  await updateUserSubscriptionStatus(email, { status: "payment_failed" });
+}
+
+async function handleCheckoutExpired(session) {
+  const email = session?.customer_details?.email;
+  if (!email) return;
+  await updateUserSubscriptionStatus(email, { status: "expired" });
+}
+
+async function handleInvoicePaymentNeedsAction(invoice, statusValue) {
+  const customerEmail = await getEmailFromStripeObject(invoice);
+  if (!customerEmail) return;
+  await updateUserSubscriptionStatus(customerEmail, { status: statusValue });
+}
+
+async function handleInvoicePaymentSucceeded(invoice) {
+  // When possible, prefer subscription-based mapping since it contains interval/price info.
+  const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+  if (invoice?.subscription) {
+    const sub = await stripe.subscriptions.retrieve(invoice.subscription);
+    await handleSubscriptionChange(sub, "customer.subscription.updated");
+    return;
+  }
+
+  // Fallback: treat as one-time payment if we can map by amount.
+  const customerEmail = await getEmailFromStripeObject(invoice);
+  if (!customerEmail) return;
+
+  const amount = invoice?.amount_paid ?? invoice?.amount_total;
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return;
+
+  const mapping = resolvePlan({ amount, mode: "payment" });
+  if (!mapping) {
+    // Don't hard-fail: still mark active so user can access if we cannot map the tier.
+    await updateUserSubscriptionStatus(customerEmail, { status: "active" });
+    return;
+  }
+
+  const name =
+    invoice?.customer_name ||
+    invoice?.customer_details?.name ||
+    customerEmail.split("@")[0] ||
+    "Customer";
+
+  await updateUserPayment(customerEmail, name, amount, {
+    tier: mapping.tier,
+    cycle: mapping.cycle,
+    status: "active",
+    lifetimeMember: mapping.tier === "lifetime",
+    stripeCustomerId: invoice?.customer || null,
+    stripeSubscriptionId: null,
+    stripePriceId: invoice?.lines?.data?.[0]?.price?.id || null,
+    nextPaymentDate: null,
+    subscriptionStartedAt: new Date(),
+  });
+}
+
+async function handleCustomerCreated(customer) {
+  const email = customer?.email;
+  if (!email) return;
+  const name = customer?.name || email.split("@")[0] || "Customer";
+  await upsertUserByEmail(email, {
+    name,
+    stripeCustomerId: customer?.id || null,
+  });
+}
+
+async function handleCustomerUpdated(customer) {
+  const email = customer?.email;
+  if (!email) return;
+  await upsertUserByEmail(email, {
+    name: customer?.name || undefined,
+    stripeCustomerId: customer?.id || undefined,
+  });
+}
+
+async function handleCustomerDeleted(customer) {
+  // Mark entitlements as cancelled if we can associate by email.
+  const email = customer?.email;
+  if (!email) return;
+  await updateUserSubscriptionStatus(email, { status: "cancelled" });
 }
 
 async function updateUserPayment(email, name, amount, opts) {
@@ -247,7 +407,29 @@ async function updateUserPayment(email, name, amount, opts) {
 async function updateUserSubscriptionStatus(email, opts) {
   await dbConnect();
   const user = await User.findOne({ email });
-  if (!user) return;
+  const tier = opts?.tier;
+  const cycle = opts?.cycle;
+
+  // If we subscribed to customer.* events, we may already have a user document.
+  // Otherwise, create one so subscription/invoice events can still update access reliably.
+  if (!user) {
+    const now = new Date();
+    await User.create({
+      email,
+      lifetimeMember: false,
+      subscriptionTier: tier || undefined,
+      billingCycle: cycle || undefined,
+      subscriptionStatus: opts?.status || undefined,
+      subscriptionType: tier && cycle ? `${tier}_${cycle}` : undefined,
+      subscribedAt: opts?.status === "active" || opts?.status === "trialing" ? now : undefined,
+      nextPaymentDate: "nextPaymentDate" in opts ? opts.nextPaymentDate : undefined,
+      stripeCustomerId: opts?.stripeCustomerId || undefined,
+      stripeSubscriptionId: opts?.stripeSubscriptionId || undefined,
+      stripePriceId: opts?.stripePriceId || undefined,
+      token: 100,
+    });
+    return;
+  }
 
   const update = {};
   if (opts.status) update.subscriptionStatus = opts.status;
@@ -269,4 +451,49 @@ async function updateUserSubscriptionStatus(email, opts) {
     update.subscribedAt = new Date();
   }
   await User.findByIdAndUpdate(user._id, { $set: update });
+}
+
+async function upsertUserByEmail(email, { name, stripeCustomerId }) {
+  await dbConnect();
+  const existing = await User.findOne({ email });
+  if (!existing) {
+    await User.create({
+      email,
+      name: name || email.split("@")[0] || "Customer",
+      stripeCustomerId: stripeCustomerId || null,
+      token: 100,
+    });
+    return;
+  }
+
+  const patch = {};
+  if (typeof name === "string" && name.trim()) patch.name = name.trim();
+  if (stripeCustomerId) patch.stripeCustomerId = stripeCustomerId;
+  if (Object.keys(patch).length) {
+    await User.findByIdAndUpdate(existing._id, { $set: patch });
+  }
+}
+
+async function getEmailFromStripeObject(obj) {
+  if (!obj) return null;
+  // Common fields across invoice/payment objects
+  const email =
+    obj.customer_email ||
+    obj?.customer_details?.email ||
+    obj?.billing_details?.email ||
+    obj?.customer_details?.customer_email ||
+    null;
+  if (email) return email;
+
+  // Fallback: if we only have a stripe customer id, fetch it.
+  if (obj.customer) {
+    try {
+      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const customer = await stripe.customers.retrieve(obj.customer);
+      return customer?.email || null;
+    } catch (err) {
+      console.error("[Stripe Webhook] Failed to resolve customer email:", err?.message || err);
+    }
+  }
+  return null;
 }
