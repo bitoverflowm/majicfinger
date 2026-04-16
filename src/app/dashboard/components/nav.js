@@ -20,8 +20,20 @@ import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
-import { Pause, Play, RotateCw, Square, ArrowLeft } from "lucide-react"
+import { Pause, Play, RotateCw, Square, ArrowLeft, Trash2, ExternalLink } from "lucide-react"
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 
 const Nav = () => {
@@ -47,6 +59,7 @@ const Nav = () => {
 
   const loadedDataMeta = contextStateV2?.loadedDataMeta
   const setLoadedDataMeta = contextStateV2?.setLoadedDataMeta
+  const userHandle = contextStateV2?.userHandle
   const loadedDataId = contextStateV2?.loadedDataId
   const setLoadedDataId = contextStateV2?.setLoadedDataId
 
@@ -101,6 +114,23 @@ const Nav = () => {
   const [saveIsOpen, setSaveIsOpen] = useState(false)
   const [newDataName, setNewDataName] = useState()
   const [newChartName, setNewChartName] = useState()
+  const [runtimeOrigin, setRuntimeOrigin] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteUses, setDeleteUses] = useState([])
+  const [deleteDownstream, setDeleteDownstream] = useState(false)
+  const [isDeleteBusy, setIsDeleteBusy] = useState(false)
+
+  const publicCharts = (savedCharts || []).filter((c) => c?.is_public && c?.public_slug)
+  const publicBase =
+    process.env.NODE_ENV === "development" && runtimeOrigin
+      ? runtimeOrigin
+      : (process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com")
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    setRuntimeOrigin(window.location.origin)
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -376,6 +406,120 @@ const Nav = () => {
     }    
   }
 
+  const openDeleteDialog = async (type, item, event) => {
+    event?.stopPropagation?.()
+    const id = item?._id
+    if (!id) return
+    const kindLabel =
+      type === "dataset"
+        ? "data sheet"
+        : type === "chart"
+          ? "chart"
+          : type === "presentation"
+            ? "presentation"
+            : "public page"
+    try {
+      const res = await fetch(`/api/assets/dependencies?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`, {
+        credentials: "include",
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) {
+        toast.error(json?.message || `Unable to inspect ${kindLabel} dependencies`)
+        return
+      }
+      setDeleteTarget({
+        type,
+        id,
+        name: json?.asset?.name || item?.data_set_name || item?.chart_name || item?.presentation_name || "Untitled",
+      })
+      setDeleteUses(Array.isArray(json?.uses) ? json.uses : [])
+      setDeleteDownstream(false)
+      setDeleteDialogOpen(true)
+    } catch {
+      toast.error(`Unable to inspect ${kindLabel} dependencies`)
+    }
+  }
+
+  const handleDeleteConfirmed = async () => {
+    if (!deleteTarget?.id || !deleteTarget?.type) return
+    try {
+      setIsDeleteBusy(true)
+      const res = await fetch("/api/assets/delete", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: deleteTarget.type,
+          id: deleteTarget.id,
+          deleteDownstream: deleteDownstream,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) {
+        toast.error(json?.message || "Delete failed")
+        return
+      }
+
+      const t = deleteTarget.type
+      if (t === "dataset") {
+        if (loadedDataMeta?._id === deleteTarget.id) setLoadedDataMeta(null)
+        setRefetchData?.(1)
+        if (deleteDownstream) {
+          if (loadedChartMeta?._id && (json?.uses || []).some((u) => u.kind === "chart" && u.id === loadedChartMeta._id)) {
+            setLoadedChartMeta(null)
+          }
+          if (loadedPresentationMeta?._id && (json?.uses || []).some((u) => u.kind === "presentation" && u.id === loadedPresentationMeta._id)) {
+            setLoadedPresentationMeta(null)
+          }
+          setRefetchChart?.(1)
+          setRefetchPresentations?.(1)
+        }
+      } else if (t === "chart") {
+        if (loadedChartMeta?._id === deleteTarget.id) {
+          setLoadedChartMeta(null)
+          setLoadedChartBuilderSnapshot?.(null)
+        }
+        setRefetchChart?.(1)
+      } else if (t === "presentation") {
+        if (loadedPresentationMeta?._id === deleteTarget.id) {
+          setLoadedPresentationMeta(null)
+          setConnectedPresentation?.(null)
+        }
+        setRefetchPresentations?.(1)
+      } else if (t === "publicPage") {
+        if (loadedChartMeta?._id === deleteTarget.id) {
+          setLoadedChartMeta((prev) => (prev ? { ...prev, is_public: false, public_slug: undefined } : prev))
+        }
+        setRefetchChart?.(1)
+      }
+
+      toast.success("Deleted successfully")
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
+      setDeleteUses([])
+      setDeleteDownstream(false)
+    } catch {
+      toast.error("Delete failed")
+    } finally {
+      setIsDeleteBusy(false)
+    }
+  }
+
+  const renderDeleteButton = (type, item) => (
+    <TooltipProvider delayDuration={120}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DestructiveIconButton
+            icon={Trash2}
+            ariaLabel="Delete"
+            onClick={(e) => openDeleteDialog(type, item, e)}
+          />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">Delete</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+
   useEffect(()=> {
     loadedChartMeta || loadedDataMeta && setOverwrite(true)
   }, [])
@@ -565,6 +709,7 @@ const Nav = () => {
                               <TabsTrigger value="data">Data Sheets</TabsTrigger>
                               <TabsTrigger value="charts">Charts</TabsTrigger>
                               <TabsTrigger value="persentations">Presentations</TabsTrigger>
+                              <TabsTrigger value="publicPages">Live Public Pages</TabsTrigger>
                             </TabsList>
                             <TabsContent value="data">
                               <div className="flex flex-wrap gap-2">
@@ -573,7 +718,13 @@ const Nav = () => {
                                       (dataSet)=> 
                                         <Card key={dataSet._id} className="w-sm text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadDataSheet(dataSet._id, dataSet)}>
                                           <CardHeader>
-                                            <div className="flex">{dataSet.data_set_name}<div className="ml-auto">{loadedDataMeta && loadedDataMeta._id === dataSet._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                            <div className="flex items-center gap-2">
+                                              <span className="truncate">{dataSet.data_set_name}</span>
+                                              <div className="ml-auto flex items-center gap-2">
+                                                {loadedDataMeta && loadedDataMeta._id === dataSet._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}
+                                                {renderDeleteButton("dataset", dataSet)}
+                                              </div>
+                                            </div>
                                           </CardHeader>
                                           <CardContent>
                                             <div className="font-muted">{dataSet.source}</div>
@@ -594,7 +745,13 @@ const Nav = () => {
                                     (chart)=> 
                                       <Card key={chart._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadChart(chart._id, chart)}>
                                         <CardHeader>
-                                          <div className="flex">{chart.chart_name}<div className="ml-auto">{loadedChartMeta && loadedChartMeta._id === chart._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="truncate">{chart.chart_name}</span>
+                                            <div className="ml-auto flex items-center gap-2">
+                                              {loadedChartMeta && loadedChartMeta._id === chart._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}
+                                              {renderDeleteButton("chart", chart)}
+                                            </div>
+                                          </div>
                                         </CardHeader>
                                         <CardContent>
                                           <div className="py-1">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
@@ -613,7 +770,13 @@ const Nav = () => {
                                     (pressie)=> 
                                       <Card key={pressie._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadPresentation(pressie._id, pressie)}>
                                         <CardHeader>
-                                          <div className="flex">{pressie.presentation_name}<div className="ml-auto">{loadedPresentationMeta && loadedPresentationMeta._id === pressie._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}</div></div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="truncate">{pressie.presentation_name}</span>
+                                            <div className="ml-auto flex items-center gap-2">
+                                              {loadedPresentationMeta && loadedPresentationMeta._id === pressie._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}
+                                              {renderDeleteButton("presentation", pressie)}
+                                            </div>
+                                          </div>
                                         </CardHeader>
                                         <CardContent>
                                           <div>{pressie.project_name}</div>
@@ -628,9 +791,91 @@ const Nav = () => {
                                       )
                                 }
                               </div></TabsContent>
+                            <TabsContent value="publicPages">
+                              <div className="flex flex-wrap gap-2">
+                                {publicCharts.map((chart) => {
+                                  const publicUrl = `${publicBase.replace(/\/$/, "")}/${encodeURIComponent(userHandle || "handle")}/charts/${encodeURIComponent(chart.public_slug)}`
+                                  return (
+                                    <Card key={`public-${chart._id}`} className="w-sm text-sm">
+                                      <CardHeader>
+                                        <div className="flex items-center gap-2">
+                                          <span className="truncate">{chart.chart_name}</span>
+                                          <div className="ml-auto">{renderDeleteButton("publicPage", chart)}</div>
+                                        </div>
+                                      </CardHeader>
+                                      <CardContent>
+                                        <a
+                                          href={publicUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex items-center gap-1 break-all text-xs text-primary underline underline-offset-2"
+                                        >
+                                          {publicUrl}
+                                          <ExternalLink className="h-3 w-3 shrink-0" />
+                                        </a>
+                                        <div className="py-1 text-xs">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
+                                      </CardContent>
+                                    </Card>
+                                  )
+                                })}
+                                {publicCharts.length === 0 && (
+                                  <div className="py-4 text-sm text-muted-foreground">No live public pages yet.</div>
+                                )}
+                              </div>
+                            </TabsContent>
                           </Tabs>
                         </SheetContent>
                   </Sheet>
+                  <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {deleteTarget?.type === "dataset" ? "data sheet" : deleteTarget?.type === "chart" ? "chart" : deleteTarget?.type === "presentation" ? "presentation" : "public page"}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {deleteUses.length > 0 ? (
+                            <span>
+                              This asset is currently used by {deleteUses.length} item(s). Deleting it can break those pages.
+                            </span>
+                          ) : (
+                            <span>This action cannot be undone.</span>
+                          )}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      {deleteUses.length > 0 && (
+                        <div className="max-h-40 overflow-y-auto rounded-md border p-2 text-xs">
+                          {deleteUses.map((use) => (
+                            <div key={`${use.kind}-${use.id}`} className="py-0.5">
+                              {use.kind}: {use.name}{use.slug ? ` (${use.slug})` : ""}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {deleteTarget?.type === "dataset" && deleteUses.length > 0 && (
+                        <div className="flex items-center gap-2 rounded-md border p-2">
+                          <Checkbox
+                            id="delete-downstream"
+                            checked={deleteDownstream}
+                            onCheckedChange={(v) => setDeleteDownstream(!!v)}
+                          />
+                          <Label htmlFor="delete-downstream" className="text-xs cursor-pointer">
+                            Delete all downstream data
+                          </Label>
+                        </div>
+                      )}
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleteBusy}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          disabled={isDeleteBusy}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handleDeleteConfirmed()
+                          }}
+                        >
+                          {isDeleteBusy ? "Deleting..." : "Delete"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
 
 
                 {loadedDataMeta && loadedDataMeta.data_set_name && (

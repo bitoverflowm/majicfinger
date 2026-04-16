@@ -22,7 +22,7 @@ import { toast } from "sonner"
 import AiView from "@/components/aiView";
 import ScraperView from "@/components/scraperView";
 import ComingSoon from "./components/comingSoon";
-import { Pricing } from "@/components/pricing/lycheePricing";
+import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 
@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
+import { isDevLoginBypassUser } from "@/lib/devLoginBypass";
 
 const DashBody = ({ user }) => {
     const contextStateV2 = useMyStateV2()
@@ -70,6 +71,7 @@ const DashBody = ({ user }) => {
     const normalizedSubscriptionStatus = String(subscriptionStatus || "").toLowerCase();
     const hasPaidAccess =
       !!isDemo ||
+      isDevLoginBypassUser(user) ||
       (!!user && (
         !!isLifeTimeMember ||
         normalizedSubscriptionStatus === "active" ||
@@ -284,7 +286,7 @@ const DashBody = ({ user }) => {
                 {!isDemo && viewing === 'presentation' && <div className="py-20"><EasyLychee /></div> }
                 {!isDemo && viewing === 'scrape' && <ScraperView />}
                 {!isDemo && viewing === 'register' && <div className="flex place-items-center place-content-center"><div><Login/></div></div>}
-                {!isDemo && viewing === 'pricing' && <div className="py-10"><Pricing /></div>}
+                {!isDemo && viewing === 'pricing' && <div className="py-10"><PricingSection /></div>}
                 {!isDemo && viewing === 'profilePage' && <div className="p-56 text-black">
                     <div className="">
                         <div className="mb-6 rounded-lg border border-border bg-background p-4 text-sm text-foreground">

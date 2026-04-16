@@ -10,6 +10,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Progress } from '../ui/progress';
+import { DEV_LOGIN_BYPASS_EMAIL, DEV_LOGIN_BYPASS_NAME } from '@/lib/devLoginBypass';
 
 const Login = ({ fromHome }) => {
   const router = useRouter();
@@ -22,8 +23,8 @@ const Login = ({ fromHome }) => {
   // Dev: pre-fill test user so you can one-click login (works even when VPN blocks MongoDB)
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      setEmail('rikesh@bitoverflow.org');
-      setName('Rikesh');
+      setEmail(DEV_LOGIN_BYPASS_EMAIL);
+      setName(DEV_LOGIN_BYPASS_NAME);
     }
   }, []);
   const [progress, setProgress] = useState(0);
@@ -35,7 +36,7 @@ const Login = ({ fromHome }) => {
     setProgress(0);
     const timer = setInterval(() => setProgress((prev) => Math.min(prev + 10, 90)), 3000);
     const body = { email, name };
-    const isDevBypass = process.env.NODE_ENV === 'development' && email === 'rikesh@bitoverflow.org';
+    const isDevBypass = process.env.NODE_ENV === 'development' && email === DEV_LOGIN_BYPASS_EMAIL;
     if (isDevBypass) body.devBypass = true;
 
     let res;

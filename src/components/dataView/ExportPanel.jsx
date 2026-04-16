@@ -16,6 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import Link from "next/link";
+import { ExternalLink, Trash2 } from "lucide-react";
+import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useUser } from "@/lib/hooks";
@@ -101,8 +104,10 @@ function ShareEmbedSection() {
   const [slugInput, setSlugInput] = useState("");
   const [showSignupDialog, setShowSignupDialog] = useState(false);
   const [showSavePublishDialog, setShowSavePublishDialog] = useState(false);
+  const [showDeleteEmbedDialog, setShowDeleteEmbedDialog] = useState(false);
   const [pendingChartName, setPendingChartName] = useState("");
   const [isSavePublishing, setIsSavePublishing] = useState(false);
+  const [isDeletingEmbed, setIsDeletingEmbed] = useState(false);
   const [runtimeOrigin, setRuntimeOrigin] = useState("");
 
   useEffect(() => {
@@ -356,6 +361,37 @@ function ShareEmbedSection() {
     }
   }, []);
 
+  const deleteEmbed = useCallback(async () => {
+    if (!loadedChartMeta?._id) return;
+    try {
+      setIsDeletingEmbed(true);
+      const res = await fetch("/api/assets/delete", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "publicPage",
+          id: loadedChartMeta._id,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        toast.error(json?.message || "Failed to delete public page");
+        return;
+      }
+      setLoadedChartMeta?.((prev) =>
+        prev ? { ...prev, is_public: false, public_slug: undefined } : prev,
+      );
+      setRefetchChart?.(1);
+      setShowDeleteEmbedDialog(false);
+      toast.success("Public embed deleted");
+    } catch {
+      toast.error("Failed to delete public page");
+    } finally {
+      setIsDeletingEmbed(false);
+    }
+  }, [loadedChartMeta?._id, setLoadedChartMeta, setRefetchChart]);
+
   return (
     <div className="space-y-2">
       <p className="text-xs font-bold text-muted-foreground">Share</p>
@@ -437,7 +473,31 @@ function ShareEmbedSection() {
         </TooltipProvider>
       </div>
       {publicUrl ? (
-        <p className="break-all text-[10px] text-muted-foreground">{publicUrl}</p>
+        <div className="flex items-center gap-2">
+          <Link
+            href={publicUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 break-all text-[10px] text-primary underline underline-offset-2"
+          >
+            {publicUrl}
+            <ExternalLink className="h-3 w-3 shrink-0" />
+          </Link>
+          {isPublishedForCurrentSlug ? (
+            <TooltipProvider delayDuration={120}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DestructiveIconButton
+                    icon={Trash2}
+                    ariaLabel="Delete"
+                    onClick={() => setShowDeleteEmbedDialog(true)}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Delete</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
+        </div>
       ) : null}
       <AlertDialog open={showSignupDialog} onOpenChange={setShowSignupDialog}>
         <AlertDialogContent>
@@ -492,6 +552,29 @@ function ShareEmbedSection() {
             <Button type="button" onClick={saveAndPublish} disabled={isSavePublishing}>
               {isSavePublishing ? "Saving..." : "Save and publish"}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={showDeleteEmbedDialog} onOpenChange={setShowDeleteEmbedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete public embed?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will unpublish the public chart page and disable its embed URL.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingEmbed}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                deleteEmbed();
+              }}
+              disabled={isDeletingEmbed}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingEmbed ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

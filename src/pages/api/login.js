@@ -2,9 +2,7 @@ import { magic } from '../../lib/magic'
 import { setLoginSession } from '../../lib/auth'
 import dbConnect from '../../lib/dbConnect'
 import User from '../../models/Users'
-
-const DEV_BYPASS_EMAIL = 'rikesh@bitoverflow.org'
-const DEV_BYPASS_NAME = 'Rikesh'
+import { DEV_LOGIN_BYPASS_EMAIL as DEV_BYPASS_EMAIL, DEV_LOGIN_BYPASS_NAME as DEV_BYPASS_NAME } from '@/lib/devLoginBypass'
 
 /** Dev-only: when DB is unreachable (e.g. VPN blocks MongoDB), set a minimal session so you can still test Polymarket with VPN on */
 async function setDevNoDbSession(res) {
