@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { AnimatePresence, motion, useScroll } from "framer-motion";
 
 import { NavMenu } from "@/components/nav-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/lib/config";
+import { isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
 
@@ -59,10 +60,13 @@ export function Navbar() {
   const [activeSection, setActiveSection] = useState("hero");
   const user = useUser();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const handleScroll = () => {
-      const sections = siteConfig.nav.links.map((item) => item.href.substring(1));
+      const sections = siteConfig.nav.links
+        .map((item) => navHrefToSectionId(item.href))
+        .filter((id): id is string => Boolean(id));
 
       for (const section of sections) {
         const element = document.getElementById(section);
@@ -254,13 +258,32 @@ export function Navbar() {
                           href={item.href}
                           onClick={(e) => {
                             e.preventDefault();
-                            const element = document.getElementById(item.href.substring(1));
+                            if (isAbsoluteHomeHashHref(item.href)) {
+                              const hash = item.href.slice(2);
+                              if (pathname === "/") {
+                                const element = document.getElementById(hash);
+                                if (element) {
+                                  const top =
+                                    element.getBoundingClientRect().top +
+                                    window.pageYOffset -
+                                    100;
+                                  window.scrollTo({ top, behavior: "smooth" });
+                                }
+                                setIsDrawerOpen(false);
+                                return;
+                              }
+                              window.location.href = item.href;
+                              setIsDrawerOpen(false);
+                              return;
+                            }
+                            const id = navHrefToSectionId(item.href);
+                            const element = id ? document.getElementById(id) : null;
                             element?.scrollIntoView({ behavior: "smooth" });
                             setIsDrawerOpen(false);
                           }}
                           className={cn(
                             "underline-offset-4 hover:text-primary/80 transition-colors",
-                            activeSection === item.href.substring(1)
+                            activeSection === navHrefToSectionId(item.href)
                               ? "text-primary font-medium"
                               : "text-primary/60",
                           )}

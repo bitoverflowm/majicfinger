@@ -8,9 +8,9 @@ export const siteConfig = {
   ...coreSiteConfig,
   nav: {
     links: [
-      { id: "hero", name: "Home", href: "#hero" },
-      { id: "pricing", name: "Pricing", href: "#pricing" },
-      { id: "guides", name: "Guides", href: "#guides" },
+      { id: "hero", name: "Home", href: "/#hero" },
+      { id: "pricing", name: "Pricing", href: "/#pricing" },
+      { id: "guides", name: "Guides", href: "/#guides" },
     ],
   },
   companyShowcase: {
@@ -153,7 +153,7 @@ In <0.69 seconds. No coding. No setup.`,
     {
       title: "Company",
       links: [
-        { id: 5, title: "Guides", url: "/#guides" },
+        { id: 5, title: "Guides", url: "/guides" },
         { id: 6, title: "Affiliates", url: "/affiliates" },
         { id: 7, title: "GitHub", url: "https://github.com/misterrpink1" },
         { id: 8, title: "Twitter / X", url: "https://x.com/misterrpink1" },

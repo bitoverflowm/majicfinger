@@ -12,10 +12,16 @@ export type TwitterCardType =
 export type BaseContent = {
   title: string;
   description: string;
+  /** Some MDX uses `summary` instead of `description` for cards. */
+  summary?: string;
+  /** Editorial grouping e.g. feature-releases. */
+  section?: string;
   publishedAt: string;
   updatedAt?: string;
   author: string;
   coverImage?: string;
+  /** Card image alias used in some content. */
+  image?: string;
   ogImage?: string;
   /** Preferred canonical URL (frontmatter may use `canonical` — normalized in loader). */
   canonicalUrl?: string;

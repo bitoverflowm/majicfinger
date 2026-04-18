@@ -43,7 +43,7 @@ export function GuideLayout({
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
-    { label: "Guides", href: "/#guides" },
+    { label: "Guides", href: "/guides" },
     { label: frontmatter.title },
   ];
 

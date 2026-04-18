@@ -4,9 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import type { ContentItem } from "@/lib/content/types";
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | undefined) {
   if (!dateStr) return "";
   const date = new Date(dateStr);
   return date.toLocaleDateString("en-us", {
@@ -16,7 +17,11 @@ function formatDate(dateStr) {
   });
 }
 
-export default function GuidesSection({ articles = [] }) {
+type GuidesSectionProps = {
+  articles?: ContentItem[];
+};
+
+export default function GuidesSection({ articles = [] }: GuidesSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredArticles = useMemo(() => {
@@ -25,8 +30,10 @@ export default function GuidesSection({ articles = [] }) {
     return articles.filter(
       (item) =>
         (item.frontmatter?.title || "").toLowerCase().includes(q) ||
-        (item.frontmatter?.description || item.frontmatter?.summary || "").toLowerCase().includes(q) ||
-        (item.excerpt || "").toLowerCase().includes(q)
+        (item.frontmatter?.description || item.frontmatter?.summary || "")
+          .toLowerCase()
+          .includes(q) ||
+        (item.excerpt || "").toLowerCase().includes(q),
     );
   }, [articles, searchQuery]);
 
@@ -37,7 +44,11 @@ export default function GuidesSection({ articles = [] }) {
         const topics = Array.isArray(item.frontmatter?.topics)
           ? item.frontmatter.topics.map((t) => String(t).toLowerCase())
           : [];
-        return section === "feature-releases" || topics.includes("feature-release") || topics.includes("product-update");
+        return (
+          section === "feature-releases" ||
+          topics.includes("feature-release") ||
+          topics.includes("product-update")
+        );
       }),
     [filteredArticles],
   );
@@ -51,11 +62,12 @@ export default function GuidesSection({ articles = [] }) {
     [filteredArticles],
   );
 
-  const renderGrid = (items) => (
+  const renderGrid = (items: ContentItem[]) => (
     <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
       {items.length > 0 ? (
         items.map((item, idx) => {
-          const image = item.frontmatter?.coverImage || item.frontmatter?.image || item.frontmatter?.ogImage;
+          const image =
+            item.frontmatter?.coverImage || item.frontmatter?.image || item.frontmatter?.ogImage;
           return (
             <Link
               key={`${item.contentType}-${item.slug}`}
@@ -86,7 +98,9 @@ export default function GuidesSection({ articles = [] }) {
                   </time>
                 </p>
                 <h3 className="text-xl font-semibold mb-2">{item.frontmatter?.title}</h3>
-                <p className="text-foreground mb-4">{item.frontmatter?.description || item.frontmatter?.summary}</p>
+                <p className="text-foreground mb-4">
+                  {item.frontmatter?.description || item.frontmatter?.summary}
+                </p>
               </div>
             </Link>
           );
@@ -110,12 +124,15 @@ export default function GuidesSection({ articles = [] }) {
       <div className="mb-8 max-w-md mx-auto">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+          <input
             type="search"
             placeholder="Search guides..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className={cn(
+              "flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300",
+              "pl-10",
+            )}
           />
         </div>
       </div>
