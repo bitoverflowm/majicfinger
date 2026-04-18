@@ -394,6 +394,324 @@ async function fetchPolymarketPricesHistoryChunked(marketId, startSec, endSec, {
   return dedupeHistoryByT(merged);
 }
 
+/** --- Polymarket metadata lookup (lycheedata.com/polymarket-metadata) --- */
+
+function parsePolymarketLookupInput(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) return { kind: "empty" };
+
+  try {
+    const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const u = new URL(withProto);
+    const host = u.hostname.toLowerCase();
+    if (host === "polymarket.com" || host.endsWith(".polymarket.com")) {
+      const segments = u.pathname.split("/").filter(Boolean);
+      if (segments.length > 0) {
+        const last = decodeURIComponent(segments[segments.length - 1] || "");
+        if (/^0x[a-fA-F0-9]{64}$/.test(last)) {
+          return { kind: "condition_id", id: last, from: "url" };
+        }
+        if (/^\d+$/.test(last)) {
+          if (last.length >= 20) return { kind: "clob_token_id", tokenId: last, from: "url" };
+          return { kind: "numeric_id", id: last, from: "url" };
+        }
+        if (last && !last.includes(".")) {
+          return { kind: "url_slug", slug: last, segments };
+        }
+      }
+    }
+  } catch {
+    /* not a URL */
+  }
+
+  if (/^0x[a-fA-F0-9]{64}$/.test(trimmed)) {
+    return { kind: "condition_id", id: trimmed };
+  }
+  if (/^\d+$/.test(trimmed)) {
+    if (trimmed.length >= 20) {
+      return { kind: "clob_token_id", tokenId: trimmed };
+    }
+    return { kind: "numeric_id", id: trimmed };
+  }
+  if (/^[a-zA-Z0-9][a-zA-Z0-9-]{0,160}$/.test(trimmed) && !/\s/.test(trimmed)) {
+    return { kind: "slug", slug: trimmed };
+  }
+  return { kind: "text", q: trimmed };
+}
+
+async function tryNamedGammaFetch(target, name, url) {
+  try {
+    target[name] = await fetchJson(url);
+    delete target[`${name}_error`];
+  } catch (err) {
+    target[`${name}_error`] = err.message || String(err);
+  }
+}
+
+async function tryNamedClobFetch(target, name, url) {
+  try {
+    target[name] = await fetchJson(url);
+    delete target[`${name}_error`];
+  } catch (err) {
+    target[`${name}_error`] = err.message || String(err);
+  }
+}
+
+function flattenPublicSearchToSuggestions(searchPayload, max = 28) {
+  const out = [];
+  const seen = new Set();
+  const add = (row) => {
+    const k = `${row.entity}:${row.id || ""}:${row.slug || ""}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(row);
+  };
+
+  const events = searchPayload?.events;
+  if (Array.isArray(events)) {
+    for (const ev of events) {
+      if (!ev) continue;
+      const eid = ev.id != null ? String(ev.id) : "";
+      const eslug = ev.slug ? String(ev.slug) : "";
+      if (eid || eslug) {
+        add({
+          entity: "event",
+          id: eid,
+          slug: eslug || undefined,
+          title: ev.title || ev.ticker || "Event",
+          subtitle: ev.subtitle || (ev.description ? String(ev.description).slice(0, 180) : undefined),
+          volume24hr: ev.volume24hr,
+        });
+      }
+      const markets = ev.markets;
+      if (Array.isArray(markets)) {
+        for (const m of markets) {
+          if (!m) continue;
+          const mid = m.id != null ? String(m.id) : "";
+          const mslug = m.slug ? String(m.slug) : "";
+          if (!mid && !mslug) continue;
+          add({
+            entity: "market",
+            id: mid,
+            slug: mslug || undefined,
+            title: m.question || m.groupItemTitle || "Market",
+            subtitle: ev.title ? `Event: ${ev.title}` : undefined,
+            conditionId: m.conditionId ?? m.condition_id,
+            parentEventId: eid || undefined,
+            parentEventSlug: eslug || undefined,
+            volume24hr: m.volume24hr ?? m.volume,
+          });
+        }
+      }
+    }
+  }
+  return out.slice(0, max);
+}
+
+async function runMetadataSuggestions(rawQ, limitPerType) {
+  const trimmed = String(rawQ || "").trim();
+  if (!trimmed) {
+    return { query: "", suggestions: [], publicSearch: null };
+  }
+  const cap = Math.min(50, Math.max(5, limitPerType ?? 20));
+  const ps = new URLSearchParams();
+  ps.set("q", trimmed);
+  ps.set("limit_per_type", String(cap));
+  ps.set("search_tags", "false");
+  ps.set("search_profiles", "false");
+  ps.set("keep_closed_markets", "0");
+  const publicSearch = await fetchJson(`${GAMMA_BASE}/public-search?${ps.toString()}`);
+  return {
+    query: trimmed,
+    suggestions: flattenPublicSearchToSuggestions(publicSearch, 30),
+    publicSearch,
+  };
+}
+
+async function runMetadataResolve({ entity, id, slug, tokenId, conditionId }) {
+  const out = {
+    selection: {
+      entity,
+      id: id || null,
+      slug: slug || null,
+      tokenId: tokenId || null,
+      conditionId: conditionId || null,
+    },
+    gammaApi: GAMMA_BASE,
+    clobApi: CLOB_BASE,
+  };
+
+  if (entity === "event") {
+    if (id) {
+      await tryNamedGammaFetch(out, "event", `${GAMMA_BASE}/events/${encodeURIComponent(id)}`);
+    } else if (slug) {
+      await tryNamedGammaFetch(out, "event", `${GAMMA_BASE}/events/slug/${encodeURIComponent(slug)}`);
+    }
+    return out;
+  }
+
+  if (entity === "market") {
+    if (tokenId) {
+      await tryNamedClobFetch(out, "marketByToken", `${CLOB_BASE}/markets-by-token/${encodeURIComponent(tokenId)}`);
+      const cid = out.marketByToken?.condition_id;
+      if (cid) {
+        const sp = new URLSearchParams();
+        sp.set("condition_ids", cid);
+        sp.set("limit", "10");
+        await tryNamedGammaFetch(out, "marketsByConditionId", `${GAMMA_BASE}/markets?${sp.toString()}`);
+        const arr = out.marketsByConditionId;
+        const first = Array.isArray(arr) ? arr.find(Boolean) : null;
+        if (first?.id != null && String(first.id) !== "") {
+          await tryNamedGammaFetch(out, "market", `${GAMMA_BASE}/markets/${encodeURIComponent(String(first.id))}`);
+        } else if (first) {
+          out.market = first;
+        }
+      }
+    }
+
+    if (!out.market && conditionId) {
+      const sp = new URLSearchParams();
+      sp.set("condition_ids", conditionId);
+      sp.set("limit", "10");
+      await tryNamedGammaFetch(out, "marketsByConditionId", `${GAMMA_BASE}/markets?${sp.toString()}`);
+      const arr = out.marketsByConditionId;
+      const first = Array.isArray(arr) ? arr.find(Boolean) : null;
+      if (first?.id != null && String(first.id) !== "") {
+        await tryNamedGammaFetch(out, "market", `${GAMMA_BASE}/markets/${encodeURIComponent(String(first.id))}`);
+      } else if (first) {
+        out.market = first;
+      }
+    }
+
+    if (!out.market && id) {
+      await tryNamedGammaFetch(out, "market", `${GAMMA_BASE}/markets/${encodeURIComponent(id)}`);
+    }
+    if (!out.market && slug) {
+      await tryNamedGammaFetch(out, "market", `${GAMMA_BASE}/markets/slug/${encodeURIComponent(slug)}`);
+    }
+
+    const m = out.market;
+    if (m) {
+      const pe = m.events?.[0];
+      if (pe?.id != null && String(pe.id) !== "") {
+        await tryNamedGammaFetch(out, "parentEvent", `${GAMMA_BASE}/events/${encodeURIComponent(String(pe.id))}`);
+      } else if (pe?.slug) {
+        await tryNamedGammaFetch(out, "parentEvent", `${GAMMA_BASE}/events/slug/${encodeURIComponent(pe.slug)}`);
+      }
+    }
+  }
+
+  return out;
+}
+
+function filterEventsMarketsBySubstring(rawQ, eventsArr) {
+  const qLower = rawQ.toLowerCase();
+  const hay = (v) => (v == null ? "" : String(v).toLowerCase());
+  const matchObj = (o, keys) => keys.some((k) => hay(o?.[k]).includes(qLower));
+  return (Array.isArray(eventsArr) ? eventsArr : []).filter((e) => {
+    if (matchObj(e, ["title", "slug", "description", "ticker"])) return true;
+    const markets = e?.markets;
+    if (!Array.isArray(markets)) return false;
+    return markets.some((m) => matchObj(m, ["question", "slug", "description", "groupItemTitle"]));
+  });
+}
+
+function filterMarketsBySubstring(rawQ, marketsArr) {
+  const qLower = rawQ.toLowerCase();
+  const hay = (v) => (v == null ? "" : String(v).toLowerCase());
+  const matchObj = (o, keys) => keys.some((k) => hay(o?.[k]).includes(qLower));
+  return (Array.isArray(marketsArr) ? marketsArr : []).filter((m) =>
+    matchObj(m, ["question", "slug", "description", "groupItemTitle", "id"]),
+  );
+}
+
+async function runPolymarketMetadataLookup(rawQ, opts) {
+  const eventListLimit = opts?.eventListLimit ?? 100;
+  const marketListLimit = opts?.marketListLimit ?? 100;
+  const parsed = parsePolymarketLookupInput(rawQ);
+  const out = { query: rawQ, parsed, gammaApi: GAMMA_BASE };
+
+  const ps = new URLSearchParams();
+  ps.set("q", rawQ);
+  ps.set("limit_per_type", "35");
+  ps.set("search_tags", "false");
+  ps.set("search_profiles", "false");
+  ps.set("keep_closed_markets", "0");
+  await tryNamedGammaFetch(out, "publicSearch", `${GAMMA_BASE}/public-search?${ps.toString()}`);
+
+  if (parsed.kind === "numeric_id") {
+    const id = encodeURIComponent(parsed.id);
+    await tryNamedGammaFetch(out, "marketById", `${GAMMA_BASE}/markets/${id}`);
+    await tryNamedGammaFetch(out, "eventById", `${GAMMA_BASE}/events/${id}`);
+  }
+
+  if (parsed.kind === "condition_id") {
+    const sp = new URLSearchParams();
+    sp.set("condition_ids", parsed.id);
+    sp.set("limit", "10");
+    await tryNamedGammaFetch(out, "marketsByConditionId", `${GAMMA_BASE}/markets?${sp.toString()}`);
+  }
+
+  if (parsed.kind === "clob_token_id") {
+    await tryNamedClobFetch(out, "marketByToken", `${CLOB_BASE}/markets-by-token/${encodeURIComponent(parsed.tokenId)}`);
+    const cid = out.marketByToken?.condition_id;
+    if (cid) {
+      const sp = new URLSearchParams();
+      sp.set("condition_ids", cid);
+      sp.set("limit", "10");
+      await tryNamedGammaFetch(out, "gammaMarketsByConditionFromToken", `${GAMMA_BASE}/markets?${sp.toString()}`);
+    }
+  }
+
+  if (parsed.kind === "slug" || parsed.kind === "url_slug") {
+    const slug = encodeURIComponent(parsed.slug);
+    await tryNamedGammaFetch(out, "marketBySlug", `${GAMMA_BASE}/markets/slug/${slug}`);
+    await tryNamedGammaFetch(out, "eventBySlug", `${GAMMA_BASE}/events/slug/${slug}`);
+  }
+
+  if (parsed.kind === "text" || parsed.kind === "slug" || parsed.kind === "url_slug") {
+    try {
+      const evSp = new URLSearchParams();
+      evSp.set("limit", String(eventListLimit));
+      evSp.set("closed", "false");
+      evSp.set("order", "volume");
+      evSp.set("ascending", "false");
+      const events = await fetchJson(`${GAMMA_BASE}/events?${evSp.toString()}`);
+      out.listEventsVolumeOrderSubstringMatch = filterEventsMarketsBySubstring(rawQ, events);
+    } catch (err) {
+      out.listEventsVolumeOrderSubstringMatch_error = err.message || String(err);
+    }
+
+    try {
+      const mkSp = new URLSearchParams();
+      mkSp.set("limit", String(marketListLimit));
+      mkSp.set("closed", "false");
+      mkSp.set("order", "volume24hr");
+      mkSp.set("ascending", "false");
+      const markets = await fetchJson(`${GAMMA_BASE}/markets?${mkSp.toString()}`);
+      out.listMarketsVolume24hrOrderSubstringMatch = filterMarketsBySubstring(rawQ, markets);
+    } catch (err) {
+      out.listMarketsVolume24hrOrderSubstringMatch_error = err.message || String(err);
+    }
+  }
+
+  const volMk = new URLSearchParams();
+  volMk.set("limit", "15");
+  volMk.set("closed", "false");
+  volMk.set("order", "volume24hr");
+  volMk.set("ascending", "false");
+  await tryNamedGammaFetch(out, "marketsTopByVolume24hr", `${GAMMA_BASE}/markets?${volMk.toString()}`);
+
+  const volEv = new URLSearchParams();
+  volEv.set("limit", "15");
+  volEv.set("closed", "false");
+  volEv.set("order", "volume");
+  volEv.set("ascending", "false");
+  await tryNamedGammaFetch(out, "eventsListByVolume", `${GAMMA_BASE}/events?${volEv.toString()}`);
+
+  return out;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -449,6 +767,12 @@ export default async function handler(req, res) {
         const slug = req.query.slug;
         if (!slug) return res.status(400).json({ message: "Missing required parameter: slug" });
         data = await fetchJson(`${GAMMA_BASE}/markets/slug/${encodeURIComponent(slug)}`);
+        break;
+      }
+      case "getMarketByToken": {
+        const tokenId = req.query.token_id ?? req.query.tokenId;
+        if (!tokenId) return res.status(400).json({ message: "Missing required parameter: token_id (CLOB outcome token id)" });
+        data = await fetchJson(`${CLOB_BASE}/markets-by-token/${encodeURIComponent(String(tokenId))}`);
         break;
       }
       case "getMarketTags": {
@@ -578,6 +902,50 @@ export default async function handler(req, res) {
         if (takerOnly === "true" || takerOnly === "false") tradesParams.set("takerOnly", takerOnly);
         data = await fetchJson(`${DATA_API_BASE}/trades?${tradesParams.toString()}`);
         break;
+      }
+      case "metadataSuggestions": {
+        const q = req.query.q;
+        if (!q || !String(q).trim()) {
+          return res.status(200).json({ query: "", suggestions: [], publicSearch: null });
+        }
+        const limitPerType = Math.min(50, Math.max(5, Number(req.query.limit_per_type) || 20));
+        const payload = await runMetadataSuggestions(String(q).trim(), limitPerType);
+        return res.status(200).json(payload);
+      }
+      case "metadataResolve": {
+        let entity = String(req.query.entity || "").trim();
+        const id = req.query.id != null ? String(req.query.id).trim() : "";
+        const slug = req.query.slug != null ? String(req.query.slug).trim() : "";
+        const tokenId = req.query.tokenId != null ? String(req.query.tokenId).trim() : "";
+        const conditionId = req.query.conditionId != null ? String(req.query.conditionId).trim() : "";
+        if (tokenId && !entity) entity = "market";
+        if (entity !== "event" && entity !== "market") {
+          return res.status(400).json({ message: "entity must be event or market" });
+        }
+        if (!id && !slug && !tokenId && !(entity === "market" && conditionId)) {
+          return res.status(400).json({ message: "Provide id, slug, tokenId, or conditionId (for markets)" });
+        }
+        if (entity === "event" && tokenId) {
+          return res.status(400).json({ message: "tokenId applies to markets only (CLOB /markets-by-token)" });
+        }
+        if (entity === "event" && conditionId) {
+          return res.status(400).json({ message: "conditionId applies to markets only" });
+        }
+        const payload = await runMetadataResolve({ entity, id, slug, tokenId, conditionId });
+        return res.status(200).json(payload);
+      }
+      case "metadataLookup": {
+        const q = req.query.q;
+        if (!q || !String(q).trim()) {
+          return res.status(400).json({ message: "Missing required parameter: q" });
+        }
+        const eventListLimit = Math.min(250, Math.max(20, Number(req.query.eventListLimit) || 100));
+        const marketListLimit = Math.min(250, Math.max(20, Number(req.query.marketListLimit) || 100));
+        const payload = await runPolymarketMetadataLookup(String(q).trim(), {
+          eventListLimit,
+          marketListLimit,
+        });
+        return res.status(200).json(payload);
       }
       default:
         return res.status(400).json({ message: "Invalid query" });

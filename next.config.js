@@ -6,6 +6,15 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/polymarket-metadata',
+        headers: [
+          {
+            key: 'Link',
+            value: '<https://lycheedata.com>; rel=preconnect',
+          },
+        ],
+      },
+      {
         source: '/:username/charts/:slug*',
         headers: [
           {
