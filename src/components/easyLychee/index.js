@@ -306,7 +306,7 @@ const EasyLychee = () => {
                                     @{userHandle}
                                 </code></Link> 
                             using 
-                            <Link rel="noopener noreferrer" target="_blank" href="https://www.lycheedata.com/#easyLychee">
+                            <Link rel="noopener noreferrer" target="_blank" href="https://lycheedata.com/#easyLychee">
                                 <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
                                     EasyLychee
                                 </code>
@@ -424,7 +424,7 @@ const EasyLychee = () => {
                                 <p className="text-xs text-muted-foreground">When you deploy, your page will be accessible here:</p>
                                 <div className="max-w-full break-words px-2 py-4">
                                 <Link rel="noopener noreferrer" target="_blank" href={`${baseUrl}${userHandle}/${projectName}/${presentationName}`}>
-                                        <small className="text-xs font-medium leading-none">www.lycheedata.com/easy/{userHandle}/{projectName}/{presentationName}</small>
+                                        <small className="text-xs font-medium leading-none">lycheedata.com/easy/{userHandle}/{projectName}/{presentationName}</small>
                                     </Link>
                                 </div>
                                 <div>
