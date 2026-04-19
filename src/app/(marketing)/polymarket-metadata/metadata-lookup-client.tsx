@@ -1,11 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Search } from "lucide-react";
+import { Check, Copy, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  buildMostNeededView,
+  cardEntityPillClass,
+  outcomeBadgeClass,
+  type MarketCardModel,
+  type MostNeededView,
+} from "./metadata-most-needed";
 
 export type MetadataSuggestion = {
   entity: "event" | "market";
@@ -30,7 +37,7 @@ function entityTagClass(entity: MetadataSuggestion["entity"]) {
   return "bg-violet-500/15 text-violet-900 ring-1 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35";
 }
 
-const LYCHEE_DASHBOARD_HREF = "/dashboard";
+const LYCHEE_HOME_HREF = "/";
 
 type ResultEntityKind = "event" | "market";
 
@@ -92,6 +99,169 @@ const suggestionRowVariants = {
   },
 };
 
+function MetadataField({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
+  return (
+    <div className="grid gap-0.5 sm:grid-cols-[9rem_1fr] sm:items-baseline sm:gap-x-3">
+      <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className={cn("min-w-0 text-sm text-foreground", mono && "break-all font-mono text-[0.7rem] leading-snug")}>
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+function MarketSummaryCard({
+  model,
+  compact,
+  entityLabel,
+}: {
+  model: MarketCardModel;
+  compact?: boolean;
+  entityLabel: "market";
+}) {
+  const pad = compact ? "p-3.5" : "p-4";
+  return (
+    <article
+      className={cn(
+        "rounded-xl border border-border bg-card/80 text-card-foreground shadow-sm backdrop-blur-sm",
+        "dark:border-slate-800 dark:bg-slate-950/60",
+        pad,
+      )}
+    >
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 space-y-1">
+          <span
+            className={cn(
+              "inline-flex rounded px-1.5 py-0.5 text-[0.65rem] font-semibold capitalize tracking-wide",
+              cardEntityPillClass(entityLabel),
+            )}
+          >
+            {entityLabel}
+          </span>
+          <h4 className={cn("font-semibold leading-snug text-foreground", compact ? "text-sm" : "text-base")}>
+            {model.title}
+          </h4>
+        </div>
+      </div>
+      <dl className="space-y-2.5">
+        {model.entityId ? (
+          <MetadataField label="Market ID" mono>
+            {model.entityId}
+          </MetadataField>
+        ) : null}
+        {model.slug ? (
+          <MetadataField label="Slug" mono>
+            {model.slug}
+          </MetadataField>
+        ) : null}
+        {model.conditionId ? (
+          <MetadataField label="Condition ID" mono>
+            {model.conditionId}
+          </MetadataField>
+        ) : null}
+        {model.oddsLine ? <MetadataField label="Odds / price">{model.oddsLine}</MetadataField> : null}
+        {model.volumeLine ? <MetadataField label="Volume">{model.volumeLine}</MetadataField> : null}
+      </dl>
+      {model.clobTokens.length > 0 ? (
+        <div className="mt-4 border-t border-border/70 pt-3 dark:border-slate-800/80">
+          <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+            CLOB tokens
+          </p>
+          <ul className="space-y-2">
+            {model.clobTokens.map((row) => (
+              <li
+                key={row.tokenId}
+                className={cn(
+                  "flex flex-col gap-1.5 rounded-lg border border-border/80 bg-muted/25 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-900/50 sm:flex-row sm:items-center sm:justify-between sm:gap-2",
+                  row.highlighted && "ring-2 ring-primary/60 ring-offset-2 ring-offset-background dark:ring-offset-slate-950",
+                )}
+              >
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-md px-2 py-0.5 text-[0.65rem] font-semibold capitalize",
+                      outcomeBadgeClass(row.tone),
+                    )}
+                  >
+                    {row.outcomeLabel}
+                  </span>
+                </div>
+                <code className="block min-w-0 break-all text-[0.68rem] leading-snug text-muted-foreground sm:text-right">
+                  {row.tokenId}
+                </code>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function MostNeededMetadataSection({ view }: { view: MostNeededView }) {
+  if (view.focus === "market") {
+    return (
+      <div className="space-y-3 border-t border-border/60 pt-5 dark:border-slate-800/80">
+        <h3 className="text-sm font-semibold tracking-tight text-foreground">Most Needed metadata</h3>
+        <MarketSummaryCard model={view.primary} entityLabel="market" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 border-t border-border/60 pt-5 dark:border-slate-800/80">
+      <h3 className="text-sm font-semibold tracking-tight text-foreground">Most Needed metadata</h3>
+      <article
+        className="rounded-xl border border-border bg-card/80 p-4 text-card-foreground shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/60"
+      >
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1">
+            <span
+              className={cn(
+                "inline-flex rounded px-1.5 py-0.5 text-[0.65rem] font-semibold capitalize tracking-wide",
+                cardEntityPillClass("event"),
+              )}
+            >
+              event
+            </span>
+            <h4 className="text-base font-semibold leading-snug text-foreground">{view.primary.title}</h4>
+          </div>
+        </div>
+        <dl className="space-y-2.5">
+          {view.primary.entityId ? (
+            <MetadataField label="Event ID" mono>
+              {view.primary.entityId}
+            </MetadataField>
+          ) : null}
+          {view.primary.slug ? (
+            <MetadataField label="Slug" mono>
+              {view.primary.slug}
+            </MetadataField>
+          ) : null}
+          {view.primary.volumeLine ? <MetadataField label="Volume">{view.primary.volumeLine}</MetadataField> : null}
+          <MetadataField label="Summary">{view.primary.summaryLine}</MetadataField>
+        </dl>
+      </article>
+
+      {view.subMarkets.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Markets in this event</p>
+          <div className="grid gap-3 sm:grid-cols-1">
+            {view.subMarkets.map((m, i) => (
+              <MarketSummaryCard
+                key={`${m.conditionId ?? ""}-${m.entityId ?? ""}-${m.slug ?? ""}-${i}`}
+                model={m}
+                compact
+                entityLabel="market"
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function MetadataLookupClient() {
   const rootRef = useRef<HTMLDivElement>(null);
   const suggestAbortRef = useRef<AbortController | null>(null);
@@ -104,8 +274,10 @@ export function MetadataLookupClient() {
   const [resolveLoading, setResolveLoading] = useState(false);
   const [jsonText, setJsonText] = useState("");
   const [resultEntity, setResultEntity] = useState<ResultEntityKind | null>(null);
+  const [jsonCopied, setJsonCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchSuggestions = useCallback(async (term: string) => {
     const mySeq = ++suggestSeqRef.current;
@@ -180,6 +352,36 @@ export function MetadataLookupClient() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
+
+  useEffect(() => {
+    setJsonCopied(false);
+    if (copyResetRef.current) {
+      clearTimeout(copyResetRef.current);
+      copyResetRef.current = null;
+    }
+  }, [jsonText]);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    };
+  }, []);
+
+  const copyJsonToClipboard = useCallback(async () => {
+    const text = jsonText.trim();
+    if (!text || resolveLoading || jsonText === "Loading…") return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setJsonCopied(true);
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+      copyResetRef.current = setTimeout(() => {
+        setJsonCopied(false);
+        copyResetRef.current = null;
+      }, 2000);
+    } catch {
+      setJsonCopied(false);
+    }
+  }, [jsonText, resolveLoading]);
 
   const resolveSelection = useCallback(async (s: MetadataSuggestion) => {
     setSuggestOpen(false);
@@ -257,8 +459,14 @@ export function MetadataLookupClient() {
   };
 
   const actionsBusy = resolveLoading;
+  const canCopyJson =
+    Boolean(jsonText?.trim()) && !resolveLoading && jsonText !== "Loading…";
   const showLycheeCta =
     Boolean(jsonText) && !resolveLoading && jsonText !== "Loading…";
+  const mostNeededView = useMemo(() => {
+    if (!jsonText || resolveLoading || jsonText === "Loading…") return null;
+    return buildMostNeededView(jsonText, resultEntity, q);
+  }, [jsonText, resultEntity, q, resolveLoading]);
   const lycheeAnalyzeLabel =
     resultEntity === "market"
       ? "Analyze this Market in Lychee"
@@ -425,7 +633,7 @@ export function MetadataLookupClient() {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 transition-colors hover:text-foreground"
         >
-          <Image src="/avatar.png" alt="misterrpink" width={22} height={22} className="rounded-full object-cover" />
+          <Image src="/mrpink_pfp.jpg" alt="misterrpink" width={22} height={22} className="rounded-full object-cover" />
           <span>
             built by <span className="font-medium text-foreground">misterrpink</span>
           </span>
@@ -439,9 +647,72 @@ export function MetadataLookupClient() {
       ) : null}
 
       <div className="space-y-2">
-        <label htmlFor="metadata-json-out" className="text-sm font-medium text-muted-foreground">
-          Result (JSON)
-        </label>
+        <div className="flex items-start justify-between gap-2">
+          <label htmlFor="metadata-json-out" className="text-sm font-medium text-muted-foreground">
+            Result (JSON)
+          </label>
+          <div className="flex shrink-0 flex-col items-center gap-0.5">
+            <button
+              type="button"
+              onClick={copyJsonToClipboard}
+              disabled={!canCopyJson}
+              title={jsonCopied ? "Copied" : "Copy JSON"}
+              aria-label={jsonCopied ? "Copied to clipboard" : "Copy JSON to clipboard"}
+              className={cn(
+                "relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors",
+                "hover:bg-muted hover:text-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "disabled:pointer-events-none disabled:opacity-40",
+                "dark:border-slate-800 dark:bg-slate-950 dark:focus-visible:ring-offset-slate-950",
+              )}
+            >
+              <span className="sr-only">{jsonCopied ? "Copied" : "Copy"}</span>
+              <AnimatePresence mode="wait" initial={false}>
+                {jsonCopied ? (
+                  <motion.span
+                    key="check"
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    transition={{ duration: 0.15 }}
+                    className="inline-flex"
+                    aria-hidden
+                  >
+                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="copy"
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    transition={{ duration: 0.15 }}
+                    className="inline-flex"
+                    aria-hidden
+                  >
+                    <Copy className="h-4 w-4" />
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+            <AnimatePresence initial={false}>
+              {jsonCopied ? (
+                <motion.p
+                  key="copied-label"
+                  role="status"
+                  aria-live="polite"
+                  initial={{ opacity: 0, y: -2 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -2 }}
+                  transition={{ duration: 0.15 }}
+                  className="whitespace-nowrap text-[0.65rem] font-semibold tracking-wide text-emerald-700 dark:text-emerald-400"
+                >
+                  Copied!
+                </motion.p>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </div>
         <textarea
           id="metadata-json-out"
           readOnly
@@ -455,11 +726,14 @@ export function MetadataLookupClient() {
           )}
           spellCheck={false}
         />
+        {mostNeededView ? <MostNeededMetadataSection view={mostNeededView} /> : null}
         {showLycheeCta ? (
-          <div className="flex flex-col gap-2.5 pt-1 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs leading-snug text-muted-foreground">{lycheeAnalyzeLabel}</p>
+          <div className="flex flex-col items-center justify-center gap-2 pt-1 sm:flex-row sm:gap-2.5">
+            <p className="max-w-md text-center text-xs leading-snug text-muted-foreground sm:max-w-none sm:text-left">
+              {lycheeAnalyzeLabel}
+            </p>
             <Link
-              href={LYCHEE_DASHBOARD_HREF}
+              href={LYCHEE_HOME_HREF}
               className="inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
             >
               Open Lychee

@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
 
-const POLYMARKET_WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
+/** Polymarket CLOB market WS; override with NEXT_PUBLIC_POLYMARKET_WS_URL if Polymarket documents a V2 preview URL. */
+const POLYMARKET_WS_URL =
+  process.env.NEXT_PUBLIC_POLYMARKET_WS_URL || "wss://ws-subscriptions-clob.polymarket.com/ws/market";
 const POLYMARKET_PING_MS = 10000;
 const CHAINLINK_WS_URL = "wss://ws-live-data.polymarket.com";
 const CHAINLINK_PING_MS = 5000;

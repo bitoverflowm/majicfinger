@@ -31,7 +31,7 @@ export async function generateMetadata({
       title,
       description,
       url: canonical,
-      siteName: "Lychee Data",
+      siteName: "Lychee",
       type: "website",
       images: [
         {

@@ -91,7 +91,7 @@ const Nav = () => {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="secondary" className="rounded-full shadow-2xl shadow-inner flex bg-white">
-                              <Image className="" src={'/avatar.png'} height={40} width={40} />
+                              <Image className="" src={'/mrpink_pfp.jpg'} height={40} width={40} />
                               <Menu/>
                             </Button>
                         </DropdownMenuTrigger>

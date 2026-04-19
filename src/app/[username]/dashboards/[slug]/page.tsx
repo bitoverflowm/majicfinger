@@ -21,7 +21,7 @@ export async function generateMetadata({
     openGraph: {
       title,
       url: canonical,
-      siteName: "Lychee Data",
+      siteName: "Lychee",
       type: "website",
     },
   };

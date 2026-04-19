@@ -884,7 +884,7 @@ const Nav = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="secondary" size="icon" className="rounded-full h-9 w-9 overflow-hidden">
-                        <Image src={'/avatar.png'} height={36} width={36} alt="Profile" />
+                        <Image src={'/mrpink_pfp.jpg'} height={36} width={36} alt="Profile" />
                       </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">

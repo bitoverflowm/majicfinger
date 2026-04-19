@@ -169,5 +169,9 @@ In <0.69 seconds. No coding. No setup.`,
         { id: 13, title: "Data use", url: "/dataUse" },
       ],
     },
+    {
+      title: "Our tools",
+      links: [{ id: 14, title: "Polymarket metadata", url: "/polymarket-metadata" }],
+    },
   ],
 } as const;

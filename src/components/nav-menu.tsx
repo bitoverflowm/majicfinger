@@ -1,7 +1,7 @@
 "use client";
 
 import { siteConfig } from "@/lib/config";
-import { isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
+import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import React, { useRef, useState } from "react";
@@ -12,11 +12,10 @@ interface NavItem {
   href: string;
 }
 
-const navs: readonly NavItem[] = siteConfig.nav.links;
-
 export function NavMenu() {
   const ref = useRef<HTMLUListElement>(null);
   const pathname = usePathname();
+  const navs = React.useMemo(() => getNavLinksForPathname(pathname), [pathname]);
   const [left, setLeft] = useState(0);
   const [width, setWidth] = useState(0);
   const [isReady, setIsReady] = useState(false);
@@ -24,16 +23,14 @@ export function NavMenu() {
   const [isManualScroll, setIsManualScroll] = useState(false);
 
   React.useEffect(() => {
-    const firstItem = ref.current?.querySelector(
-      `[href="${navs[0]?.href}"]`,
-    )?.parentElement;
+    const firstItem = ref.current?.querySelector(`[href="${navs[0]?.href}"]`)?.parentElement;
     if (firstItem) {
       const rect = firstItem.getBoundingClientRect();
       setLeft(firstItem.offsetLeft);
       setWidth(rect.width);
       setIsReady(true);
     }
-  }, []);
+  }, [navs]);
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -70,7 +67,7 @@ export function NavMenu() {
     window.addEventListener("scroll", handleScroll);
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isManualScroll]);
+  }, [isManualScroll, navs]);
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
     e.preventDefault();

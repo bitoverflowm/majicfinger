@@ -10,7 +10,7 @@ import { AnimatePresence, motion, useScroll } from "framer-motion";
 import { NavMenu } from "@/components/nav-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/lib/config";
-import { isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
+import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
 
@@ -64,7 +64,7 @@ export function Navbar() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const sections = siteConfig.nav.links
+      const sections = getNavLinksForPathname(pathname)
         .map((item) => navHrefToSectionId(item.href))
         .filter((id): id is string => Boolean(id));
 
@@ -82,7 +82,7 @@ export function Navbar() {
     window.addEventListener("scroll", handleScroll);
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     return scrollY.on("change", (latest) => {
@@ -178,7 +178,7 @@ export function Navbar() {
                       className="hidden md:flex items-center justify-center h-8 w-8 rounded-full border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95 overflow-hidden"
                       aria-label="Open dashboard"
                     >
-                      <Image src={"/avatar.png"} alt="Avatar" height={32} width={32} />
+                      <Image src={"/mrpink_pfp.jpg"} alt="Avatar" height={32} width={32} />
                     </Link>
                   </>
                 )}
@@ -248,7 +248,7 @@ export function Navbar() {
                   variants={drawerMenuContainerVariants}
                 >
                   <AnimatePresence>
-                    {siteConfig.nav.links.map((item) => (
+                    {getNavLinksForPathname(pathname).map((item) => (
                       <motion.li
                         key={item.id}
                         className="p-2.5 border-b border-border last:border-b-0"

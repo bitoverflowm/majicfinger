@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
+import GuidesSection from "@/components/sections/guides-section";
 import { FooterSection } from "@/components/sections/footer-section";
+import { getAllContent } from "@/lib/content";
+import type { ContentItem } from "@/lib/content/types";
 import { MetadataLookupClient } from "./metadata-lookup-client";
+import { PolymarketMetadataFAQSection } from "./polymarket-metadata-faq-section";
 
 const CANONICAL = "https://lycheedata.com/polymarket-metadata";
 const OG_IMAGE = "https://lycheedata.com/og-polymarket-metadata.png";
@@ -14,6 +17,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://lycheedata.com"),
+  applicationName: "Lychee Polymarket Metadata Lookup",
+  category: "Developer Tools",
   title: {
     absolute: "Polymarket Metadata Lookup Tool – Find Market ID, Event ID & Slugs Instantly",
   },
@@ -55,15 +60,20 @@ export const metadata: Metadata = {
       "Find Polymarket market IDs, event IDs, and slugs instantly. Search prediction markets without using APIs or GraphQL.",
     type: "website",
     url: CANONICAL,
-    siteName: "LycheeData",
+    siteName: "Lychee",
     locale: "en",
-    images: [{ url: OG_IMAGE }],
+    images: [{ 
+      url: OG_IMAGE, 
+      alt: "Polymarket Metadata Lookup Tool showing market ID, event ID, and slug search",
+
+    }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Polymarket Metadata Lookup Tool",
     description: "Search Polymarket predictions and instantly get market IDs, event IDs, and metadata.",
     images: [OG_IMAGE],
+    imageAlt: "Polymarket Metadata Lookup Tool for finding market IDs and event IDs",
   },
   other: {
     "content-language": "en",
@@ -78,6 +88,13 @@ const softwareApplicationLd = {
   operatingSystem: "Web",
   description:
     "Search any Polymarket prediction and instantly find market ID, event ID, slug, and structured metadata.",
+  featureList: [
+    "Find Polymarket market ID",
+    "Find Polymarket event ID",
+    "Extract Polymarket slug",
+    "Search prediction markets",
+    "No API required",
+  ],
   url: "https://lycheedata.com/polymarket-metadata",
   publisher: {
     "@type": "Organization",
@@ -92,18 +109,26 @@ const faqLd = {
   mainEntity: [
     {
       "@type": "Question",
-      name: "How do I find a Polymarket market ID?",
+      name: "What is Polymarket metadata?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Use the Polymarket metadata lookup tool to search by question and retrieve the market ID instantly.",
+        text: "Polymarket metadata refers to structured information including market IDs, event IDs, outcome tokens, and slugs used to identify prediction markets.",
       },
     },
     {
       "@type": "Question",
-      name: "What is a Polymarket event ID?",
+      name: "How do I find a Polymarket event ID?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "An event ID groups related prediction markets under a single real-world event.",
+        text: "Search the market question in the lookup tool to instantly retrieve the event ID and related market identifiers.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Do I need the Polymarket API?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "No. This tool allows you to access Polymarket metadata without using APIs or GraphQL.",
       },
     },
   ],
@@ -135,6 +160,18 @@ const breadcrumbLd = {
 };
 
 export default function PolymarketMetadataPage() {
+  let articles: ContentItem[] = [];
+  try {
+    const guides = getAllContent("guides") || [];
+    const blog = getAllContent("blog") || [];
+    articles = [...guides, ...blog];
+    articles.sort((a, b) =>
+      (b.frontmatter?.publishedAt || "").localeCompare(a.frontmatter?.publishedAt || ""),
+    );
+  } catch (e) {
+    console.warn("Content could not be loaded:", e);
+  }
+
   return (
     <>
       <script
@@ -156,7 +193,12 @@ export default function PolymarketMetadataPage() {
               </h1>
               <p className="max-w-2xl text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg text-balance">
                 Search any Polymarket question and instantly find the correct market ID, event ID, slug, and structured
-                metadata — without using APIs, GraphQL, or code.
+                metadata, without using APIs, GraphQL, or code.
+              </p>
+              <p className="max-w-2xl text-sm font-normal leading-relaxed tracking-tight text-muted-foreground/85 md:text-base text-pretty">
+                This Polymarket metadata lookup tool helps you find Polymarket market IDs, event IDs, slugs, and
+                structured prediction market data. Instead of using the <Link href="/guides/polymarket-events-endpoint-no-code">Polymarket API guide</Link>, GraphQL, or manual scraping, you
+                can search any prediction and instantly resolve the correct identifiers.
               </p>
               <MetadataLookupClient />
             </div>
@@ -166,7 +208,7 @@ export default function PolymarketMetadataPage() {
         <section className="w-full px-6 py-16 sm:px-6">
           <div className="mx-auto w-full max-w-2xl space-y-10 text-left">
             <p className="text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg text-pretty">
-              Polymarket data is powerful — but fragmented. If you&apos;ve ever tried to find a market ID, locate an
+              Polymarket data is powerful, but fragmented. If you&apos;ve ever tried to find a market ID, locate an
               event ID, extract a slug, or query Polymarket via API, you&apos;ve likely ended up digging through GraphQL
               endpoints, Gamma API docs, Reddit threads, GitHub scrapers, or outdated scripts. This tool removes all of
               that. Just search what you&apos;re looking for and get structured Polymarket metadata instantly.
@@ -195,12 +237,22 @@ export default function PolymarketMetadataPage() {
             </div>
 
             <div className="space-y-3">
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                How to Find a Polymarket Market ID
+              </h2>
+              <p className="text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg text-pretty">
+                To find a Polymarket market ID, search for the prediction question using the lookup tool above. The tool
+                resolves the correct market ID, event ID, and slug instantly without requiring API access.
+              </p>
+            </div>
+
+            <div className="space-y-3">
               <h2 className="text-xl font-semibold tracking-tight text-foreground">Common Use Cases</h2>
               <ul className="list-none space-y-2 text-base font-medium leading-relaxed text-muted-foreground">
-                <li>Traders — Find exact markets faster than browsing</li>
-                <li>Bot Builders — Resolve IDs for automation</li>
-                <li>Analysts — Map real-world events to structured prediction data</li>
-                <li>Researchers — Access metadata without scraping</li>
+                <li>Traders: find exact markets faster than browsing</li>
+                <li>Bot builders: resolve IDs for automation</li>
+                <li>Analysts: map real-world events to structured prediction data</li>
+                <li>Researchers: access metadata without scraping</li>
               </ul>
             </div>
 
@@ -248,32 +300,22 @@ export default function PolymarketMetadataPage() {
             </div>
 
             <div className="space-y-3">
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">Internal Links</h2>
-              <p className="text-base font-medium leading-relaxed text-muted-foreground">
-                <Link href="/polymarket-data" className="text-primary underline-offset-4 hover:underline">
-                  Polymarket data
-                </Link>
-                {", "}
-                <Link href="/polymarket-price-history" className="text-primary underline-offset-4 hover:underline">
-                  Polymarket price history
-                </Link>
-                {", "}
-                <Link href="/polymarket-data-export" className="text-primary underline-offset-4 hover:underline">
-                  Polymarket data export
-                </Link>
-                {", "}
-                <Link href="/prediction-market-analytics" className="text-primary underline-offset-4 hover:underline">
-                  Prediction market analytics
-                </Link>
-                .
-              </p>
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                Learn More and Dive Deeper to Get Your Edge
+              </h2>
             </div>
+          </div>
 
+          <PolymarketMetadataFAQSection />
+
+          <div className="mx-auto w-full max-w-2xl pb-8 pt-4 text-left">
             <p className="text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg text-pretty">
-              Stop digging through APIs and documentation. Search your question and get structured Polymarket metadata
-              instantly.
+              Stop digging through APIs and documentation. Search any Polymarket prediction and instantly get the market
+              ID, event ID, slug, and structured metadata.
             </p>
           </div>
+
+          <GuidesSection articles={articles} />
         </section>
 
         <FooterSection />

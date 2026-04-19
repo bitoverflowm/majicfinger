@@ -1,6 +1,18 @@
-const GAMMA_BASE = "https://gamma-api.polymarket.com";
-const DATA_API_BASE = "https://data-api.polymarket.com";
-const CLOB_BASE = "https://clob.polymarket.com";
+/**
+ * Polymarket HTTP bases (defaults = production).
+ * CLOB V2 preview host (until ~2026-04-28 cutover): https://clob-v2.polymarket.com — set POLYMARKET_CLOB_API_URL to test.
+ * After cutover, production stays https://clob.polymarket.com (per Polymarket migration guide).
+ * This integration only uses public GETs (Gamma, Data API, CLOB read); no order signing / legacy clob-client.
+ */
+function polymarketApiBase(envVar, fallback) {
+  const v = process.env[envVar];
+  if (typeof v !== "string" || !v.trim()) return fallback;
+  return v.trim().replace(/\/$/, "");
+}
+
+const GAMMA_BASE = polymarketApiBase("POLYMARKET_GAMMA_API_URL", "https://gamma-api.polymarket.com");
+const DATA_API_BASE = polymarketApiBase("POLYMARKET_DATA_API_URL", "https://data-api.polymarket.com");
+const CLOB_BASE = polymarketApiBase("POLYMARKET_CLOB_API_URL", "https://clob.polymarket.com");
 
 const EVENTS_PARAMS = [
   "limit", "offset", "order", "ascending",
