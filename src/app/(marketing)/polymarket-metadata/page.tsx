@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import GuidesSection from "@/components/sections/guides-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { getAllContent } from "@/lib/content";
@@ -72,8 +73,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Polymarket Metadata Lookup Tool",
     description: "Search Polymarket predictions and instantly get market IDs, event IDs, and metadata.",
-    images: [OG_IMAGE],
-    imageAlt: "Polymarket Metadata Lookup Tool for finding market IDs and event IDs",
+    images: [
+      {
+        url: OG_IMAGE,
+        alt: "Polymarket Metadata Lookup Tool for finding market IDs and event IDs",
+      },
+    ],
   },
   other: {
     "content-language": "en",
