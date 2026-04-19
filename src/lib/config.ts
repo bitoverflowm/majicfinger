@@ -50,6 +50,7 @@ export const siteConfig = {
       yearlyNote: plan.yearlyNote ?? null,
       trial: plan.trial ?? null,
     })),
+    lifetimeAccess: landingPageV2Config.lifetimeAccess,
   },
   featureSection: {
     title: "Everything You Need to Move Fast",

@@ -32,14 +32,20 @@ const PLAN_MAP = {
   "38388:year": { tier: "premium", cycle: "annual" },
   "38390:year": { tier: "premium", cycle: "annual" },
 
-  // Existing / legacy one-time lifetime
-  "19999:one-time": { tier: "lifetime", cycle: "one-time" },
+  // Lifetime Payment Link ($199.99 one-time): Elite-tier entitlements + lifetimeMember in DB
+  "19999:one-time": { tier: "elite", cycle: "lifetime", lifetimeMember: true },
 };
 
 function resolvePlan({ amount, interval, mode }) {
   if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
   const key = `${amount}:${mode === "payment" ? "one-time" : interval || "unknown"}`;
   return PLAN_MAP[key] || null;
+}
+
+function mappingGrantsLifetime(mapping) {
+  if (!mapping) return false;
+  if (mapping.lifetimeMember === true) return true;
+  return mapping.tier === "lifetime";
 }
 
 export default async function handler(req, res) {
@@ -152,7 +158,7 @@ async function handleCheckoutCompleted(session) {
       tier: mapping.tier,
       cycle: mapping.cycle,
       status: "active",
-      lifetimeMember: mapping.tier === "lifetime",
+      lifetimeMember: mappingGrantsLifetime(mapping),
       stripeCustomerId: session.customer || null,
       stripeSubscriptionId: null,
       stripePriceId: null,
@@ -331,7 +337,7 @@ async function handleInvoicePaymentSucceeded(invoice) {
     tier: mapping.tier,
     cycle: mapping.cycle,
     status: "active",
-    lifetimeMember: mapping.tier === "lifetime",
+    lifetimeMember: mappingGrantsLifetime(mapping),
     stripeCustomerId: invoice?.customer || null,
     stripeSubscriptionId: null,
     stripePriceId: invoice?.lines?.data?.[0]?.price?.id || null,

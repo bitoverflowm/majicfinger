@@ -83,6 +83,23 @@ export const landingPageV2Config = {
       isPopular: false,
     },
   ],
+  /** One-time Stripe Payment Link; amount must match webhook PLAN_MAP (19999 cents = $199.99). */
+  lifetimeAccess: {
+    href: "https://buy.stripe.com/cNieVe3fX1PgcVSdvq2ZO0B",
+    title: "Lifetime access",
+    badge: "Pay once",
+    price: "$199.99",
+    priceNote: "one-time",
+    headline: "Support the project: pay once and never pay again for life",
+    description:
+      "Unlock Elite-level access to Lychee with a single payment. No subscriptions, no surprise renewals. (Very large or dedicated datasets may still be billed separately.)",
+    buttonText: "Get lifetime access",
+    features: [
+      "Everything in Elite: integrations, dashboards, alerts, and priority-style access",
+      "lifetimeMember status in your account for as long as Lychee exists",
+      "Directly supports ongoing development",
+    ],
+  },
   faqs: [
     {
       question: "What is Lychee?",

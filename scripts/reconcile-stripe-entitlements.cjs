@@ -58,14 +58,20 @@ const PLAN_MAP = {
   "38388:year": { tier: "premium", cycle: "annual" },
   "38390:year": { tier: "premium", cycle: "annual" },
 
-  // Existing / legacy one-time lifetime
-  "19999:one-time": { tier: "lifetime", cycle: "one-time" },
+  // Lifetime Payment Link ($199.99 one-time): aligned with stripeWebHook/success.js
+  "19999:one-time": { tier: "elite", cycle: "lifetime", lifetimeMember: true },
 };
 
 function resolvePlan({ amount, interval, mode }) {
   if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
   const key = `${amount}:${mode === "payment" ? "one-time" : interval || "unknown"}`;
   return PLAN_MAP[key] || null;
+}
+
+function mappingGrantsLifetime(mapping) {
+  if (!mapping) return false;
+  if (mapping.lifetimeMember === true) return true;
+  return mapping.tier === "lifetime";
 }
 
 // Minimal schema for updates; keep strict off so schema drift never blocks reconciliation.
@@ -184,7 +190,7 @@ async function reconcileSubscriptions() {
       patch.subscriptionTier = mapping.tier;
       patch.billingCycle = mapping.cycle;
       patch.subscriptionType = `${mapping.tier}_${mapping.cycle}`;
-      if (mapping.tier === "lifetime") patch.lifetimeMember = true;
+      if (mappingGrantsLifetime(mapping)) patch.lifetimeMember = true;
     } else {
       console.warn("[subs] Unrecognized plan mapping (still granting access)", {
         subId: sub.id,
@@ -333,7 +339,7 @@ async function reconcileOneTimeCheckoutSessions() {
       patch.subscriptionTier = effectiveMapping.tier;
       patch.billingCycle = effectiveMapping.cycle;
       patch.subscriptionType = `${effectiveMapping.tier}_${effectiveMapping.cycle}`;
-      if (effectiveMapping.tier === "lifetime") patch.lifetimeMember = true;
+      if (mappingGrantsLifetime(effectiveMapping)) patch.lifetimeMember = true;
     } else {
       // Preserve internal value even when tier mapping doesn't exist.
       patch.subscriptionTier = "unknown";

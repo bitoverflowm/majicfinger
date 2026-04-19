@@ -70,9 +70,22 @@ function PricingTabs({ activeTab, setActiveTab, className }: TabsProps) {
   );
 }
 
+type LifetimeAccess = {
+  href: string;
+  title: string;
+  badge: string;
+  price: string;
+  priceNote: string;
+  headline: string;
+  description: string;
+  buttonText: string;
+  features: string[];
+};
+
 export function PricingSection() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("weekly");
   const { title, description, pricingItems } = siteConfig.pricingSection;
+  const lifetimeAccess = (siteConfig.pricingSection as { lifetimeAccess?: LifetimeAccess }).lifetimeAccess;
 
   const computedTiers = useMemo(() => {
     return pricingItems.map((tier) => {
@@ -258,6 +271,57 @@ export function PricingSection() {
             </div>
           ))}
         </div>
+
+        {lifetimeAccess && (
+          <div className="mt-14 w-full border-y border-border bg-gradient-to-br from-accent via-accent/80 to-muted/30 dark:from-accent/30 dark:via-background dark:to-muted/20 py-10 md:py-12 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 lg:flex-row lg:items-stretch lg:justify-between lg:gap-12">
+              <div className="flex min-w-0 flex-1 flex-col gap-3 text-left">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {lifetimeAccess.badge}
+                  </span>
+                  <span className="text-sm font-medium text-muted-foreground">{lifetimeAccess.title}</span>
+                </div>
+                <h3 className="text-balance text-2xl font-medium tracking-tighter text-foreground md:text-3xl">
+                  {lifetimeAccess.headline}
+                </h3>
+                <p className="max-w-2xl text-sm font-medium leading-relaxed text-muted-foreground md:text-base">
+                  {lifetimeAccess.description}
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {lifetimeAccess.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2 text-sm text-foreground/90">
+                      <span
+                        className="mt-1.5 size-1.5 shrink-0 rounded-full bg-secondary"
+                        aria-hidden
+                      />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex w-full shrink-0 flex-col justify-center gap-4 rounded-xl border border-border bg-background/90 p-6 shadow-sm backdrop-blur-sm dark:bg-background/60 lg:max-w-sm">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">One-time</p>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-4xl font-semibold tracking-tight">{lifetimeAccess.price}</span>
+                    <span className="text-sm text-muted-foreground">/{lifetimeAccess.priceNote}</span>
+                  </div>
+                </div>
+                <a
+                  href={lifetimeAccess.href}
+                  className="flex h-11 w-full items-center justify-center rounded-full bg-secondary px-4 text-sm font-medium tracking-wide text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.24)] transition-all ease-out hover:opacity-95 active:scale-[0.98]"
+                >
+                  {lifetimeAccess.buttonText}
+                </a>
+                <p className="text-center text-xs text-muted-foreground">
+                  Elite-level product access for life. Large or dedicated datasets may be quoted separately.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
