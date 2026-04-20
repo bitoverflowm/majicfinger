@@ -1,18 +1,10 @@
 import Script from "next/script";
-import { GoogleAnalytics } from "@next/third-parties/google";
 
 import { StateProvider } from "@/context/stateContext";
 
 import LandingPageV2 from "./landingpage_v2/page";
 
 export default function Home() {
-  const clairtyCode = `
-                      (function (c,l,a,r,i,t,y){
-                          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-                          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-                          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-                      })(window, document, "clarity", "script", "l5zqf94lap"); `;
-
   const affiliateCode = `(function(){
                           setTimeout(function() {
                               $('a[href^="https://buy.stripe.com/"]').each(function(){
@@ -34,9 +26,6 @@ export default function Home() {
 
   return (
     <>
-      <Script id="ms-clarity" strategy="afterInteractive">
-        {clairtyCode}
-      </Script>
       <Script
         async
         src="https://cdn.promotekit.com/promotekit.js"
@@ -45,7 +34,6 @@ export default function Home() {
       />
       <Script id="promoteKit">{affiliateCode}</Script>
       <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" />
-      <GoogleAnalytics gaId="G-G8X2NEPTEG" />
       <StateProvider>
         <LandingPageV2 />
       </StateProvider>
