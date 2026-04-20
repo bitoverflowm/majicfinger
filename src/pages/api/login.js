@@ -2,7 +2,13 @@ import { magic } from '../../lib/magic'
 import { setLoginSession } from '../../lib/auth'
 import dbConnect from '../../lib/dbConnect'
 import User from '../../models/Users'
-import { DEV_LOGIN_BYPASS_EMAIL as DEV_BYPASS_EMAIL, DEV_LOGIN_BYPASS_NAME as DEV_BYPASS_NAME } from '@/lib/devLoginBypass'
+import {
+  DEV_LOGIN_BYPASS_EMAIL as DEV_BYPASS_EMAIL,
+  DEV_LOGIN_BYPASS_NAME as DEV_BYPASS_NAME,
+  isDevMagicLinkBypassEmail,
+  devBypassCanonicalEmail,
+  defaultNameForDevBypassEmail,
+} from '@/lib/devLoginBypass'
 
 /** Dev-only: when DB is unreachable (e.g. VPN blocks MongoDB), set a minimal session so you can still test Polymarket with VPN on */
 async function setDevNoDbSession(res) {
@@ -28,24 +34,28 @@ export default async (req, res) => {
     await dbConnect()
 
     // Dev-only: allow direct login without Magic link for testing (DB reachable)
-    const isDevBypass = isDev &&
-      req.body?.devBypass === true &&
-      req.body?.email === DEV_BYPASS_EMAIL
+    const isDevBypass =
+      isDev && req.body?.devBypass === true && isDevMagicLinkBypassEmail(req.body?.email)
 
     if (isDevBypass) {
-      let user = await User.findOne({ email: DEV_BYPASS_EMAIL })
+      const canonicalEmail = devBypassCanonicalEmail(req.body.email)
+      if (!canonicalEmail) {
+        return res.status(400).send('Invalid dev bypass email')
+      }
+      const defaultName = defaultNameForDevBypassEmail(canonicalEmail)
+      let user = await User.findOne({ email: canonicalEmail })
       if (!user) {
         user = await User.create({
-          name: req.body.name || DEV_BYPASS_NAME,
-          email: DEV_BYPASS_EMAIL,
-          mgkIssuer: 'dev-bypass-' + DEV_BYPASS_EMAIL,
+          name: (req.body.name && String(req.body.name).trim()) || defaultName,
+          email: canonicalEmail,
+          mgkIssuer: 'dev-bypass-' + canonicalEmail,
         })
       }
       const session = {
         email: user.email,
         userId: user._id,
         name: user.name,
-        issuer: 'dev-bypass-' + DEV_BYPASS_EMAIL,
+        issuer: 'dev-bypass-' + canonicalEmail,
       }
       await setLoginSession(res, session)
       return res.status(200).send({ done: true, user })

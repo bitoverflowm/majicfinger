@@ -3,8 +3,9 @@
 import Script from 'next/script'
 
 import { useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
+import useSWR from "swr"
 
-import { useUser } from '@/lib/hooks';
 import { StateProvider } from '@/context/stateContext'
 import { StateProviderV2 } from '@/context/stateContextV2';
 
@@ -15,13 +16,26 @@ import { Toaster } from "@/components/ui/sonner"
 
 import { toast } from "sonner"
 
+const userFetcher = (url) =>
+  fetch(url)
+    .then((r) => r.json())
+    .then((data) => data?.user ?? null)
 
 const Dashbaord = () => {
-    const user = useUser()    
+    const router = useRouter()
+    const { data: user, isLoading } = useSWR("/api/user", userFetcher)
     const hasShownWelcomeToastRef = useRef(false);
 
     useEffect(() => {
-        if (hasShownWelcomeToastRef.current) return;
+        if (isLoading) return
+        if (!user) {
+            router.replace("/login")
+        }
+    }, [isLoading, user, router])
+
+    useEffect(() => {
+        if (!user) return
+        if (hasShownWelcomeToastRef.current) return
 
         // Session-level guard: avoid duplicate welcome toasts on remounts.
         const key = "dashboard_welcome_toast_shown";
@@ -30,23 +44,24 @@ const Dashbaord = () => {
             return;
         }
 
-        if (!user) {
-            toast('Welcome to Lychee!', {
-                description: `I'm Mr Pink. Take a look around. Don't forget to signup to save your work.`,
-                duration: 10000
-              });
-        } else {
-            toast('Hey!', {
-                description: `Welcome ${user.email}`,
-                duration: 10000
-              });
-        }
+        toast('Hey!', {
+            description: `Welcome ${user.email}`,
+            duration: 10000
+        })
 
         hasShownWelcomeToastRef.current = true;
         if (typeof window !== "undefined") {
             window.sessionStorage.setItem(key, "1");
         }
     }, [user])
+
+    if (isLoading || !user) {
+        return (
+            <div className="flex min-h-svh w-full items-center justify-center bg-background text-muted-foreground">
+                <p className="text-sm font-medium">Loading…</p>
+            </div>
+        )
+    }
 
     return (
         <div>

@@ -10,7 +10,11 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Progress } from '../ui/progress';
-import { DEV_LOGIN_BYPASS_EMAIL, DEV_LOGIN_BYPASS_NAME } from '@/lib/devLoginBypass';
+import {
+  DEV_UNPAID_TEST_EMAIL,
+  DEV_UNPAID_TEST_NAME,
+  isDevMagicLinkBypassEmail,
+} from '@/lib/devLoginBypass';
 
 const Login = ({ fromHome }) => {
   const router = useRouter();
@@ -20,11 +24,11 @@ const Login = ({ fromHome }) => {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Dev: pre-fill test user so you can one-click login (works even when VPN blocks MongoDB)
+  // Dev: pre-fill unpaid test user (magic link skipped) to exercise locked-dashboard flow. Use rikesh@bitoverflow.org for full access.
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      setEmail(DEV_LOGIN_BYPASS_EMAIL);
-      setName(DEV_LOGIN_BYPASS_NAME);
+      setEmail(DEV_UNPAID_TEST_EMAIL);
+      setName(DEV_UNPAID_TEST_NAME);
     }
   }, []);
   const [progress, setProgress] = useState(0);
@@ -36,7 +40,7 @@ const Login = ({ fromHome }) => {
     setProgress(0);
     const timer = setInterval(() => setProgress((prev) => Math.min(prev + 10, 90)), 3000);
     const body = { email, name };
-    const isDevBypass = process.env.NODE_ENV === 'development' && email === DEV_LOGIN_BYPASS_EMAIL;
+    const isDevBypass = process.env.NODE_ENV === 'development' && isDevMagicLinkBypassEmail(email);
     if (isDevBypass) body.devBypass = true;
 
     let res;
@@ -82,6 +86,9 @@ const Login = ({ fromHome }) => {
           <div className="flex flex-col gap-2 text-center">
             <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
             <p className="text-sm text-muted-foreground">Enter your email below to receive a magic link</p>
+            <p className="text-xs text-muted-foreground text-balance">
+              Your email must match the email you used to complete the Stripe Checkout.
+            </p>
           </div>
           {loading ? (
             <Progress value={progress} className="w-full" />

@@ -380,33 +380,24 @@ const DashBody = ({ user }) => {
             <SidebarInset className="min-h-0">{content}</SidebarInset>
           </div>
 
-          {isLocked && (
-            <div className="pointer-events-auto fixed bottom-5 left-1/2 z-[999] w-[min(94vw,42rem)] -translate-x-1/2 rounded-xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {isLocked && user && (
+            <div className="pointer-events-auto fixed bottom-5 left-1/2 z-[999] w-[min(94vw,42rem)] -translate-x-1/2 rounded-xl border-2 border-primary/50 bg-card p-5 shadow-2xl ring-4 ring-primary/15">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-sm font-semibold">
-                    {user ? "Upgrade to access dashboard actions" : "Sign in and choose a plan to use dashboard actions"}
+                  <div className="text-base font-semibold text-foreground">
+                    Choose a plan to unlock the dashboard
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    You can look around, but editing, saving, uploads, and integrations are locked until you have an active paid plan.
+                  <div className="mt-1 text-sm leading-snug text-muted-foreground">
+                    Editing, saving, uploads, and integrations stay locked until you have an active paid plan (or lifetime access).
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {!user ? (
-                    <Link
-                      href="/login"
-                      className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-xs font-medium hover:bg-accent"
-                    >
-                      Sign in
-                    </Link>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => setViewing?.("pricing")}
-                    className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90"
+                  <Link
+                    href="/#pricing"
+                    className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-md hover:opacity-90"
                   >
                     View plans
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
