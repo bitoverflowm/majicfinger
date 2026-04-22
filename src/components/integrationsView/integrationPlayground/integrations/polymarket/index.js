@@ -52,6 +52,7 @@ import {
   CalendarIcon,
 } from "lucide-react";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
 import { cn } from "@/lib/utils";
 import { ENDPOINTS, POLYMARKET_GROUPS, TRADES_RESPONSE_FIELDS } from "./config";
 
@@ -297,15 +298,12 @@ const Polymarket = ({ setConnectedData, requestSheetDestination }) => {
       }
 
       const arr = Array.isArray(data) ? data : [data];
-      if (destination === "append") {
-        setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...arr]);
-      } else if (destination === "new_sheet") {
-        addNewSheetAndActivate?.((newId) => {
-          setSheetData?.(newId, arr);
-        });
-      } else {
-        setConnectedData?.(arr);
-      }
+      applySheetIntegrationDecision(destination, {
+        incomingRows: arr,
+        setConnectedData,
+        addNewSheetAndActivate,
+        setSheetData,
+      });
       if (!qs.includes("fields=") && arr.length > 0 && arr[0] && typeof arr[0] === "object") {
         setLastResultKeys(Object.keys(arr[0]));
       }

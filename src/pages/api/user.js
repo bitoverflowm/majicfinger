@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
+import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -63,6 +64,12 @@ export default async function user(req, res) {
       if (dbUser.subscriptionStatus != null) payload.subscriptionStatus = dbUser.subscriptionStatus;
       if (dbUser.subscribedAt != null) payload.subscribedAt = dbUser.subscribedAt;
       if (dbUser.user_name != null) payload.user_name = dbUser.user_name;
+    }
+
+    if (isOwnerFullAccessUser(payload)) {
+      payload.lifetimeMember = true;
+      payload.subscriptionStatus = payload.subscriptionStatus || "active";
+      payload.subscriptionTier = payload.subscriptionTier || "elite";
     }
 
     return res.status(200).json({ user: payload });

@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
 
 const WallStreetBets = ({ setConnectedData, requestSheetDestination }) => {
     const contextStateV2 = useMyStateV2();
@@ -42,13 +43,12 @@ const WallStreetBets = ({ setConnectedData, requestSheetDestination }) => {
                 let data = await res.json();
                 console.log(data);
                 const rows = Array.isArray(data) ? data : [data];
-                if (destination === "append") {
-                    setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
-                } else if (destination === "new_sheet") {
-                    addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
-                } else {
-                    setConnectedData(data);
-                }
+                applySheetIntegrationDecision(destination, {
+                    incomingRows: rows,
+                    setConnectedData,
+                    addNewSheetAndActivate,
+                    setSheetData,
+                });
             } else {
                 console.error("WallStreetBets User Data pull failed");
             }           
@@ -64,13 +64,12 @@ const WallStreetBets = ({ setConnectedData, requestSheetDestination }) => {
                 let data = await res.json();
                 console.log(data);
                 const rows = Array.isArray(data) ? data : [data];
-                if (destination === "append") {
-                    setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
-                } else if (destination === "new_sheet") {
-                    addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
-                } else {
-                    setConnectedData(data);
-                }
+                applySheetIntegrationDecision(destination, {
+                    incomingRows: rows,
+                    setConnectedData,
+                    addNewSheetAndActivate,
+                    setSheetData,
+                });
             } else {
                 console.error("WallStreetBets User Data pull failed");
             }

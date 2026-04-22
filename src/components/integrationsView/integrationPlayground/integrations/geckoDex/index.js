@@ -11,6 +11,7 @@ import { useState } from "react"
 
 import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
 
 
 const GeckoDex = ({ setConnectedData, requestSheetDestination }) => {
@@ -45,13 +46,12 @@ const GeckoDex = ({ setConnectedData, requestSheetDestination }) => {
             setInputValues({})
             let data = await res.json();
             const rows = Array.isArray(data) ? data : [data];
-            if (destination === "append") {
-                setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
-            } else if (destination === "new_sheet") {
-                addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
-            } else {
-                setConnectedData(data);
-            }
+            applySheetIntegrationDecision(destination, {
+                incomingRows: rows,
+                setConnectedData,
+                addNewSheetAndActivate,
+                setSheetData,
+            });
         } else {
             setArgs()
             setQuery()

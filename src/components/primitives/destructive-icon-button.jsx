@@ -28,3 +28,22 @@ export function DestructiveIconButton({
     </Button>
   );
 }
+
+export function DestructiveActionButton({
+  className,
+  children,
+  size = "compact",
+  ...props
+}) {
+  const sizing = size === "compact" ? "h-7 px-2 text-xs" : "h-8 px-3 text-xs";
+  return (
+    <Button
+      type="button"
+      variant="destructive"
+      className={cn("font-medium", sizing, className)}
+      {...props}
+    >
+      {children}
+    </Button>
+  );
+}

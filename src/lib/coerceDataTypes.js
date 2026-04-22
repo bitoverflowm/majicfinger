@@ -30,6 +30,7 @@ function isLongTokenId(value) {
  */
 function coerceCell(value, key) {
   if (value === null || value === undefined) return value;
+  if (typeof value === "number" && Number.isNaN(value)) return value;
   if (typeof value === "boolean") return value;
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (value instanceof Date) return value;

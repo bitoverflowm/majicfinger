@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner';
 
 import { useMyStateV2  } from '@/context/stateContextV2'
+import { applySheetIntegrationDecision } from '@/lib/integrations/applyIntegrationDestination';
 
 const TwitterSearch = ({ searchTweets, requestSheetDestination }) => {
   const [query, setQuery] = useState('');
@@ -31,13 +32,12 @@ const TwitterSearch = ({ searchTweets, requestSheetDestination }) => {
             const response = await fetch(`/api/integrations/twitter/search?tweets=${query}`);
             let tweets = await response.json();
             const rows = Array.isArray(tweets?.data) ? tweets.data : [];
-            if (destination === "append") {
-              setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
-            } else if (destination === "new_sheet") {
-              addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
-            } else {
-              setConnectedData(rows);
-            }
+            applySheetIntegrationDecision(destination, {
+              incomingRows: rows,
+              setConnectedData,
+              addNewSheetAndActivate,
+              setSheetData,
+            });
             toast(`Search executed ${rows.length} tweets found over the past 7 days`)
         }else{
             //search users

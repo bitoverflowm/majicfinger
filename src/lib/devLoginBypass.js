@@ -15,7 +15,7 @@ const MAGIC_LINK_BYPASS_NORMALIZED = new Set([
  * Does not grant paid access; see isDevLoginBypassUser for the Rikesh-only shortcut.
  */
 export function isDevMagicLinkBypassEmail(email) {
-  if (process.env.NODE_ENV !== "development") return false;
+  if (process.env.NODE_ENV === "production") return false;
   const e = String(email ?? "").toLowerCase().trim();
   return MAGIC_LINK_BYPASS_NORMALIZED.has(e);
 }
@@ -36,7 +36,7 @@ export function defaultNameForDevBypassEmail(canonicalEmail) {
 
 /** Development-only: grants full dashboard access in dashBody (Rikesh only). */
 export function isDevLoginBypassUser(user) {
-  if (process.env.NODE_ENV !== "development") return false;
+  if (process.env.NODE_ENV === "production") return false;
   if (!user?.email) return false;
   return String(user.email).toLowerCase().trim() === DEV_LOGIN_BYPASS_EMAIL.toLowerCase();
 }

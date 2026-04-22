@@ -15,15 +15,11 @@ import LiveStreamManager from './components/liveStreamManager';
 import { Toaster } from "@/components/ui/sonner"
 
 import { toast } from "sonner"
-
-const userFetcher = (url) =>
-  fetch(url)
-    .then((r) => r.json())
-    .then((data) => data?.user ?? null)
+import { userSwrFetcher } from "@/lib/hooks"
 
 const Dashbaord = () => {
     const router = useRouter()
-    const { data: user, isLoading } = useSWR("/api/user", userFetcher)
+    const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher)
     const hasShownWelcomeToastRef = useRef(false);
 
     useEffect(() => {

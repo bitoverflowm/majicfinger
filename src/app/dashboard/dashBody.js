@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
 import { isDevLoginBypassUser } from "@/lib/devLoginBypass";
+import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
 
 const DashBody = ({ user }) => {
     const contextStateV2 = useMyStateV2()
@@ -78,6 +79,7 @@ const DashBody = ({ user }) => {
     const hasPaidAccess =
       !!isDemo ||
       isDevLoginBypassUser(user) ||
+      isOwnerFullAccessUser(user) ||
       (!!user && (
         lifetimeForAccess ||
         normalizedSubscriptionStatus === "active" ||

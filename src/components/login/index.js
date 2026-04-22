@@ -26,7 +26,7 @@ const Login = ({ fromHome }) => {
 
   // Dev: pre-fill unpaid test user (magic link skipped) to exercise locked-dashboard flow. Use rikesh@bitoverflow.org for full access.
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production') {
       setEmail(DEV_UNPAID_TEST_EMAIL);
       setName(DEV_UNPAID_TEST_NAME);
     }
@@ -40,7 +40,7 @@ const Login = ({ fromHome }) => {
     setProgress(0);
     const timer = setInterval(() => setProgress((prev) => Math.min(prev + 10, 90)), 3000);
     const body = { email, name };
-    const isDevBypass = process.env.NODE_ENV === 'development' && isDevMagicLinkBypassEmail(email);
+    const isDevBypass = process.env.NODE_ENV !== 'production' && isDevMagicLinkBypassEmail(email);
     if (isDevBypass) body.devBypass = true;
 
     let res;

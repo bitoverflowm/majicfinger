@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/popover"
 import { DateRange } from "react-day-picker"
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
 
 const CoinGecko = ({ setConnectedData, requestSheetDestination }) => {
     const contextStateV2 = useMyStateV2();
@@ -68,15 +69,13 @@ const CoinGecko = ({ setConnectedData, requestSheetDestination }) => {
             setQuery()
             setInputValues({})
             let data = await res.json();
-            if (destination === "append") {
-                const rows = Array.isArray(data) ? data : [data];
-                setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
-            } else if (destination === "new_sheet") {
-                const rows = Array.isArray(data) ? data : [data];
-                addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
-            } else {
-                setConnectedData(data);
-            }
+            const rows = Array.isArray(data) ? data : [data];
+            applySheetIntegrationDecision(destination, {
+                incomingRows: rows,
+                setConnectedData,
+                addNewSheetAndActivate,
+                setSheetData,
+            });
         } else {
             setArgs()
             setQuery()

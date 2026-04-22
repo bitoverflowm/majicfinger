@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/accordion";
 import Search from './helpers/search';
 import { useMyStateV2 } from '@/context/stateContextV2';
+import { applySheetIntegrationDecision } from '@/lib/integrations/applyIntegrationDestination';
 
 const Twitter = ({ setConnectedData, requestSheetDestination }) => {
   const contextStateV2 = useMyStateV2();
@@ -32,13 +33,12 @@ const Twitter = ({ setConnectedData, requestSheetDestination }) => {
       if (res.status === 200) {
         const data = await res.json();
         const rows = Array.isArray(data) ? data : [data];
-        if (destination === "append") {
-          setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
-        } else if (destination === "new_sheet") {
-          addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
-        } else {
-          setConnectedData(data);
-        }
+        applySheetIntegrationDecision(destination, {
+          incomingRows: rows,
+          setConnectedData,
+          addNewSheetAndActivate,
+          setSheetData,
+        });
       } else {
         const errorData = await res.json();
         setError(errorData.error);

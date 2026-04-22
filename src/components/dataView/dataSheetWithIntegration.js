@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import DataView from "@/components/dataView";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
@@ -91,6 +91,22 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const anySheetHasData = Object.values(dataSheets).some(
     (sheet) => Array.isArray(sheet?.data) && sheet.data.length > 0,
   );
+  const existingColumnNames = useMemo(() => {
+    const rows = connectedData;
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    const seen = new Set();
+    const ordered = [];
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      for (const k of Object.keys(row)) {
+        if (!seen.has(k)) {
+          seen.add(k);
+          ordered.push(k);
+        }
+      }
+    }
+    return ordered;
+  }, [connectedData]);
   const resolveDestinationRef = useRef(null);
 
   const requestSheetDestination = useCallback(async () => {
@@ -287,11 +303,14 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     )}>
       <ReplaceOrNewSheetDialog
         open={replaceOrNewSheetOpen}
+        existingColumnNames={existingColumnNames}
         onOpenChange={(open) => {
           if (!open) resolveSheetDestination(null);
           else setReplaceOrNewSheetOpen(true);
         }}
-        onAddToCurrent={() => resolveSheetDestination("append")}
+        onAddToCurrent={(sameSheet) =>
+          resolveSheetDestination({ action: "append", sameSheet })
+        }
         onReplace={() => resolveSheetDestination("replace")}
         onAddNewSheet={() => resolveSheetDestination("new_sheet")}
       />

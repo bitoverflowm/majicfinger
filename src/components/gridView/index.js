@@ -72,6 +72,7 @@ import {
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
+import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
 import { ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { athenaRowsToObjects } from "@/lib/duckdb/duckdbWasmClient";
 import * as XLSX from 'xlsx';
@@ -1676,6 +1677,11 @@ const GridView = ({startNew}) => {
         setConnectedData((prevData) => prevData.filter((_, index) => index !== origIndex));
         toast('Row deleted!', { duration: 5000 });
     };
+
+    const handleClearSheet = () => {
+        setConnectedData([]);
+        toast("Sheet cleared!", { duration: 3000 });
+    };
     
 
     useEffect(()=>{
@@ -2805,6 +2811,22 @@ const GridView = ({startNew}) => {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+
+                <div className="ml-auto" />
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DestructiveIconButton
+                        className="h-2.5 w-2.5 shrink-0"
+                        ariaLabel="Clear sheet"
+                        onClick={handleClearSheet}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      clear sheet
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <TabsContent value="sort-filter" className="mt-3">
                 <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-muted/30">
