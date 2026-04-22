@@ -18,6 +18,7 @@ import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtr
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { sanitizeCartesianRowsForPlotting } from "@/lib/chartDataSanitize";
 
 const ChartBuilderContext = createContext(null);
 
@@ -605,14 +606,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const livelineData = useMemo(() => {
     if (!chartData?.length || !selX || !selY?.length) return [];
     const valueKey = selY[0];
-    return chartData.map((row, idx) => {
-      const rawT = row?.[selX];
-      const parsed = (typeof rawT === "number") ? rawT : Date.parse(String(rawT));
-      const timeSec = Number.isFinite(parsed) ? parsed / 1000 : idx;
-      const vNum = Number(row?.[valueKey]);
-      const value = Number.isFinite(vNum) ? vNum : 0;
-      return { time: timeSec, value };
-    });
+    return chartData
+      .map((row, idx) => {
+        const rawT = row?.[selX];
+        const parsed = typeof rawT === "number" ? rawT : Date.parse(String(rawT));
+        const timeSec = Number.isFinite(parsed) ? parsed / 1000 : idx;
+        const vNum = Number(row?.[valueKey]);
+        const value = Number.isFinite(vNum) ? vNum : null;
+        return { time: timeSec, value };
+      })
+      .filter((p) => p.value != null && Number.isFinite(p.value));
   }, [chartData, selX, selY]);
 
   const lineIsTemporalX = useMemo(() => isLikelyTemporalKey(selX, dataTypes, chartData), [selX, dataTypes, chartData]);
@@ -638,7 +641,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
         const sheetId = splitIdx > 0 ? raw.slice(0, splitIdx) : contextStateV2?.activeSheetId;
         const column = splitIdx > 0 ? raw.slice(splitIdx + 2) : raw;
         const sourceRows = Array.isArray(contextStateV2?.dataSheets?.[sheetId]?.data) ? contextStateV2.dataSheets[sheetId].data : [];
-        row[yKey] = sourceRows[idx]?.[column] ?? "";
+        row[yKey] = sourceRows[idx]?.[column] ?? null;
       }
       rows.push(row);
     }
@@ -1159,8 +1162,17 @@ export function ChartCanvas() {
     });
   }, [plotRows, xAxisType, xKey, selX, sortXDir, effectiveTemporalSort]);
 
-  /** All cartesian series use the same sorted rows so every line maps the full column. */
-  const finalRenderedData = sortedPlotRows;
+  /** Drop non-finite Y (and numeric/date X) so Recharts draws gaps instead of bogus points. */
+  const finalRenderedData = useMemo(() => {
+    if (!cartesianChart) return sortedPlotRows;
+    return sanitizeCartesianRowsForPlotting(sortedPlotRows, {
+      xKey,
+      yKeys,
+      xAxisType,
+      dataTypes,
+      getAxisType,
+    });
+  }, [cartesianChart, sortedPlotRows, xKey, yKeys, xAxisType, dataTypes]);
 
   /** Treemap keeps raw pivot labels (not epoch ms). */
   const treemapRows = useMemo(() => {
@@ -1468,6 +1480,7 @@ export function ChartCanvas() {
                             key={yKey + idx}
                             dataKey={yKey}
                             type={lineStyle}
+                            connectNulls
                             fill={seriesColorFor(yKey, idx)}
                             fillOpacity={0.4}
                             stroke={seriesColorFor(yKey, idx)}
@@ -1569,6 +1582,7 @@ export function ChartCanvas() {
                             key={yKey + idx}
                             dataKey={yKey}
                             type={lineStyle}
+                            connectNulls
                             stroke={seriesColorFor(yKey, idx)}
                             strokeWidth={2}
                             dot={dots && finalRenderedData.length <= 40}

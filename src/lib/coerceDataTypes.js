@@ -30,10 +30,11 @@ function isLongTokenId(value) {
  */
 function coerceCell(value, key) {
   if (value === null || value === undefined) return value;
-  if (typeof value === "number" && Number.isNaN(value)) return value;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
   if (typeof value === "boolean") return value;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (value instanceof Date) return value;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
 
   const s = typeof value === "string" ? value.trim() : String(value);
 
@@ -43,8 +44,16 @@ function coerceCell(value, key) {
   if (s === "true") return true;
   if (s === "false") return false;
 
+  const sl = s.toLowerCase();
+  if (sl === "nan" || sl === "infinity" || sl === "-infinity" || sl === "inf" || sl === "-inf") {
+    return null;
+  }
+
   const num = Number(s);
-  if (s !== "" && !Number.isNaN(num) && Number.isFinite(num)) return num;
+  if (s !== "" && !Number.isNaN(num)) {
+    if (!Number.isFinite(num)) return null;
+    return num;
+  }
 
   // ISO date or common date strings
   const iso = /^\d{4}-\d{2}-\d{2}(T|\s)/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s);

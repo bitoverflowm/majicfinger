@@ -1,7 +1,7 @@
 /**
  * Merge integration pull into an existing sheet as additional columns (join / index-align).
  * Column name clashes get numeric suffixes: t → t_1 → t_2
- * Missing cells use Number.NaN (preserved by coerceCell).
+ * Missing / unmatched cells use `null` (JSON-safe; charts treat as gaps).
  */
 
 function disambiguateKey(usedSet, base) {
@@ -39,7 +39,7 @@ function mergeTwoRows(baseRow, incomingRow, pivotColumn, usePivot) {
       const left = a[pivotColumn];
       const right = b[pivotColumn];
       out[pivotColumn] =
-        left !== undefined ? left : right !== undefined ? right : Number.NaN;
+        left !== undefined ? left : right !== undefined ? right : null;
       continue;
     }
     let nk = k;
@@ -49,13 +49,13 @@ function mergeTwoRows(baseRow, incomingRow, pivotColumn, usePivot) {
   }
 
   if (usePivot && pivotColumn && !(pivotColumn in out)) {
-    out[pivotColumn] = Number.NaN;
+    out[pivotColumn] = null;
   }
 
   return out;
 }
 
-function fillMissingWithNaN(rows) {
+function fillMissingWithNull(rows) {
   if (!rows.length) return rows;
   const orderedKeys = [];
   const seen = new Set();
@@ -71,7 +71,7 @@ function fillMissingWithNaN(rows) {
   return rows.map((row) => {
     const r = row && typeof row === "object" ? { ...row } : {};
     for (const k of orderedKeys) {
-      if (!(k in r)) r[k] = Number.NaN;
+      if (!(k in r)) r[k] = null;
     }
     return r;
   });
@@ -132,7 +132,7 @@ function mergeByPivotKey(existing, incoming, pivotColumn) {
     merged.push(mergeTwoRows({}, row, pivotColumn, true));
   }
 
-  return fillMissingWithNaN(merged);
+  return fillMissingWithNull(merged);
 }
 
 function collectIncomingRename(existingKeysOrdered, incomingKeysOrdered) {
@@ -176,16 +176,16 @@ function mergeByRowIndex(existing, incoming) {
     const row = {};
 
     for (const k of exKeys) {
-      row[k] = k in eObj ? eObj[k] : Number.NaN;
+      row[k] = k in eObj ? eObj[k] : null;
     }
     for (const k of inKeys) {
       const nk = rename.get(k);
-      row[nk] = k in iObj ? iObj[k] : Number.NaN;
+      row[nk] = k in iObj ? iObj[k] : null;
     }
     out.push(row);
   }
 
-  return fillMissingWithNaN(out);
+  return fillMissingWithNull(out);
 }
 
 /**
