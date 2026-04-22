@@ -14,12 +14,30 @@ function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase()
+}
+
+function userEntitlementScore(user) {
+  if (!user) return 0
+  const status = String(user.subscriptionStatus || '').toLowerCase()
+  let score = 0
+  if (user.lifetimeMember) score += 100
+  if (status === 'active') score += 50
+  if (status === 'trialing') score += 25
+  if (user.subscriptionTier) score += 10
+  return score
+}
+
 async function findUserByEmailInsensitive(email) {
-  const trimmed = String(email || '').trim()
+  const trimmed = normalizeEmail(email)
   if (!trimmed) return null
-  return User.findOne({
+  const candidates = await User.find({
     email: { $regex: new RegExp(`^${escapeRegex(trimmed)}$`, 'i') },
   })
+  if (!candidates?.length) return null
+  candidates.sort((a, b) => userEntitlementScore(b) - userEntitlementScore(a))
+  return candidates[0]
 }
 
 /** Dev-only: when DB is unreachable (e.g. VPN blocks MongoDB), set a minimal session so you can still test Polymarket with VPN on */
@@ -76,12 +94,13 @@ export default async (req, res) => {
     const didToken = req.headers.authorization?.slice(7)
     if (!didToken) return res.status(401).send('Missing authorization')
     const metadata = await magic.users.getMetadataByToken(didToken)
-    let user = await findUserByEmailInsensitive(metadata.email)
+    const normalizedEmail = normalizeEmail(metadata.email)
+    let user = await findUserByEmailInsensitive(normalizedEmail)
 
     if (!user) {
       user = await User.create({
         name: req.body.name,
-        email: metadata.email,
+        email: normalizedEmail,
         mgkpublicAddress: metadata.publicAddress,
         confirmedAt: metadata.confirmedAt ? new Date(metadata.confirmedAt) : null,
         lastLoginAt: metadata.lastLoginAt ? new Date(metadata.lastLoginAt) : null,

@@ -7,6 +7,17 @@ function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function userEntitlementScore(user) {
+  if (!user) return 0;
+  const status = String(user.subscriptionStatus || "").toLowerCase();
+  let score = 0;
+  if (user.lifetimeMember) score += 100;
+  if (status === "active") score += 50;
+  if (status === "trialing") score += 25;
+  if (user.subscriptionTier) score += 10;
+  return score;
+}
+
 export default async function user(req, res) {
   let session;
   try {
@@ -33,9 +44,13 @@ export default async function user(req, res) {
     }
 
     if (!dbUser && session.email) {
-      dbUser = await User.findOne({
+      const candidates = await User.find({
         email: { $regex: new RegExp(`^${escapeRegex(String(session.email).trim())}$`, "i") },
       });
+      if (candidates?.length) {
+        candidates.sort((a, b) => userEntitlementScore(b) - userEntitlementScore(a));
+        dbUser = candidates[0];
+      }
     }
 
     const payload = { ...session };
