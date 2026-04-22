@@ -67,22 +67,30 @@ const DashBody = ({ user }) => {
     const [billingCycle, setBillingCycle] = useState(null);
     const [subscriptionStatus, setSubscriptionStatus] = useState(null);
     const [subscribedAt, setSubscribedAt] = useState(null);
+    const hasDbBackedUserId =
+      typeof user?.userId === "string" &&
+      user.userId !== "dev-bypass-no-db" &&
+      /^[a-f0-9]{24}$/i.test(user.userId);
 
-    const normalizedSubscriptionStatus = String(subscriptionStatus || "").toLowerCase();
+    const normalizedSubscriptionStatus = String(
+      subscriptionStatus || user?.subscriptionStatus || "",
+    ).toLowerCase();
+    const tierForAccess = subscriptionTier ?? user?.subscriptionTier ?? null;
+    const lifetimeForAccess = Boolean(isLifeTimeMember || user?.lifetimeMember);
     const hasPaidAccess =
       !!isDemo ||
       isDevLoginBypassUser(user) ||
       (!!user && (
-        !!isLifeTimeMember ||
+        lifetimeForAccess ||
         normalizedSubscriptionStatus === "active" ||
         normalizedSubscriptionStatus === "trialing" ||
         // Backward-compatible: some historical users have tier/cycle populated without status.
-        (!!subscriptionTier && !normalizedSubscriptionStatus)
+        (!!tierForAccess && !normalizedSubscriptionStatus)
       ));
     const isLocked = !hasPaidAccess;
 
     useEffect(() => {
-        if(user && !isDemo){
+        if(user && !isDemo && hasDbBackedUserId){
             fetch(`/api/dataSets?uid=${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -104,10 +112,10 @@ const DashBody = ({ user }) => {
                 setRefetchData(0)
             })
         }
-    }, [user, refetchData, isDemo])
+    }, [user, refetchData, isDemo, hasDbBackedUserId])
 
     useEffect(() => {
-        if(user && !isDemo){
+        if(user && !isDemo && hasDbBackedUserId){
             fetch(`/api/charts?uid=${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -129,12 +137,12 @@ const DashBody = ({ user }) => {
                 setRefetchChart(0)
             })
         }
-    }, [user, refetchChart, isDemo])
+    }, [user, refetchChart, isDemo, hasDbBackedUserId])
 
 
 
     useEffect(() => {
-        if(user && !isDemo){
+        if(user && !isDemo && hasDbBackedUserId){
             fetch(`/api/presentations?uid=${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -157,11 +165,11 @@ const DashBody = ({ user }) => {
                 setRefetchPresentations(0)
             })
         }
-    }, [user, refetchPresentations, isDemo])
+    }, [user, refetchPresentations, isDemo, hasDbBackedUserId])
 
 
     useEffect(() => {
-        if (user && !isDemo) {
+        if (user && !isDemo && hasDbBackedUserId) {
             fetch(`/api/users/${user.userId}`, {
                 method: 'GET',
                 headers: {
@@ -185,7 +193,7 @@ const DashBody = ({ user }) => {
                 console.error('Error fetching user info:', error);
             });
         }
-    }, [user, isDemo]);
+    }, [user, isDemo, hasDbBackedUserId]);
 
     const checkUsernameAvailability = useCallback(
         debounce((value) => {
@@ -226,6 +234,9 @@ const DashBody = ({ user }) => {
     const handleUpdateUserHandle = () => {
         if (isReservedUserHandle(newUserHandle)) {
             toast.error(reservedUserHandleMessage(newUserHandle));
+            return;
+        }
+        if (!hasDbBackedUserId) {
             return;
         }
         fetch(`/api/users/${user.userId}`, {

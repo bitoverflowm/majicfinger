@@ -10,6 +10,18 @@ import {
   defaultNameForDevBypassEmail,
 } from '@/lib/devLoginBypass'
 
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function findUserByEmailInsensitive(email) {
+  const trimmed = String(email || '').trim()
+  if (!trimmed) return null
+  return User.findOne({
+    email: { $regex: new RegExp(`^${escapeRegex(trimmed)}$`, 'i') },
+  })
+}
+
 /** Dev-only: when DB is unreachable (e.g. VPN blocks MongoDB), set a minimal session so you can still test Polymarket with VPN on */
 async function setDevNoDbSession(res) {
   const session = {
@@ -53,7 +65,7 @@ export default async (req, res) => {
       }
       const session = {
         email: user.email,
-        userId: user._id,
+        userId: String(user._id),
         name: user.name,
         issuer: 'dev-bypass-' + canonicalEmail,
       }
@@ -64,7 +76,7 @@ export default async (req, res) => {
     const didToken = req.headers.authorization?.slice(7)
     if (!didToken) return res.status(401).send('Missing authorization')
     const metadata = await magic.users.getMetadataByToken(didToken)
-    let user = await User.findOne({ email: metadata.email })
+    let user = await findUserByEmailInsensitive(metadata.email)
 
     if (!user) {
       user = await User.create({
@@ -76,12 +88,12 @@ export default async (req, res) => {
         mgkIssuer: metadata.issuer,
         metadata: metadata.metadata,
       })
-      const newSession = { ...metadata, userId: user._id, name: user.name }
+      const newSession = { ...metadata, userId: String(user._id), name: user.name }
       await setLoginSession(res, newSession)
       return res.status(200).send({ done: true, newUser: user })
     }
 
-    const session = { ...metadata, userId: user._id, name: user.name }
+    const session = { ...metadata, userId: String(user._id), name: user.name }
     await setLoginSession(res, session)
     return res.status(200).send({ done: true, session, user })
   } catch (error) {

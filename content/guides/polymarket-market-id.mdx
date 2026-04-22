@@ -1,0 +1,330 @@
+---
+
+title: "How to Find Polymarket Market ID (CLOB, Token, Condition & Slug Explained)"
+description: "Learn how to find Polymarket Market IDs, CLOB IDS, token IDs, condition IDs, and slugs. Step-by-step guide to extracting Polymarket metadata for API queries and historical analysis."
+publishedAt: "2026-04-21"
+author: "misterrpink"
+topics: ["polymarket", "prediction markets", "api", "market data", "metadata", "analytics"]
+integration: ["Polymarket"]
+coverImage: "/images/guides/polymarket-market-id/main.png"
+ogImage: "https://lycheedata.com/images/guides/polymarket-market-id/main.png"
+featured: true
+slug: "/polymarket-market-id"
+readingTime: "9 min"
+keywords: [
+"polymarket market id",
+"polymarket token id",
+"polymarket condition id",
+"polymarket slug",
+"polymarket metadata",
+"polymarket api market id",
+"find polymarket market id",
+"polymarket clob token id",
+"polymarket asset id",
+"polymarket clobtokenids"
+]
+canonical: "https://lycheedata.com/guides/polymarket-market-id"
+seoTitle: "How to Find Polymarket Market ID — Token, Condition & Slug Explained"
+twitterCard: "summary_large_image"
+----------------------------------
+
+# How to Find Polymarket Market ID (Token, Condition & Slug Explained)
+
+When I first started using the Polymarket API for research, I was completely stumped by how everything was structured. Even if you understand the difference between the [Gamma API, Data API, and CLOB API](https://docs.polymarket.com/api-reference/introduction), you still need to navigate:
+
+* [Events vs Markets](/guides/polymarket-events-endpoint-no-code)
+* Event IDs, Event Slugs, Event Tags
+* Market IDs, Market Slugs, Market Tokens
+* CLOB markets, orderbooks, trades, price history
+* Metadata needed for backtesting and analysis
+
+Everything ultimately flows through [**Events and Markets**](/guides/polymarket-events-endpoint-no-code). Whether you're building a bot, running quant-level backtests, tracking probability momentum, or just [researching odds](/guides/polymarket-odds-over-time), extracting the correct ID becomes crucial.
+
+The challenge is that **the ID you actually need is rarely the one you start with.**
+
+---
+
+## What is a Polymarket Market ID
+
+A Polymarket Market ID is the **unique identifier** for a specific binary market inside an event.
+
+Each market has:
+
+* market id
+* slug
+* condition id
+* clob token ids
+* outcomes
+
+The Market ID is typically required when making:
+
+* API requests
+* price history queries
+* orderbook calls
+* metadata lookups
+
+However, you usually **don’t start with the market ID**. You start with:
+
+* a question
+* a URL
+* an event page
+
+Which means you need to derive the market ID first.
+
+---
+
+## Market ID vs Token ID vs Condition ID
+
+Polymarket uses multiple identifiers, which is where confusion starts.
+
+**Market ID**
+
+* identifies a specific market
+* used for metadata lookup
+* used for down stream deeper analysis into other markets endpoints
+
+**Token ID (CLOB Token ID)**
+
+* sometimes referred to as "asset ID"
+* identifies tradable outcomes
+* used for price / orderbook queries
+* separate token for YES and NO
+
+**Condition ID**
+
+* links outcomes to settlement logic
+* derived from market structure
+
+**Slug**
+
+* human readable identifier
+* used to find markets
+* normally can be found in Market URLs
+
+Every binary market returns token IDs like:
+
+```
+["YES_TOKEN_ID", "NO_TOKEN_ID"]
+```
+
+These are the **actual asset IDs** used in price queries.
+
+---
+
+## How to Find a Polymarket Market ID Manually
+
+Let’s say you want to analyze:
+
+> Will the Virginia redistricting referendum pass?
+
+You start with the URL:
+
+```
+https://polymarket.com/event/will-the-virginia-redistricting-referendum-pass
+```
+
+The slug is:
+
+```
+will-the-virginia-redistricting-referendum-pass
+```
+
+You can:
+
+* query metadata by slug
+* call the markets endpoint
+* retrieve the market ID
+
+<screenshot of lychee>
+![Create to Polymarket API](/images/guides/polymarket-odds-over-time/1.png)
+
+Or via API:
+
+```js
+// example code placeholder
+```
+
+The response includes:
+
+* market id
+* condition id
+* clobTokenIds
+* outcomes
+
+---
+
+## How to Get Token IDs from a Market
+
+Once you retrieve market metadata, you extract:
+
+```
+["YES_TOKEN_ID", "NO_TOKEN_ID"]
+```
+
+These represent:
+
+* YES outcome token
+* NO outcome token
+
+These IDs are required for:
+
+* price history
+* trades
+* orderbook
+* liquidity
+
+Without them, you cannot query probability over time.
+
+<show chart>
+
+---
+
+## Polymarket Metadata Explained
+
+Market metadata typically includes:
+
+* market id
+* event id
+* slug
+* outcomes
+* prices
+* probabilities
+* timestamps
+* tags
+* condition id
+* neg_risk
+* min_order_size
+* clobTokenIds
+
+This metadata is required to:
+
+* build dashboards
+* backtest strategies
+* analyze liquidity
+* plot probability movement
+
+Everything flows from this metadata response.
+
+---
+
+## Use This Tool to Instantly Get Market IDs
+
+Instead of manually:
+
+* extracting slugs
+* calling endpoints
+* parsing JSON
+
+You can search using natural language:
+
+<search image>
+
+This returns:
+
+* Market ID
+* Event ID
+* Slug
+* Condition ID
+* CLOB Token IDs
+* metadata
+
+<results image>
+
+This removes the entire dependency chain.
+
+---
+
+## Polymarket API Example
+
+Typical workflow:
+
+1. Find market slug
+2. Query markets endpoint
+3. Extract metadata
+4. Retrieve token IDs
+5. Query price history
+
+Example endpoints:
+
+```
+/markets
+/events
+/markets/{id}
+```
+
+These endpoints return JSON metadata including token IDs.
+
+<Screenshot of docs>
+
+---
+
+## Common Mistakes When Working With Polymarket IDs
+
+Common issues include:
+
+* confusing slug with market id
+* using token id as market id
+* missing condition id
+* querying wrong endpoint
+* guessing slugs manually
+* not handling multi-outcome events
+
+Multi-outcome events like:
+
+```
+https://polymarket.com/event/2026-fifa-world-cup-winner-595
+```
+
+contain multiple markets, each with separate token IDs.
+
+You must retrieve **all markets** and select the one you need.
+
+<image of results>
+
+<plot fifa probability price history>
+
+---
+
+## FAQ
+
+### Where can I find my Polymarket token ID?
+
+You must retrieve market metadata and extract `clobTokenIds`.
+
+### Does Polymarket have a data API?
+
+Yes. Public endpoints provide market and event metadata.
+
+### Can you scrape Polymarket data?
+
+Yes, via public API endpoints returning JSON metadata.
+
+### What is a Polymarket condition ID?
+
+It links outcomes to settlement conditions.
+
+### How does Polymarket work technically?
+
+Markets map to tokens, which trade on the CLOB and represent probabilities.
+
+---
+
+## Final Thoughts
+
+Working with Polymarket data means understanding the relationship between:
+
+* Events
+* Markets
+* Slugs
+* Market IDs
+* Condition IDs
+* CLOB token IDs
+
+Once you can reliably extract these identifiers, you unlock:
+
+* historical probability tracking
+* orderbook analysis
+* strategy backtesting
+* automated trading workflows
+
+The hardest part is simply finding the right ID — after that, everything else becomes much easier.

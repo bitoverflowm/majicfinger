@@ -8,11 +8,28 @@ export default async function handler(req, res) {
         method,
     } = req;
 
-    await dbConnect();
+    if (id === "dev-bypass-no-db") {
+        if (method === "GET") {
+            return res.status(200).json({
+                success: true,
+                data: {
+                    _id: "dev-bypass-no-db",
+                    user_name: null,
+                    lifetimeMember: false,
+                    subscriptionTier: null,
+                    billingCycle: null,
+                    subscriptionStatus: null,
+                    subscribedAt: null,
+                },
+            });
+        }
+        return res.status(200).json({ success: false, message: "No DB user in dev bypass mode" });
+    }
 
     switch (method) {
         case "GET": /* Get a model by its ID */
             try {
+                await dbConnect();
                 const user = await User.findById(id);
                 if(!user) {
                     return res.status(400).json({success: false});
@@ -24,6 +41,7 @@ export default async function handler(req, res) {
             break;
         case "PUT": /* Edit a model by its ID */
             try {
+                await dbConnect();
                 if (req.body?.user_name !== undefined && isReservedUserHandle(String(req.body.user_name || ""))) {
                     return res.status(400).json({
                         success: false,
@@ -50,6 +68,7 @@ export default async function handler(req, res) {
             break;
         case "DELETE": /* Delete a model by its ID */
             try {
+                await dbConnect();
                 const deleteUser = await User.deleteOne({_id: id});
                 if(!deleteUser) {
                     return res.status(400).json({success: false});
