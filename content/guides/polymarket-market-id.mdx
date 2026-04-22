@@ -139,10 +139,9 @@ The slug is:
 will-the-virginia-redistricting-referendum-pass
 ```
 
-You can:
+You can use [Lychee](/) to:
 
 * query metadata by slug
-* call the markets endpoint
 * retrieve the market ID
 
 ![Create to Polymarket API](/images/guides/polymarket-market-id/1.png)
@@ -153,7 +152,7 @@ Or via API:
 import requests
 
 # Example slug: copy from a Polymarket market URL
-slug = "will-bitcoin-be-above-100k-by-december-31-2026"
+slug = "will-the-virginia-redistricting-referendum-pass"
 url = f"https://gamma-api.polymarket.com/markets/slug/{slug}"
 
 # Optional query param from docs: include_tag=true|false
@@ -315,12 +314,12 @@ contain multiple markets, each with separate token IDs.
 The only way to extract the CLOB Token ID effectively is to use [lycheedata.com/polymarket-metadata](/polymarket-metadata)
 
 Otherwise: 
-> hit the get Events by slug endpoint to get all markets in 2026-fifa-world-cup-winner-595
-> Then you need to parse the markets from the returned JSON
-> Extract the market slug 
-> query markets by slug endpoint 
-> parse the returned json to get the CLOB tokens 
-> then finally call the price history endpoint using the correct asset id (CLOB id) 
+* hit the get Events by slug endpoint to get all markets in 2026-fifa-world-cup-winner-595
+* Then you need to parse the markets from the returned JSON
+* Extract the market slug 
+* query markets by slug endpoint 
+* parse the returned json to get the CLOB tokens 
+* then finally call the price history endpoint using the correct asset id (CLOB id) 
 
 If you want to hit all countries in the fifa world cup probabilities, then you will need to do this for all countries i.e. **all markets**. 
 
