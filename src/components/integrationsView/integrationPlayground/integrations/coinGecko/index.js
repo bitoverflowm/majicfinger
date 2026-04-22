@@ -23,8 +23,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { DateRange } from "react-day-picker"
+import { useMyStateV2 } from "@/context/stateContextV2";
 
-const CoinGecko = ({setConnectedData}) => {
+const CoinGecko = ({ setConnectedData, requestSheetDestination }) => {
+    const contextStateV2 = useMyStateV2();
+    const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
+    const setSheetData = contextStateV2?.setSheetData;
     
     const [args, setArgs] = useState()
     const [query, setQuery] = useState()
@@ -34,6 +38,8 @@ const CoinGecko = ({setConnectedData}) => {
 
 
     const fetchHandler = async (query, args) => {
+        const destination = await requestSheetDestination?.();
+        if (!destination) return;
         let queryString = `query=${query}`;
         if (args) {
             args.forEach((arg) => {
@@ -62,7 +68,15 @@ const CoinGecko = ({setConnectedData}) => {
             setQuery()
             setInputValues({})
             let data = await res.json();
-            setConnectedData(data);
+            if (destination === "append") {
+                const rows = Array.isArray(data) ? data : [data];
+                setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
+            } else if (destination === "new_sheet") {
+                const rows = Array.isArray(data) ? data : [data];
+                addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
+            } else {
+                setConnectedData(data);
+            }
         } else {
             setArgs()
             setQuery()

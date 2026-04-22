@@ -10,15 +10,21 @@ import {
 import { useState } from "react"
 
 import { Input } from "@/components/ui/input";
+import { useMyStateV2 } from "@/context/stateContextV2";
 
 
-const GeckoDex = ({setConnectedData}) => {
+const GeckoDex = ({ setConnectedData, requestSheetDestination }) => {
+    const contextStateV2 = useMyStateV2();
+    const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
+    const setSheetData = contextStateV2?.setSheetData;
 
     const [args, setArgs] = useState()
     const [query, setQuery] = useState()
     const [inputValues, setInputValues] = useState({});
     
     const fetchHandler = async (query, args) => {
+        const destination = await requestSheetDestination?.();
+        if (!destination) return;
         let queryString = `query=${query}`;
         if (args) {
           args.forEach((arg) => {
@@ -38,7 +44,14 @@ const GeckoDex = ({setConnectedData}) => {
             setQuery()
             setInputValues({})
             let data = await res.json();
-            setConnectedData(data);
+            const rows = Array.isArray(data) ? data : [data];
+            if (destination === "append") {
+                setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
+            } else if (destination === "new_sheet") {
+                addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
+            } else {
+                setConnectedData(data);
+            }
         } else {
             setArgs()
             setQuery()

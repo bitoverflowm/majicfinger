@@ -98,7 +98,7 @@ export function ReplaceOrNewSheetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Data already connected</DialogTitle>
           <DialogDescription>
@@ -107,19 +107,19 @@ export function ReplaceOrNewSheetDialog({
               : "You already have data in this sheet. Choose whether to add to the current sheet, replace it, or add a new sheet."}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <DialogClose asChild>
-            <Button variant="ghost">Cancel</Button>
+            <Button variant="ghost" className="w-full sm:w-auto">Cancel</Button>
           </DialogClose>
           {typeof onAddToCurrent === "function" ? (
-            <Button variant="secondary" onClick={onAddToCurrent}>
-              Add to current sheet
+            <Button variant="secondary" onClick={onAddToCurrent} className="w-full sm:w-auto">
+              Add to same sheet
             </Button>
           ) : null}
-          <Button variant="outline" onClick={handleReplace}>
+          <Button variant="outline" onClick={handleReplace} className="w-full sm:w-auto">
             Replace data
           </Button>
-          <Button onClick={handleAddNewSheet}>Add new sheet</Button>
+          <Button onClick={handleAddNewSheet} className="w-full sm:w-auto">Add new sheet</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

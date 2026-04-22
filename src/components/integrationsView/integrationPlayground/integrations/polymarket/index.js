@@ -130,7 +130,7 @@ function calendarWallTimeToUnixSeconds(date, timeString, fallbackHour = 0, fallb
   return String(m.unix());
 }
 
-const Polymarket = ({ setConnectedData }) => {
+const Polymarket = ({ setConnectedData, requestSheetDestination }) => {
   const contextStateV2 = useMyStateV2();
   const setViewing = contextStateV2?.setViewing;
   const setPolymarketWsState = contextStateV2?.setPolymarketWsState;
@@ -139,6 +139,7 @@ const Polymarket = ({ setConnectedData }) => {
   const activeSheetId = contextStateV2?.activeSheetId;
   const replaceCurrentSheetData = contextStateV2?.replaceCurrentSheetData;
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
+  const setSheetData = contextStateV2?.setSheetData;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -247,6 +248,8 @@ const Polymarket = ({ setConnectedData }) => {
 
   const runRequest = useCallback(
     async (query, values) => {
+      const destination = await requestSheetDestination?.();
+      if (!destination) return;
       if (throttleRemaining > 0) return;
       setError(null);
       setLoading(true);
@@ -294,7 +297,15 @@ const Polymarket = ({ setConnectedData }) => {
       }
 
       const arr = Array.isArray(data) ? data : [data];
-      setConnectedData(arr);
+      if (destination === "append") {
+        setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...arr]);
+      } else if (destination === "new_sheet") {
+        addNewSheetAndActivate?.((newId) => {
+          setSheetData?.(newId, arr);
+        });
+      } else {
+        setConnectedData?.(arr);
+      }
       if (!qs.includes("fields=") && arr.length > 0 && arr[0] && typeof arr[0] === "object") {
         setLastResultKeys(Object.keys(arr[0]));
       }
@@ -305,7 +316,14 @@ const Polymarket = ({ setConnectedData }) => {
       setSelectedAction(null);
       setParamValues({});
     },
-    [buildQueryString, setConnectedData, throttleRemaining]
+    [
+      addNewSheetAndActivate,
+      buildQueryString,
+      requestSheetDestination,
+      setConnectedData,
+      setSheetData,
+      throttleRemaining,
+    ]
   );
 
   useEffect(() => {

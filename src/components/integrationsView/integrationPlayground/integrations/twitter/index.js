@@ -8,12 +8,18 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import Search from './helpers/search';
+import { useMyStateV2 } from '@/context/stateContextV2';
 
-const Twitter = ({ setConnectedData }) => {
+const Twitter = ({ setConnectedData, requestSheetDestination }) => {
+  const contextStateV2 = useMyStateV2();
+  const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
+  const setSheetData = contextStateV2?.setSheetData;
   const [error, setError] = useState(null);
   const [args, setArgs ] = useState()
 
   const fetchHandler = async (query, params) => {
+    const destination = await requestSheetDestination?.();
+    if (!destination) return;
     try {
       const res = await fetch(`/api/integrations/twitter?query=${query}`, {
         method: 'POST',
@@ -25,7 +31,14 @@ const Twitter = ({ setConnectedData }) => {
 
       if (res.status === 200) {
         const data = await res.json();
-        setConnectedData(data);
+        const rows = Array.isArray(data) ? data : [data];
+        if (destination === "append") {
+          setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
+        } else if (destination === "new_sheet") {
+          addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
+        } else {
+          setConnectedData(data);
+        }
       } else {
         const errorData = await res.json();
         setError(errorData.error);
@@ -111,7 +124,7 @@ const Twitter = ({ setConnectedData }) => {
                 <AccordionTrigger>Search Tweets</AccordionTrigger>
                 <AccordionContent>
                 <div className='flex flex-wrap gap-1'>
-                    <Search searchTweets={true} />
+                    <Search searchTweets={true} requestSheetDestination={requestSheetDestination} />
                 </div>
                 </AccordionContent>
             </AccordionItem>

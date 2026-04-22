@@ -22,8 +22,10 @@ import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integra
 import { cn } from "@/lib/utils";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { scrollToPricingSection } from "@/lib/scrollToPricing";
+import { useRouter } from "next/navigation";
 
 const DataView = ({ user }) => {
+  const router = useRouter();
   const contextStateV2 = useMyStateV2();
   const isDemo = contextStateV2?.isDemo;
 
@@ -158,7 +160,7 @@ const DataView = ({ user }) => {
         <div className="relative">
           {!(user) && !isDemo && (
             <div className="w-full max-w-md mx-auto py-4">
-              <Alert onClick={() => setViewing("register")} className="cursor-pointer">
+              <Alert onClick={() => router.push("/login")} className="cursor-pointer">
                 <VscCircleFilled className="h-5 w-5" />
                 <AlertTitle className="text-xs">Want to save your work?</AlertTitle>
                 <AlertDescription className="text-xs">Click here to register.</AlertDescription>

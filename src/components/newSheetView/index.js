@@ -6,10 +6,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import GridView from '@/components/gridView'
 import { VscCircleFilled } from 'react-icons/vsc'
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge"
+import { useRouter } from "next/navigation"
 
 const NewSheetView = ({user, startNew}) => {
+    const router = useRouter()
     const contextStateV2 = useMyStateV2()
-    const setViewing = contextStateV2?.setViewing
     const isDemo = contextStateV2?.isDemo
 
     return(
@@ -24,7 +25,7 @@ const NewSheetView = ({user, startNew}) => {
             ) : null}
             {
                 !(user) && 
-                    <Alert onClick={()=>setViewing('register')} className="cursor-pointer">
+                    <Alert onClick={() => router.push('/login')} className="cursor-pointer">
                         <VscCircleFilled className="h-5 w-5"/>
                         <AlertTitle className="text-xs">Want to save your work?</AlertTitle>
                         <AlertDescription className="text-xs" >

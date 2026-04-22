@@ -12,8 +12,6 @@ import Upload from '@/components/dataView/upload'
 import IntegrationsView from "@/components/integrationsView";
 import NewSheetView from "@/components/newSheetView";
 
-import Login from "@/components/login";
-
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"
@@ -296,7 +294,6 @@ const DashBody = ({ user }) => {
                 {!isDemo && viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
                 {!isDemo && viewing === 'presentation' && <div className="py-20"><EasyLychee /></div> }
                 {!isDemo && viewing === 'scrape' && <ScraperView />}
-                {!isDemo && viewing === 'register' && <div className="flex place-items-center place-content-center"><div><Login/></div></div>}
                 {!isDemo && viewing === 'pricing' && <div className="py-10"><PricingSection /></div>}
                 {!isDemo && viewing === 'profilePage' && <div className="p-56 text-black">
                     <div className="">
@@ -368,15 +365,6 @@ const DashBody = ({ user }) => {
                     <div>For now I have enabled managed billing using Stripe click here: </div>
                     <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
                 </div>}
-                {!isDemo && (
-                  <button
-                      type="button"
-                      onClick={() => setViewing?.('pricing')}
-                      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-border shadow-lg hover:shadow-xl transition-shadow text-xs font-medium opacity-70 hover:opacity-100"
-                  >
-                      Deal for you
-                  </button>
-                )}
         </div>
       </>
     );

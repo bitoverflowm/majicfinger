@@ -906,7 +906,7 @@ const Nav = () => {
                     Register to save your work
                   </span>
                 )}
-                <Button variant="default" size="sm" onClick={()=>setViewing('register')}>Log In</Button>
+                <Button variant="default" size="sm" onClick={() => router.push('/login')}>Log In</Button>
                 <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
               </div>
             )}

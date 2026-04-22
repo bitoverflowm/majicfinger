@@ -13,21 +13,32 @@ import { toast } from 'sonner';
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 
-const TwitterSearch = ({searchTweets}) => {
+const TwitterSearch = ({ searchTweets, requestSheetDestination }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
 
   const contextStateV2 = useMyStateV2()
   const setConnectedData = contextStateV2?.setConnectedData
+  const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
+  const setSheetData = contextStateV2?.setSheetData;
 
   const handleSearch = async(e) => {
     e.preventDefault();
     try {
         if(searchTweets){
+            const destination = await requestSheetDestination?.();
+            if (!destination) return;
             const response = await fetch(`/api/integrations/twitter/search?tweets=${query}`);
             let tweets = await response.json();
-            setConnectedData(tweets.data)
-            toast('Search executed ' + data.length + ' tweets found over the past 7 days')
+            const rows = Array.isArray(tweets?.data) ? tweets.data : [];
+            if (destination === "append") {
+              setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
+            } else if (destination === "new_sheet") {
+              addNewSheetAndActivate?.((newId) => setSheetData?.(newId, rows));
+            } else {
+              setConnectedData(rows);
+            }
+            toast(`Search executed ${rows.length} tweets found over the past 7 days`)
         }else{
             //search users
             const response = await fetch(`/api/integrations/twitter/search?username=${query}`);
