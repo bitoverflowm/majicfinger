@@ -19,6 +19,7 @@ import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { sanitizeCartesianRowsForPlotting } from "@/lib/chartDataSanitize";
+import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
 
 const ChartBuilderContext = createContext(null);
 
@@ -717,7 +718,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (index >= 0) return curr.map((v, i) => (i === index ? value : v));
       return [...curr, value];
     });
-    setChartConfig((prev) => ({ ...(prev || {}), [value]: { label: value } }));
+    setChartConfig((prev) => ({
+      ...(prev || {}),
+      [value]: { label: stripSheetScopedColumnKey(value) },
+    }));
   };
 
   const removeY = (_val, index) => setSelY((prev) => (prev || []).filter((_, i) => i !== index));

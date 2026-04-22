@@ -3,6 +3,7 @@ import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
 import { cn } from "@/lib/utils"
+import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay"
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = {
@@ -236,10 +237,13 @@ const ChartLegendContent = React.forwardRef((
       {payload.map((item) => {
         const key = `${nameKey || item.dataKey || "value"}`
         const itemConfig = getPayloadConfigFromPayload(config, item, key)
+        const legendLabel = stripSheetScopedColumnKey(
+          itemConfig?.label ?? item.value ?? item.dataKey ?? ""
+        )
 
         return (
           (<div
-            key={item.value}
+            key={String(item.dataKey ?? item.value ?? legendLabel)}
             className={cn(
               "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-slate-500 dark:[&>svg]:text-slate-400"
             )}>
@@ -252,7 +256,7 @@ const ChartLegendContent = React.forwardRef((
                   backgroundColor: item.color,
                 }} />
             )}
-            {itemConfig?.label}
+            {legendLabel}
           </div>)
         );
       })}
