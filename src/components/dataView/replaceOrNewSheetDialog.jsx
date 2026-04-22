@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 export function ReplaceOrNewSheetDialog({
   open,
   onOpenChange,
+  onAddToCurrent,
   onReplace,
   onReplaceOne,
   onReplaceAll,
@@ -103,13 +104,18 @@ export function ReplaceOrNewSheetDialog({
           <DialogDescription>
             {hasLiveConnection
               ? "You already have a live connection or data in this sheet. Would you like to replace the current data (and stop the live connection) or create a new sheet?"
-              : "You already have data in this sheet. Would you like to replace the current data or create a new sheet?"}
+              : "You already have data in this sheet. Choose whether to add to the current sheet, replace it, or add a new sheet."}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <DialogClose asChild>
             <Button variant="ghost">Cancel</Button>
           </DialogClose>
+          {typeof onAddToCurrent === "function" ? (
+            <Button variant="secondary" onClick={onAddToCurrent}>
+              Add to current sheet
+            </Button>
+          ) : null}
           <Button variant="outline" onClick={handleReplace}>
             Replace data
           </Button>

@@ -36,6 +36,7 @@ import ExportPanel from "@/components/dataView/ExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 
 /** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
 const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
@@ -68,7 +69,10 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const connectedData = contextStateV2?.connectedData ?? [];
-  const setConnectedData = contextStateV2?.setConnectedData;
+  const setConnectedDataRaw = contextStateV2?.setConnectedData;
+  const dataSheets = contextStateV2?.dataSheets || {};
+  const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
+  const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
   const rightPanelOpen = contextStateV2?.rightPanelOpen;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
@@ -76,12 +80,61 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const setRightPanelTab = contextStateV2?.setRightPanelTab;
 
   const [isPanelClosing, setIsPanelClosing] = useState(false);
+  const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
+  const [pendingIntegrationRows, setPendingIntegrationRows] = useState(null);
   /** Sync with context on mount so remounts (or SSR) don’t replay the slide-in while the panel is already open. */
   const [isPanelOpen, setIsPanelOpen] = useState(() => !!rightPanelOpen);
   const [drawerExpanded, setDrawerExpanded] = useState(false);
   const closeTimeoutRef = useRef(null);
   const wasOpenRef = useRef(!!rightPanelOpen);
   const autoExpandedEmptySheetRef = useRef(false);
+
+  const anySheetHasData = Object.values(dataSheets).some(
+    (sheet) => Array.isArray(sheet?.data) && sheet.data.length > 0,
+  );
+
+  const normalizeRows = useCallback((value) => {
+    if (Array.isArray(value)) return value;
+    if (value != null && typeof value === "object") return [value];
+    return [];
+  }, []);
+
+  const applyRowsReplaceCurrent = useCallback((rows) => {
+    setConnectedDataRaw?.(rows);
+  }, [setConnectedDataRaw]);
+
+  const applyRowsAddCurrent = useCallback((rows) => {
+    setConnectedDataRaw?.((prev) => [...(Array.isArray(prev) ? prev : []), ...rows]);
+  }, [setConnectedDataRaw]);
+
+  const applyRowsAddNewSheet = useCallback((rows) => {
+    addNewSheetAndActivate?.((newId) => {
+      setSheetData?.(newId, rows);
+    });
+  }, [addNewSheetAndActivate, setSheetData]);
+
+  const setConnectedDataFromIntegration = useCallback((value) => {
+    // Keep function updaters untouched (live streams / append mechanics).
+    if (typeof value === "function") {
+      setConnectedDataRaw?.(value);
+      return;
+    }
+
+    const rows = normalizeRows(value);
+    if (rows.length === 0) {
+      setConnectedDataRaw?.(rows);
+      return;
+    }
+
+    // Request applies across integrations when any sheet already has data.
+    if (anySheetHasData) {
+      setPendingIntegrationRows(rows);
+      setReplaceOrNewSheetOpen(true);
+      return;
+    }
+
+    setConnectedDataRaw?.(rows);
+  }, [anySheetHasData, normalizeRows, setConnectedDataRaw]);
 
   // When arriving to charts view, default the panel tab to charts (don't override if user chose Export)
   useEffect(() => {
@@ -190,23 +243,23 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const renderIntegration = () => {
     switch (integrationSidebar) {
       case "polymarket":
-        return <Polymarket setConnectedData={setConnectedData} />;
+        return <Polymarket setConnectedData={setConnectedDataFromIntegration} />;
       case "polymarketHistorical":
-        return <PolymarketHistorical setConnectedData={setConnectedData} />;
+        return <PolymarketHistorical setConnectedData={setConnectedDataRaw} />;
       case "kalshiHistorical":
-        return <KalshiHistorical setConnectedData={setConnectedData} />;
+        return <KalshiHistorical setConnectedData={setConnectedDataRaw} />;
       case "coinGecko":
-        return <CoinGecko setConnectedData={setConnectedData} />;
+        return <CoinGecko setConnectedData={setConnectedDataFromIntegration} />;
       case "twitter":
-        return <Twitter setConnectedData={setConnectedData} />;
+        return <Twitter setConnectedData={setConnectedDataFromIntegration} />;
       case "wallStreetBets":
-        return <WallStreetBets setConnectedData={setConnectedData} />;
+        return <WallStreetBets setConnectedData={setConnectedDataFromIntegration} />;
       case "geckoDex":
-        return <GeckoDex setConnectedData={setConnectedData} />;
+        return <GeckoDex setConnectedData={setConnectedDataFromIntegration} />;
       case "binance":
-        return <Binance setConnectedData={setConnectedData} />;
+        return <Binance setConnectedData={setConnectedDataFromIntegration} />;
       case "chainlink":
-        return <Chainlink setConnectedData={setConnectedData} />;
+        return <Chainlink setConnectedData={setConnectedDataFromIntegration} />;
       default:
         return null;
     }
@@ -233,6 +286,28 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       // The parent container should clip overflow; we still set relative here so `absolute` works.
       isDemo && "relative",
     )}>
+      <ReplaceOrNewSheetDialog
+        open={replaceOrNewSheetOpen}
+        onOpenChange={(open) => {
+          setReplaceOrNewSheetOpen(open);
+          if (!open) setPendingIntegrationRows(null);
+        }}
+        onAddToCurrent={() => {
+          if (!pendingIntegrationRows) return;
+          applyRowsAddCurrent(pendingIntegrationRows);
+          setPendingIntegrationRows(null);
+        }}
+        onReplace={() => {
+          if (!pendingIntegrationRows) return;
+          applyRowsReplaceCurrent(pendingIntegrationRows);
+          setPendingIntegrationRows(null);
+        }}
+        onAddNewSheet={() => {
+          if (!pendingIntegrationRows) return;
+          applyRowsAddNewSheet(pendingIntegrationRows);
+          setPendingIntegrationRows(null);
+        }}
+      />
       <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:gap-6">
         {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
         <main

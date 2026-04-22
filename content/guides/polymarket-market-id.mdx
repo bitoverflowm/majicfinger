@@ -24,11 +24,11 @@ keywords: [
 "polymarket clobtokenids"
 ]
 canonical: "https://lycheedata.com/guides/polymarket-market-id"
-seoTitle: "How to Find Polymarket Market ID — Token, Condition & Slug Explained"
+seoTitle: "How to Find Polymarket Market ID — CLOB, Token, Condition & Slug Explained"
 twitterCard: "summary_large_image"
 ----------------------------------
 
-# How to Find Polymarket Market ID (Token, Condition & Slug Explained)
+# How to Find Polymarket Market ID (CLOB, Token, Condition & Slug Explained)
 
 When I first started using the Polymarket API for research, I was completely stumped by how everything was structured. Even if you understand the difference between the [Gamma API, Data API, and CLOB API](https://docs.polymarket.com/api-reference/introduction), you still need to navigate:
 
@@ -81,11 +81,12 @@ Polymarket uses multiple identifiers, which is where confusion starts.
 
 * identifies a specific market
 * used for metadata lookup
-* used for down stream deeper analysis into other markets endpoints
+* used for downstream deeper analysis into other markets endpoints
 
 **Token ID (CLOB Token ID)**
 
 * sometimes referred to as "asset ID"
+* CLOB token IDs correspond to ERC1155 tokens representing YES/NO outcome shares.
 * identifies tradable outcomes
 * used for price / orderbook queries
 * separate token for YES and NO
@@ -108,6 +109,15 @@ Every binary market returns token IDs like:
 ```
 
 These are the **actual asset IDs** used in price queries.
+
+| Identifier | Used For | Example |
+| :--------: | :------: | :------: |
+| Market ID | Metadata lookup | 558934 |
+| Condition ID | Settlement logic | `0x7976b8dbacf9077eb1453a62bcefd6ab2df199acd28aad276ff0d920d6992892` |
+| Token ID | Trading / price data | `4394372887385518214471608448209527405727552777602031099972143344338178308080` |
+| Slug | Human readable lookup | `will-spain-win-the-2026-fifa-world-cup-963` |
+
+
 
 ---
 
@@ -135,12 +145,30 @@ You can:
 * call the markets endpoint
 * retrieve the market ID
 
-![Create to Polymarket API](/images/guides/polymarket-odds-over-time/1.png)
+![Create to Polymarket API](/images/guides/polymarket-market-id/1.png)
 
 Or via API:
 
-```js
-// example code placeholder
+```python
+import requests
+
+# Example slug: copy from a Polymarket market URL
+slug = "will-bitcoin-be-above-100k-by-december-31-2026"
+url = f"https://gamma-api.polymarket.com/markets/slug/{slug}"
+
+# Optional query param from docs: include_tag=true|false
+response = requests.get(url, params={"include_tag": "true"}, timeout=20)
+response.raise_for_status()
+
+market = response.json()
+
+print("market_id:", market.get("id"))
+print("question:", market.get("question"))
+print("condition_id:", market.get("conditionId"))
+print("slug:", market.get("slug"))
+print("clob_token_ids:", market.get("clobTokenIds"))
+print("outcomes:", market.get("outcomes"))
+print("outcome_prices:", market.get("outcomePrices"))
 ```
 
 The response includes:
@@ -152,7 +180,7 @@ The response includes:
 
 ---
 
-## How to Get Token IDs from a Market
+## How to Get Token IDs or Asset IDs from a Market
 
 Once you retrieve market metadata, you extract:
 
@@ -162,8 +190,8 @@ Once you retrieve market metadata, you extract:
 
 These represent:
 
-* YES outcome token
-* NO outcome token
+* YES outcome token eg: 61918066498633367803417153950894166474387166330773245675672479227566263123431
+* NO outcome token eg: 86819819312063810480442948275164497299497518243211784396459396519262712651330
 
 These IDs are required for:
 
@@ -174,7 +202,7 @@ These IDs are required for:
 
 Without them, you cannot query probability over time.
 
-<PublicChart username="misterrpink" slug="will-bryan-johnson-have-sex-again-this-month" />
+<PublicChart username="misterrpink" slug="will-the-virginia-redistricting-referendum-pass-probability-momentum" />
 
 ---
 
@@ -202,7 +230,17 @@ This metadata is required to:
 * analyze liquidity
 * plot probability movement
 
+This metadata response is what powers all downstream Polymarket API queries.
 Everything flows from this metadata response.
+
+
+* see top holders
+* open interest
+* live volumes
+* check order book
+* get spreads
+* get trades 
+* more
 
 ---
 
@@ -214,9 +252,9 @@ Instead of manually:
 * calling endpoints
 * parsing JSON
 
-You can search using natural language:
+You can search [polymarket-metadata](/polymarket-metadata) using natural language:
 
-![Create to Polymarket API](/images/guides/polymarket-odds-over-time/1.png)
+![Create to Polymarket API](/images/guides/polymarket-market-id/2.png)
 
 This returns:
 
@@ -227,7 +265,7 @@ This returns:
 * CLOB Token IDs
 * metadata
 
-![Create to Polymarket API](/images/guides/polymarket-odds-over-time/1.png)
+![Create to Polymarket API](/images/guides/polymarket-market-id/3.png)
 
 This removes the entire dependency chain.
 
@@ -253,8 +291,6 @@ Example endpoints:
 
 These endpoints return JSON metadata including token IDs.
 
-![Create to Polymarket API](/images/guides/polymarket-odds-over-time/1.png)
-
 ---
 
 ## Common Mistakes When Working With Polymarket IDs
@@ -276,11 +312,23 @@ https://polymarket.com/event/2026-fifa-world-cup-winner-595
 
 contain multiple markets, each with separate token IDs.
 
-You must retrieve **all markets** and select the one you need.
+The only way to extract the CLOB Token ID effectively is to use [lycheedata.com/polymarket-metadata](/polymarket-metadata)
 
-![Create to Polymarket API](/images/guides/polymarket-odds-over-time/1.png)
+Otherwise: 
+> hit the get Events by slug endpoint to get all markets in 2026-fifa-world-cup-winner-595
+> Then you need to parse the markets from the returned JSON
+> Extract the market slug 
+> query markets by slug endpoint 
+> parse the returned json to get the CLOB tokens 
+> then finally call the price history endpoint using the correct asset id (CLOB id) 
 
-<PublicChart username="misterrpink" slug="will-bryan-johnson-have-sex-again-this-month" />
+If you want to hit all countries in the fifa world cup probabilities, then you will need to do this for all countries i.e. **all markets**. 
+
+[lycheedata.com/polymarket-metadata](/polymarket-metadata) is easier:
+
+![Create to Polymarket API](/images/guides/polymarket-market-id/4.png)
+
+<PublicChart username="misterrpink" slug="will-spain-win-the-2026-fifa-world-cup" />
 
 ---
 
