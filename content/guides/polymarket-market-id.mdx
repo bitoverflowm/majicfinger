@@ -306,7 +306,7 @@ Common issues include:
 Multi-outcome events like:
 
 ```
-https://polymarket.com/event/2026-fifa-world-cup-winner-595
+https://polymarket.com/event/2026-nba-champion
 ```
 
 contain multiple markets, each with separate token IDs.
@@ -314,14 +314,14 @@ contain multiple markets, each with separate token IDs.
 The only way to extract the CLOB Token ID effectively is to use [lycheedata.com/polymarket-metadata](/polymarket-metadata)
 
 Otherwise: 
-* hit the get Events by slug endpoint to get all markets in 2026-fifa-world-cup-winner-595
+* hit the get Events by slug endpoint to get all markets in 2026-nba-champion
 * Then you need to parse the markets from the returned JSON
 * Extract the market slug 
 * query markets by slug endpoint 
 * parse the returned json to get the CLOB tokens 
 * then finally call the price history endpoint using the correct asset id (CLOB id) 
 
-If you want to hit all countries in the fifa world cup probabilities, then you will need to do this for all countries i.e. **all markets**. 
+If you want to hit all countries in the NBA Championship probabilities, then you will need to do this for all countries i.e. **all markets**. 
 
 [lycheedata.com/polymarket-metadata](/polymarket-metadata) is easier:
 
