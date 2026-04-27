@@ -83,8 +83,28 @@ function ShareEmbedSection() {
   const loadedDataMeta = v2?.loadedDataMeta;
   const loadedChartMeta = v2?.loadedChartMeta;
   const setLoadedChartMeta = v2?.setLoadedChartMeta;
+  const chartSheets = v2?.chartSheets || {};
+  const setChartSheets = v2?.setChartSheets;
+  const activeChartSheetId = v2?.activeChartSheetId;
   const setRefetchChart = v2?.setRefetchChart;
   const { getBuilderSnapshot, getChartPngDataUrl } = useChartBuilder();
+  const activeChartMeta = activeChartSheetId ? (chartSheets?.[activeChartSheetId]?.chartMeta || loadedChartMeta) : loadedChartMeta;
+
+  const syncActiveChartSheet = useCallback((chartMeta, snapshot = null) => {
+    if (!activeChartSheetId || !chartMeta) return;
+    setChartSheets?.((prev) => {
+      const cur = prev?.[activeChartSheetId] || { name: chartMeta.chart_name || "Chart", snapshot: null, chartMeta: null };
+      return {
+        ...(prev || {}),
+        [activeChartSheetId]: {
+          ...cur,
+          name: chartMeta.chart_name || cur.name,
+          chartMeta,
+          snapshot: snapshot ?? cur.snapshot ?? null,
+        },
+      };
+    });
+  }, [activeChartSheetId, setChartSheets]);
 
   const uploadOgImage = useCallback(async (chartId) => {
     if (!chartId || typeof getChartPngDataUrl !== "function") return null;
@@ -116,12 +136,12 @@ function ShareEmbedSection() {
   }, []);
 
   useEffect(() => {
-    if (loadedChartMeta?.public_slug) {
-      setSlugInput(loadedChartMeta.public_slug);
+    if (activeChartMeta?.public_slug) {
+      setSlugInput(activeChartMeta.public_slug);
       return;
     }
-    setSlugInput(normalizeChartEmbedSlug(loadedChartMeta?.chart_name || "chart") || "chart");
-  }, [loadedChartMeta?._id, loadedChartMeta?.chart_name, loadedChartMeta?.public_slug]);
+    setSlugInput(normalizeChartEmbedSlug(activeChartMeta?.chart_name || "chart") || "chart");
+  }, [activeChartMeta?._id, activeChartMeta?.chart_name, activeChartMeta?.public_slug]);
 
   const publicUrl = useMemo(() => {
     const slug = normalizeChartEmbedSlug(slugInput);
@@ -139,12 +159,12 @@ function ShareEmbedSection() {
   }, [publicUrl]);
   const normalizedSlug = useMemo(() => normalizeChartEmbedSlug(slugInput), [slugInput]);
   const publishedSlug = useMemo(
-    () => normalizeChartEmbedSlug(loadedChartMeta?.public_slug || ""),
-    [loadedChartMeta?.public_slug],
+    () => normalizeChartEmbedSlug(activeChartMeta?.public_slug || ""),
+    [activeChartMeta?.public_slug],
   );
   const isPublishedForCurrentSlug = !!(
-    loadedChartMeta?._id &&
-    loadedChartMeta?.is_public &&
+    activeChartMeta?._id &&
+    activeChartMeta?.is_public &&
     publishedSlug &&
     normalizedSlug &&
     publishedSlug === normalizedSlug
@@ -253,6 +273,7 @@ function ShareEmbedSection() {
 
       setSlugInput(pendingSlug);
       setLoadedChartMeta?.(publishJson?.data);
+      syncActiveChartSheet(publishJson?.data, snapshot);
       setRefetchChart?.(1);
       setShowSavePublishDialog(false);
       toast.success("Chart saved and embed published");
@@ -286,7 +307,7 @@ function ShareEmbedSection() {
       toast.error("Set your user handle under Profile before publishing");
       return;
     }
-    if (!loadedChartMeta?._id) {
+      if (!activeChartMeta?._id) {
       const guessed =
         (slugInput || "").trim() ||
         (pendingChartName || "").trim() ||
@@ -301,7 +322,7 @@ function ShareEmbedSection() {
       return;
     }
 
-    const chartRes = await fetch(`/api/charts/chart/${loadedChartMeta._id}`, {
+    const chartRes = await fetch(`/api/charts/chart/${activeChartMeta._id}`, {
       credentials: "include",
     });
     const chartJson = await chartRes.json();
@@ -316,9 +337,9 @@ function ShareEmbedSection() {
         : {};
     const snapshot = getBuilderSnapshot();
     const chart_properties = [{ ...prev0, rechartsBuilder: snapshot }];
-    const ogImageUrl = await uploadOgImage(loadedChartMeta._id);
+    const ogImageUrl = await uploadOgImage(activeChartMeta._id);
 
-    const putRes = await fetch(`/api/charts/chart/${loadedChartMeta._id}`, {
+    const putRes = await fetch(`/api/charts/chart/${activeChartMeta._id}`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -338,18 +359,20 @@ function ShareEmbedSection() {
     }
     toast.success("Embed link is live");
     setLoadedChartMeta?.(putJson?.data);
+    syncActiveChartSheet(putJson?.data, snapshot);
     setRefetchChart?.(1);
   }, [
     user,
     isDemo,
     userHandle,
-    loadedChartMeta,
+    activeChartMeta,
     pendingChartName,
     slugInput,
     setLoadedChartMeta,
     getBuilderSnapshot,
     uploadOgImage,
     setRefetchChart,
+    syncActiveChartSheet,
   ]);
 
   const copyText = useCallback(async (text, label) => {
@@ -362,7 +385,7 @@ function ShareEmbedSection() {
   }, []);
 
   const deleteEmbed = useCallback(async () => {
-    if (!loadedChartMeta?._id) return;
+    if (!activeChartMeta?._id) return;
     try {
       setIsDeletingEmbed(true);
       const res = await fetch("/api/assets/delete", {
@@ -371,7 +394,7 @@ function ShareEmbedSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "publicPage",
-          id: loadedChartMeta._id,
+          id: activeChartMeta._id,
         }),
       });
       const json = await res.json();
@@ -382,6 +405,19 @@ function ShareEmbedSection() {
       setLoadedChartMeta?.((prev) =>
         prev ? { ...prev, is_public: false, public_slug: undefined } : prev,
       );
+      if (activeChartSheetId) {
+        setChartSheets?.((prev) => {
+          const cur = prev?.[activeChartSheetId];
+          if (!cur?.chartMeta) return prev;
+          return {
+            ...(prev || {}),
+            [activeChartSheetId]: {
+              ...cur,
+              chartMeta: { ...cur.chartMeta, is_public: false, public_slug: undefined },
+            },
+          };
+        });
+      }
       setRefetchChart?.(1);
       setShowDeleteEmbedDialog(false);
       toast.success("Public embed deleted");
@@ -390,7 +426,7 @@ function ShareEmbedSection() {
     } finally {
       setIsDeletingEmbed(false);
     }
-  }, [loadedChartMeta?._id, setLoadedChartMeta, setRefetchChart]);
+  }, [activeChartMeta?._id, activeChartSheetId, setChartSheets, setLoadedChartMeta, setRefetchChart]);
 
   return (
     <div className="space-y-2">

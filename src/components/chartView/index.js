@@ -283,7 +283,26 @@ function formatCompactNumber(value) {
   return `${Math.round(value * 100) / 100}`;
 }
 
-export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, embedCompact = false }) {
+function parseScopedColumnKey(value, fallbackSheetId) {
+  const raw = String(value || "");
+  const splitIdx = raw.indexOf("::");
+  if (splitIdx > 0) {
+    return {
+      raw,
+      sheetId: raw.slice(0, splitIdx),
+      column: raw.slice(splitIdx + 2),
+      isScoped: true,
+    };
+  }
+  return {
+    raw,
+    sheetId: fallbackSheetId || null,
+    column: raw,
+    isScoped: false,
+  };
+}
+
+export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, embedCompact = false, onSnapshotGetterReady }) {
   const contextStateV2 = useMyStateV2();
   const chartRef = useRef(null);
 
@@ -475,14 +494,55 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     a.length === b.length &&
     a.every((v, i) => v === b[i]);
 
+  const globalSheetColumnGroups = useMemo(() => {
+    const groups = [];
+    const dataSheets = contextStateV2?.dataSheets || {};
+    for (const [sheetId, sheet] of Object.entries(dataSheets)) {
+      const rows = Array.isArray(sheet?.data) ? sheet.data : [];
+      if (!rows.length) continue;
+      const first = rows[0] || {};
+      const cols = Object.keys(first);
+      if (!cols.length) continue;
+      groups.push({
+        sheetId,
+        sheetName: sheet?.name || sheetId,
+        options: cols.map((column) => ({
+          value: `${sheetId}::${column}`,
+          column,
+          sheetId,
+          sheetName: sheet?.name || sheetId,
+        })),
+      });
+    }
+    if (!groups.length) {
+      const cols = (effectiveCols || []).map((c) => c.field).filter(Boolean);
+      if (cols.length) {
+        groups.push({
+          sheetId: "__inline__",
+          sheetName: "Data",
+          options: cols.map((column) => ({
+            value: column,
+            column,
+            sheetId: "__inline__",
+            sheetName: "Data",
+          })),
+        });
+      }
+    }
+    return groups;
+  }, [contextStateV2?.dataSheets, effectiveCols]);
+
+  const globalColumnOptions = useMemo(
+    () => globalSheetColumnGroups.flatMap((g) => g.options.map((o) => o.value)),
+    [globalSheetColumnGroups],
+  );
+
   useEffect(() => {
-    if (!effectiveCols?.length) return;
-    const cols = effectiveCols.map((c) => c.field);
-    setXOptions((prev) => (areArraysEqual(prev, cols) ? prev : cols));
-    const pivotForStackedY = selX && cols.includes(selX) ? selX : null;
-    const yOpts = pivotForStackedY ? cols.filter((c) => c !== pivotForStackedY) : cols;
+    if (!globalColumnOptions?.length) return;
+    setXOptions((prev) => (areArraysEqual(prev, globalColumnOptions) ? prev : globalColumnOptions));
+    const yOpts = selX ? globalColumnOptions.filter((c) => c !== selX) : globalColumnOptions;
     setAvailableYOptons((prev) => (areArraysEqual(prev, yOpts) ? prev : yOpts));
-  }, [effectiveCols, selX]);
+  }, [globalColumnOptions, selX]);
 
   // Drop axis selections that no longer exist on the sheet (do not auto-pick replacements).
   // In demo, only enforce this when the sheet has real rows; sample fallback uses synthetic columns.
@@ -491,7 +551,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const live = Array.isArray(effectiveData) ? effectiveData : [];
       if (!live.length) return;
     }
-    const cols = effectiveCols?.map((c) => c.field) || [];
+    const cols = globalColumnOptions || [];
     if (!cols.length) return;
     const colSet = new Set(cols);
     const deScope = (value) => {
@@ -511,7 +571,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const next = curr.filter((y) => hasColumn(y));
       return next.length === curr.length && next.every((v, i) => v === curr[i]) ? curr : next;
     });
-  }, [demo, effectiveData, effectiveCols]);
+  }, [demo, effectiveData, globalColumnOptions]);
 
   // Auto-trim Y for single-series chart types (keeps filters/sorts intact).
   useEffect(() => {
@@ -621,76 +681,50 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const lineIsTemporalX = useMemo(() => isLikelyTemporalKey(selX, dataTypes, chartData), [selX, dataTypes, chartData]);
 
-  const lineChartData = useMemo(() => {
-    // For line charts, allow Y keys from any sheet using scoped keys: `${sheetId}::${column}`.
-    if (selChartType !== "line") return chartData;
+  const scopedKeysInUse = useMemo(() => {
+    const keys = [selX, ...(selY || []), lineSeriesColumn, chartFilterColumn].filter(Boolean);
+    return keys.some((k) => String(k).includes("::"));
+  }, [selX, selY, lineSeriesColumn, chartFilterColumn]);
+
+  const crossSheetChartData = useMemo(() => {
     const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
     if (!sheetEntries.length) return chartData || dfltChartData;
     const activeRows = Array.isArray(contextStateV2?.dataSheets?.[contextStateV2?.activeSheetId]?.data)
       ? contextStateV2.dataSheets[contextStateV2.activeSheetId].data
       : [];
+    const neededKeys = new Set([selX, ...(selY || []), lineSeriesColumn, chartFilterColumn].filter(Boolean));
+    if (!neededKeys.size) return chartData || dfltChartData;
     const maxRows = Math.max(0, ...sheetEntries.map(([, sheet]) => sheet.data.length));
     const rows = [];
     for (let idx = 0; idx < maxRows; idx += 1) {
       const row = {};
-      if (selX) {
-        row[selX] = activeRows[idx]?.[selX] ?? idx;
+      for (const key of neededKeys) {
+        const parsed = parseScopedColumnKey(key, contextStateV2?.activeSheetId);
+        const sourceRows = parsed.sheetId && Array.isArray(contextStateV2?.dataSheets?.[parsed.sheetId]?.data)
+          ? contextStateV2.dataSheets[parsed.sheetId].data
+          : activeRows;
+        row[key] = sourceRows[idx]?.[parsed.column] ?? null;
       }
-      for (const yKey of selY || []) {
-        const raw = String(yKey || "");
-        const splitIdx = raw.indexOf("::");
-        const sheetId = splitIdx > 0 ? raw.slice(0, splitIdx) : contextStateV2?.activeSheetId;
-        const column = splitIdx > 0 ? raw.slice(splitIdx + 2) : raw;
-        const sourceRows = Array.isArray(contextStateV2?.dataSheets?.[sheetId]?.data) ? contextStateV2.dataSheets[sheetId].data : [];
-        row[yKey] = sourceRows[idx]?.[column] ?? null;
+      if (selX && row[selX] == null) {
+        row[selX] = idx;
       }
       rows.push(row);
     }
     return rows.length ? rows : chartData || dfltChartData;
-  }, [selChartType, chartData, contextStateV2?.dataSheets, contextStateV2?.activeSheetId, selX, selY]);
+  }, [
+    chartData,
+    chartFilterColumn,
+    contextStateV2?.activeSheetId,
+    contextStateV2?.dataSheets,
+    lineSeriesColumn,
+    selX,
+    selY,
+  ]);
 
-  const lineSheetColumnGroups = useMemo(() => {
-    const groups = [];
-    for (const [sheetId, sheet] of Object.entries(contextStateV2?.dataSheets || {})) {
-      const rows = Array.isArray(sheet?.data) ? sheet.data : [];
-      if (!rows.length) continue;
-      const first = rows[0] || {};
-      const cols = Object.keys(first);
-      if (!cols.length) continue;
-      const options = cols.map((column) => ({
-        value: `${sheetId}::${column}`,
-        column,
-        sheetId,
-        sheetName: sheet?.name || sheetId,
-      }));
-      groups.push({
-        sheetId,
-        sheetName: sheet?.name || sheetId,
-        options,
-      });
-    }
-    if (!groups.length) {
-      const rows = Array.isArray(chartData) && chartData.length ? chartData : [];
-      const first = rows[0];
-      if (first && typeof first === "object") {
-        const cols = Object.keys(first);
-        if (cols.length) {
-          const sheetId = "__inline__";
-          groups.push({
-            sheetId,
-            sheetName: "Data",
-            options: cols.map((column) => ({
-              value: column,
-              column,
-              sheetId,
-              sheetName: "Data",
-            })),
-          });
-        }
-      }
-    }
-    return groups;
-  }, [contextStateV2?.dataSheets, chartData]);
+  const lineChartData = useMemo(() => {
+    if (selChartType === "line" || scopedKeysInUse) return crossSheetChartData;
+    return chartData;
+  }, [selChartType, scopedKeysInUse, crossSheetChartData, chartData]);
 
   const selectedPaletteHandler = (baseId) => {
     const id = String(baseId || "").trim();
@@ -791,6 +825,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   };
 
   const getBuilderSnapshot = useCallback(() => ({ v: 1, ...builderStateRef.current }), []);
+  useEffect(() => {
+    if (typeof onSnapshotGetterReady !== "function") return;
+    onSnapshotGetterReady(getBuilderSnapshot);
+  }, [onSnapshotGetterReady, getBuilderSnapshot]);
 
   const downloadChart = (format) => {
     const el = chartRef.current;
@@ -936,7 +974,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     yAxisCompact,
     setYAxisCompact,
 
-    chartData,
+    chartData: scopedKeysInUse ? crossSheetChartData : chartData,
     getAxisType,
 
     selectedPalette,
@@ -1037,9 +1075,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     lineSeriesCandidates,
     lineSeriesValues,
     setLineSeriesValues,
-    lineSheetColumnGroups,
+    lineSheetColumnGroups: globalSheetColumnGroups,
     lineIsTemporalX,
     lineChartData,
+    scopedKeysInUse,
     formatXAxisValue,
     formatCompactNumber,
   };
@@ -1109,6 +1148,7 @@ export function ChartCanvas() {
     xAxisTicksAngled,
     lineIsTemporalX,
     lineChartData,
+    scopedKeysInUse,
     formatXAxisValue,
     formatCompactNumber,
     scaleY,
@@ -1130,7 +1170,7 @@ export function ChartCanvas() {
   );
   const xAxisTickMargin = xAxisTicksAngled ? 12 : 8;
 
-  const rawData = (selChartType === "line" ? lineChartData : chartData) || [];
+  const rawData = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
   const axesConfigured = usingSampleFallback || (!!selX && yKeys.length > 0);

@@ -93,6 +93,10 @@ const Nav = () => {
   const loadedChartMeta = contextStateV2?.loadedChartMeta
   const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta
   const setLoadedChartBuilderSnapshot = contextStateV2?.setLoadedChartBuilderSnapshot
+  const chartSheets = contextStateV2?.chartSheets || {}
+  const setChartSheets = contextStateV2?.setChartSheets
+  const activeChartSheetId = contextStateV2?.activeChartSheetId
+  const setActiveChartSheetId = contextStateV2?.setActiveChartSheetId
 
   // summarization: when charting a summary table
   const chartDataOverride = contextStateV2?.chartDataOverride
@@ -149,11 +153,13 @@ const Nav = () => {
   };
 
   const [overwrite, setOverwrite] = useState()
+  const activeChartSheet = activeChartSheetId ? chartSheets?.[activeChartSheetId] : null;
+  const activeChartMeta = activeChartSheet?.chartMeta || loadedChartMeta;
 
   const handleSave = async () => {
       if(overwrite){
-        if(viewing === 'charts'){
-          fetch(`/api/charts/chart/${loadedChartMeta._id}`, {
+        if(viewing === 'charts' && activeChartMeta?._id){
+          fetch(`/api/charts/chart/${activeChartMeta._id}`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -164,13 +170,13 @@ const Nav = () => {
               const existingChartProps = Array.isArray(current?.data?.chart_properties)
                 ? current.data.chart_properties
                 : (current?.data?.chart_properties ? [current.data.chart_properties] : []);
-              return fetch(`/api/charts/chart/${loadedChartMeta._id}`, {
+              return fetch(`/api/charts/chart/${activeChartMeta._id}`, {
                 method: 'PUT',
                 headers: {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ 
-                  chart_name: loadedChartMeta.chart_name,
+                  chart_name: activeChartMeta.chart_name,
                   chart_properties: existingChartProps,
                   last_saved_date: new Date(),
                   labels: ['test'],
@@ -179,7 +185,7 @@ const Nav = () => {
             })
             .then(response => response.json())
             .then(data => {
-              toast(`Your Chart has been saved as ${loadedChartMeta.chart_name}`)
+              toast(`Your Chart has been saved as ${activeChartMeta.chart_name}`)
               setRefetchChart(1)
             })
             .catch(error => {
@@ -214,14 +220,14 @@ const Nav = () => {
         if(viewing === 'charts'){
           const saveChartWithData = async (dataSetId) => {
             const snapshot =
-              loadedChartMeta?.chart_properties?.[0]?.rechartsBuilder ||
+              activeChartMeta?.chart_properties?.[0]?.rechartsBuilder ||
               inferDefaultBuilderSnapshot(connectedData || []);
             const res = await fetch('/api/charts', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
-                chart_name: newChartName,
-                chart_properties: [{ title: newChartName, rechartsBuilder: snapshot }],
+                chart_name: newChartName || activeChartSheet?.name || "Chart",
+                chart_properties: [{ title: newChartName || activeChartSheet?.name || "Chart", rechartsBuilder: snapshot }],
                 created_date: new Date(),
                 last_saved_date: new Date(),
                 labels: ['test'],
@@ -231,8 +237,25 @@ const Nav = () => {
             });
             const data = await res.json();
             if (data._id || data.success) {
-              toast(`Your Chart has been saved as ${newChartName}`);
+              const createdChart = data?.data || data;
+              const createdSnapshot = createdChart?.chart_properties?.[0]?.rechartsBuilder || snapshot;
+              toast(`Your Chart has been saved as ${createdChart.chart_name || newChartName || activeChartSheet?.name || "Chart"}`);
               setRefetchChart(1);
+              if (activeChartSheetId && createdChart?._id) {
+                setChartSheets?.((prev) => {
+                  const cur = prev?.[activeChartSheetId] || { name: newChartName || activeChartSheet?.name || "Chart", snapshot: null, chartMeta: null };
+                  return {
+                    ...(prev || {}),
+                    [activeChartSheetId]: {
+                      ...cur,
+                      name: createdChart.chart_name || newChartName || cur.name,
+                      chartMeta: createdChart,
+                      snapshot: createdSnapshot,
+                    },
+                  };
+                });
+              }
+              setLoadedChartMeta?.(createdChart || null);
               setChartDataOverride?.(null);
               setChartDataOverrideMeta?.(null);
             }
@@ -311,6 +334,53 @@ const Nav = () => {
       setSaveIsOpen(false)
   }
 
+  const hydrateProjectCharts = async (dataSetId, preferredChartId = null) => {
+    const scoped = (savedCharts || []).filter((chart) => String(chart?.data_set_id) === String(dataSetId));
+    if (!scoped.length) {
+      setChartSheets?.({
+        "chart-1": { name: "Chart 1", snapshot: null, chartMeta: null },
+      });
+      setActiveChartSheetId?.("chart-1");
+      setLoadedChartMeta?.(null);
+      setLoadedChartBuilderSnapshot?.(null);
+      return;
+    }
+
+    const detailed = await Promise.all(
+      scoped.map(async (meta) => {
+        try {
+          const res = await fetch(`/api/charts/chart/${meta._id}`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          });
+          const json = await res.json();
+          const full = json?.data || null;
+          const cp0 = Array.isArray(full?.chart_properties) ? full.chart_properties[0] : full?.chart_properties;
+          const snapshot = cp0?.rechartsBuilder || null;
+          return { meta: full || meta, snapshot };
+        } catch {
+          return { meta, snapshot: null };
+        }
+      }),
+    );
+
+    const nextSheets = {};
+    detailed.forEach((entry, idx) => {
+      const id = `chart-${idx + 1}`;
+      nextSheets[id] = {
+        name: entry?.meta?.chart_name || `Chart ${idx + 1}`,
+        chartMeta: entry?.meta || null,
+        snapshot: entry?.snapshot || null,
+      };
+    });
+    setChartSheets?.(nextSheets);
+    const preferred = detailed.find((d) => String(d?.meta?._id) === String(preferredChartId)) || detailed[0];
+    const activeId = Object.keys(nextSheets).find((k) => nextSheets[k]?.chartMeta?._id === preferred?.meta?._id) || "chart-1";
+    setActiveChartSheetId?.(activeId);
+    setLoadedChartMeta?.(preferred?.meta || null);
+    setLoadedChartBuilderSnapshot?.(preferred?.snapshot || null);
+  };
+
   const loadDataSheet = async (dataSetId, dataSet) => {
     if(loadedDataMeta && dataSetId === loadedDataMeta._id){
       setViewing('dataStart')
@@ -325,6 +395,7 @@ const Nav = () => {
         .then(res =>{
           setConnectedData(res.data.data)
           setLoadedDataMeta(dataSet)
+          hydrateProjectCharts(dataSetId)
           toast.success(`Data: ${res.data.data_set_name} loaded`, {
             duration: 99999999
           })
@@ -363,12 +434,14 @@ const Nav = () => {
             .then(dataSheetRes =>{
               const rows = dataSheetRes?.data?.data || []
               setConnectedData(rows)
-              const incomingSnapshot = cp0?.rechartsBuilder
-              const normalizedSnapshot = incomingSnapshot?.v === 1
-                ? incomingSnapshot
-                : inferDefaultBuilderSnapshot(rows)
-              setLoadedChartBuilderSnapshot?.(normalizedSnapshot)
               setLoadedDataMeta(savedDataSets.find(ds => ds._id === chartMeta.data_set_id))
+              hydrateProjectCharts(chartMeta.data_set_id, chartMeta._id).then(() => {
+                const incomingSnapshot = cp0?.rechartsBuilder
+                const normalizedSnapshot = incomingSnapshot?.v === 1
+                  ? incomingSnapshot
+                  : inferDefaultBuilderSnapshot(rows)
+                setLoadedChartBuilderSnapshot?.(normalizedSnapshot)
+              })
           })
           setIsOpen(false)
           setViewing('charts')
@@ -598,23 +671,23 @@ const Nav = () => {
                             <DialogTitle>{viewing !== 'presentation' && (viewing === 'charts' ? 'Save Chart' : 'Save Data Set')}</DialogTitle>
                             <DialogDescription>
                               { loadedDataMeta && `You are currently connected to ${loadedDataMeta.data_set_name}`}
-                              { loadedChartMeta && `You are currently connected to ${loadedChartMeta.chart_name}`}
+                              { activeChartMeta && `You are currently connected to ${activeChartMeta.chart_name}`}
                             </DialogDescription>
                           </DialogHeader>
                           {
                             viewing === "charts" 
                               ?<div className="grid gap-4 py-4">
                                   {
-                                    loadedChartMeta && 
+                                    activeChartMeta && 
                                       <div className="grid grid-cols-4 items-center gap-4">
                                         <Label htmlFor="overwrite" className="text-right">
-                                          Overwrite {loadedChartMeta.chart_name} ?
+                                          Overwrite {activeChartMeta.chart_name} ?
                                         </Label>
                                         <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
                                       </div>
                                   }
                                   {
-                                    loadedChartMeta && !(overwrite) &&
+                                    activeChartMeta && !(overwrite) &&
                                       <div className="grid grid-cols-4 items-center gap-4">
                                         <Label htmlFor="name" className="text-right">
                                           Chart Name
@@ -628,7 +701,7 @@ const Nav = () => {
                                       </div>
                                   }
                                   {
-                                    !(loadedChartMeta) &&
+                                    !(activeChartMeta) &&
                                       <div className="grid grid-cols-4 items-center gap-4">
                                         <Label htmlFor="name" className="text-right">
                                           Name your chart

@@ -228,6 +228,15 @@ export default function ChartControls() {
       return { ...group, options };
     })
     .filter((group) => group.options.length > 0);
+  const sheetNameById = Object.fromEntries(
+    (lineSheetColumnGroups || []).map((g) => [g.sheetId, g.sheetName || g.sheetId]),
+  );
+  const formatColumnLabel = (value) => {
+    const parsed = parseScopedLineKey(value);
+    if (!parsed.isScoped) return parsed.column || String(value || "");
+    const sheetLabel = sheetNameById[parsed.sheetId] || parsed.sheetId;
+    return `${sheetLabel} • ${parsed.column}`;
+  };
   const hasGroupedLineOptions = groupedLineOptions.length > 0;
   const lineNonNumericColumns = (selY || []).filter((col) => {
     if (!col || !Array.isArray(chartData) || !chartData.length) return false;
@@ -501,7 +510,7 @@ export default function ChartControls() {
                               </SelectItem>
                               {(xOptions || []).map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs font-normal">
-                                  {i}
+                                  {formatColumnLabel(i)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -706,7 +715,7 @@ export default function ChartControls() {
                             {xOptions &&
                               xOptions.map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs">
-                                  {i}
+                                  {formatColumnLabel(i)}
                                 </SelectItem>
                               ))}
                           </SelectContent>
@@ -718,13 +727,13 @@ export default function ChartControls() {
                             <div className="flex min-w-0 place-items-center gap-2 py-1 text-foreground" key={index}>
                               <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
                                 <SelectTrigger className="min-w-0 flex-1">
-                                  <SelectValue className="text-xs">{yValue}</SelectValue>
+                                <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent className="text-xs">
                                   {availableYOptions &&
                                     availableYOptions.map((i) => (
                                       <SelectItem key={i} value={i} className="text-xs">
-                                        {i}
+                                        {formatColumnLabel(i)}
                                       </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -746,7 +755,7 @@ export default function ChartControls() {
                                 {availableYOptions &&
                                   availableYOptions.map((i) => (
                                     <SelectItem key={i} value={i} className="text-xs">
-                                      {i}
+                                      {formatColumnLabel(i)}
                                     </SelectItem>
                                   ))}
                               </SelectContent>
@@ -770,7 +779,7 @@ export default function ChartControls() {
                             {xOptions &&
                               xOptions.map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs">
-                                  {i}
+                                  {formatColumnLabel(i)}
                                 </SelectItem>
                               ))}
                           </SelectContent>
@@ -782,13 +791,13 @@ export default function ChartControls() {
                             <div className="flex min-w-0 place-items-center gap-2 py-1 text-foreground" key={index}>
                               <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
                                 <SelectTrigger className="min-w-0 flex-1">
-                                  <SelectValue className="text-xs">{yValue}</SelectValue>
+                                <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent className="text-xs">
                                   {availableYOptions &&
                                     availableYOptions.map((i) => (
                                       <SelectItem key={i} value={i} className="text-xs">
-                                        {i}
+                                        {formatColumnLabel(i)}
                                       </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -810,7 +819,7 @@ export default function ChartControls() {
                                 {availableYOptions &&
                                   availableYOptions.map((i) => (
                                     <SelectItem key={i} value={i} className="text-xs">
-                                      {i}
+                                      {formatColumnLabel(i)}
                                     </SelectItem>
                                   ))}
                               </SelectContent>
@@ -830,7 +839,7 @@ export default function ChartControls() {
                                       className="inline-block h-2 w-2 rounded-full"
                                       style={{ backgroundColor: getSeriesColor(seriesColumn, index) }}
                                     />
-                                    {`Bar ${index + 1}: ${seriesColumn}`}
+                                    {`Bar ${index + 1}: ${formatColumnLabel(seriesColumn)}`}
                                   </span>
                                   {(selY || []).length > 1 ? (
                                     <button
@@ -884,7 +893,7 @@ export default function ChartControls() {
                             {xOptions &&
                               xOptions.filter((k) => k !== selX).map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs">
-                                  {i}
+                                  {formatColumnLabel(i)}
                                 </SelectItem>
                               ))}
                           </SelectContent>
@@ -904,7 +913,7 @@ export default function ChartControls() {
                             {xOptions &&
                               xOptions.map((i) => (
                                 <SelectItem key={i} value={i} className="text-xs">
-                                  {i}
+                                  {formatColumnLabel(i)}
                                 </SelectItem>
                               ))}
                           </SelectContent>
@@ -984,7 +993,7 @@ export default function ChartControls() {
                         <SelectContent className="text-xs">
                           {["natural", "linear", "step"].map((i) => (
                             <SelectItem key={i} value={i} className="text-xs">
-                              {i}
+                              {formatColumnLabel(i)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1192,7 +1201,7 @@ export default function ChartControls() {
                         {xOptions &&
                           xOptions.filter((k) => k !== selX).map((i) => (
                             <SelectItem key={i} value={i} className="text-xs">
-                              {i}
+                              {formatColumnLabel(i)}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -1212,7 +1221,7 @@ export default function ChartControls() {
                         {xOptions &&
                           xOptions.map((i) => (
                             <SelectItem key={i} value={i} className="text-xs">
-                              {i}
+                              {formatColumnLabel(i)}
                             </SelectItem>
                           ))}
                       </SelectContent>

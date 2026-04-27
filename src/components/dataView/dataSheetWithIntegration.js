@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
+import { Plus } from "lucide-react";
 
 /** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
 const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
@@ -74,6 +75,14 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
+  const chartSheets = contextStateV2?.chartSheets || {};
+  const setChartSheets = contextStateV2?.setChartSheets;
+  const activeChartSheetId = contextStateV2?.activeChartSheetId;
+  const setActiveChartSheetId = contextStateV2?.setActiveChartSheetId;
+  const addNewChartAndActivate = contextStateV2?.addNewChartAndActivate;
+  const setLoadedChartBuilderSnapshot = contextStateV2?.setLoadedChartBuilderSnapshot;
+  const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta;
+  const loadedChartMeta = contextStateV2?.loadedChartMeta;
   const rightPanelOpen = contextStateV2?.rightPanelOpen;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
   const rightPanelTab = contextStateV2?.rightPanelTab;
@@ -85,6 +94,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const [isPanelOpen, setIsPanelOpen] = useState(() => !!rightPanelOpen);
   const [drawerExpanded, setDrawerExpanded] = useState(false);
   const closeTimeoutRef = useRef(null);
+  const snapshotGetterRef = useRef(null);
   const wasOpenRef = useRef(!!rightPanelOpen);
   const autoExpandedEmptySheetRef = useRef(false);
 
@@ -284,6 +294,65 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const isPanelVisible = showSidebar || isPanelClosing;
   const chartsActive = rightPanelTab === "charts";
   const panelAnimatingOpen = isPanelOpen && !isPanelClosing;
+  const chartSheetIds = useMemo(() => Object.keys(chartSheets || {}), [chartSheets]);
+  const chartSnapshotSeed = useMemo(() => {
+    if (!activeChartSheetId) return loadedChartBuilderSnapshot;
+    const entry = chartSheets?.[activeChartSheetId];
+    return entry?.snapshot ?? loadedChartBuilderSnapshot;
+  }, [activeChartSheetId, chartSheets, loadedChartBuilderSnapshot]);
+
+  const persistActiveChartSnapshot = useCallback(() => {
+    if (!activeChartSheetId || typeof snapshotGetterRef.current !== "function") return;
+    const snap = snapshotGetterRef.current();
+    if (!snap) return;
+    setChartSheets?.((prev) => {
+      const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+      return {
+        ...(prev || {}),
+        [activeChartSheetId]: { ...cur, snapshot: snap },
+      };
+    });
+  }, [activeChartSheetId, setChartSheets]);
+
+  const activateChartSheet = useCallback((nextId) => {
+    if (!nextId || nextId === activeChartSheetId) return;
+    persistActiveChartSnapshot();
+    const next = chartSheets?.[nextId];
+    setActiveChartSheetId?.(nextId);
+    setLoadedChartBuilderSnapshot?.(next?.snapshot ?? null);
+    setLoadedChartMeta?.(next?.chartMeta ?? null);
+  }, [
+    activeChartSheetId,
+    chartSheets,
+    persistActiveChartSnapshot,
+    setActiveChartSheetId,
+    setLoadedChartBuilderSnapshot,
+    setLoadedChartMeta,
+  ]);
+
+  useEffect(() => {
+    if (!chartMode) return;
+    if (!activeChartSheetId || chartSheets?.[activeChartSheetId]) return;
+    const firstId = Object.keys(chartSheets || {})[0];
+    if (firstId) setActiveChartSheetId?.(firstId);
+  }, [chartMode, chartSheets, activeChartSheetId, setActiveChartSheetId]);
+
+  useEffect(() => {
+    if (!activeChartSheetId) return;
+    if (!loadedChartMeta && !loadedChartBuilderSnapshot) return;
+    setChartSheets?.((prev) => {
+      const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+      return {
+        ...(prev || {}),
+        [activeChartSheetId]: {
+          ...cur,
+          name: loadedChartMeta?.chart_name || cur.name,
+          chartMeta: loadedChartMeta || cur.chartMeta || null,
+          snapshot: loadedChartBuilderSnapshot ?? cur.snapshot ?? null,
+        },
+      };
+    });
+  }, [activeChartSheetId, loadedChartBuilderSnapshot, loadedChartMeta, setChartSheets]);
 
   /** Collapsed (default) vs expanded — spacer reserves width; aside is fixed (mobile: inset-x-0 + w-auto). */
   const drawerWidthCollapsed = "w-[18rem] min-w-[18rem] sm:w-[300px] sm:min-w-[300px]";
@@ -340,6 +409,41 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
           )}
           {chartMode ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div className="mb-2 flex flex-wrap items-center gap-1">
+                {chartSheetIds.map((id) => (
+                  <code
+                    key={id}
+                    className={`${id === activeChartSheetId ? "bg-lychee_blue/30" : "bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
+                    onClick={() => activateChartSheet(id)}
+                  >
+                    {chartSheets?.[id]?.name || id}
+                  </code>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px]"
+                  onClick={() => {
+                    persistActiveChartSnapshot();
+                    addNewChartAndActivate?.((newId) => {
+                      setLoadedChartBuilderSnapshot?.(null);
+                      setLoadedChartMeta?.(null);
+                      setChartSheets?.((prev) => {
+                        const nextNum = Object.keys(prev || {}).length;
+                        const chartName = `Chart ${nextNum}`;
+                        const cur = prev?.[newId] || {};
+                        return {
+                          ...(prev || {}),
+                          [newId]: { ...cur, name: chartName, snapshot: null, chartMeta: null },
+                        };
+                      });
+                    });
+                  }}
+                >
+                  <Plus className="mr-1 h-3 w-3" /> New chart
+                </Button>
+              </div>
               {isDemo ? (
                 <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 pb-2 sm:justify-start">
                   <h2 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">
@@ -573,7 +677,14 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     </div>
   );
   return (
-    <ChartBuilderProvider demo={isDemo} initialBuilderSnapshot={loadedChartBuilderSnapshot}>
+    <ChartBuilderProvider
+      key={activeChartSheetId || "chart-1"}
+      demo={isDemo}
+      initialBuilderSnapshot={chartSnapshotSeed}
+      onSnapshotGetterReady={(fn) => {
+        snapshotGetterRef.current = fn;
+      }}
+    >
       {layout}
     </ChartBuilderProvider>
   );
