@@ -83,6 +83,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const setLoadedChartBuilderSnapshot = contextStateV2?.setLoadedChartBuilderSnapshot;
   const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta;
   const loadedChartMeta = contextStateV2?.loadedChartMeta;
+  const setChartSnapshotFlusher = contextStateV2?.setChartSnapshotFlusher;
   const rightPanelOpen = contextStateV2?.rightPanelOpen;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
   const rightPanelTab = contextStateV2?.rightPanelTab;
@@ -314,6 +315,20 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     });
   }, [activeChartSheetId, setChartSheets]);
 
+  const flushActiveChartSnapshot = useCallback(async () => {
+    if (!activeChartSheetId || typeof snapshotGetterRef.current !== "function") return null;
+    const snap = snapshotGetterRef.current();
+    if (!snap) return null;
+    setChartSheets?.((prev) => {
+      const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+      return {
+        ...(prev || {}),
+        [activeChartSheetId]: { ...cur, snapshot: snap },
+      };
+    });
+    return snap;
+  }, [activeChartSheetId, setChartSheets]);
+
   const activateChartSheet = useCallback((nextId) => {
     if (!nextId || nextId === activeChartSheetId) return;
     persistActiveChartSnapshot();
@@ -336,6 +351,12 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     const firstId = Object.keys(chartSheets || {})[0];
     if (firstId) setActiveChartSheetId?.(firstId);
   }, [chartMode, chartSheets, activeChartSheetId, setActiveChartSheetId]);
+
+  useEffect(() => {
+    if (!setChartSnapshotFlusher) return;
+    setChartSnapshotFlusher(() => flushActiveChartSnapshot);
+    return () => setChartSnapshotFlusher(() => async () => null);
+  }, [flushActiveChartSnapshot, setChartSnapshotFlusher]);
 
   useEffect(() => {
     if (!activeChartSheetId) return;

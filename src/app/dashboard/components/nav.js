@@ -109,6 +109,7 @@ const Nav = () => {
   const dataSheets = contextStateV2?.dataSheets
   const setDataSheets = contextStateV2?.setDataSheets
   const setActiveSheetId = contextStateV2?.setActiveSheetId
+  const chartSnapshotFlusher = contextStateV2?.chartSnapshotFlusher
   const [selectedStreamSheetId, setSelectedStreamSheetId] = useState(null)
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {}
   const streamSheetIds = Object.keys(streamsBySheetId).filter((id) => streamsBySheetId[id]?.isRunning || streamsBySheetId[id]?.config)
@@ -203,8 +204,8 @@ const Nav = () => {
     setConnectedData?.(rows);
   };
 
-  const saveAllChartsForProject = async (dataSetId, forceCreate = false) => {
-    const entries = Object.entries(chartSheets || {});
+  const saveAllChartsForProject = async (dataSetId, forceCreate = false, chartSheetsForSave = chartSheets) => {
+    const entries = Object.entries(chartSheetsForSave || {});
     const nextSheets = {};
     for (let idx = 0; idx < entries.length; idx += 1) {
       const [chartId, sheet] = entries[idx];
@@ -214,6 +215,10 @@ const Nav = () => {
         sheet?.snapshot ||
         chartMeta?.chart_properties?.[0]?.rechartsBuilder ||
         inferDefaultBuilderSnapshot(connectedData || []);
+      const hasChartState = !!snapshot && (snapshot.selX || (Array.isArray(snapshot.selY) && snapshot.selY.length));
+      const hasNamedChart = String(chartName || "").trim() !== "" && String(chartName || "").trim() !== `Chart ${idx + 1}`;
+      const hasExistingChart = !!chartMeta?._id;
+      if (!hasChartState && !hasNamedChart && !hasExistingChart) continue;
       const payload = {
         chart_name: chartName,
         chart_properties: [{ title: chartName, rechartsBuilder: snapshot }],
@@ -263,6 +268,18 @@ const Nav = () => {
 
   const handleSave = async () => {
     try {
+      const flushedSnapshot = typeof chartSnapshotFlusher === "function"
+        ? await chartSnapshotFlusher()
+        : null;
+      const chartSheetsForSave = flushedSnapshot && activeChartSheetId
+        ? {
+            ...(chartSheets || {}),
+            [activeChartSheetId]: {
+              ...(chartSheets?.[activeChartSheetId] || { name: "Chart", chartMeta: null, snapshot: null }),
+              snapshot: flushedSnapshot,
+            },
+          }
+        : (chartSheets || {});
       const hasLoadedProject = !!loadedDataMeta?._id;
       const shouldOverwrite = hasLoadedProject && !!overwrite;
       const projectName = shouldOverwrite
@@ -274,10 +291,24 @@ const Nav = () => {
         return;
       }
 
+      const sanitizedSheets = Object.entries(dataSheets || {}).reduce((acc, [sheetId, sheet]) => {
+        const rows = Array.isArray(sheet?.data) ? sheet.data : [];
+        const name = String(sheet?.name || sheetId);
+        const hasData = rows.length > 0;
+        const hasName = !!name.trim();
+        if (!hasData && !hasName) return acc;
+        acc[sheetId] = {
+          name: hasName ? name : sheetId,
+          data: rows,
+          provenance: sheet?.provenance ?? null,
+        };
+        return acc;
+      }, {});
+
       const dataPayload = {
         data_set_name: projectName,
         data: connectedData || [],
-        data_sheets: dataSheets || {},
+        data_sheets: sanitizedSheets,
         last_saved_date: new Date(),
         labels: ['project'],
         source: 'project',
@@ -311,11 +342,10 @@ const Nav = () => {
         return;
       }
 
-      await saveAllChartsForProject(savedProject._id, !shouldOverwrite);
+      await saveAllChartsForProject(savedProject._id, !shouldOverwrite, chartSheetsForSave);
 
       setLoadedDataMeta(savedProject);
       setLoadedDataId(savedProject._id);
-      hydrateDataSheetsFromDataSet(savedProject);
       setRefetchData(1);
       setRefetchChart(1);
       setChartDataOverride?.(null);
@@ -335,7 +365,21 @@ const Nav = () => {
   };
 
   const hydrateProjectCharts = async (dataSetId, preferredChartId = null) => {
-    const scoped = (savedCharts || []).filter((chart) => String(chart?.data_set_id) === String(dataSetId));
+    let allCharts = savedCharts || [];
+    if (user?.userId) {
+      try {
+        const freshRes = await fetch(`/api/charts?uid=${user.userId}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        const freshJson = await freshRes.json();
+        if (freshJson?.success && Array.isArray(freshJson?.data)) {
+          allCharts = freshJson.data;
+          setSavedCharts?.(freshJson.data);
+        }
+      } catch {}
+    }
+    const scoped = (allCharts || []).filter((chart) => String(chart?.data_set_id) === String(dataSetId));
     if (!scoped.length) {
       setChartSheets?.({
         "chart-1": { name: "Chart 1", snapshot: null, chartMeta: null },
