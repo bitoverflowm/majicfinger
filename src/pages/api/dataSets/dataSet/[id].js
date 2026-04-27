@@ -28,6 +28,7 @@ export default async function handler(req, res) {
                     $set: {
                         data_set_name: req.body.data_set_name,
                         data: req.body.data,
+                        data_sheets: req.body.data_sheets,
                         last_saved_date: new Date(),
                         labels: req.body.labels,
                         source: req.body.source,

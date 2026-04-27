@@ -12,6 +12,10 @@ const DataSetSchema = new mongoose.Schema({
         type: Array,
         default: [],
     },
+    data_sheets: {
+        type: Schema.Types.Mixed,
+        default: {},
+    },
     created_date: {
         type: Date,
         default: Date.now, // Automatically set to the current date

@@ -107,6 +107,8 @@ const Nav = () => {
   const liveStreamState = contextStateV2?.liveStreamState
   const liveStreamActions = contextStateV2?.liveStreamActions
   const dataSheets = contextStateV2?.dataSheets
+  const setDataSheets = contextStateV2?.setDataSheets
+  const setActiveSheetId = contextStateV2?.setActiveSheetId
   const [selectedStreamSheetId, setSelectedStreamSheetId] = useState(null)
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {}
   const streamSheetIds = Object.keys(streamsBySheetId).filter((id) => streamsBySheetId[id]?.isRunning || streamsBySheetId[id]?.config)
@@ -116,8 +118,7 @@ const Nav = () => {
 
   const [isOpen, setIsOpen] = useState(false) 
   const [saveIsOpen, setSaveIsOpen] = useState(false)
-  const [newDataName, setNewDataName] = useState()
-  const [newChartName, setNewChartName] = useState()
+  const [projectNameInput, setProjectNameInput] = useState("")
   const [runtimeOrigin, setRuntimeOrigin] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -156,183 +157,182 @@ const Nav = () => {
   const activeChartSheet = activeChartSheetId ? chartSheets?.[activeChartSheetId] : null;
   const activeChartMeta = activeChartSheet?.chartMeta || loadedChartMeta;
 
-  const handleSave = async () => {
-      if(overwrite){
-        if(viewing === 'charts' && activeChartMeta?._id){
-          fetch(`/api/charts/chart/${activeChartMeta._id}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          })
-            .then(response => response.json())
-            .then(current => {
-              const existingChartProps = Array.isArray(current?.data?.chart_properties)
-                ? current.data.chart_properties
-                : (current?.data?.chart_properties ? [current.data.chart_properties] : []);
-              return fetch(`/api/charts/chart/${activeChartMeta._id}`, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                  chart_name: activeChartMeta.chart_name,
-                  chart_properties: existingChartProps,
-                  last_saved_date: new Date(),
-                  labels: ['test'],
-                }),
-              });
-            })
-            .then(response => response.json())
-            .then(data => {
-              toast(`Your Chart has been saved as ${activeChartMeta.chart_name}`)
-              setRefetchChart(1)
-            })
-            .catch(error => {
-              console.error('Error saving Data:', error);
-            });
-        }else{
-            fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
-              method: 'PUT',
-              headers: {
-                  'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ 
-                  data_set_name: loadedDataMeta.data_set_name,
-                  data: connectedData,
-                  last_saved_date: new Date(),
-                  labels: ['test'],
-                  source: 'userUpload',       
-              }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                toast(`Your Data has been saved as ${loadedDataMeta.data_set_name}`)
-                setRefetchData(1)
-                // Handle the response data here
-            })
-            .catch(error => {
-                console.error('Error saving Data:', error);
-                // Handle the error here
-            });
-        }        
-      }else{
-        if(viewing === 'charts'){
-          const saveChartWithData = async (dataSetId) => {
-            const snapshot =
-              activeChartMeta?.chart_properties?.[0]?.rechartsBuilder ||
-              inferDefaultBuilderSnapshot(connectedData || []);
-            const res = await fetch('/api/charts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                chart_name: newChartName || activeChartSheet?.name || "Chart",
-                chart_properties: [{ title: newChartName || activeChartSheet?.name || "Chart", rechartsBuilder: snapshot }],
-                created_date: new Date(),
-                last_saved_date: new Date(),
-                labels: ['test'],
-                user_id: user.userId,           
-                data_set_id: dataSetId
-              }),
-            });
-            const data = await res.json();
-            if (data._id || data.success) {
-              const createdChart = data?.data || data;
-              const createdSnapshot = createdChart?.chart_properties?.[0]?.rechartsBuilder || snapshot;
-              toast(`Your Chart has been saved as ${createdChart.chart_name || newChartName || activeChartSheet?.name || "Chart"}`);
-              setRefetchChart(1);
-              if (activeChartSheetId && createdChart?._id) {
-                setChartSheets?.((prev) => {
-                  const cur = prev?.[activeChartSheetId] || { name: newChartName || activeChartSheet?.name || "Chart", snapshot: null, chartMeta: null };
-                  return {
-                    ...(prev || {}),
-                    [activeChartSheetId]: {
-                      ...cur,
-                      name: createdChart.chart_name || newChartName || cur.name,
-                      chartMeta: createdChart,
-                      snapshot: createdSnapshot,
-                    },
-                  };
-                });
-              }
-              setLoadedChartMeta?.(createdChart || null);
-              setChartDataOverride?.(null);
-              setChartDataOverrideMeta?.(null);
-            }
-          };
+  const handleStartNewProject = () => {
+    const ok = window.confirm("Start a new project? This clears your current loaded workspace state.");
+    if (!ok) return;
 
-          if (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length > 0) {
-            // Save summary data as DataSet first, then chart
-            fetch('/api/dataSets', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                data_set_name: `${newChartName || 'Summary'} (summary)`,
-                data: chartDataOverride,
-                created_date: new Date(),
-                last_saved_date: new Date(),
-                labels: JSON.stringify({
-                  parentDataSetId: loadedDataMeta?._id,
-                  summarizationType: chartDataOverrideMeta?.type,
-                  summarizationTitle: chartDataOverrideMeta?.title
-                }),
-                source: 'summarization',
-                user_id: user.userId,
-              }),
-            })
-              .then(r => r.json())
-              .then((dsRes) => {
-                const summaryDataSetId = dsRes.data?._id || dsRes._id;
-                if (summaryDataSetId) {
-                  saveChartWithData(summaryDataSetId);
-                } else {
-                  toast.error('Failed to save summary data');
-                }
-              })
-              .catch((err) => {
-                console.error('Error saving summary data:', err);
-                toast.error('Failed to save summary data');
-              });
-          } else {
-            const dataSetId = loadedDataMeta?._id;
-            if (!dataSetId) {
-              toast.error('Save your data first, or create a summary from the Summarize drawer.');
-              return;
-            }
-            saveChartWithData(dataSetId);
-          }
-        }else{
-          fetch('/api/dataSets', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                data_set_name: newDataName,
-                data: connectedData,
-                created_date: new Date(),
-                last_saved_date: new Date(),
-                labels: ['test'],
-                source: 'userUpload',
-                user_id: user.userId,        
-            }),
-          })
-          .then(response => response.json())
-          .then(data => {
-              toast(`Your Data has been saved as ${newDataName}`)
-              setRefetchData(1)
-              setConnectedData(data.data.data)
-              setLoadedDataId(data._id)
-              // Handle the response data here
-          })
-          .catch(error => {
-              console.error('Error saving Data:', error);
-              // Handle the error here
-          });
-        }
+    const blankSheets = { "sheet-1": { name: "Sheet 1", data: [], provenance: null } };
+    const blankCharts = { "chart-1": { name: "Chart 1", snapshot: null, chartMeta: null } };
+
+    setConnectedData?.([]);
+    setDataSheets?.(blankSheets);
+    setActiveSheetId?.("sheet-1");
+    setChartSheets?.(blankCharts);
+    setActiveChartSheetId?.("chart-1");
+
+    setLoadedDataMeta?.(null);
+    setLoadedDataId?.(null);
+    setLoadedChartMeta?.(null);
+    setLoadedChartBuilderSnapshot?.(null);
+    setLoadedPresentationMeta?.(null);
+    setConnectedPresentation?.(null);
+    setChartDataOverride?.(null);
+    setChartDataOverrideMeta?.(null);
+    setProjectNameInput("");
+    setOverwrite(false);
+    setViewing?.("dataStart");
+    toast.success("Started a new blank project.");
+  };
+
+  const hydrateDataSheetsFromDataSet = (ds) => {
+    const incomingSheets = ds?.data_sheets && typeof ds.data_sheets === "object"
+      ? ds.data_sheets
+      : null;
+    if (incomingSheets && Object.keys(incomingSheets).length > 0) {
+      setDataSheets?.(incomingSheets);
+      const firstId = Object.keys(incomingSheets)[0];
+      setActiveSheetId?.(firstId);
+      const firstRows = incomingSheets?.[firstId]?.data || [];
+      setConnectedData?.(firstRows);
+      return;
+    }
+    const rows = Array.isArray(ds?.data) ? ds.data : [];
+    const fallback = { "sheet-1": { name: "Sheet 1", data: rows, provenance: null } };
+    setDataSheets?.(fallback);
+    setActiveSheetId?.("sheet-1");
+    setConnectedData?.(rows);
+  };
+
+  const saveAllChartsForProject = async (dataSetId, forceCreate = false) => {
+    const entries = Object.entries(chartSheets || {});
+    const nextSheets = {};
+    for (let idx = 0; idx < entries.length; idx += 1) {
+      const [chartId, sheet] = entries[idx];
+      const chartMeta = sheet?.chartMeta || null;
+      const chartName = sheet?.name || chartMeta?.chart_name || `Chart ${idx + 1}`;
+      const snapshot =
+        sheet?.snapshot ||
+        chartMeta?.chart_properties?.[0]?.rechartsBuilder ||
+        inferDefaultBuilderSnapshot(connectedData || []);
+      const payload = {
+        chart_name: chartName,
+        chart_properties: [{ title: chartName, rechartsBuilder: snapshot }],
+        last_saved_date: new Date(),
+        labels: ['project'],
+      };
+
+      let saved = null;
+      const canUpdateExisting = !forceCreate && chartMeta?._id && String(chartMeta?.data_set_id || dataSetId) === String(dataSetId);
+      if (canUpdateExisting) {
+        const updateRes = await fetch(`/api/charts/chart/${chartMeta._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const updateJson = await updateRes.json();
+        saved = updateJson?.data || null;
+      } else {
+        const createRes = await fetch('/api/charts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...payload,
+            created_date: new Date(),
+            user_id: user.userId,
+            data_set_id: dataSetId,
+          }),
+        });
+        const createJson = await createRes.json();
+        saved = createJson?.data || null;
       }
-      setSaveIsOpen(false)
+
+      nextSheets[chartId] = {
+        ...(sheet || {}),
+        name: saved?.chart_name || chartName,
+        chartMeta: saved || chartMeta || null,
+        snapshot,
+      };
+    }
+    if (Object.keys(nextSheets).length > 0) {
+      setChartSheets?.(nextSheets);
+      const active = nextSheets?.[activeChartSheetId] || Object.values(nextSheets)[0];
+      setLoadedChartMeta?.(active?.chartMeta || null);
+      setLoadedChartBuilderSnapshot?.(active?.snapshot || null);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const hasLoadedProject = !!loadedDataMeta?._id;
+      const shouldOverwrite = hasLoadedProject && !!overwrite;
+      const projectName = shouldOverwrite
+        ? loadedDataMeta?.data_set_name
+        : String(projectNameInput || "").trim();
+
+      if (!projectName) {
+        toast.error("Name your project before saving.");
+        return;
+      }
+
+      const dataPayload = {
+        data_set_name: projectName,
+        data: connectedData || [],
+        data_sheets: dataSheets || {},
+        last_saved_date: new Date(),
+        labels: ['project'],
+        source: 'project',
+      };
+
+      let savedProject = null;
+      if (shouldOverwrite) {
+        const updateRes = await fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataPayload),
+        });
+        const updateJson = await updateRes.json();
+        savedProject = updateJson?.data || null;
+      } else {
+        const createRes = await fetch('/api/dataSets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...dataPayload,
+            created_date: new Date(),
+            user_id: user.userId,
+          }),
+        });
+        const createJson = await createRes.json();
+        savedProject = createJson?.data || null;
+      }
+
+      if (!savedProject?._id) {
+        toast.error("Failed to save project.");
+        return;
+      }
+
+      await saveAllChartsForProject(savedProject._id, !shouldOverwrite);
+
+      setLoadedDataMeta(savedProject);
+      setLoadedDataId(savedProject._id);
+      hydrateDataSheetsFromDataSet(savedProject);
+      setRefetchData(1);
+      setRefetchChart(1);
+      setChartDataOverride?.(null);
+      setChartDataOverrideMeta?.(null);
+      setSaveIsOpen(false);
+      setProjectNameInput("");
+      toast.success(shouldOverwrite ? "Project overwritten." : "New project saved.");
+    } catch (error) {
+      console.error('Error saving project:', error);
+      toast.error("Failed to save project.");
+    }
   }
+
+  const handleSaveProjectSubmit = (e) => {
+    e.preventDefault();
+    handleSave();
+  };
 
   const hydrateProjectCharts = async (dataSetId, preferredChartId = null) => {
     const scoped = (savedCharts || []).filter((chart) => String(chart?.data_set_id) === String(dataSetId));
@@ -393,8 +393,8 @@ const Nav = () => {
         },
       }).then(response => response.json())
         .then(res =>{
-          setConnectedData(res.data.data)
-          setLoadedDataMeta(dataSet)
+          hydrateDataSheetsFromDataSet(res.data)
+          setLoadedDataMeta(res.data || dataSet)
           hydrateProjectCharts(dataSetId)
           toast.success(`Data: ${res.data.data_set_name} loaded`, {
             duration: 99999999
@@ -433,7 +433,7 @@ const Nav = () => {
           }).then(response => response.json())
             .then(dataSheetRes =>{
               const rows = dataSheetRes?.data?.data || []
-              setConnectedData(rows)
+              hydrateDataSheetsFromDataSet(dataSheetRes?.data || {})
               setLoadedDataMeta(savedDataSets.find(ds => ds._id === chartMeta.data_set_id))
               hydrateProjectCharts(chartMeta.data_set_id, chartMeta._id).then(() => {
                 const incomingSnapshot = cp0?.rechartsBuilder
@@ -597,6 +597,13 @@ const Nav = () => {
     loadedChartMeta || loadedDataMeta && setOverwrite(true)
   }, [])
 
+  useEffect(() => {
+    if (!saveIsOpen) return;
+    const hasProject = !!loadedDataMeta?.data_set_name;
+    setOverwrite(hasProject);
+    setProjectNameInput(hasProject ? "" : (loadedDataMeta?.data_set_name || ""));
+  }, [saveIsOpen, loadedDataMeta?.data_set_name]);
+
 
   const breadcrumb = viewing === 'dashboard' ? 'Lychee / Dashboard' :
     viewing === 'charts' ? 'Lychee / Charts' :
@@ -662,102 +669,49 @@ const Nav = () => {
                     <span className="text-[7pt] px-2 py-1 rounded-sm bg-rose-100 text-rose-500  dark:text-amber-400 font-bold shrink-0">Viewing Unsaved Data</span>
                   )}
                   {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
+                      <Button variant="outline" size="sm" onClick={handleStartNewProject}>Start New Project</Button>
+                  )}
+                  {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
                       <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
                         <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">Save {viewing === 'charts' ? 'Chart' : 'Data'}</Button>
+                          <Button variant="outline" size="sm">Save Project</Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
-                            <DialogTitle>{viewing !== 'presentation' && (viewing === 'charts' ? 'Save Chart' : 'Save Data Set')}</DialogTitle>
+                            <DialogTitle>Save Project</DialogTitle>
                             <DialogDescription>
-                              { loadedDataMeta && `You are currently connected to ${loadedDataMeta.data_set_name}`}
-                              { activeChartMeta && `You are currently connected to ${activeChartMeta.chart_name}`}
+                              Save all sheets and all charts together in one project.
                             </DialogDescription>
                           </DialogHeader>
-                          {
-                            viewing === "charts" 
-                              ?<div className="grid gap-4 py-4">
-                                  {
-                                    activeChartMeta && 
-                                      <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="overwrite" className="text-right">
-                                          Overwrite {activeChartMeta.chart_name} ?
-                                        </Label>
-                                        <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
-                                      </div>
-                                  }
-                                  {
-                                    activeChartMeta && !(overwrite) &&
-                                      <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="name" className="text-right">
-                                          Chart Name
-                                        </Label>
-                                        <Input
-                                          id="name"
-                                          defaultValue="Pied-Piper"
-                                          className="col-span-3"
-                                          onChange={(e)=>setNewChartName(e.target.value)}
-                                        />
-                                      </div>
-                                  }
-                                  {
-                                    !(activeChartMeta) &&
-                                      <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="name" className="text-right">
-                                          Name your chart
-                                        </Label>
-                                        <Input
-                                          id="name"
-                                          defaultValue="Pied-Piper"
-                                          className="col-span-3"
-                                          onChange={(e)=>setNewChartName(e.target.value)}
-                                        />
-                                      </div>
-                                  }
+                          <form onSubmit={handleSaveProjectSubmit}>
+                            <div className="grid gap-4 py-4">
+                              {loadedDataMeta?.data_set_name && (
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="overwrite" className="text-right">
+                                    Overwrite current project?
+                                  </Label>
+                                  <Checkbox id="overwrite" checked={!!overwrite} onCheckedChange={setOverwrite}/>
                                 </div>
-                              : <div className="grid gap-4 py-4">
-                              {
-                                loadedDataMeta && loadedDataMeta.data_set_name &&
-                                  <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="overwrite" className="text-right">
-                                      Overwrite {loadedDataMeta.data_set_name} ?
-                                    </Label>
-                                    <Checkbox id="overwrite" checked={overwrite} onCheckedChange={setOverwrite}/>
-                                  </div>
-                              }
-                              {
-                                loadedDataMeta && loadedDataMeta.data_set_name && !(overwrite) &&
-                                  <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="name" className="text-right">
-                                      Data Sheet Name
-                                    </Label>
-                                    <Input
-                                      id="name"
-                                      defaultValue="Pied-Piper"
-                                      className="col-span-3"
-                                      onChange={(e)=>setNewDataName(e.target.value)}
-                                    />
-                                  </div>
-                              }
-                              {
-                                !(loadedDataMeta) &&
-                                  <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="name" className="text-right">
-                                      Name your data sheet
-                                    </Label>
-                                    <Input
-                                      id="name"
-                                      defaultValue="Pied-Piper"
-                                      className="col-span-3"
-                                      onChange={(e)=>setNewDataName(e.target.value)}
-                                    />
-                                  </div>
-                              }
-                            </div>                          
-                          }                      
-                          <DialogFooter>
-                            <Button type="submit" onClick={()=>handleSave()}>Save changes</Button>
-                          </DialogFooter>
+                              )}
+                              {(!loadedDataMeta?.data_set_name || !overwrite) && (
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="project-name" className="text-right">
+                                    Project Name
+                                  </Label>
+                                  <Input
+                                    id="project-name"
+                                    placeholder="myProject"
+                                    className="col-span-3"
+                                    value={projectNameInput}
+                                    onChange={(e)=>setProjectNameInput(e.target.value)}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                            <DialogFooter>
+                              <Button type="submit">Save Project</Button>
+                            </DialogFooter>
+                          </form>
                         </DialogContent>
                       </Dialog>
                   )}

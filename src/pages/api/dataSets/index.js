@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     const {
         query: { uid },
         method,
-        body: { data_set_name, data, created_date, last_saved_date, labels, source, user_id }, // Destructure these from req.body
+        body: { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source, user_id }, // Destructure these from req.body
     } = req;
 
     await dbConnect();
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
         case "GET":
             try {
                 const savedDataSets = await DataSet.find({ user_id: uid })
-                    .select('data_set_name created_date last_saved_date labels source user_id')
+                    .select('data_set_name created_date last_saved_date labels source user_id data_sheets')
                     .exec();
 
                 if (!savedDataSets || savedDataSets.length === 0) {
@@ -36,6 +36,7 @@ export default async function handler(req, res) {
                 const newDataSet = await DataSet.create({
                     data_set_name,
                     data,
+                    data_sheets,
                     created_date: new Date(created_date),
                     last_saved_date: new Date(last_saved_date),
                     labels,
