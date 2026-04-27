@@ -1,386 +1,353 @@
 ---
-title: "How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)"
-description: "Learn how to access, query, and download Kalshi historical data instantly — no coding skills required. Perfect for backtesting prediction markets, visualizing trades, and exporting CSV, Excel, or JSON files."
-publishedAt: "2026-04-05"
+title: "Kalshi Volume Explained: Quarterly Trends, Historical Growth, and Market Activity Data"
+description: "Explore Kalshi trading volume over time with quarterly charts, growth trends, and data-driven insights. Learn what Kalshi volume means and what drives market activity."
+publishedAt: "2026-04-27"
 author: "misterrpink"
-topics: ["kalshi", "prediction markets", "market data", "no-code", "backtesting", "historical data"]
+topics: ["kalshi", "prediction markets", "market data", "volume", "analytics"]
 integration: ["Kalshi"]
-coverImage: "/images/guides/kalshi-historical-data/main.png"
-ogImage: "https://lycheedata.com/images/guides/kalshi-historical-data/main.png"
+coverImage: "/images/guides/kalshi-volume/main.png"
+ogImage: "https://lycheedata.com/images/guides/kalshi-volume/main.png"
 featured: true
-slug: "/kalshi-historical-data"
-readingTime: "8 min"
-keywords: ["kalshi historical data", "kalshi data export", "prediction market backtesting", "no code kalshi data", "kalshi CSV download", "kalshi SQL queries"]
-canonical: "https://lycheedata.com/guides/kalshi-historical-data"
-seoTitle: "Kalshi Historical Data — Download, Query, and Backtest Without Coding"
+slug: "/kalshi-volume"
+readingTime: "6 min"
+keywords: [
+  "kalshi volume",
+  "kalshi trading volume",
+  "kalshi volume chart",
+  "kalshi volume trends",
+  "kalshi historical volume",
+  "prediction market volume",
+  "what does kalshi volume mean",
+  "kalshi vs polymarket volume",
+  "prediction market analytics"
+]
+canonical: "https://lycheedata.com/guides/kalshi-volume"
+seoTitle: "Kalshi Volume: Trends, Charts, and What the Data Shows (2026)"
 twitterCard: "summary_large_image"
 ---
 
-Kalshi is "the first CFTC regulated exchange dedicated to trading on the outcome of future events". In short, Kalshi is a prediction market where traders buy and sell contracts on anything from politics to weather.
+# Kalshi Volume Explained: Quarterly Trends, Historical Growth, and Market Activity
 
-Whether you're a trader, quant, or researcher, accessing Kalshi historical data is essential for **backtesting strategies, analyzing market behavior, and studying pricing inefficiencies**.
+Kalshi didn’t just grow — it **exploded**.
 
-In a deeper sense, historical Kalshi data isn't just transactional trade data; it's a record of sentiment, a ledger of every emotional shift and opinion change on any given event outcome.
+In Q1 2023, total trading volume sat under ~$20M.
+By 2025, the platform was pushing **multi-billion dollar monthly volume**, with single-day spikes crossing **$1B during major events like the Super Bowl**.
 
-To make this easier, we collated every trade and market since Kalshi launched — a **36GB historical dataset** available instantly through Lychee, with no setup and **no coding required**.
+> [“Want to isolate Super Bowl volume vs baseline? You can filter that directly in Lychee’s dataset explorer.”](https://lycheedata.com)
 
-In this guide, you'll learn how to access Kalshi historical data, **query it, visualize it and export it to CSV, Excel, or JSON** all within a matter of seconds. 
+<PublicChart username="misterrpink" slug="kalshi-quaterly-volume" />
 
-If you want to skip straight to how to start working with Lychee's Kalshi historical data set, [click here](#download-kalshi-historical-data-csv-excel-json).
 
----
-# Does Kalshi Provide Historical Data?
+That kind of growth isn't normal, even by Crypto or AI standards.
 
-Yes — Kalshi does provide historical market data. However, accessing it directly is not always straightforward.
+Kalshi trading volume is the total number of contracts traded across all markets over a given period.
 
-While you can retrieve some historical information through APIs, the data is often fragmented across endpoints and requires stitching together trades, markets, and price history manually. For traders, researchers, and developers trying to backtest prediction market strategies, this becomes time-consuming very quickly.
+But the real question isn’t what is Kalshi volume.
 
-Common use cases for Kalshi historical data include:
+It’s:
 
-- Backtesting prediction market strategies  
-- Analyzing market efficiency  
-- Studying event resolution behavior  
-- Building trading dashboards  
-- Exporting data for spreadsheets or BI tools  
+> What does Kalshi’s trading volume actually tell us about how prediction markets behave?
 
-The challenge isn’t whether the data exists — it’s how much work is required to actually use it.
+Let's break it down. 
 
 ---
 
-# Kalshi Historical Data API Limitations
+## Kalshi trading volume over time (quarterly breakdown)
 
-The Kalshi API provides access to markets, events, trades, fills and orders, but there are several limitations when working with historical datasets:
+When you chart Kalshi’s volume over time, a few things become obvious immediately:
 
-## Pagination limits 
+1. **Growth is not linear — it’s exponential**
+2. **Volume is highly concentrated in specific periods**
+3. **Most of the activity is event-driven, not continuous**
 
-First you need to understand pagination. Kalshi uses cursor-based pagination. This means when you make a request, Kalshi API returns results in bite sized pieces to keep response size managable. 
+Early on, volume was relatively thin. Markets existed, but participation was limited.
 
-According to Kalshi API docs, the maximum number of items per page is <a href="https://docs.kalshi.com/getting_started/pagination" target="_blank" rel="noopener noreferrer">100</a>. Which means to get 700,000 rows of trade data, you need to make 7000 requests to get the full history 
+Then two things changed:
 
-## Rate Limits
+* Sports markets launched in 2025 and scaled aggressively  
+* [Major macro and political events started attracting real capital (2024 election cycle)](https://media.cadc.uscourts.gov/opinions/docs/2024/10/24-5205-2077790.pdf)
 
-Now even if you are able to setup your code to pull effectively with pagination, you need to be aware of rate limits.
+From there, volume didn’t just increase — it started **spiking in waves**.
 
-| Tier     | Read Requests   | Write Requests  |
-| :------: | :-------------: | :-------------: |
-| Basic    | 20 per second   | 10 per second   |
-| Advanced | 30 per second   | 30 per second   |
-| Premier  | 100 per second  | 100 per second  |
-| Prime    | 400 per second  | 400 per second  |
+You see:
 
-There are also <a href="https://docs.kalshi.com/getting_started/rate_limits" target="_blank" rel="noopener noreferrer">specific criteria</a> to qualify for different Tiers, the pricing however is unclear.
+* steady baseline growth between quarters  
+* followed by massive bursts during:
+  * NFL season  
+  * Super Bowl  
+  * election cycles  
 
-## No single endpoint
-
-Trades, markets, and order books live in separate endpoints. And therefore securing meaningful data using solely the API requires a robust system architecture to poll data consistently, oragnize, clean and execute the necessary joins to derive value.
-
-## Requires scripting to combine data
-
-Pulling a full dataset often involves:
-
-- Writing scripts  
-- Handling pagination
-- Joining datasets manually  
-- Cleaning inconsistent fields  
-- Exporting to usable formats
-
-Here is Python script to handle pagination. 
-
-```python
-cursor = None
-all_markets = []
-
-while True:
-    url = f"{base_url}?series_ticker={series_ticker}&limit=100"
-    if cursor:
-        url += f"&cursor={cursor}"
-
-    data = requests.get(url).json()
-    all_markets.extend(data["markets"])
-
-    cursor = data.get("cursor")
-    if not cursor:
-        break
-```
-
-More complete example for pagination <a href="https://docs.kalshi.com/getting_started/pagination" target="_blank" rel="noopener noreferrer">here</a>
-
-For many users, this creates unnecessary friction — especially if the goal is simply to analyze or backtest.
+This creates a pattern that looks less like a traditional exchange…  
+and more like a **demand shock engine tied to real-world events**.
 
 ---
 
-# Download Kalshi Historical Data (CSV, Excel, JSON)
+## What does Kalshi volume mean?
 
-If your goal is to quickly download Kalshi historical data, you can quickly query and export to common formats like CSV or Excel.
+At its core, Kalshi volume is simple:
 
-You may want to export:
+> **Total number of contracts traded across markets over a given time period**
 
-- Trade history  
-- Historical prices  
-- Market metadata  
-- Event outcomes  
-- Volume data  
+But this is where most people get tripped up.
 
-## 1. Connect to Kalshi Historical Data
+Volume is **not**:
 
-Navigate to the **Integrations** section and select **Connect** under the Kalshi Historical integration.
+* profit  
+* number of users  
+* open positions  
+* liquidity depth  
 
-![Create API connection screen](/images/guides/kalshi-historical-data/1.png)
+Instead, it’s a **measure of activity**.
 
----
-## 2. Select data source
+If volume is high, it means:
 
-In the integrations panel on the right select which data source you want to query.
+* more contracts are changing hands  
+* more participants are active  
+* more capital is flowing through markets  
 
-![Select your data source](/images/guides/kalshi-historical-data/2.png)
+But it doesn’t automatically mean:
 
----
-## 3. Query the data
+* markets are efficient  
+* predictions are accurate  
+* traders are profitable  
 
-To get exactly what you want. Select the columnms that you are interested in. Then apply any filters you may be interested in. Anything you are used to in Python or SQL has been extrapolated into a nocode interface. Filter your data however you want. Here we are:
-
-- Selecting all Markets
-- Selecting ticker, market_type, title and volume
-- And filtering all markets where volume is greater than $100
-
-![Query your data by selecting columns and filters](/images/guides/kalshi-historical-data/3.png)
+That distinction matters.
 
 ---
 
-## 4. Run the request
+## How Kalshi trading volume works
 
-Click Run request to initiate the data pull. Your data will be loaded into the data sheet in a matter of seconds.
+Kalshi operates on event contracts.
 
-![Run the request](/images/guides/kalshi-historical-data/4.png)
-![Loaded Data Sheet](/images/guides/kalshi-historical-data/5.png)
+Each contract settles at:
 
----
+* **$1 if the event happens**
+* **$0 if it doesn’t**
 
-## 5. Export to CSV, JSON, XLSX (EXCEL)
+Traders buy and sell based on probabilities.
 
-Click on exports in the right side panel, and select the file format you are interested in downloading. 
+Every time a contract is traded:
 
-![Export to your favorite file formats](/images/guides/kalshi-historical-data/6.png)
+* it contributes to total volume  
 
----
+So volume increases when:
 
+* more people are trading  
+* contracts are flipped frequently  
+* large positions move through the market  
 
-Once exported, you can use the data however you want in:
+Because these are **event-based markets**, activity clusters around:
 
-- Excel  
-- Google Sheets  
-- Python  
-- R  
-- BI tools like Tableau  
-- Custom dashboards  
+* uncertainty  
+* breaking news  
+* time-sensitive outcomes  
 
----
+That’s why volume doesn’t behave like stocks or crypto.
 
-# Access a Full Kalshi Historical Dataset
+It behaves more like:
 
-Instead of pulling individual endpoints, many users prefer working with a complete dataset that includes:
-
-- All markets  
-- Trade history  
-- Price movements  
-- Resolution outcomes  
-- Market metadata  
-- Timestamps  
-
-This allows you to analyze:
-
-- Market trends over time  
-- Pricing inefficiencies  
-- Liquidity patterns  
-- Event category performance  
-
-Lychee gives you access to the entire 36GB worth of data within a few queries. Having a complete dataset removes the need to manually merge multiple sources and significantly speeds up analysis.
+> **bursts of attention around real-world events**
 
 ---
 
-# How to Query Kalshi Historical Market Data with SQL and Python
+## Why Kalshi volume changes so dramatically
 
-Once you have access to structured historical data, Python and SQL becomes one of the most powerful ways to analyze it.
+Volume is not evenly distributed.
 
-You can run queries like:
+It is dominated by a few key drivers:
 
-- Average closing price by category  
-- Most volatile markets  
-- Volume by event type  
-- Win rate of specific strategies  
-- Price movement before resolution  
+### 1. Sports markets (the biggest factor)
 
-Example analyses include:
+In many periods, **75%–90%+ of total volume** comes from sports.
 
-- Finding markets that moved more than 20% before resolution  
-- Identifying highest liquidity contracts  
-- Measuring spread changes over time  
-- Aggregating volume by day or week  
+Especially:
 
-Lets say you want to see the historical volume distribution of Kalshi categories.
+* NFL games  
+* playoffs  
+* Super Bowl  
 
-Using pure Python and SQL, your code might look something like this after downloading the dataset onto your local machine.
+Single events can generate:
 
-This example loads Kalshi market data from parquet files, groups markets by category, and calculates total trading volume for each category. The SQL query aggregates volume across all markets and sorts the results to show which categories have the highest activity:
+* hundreds of millions  
+* sometimes over **$1B in a single day**
 
-```python
-import duckdb
+<PublicChart username="misterrpink" slug="kalshi-volume-by-category" />
 
-con = duckdb.connect()
-
-df = con.execute("""
-SELECT
-    category,
-    SUM(volume) AS total_volume
-FROM 'kalshi_markets/*.parquet'
-GROUP BY category
-ORDER BY total_volume DESC
-""").df()
-```
-
-To run this yourself, you would need to install DuckDB, download the Kalshi dataset, load the parquet files locally, and execute the SQL query. You can find the full code and setup instructions on <a href="https://github.com/misterrPink1/prediction-market-analysis/blob/main/src/analysis/kalshi/market_types.py" target="_blank" rel="noopener noreferrer">GitHub</a>.
-
-While this approach works, it involves installing dependencies, handling datasets, and writing queries just to answer a simple question.
-
-Lychee removes this overhead by letting you analyze Kalshi historical data instantly all in your browser — without writing code or managing files.
-
-Here’s how to do it. 
-
-## 1. Select your data source and recipes
-
-Navigate to the **Integrations** section and select **Connect** under the Kalshi Historical integration; select Markets as the data source and **Recipes** for prebuilt workflows.
-
-![Head to recipes in Kalshi Historical Markets data source](/images/guides/kalshi-historical-data/7.png)
-
----
-## 2. Roll up into taxonomy
-
-We have provided helper tools such as "Roll up into taxonomy" selection. This parses 36 GB worth of Kalshi historical data and arranges the categories into usable buckets, that make sense for analysis.
-
-Select "Roll up..." option and **Run Request**
-
-![Roll up ](/images/guides/kalshi-historical-data/8.png)
+> Explore this dataset directly in [Lychee](https://lycheedata.com) and break it down by category, time, or market.
 
 ---
 
-## 3. Inspect and visualize the data
+### 2. Political and macro events
 
-It takes 4.5 seconds for Lychee to execute on this analysis over the entire Kalshi Market History since 2021.
+Elections, Fed decisions, and economic indicators create:
 
-Your data set is loaded into sheet
+* sharp increases in participation  
+* short bursts of high liquidity  
 
-![View summary data ](/images/guides/kalshi-historical-data/9.png)
-
-Select Charts in the sidebar to visualize your analysis
-
-![Head to charts ](/images/guides/kalshi-historical-data/10.png)
-
-Select Tree map to gain deeper insight
-
-![Generate Tree map ](/images/guides/kalshi-historical-data/11.png)
-
-Format your chart design as you wish, and export as a png, svg or jpg.
-
-![Export your chart as png ](/images/guides/kalshi-historical-data/12.png)
-
-Your chart is ready to be shared
-
-![Your volume by category tree map](/images/guides/kalshi-historical-data/13.png)
+These are smaller than sports overall, but still meaningful spikes.
 
 ---
 
-Lychee makes it possible to test hypotheses quickly without writing complex scripts.
+### 3. Event-driven behavior
 
-We can draw interesting conclusions and gain in-depth understanding of what is going on in the markets.
+Unlike traditional markets, Kalshi doesn’t have:
 
-In this case, since the legal victory over the CFTC secured the right to list political contracts, and the 2024 election cycle triggered explosive growth. Sports markets, introduced in 2025, now dominate trading activity.
+* continuous earnings cycles  
+* steady institutional flows  
 
----
+Instead:
 
-# Kalshi Historical Prices and Trade Data
+> volume appears when something **important is about to happen**
 
-Historical price and trade data are essential for understanding how markets evolved.
-
-This typically includes:
-
-- Timestamped trades  
-- Buy and sell prices  
-- Trade size  
-- Market ticker  
-- Volume over time  
-
-With this data you can:
-
-- Build price charts  
-- Calculate volatility  
-- Track liquidity changes  
-- Analyze momentum strategies  
-
-This is the foundation for most backtesting and strategy development.
+Then disappears just as quickly.
 
 ---
 
-# Kalshi Historical Order Book Data (What’s Available?)
+## What high volume actually signals in prediction markets
 
-Order book data provides deeper insights into market behavior, including:
+A common assumption is:
 
-- Bid and ask depth  
-- Spread changes  
-- Liquidity shifts  
-- Market microstructure  
+> “Higher volume = better predictions”
 
-However, order book history is typically harder to obtain because:
+That’s not always true.
 
-- Snapshots are not always stored  
-- High-frequency data is large  
-- APIs may not expose full depth history  
+High volume usually means:
 
-When available, this data can be used to:
+* more participants  
+* tighter spreads (in active markets)  
+* faster price updates  
 
-- Analyze slippage  
-- Study liquidity gaps  
-- Model execution strategies  
-- Evaluate spread behavior  
+But it can also mean:
 
----
+* herd behavior  
+* reactive trading  
+* short-term speculation  
 
-# GitHub and Reddit Workarounds for Kalshi Data (and Why They Fall Short)
+In prediction markets, volume is best understood as:
 
-You may find various workarounds online, including:
-
-- GitHub scraping scripts  
-- Community datasets  
-- Reddit shared exports  
-- Custom API pull scripts  
-
-While useful, these approaches often have limitations:
-
-- Outdated datasets  
-- Incomplete history  
-- Missing metadata  
-- No regular updates  
-- Manual maintenance required  
-
-They can be helpful for experimentation, but they are usually not ideal for serious analysis or production workflows.
+> **a signal of attention, not necessarily accuracy**
 
 ---
 
-# Backtest Strategies Using Kalshi Historical Data
+## Kalshi volume trends (visual analysis)
 
-Once you have structured historical data, you can begin backtesting strategies such as:
+When you layer everything together on a quarterly chart, the pattern becomes clear:
 
-- Buying undervalued contracts  
-- Momentum trading  
-- Mean reversion  
-- Event category performance  
-- Liquidity-based entries  
+<PublicChart username="misterrpink" slug="kalshi-quarterly-volume" />
 
-Backtesting helps answer questions like:
+Key observations:
 
-- Do markets trend before resolution?  
-- Are certain event types mispriced?  
-- Does liquidity predict outcomes?  
-- Are spreads wider at specific times?  
+* Growth accelerates dramatically post-2024  
+* Volume clusters around predictable cycles (NFL, elections)  
+* Outside major events, activity drops but does not disappear  
+
+This creates a hybrid structure:
+
+* part exchange  
+* part event-driven marketplace  
+
+And that’s what makes Kalshi fundamentally different.
+
+---
+
+## Kalshi vs Polymarket volume (context only)
+
+Volume comparisons come up a lot, but they are often misunderstood.
+
+Broadly:
+
+* Kalshi dominates in **regulated US markets**, especially sports  
+* Polymarket tends to be stronger in **global, crypto-native markets**
+
+The difference isn’t just size — it’s structure:
+
+* user base  
+* market types  
+* regulatory constraints  
+
+So volume leadership can shift depending on:
+
+* the type of event  
+* and who is participating  
+
+---
+
+## Where this data comes from
+
+Kalshi volume data is typically derived from:
+
+* trade-level activity across markets  
+* aggregated historical datasets  
+* third-party analytics platforms  
+
+Most public sources provide:
+
+* partial trade history  
+* snapshots of activity  
+* limited export functionality  
+
+That’s why many analyses rely on **reconstructed datasets** to understand full historical volume.
+
+You can specifically learn how to utilize Kalshi historical data [here](/guides/kalshi-historical-data).
+
+In practice, this means most users either:
+
+* manually stitch together API responses across multiple endpoints
+* deal with rate limits and incomplete datasets
+
+This is where most analysts get stuck — Kalshi data is fragmented across endpoints.
+
+[Tools like Lychee solve this by providing structured, queryable historical data out of the box.](https://lycheedata.com)
 
 
-With historical data and repeatable queries, you can test ideas quickly and refine strategies before deploying them.
+
+---
+
+## Frequently asked questions about Kalshi volume
+
+### What is Kalshi volume?
+
+Total number of contracts traded across all markets in a given period.
+
+### How is Kalshi volume calculated?
+
+By summing all executed trades over time.
+
+### Why does Kalshi volume spike?
+
+Because trading activity concentrates around major real-world events like sports and elections.
+
+### Is high volume good?
+
+It usually means more activity and participation, but not necessarily better predictions.
+
+### Which platform has more volume: Kalshi or Polymarket?
+
+It depends on the market. Kalshi often leads in US-regulated markets, while Polymarket is stronger in global and crypto-native events.
+
+---
+
+## Final takeaway
+
+Kalshi's volume isn’t just growing — it’s revealing something deeper:
+
+> **Prediction markets don’t behave like traditional financial markets.**
+
+They behave like:
+
+* attention markets  
+* event-driven liquidity systems  
+* bursts of collective belief around real-world outcomes  
+
+And when you look at volume over time, that pattern becomes impossible to ignore.
+
+If you actually want to work with Kalshi data instead of just reading about it:
+
+→ Query full historical datasets
+→ Build your own volume charts
+→ Export to CSV, Excel, or dashboards
+
+[You can do all of that without writing code using Lychee](https://lycheedata.com).
+
+And the only way to really see that clearly is to work with the raw data yourself.
+
