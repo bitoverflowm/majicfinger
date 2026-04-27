@@ -302,7 +302,7 @@ function parseScopedColumnKey(value, fallbackSheetId) {
   };
 }
 
-export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, embedCompact = false, onSnapshotGetterReady }) {
+export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, embedCompact = false, onSnapshotGetterReady = null }) {
   const contextStateV2 = useMyStateV2();
   const chartRef = useRef(null);
 
