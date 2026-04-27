@@ -13,11 +13,23 @@ function stripInternalFromRows(rows) {
   });
 }
 
-function normalizeBuilderSnapshot(snapshot, rows) {
+function collectAllColumnKeys(rows, dataSheets) {
+  const keys = new Set();
+  const addRows = (arr) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((row) => {
+      if (row && typeof row === "object") Object.keys(row).forEach((k) => keys.add(k));
+    });
+  };
+  addRows(rows);
+  Object.values(dataSheets || {}).forEach((sheet) => addRows(sheet?.data));
+  return Array.from(keys);
+}
+
+function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
   const fallback = inferDefaultBuilderSnapshot(rows);
   const s = snapshot && typeof snapshot === "object" ? { ...snapshot } : { ...fallback };
-  const first = Array.isArray(rows) && rows[0] && typeof rows[0] === "object" ? rows[0] : null;
-  const keys = first ? Object.keys(first) : [];
+  const keys = collectAllColumnKeys(rows, dataSheets);
   if (!keys.length) return fallback;
 
   const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline"]);
@@ -31,20 +43,27 @@ function normalizeBuilderSnapshot(snapshot, rows) {
   };
 
   const normalizedX = deScope(s.selX);
-  s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
+  if (String(s.selX || "").includes("::")) {
+    s.selX = String(s.selX);
+  } else {
+    s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
+  }
 
   const rawY = Array.isArray(s.selY) ? s.selY : [];
-  const cleanY = rawY
-    .map((k) => deScope(k))
-    .filter((k) => keys.includes(k));
+  const cleanY = rawY.filter((k) => {
+    const raw = String(k || "");
+    if (raw.includes("::")) return true;
+    return keys.includes(deScope(raw));
+  });
   s.selY = cleanY.length ? [...new Set(cleanY)] : fallback.selY;
 
   // Keep per-series visual config aligned when historical snapshots used scoped keys.
   if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
     const nextOverrides = {};
     for (const [rawKey, color] of Object.entries(s.lineColorOverrides)) {
-      const key = deScope(rawKey);
-      if (keys.includes(key) && typeof color === "string" && color.trim()) {
+      const raw = String(rawKey || "");
+      const key = raw.includes("::") ? raw : deScope(raw);
+      if ((raw.includes("::") || keys.includes(key)) && typeof color === "string" && color.trim()) {
         nextOverrides[key] = color;
       }
     }
@@ -54,8 +73,9 @@ function normalizeBuilderSnapshot(snapshot, rows) {
   if (s.chartConfig && typeof s.chartConfig === "object") {
     const nextCfg = {};
     for (const [rawKey, cfg] of Object.entries(s.chartConfig)) {
-      const key = deScope(rawKey);
-      if (keys.includes(key) && cfg && typeof cfg === "object") {
+      const raw = String(rawKey || "");
+      const key = raw.includes("::") ? raw : deScope(raw);
+      if ((raw.includes("::") || keys.includes(key)) && cfg && typeof cfg === "object") {
         nextCfg[key] = cfg;
       }
     }
@@ -103,11 +123,14 @@ export default async function handler(req, res) {
     }
 
     const cp = Array.isArray(chart.chart_properties) ? chart.chart_properties[0] : chart.chart_properties;
+    const dataSheets = dataSet?.data_sheets && typeof dataSet.data_sheets === "object"
+      ? dataSet.data_sheets
+      : {};
     const rechartsBuilderRaw =
       cp && typeof cp === "object" && cp.rechartsBuilder && cp.rechartsBuilder.v === 1
         ? cp.rechartsBuilder
         : inferDefaultBuilderSnapshot(dataSet.data);
-    const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, dataSet.data);
+    const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, dataSet.data, dataSheets);
 
     const publicChart = {
       chart_name: chart.chart_name,
@@ -115,11 +138,15 @@ export default async function handler(req, res) {
       rechartsBuilder,
     };
 
+    const fallbackRowsFromSheets = Object.values(dataSheets || {}).find((s) => Array.isArray(s?.data) && s.data.length)?.data || [];
+    const rows = Array.isArray(dataSet.data) && dataSet.data.length ? dataSet.data : fallbackRowsFromSheets;
+
     return res.status(200).json({
       success: true,
       data: {
         chart: publicChart,
-        rows: stripInternalFromRows(dataSet.data),
+        rows: stripInternalFromRows(rows),
+        dataSheets,
       },
     });
   } catch (e) {

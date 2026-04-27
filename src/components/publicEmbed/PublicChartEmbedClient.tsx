@@ -18,6 +18,22 @@ function DataLoader({ rows }: { rows: unknown[] }) {
   return null;
 }
 
+function DataSheetsLoader({ rows, dataSheets }: { rows: unknown[]; dataSheets?: Record<string, any> }) {
+  const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
+  useEffect(() => {
+    const incomingSheets =
+      dataSheets && typeof dataSheets === "object" && Object.keys(dataSheets).length
+        ? dataSheets
+        : { "sheet-1": { name: "Sheet 1", data: Array.isArray(rows) ? rows : [], provenance: null } };
+    setDataSheets?.(incomingSheets as never);
+    const firstId = Object.keys(incomingSheets)[0] || "sheet-1";
+    setActiveSheetId?.(firstId as never);
+    const firstRows = Array.isArray(incomingSheets?.[firstId]?.data) ? incomingSheets[firstId].data : [];
+    setConnectedData?.((firstRows.length ? firstRows : (Array.isArray(rows) ? rows : [])) as never[]);
+  }, [rows, dataSheets, setDataSheets, setActiveSheetId, setConnectedData]);
+  return null;
+}
+
 type PublicPayload = {
   success: boolean;
   data?: {
@@ -27,15 +43,30 @@ type PublicPayload = {
       rechartsBuilder?: { v: number };
     };
     rows: unknown[];
+    dataSheets?: Record<string, any>;
   };
   message?: string;
 };
 
-function normalizeSnapshotForRows(snapshot: any, rows: unknown[]) {
+function collectAllColumnKeys(rows: unknown[], dataSheets?: Record<string, any>) {
+  const keys = new Set<string>();
+  const addRows = (arr: unknown[]) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((row) => {
+      if (row && typeof row === "object") {
+        Object.keys(row as Record<string, unknown>).forEach((k) => keys.add(k));
+      }
+    });
+  };
+  addRows(rows || []);
+  Object.values(dataSheets || {}).forEach((sheet: any) => addRows(sheet?.data || []));
+  return Array.from(keys);
+}
+
+function normalizeSnapshotForRows(snapshot: any, rows: unknown[], dataSheets?: Record<string, any>) {
   const fallback = inferDefaultBuilderSnapshot(rows as any[]);
   const s = snapshot && typeof snapshot === "object" ? { ...snapshot } : { ...fallback };
-  const first = Array.isArray(rows) && rows[0] && typeof rows[0] === "object" ? (rows[0] as Record<string, unknown>) : null;
-  const keys = first ? Object.keys(first) : [];
+  const keys = collectAllColumnKeys(rows, dataSheets);
   if (!keys.length) return fallback;
 
   const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline"]);
@@ -49,18 +80,25 @@ function normalizeSnapshotForRows(snapshot: any, rows: unknown[]) {
   s.selChartType = allowedTypes.has(t) ? t : fallback.selChartType;
 
   const normalizedX = deScope(s.selX);
-  s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
+  if (String(s.selX || "").includes("::")) {
+    s.selX = String(s.selX);
+  } else {
+    s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
+  }
 
-  const normalizedY = (Array.isArray(s.selY) ? s.selY : [])
-    .map((k: unknown) => deScope(k))
-    .filter((k: string) => keys.includes(k));
+  const normalizedY = (Array.isArray(s.selY) ? s.selY : []).filter((k: unknown) => {
+    const raw = String(k || "");
+    if (raw.includes("::")) return true;
+    return keys.includes(deScope(raw));
+  });
   s.selY = normalizedY.length ? [...new Set(normalizedY)] : fallback.selY;
 
   if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
     const nextOverrides: Record<string, string> = {};
     for (const [rawKey, color] of Object.entries(s.lineColorOverrides as Record<string, unknown>)) {
-      const key = deScope(rawKey);
-      if (keys.includes(key) && typeof color === "string" && color.trim()) {
+      const raw = String(rawKey || "");
+      const key = raw.includes("::") ? raw : deScope(raw);
+      if ((raw.includes("::") || keys.includes(key)) && typeof color === "string" && color.trim()) {
         nextOverrides[key] = color;
       }
     }
@@ -70,8 +108,9 @@ function normalizeSnapshotForRows(snapshot: any, rows: unknown[]) {
   if (s.chartConfig && typeof s.chartConfig === "object") {
     const nextCfg: Record<string, unknown> = {};
     for (const [rawKey, cfg] of Object.entries(s.chartConfig as Record<string, unknown>)) {
-      const key = deScope(rawKey);
-      if (keys.includes(key) && cfg && typeof cfg === "object") {
+      const raw = String(rawKey || "");
+      const key = raw.includes("::") ? raw : deScope(raw);
+      if ((raw.includes("::") || keys.includes(key)) && cfg && typeof cfg === "object") {
         nextCfg[key] = cfg;
       }
     }
@@ -97,13 +136,14 @@ export default function PublicChartEmbedClient({
   const [loadStage, setLoadStage] = useState("Preparing data");
   const [isEmbedded, setIsEmbedded] = useState(false);
   const rows = payload?.data?.rows ?? [];
+  const dataSheets = payload?.data?.dataSheets ?? {};
   const rb =
     payload?.data?.chart?.rechartsBuilder && payload.data.chart.rechartsBuilder.v === 1
       ? payload.data.chart.rechartsBuilder
       : undefined;
   const chartSnapshot = useMemo(
-    () => normalizeSnapshotForRows(rb, rows),
-    [rb, rows],
+    () => normalizeSnapshotForRows(rb, rows, dataSheets),
+    [rb, rows, dataSheets],
   );
 
   useEffect(() => {
@@ -157,7 +197,8 @@ export default function PublicChartEmbedClient({
     );
   }
 
-  if (!payload || !payload.success || !payload.data || !rows.length) {
+  const hasRowsInAnySheet = Object.values(dataSheets || {}).some((sheet: any) => Array.isArray(sheet?.data) && sheet.data.length > 0);
+  if (!payload || !payload.success || !payload.data || (!rows.length && !hasRowsInAnySheet)) {
     return (
       <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
         <p className="text-center text-sm font-medium">{loadStage}</p>
@@ -187,6 +228,7 @@ export default function PublicChartEmbedClient({
         }}
       >
         <DataLoader rows={rows} />
+        <DataSheetsLoader rows={rows} dataSheets={dataSheets} />
         <div className={`mt-0 flex flex-1 items-center justify-center ${isEmbedded ? "" : "md:mt-2"}`}>
           <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
             <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center">
