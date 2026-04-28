@@ -118,7 +118,7 @@ export default async function handler(req, res) {
     }
 
     const dataSet = await DataSet.findById(chart.data_set_id).lean();
-    if (!dataSet || !Array.isArray(dataSet.data)) {
+    if (!dataSet) {
       return res.status(404).json({ success: false, message: "Dataset not found" });
     }
 
@@ -126,11 +126,14 @@ export default async function handler(req, res) {
     const dataSheets = dataSet?.data_sheets && typeof dataSet.data_sheets === "object"
       ? dataSet.data_sheets
       : {};
+    const fallbackRowsFromSheets = Object.values(dataSheets || {}).find((s) => Array.isArray(s?.data) && s.data.length)?.data || [];
+    const baseRows = Array.isArray(dataSet.data) ? dataSet.data : [];
+    const rowsForFallback = baseRows.length ? baseRows : fallbackRowsFromSheets;
     const rechartsBuilderRaw =
       cp && typeof cp === "object" && cp.rechartsBuilder && cp.rechartsBuilder.v === 1
         ? cp.rechartsBuilder
-        : inferDefaultBuilderSnapshot(dataSet.data);
-    const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, dataSet.data, dataSheets);
+        : inferDefaultBuilderSnapshot(rowsForFallback);
+    const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, rowsForFallback, dataSheets);
 
     const publicChart = {
       chart_name: chart.chart_name,
@@ -138,8 +141,7 @@ export default async function handler(req, res) {
       rechartsBuilder,
     };
 
-    const fallbackRowsFromSheets = Object.values(dataSheets || {}).find((s) => Array.isArray(s?.data) && s.data.length)?.data || [];
-    const rows = Array.isArray(dataSet.data) && dataSet.data.length ? dataSet.data : fallbackRowsFromSheets;
+    const rows = rowsForFallback;
 
     return res.status(200).json({
       success: true,

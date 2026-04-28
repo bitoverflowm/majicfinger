@@ -559,17 +559,33 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const idx = raw.indexOf("::");
       return idx > -1 ? raw.slice(idx + 2) : raw;
     };
-    const hasColumn = (value) => {
-      if (!value) return false;
-      if (colSet.has(value)) return true;
+    const resolveToExistingKey = (value) => {
+      if (!value) return null;
+      if (colSet.has(value)) return value;
       const plain = deScope(value);
-      return !!plain && colSet.has(plain);
+      if (plain && colSet.has(plain)) return plain;
+      if (!plain) return null;
+      // Back-compat: legacy snapshots stored unscoped keys (e.g. "created_time") but options are now scoped ("sheet-1::created_time").
+      // If any scoped option matches by deScoped column name, pick the first matching key.
+      for (const k of cols) {
+        if (deScope(k) === plain) return k;
+      }
+      return null;
     };
-    setSelX((x) => (x && !hasColumn(x) ? undefined : x));
+    setSelX((x) => {
+      if (!x) return x;
+      const resolved = resolveToExistingKey(x);
+      if (!resolved) return undefined;
+      return resolved;
+    });
     setSelY((prev) => {
       const curr = Array.isArray(prev) ? prev : [];
-      const next = curr.filter((y) => hasColumn(y));
-      return next.length === curr.length && next.every((v, i) => v === curr[i]) ? curr : next;
+      const next = curr
+        .map((y) => ({ raw: y, resolved: resolveToExistingKey(y) }))
+        .filter((p) => !!p.resolved)
+        .map((p) => p.resolved);
+      const stable = next.length === curr.length && next.every((v, i) => v === curr[i]);
+      return stable ? curr : next;
     });
   }, [demo, effectiveData, globalColumnOptions]);
 
