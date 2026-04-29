@@ -48,6 +48,49 @@ function mappingGrantsLifetime(mapping) {
   return mapping.tier === "lifetime";
 }
 
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function userEntitlementScore(user) {
+  if (!user) return 0;
+  const status = String(user.subscriptionStatus || "").toLowerCase();
+  let score = 0;
+  if (user.lifetimeMember) score += 100;
+  if (status === "active") score += 50;
+  if (status === "trialing") score += 25;
+  if (user.subscriptionTier) score += 10;
+  if (user.stripeSubscriptionId) score += 5;
+  if (user.stripeCustomerId) score += 3;
+  return score;
+}
+
+async function findUserForWebhook({ email, stripeCustomerId, stripeSubscriptionId }) {
+  await dbConnect();
+
+  if (stripeSubscriptionId) {
+    const bySub = await User.findOne({ stripeSubscriptionId: String(stripeSubscriptionId) });
+    if (bySub) return bySub;
+  }
+  if (stripeCustomerId) {
+    const byCustomer = await User.findOne({ stripeCustomerId: String(stripeCustomerId) });
+    if (byCustomer) return byCustomer;
+  }
+
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  const candidates = await User.find({
+    email: { $regex: new RegExp(`^${escapeRegex(normalized)}$`, "i") },
+  });
+  if (!candidates?.length) return null;
+  candidates.sort((a, b) => userEntitlementScore(b) - userEntitlementScore(a));
+  return candidates[0];
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
@@ -172,12 +215,11 @@ async function handleCheckoutCompleted(session) {
     const isActive = sub.status === "active" || sub.status === "trialing";
     if (email && isActive) {
       const mapping = mapSubscriptionToTier(sub);
-      if (!mapping) return; // Unrecognized - skip update, error already logged
       const amount = sub.items?.data?.[0]?.plan?.amount ?? sub.items?.data?.[0]?.price?.unit_amount ?? 0;
       const status = sub.status === "trialing" ? "trialing" : "active";
       await updateUserPayment(email, session.customer_details?.name, amount, {
-        tier: mapping.tier,
-        cycle: mapping.cycle,
+        tier: mapping?.tier,
+        cycle: mapping?.cycle,
         status,
         lifetimeMember: false,
         stripeCustomerId: sub.customer || session.customer || null,
@@ -386,14 +428,19 @@ async function updateUserPayment(email, name, amount, opts) {
     subscriptionStartedAt,
   } = opts;
 
-  let user = await User.findOne({ email });
+  const normalizedEmail = normalizeEmail(email);
+  let user = await findUserForWebhook({
+    email: normalizedEmail,
+    stripeCustomerId,
+    stripeSubscriptionId,
+  });
   const update = {
     name: name || user?.name,
-    subscriptionTier: tier,
-    billingCycle: cycle,
+    ...(tier ? { subscriptionTier: tier } : {}),
+    ...(cycle ? { billingCycle: cycle } : {}),
     subscriptionStatus: status,
     lifetimeMember: !!lifetimeMember,
-    subscriptionType: `${tier}_${cycle}`,
+    ...(tier && cycle ? { subscriptionType: `${tier}_${cycle}` } : {}),
     netPay: user?.netPay ? Number(user.netPay) + Number(amount) : amount,
     token: 100,
     subscribedAt: subscriptionStartedAt || user?.subscribedAt || new Date(),
@@ -404,15 +451,20 @@ async function updateUserPayment(email, name, amount, opts) {
   };
 
   if (!user) {
-    await User.create({ email, ...update });
+    await User.create({ email: normalizedEmail, ...update });
   } else {
-    await User.findByIdAndUpdate(user._id, { $set: update });
+    await User.findByIdAndUpdate(user._id, { $set: { ...update, email: normalizeEmail(user.email || normalizedEmail) } });
   }
 }
 
 async function updateUserSubscriptionStatus(email, opts) {
   await dbConnect();
-  const user = await User.findOne({ email });
+  const normalizedEmail = normalizeEmail(email);
+  const user = await findUserForWebhook({
+    email: normalizedEmail,
+    stripeCustomerId: opts?.stripeCustomerId,
+    stripeSubscriptionId: opts?.stripeSubscriptionId,
+  });
   const tier = opts?.tier;
   const cycle = opts?.cycle;
 
@@ -421,7 +473,7 @@ async function updateUserSubscriptionStatus(email, opts) {
   if (!user) {
     const now = new Date();
     await User.create({
-      email,
+      email: normalizedEmail,
       lifetimeMember: false,
       subscriptionTier: tier || undefined,
       billingCycle: cycle || undefined,
@@ -461,11 +513,12 @@ async function updateUserSubscriptionStatus(email, opts) {
 
 async function upsertUserByEmail(email, { name, stripeCustomerId }) {
   await dbConnect();
-  const existing = await User.findOne({ email });
+  const normalizedEmail = normalizeEmail(email);
+  const existing = await findUserForWebhook({ email: normalizedEmail, stripeCustomerId, stripeSubscriptionId: null });
   if (!existing) {
     await User.create({
-      email,
-      name: name || email.split("@")[0] || "Customer",
+      email: normalizedEmail,
+      name: name || normalizedEmail.split("@")[0] || "Customer",
       stripeCustomerId: stripeCustomerId || null,
       token: 100,
     });

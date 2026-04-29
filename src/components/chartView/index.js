@@ -710,7 +710,14 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       : [];
     const neededKeys = new Set([selX, ...(selY || []), lineSeriesColumn, chartFilterColumn].filter(Boolean));
     if (!neededKeys.size) return chartData || dfltChartData;
-    const maxRows = Math.max(0, ...sheetEntries.map(([, sheet]) => sheet.data.length));
+    const neededSheetIds = new Set();
+    for (const key of neededKeys) {
+      const parsed = parseScopedColumnKey(key, contextStateV2?.activeSheetId);
+      if (parsed?.sheetId) neededSheetIds.add(parsed.sheetId);
+    }
+    const relevantSheetEntries = sheetEntries.filter(([sheetId]) => neededSheetIds.has(sheetId));
+    const sourceEntries = relevantSheetEntries.length ? relevantSheetEntries : sheetEntries;
+    const maxRows = Math.max(0, ...sourceEntries.map(([, sheet]) => sheet.data.length));
     const rows = [];
     for (let idx = 0; idx < maxRows; idx += 1) {
       const row = {};

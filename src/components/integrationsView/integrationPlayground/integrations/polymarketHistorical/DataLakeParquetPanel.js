@@ -484,6 +484,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const setSheetData = ctx?.setSheetData;
   const setDataSheets = ctx?.setDataSheets;
   const dataSheets = ctx?.dataSheets || {};
+  const chartSheets = ctx?.chartSheets || {};
+  const setChartSheets = ctx?.setChartSheets;
   const liveStreamState = ctx?.liveStreamState;
   const activeSheetId = ctx?.activeSheetId;
   const setActiveSheetId = ctx?.setActiveSheetId;
@@ -2564,9 +2566,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           return na - nb;
         });
       const prev = dataSheets || {};
-      const next = { ...prev };
-      delete next[sheetId];
-      const remainingKeys = sortIds(Object.keys(next));
+      const withoutDeleted = { ...prev };
+      delete withoutDeleted[sheetId];
+      const remainingKeys = sortIds(Object.keys(withoutDeleted));
       if (remainingKeys.length === 0) {
         setDataSheets({
           "sheet-1": { name: "Sheet 1", data: [], provenance: null, requestCards: [] },
@@ -2574,17 +2576,94 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         setActiveSheetId?.("sheet-1");
         setConnectedData?.([]);
       } else {
-        setDataSheets(next);
-        if (activeSheetId === sheetId) {
-          setActiveSheetId?.(remainingKeys[0]);
-          const rows = next[remainingKeys[0]]?.data;
-          setConnectedData?.(Array.isArray(rows) ? rows : []);
+        // Re-index sheet ids to keep contiguous keys (sheet-1, sheet-2, ...) after deletion.
+        const idMap = {};
+        const reindexed = {};
+        remainingKeys.forEach((oldId, idx) => {
+          const newId = `sheet-${idx + 1}`;
+          idMap[oldId] = newId;
+          const oldSheet = withoutDeleted[oldId] || {};
+          reindexed[newId] = {
+            ...oldSheet,
+            name: oldSheet?.name || `Sheet ${idx + 1}`,
+          };
+        });
+        setDataSheets(reindexed);
+        const mappedActive = activeSheetId === sheetId
+          ? (idMap[remainingKeys[0]] || "sheet-1")
+          : (idMap[activeSheetId] || idMap[remainingKeys[0]] || "sheet-1");
+        setActiveSheetId?.(mappedActive);
+        const rows = reindexed?.[mappedActive]?.data;
+        setConnectedData?.(Array.isArray(rows) ? rows : []);
+
+        // Remap chart builder scoped keys that referenced old sheet ids.
+        if (setChartSheets) {
+          const remapScopedKey = (raw) => {
+            const v = String(raw || "");
+            const idx = v.indexOf("::");
+            if (idx <= 0) return v;
+            const oldPrefix = v.slice(0, idx);
+            const col = v.slice(idx + 2);
+            const mappedPrefix = idMap[oldPrefix];
+            if (!mappedPrefix) return v;
+            return `${mappedPrefix}::${col}`;
+          };
+          const remapSnapshot = (snap) => {
+            if (!snap || typeof snap !== "object") return snap;
+            const next = { ...snap };
+            if (next.selX) next.selX = remapScopedKey(next.selX);
+            if (Array.isArray(next.selY)) next.selY = next.selY.map(remapScopedKey);
+            if (next.lineSeriesColumn) next.lineSeriesColumn = remapScopedKey(next.lineSeriesColumn);
+            if (next.chartFilterColumn) next.chartFilterColumn = remapScopedKey(next.chartFilterColumn);
+            if (next.chartConfig && typeof next.chartConfig === "object") {
+              const cfg = {};
+              Object.entries(next.chartConfig).forEach(([k, val]) => {
+                cfg[remapScopedKey(k)] = val;
+              });
+              next.chartConfig = cfg;
+            }
+            if (next.lineColorOverrides && typeof next.lineColorOverrides === "object") {
+              const overrides = {};
+              Object.entries(next.lineColorOverrides).forEach(([k, val]) => {
+                overrides[remapScopedKey(k)] = val;
+              });
+              next.lineColorOverrides = overrides;
+            }
+            return next;
+          };
+          setChartSheets((prevCharts) => {
+            const p = prevCharts || {};
+            const out = {};
+            Object.entries(p).forEach(([chartId, chartSheet]) => {
+              const existingSnapshot = chartSheet?.snapshot || null;
+              const chartMeta = chartSheet?.chartMeta || null;
+              const cp0 = Array.isArray(chartMeta?.chart_properties)
+                ? chartMeta.chart_properties[0]
+                : chartMeta?.chart_properties;
+              const existingMetaSnap =
+                cp0 && typeof cp0 === "object" ? cp0?.rechartsBuilder || null : null;
+              const remappedSnapshot = remapSnapshot(existingSnapshot);
+              const remappedMetaSnap = remapSnapshot(existingMetaSnap);
+              let remappedMeta = chartMeta;
+              if (chartMeta && cp0 && typeof cp0 === "object") {
+                const chartProps = Array.isArray(chartMeta.chart_properties) ? [...chartMeta.chart_properties] : [cp0];
+                chartProps[0] = { ...cp0, rechartsBuilder: remappedMetaSnap };
+                remappedMeta = { ...chartMeta, chart_properties: chartProps };
+              }
+              out[chartId] = {
+                ...chartSheet,
+                snapshot: remappedSnapshot,
+                chartMeta: remappedMeta,
+              };
+            });
+            return out;
+          });
         }
       }
       setExpandedRequestKey(null);
       setShowRequestComposer(true);
     },
-    [setDataSheets, setActiveSheetId, setConnectedData, activeSheetId, dataSheets],
+    [setDataSheets, setActiveSheetId, setConnectedData, activeSheetId, dataSheets, setChartSheets],
   );
 
   const openDeleteSheetDialog = useCallback((sheetId) => {
