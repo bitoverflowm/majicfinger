@@ -210,8 +210,19 @@ async function handleCheckoutCompleted(session) {
     });
   } else if (session.mode === "subscription" && session.subscription) {
     const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-    const sub = await stripe.subscriptions.retrieve(session.subscription);
+    const sub = await resolveSubscriptionFromCheckoutSession(session, stripe);
     const email = session.customer_details?.email;
+    if (!sub) {
+      if (email) {
+        await updateUserSubscriptionStatus(email, {
+          status: "active",
+          stripeCustomerId: session.customer || null,
+          stripeSubscriptionId: typeof session.subscription === "string" ? session.subscription : session.subscription?.id || null,
+          nextPaymentDate: null,
+        });
+      }
+      return;
+    }
     const isActive = sub.status === "active" || sub.status === "trialing";
     if (email && isActive) {
       const mapping = mapSubscriptionToTier(sub);
@@ -240,9 +251,13 @@ async function handleSubscriptionChange(subscription, eventType) {
 
   let customerEmail = subscription.customer_email;
   if (!customerEmail && subscription.customer) {
-    const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-    const customer = await stripe.customers.retrieve(subscription.customer);
-    customerEmail = customer.email;
+    try {
+      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const customer = await stripe.customers.retrieve(subscription.customer);
+      customerEmail = customer.email;
+    } catch (err) {
+      console.error("[Stripe Webhook] Failed to retrieve customer for subscription change:", err?.message || err);
+    }
   }
 
   if (customerEmail) {
@@ -282,6 +297,78 @@ function mapSubscriptionToTier(subscription) {
     `[Stripe Webhook] Unrecognized subscription amount: ${amount} cents, interval: ${interval}. ` +
     `Add to PLAN_MAP or use price ID mapping. User may not get access.`
   );
+  return null;
+}
+
+function buildSubscriptionFromInvoice(invoice) {
+  if (!invoice) return null;
+  const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+  if (!subscriptionId) return null;
+
+  const lineItems = invoice?.lines?.data || [];
+  const subscriptionLine =
+    lineItems.find((line) => line?.type === "subscription") ||
+    lineItems.find((line) => line?.price?.recurring) ||
+    lineItems[0];
+  if (!subscriptionLine) return null;
+
+  const price = subscriptionLine?.price || {};
+  const plan = subscriptionLine?.plan || {};
+  return {
+    id: subscriptionId,
+    customer: typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id,
+    customer_email: invoice.customer_email || invoice?.customer_details?.email || null,
+    status: invoice.paid ? "active" : "incomplete",
+    current_period_end: subscriptionLine?.period?.end || null,
+    start_date: subscriptionLine?.period?.start || null,
+    items: {
+      data: [{
+        price: {
+          id: price.id || null,
+          unit_amount: price.unit_amount ?? plan.amount ?? null,
+          recurring: price.recurring || (plan.interval ? { interval: plan.interval } : null),
+        },
+        plan: {
+          amount: plan.amount ?? price.unit_amount ?? null,
+          interval: plan.interval ?? price?.recurring?.interval ?? null,
+        },
+      }],
+    },
+  };
+}
+
+async function resolveSubscriptionFromCheckoutSession(session, stripe) {
+  const subscriptionId = typeof session?.subscription === "string" ? session.subscription : session?.subscription?.id;
+  if (!subscriptionId) return null;
+
+  try {
+    return await stripe.subscriptions.retrieve(subscriptionId);
+  } catch (err) {
+    console.error(`[Stripe Webhook] subscriptions.retrieve failed for ${subscriptionId}:`, err?.message || err);
+  }
+
+  const invoiceId = typeof session?.invoice === "string" ? session.invoice : session?.invoice?.id;
+  if (invoiceId) {
+    try {
+      const invoice = await stripe.invoices.retrieve(invoiceId);
+      const synthetic = buildSubscriptionFromInvoice(invoice);
+      if (synthetic) return synthetic;
+    } catch (err) {
+      console.error(`[Stripe Webhook] invoices.retrieve fallback failed for ${invoiceId}:`, err?.message || err);
+    }
+  }
+
+  if (session?.id) {
+    try {
+      const expanded = await stripe.checkout.sessions.retrieve(session.id, { expand: ["subscription"] });
+      if (expanded?.subscription && typeof expanded.subscription === "object") {
+        return expanded.subscription;
+      }
+    } catch (err) {
+      console.error(`[Stripe Webhook] checkout.sessions.retrieve fallback failed for ${session.id}:`, err?.message || err);
+    }
+  }
+
   return null;
 }
 
@@ -346,13 +433,22 @@ async function handleInvoicePaymentNeedsAction(invoice, statusValue) {
 }
 
 async function handleInvoicePaymentSucceeded(invoice) {
-  // When possible, prefer subscription-based mapping since it contains interval/price info.
-  const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-
   if (invoice?.subscription) {
-    const sub = await stripe.subscriptions.retrieve(invoice.subscription);
-    await handleSubscriptionChange(sub, "customer.subscription.updated");
-    return;
+    const syntheticSub = buildSubscriptionFromInvoice(invoice);
+    if (syntheticSub) {
+      await handleSubscriptionChange(syntheticSub, "customer.subscription.updated");
+      return;
+    }
+
+    // Rare fallback when invoice payload lacks enough line item details.
+    try {
+      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const sub = await stripe.subscriptions.retrieve(invoice.subscription);
+      await handleSubscriptionChange(sub, "customer.subscription.updated");
+      return;
+    } catch (err) {
+      console.error("[Stripe Webhook] Failed to retrieve subscription for invoice payment success:", err?.message || err);
+    }
   }
 
   // Fallback: treat as one-time payment if we can map by amount.
