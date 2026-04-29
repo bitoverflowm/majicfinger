@@ -1,0 +1,338 @@
+---
+title: "How to Build Kalshi Volume Charts Using Historical Data (Step-by-Step Guide)"
+description: "Learn how to build Kalshi volume charts using historical data in Lychee. Step-by-step guide to creating quarterly, daily, and yearly volume visualizations without coding."
+publishedAt: "2026-04-29"
+author: "misterrpink"
+topics: ["kalshi", "prediction markets", "volume", "data analysis", "charts"]
+integration: ["Kalshi", "Lychee"]
+coverImage: "/images/guides/kalshi-volume-chart-guide/main.png"
+ogImage: "https://lycheedata.com/images/guides/kalshi-volume-chart-guide/main.png"
+featured: false
+slug: "/kalshi-volume-chart-guide"
+readingTime: "7 min"
+keywords: [
+  "kalshi volume chart",
+  "kalshi quarterly volume chart",
+  "how to build kalshi volume chart",
+  "kalshi historical data volume",
+  "kalshi trading volume visualization",
+  "kalshi volume analysis tutorial",
+  "prediction market volume chart",
+  "lychee kalshi charts"
+]
+canonical: "https://lycheedata.com/guides/kalshi-volume-chart-guide"
+seoTitle: "How to Build Kalshi Volume Charts (Quarterly, Daily, Historical) | Lychee"
+twitterCard: "summary_large_image"
+---
+
+# How to Build a Kalshi Volume Chart (Quarterly, Daily, Historical Guide)
+
+This guide is a direct extension of our main breakdown:
+
+👉 [Kalshi Volume Explained: Quarterly Trends and Market Activity](/guides/kalshi-volume)
+
+That page explains **what Kalshi volume is and why it matters**.
+
+This one shows you something more important:
+
+> **How to actually build those volume charts yourself using historical data in [Lychee](lycheedata.com)**
+
+No code. No API stitching. Just structured analysis.
+
+And more importantly:
+
+You’re working with the exact same dataset behind the charts you see in the main Kalshi volume analysis.
+
+No approximations. No scraped snapshots. Full trade-level history.
+
+---
+
+## 1. Why Kalshi Volume Charts Matter
+
+Kalshi volume only becomes meaningful when you can **see it over time**.
+
+Without visualization, you're just looking at raw trade activity.
+
+With charts, you unlock:
+
+* quarterly growth trends
+* daily spikes during events
+* long-term structural shifts
+* baseline vs event-driven activity
+
+This is the foundation of every analysis in the Kalshi Volume cluster.
+
+---
+
+## 2. The Dataset Behind Kalshi Volume (Lychee Historical Data)
+
+All charts in this guide are built using Lychee’s Kalshi historical dataset.
+
+Key scale:
+
+* **7.68 million markets**
+* **72.1 million trades**
+
+This is a complete historical dataset — not sampled data or partial API responses. The largest publicly available dataset of Polymarket and Kalshi market and trade data.
+
+This matters because:
+
+> Kalshi volume is not a single metric — it is reconstructed from trade-level activity.
+
+Each trade contributes to total volume, which can then be aggregated into:
+
+* daily volume
+* quarterly volume
+* yearly volume
+
+---
+
+## 3. Step 1 — Querying Kalshi Volume Data in Lychee
+
+- Start by opening the Kalshi historical dataset in Lychee.
+
+![Open Kalshi Historical Dataset](/images/guides/kalshi-volume-chart-guide/1.png)
+
+- Select "Trades" as your Data Source. Here each row of data represents a single trade execution
+
+![Select Trades Dataset](/images/guides/kalshi-volume-chart-guide/2.png)
+
+### What you need to extract:
+
+* created_time: when the trade occurred
+* count: the number of contracts traded
+* ticker: (optional) Market ticker this trade belongs to
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/3.png)
+
+---
+
+## 4. Step 2 — Building a Quarterly Volume Chart
+
+This is the core chart used in the [main Kalshi Volume article](/guides/kalshi-volume).
+
+You are aggregating:
+
+- Total contracts traded (volume)
+- Grouped by quarter
+- Across the full history of Kalshi trades
+
+> sum(count) grouped by quarter = sum(the number of contracts traded over all trades since Kalshi conception) grouped by quarter
+
+---
+
+### Working with aggregations No-Code
+
+- Select a Date/time shape under your created_time field: Lychee provides some very useful aggregation helpers which lets you bucket dates by days, weeks, months, quarters and years. 
+- In this case lets select Quarters
+- Let's also rename out Column "Quarter"
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/4.png)
+
+- Select Summarize and SUM in the "count" column selection: we need to aggregate all the traded contracts within a given time bucket using the SUM function just like we would do in regular SQL, Python or any Data Science tool
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/5.png)
+
+```
+- Lychee tooling already handles the date formatting and chronological adjustment, which normally is a pain to deal with in any other platform.
+```
+
+- Hit Run Request to run your query across all Kalshi Trade history since the beginning of time
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/6.png)
+
+---
+
+Quarterly Volume Chart Output
+
+Now we move onto charting the data we just pulled
+
+- Select Chart in order to move to the charting panel
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/7.png)
+
+- Select Bar chart: we select from line, area, bar, pie, radial, heat maps, live charts, etc. In this case line and bar charts make the most sense. Lets go with Bar charts 
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/8.png)
+
+- Select Date for the x-axis and volume for the y-axis, and your chart will be instantly rendered (this will reflect the name you chose for your columns in the Data Sheets section)
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/9.png)
+
+- Finally design and add descriptive text as you desire
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/10.png)
+
+- Hit Publish to Embed in order to get a sharable and embeddable version of your interactive chart. Or you can download a static png, jpg, etc
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/11.png)
+
+
+<PublicChart username="misterrpink" slug="kalshi-quarterly-volume-chart" />
+
+---
+
+At this point, you’ve already recreated the core Kalshi volume chart using raw trade data.
+
+If you want to explore this dataset yourself:
+
+→ Filter by specific events  
+→ Drill into individual markets  
+→ Export full datasets instantly  
+
+[Start exploring in Lychee](https://lycheedata.com)
+
+---
+
+## 5. Step 3 — Building Daily and Yearly Volume Trends
+
+Once quarterly structure is built, you can zoom in or out:
+
+### Daily Volume
+
+* captures volatility spikes
+* highlights event-driven trading behavior
+
+### Yearly Volume
+
+* smooths short-term noise
+* shows structural adoption curve
+
+
+### Analyzing different timeframes is very simple:
+
+Monthly:
+- Group by month instead of quarter
+- Sum volume in the same way
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/12.png)
+
+- Select "Create another request" if you want to work on the same project. And create a new sheet when prompted
+
+- Select Date/time shape as Bucket by month: 
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/13.png)
+
+- You will now have 2 sheets (Quarterly and Monthly)
+
+![Columns you need to extract](/images/guides/kalshi-volume-chart-guide/14.png)
+
+- Chart using chart functionality
+
+---
+Yearly:
+- Yearly analysis is the same simple approach
+- Group by year (YYYY)
+- Sum volume per year
+
+---
+
+## 6. Step 4 — Cleaning Volume Data for Accurate Charts
+
+Before visualizing, apply filters to remove noise.
+
+This step is optional — but critical if you want cleaner, more reliable volume charts.
+
+Without filtering:
+→ low-quality markets can distort trends
+→ inactive markets add noise
+→ unresolved data can skew totals
+
+### Recommended filters:
+
+* exclude markets with < $100 notional volume
+* exclude voided / delisted markets
+* optionally include only resolved markets
+
+---
+
+## 7. Step 5 — Exporting Volume Data
+
+Once your dataset is structured:
+
+You can export or visualize directly inside Lychee.
+
+### Export options:
+
+* CSV
+* Excel
+* JSON
+* Dashboard view
+
+---
+
+## 8. How These Charts Are Used in Practice
+
+These volume charts are used for:
+
+* research dashboards
+* market structure analysis
+* event impact studies
+* historical trend comparison
+* content and reporting layers
+
+---
+
+## 9. Relationship to the Main Kalshi Volume Article
+
+This guide is the execution layer of:
+
+[Kalshi Volume Explained](/guides/kalshi-volume)
+
+That page explains:
+
+* what volume means
+* why it matters
+* how it behaves
+
+This page shows:
+
+* how to build it
+* how to visualize it
+* how to reproduce it
+
+---
+
+## 10. Next Step
+
+Once you can build Kalshi volume charts, you can extend this workflow into:
+
+* volatility analysis
+* category breakdowns
+* event-driven spikes
+* cross-market comparisons
+
+Each of these will be broken out into dedicated deep-dive guides:
+
+→ Volume by category  
+→ Event-driven spike analysis  
+→ Market-level volume breakdowns  
+
+(coming next in this series)
+
+---
+
+### Explore more:
+
+* [Kalshi Volume Explained](/guides/kalshi-volume)
+* [Kalshi Historical Data Guide](/guides/kalshi-historical-data)
+* [Lychee Homepage](https://lycheedata.com)
+
+---
+
+## Final Note
+
+Kalshi volume is only as useful as your ability to **structure and visualize it properly**.
+
+This is exactly what Lychee is built for:
+
+> turn raw prediction market data into structured, queryable, visual insights — instantly.
+
+You just built a full Kalshi volume chart from raw trade data.
+
+That’s the difference:
+
+→ reading about markets  
+→ vs actually working with them  
+
+Lychee is built to close that gap.
