@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,11 +15,16 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { createEmptyDashboardLayout } from "@/lib/dashboardLayoutDefaults";
+import {
+  persistChartDashboardDraft,
+  mergeCreatedChartDashboardDraft,
+} from "@/lib/persistChartDashboardDraft";
 import { IsolatedChartPreview } from "./IsolatedChartPreview";
 import DotPattern from "@/components/magicui/dot-pattern";
 import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 function rid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -60,6 +65,8 @@ export default function DashboardComposerPage({ user }) {
 
   const [dashboardLoadProgress, setDashboardLoadProgress] = useState(8);
   const [dashboardLoadStage, setDashboardLoadStage] = useState("Loading dashboard");
+  /** Row ids with expanded editor; new rows start collapsed. */
+  const [expandedRowIds, setExpandedRowIds] = useState(() => new Set());
 
   useEffect(() => {
     if (!activeChartDashboardId || !hasDbUser) return;
@@ -88,7 +95,7 @@ export default function DashboardComposerPage({ user }) {
           dashboard_name: d.dashboard_name || "",
           page_heading: d.page_heading || "",
           layout: d.layout && typeof d.layout === "object" ? d.layout : createEmptyDashboardLayout(),
-          theme: d.theme && typeof d.theme === "object" ? d.theme : { background: "dotPattern", background_color: "" },
+          theme: d.theme && typeof d.theme === "object" ? d.theme : { background: "none", background_color: "" },
           data_set_id: d.data_set_id ? String(d.data_set_id) : "",
           public_slug: d.public_slug || "",
           is_public: !!d.is_public,
@@ -212,105 +219,82 @@ export default function DashboardComposerPage({ user }) {
       return;
     }
     const dataSetId = draft?.data_set_id || loadedDataMeta?._id || savedDataSets?.[0]?._id;
-    if (!dataSetId) {
-      toast.error("Load or select a project (dataset) first.");
-      return;
-    }
     setSelectedDashboardCard?.(null);
     setActiveChartDashboardId?.(null);
     setChartDashboardDraft({
       dashboard_name: "",
       page_heading: "",
       layout: createEmptyDashboardLayout(),
-      theme: { background: "dotPattern", background_color: "" },
-      data_set_id: String(dataSetId),
+      theme: { background: "none", background_color: "" },
+      data_set_id: dataSetId ? String(dataSetId) : "",
       public_slug: "",
       is_public: false,
     });
-    toast.success("New dashboard — save when you're ready.");
+    toast.success(
+      dataSetId
+        ? "New dashboard — fill name and page title to auto-save."
+        : "New dashboard — pick an associated project, name, and page title to auto-save.",
+    );
   };
 
-  const handleSaveDraft = async () => {
-    if (!draft || !hasDbUser) {
-      toast.error("Nothing to save");
-      return;
-    }
-    if (!draft.data_set_id) {
-      toast.error("Choose a home project (dataset) first.");
-      return;
-    }
-    try {
-      if (draft._id) {
-        const res = await fetch(`/api/chart-dashboards/${draft._id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            dashboard_name: draft.dashboard_name,
-            page_heading: draft.page_heading,
-            layout: draft.layout,
-            theme: draft.theme,
-            data_set_id: draft.data_set_id,
-          }),
-        });
-        const j = await res.json();
-        if (!j?.success) {
-          toast.error(j?.message || "Save failed");
-          return;
+  const autoSaveTimerRef = useRef(null);
+  const autoSaveBusyRef = useRef(false);
+  const lastAutoToastAtRef = useRef(0);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  useEffect(() => {
+    if (!draft || !hasDbUser || !user?.userId) return;
+    const name = String(draft.dashboard_name || "").trim();
+    const title = String(draft.page_heading || "").trim();
+    const pid = draft.data_set_id ? String(draft.data_set_id).trim() : "";
+    if (!name || !title || !pid) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (autoSaveBusyRef.current) return;
+      autoSaveBusyRef.current = true;
+      try {
+        const current = draftRef.current;
+        if (!current) return;
+        const result = await persistChartDashboardDraft({ draft: current, userId: user.userId });
+        if (!result.ok) return;
+        if (result.created) {
+          setChartDashboardDraft((prev) => mergeCreatedChartDashboardDraft(prev, result.created));
+          setActiveChartDashboardId?.(String(result.created._id));
         }
         setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
-        toast.success("Dashboard saved");
-        return;
+        const now = Date.now();
+        if (now - lastAutoToastAtRef.current > 3500) {
+          toast.success("Dashboard auto-saved");
+          lastAutoToastAtRef.current = now;
+        }
+      } finally {
+        autoSaveBusyRef.current = false;
       }
+    }, 1400);
 
-      const res = await fetch("/api/chart-dashboards", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: user.userId,
-          data_set_id: draft.data_set_id,
-          dashboard_name: draft.dashboard_name || "Untitled dashboard",
-          page_heading: draft.page_heading || "",
-          layout: draft.layout && typeof draft.layout === "object" ? draft.layout : createEmptyDashboardLayout(),
-          theme:
-            draft.theme && typeof draft.theme === "object"
-              ? draft.theme
-              : { background: "dotPattern", background_color: "" },
-        }),
-      });
-      const j = await res.json();
-      if (!j?.success || !j?.data?._id) {
-        toast.error(j?.message || "Save failed");
-        return;
-      }
-      const d = j.data;
-      setChartDashboardDraft((prev) => ({
-        ...(prev || {}),
-        _id: String(d._id),
-        dashboard_name: d.dashboard_name ?? prev?.dashboard_name,
-        page_heading: d.page_heading ?? prev?.page_heading ?? "",
-        layout: d.layout && typeof d.layout === "object" ? d.layout : prev?.layout,
-        theme: d.theme && typeof d.theme === "object" ? d.theme : prev?.theme,
-        data_set_id: d.data_set_id ? String(d.data_set_id) : prev?.data_set_id,
-        public_slug: d.public_slug || "",
-        is_public: !!d.is_public,
-      }));
-      setActiveChartDashboardId?.(String(d._id));
-      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
-      toast.success("Dashboard saved");
-    } catch {
-      toast.error("Save failed");
-    }
-  };
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [
+    draft?.dashboard_name,
+    draft?.page_heading,
+    draft?.data_set_id,
+    draft?.layout,
+    draft?.theme,
+    draft?._id,
+    hasDbUser,
+    user?.userId,
+    setChartDashboardDraft,
+    setActiveChartDashboardId,
+    setRefetchChartDashboardsTick,
+  ]);
 
   const chartOptions = useMemo(() => {
     const list = Array.isArray(savedCharts) ? savedCharts : [];
     return list.map((c) => ({ id: String(c._id), name: c.chart_name || "Chart" }));
   }, [savedCharts]);
-
-  const dataSetOptions = useMemo(() => {
-    const list = Array.isArray(savedDataSets) ? savedDataSets : [];
-    return list.map((d) => ({ id: String(d._id), name: d.data_set_name || "Dataset" }));
-  }, [savedDataSets]);
 
   const savedDashboardOptions = useMemo(() => {
     const list = Array.isArray(savedChartDashboards) ? savedChartDashboards : [];
@@ -325,8 +309,12 @@ export default function DashboardComposerPage({ user }) {
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-6">
           <p className="text-center text-sm font-medium text-muted-foreground">{dashboardLoadStage}</p>
-          <div className="w-full max-w-sm space-y-1">
-            <Progress value={dashboardLoadProgress} className="h-2 w-full" />
+          <div className="w-full max-w-md space-y-1.5">
+            <Progress
+              value={dashboardLoadProgress}
+              className="h-2.5 w-full"
+              indicatorClassName="bg-primary"
+            />
             <p className="text-center text-xs text-muted-foreground">
               {Math.max(1, Math.min(100, dashboardLoadProgress))}%
             </p>
@@ -390,87 +378,6 @@ export default function DashboardComposerPage({ user }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-6 py-6">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="grid min-w-[240px] flex-1 gap-1.5">
-          <Label htmlFor="dash-h1" className="text-xs">
-            Page title (H1)
-          </Label>
-          <Input
-            id="dash-h1"
-            className="h-9"
-            value={draft.page_heading || ""}
-            onChange={(e) => setDraft((d) => ({ ...d, page_heading: e.target.value }))}
-            placeholder="Dashboard headline"
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label className="text-xs">Home project</Label>
-          <Select
-            value={draft.data_set_id ? String(draft.data_set_id) : ""}
-            onValueChange={(v) => setDraft((d) => ({ ...d, data_set_id: v }))}
-          >
-            <SelectTrigger className="h-9 w-[220px]">
-              <SelectValue placeholder="Dataset" />
-            </SelectTrigger>
-            <SelectContent>
-              {dataSetOptions.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button type="button" size="sm" variant="secondary" onClick={handleSaveDraft}>
-          Save
-        </Button>
-      </div>
-
-      <div className="grid gap-2 md:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label className="text-xs">Background style</Label>
-          <Select
-            value={draft.theme?.background || "dotPattern"}
-            onValueChange={(v) =>
-              setDraft((d) => ({ ...d, theme: { ...(d.theme || {}), background: v } }))
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dotPattern">Dot pattern</SelectItem>
-              <SelectItem value="none">None</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label className="text-xs">Background color (optional)</Label>
-          <Input
-            className="h-9"
-            value={draft.theme?.background_color || ""}
-            placeholder="#f8fafc or empty"
-            onChange={(e) =>
-              setDraft((d) => ({
-                ...d,
-                theme: { ...(d.theme || {}), background_color: e.target.value },
-              }))
-            }
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={addCardsRow}>
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Chart row
-        </Button>
-        <Button type="button" size="sm" variant="outline" onClick={addTextRow}>
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Text row
-        </Button>
-      </div>
-
       <div
         className="relative rounded-lg border p-6 shadow-sm"
         style={{ backgroundColor: bg || undefined }}
@@ -481,237 +388,322 @@ export default function DashboardComposerPage({ user }) {
           />
         ) : null}
         <div className="relative z-[1] mx-auto max-w-6xl space-y-6">
-          {draft.page_heading ? (
-            <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-              {draft.page_heading}
-            </h1>
-          ) : null}
+          <input
+            type="text"
+            aria-label="Page title"
+            autoComplete="off"
+            spellCheck={false}
+            value={draft.page_heading ?? ""}
+            placeholder="Your Title"
+            onChange={(e) =>
+              setDraft((d) => ({
+                ...d,
+                page_heading: e.target.value,
+              }))
+            }
+            className={cn(
+              "w-full min-w-0 cursor-text border-0 bg-transparent p-0 shadow-none outline-none",
+              "text-2xl font-bold tracking-tight text-foreground md:text-3xl",
+              "placeholder:text-muted-foreground/80",
+              "focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+            )}
+          />
 
-          {rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Add rows to build your dashboard.</p>
-          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={addCardsRow}>
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Add Chart
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={addTextRow}>
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Add Text
+            </Button>
+          </div>
 
-          {rows.map((row) => (
-            <div key={row.id} className="rounded-lg border border-border/80 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium uppercase text-muted-foreground">
-                  {row.type === "cards" ? "Chart row" : "Text row"}
-                </span>
-                <div className="ml-auto flex gap-1">
-                  <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={() => moveRow(row.id, -1)}>
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={() => moveRow(row.id, 1)}>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => removeRow(row.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {row.type === "text" && (
-                <Textarea
-                  value={row.body || ""}
-                  onChange={(e) =>
-                    updateRow(row.id, (r) => ({ ...r, body: e.target.value }))
-                  }
-                  placeholder="Descriptive text for this row…"
-                  className="min-h-[100px]"
-                />
-              )}
-
-              {row.type === "cards" && (
-                <>
-                  <div className="mb-3">
-                    <Button type="button" size="sm" variant="secondary" onClick={() => addColumn(row.id)}>
-                      <Plus className="mr-1 h-3.5 w-3.5" />
-                      Add column
-                    </Button>
-                  </div>
-                  <div
-                    className="grid gap-4"
-                    style={{
-                      gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
-                    }}
-                  >
-                    {(row.columns || []).map((col) => {
-                      const selected =
-                        selectedDashboardCard?.rowId === row.id &&
-                        selectedDashboardCard?.colId === col.id;
-                      return (
-                        <div
-                          key={col.id}
-                          role="button"
-                          tabIndex={0}
-                          style={{
-                            gridColumn: `span ${Math.min(12, Math.max(1, col.colSpan ?? 12))}`,
-                            gridRow: `span ${Math.max(1, col.rowSpan ?? 1)}`,
-                          }}
-                          onClick={() => setSelectedDashboardCard?.({ rowId: row.id, colId: col.id })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ")
-                              setSelectedDashboardCard?.({ rowId: row.id, colId: col.id });
-                          }}
+          {rows.map((row) => {
+            const rowExpanded = expandedRowIds.has(row.id);
+            const collapsedSummary =
+              row.type === "cards"
+                ? `${(row.columns || []).length} column${(row.columns || []).length !== 1 ? "s" : ""}`
+                : row.body?.trim()
+                  ? `${row.body.trim().slice(0, 100)}${row.body.trim().length > 100 ? "…" : ""}`
+                  : "Empty text row";
+            return (
+              <Collapsible
+                key={row.id}
+                open={rowExpanded}
+                onOpenChange={(open) => {
+                  setExpandedRowIds((prev) => {
+                    const next = new Set(prev);
+                    if (open) next.add(row.id);
+                    else next.delete(row.id);
+                    return next;
+                  });
+                }}
+              >
+                <div className="rounded-lg border border-border/80 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-expanded={rowExpanded}
+                        aria-label={rowExpanded ? "Collapse row" : "Expand row"}
+                      >
+                        <ChevronDown
                           className={cn(
-                            "flex min-w-0 flex-col gap-2 rounded-md border p-3 transition-colors",
-                            selected ? "border-primary ring-1 ring-primary/30" : "border-border/60 bg-card/50",
+                            "h-4 w-4 transition-transform duration-200",
+                            rowExpanded ? "rotate-0" : "-rotate-90",
                           )}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-medium text-muted-foreground">Card</span>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeColumn(row.id, col.id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="grid gap-1">
-                              <Label className="text-[10px]">Grid span (12 cols)</Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={12}
-                                className="h-8 text-xs"
-                                value={col.colSpan ?? 12}
-                                onChange={(e) =>
-                                  updateColumn(row.id, col.id, (c) => ({
-                                    ...c,
-                                    colSpan: Math.min(12, Math.max(1, Number(e.target.value) || 1)),
-                                  }))
-                                }
-                              />
-                            </div>
-                            <div className="grid gap-1">
-                              <Label className="text-[10px]">Row span</Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={4}
-                                className="h-8 text-xs"
-                                value={col.rowSpan ?? 1}
-                                onChange={(e) =>
-                                  updateColumn(row.id, col.id, (c) => ({
-                                    ...c,
-                                    rowSpan: Math.min(4, Math.max(1, Number(e.target.value) || 1)),
-                                  }))
-                                }
-                              />
-                            </div>
-                          </div>
-                          <div className="grid gap-1">
-                            <Label className="text-[10px]">Chart</Label>
-                            <Select
-                              value={col.chart_id ? String(col.chart_id) : "__none__"}
-                              onValueChange={(v) =>
-                                updateColumn(row.id, col.id, (c) => ({
-                                  ...c,
-                                  chart_id: v === "__none__" ? null : v,
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Pick chart" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__">None</SelectItem>
-                                {chartOptions.map((c) => (
-                                  <SelectItem key={c.id} value={c.id}>
-                                    {c.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Input
-                            className="h-8 text-sm font-semibold"
-                            placeholder="H2 heading"
-                            value={col.h2 || ""}
-                            onChange={(e) =>
-                              updateColumn(row.id, col.id, (c) => ({ ...c, h2: e.target.value }))
-                            }
-                          />
-                          <Input
-                            className="h-8 text-xs"
-                            placeholder="Caption"
-                            value={col.caption || ""}
-                            onChange={(e) =>
-                              updateColumn(row.id, col.id, (c) => ({ ...c, caption: e.target.value }))
-                            }
-                          />
-                          <Input
-                            className="h-8 text-[11px] text-muted-foreground"
-                            placeholder="Microtext"
-                            value={col.microtext || ""}
-                            onChange={(e) =>
-                              updateColumn(row.id, col.id, (c) => ({ ...c, microtext: e.target.value }))
-                            }
-                          />
-                          <div className="grid gap-1">
-                            <Label className="text-[10px]">Link</Label>
-                            <Select
-                              value={col.link?.mode || "none"}
-                              onValueChange={(v) =>
-                                updateColumn(row.id, col.id, (c) => ({
-                                  ...c,
-                                  link: { mode: v, url: c.link?.url || "" },
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">None</SelectItem>
-                                <SelectItem value="chart_public">Published chart page</SelectItem>
-                                <SelectItem value="custom">Custom URL</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            {col.link?.mode === "custom" && (
-                              <Input
-                                className="h-8 text-xs"
-                                placeholder="https://…"
-                                value={col.link?.url || ""}
-                                onChange={(e) =>
-                                  updateColumn(row.id, col.id, (c) => ({
-                                    ...c,
-                                    link: { ...c.link, url: e.target.value },
-                                  }))
-                                }
-                              />
-                            )}
-                          </div>
-                          {col.h2 ? (
-                            <h2 className="pt-1 text-base font-semibold leading-tight">{col.h2}</h2>
-                          ) : null}
-                          <div
-                            className="min-h-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <IsolatedChartPreview chartId={col.chart_id} />
-                          </div>
-                          {col.caption ? (
-                            <p className="text-xs text-muted-foreground">{col.caption}</p>
-                          ) : null}
-                          {col.microtext ? (
-                            <p className="text-[10px] text-muted-foreground">{col.microtext}</p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                        />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <span className="text-xs font-medium uppercase text-muted-foreground">
+                      {row.type === "cards" ? "Chart row" : "Text row"}
+                    </span>
+                    <div className="ml-auto flex gap-1">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => moveRow(row.id, -1)}
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => moveRow(row.id, 1)}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => removeRow(row.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </>
-              )}
-            </div>
-          ))}
+
+                  {!rowExpanded ? (
+                    <p className="text-xs text-muted-foreground">{collapsedSummary}</p>
+                  ) : null}
+
+                  <CollapsibleContent>
+                    {row.type === "text" && (
+                      <Textarea
+                        value={row.body || ""}
+                        onChange={(e) =>
+                          updateRow(row.id, (r) => ({ ...r, body: e.target.value }))
+                        }
+                        placeholder="Descriptive text for this row…"
+                        className="min-h-[100px]"
+                      />
+                    )}
+
+                    {row.type === "cards" && (
+                      <>
+                        <div className="mb-3">
+                          <Button type="button" size="sm" variant="secondary" onClick={() => addColumn(row.id)}>
+                            <Plus className="mr-1 h-3.5 w-3.5" />
+                            Add column
+                          </Button>
+                        </div>
+                        <div
+                          className="grid gap-4"
+                          style={{
+                            gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
+                          }}
+                        >
+                          {(row.columns || []).map((col) => {
+                            const selected =
+                              selectedDashboardCard?.rowId === row.id &&
+                              selectedDashboardCard?.colId === col.id;
+                            return (
+                              <div
+                                key={col.id}
+                                role="button"
+                                tabIndex={0}
+                                style={{
+                                  gridColumn: `span ${Math.min(12, Math.max(1, col.colSpan ?? 12))}`,
+                                  gridRow: `span ${Math.max(1, col.rowSpan ?? 1)}`,
+                                }}
+                                onClick={() => setSelectedDashboardCard?.({ rowId: row.id, colId: col.id })}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ")
+                                    setSelectedDashboardCard?.({ rowId: row.id, colId: col.id });
+                                }}
+                                className={cn(
+                                  "flex min-w-0 flex-col gap-2 rounded-md border p-3 transition-colors",
+                                  selected ? "border-primary ring-1 ring-primary/30" : "border-border/60 bg-card/50",
+                                )}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-medium text-muted-foreground">Card</span>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeColumn(row.id, col.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid gap-1">
+                                    <Label className="text-[10px]">Grid span (12 cols)</Label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      max={12}
+                                      className="h-8 text-xs"
+                                      value={col.colSpan ?? 12}
+                                      onChange={(e) =>
+                                        updateColumn(row.id, col.id, (c) => ({
+                                          ...c,
+                                          colSpan: Math.min(12, Math.max(1, Number(e.target.value) || 1)),
+                                        }))
+                                      }
+                                    />
+                                  </div>
+                                  <div className="grid gap-1">
+                                    <Label className="text-[10px]">Row span</Label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      max={4}
+                                      className="h-8 text-xs"
+                                      value={col.rowSpan ?? 1}
+                                      onChange={(e) =>
+                                        updateColumn(row.id, col.id, (c) => ({
+                                          ...c,
+                                          rowSpan: Math.min(4, Math.max(1, Number(e.target.value) || 1)),
+                                        }))
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                                <div className="grid gap-1">
+                                  <Label className="text-[10px]">Chart</Label>
+                                  <Select
+                                    value={col.chart_id ? String(col.chart_id) : "__none__"}
+                                    onValueChange={(v) =>
+                                      updateColumn(row.id, col.id, (c) => ({
+                                        ...c,
+                                        chart_id: v === "__none__" ? null : v,
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue placeholder="Pick chart" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">None</SelectItem>
+                                      {chartOptions.map((c) => (
+                                        <SelectItem key={c.id} value={c.id}>
+                                          {c.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Input
+                                  className="h-8 text-sm font-semibold"
+                                  placeholder="H2 heading"
+                                  value={col.h2 || ""}
+                                  onChange={(e) =>
+                                    updateColumn(row.id, col.id, (c) => ({ ...c, h2: e.target.value }))
+                                  }
+                                />
+                                <Input
+                                  className="h-8 text-xs"
+                                  placeholder="Caption"
+                                  value={col.caption || ""}
+                                  onChange={(e) =>
+                                    updateColumn(row.id, col.id, (c) => ({ ...c, caption: e.target.value }))
+                                  }
+                                />
+                                <Input
+                                  className="h-8 text-[11px] text-muted-foreground"
+                                  placeholder="Microtext"
+                                  value={col.microtext || ""}
+                                  onChange={(e) =>
+                                    updateColumn(row.id, col.id, (c) => ({ ...c, microtext: e.target.value }))
+                                  }
+                                />
+                                <div className="grid gap-1">
+                                  <Label className="text-[10px]">Link</Label>
+                                  <Select
+                                    value={col.link?.mode || "none"}
+                                    onValueChange={(v) =>
+                                      updateColumn(row.id, col.id, (c) => ({
+                                        ...c,
+                                        link: { mode: v, url: c.link?.url || "" },
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">None</SelectItem>
+                                      <SelectItem value="chart_public">Published chart page</SelectItem>
+                                      <SelectItem value="custom">Custom URL</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {col.link?.mode === "custom" && (
+                                    <Input
+                                      className="h-8 text-xs"
+                                      placeholder="https://…"
+                                      value={col.link?.url || ""}
+                                      onChange={(e) =>
+                                        updateColumn(row.id, col.id, (c) => ({
+                                          ...c,
+                                          link: { ...c.link, url: e.target.value },
+                                        }))
+                                      }
+                                    />
+                                  )}
+                                </div>
+                                {col.h2 ? (
+                                  <h2 className="pt-1 text-base font-semibold leading-tight">{col.h2}</h2>
+                                ) : null}
+                                <div
+                                  className="min-h-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <IsolatedChartPreview chartId={col.chart_id} />
+                                </div>
+                                {col.caption ? (
+                                  <p className="text-xs text-muted-foreground">{col.caption}</p>
+                                ) : null}
+                                {col.microtext ? (
+                                  <p className="text-[10px] text-muted-foreground">{col.microtext}</p>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            );
+          })}
         </div>
       </div>
     </div>

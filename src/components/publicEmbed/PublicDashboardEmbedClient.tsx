@@ -5,6 +5,7 @@ import Link from "next/link";
 import DotPattern from "@/components/magicui/dot-pattern";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
+import { Progress } from "@/components/ui/progress";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -101,8 +102,9 @@ export default function PublicDashboardEmbedClient({
 
   if (!payload?.success || !payload.data) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center p-6 text-sm text-muted-foreground">
-        Loading dashboard…
+      <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+        <p>Loading dashboard…</p>
+        <Progress indeterminate className="h-2.5 w-full max-w-xs" indicatorClassName="bg-primary" />
       </div>
     );
   }

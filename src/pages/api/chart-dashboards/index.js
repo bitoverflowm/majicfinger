@@ -82,7 +82,7 @@ export default async function handler(req, res) {
           theme:
             theme && typeof theme === "object"
               ? theme
-              : { background: "dotPattern", background_color: "" },
+              : { background: "none", background_color: "" },
           user_id: new mongoose.Types.ObjectId(user_id),
           data_set_id: new mongoose.Types.ObjectId(data_set_id),
           last_edited_date: new Date(),

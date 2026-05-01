@@ -19,7 +19,7 @@ const ChartDashboardSchema = new mongoose.Schema({
   },
   theme: {
     type: Schema.Types.Mixed,
-    default: () => ({ background: "dotPattern", background_color: "" }),
+    default: () => ({ background: "none", background_color: "" }),
   },
   created_date: {
     type: Date,

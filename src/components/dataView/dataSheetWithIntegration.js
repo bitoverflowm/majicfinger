@@ -16,6 +16,7 @@ import Binance from "@/components/integrationsView/integrationPlayground/integra
 import Chainlink from "@/components/integrationsView/integrationPlayground/integrations/chainlink";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -29,10 +30,12 @@ import {
   Cable,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   LayoutDashboard,
   Share2,
   X,
   Plus,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -46,10 +49,15 @@ import ExportPanel from "@/components/dataView/ExportPanel";
 import DashboardComposerPage from "@/components/dashboardComposer/DashboardComposerPage";
 import { DashboardExportPanel } from "@/components/dashboardComposer/DashboardExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
-import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
+import {
+  DestructiveIconButton,
+  YellowIconButton,
+} from "@/components/primitives/destructive-icon-button";
 import { toast } from "sonner";
 /** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
 const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
@@ -114,6 +122,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const setActiveChartDashboardId = contextStateV2?.setActiveChartDashboardId;
   const setRefetchChartDashboardsTick = contextStateV2?.setRefetchChartDashboardsTick;
   const setSelectedDashboardCard = contextStateV2?.setSelectedDashboardCard;
+  const savedDataSets = contextStateV2?.savedDataSets ?? [];
+  const loadedDataMeta = contextStateV2?.loadedDataMeta;
 
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
@@ -124,6 +134,39 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const snapshotGetterRef = useRef(null);
   const wasOpenRef = useRef(!!rightPanelOpen);
   const autoExpandedEmptySheetRef = useRef(false);
+  const prevDashboardModeRef = useRef(false);
+
+  useEffect(() => {
+    if (dashboardMode && !prevDashboardModeRef.current) {
+      setRightPanelOpen?.(true);
+      // Narrow (~300px) panel, not half-viewport expanded.
+      setDrawerExpanded(false);
+      setRightPanelTab?.("dashboard");
+    }
+    prevDashboardModeRef.current = dashboardMode;
+  }, [dashboardMode, setRightPanelOpen, setRightPanelTab]);
+
+  const dashboardDataSetOptions = useMemo(() => {
+    const list = Array.isArray(savedDataSets) ? savedDataSets : [];
+    return list.map((d) => ({ id: String(d._id), name: d.data_set_name || "Project" }));
+  }, [savedDataSets]);
+
+  useEffect(() => {
+    if (!dashboardMode || !chartDashboardDraft) return;
+    if (chartDashboardDraft.data_set_id) return;
+    const oid = loadedDataMeta?._id;
+    if (!oid) return;
+    setChartDashboardDraft?.((prev) => {
+      if (!prev || prev.data_set_id) return prev;
+      return { ...prev, data_set_id: String(oid) };
+    });
+  }, [
+    dashboardMode,
+    chartDashboardDraft?._id,
+    chartDashboardDraft?.data_set_id,
+    loadedDataMeta?._id,
+    setChartDashboardDraft,
+  ]);
 
   const anySheetHasData = Object.values(dataSheets).some(
     (sheet) => Array.isArray(sheet?.data) && sheet.data.length > 0,
@@ -226,6 +269,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   useEffect(() => {
     // Demo should start semi-collapsed, never auto-expand.
     if (isDemo) return;
+    if (dashboardMode) return;
     if (!rightPanelOpen) return;
     if (rightPanelTab !== "integrations") return;
     if (drawerExpanded) return;
@@ -234,7 +278,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     if (autoExpandedEmptySheetRef.current) return;
     autoExpandedEmptySheetRef.current = true;
     setDrawerExpanded(true);
-  }, [isDemo, rightPanelOpen, rightPanelTab, drawerExpanded, connectedData]);
+  }, [isDemo, dashboardMode, rightPanelOpen, rightPanelTab, drawerExpanded, connectedData]);
 
   useEffect(() => {
     const isEmpty = !Array.isArray(connectedData) || connectedData.length === 0;
@@ -249,6 +293,13 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       wasOpenRef.current = false;
     });
   }, [isPanelClosing, beginPanelClose, setRightPanelOpen]);
+
+  const backToDashboardLoadScreen = useCallback(() => {
+    if (!dashboardMode) return;
+    setSelectedDashboardCard?.(null);
+    setActiveChartDashboardId?.(null);
+    setChartDashboardDraft?.(null);
+  }, [dashboardMode, setSelectedDashboardCard, setActiveChartDashboardId, setChartDashboardDraft]);
 
   const deleteDashboardFromComposer = useCallback(async () => {
     if (!chartDashboardDraft || !dashboardMode) return;
@@ -841,12 +892,110 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                               switching workspace.
                             </p>
                           ) : chartDashboardDraft ? (
-                            <div className="grid gap-1.5">
-                              <div className="flex items-center gap-2">
+                            <div className="grid gap-3">
+                              <div className="grid gap-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex min-w-0 items-center gap-1.5">
+                                    <Label
+                                      htmlFor="dash-associated-project"
+                                      className="text-xs font-medium text-foreground"
+                                    >
+                                      Associated Project
+                                    </Label>
+                                    <TooltipProvider delayDuration={200}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            type="button"
+                                            className="-m-0.5 inline-flex rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                                            aria-label="About associated project"
+                                          >
+                                            <Info className="h-3.5 w-3.5 shrink-0" />
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                          side="bottom"
+                                          sideOffset={6}
+                                          className="z-[100] max-w-[260px] text-xs leading-snug"
+                                        >
+                                          All dashboards need to be associated with a parent project. Click the
+                                          dropdown to select a parent project.
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                  <div className="inline-flex shrink-0 items-center gap-1">
+                                    <TooltipProvider delayDuration={200}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex shrink-0">
+                                            <YellowIconButton
+                                              className="h-2.5 w-2.5 min-h-0 min-w-0 shrink-0"
+                                              ariaLabel="back to load screen"
+                                              title="back to load screen"
+                                              onClick={backToDashboardLoadScreen}
+                                            />
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" sideOffset={6} className="z-[100] text-xs">
+                                          back to load screen
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    <TooltipProvider delayDuration={200}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex shrink-0">
+                                            <DestructiveIconButton
+                                              className="h-2.5 w-2.5 shrink-0"
+                                              ariaLabel="delete dashboard"
+                                              title="delete dashboard"
+                                              onClick={deleteDashboardFromComposer}
+                                            />
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" sideOffset={6} className="z-[100] text-xs">
+                                          delete dashboard
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                </div>
+                                <Select
+                                  value={
+                                    chartDashboardDraft.data_set_id
+                                      ? String(chartDashboardDraft.data_set_id)
+                                      : ""
+                                  }
+                                  onValueChange={(v) =>
+                                    setChartDashboardDraft?.((prev) => ({
+                                      ...(prev || {}),
+                                      data_set_id: v,
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger
+                                    id="dash-associated-project"
+                                    className="h-9 w-full min-w-0 text-sm text-foreground"
+                                  >
+                                    <SelectValue placeholder="Select project" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {dashboardDataSetOptions.map((d) => (
+                                      <SelectItem key={d.id} value={d.id}>
+                                        {d.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="grid gap-1.5">
+                                <Label htmlFor="dash-name-panel" className="text-xs text-foreground">
+                                  Internal name
+                                </Label>
                                 <Input
                                   id="dash-name-panel"
-                                  className="h-9 min-w-0 flex-1 text-sm text-foreground"
-                                  aria-label="Name your dashboard"
+                                  className="h-9 w-full min-w-0 text-sm text-foreground"
                                   placeholder="name your dashboard"
                                   value={chartDashboardDraft.dashboard_name || ""}
                                   onChange={(e) =>
@@ -856,27 +1005,89 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                     }))
                                   }
                                 />
-                                <TooltipProvider delayDuration={200}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="inline-flex shrink-0">
-                                        <DestructiveIconButton
-                                          className="h-2.5 w-2.5 shrink-0"
-                                          ariaLabel="delete dashboard"
-                                          title="delete dashboard"
-                                          onClick={deleteDashboardFromComposer}
-                                        />
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom" sideOffset={6} className="z-[100] text-xs">
-                                      delete dashboard
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
                               </div>
+                              <div className="grid gap-1.5">
+                                <Label htmlFor="dash-page-title-panel" className="text-xs text-foreground">
+                                  Page title
+                                </Label>
+                                <Input
+                                  id="dash-page-title-panel"
+                                  className="h-9 w-full min-w-0 text-sm text-foreground"
+                                  value={chartDashboardDraft.page_heading || ""}
+                                  onChange={(e) =>
+                                    setChartDashboardDraft?.((prev) => ({
+                                      ...(prev || {}),
+                                      page_heading: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Your Title"
+                                />
+                              </div>
+
+                              <Collapsible
+                                defaultOpen={false}
+                                className="rounded-md border border-border/70 bg-muted/15"
+                              >
+                                <CollapsibleTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left text-xs font-medium text-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180"
+                                  >
+                                    <span>Design</span>
+                                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+                                  </button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="space-y-3 border-t border-border/60 px-2 pb-3 pt-2">
+                                  <div className="grid gap-1.5">
+                                    <Label htmlFor="dash-bg-style" className="text-xs text-foreground">
+                                      Background style
+                                    </Label>
+                                    <Select
+                                      value={chartDashboardDraft.theme?.background || "none"}
+                                      onValueChange={(v) =>
+                                        setChartDashboardDraft?.((prev) => ({
+                                          ...(prev || {}),
+                                          theme: { ...(prev?.theme || {}), background: v },
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger
+                                        id="dash-bg-style"
+                                        className="h-9 w-full min-w-0 text-sm text-foreground"
+                                      >
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="dotPattern">Dot pattern</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Label className="text-xs text-foreground">Background color</Label>
+                                    <ChartColorPalettePopover
+                                      value={chartDashboardDraft.theme?.background_color || null}
+                                      onChange={(color) =>
+                                        setChartDashboardDraft?.((prev) => ({
+                                          ...(prev || {}),
+                                          theme: { ...(prev?.theme || {}), background_color: color },
+                                        }))
+                                      }
+                                      ariaLabel="Dashboard background color"
+                                      triggerClassName="h-7 w-7"
+                                      onClear={() =>
+                                        setChartDashboardDraft?.((prev) => ({
+                                          ...(prev || {}),
+                                          theme: { ...(prev?.theme || {}), background_color: "" },
+                                        }))
+                                      }
+                                    />
+                                  </div>
+                                </CollapsibleContent>
+                              </Collapsible>
                             </div>
                           ) : (
-                            <p>Load or create a dashboard to edit its internal name.</p>
+                            <p>Load or create a dashboard to edit settings in this tab.</p>
                           )}
                         </div>
                       </TabsContent>

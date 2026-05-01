@@ -29,6 +29,33 @@ export function DestructiveIconButton({
   );
 }
 
+/** Compact yellow circle control (same shape as DestructiveIconButton) for secondary navigation. */
+export function YellowIconButton({
+  className,
+  icon: Icon,
+  ariaLabel = "Back",
+  size = "compact",
+  ...props
+}) {
+  const sizing = size === "compact" ? "h-6 w-6" : "h-7 w-7";
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="secondary"
+      className={cn(
+        "rounded-full border-0 bg-yellow-400 p-0 text-slate-900 shadow-none hover:bg-yellow-500/90 focus-visible:ring-yellow-600 dark:bg-yellow-400 dark:text-slate-950 dark:hover:bg-yellow-500/90 dark:focus-visible:ring-yellow-500 [&_svg]:size-3.5",
+        sizing,
+        className,
+      )}
+      aria-label={ariaLabel}
+      {...props}
+    >
+      {Icon ? <Icon /> : null}
+    </Button>
+  );
+}
+
 export function DestructiveActionButton({
   className,
   children,

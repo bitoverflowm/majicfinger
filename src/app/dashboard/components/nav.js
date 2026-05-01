@@ -20,8 +20,12 @@ import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
-import { Pause, Play, RotateCw, Square, ArrowLeft, Trash2, ExternalLink } from "lucide-react"
+import { Pause, Play, RotateCw, Square, ArrowLeft, Trash2, ExternalLink, Loader2 } from "lucide-react"
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
+import {
+  persistChartDashboardDraft,
+  mergeCreatedChartDashboardDraft,
+} from "@/lib/persistChartDashboardDraft"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button"
 import {
@@ -40,6 +44,11 @@ const Nav = () => {
   const user = useUser()
   const router = useRouter();
   const contextStateV2 = useMyStateV2()
+
+  const hasDbBackedUserId =
+    typeof user?.userId === "string" &&
+    user.userId !== "dev-bypass-no-db" &&
+    /^[a-f0-9]{24}$/i.test(user.userId)
 
   //what component are we viewing
   const viewing = contextStateV2?.viewing
@@ -77,7 +86,16 @@ const Nav = () => {
   const savedChartDashboards = contextStateV2?.savedChartDashboards
   const setActiveChartDashboardId = contextStateV2?.setActiveChartDashboardId
   const setChartDashboardDraft = contextStateV2?.setChartDashboardDraft
+  const chartDashboardDraft = contextStateV2?.chartDashboardDraft
   const activeChartDashboardId = contextStateV2?.activeChartDashboardId
+  const setRefetchChartDashboardsTick = contextStateV2?.setRefetchChartDashboardsTick
+
+  const savedWorkCountLoading =
+    hasDbBackedUserId &&
+    (savedDataSets === undefined ||
+      savedCharts === undefined ||
+      savedPresentations === undefined ||
+      savedChartDashboards === undefined)
 
   // chart properties used by legacy save flow
   const chartOptions = contextStateV2?.chartOptions
@@ -358,6 +376,23 @@ const Nav = () => {
       setSaveIsOpen(false);
       setProjectNameInput("");
       toast.success(shouldOverwrite ? "Project overwritten." : "New project saved.");
+
+      if (viewing === "dashboardComposer" && chartDashboardDraft) {
+        const dashResult = await persistChartDashboardDraft({
+          draft: chartDashboardDraft,
+          userId: user.userId,
+        });
+        if (!dashResult.ok) {
+          toast.warning(dashResult.message);
+        } else {
+          if (dashResult.created) {
+            setChartDashboardDraft?.((prev) => mergeCreatedChartDashboardDraft(prev, dashResult.created));
+            setActiveChartDashboardId?.(String(dashResult.created._id));
+          }
+          setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+          toast.success("Dashboard saved.");
+        }
+      }
     } catch (error) {
       console.error('Error saving project:', error);
       toast.error("Failed to save project.");
@@ -782,12 +817,21 @@ const Nav = () => {
                     <SheetTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-1.5">
                         Your Work
-                        <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-[10px]">
-                          {(savedDataSets?.length ?? 0) +
-                            (savedCharts?.length ?? 0) +
-                            (savedPresentations?.length ?? 0) +
-                            (savedChartDashboards?.length ?? 0)}
-                        </Badge>
+                        {savedWorkCountLoading ? (
+                          <span
+                            className="ml-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center"
+                            aria-label="Loading saved work"
+                          >
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                          </span>
+                        ) : (
+                          <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-[10px]">
+                            {(savedDataSets?.length ?? 0) +
+                              (savedCharts?.length ?? 0) +
+                              (savedPresentations?.length ?? 0) +
+                              (savedChartDashboards?.length ?? 0)}
+                          </Badge>
+                        )}
                       </Button>
                     </SheetTrigger>
                         <SheetContent side={'left'} className="w-[1000px]! sm:max-w-4xl flex flex-col">

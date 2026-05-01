@@ -343,3 +343,13 @@ body {
     opacity: 0;
   }
 }
+
+/* Sliding segment for Progress indeterminate (width ~35% of track) */
+@keyframes mf-progress-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
