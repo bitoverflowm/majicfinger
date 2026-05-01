@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import DataView from "@/components/dataView";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
@@ -47,6 +47,8 @@ import {
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import DashboardComposerPage from "@/components/dashboardComposer/DashboardComposerPage";
+import { PageTitleFormatDock } from "@/components/dashboardComposer/PageTitleFormatDock";
+import { getPageTitleSidebarClasses, getPageTitleSidebarStyle } from "@/lib/pageTitleTheme";
 import { DashboardExportPanel } from "@/components/dashboardComposer/DashboardExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -122,6 +124,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const setActiveChartDashboardId = contextStateV2?.setActiveChartDashboardId;
   const setRefetchChartDashboardsTick = contextStateV2?.setRefetchChartDashboardsTick;
   const setSelectedDashboardCard = contextStateV2?.setSelectedDashboardCard;
+  const setPageTitleFormatDockOpen = contextStateV2?.setPageTitleFormatDockOpen;
   const savedDataSets = contextStateV2?.savedDataSets ?? [];
   const loadedDataMeta = contextStateV2?.loadedDataMeta;
 
@@ -135,6 +138,18 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const wasOpenRef = useRef(!!rightPanelOpen);
   const autoExpandedEmptySheetRef = useRef(false);
   const prevDashboardModeRef = useRef(false);
+  const mainColumnRef = useRef(null);
+  const [mainColumnRect, setMainColumnRect] = useState(null);
+
+  const openPageTitleDock = useCallback(() => {
+    setPageTitleFormatDockOpen?.(true);
+  }, [setPageTitleFormatDockOpen]);
+
+  useEffect(() => {
+    if (!dashboardMode || !chartDashboardDraft) {
+      setPageTitleFormatDockOpen?.(false);
+    }
+  }, [dashboardMode, chartDashboardDraft, setPageTitleFormatDockOpen]);
 
   useEffect(() => {
     if (dashboardMode && !prevDashboardModeRef.current) {
@@ -420,6 +435,29 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
 
   const showSidebar = !!rightPanelOpen;
   const isPanelVisible = showSidebar || isPanelClosing;
+
+  useLayoutEffect(() => {
+    if (!dashboardMode) {
+      setMainColumnRect(null);
+      return;
+    }
+    const el = mainColumnRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setMainColumnRect({ left: r.left, width: r.width });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [dashboardMode, rightPanelOpen, isPanelOpen, drawerExpanded, isPanelClosing]);
   const chartsActive = rightPanelTab === "charts";
   const panelAnimatingOpen = isPanelOpen && !isPanelClosing;
   const chartSheetIds = useMemo(() => Object.keys(chartSheets || {}), [chartSheets]);
@@ -534,6 +572,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:gap-6">
         {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
         <main
+          ref={mainColumnRef}
           className={cn(
             "relative min-w-0 flex-1",
             chartMode ? "flex min-h-0 flex-col overflow-hidden" : "overflow-auto",
@@ -1012,7 +1051,11 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                 </Label>
                                 <Input
                                   id="dash-page-title-panel"
-                                  className="h-9 w-full min-w-0 text-sm text-foreground"
+                                  className={cn(
+                                    "h-9 w-full min-w-0 text-sm text-foreground",
+                                    getPageTitleSidebarClasses(chartDashboardDraft?.theme),
+                                  )}
+                                  style={getPageTitleSidebarStyle(chartDashboardDraft?.theme)}
                                   value={chartDashboardDraft.page_heading || ""}
                                   onChange={(e) =>
                                     setChartDashboardDraft?.((prev) => ({
@@ -1020,6 +1063,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                       page_heading: e.target.value,
                                     }))
                                   }
+                                  onFocus={openPageTitleDock}
                                   placeholder="Your Title"
                                 />
                               </div>
@@ -1105,6 +1149,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
           </>
         )}
       </div>
+      {dashboardMode ? <PageTitleFormatDock editorInset={mainColumnRect} /> : null}
     </div>
   );
   return (

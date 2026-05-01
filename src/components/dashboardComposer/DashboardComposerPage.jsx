@@ -25,6 +25,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { getPageTitleEditorClasses, getPageTitleEditorStyle } from "@/lib/pageTitleTheme";
 
 function rid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -56,6 +57,7 @@ export default function DashboardComposerPage({ user }) {
     setSelectedDashboardCard,
     setRefetchChartDashboardsTick,
     savedChartDashboards,
+    setPageTitleFormatDockOpen,
   } = useMyStateV2();
 
   const hasDbUser =
@@ -67,6 +69,9 @@ export default function DashboardComposerPage({ user }) {
   const [dashboardLoadStage, setDashboardLoadStage] = useState("Loading dashboard");
   /** Row ids with expanded editor; new rows start collapsed. */
   const [expandedRowIds, setExpandedRowIds] = useState(() => new Set());
+  const openPageTitleDock = useCallback(() => {
+    setPageTitleFormatDockOpen?.(true);
+  }, [setPageTitleFormatDockOpen]);
 
   useEffect(() => {
     if (!activeChartDashboardId || !hasDbUser) return;
@@ -401,11 +406,14 @@ export default function DashboardComposerPage({ user }) {
                 page_heading: e.target.value,
               }))
             }
+            onFocus={openPageTitleDock}
+            style={getPageTitleEditorStyle(draft?.theme)}
             className={cn(
               "w-full min-w-0 cursor-text border-0 bg-transparent p-0 shadow-none outline-none",
-              "text-2xl font-bold tracking-tight text-foreground md:text-3xl",
+              "tracking-tight text-foreground",
               "placeholder:text-muted-foreground/80",
               "focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+              getPageTitleEditorClasses(draft?.theme),
             )}
           />
 

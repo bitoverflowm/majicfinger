@@ -6,6 +6,7 @@ import DotPattern from "@/components/magicui/dot-pattern";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
 import { Progress } from "@/components/ui/progress";
+import { getPageTitlePublicClassName, getPageTitlePublicStyle } from "@/lib/pageTitleTheme";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -128,7 +129,12 @@ export default function PublicDashboardEmbedClient({
         ) : null}
         <div className="relative z-[1] mx-auto max-w-6xl space-y-8">
           {d.page_heading ? (
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{d.page_heading}</h1>
+            <h1
+              className={getPageTitlePublicClassName(d.theme)}
+              style={getPageTitlePublicStyle(d.theme)}
+            >
+              {d.page_heading}
+            </h1>
           ) : null}
 
           {rows.map((row) => {
