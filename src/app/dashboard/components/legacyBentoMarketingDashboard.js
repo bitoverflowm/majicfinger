@@ -11,10 +11,10 @@ import { BentoCard, BentoGrid } from "@/components/magicui/bento-grid";
 import DotPattern from "@/components/magicui/dot-pattern";
 
 import { colorPalettes } from '@/components/chartView/panels/colorPalette';
-import { Label } from "@/components/ui/label";
 import { Pause, Play, RotateCw, Shuffle } from "lucide-react";
 
-export function BentoBase({data, dashView, demo, readOnly, bentoContainer, setDashData, setBentoContainer, viewing, setViewing}) { 
+/** Archived Katsu marketing-style bento dashboard shell (pre–chart composer). */
+export function LegacyBentoMarketingDashboard({data, dashView, demo, readOnly, bentoContainer, setDashData, setBentoContainer, viewing, setViewing}) { 
 
   const [pause, setPause] = useState(() => !!readOnly)
   const [selectedPalette, setSelectedPalette] = useState()
@@ -144,7 +144,7 @@ export function BentoBase({data, dashView, demo, readOnly, bentoContainer, setDa
               <div className="flex gap-1 place-items-center p-1 bg-slate-200/30 rounded-md" onClick={()=>copyPaletteToClipboard()}>
                 {
                   selectedPalette && selectedPalette.map((color)=>
-                    <div className="p-2 rounded" style={{ backgroundColor: color}}> </div>
+                    <div key={color} className="p-2 rounded" style={{ backgroundColor: color}}> </div>
                   )
                 }
               </div>

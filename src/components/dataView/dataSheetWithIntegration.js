@@ -33,6 +33,8 @@ import {
 } from "@/components/ui/tooltip";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
+import DashboardComposerPage from "@/components/dashboardComposer/DashboardComposerPage";
+import { DashboardExportPanel } from "@/components/dashboardComposer/DashboardExportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
@@ -62,7 +64,7 @@ const INTEGRATION_OPTIONS = [
 
 const PANEL_CLOSE_MS = 300;
 
-export default function DataSheetWithIntegration({ user, startNew, setStartNew, chartMode }) {
+export default function DataSheetWithIntegration({ user, startNew, setStartNew, chartMode, dashboardMode = false }) {
   const contextStateV2 = useMyStateV2();
   const isDemo = !!contextStateV2?.isDemo;
   const viewing = contextStateV2?.viewing;
@@ -143,6 +145,12 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       setRightPanelTab("charts");
     }
   }, [chartMode, rightPanelTab, setRightPanelTab]);
+
+  useEffect(() => {
+    if (!dashboardMode || !setRightPanelTab) return;
+    const ok = ["integrations", "charts", "dashboard", "export"].includes(rightPanelTab);
+    if (!ok) setRightPanelTab("dashboard");
+  }, [dashboardMode, rightPanelTab, setRightPanelTab]);
 
   const beginPanelClose = useCallback((onAfterClose) => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
@@ -416,7 +424,10 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
             <OpenApiPanelTab
               contained={isDemo}
               onOpen={() => {
-                if (chartMode) {
+                if (dashboardMode) {
+                  setRightPanelTab?.("dashboard");
+                  setViewing?.("dashboardComposer");
+                } else if (chartMode) {
                   setRightPanelTab?.("charts");
                   setViewing?.("charts");
                 } else {
@@ -428,7 +439,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
               }}
             />
           )}
-          {chartMode ? (
+          {dashboardMode ? (
+            <DashboardComposerPage user={user} />
+          ) : chartMode ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <div className="mb-2 flex flex-wrap items-center gap-1">
                 {chartSheetIds.map((id) => (
@@ -521,6 +534,15 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                     onValueChange={(v) => {
                       setRightPanelTab?.(v);
                       setRightPanelOpen?.(true);
+                      if (dashboardMode) {
+                        if (v === "integrations") {
+                          setViewing?.("dataStart");
+                          setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+                        } else {
+                          setViewing?.("dashboardComposer");
+                        }
+                        return;
+                      }
                       if (v === "charts") {
                         setViewing?.("charts");
                       } else if (v === "integrations") {
@@ -538,6 +560,11 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                         <TabsTrigger value="charts" className="text-xs">
                           Charts
                         </TabsTrigger>
+                        {dashboardMode ? (
+                          <TabsTrigger value="dashboard" className="text-xs">
+                            Dashboard
+                          </TabsTrigger>
+                        ) : null}
                         <TabsTrigger value="export" className="text-xs">
                           Export
                         </TabsTrigger>
@@ -674,7 +701,26 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                             drawerExpanded ? "w-full p-1 sm:p-2" : "p-1",
                           )}
                         >
-                          {chartsActive ? (
+                          {dashboardMode ? (
+                            <div className="space-y-3 p-2 text-xs text-muted-foreground">
+                              <p>
+                                Build and save charts in the Chart workspace. They appear in each dashboard
+                                card&apos;s chart picker.
+                              </p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="w-full"
+                                onClick={() => {
+                                  setViewing?.("charts");
+                                  setRightPanelOpen?.(false);
+                                }}
+                              >
+                                Open chart workspace
+                              </Button>
+                            </div>
+                          ) : chartsActive ? (
                             <ChartControls />
                           ) : (
                             <div className="text-xs text-muted-foreground">Select Charts tab to edit.</div>
@@ -682,9 +728,21 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                         </div>
                       </TabsContent>
 
+                      {dashboardMode ? (
+                        <TabsContent value="dashboard" className="m-0 h-full min-w-0 w-full max-w-full">
+                          <div className="h-full min-w-0 w-full max-w-full overflow-auto p-2 text-xs text-muted-foreground">
+                            <p className="mb-2 font-medium text-foreground">Dashboard layout</p>
+                            <p>
+                              Add chart and text rows on the canvas. Click a card to edit it. Use the 12-column
+                              grid span to size cards in a row.
+                            </p>
+                          </div>
+                        </TabsContent>
+                      ) : null}
+
                       <TabsContent value="export" className="m-0 h-full min-w-0 w-full max-w-full">
                         <div className="h-full min-w-0 w-full max-w-full overflow-auto">
-                          <ExportPanel />
+                          {dashboardMode ? <DashboardExportPanel /> : <ExportPanel />}
                         </div>
                       </TabsContent>
                     </div>

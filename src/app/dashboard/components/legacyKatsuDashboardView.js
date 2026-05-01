@@ -3,16 +3,10 @@
 import React from 'react';
 import { useMyStateV2  } from '@/context/stateContextV2'
 
+import { LegacyBentoMarketingDashboard } from './legacyBentoMarketingDashboard';
 
-import { BentoBase } from './bentoBase';
-import ComingSoon from './comingSoon';
-
-const bentoVariants = {
-    open: { height: "100vh", width: "100vw" },
-    closed: { height: "75vh", width: "60vw" },
-  }
-
-const KatsuView = () => {
+/** Archived Katsu marketing dashboard (pre–chart composer). */
+const LegacyKatsuDashboardView = () => {
     const contextStateV2 = useMyStateV2()
     
     const dashData = contextStateV2?.dashData
@@ -24,9 +18,9 @@ const KatsuView = () => {
 
     return (
         <div className="w-full px-10 py-16 relative">
-            <BentoBase data={dashData} dashView={true} bentoContainer={bentoContainer} setDashData={setDashData} setBentoContainer={setBentoContainer} viewing={viewing} setViewing={setViewing}/>
+            <LegacyBentoMarketingDashboard data={dashData} dashView={true} bentoContainer={bentoContainer} setDashData={setDashData} setBentoContainer={setBentoContainer} viewing={viewing} setViewing={setViewing}/>
         </div>       
     );
 };
 
-export default KatsuView;
+export default LegacyKatsuDashboardView;

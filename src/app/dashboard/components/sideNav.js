@@ -44,7 +44,7 @@ import {
 
 const dataViewKeys = ["dataStart", "newSheet", "upload", "integrations"];
 const chartViewKeys = ["charts"];
-const dashboardViewKeys = ["dashboard", "presentation"];
+const dashboardViewKeys = ["dashboardComposer", "presentation"];
 const underConstructionKeys = ["scrape", "generate", "ai"];
 
 const SideNav = () => {
@@ -177,7 +177,7 @@ const SideNav = () => {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     isActive={isDashboardActive}
-                    onClick={() => viewHandler("dashboard")}
+                    onClick={() => viewHandler("dashboardComposer")}
                     tooltip="Dashboard"
                   >
                     <LayoutDashboard className="h-5 w-5" />

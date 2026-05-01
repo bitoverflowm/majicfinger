@@ -6,7 +6,6 @@ import { useMyStateV2  } from '@/context/stateContextV2'
 import SideNav from './components/sideNav'
 import Nav from './components/nav'
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import KatsuView from './components/katsuView';
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
 import Upload from '@/components/dataView/upload'
 import IntegrationsView from "@/components/integrationsView";
@@ -42,6 +41,7 @@ const DashBody = ({ user }) => {
     const setSavedDataSets = contextStateV2?.setSavedDataSets
     const setSavedCharts = contextStateV2?.setSavedCharts
     const setSavedPresentations = contextStateV2?.setSavedPresentations
+    const setSavedChartDashboards = contextStateV2?.setSavedChartDashboards
     
     const refetchData = contextStateV2?.refetchData
     const setRefetchData = contextStateV2?.setRefetchData
@@ -49,6 +49,7 @@ const DashBody = ({ user }) => {
     const setRefetchChart = contextStateV2?.setRefetchChart
     const refetchPresentations = contextStateV2?.refetchPresentations
     const setRefetchPresentations = contextStateV2?.setRefetchPresentations
+    const refetchChartDashboardsTick = contextStateV2?.refetchChartDashboardsTick
     const setUserHandle = contextStateV2?.setUserHandle
     const userHandle = contextStateV2?.userHandle
     const polymarketWsState = contextStateV2?.polymarketWsState
@@ -138,6 +139,24 @@ const DashBody = ({ user }) => {
             })
         }
     }, [user, refetchChart, isDemo, hasDbBackedUserId])
+
+    useEffect(() => {
+        if (user && !isDemo && hasDbBackedUserId) {
+            fetch(`/api/chart-dashboards?uid=${user.userId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && Array.isArray(data.data)) {
+                    setSavedChartDashboards(data.data);
+                } else {
+                    setSavedChartDashboards([]);
+                }
+            })
+            .catch(() => setSavedChartDashboards([]));
+        }
+    }, [user, isDemo, hasDbBackedUserId, refetchChartDashboardsTick, setSavedChartDashboards])
 
 
 
@@ -278,14 +297,14 @@ const DashBody = ({ user }) => {
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
-                {!isDemo && viewing === 'dashboard' && <div className=""><KatsuView user={user}/></div> }             
-                { (viewing === 'dataStart' || viewing === 'charts') && (
+                { (viewing === 'dataStart' || viewing === 'charts' || viewing === 'dashboardComposer') && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration
                       user={user}
                       startNew={startNew}
                       setStartNew={setStartNew}
                       chartMode={viewing === 'charts'}
+                      dashboardMode={viewing === 'dashboardComposer'}
                     />
                   </div>
                 ) }

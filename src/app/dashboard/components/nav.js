@@ -74,6 +74,10 @@ const Nav = () => {
   //saving charts
   const savedCharts = contextStateV2?.savedCharts
   const setSavedCharts = contextStateV2?.setSavedCharts
+  const savedChartDashboards = contextStateV2?.savedChartDashboards
+  const setActiveChartDashboardId = contextStateV2?.setActiveChartDashboardId
+  const setChartDashboardDraft = contextStateV2?.setChartDashboardDraft
+  const activeChartDashboardId = contextStateV2?.activeChartDashboardId
 
   // chart properties used by legacy save flow
   const chartOptions = contextStateV2?.chartOptions
@@ -128,6 +132,7 @@ const Nav = () => {
   const [isDeleteBusy, setIsDeleteBusy] = useState(false)
 
   const publicCharts = (savedCharts || []).filter((c) => c?.is_public && c?.public_slug)
+  const publicDashboards = (savedChartDashboards || []).filter((d) => d?.is_public && d?.public_slug)
   const publicBase =
     process.env.NODE_ENV === "development" && runtimeOrigin
       ? runtimeOrigin
@@ -493,6 +498,20 @@ const Nav = () => {
     }    
   }
 
+  const loadChartDashboard = (dashboardId) => {
+    if (!dashboardId) return;
+    if (activeChartDashboardId && String(dashboardId) === String(activeChartDashboardId)) {
+      setViewing("dashboardComposer");
+      setIsOpen(false);
+      return;
+    }
+    setActiveChartDashboardId?.(String(dashboardId));
+    setChartDashboardDraft?.(null);
+    setViewing("dashboardComposer");
+    setIsOpen(false);
+    toast.success("Loading dashboard…", { duration: 4000 });
+  };
+
   const loadPresentation = async (presentationId, presentationMeta) => {
     if(loadedPresentationMeta && presentationId === loadedPresentationMeta._id){
       //set the data
@@ -649,7 +668,7 @@ const Nav = () => {
   }, [saveIsOpen, loadedDataMeta?.data_set_name]);
 
 
-  const breadcrumb = viewing === 'dashboard' ? 'Lychee / Dashboard' :
+  const breadcrumb = viewing === 'dashboardComposer' ? 'Lychee / Dashboard' :
     viewing === 'charts' ? 'Lychee / Charts' :
     (viewing === 'dataStart' || viewing === 'upload' || viewing === 'newSheet' || viewing === 'integrations') ? 'Lychee / Data' :
     viewing === 'ai' ? 'Lychee / AI' :
@@ -661,7 +680,7 @@ const Nav = () => {
   return (
     <div className="w-full flex flex-col items-start gap-2 px-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2 md:h-16">
           <div className="w-full flex items-center gap-2 min-w-0 pl-2">
-            {(viewing === "dataStart" || viewing === "charts") && rightPanelOpen && (
+            {(viewing === "dataStart" || viewing === "charts" || viewing === "dashboardComposer") && rightPanelOpen && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -764,7 +783,10 @@ const Nav = () => {
                       <Button variant="outline" size="sm" className="gap-1.5">
                         Your Work
                         <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-[10px]">
-                          {(savedDataSets?.length ?? 0) + (savedCharts?.length ?? 0) + (savedPresentations?.length ?? 0)}
+                          {(savedDataSets?.length ?? 0) +
+                            (savedCharts?.length ?? 0) +
+                            (savedPresentations?.length ?? 0) +
+                            (savedChartDashboards?.length ?? 0)}
                         </Badge>
                       </Button>
                     </SheetTrigger>
@@ -779,6 +801,7 @@ const Nav = () => {
                             <TabsList className="">
                               <TabsTrigger value="data">Data Sheets</TabsTrigger>
                               <TabsTrigger value="charts">Charts</TabsTrigger>
+                              <TabsTrigger value="dashboards">Dashboards</TabsTrigger>
                               <TabsTrigger value="persentations">Presentations</TabsTrigger>
                               <TabsTrigger value="publicPages">Live Public Pages</TabsTrigger>
                             </TabsList>
@@ -835,6 +858,44 @@ const Nav = () => {
                                 }
                               </div>
                             </TabsContent>
+                            <TabsContent value="dashboards">
+                              <div className="flex flex-wrap gap-2">
+                                {savedChartDashboards &&
+                                  savedChartDashboards.length > 0 &&
+                                  savedChartDashboards.map((dash) => (
+                                    <Card
+                                      key={dash._id}
+                                      className="w-sm cursor-pointer text-sm hover:bg-green-100"
+                                      onClick={() => loadChartDashboard(dash._id)}
+                                    >
+                                      <CardHeader>
+                                        <div className="flex items-center gap-2">
+                                          <span className="truncate">
+                                            {dash.dashboard_name || dash.page_heading || "Dashboard"}
+                                          </span>
+                                          <div className="ml-auto">
+                                            {activeChartDashboardId &&
+                                            String(activeChartDashboardId) === String(dash._id) ? (
+                                              <Badge className={"bg-green-200 text-black"}>Loaded</Badge>
+                                            ) : null}
+                                          </div>
+                                        </div>
+                                      </CardHeader>
+                                      <CardContent>
+                                        <div className="py-1 text-xs text-muted-foreground">
+                                          Edited:{" "}
+                                          {dash.last_edited_date
+                                            ? moment(dash.last_edited_date).format("ddd MMM YY h:mm a")
+                                            : "—"}
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                {(!savedChartDashboards || savedChartDashboards.length === 0) && (
+                                  <div className="py-4 text-sm text-muted-foreground">No saved dashboards yet.</div>
+                                )}
+                              </div>
+                            </TabsContent>
                             <TabsContent value="persentations"><div className="flex flex-wrap gap-2">
                                 { 
                                   savedPresentations && savedPresentations.length > 0 && savedPresentations.map(
@@ -889,7 +950,38 @@ const Nav = () => {
                                     </Card>
                                   )
                                 })}
-                                {publicCharts.length === 0 && (
+                                {publicDashboards.map((dash) => {
+                                  const publicUrl = `${publicBase.replace(/\/$/, "")}/${encodeURIComponent(userHandle || "handle")}/dashboards/${encodeURIComponent(dash.public_slug)}`
+                                  return (
+                                    <Card key={`public-dash-${dash._id}`} className="w-sm text-sm">
+                                      <CardHeader>
+                                        <div className="flex items-center gap-2">
+                                          <span className="truncate">
+                                            {dash.page_heading || dash.dashboard_name || "Dashboard"}
+                                          </span>
+                                        </div>
+                                      </CardHeader>
+                                      <CardContent>
+                                        <a
+                                          href={publicUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex items-center gap-1 break-all text-xs text-primary underline underline-offset-2"
+                                        >
+                                          {publicUrl}
+                                          <ExternalLink className="h-3 w-3 shrink-0" />
+                                        </a>
+                                        <div className="py-1 text-xs">
+                                          Edited:{" "}
+                                          {dash.last_edited_date
+                                            ? moment(dash.last_edited_date).format("ddd MMM YY h:mm a")
+                                            : "—"}
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  )
+                                })}
+                                {publicCharts.length === 0 && publicDashboards.length === 0 && (
                                   <div className="py-4 text-sm text-muted-foreground">No live public pages yet.</div>
                                 )}
                               </div>
