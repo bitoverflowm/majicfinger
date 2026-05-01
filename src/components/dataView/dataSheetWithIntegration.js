@@ -15,6 +15,7 @@ import GeckoDex from "@/components/integrationsView/integrationPlayground/integr
 import Binance from "@/components/integrationsView/integrationPlayground/integrations/binance";
 import Chainlink from "@/components/integrationsView/integrationPlayground/integrations/chainlink";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -23,7 +24,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  BarChart3,
+  Cable,
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  Share2,
+  X,
+  Plus,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -39,8 +49,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
-import { Plus } from "lucide-react";
-
+import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
+import { toast } from "sonner";
 /** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
 const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
 
@@ -64,7 +74,16 @@ const INTEGRATION_OPTIONS = [
 
 const PANEL_CLOSE_MS = 300;
 
+const RIGHT_PANEL_TAB_ITEMS = [
+  { value: "integrations", label: "Integrations", Icon: Cable },
+  { value: "charts", label: "Charts", Icon: BarChart3 },
+  { value: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { value: "export", label: "Export", Icon: Share2 },
+];
+
 export default function DataSheetWithIntegration({ user, startNew, setStartNew, chartMode, dashboardMode = false }) {
+  const hasDbBackedUserId =
+    !!user?.userId && user.userId !== "dev-bypass-no-db" && /^[a-f0-9]{24}$/i.test(user.userId);
   const contextStateV2 = useMyStateV2();
   const isDemo = !!contextStateV2?.isDemo;
   const viewing = contextStateV2?.viewing;
@@ -90,6 +109,11 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
   const rightPanelTab = contextStateV2?.rightPanelTab;
   const setRightPanelTab = contextStateV2?.setRightPanelTab;
+  const chartDashboardDraft = contextStateV2?.chartDashboardDraft;
+  const setChartDashboardDraft = contextStateV2?.setChartDashboardDraft;
+  const setActiveChartDashboardId = contextStateV2?.setActiveChartDashboardId;
+  const setRefetchChartDashboardsTick = contextStateV2?.setRefetchChartDashboardsTick;
+  const setSelectedDashboardCard = contextStateV2?.setSelectedDashboardCard;
 
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
@@ -147,10 +171,18 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
   }, [chartMode, rightPanelTab, setRightPanelTab]);
 
   useEffect(() => {
-    if (!dashboardMode || !setRightPanelTab) return;
-    const ok = ["integrations", "charts", "dashboard", "export"].includes(rightPanelTab);
-    if (!ok) setRightPanelTab("dashboard");
-  }, [dashboardMode, rightPanelTab, setRightPanelTab]);
+    if (!setRightPanelTab) return;
+    const valid = new Set(["integrations", "charts", "dashboard", "export"]);
+    if (rightPanelTab != null && rightPanelTab !== "" && !valid.has(rightPanelTab)) {
+      setRightPanelTab("integrations");
+    }
+  }, [rightPanelTab, setRightPanelTab]);
+
+  useEffect(() => {
+    if (!chartMode && !dashboardMode && setRightPanelTab && rightPanelTab === "dashboard") {
+      setRightPanelTab("integrations");
+    }
+  }, [chartMode, dashboardMode, rightPanelTab, setRightPanelTab]);
 
   const beginPanelClose = useCallback((onAfterClose) => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
@@ -217,6 +249,42 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       wasOpenRef.current = false;
     });
   }, [isPanelClosing, beginPanelClose, setRightPanelOpen]);
+
+  const deleteDashboardFromComposer = useCallback(async () => {
+    if (!chartDashboardDraft || !dashboardMode) return;
+    const id = chartDashboardDraft._id;
+    let removedFromDb = false;
+    if (id && !isDemo && hasDbBackedUserId) {
+      try {
+        const res = await fetch(`/api/chart-dashboards/${id}`, { method: "DELETE" });
+        const j = await res.json();
+        if (!j?.success) {
+          toast.error(j?.message || "Delete failed");
+          return;
+        }
+        removedFromDb = true;
+      } catch {
+        toast.error("Delete failed");
+        return;
+      }
+    }
+    setSelectedDashboardCard?.(null);
+    setActiveChartDashboardId?.(null);
+    setChartDashboardDraft?.(null);
+    setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+    if (removedFromDb) toast.success("Dashboard deleted");
+    else if (id) toast.success("Dashboard removed");
+    else toast.success("Draft discarded");
+  }, [
+    chartDashboardDraft,
+    dashboardMode,
+    isDemo,
+    hasDbBackedUserId,
+    setSelectedDashboardCard,
+    setActiveChartDashboardId,
+    setChartDashboardDraft,
+    setRefetchChartDashboardsTick,
+  ]);
 
   useEffect(() => () => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
@@ -534,64 +602,94 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                     onValueChange={(v) => {
                       setRightPanelTab?.(v);
                       setRightPanelOpen?.(true);
-                      if (dashboardMode) {
-                        if (v === "integrations") {
-                          setViewing?.("dataStart");
-                          setIntegrationSidebar?.((prev) => prev ?? "polymarket");
-                        } else {
-                          setViewing?.("dashboardComposer");
-                        }
+                      if (v === "dashboard") {
+                        setViewing?.("dashboardComposer");
                         return;
                       }
                       if (v === "charts") {
                         setViewing?.("charts");
-                      } else if (v === "integrations") {
+                        return;
+                      }
+                      if (v === "integrations") {
                         setViewing?.("dataStart");
                         setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+                        return;
                       }
+                      // export: keep current main workspace
                     }}
                     className="flex h-full flex-col"
                   >
-                    <div className="relative flex items-center gap-2 p-2">
-                      <TabsList className="h-9">
-                        <TabsTrigger value="integrations" className="text-xs">
-                          Integrations
-                        </TabsTrigger>
-                        <TabsTrigger value="charts" className="text-xs">
-                          Charts
-                        </TabsTrigger>
-                        {dashboardMode ? (
-                          <TabsTrigger value="dashboard" className="text-xs">
-                            Dashboard
-                          </TabsTrigger>
-                        ) : null}
-                        <TabsTrigger value="export" className="text-xs">
-                          Export
-                        </TabsTrigger>
-                      </TabsList>
-                      <div className="ml-auto flex items-center gap-1">
-                        {drawerExpanded ? (
-                          <TooltipProvider delayDuration={200}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 shrink-0"
-                                  onClick={() => setDrawerExpanded(false)}
-                                  aria-label="Collapse panel"
-                                >
-                                  <ChevronRight className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="text-xs">
-                                Collapse
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          <>
-                            <TooltipProvider delayDuration={200}>
+                    <TooltipProvider delayDuration={200}>
+                      <div className="relative flex min-w-0 items-center gap-2 p-2">
+                        <TabsList
+                          className={cn(
+                            "h-9 min-h-9 min-w-0 flex-1 justify-start gap-0.5 overflow-x-auto overflow-y-hidden rounded-md bg-slate-100 p-1 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                            drawerExpanded && "flex-wrap",
+                          )}
+                        >
+                          {RIGHT_PANEL_TAB_ITEMS.map(({ value, label, Icon }) => {
+                            const iconOnly = !drawerExpanded;
+                            return (
+                              <TabsTrigger
+                                key={value}
+                                value={value}
+                                title={iconOnly ? label : undefined}
+                                className={cn(
+                                  "shrink-0 gap-1.5 text-xs transition-colors aria-selected:z-[1] aria-selected:bg-white aria-selected:text-slate-950 aria-selected:shadow-sm dark:aria-selected:bg-slate-950 dark:aria-selected:text-slate-50",
+                                  iconOnly ? "px-2" : "px-2.5",
+                                )}
+                                aria-label={label}
+                              >
+                                {drawerExpanded ? (
+                                  <>
+                                    <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                    <span className="truncate">{label}</span>
+                                  </>
+                                ) : (
+                                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                )}
+                              </TabsTrigger>
+                            );
+                          })}
+                        </TabsList>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {drawerExpanded ? (
+                            <>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    onClick={() => setDrawerExpanded(false)}
+                                    aria-label="Narrow panel"
+                                  >
+                                    <ChevronRight className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                  Narrow panel
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    onClick={closePanel}
+                                    aria-label="Close panel"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                  Close panel
+                                </TooltipContent>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            <>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
@@ -608,20 +706,27 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                   Expand
                                 </TooltipContent>
                               </Tooltip>
-                            </TooltipProvider>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0"
-                              onClick={closePanel}
-                              aria-label="Close panel"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    onClick={closePanel}
+                                    aria-label="Close panel"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                  Close panel
+                                </TooltipContent>
+                              </Tooltip>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </TooltipProvider>
 
                     <div
                       className={cn(
@@ -728,17 +833,53 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                         </div>
                       </TabsContent>
 
-                      {dashboardMode ? (
-                        <TabsContent value="dashboard" className="m-0 h-full min-w-0 w-full max-w-full">
-                          <div className="h-full min-w-0 w-full max-w-full overflow-auto p-2 text-xs text-muted-foreground">
-                            <p className="mb-2 font-medium text-foreground">Dashboard layout</p>
+                      <TabsContent value="dashboard" className="m-0 h-full min-w-0 w-full max-w-full">
+                        <div className="h-full min-w-0 w-full max-w-full overflow-auto p-2 text-xs text-muted-foreground">
+                          {!dashboardMode ? (
                             <p>
-                              Add chart and text rows on the canvas. Click a card to edit it. Use the 12-column
-                              grid span to size cards in a row.
+                              Open the dashboard composer to edit rows and cards, or choose this tab again after
+                              switching workspace.
                             </p>
-                          </div>
-                        </TabsContent>
-                      ) : null}
+                          ) : chartDashboardDraft ? (
+                            <div className="grid gap-1.5">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  id="dash-name-panel"
+                                  className="h-9 min-w-0 flex-1 text-sm text-foreground"
+                                  aria-label="Name your dashboard"
+                                  placeholder="name your dashboard"
+                                  value={chartDashboardDraft.dashboard_name || ""}
+                                  onChange={(e) =>
+                                    setChartDashboardDraft?.((prev) => ({
+                                      ...(prev || {}),
+                                      dashboard_name: e.target.value,
+                                    }))
+                                  }
+                                />
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex shrink-0">
+                                        <DestructiveIconButton
+                                          className="h-2.5 w-2.5 shrink-0"
+                                          ariaLabel="delete dashboard"
+                                          title="delete dashboard"
+                                          onClick={deleteDashboardFromComposer}
+                                        />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" sideOffset={6} className="z-[100] text-xs">
+                                      delete dashboard
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </div>
+                          ) : (
+                            <p>Load or create a dashboard to edit its internal name.</p>
+                          )}
+                        </div>
+                      </TabsContent>
 
                       <TabsContent value="export" className="m-0 h-full min-w-0 w-full max-w-full">
                         <div className="h-full min-w-0 w-full max-w-full overflow-auto">

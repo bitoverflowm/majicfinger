@@ -56,6 +56,13 @@ const ChartSchema = new mongoose.Schema({
     },
 })
 
-ChartSchema.index({ user_id: 1, public_slug: 1 }, { unique: true, sparse: true })
+// Same as ChartDashboard: sparse+unique still indexes null slug once per user.
+ChartSchema.index(
+    { user_id: 1, public_slug: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { public_slug: { $type: "string", $gt: "" } },
+    },
+)
 
 export default mongoose.models.Chart || mongoose.model("Chart", ChartSchema)

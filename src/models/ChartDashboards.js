@@ -49,7 +49,17 @@ const ChartDashboardSchema = new mongoose.Schema({
   },
 });
 
-ChartDashboardSchema.index({ user_id: 1, public_slug: 1 }, { unique: true, sparse: true });
+// Only enforce uniqueness when a real embed slug exists. A *sparse* unique index still
+// treats `public_slug: null` as indexed, so a user could only have one unpublished dashboard.
+// After changing this, drop the old index once if MongoDB reports a conflict, e.g. in mongosh:
+//   db.chartdashboards.dropIndex("user_id_1_public_slug_1")
+ChartDashboardSchema.index(
+  { user_id: 1, public_slug: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { public_slug: { $type: "string", $gt: "" } },
+  },
+);
 ChartDashboardSchema.index({ user_id: 1, last_edited_date: -1 });
 
 export default mongoose.models.ChartDashboard ||

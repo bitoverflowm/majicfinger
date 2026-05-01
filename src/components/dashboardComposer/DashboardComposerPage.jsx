@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { IsolatedChartPreview } from "./IsolatedChartPreview";
 import DotPattern from "@/components/magicui/dot-pattern";
 import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 function rid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -49,6 +50,7 @@ export default function DashboardComposerPage({ user }) {
     selectedDashboardCard,
     setSelectedDashboardCard,
     setRefetchChartDashboardsTick,
+    savedChartDashboards,
   } = useMyStateV2();
 
   const hasDbUser =
@@ -56,18 +58,30 @@ export default function DashboardComposerPage({ user }) {
 
   const draft = chartDashboardDraft;
 
+  const [dashboardLoadProgress, setDashboardLoadProgress] = useState(8);
+  const [dashboardLoadStage, setDashboardLoadStage] = useState("Loading dashboard");
+
   useEffect(() => {
     if (!activeChartDashboardId || !hasDbUser) return;
     let cancelled = false;
+    setDashboardLoadProgress(12);
+    setDashboardLoadStage("Loading dashboard");
     (async () => {
       try {
         const res = await fetch(`/api/chart-dashboards/${activeChartDashboardId}`);
+        if (!cancelled) {
+          setDashboardLoadProgress(48);
+          setDashboardLoadStage("Reading saved layout");
+        }
         const j = await res.json();
         if (!j?.success || !j?.data) {
           toast.error(j?.message || "Failed to load dashboard");
+          setActiveChartDashboardId?.(null);
           return;
         }
         if (cancelled) return;
+        setDashboardLoadProgress(82);
+        setDashboardLoadStage("Applying dashboard");
         const d = j.data;
         setChartDashboardDraft({
           _id: d._id,
@@ -79,14 +93,18 @@ export default function DashboardComposerPage({ user }) {
           public_slug: d.public_slug || "",
           is_public: !!d.is_public,
         });
+        if (!cancelled) setDashboardLoadProgress(100);
       } catch {
-        if (!cancelled) toast.error("Failed to load dashboard");
+        if (!cancelled) {
+          toast.error("Failed to load dashboard");
+          setActiveChartDashboardId?.(null);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [activeChartDashboardId, hasDbUser, setChartDashboardDraft]);
+  }, [activeChartDashboardId, hasDbUser, setChartDashboardDraft, setActiveChartDashboardId]);
 
   const setDraft = useCallback(
     (updater) => {
@@ -188,7 +206,7 @@ export default function DashboardComposerPage({ user }) {
     setSelectedDashboardCard?.(null);
   };
 
-  const handleCreateNew = async () => {
+  const handleCreateNew = () => {
     if (!hasDbUser) {
       toast.error("Sign in to create a dashboard.");
       return;
@@ -198,54 +216,85 @@ export default function DashboardComposerPage({ user }) {
       toast.error("Load or select a project (dataset) first.");
       return;
     }
+    setSelectedDashboardCard?.(null);
+    setActiveChartDashboardId?.(null);
+    setChartDashboardDraft({
+      dashboard_name: "",
+      page_heading: "",
+      layout: createEmptyDashboardLayout(),
+      theme: { background: "dotPattern", background_color: "" },
+      data_set_id: String(dataSetId),
+      public_slug: "",
+      is_public: false,
+    });
+    toast.success("New dashboard — save when you're ready.");
+  };
+
+  const handleSaveDraft = async () => {
+    if (!draft || !hasDbUser) {
+      toast.error("Nothing to save");
+      return;
+    }
+    if (!draft.data_set_id) {
+      toast.error("Choose a home project (dataset) first.");
+      return;
+    }
     try {
+      if (draft._id) {
+        const res = await fetch(`/api/chart-dashboards/${draft._id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dashboard_name: draft.dashboard_name,
+            page_heading: draft.page_heading,
+            layout: draft.layout,
+            theme: draft.theme,
+            data_set_id: draft.data_set_id,
+          }),
+        });
+        const j = await res.json();
+        if (!j?.success) {
+          toast.error(j?.message || "Save failed");
+          return;
+        }
+        setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+        toast.success("Dashboard saved");
+        return;
+      }
+
       const res = await fetch("/api/chart-dashboards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.userId,
-          data_set_id: dataSetId,
-          dashboard_name: "New dashboard",
-          page_heading: "",
-          layout: createEmptyDashboardLayout(),
-          theme: { background: "dotPattern", background_color: "" },
+          data_set_id: draft.data_set_id,
+          dashboard_name: draft.dashboard_name || "Untitled dashboard",
+          page_heading: draft.page_heading || "",
+          layout: draft.layout && typeof draft.layout === "object" ? draft.layout : createEmptyDashboardLayout(),
+          theme:
+            draft.theme && typeof draft.theme === "object"
+              ? draft.theme
+              : { background: "dotPattern", background_color: "" },
         }),
       });
       const j = await res.json();
       if (!j?.success || !j?.data?._id) {
-        toast.error(j?.message || "Create failed");
-        return;
-      }
-      setActiveChartDashboardId?.(String(j.data._id));
-      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
-      toast.success("Dashboard created");
-    } catch {
-      toast.error("Create failed");
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    if (!draft?._id || !hasDbUser) {
-      toast.error("Nothing to save");
-      return;
-    }
-    try {
-      const res = await fetch(`/api/chart-dashboards/${draft._id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dashboard_name: draft.dashboard_name,
-          page_heading: draft.page_heading,
-          layout: draft.layout,
-          theme: draft.theme,
-          data_set_id: draft.data_set_id,
-        }),
-      });
-      const j = await res.json();
-      if (!j?.success) {
         toast.error(j?.message || "Save failed");
         return;
       }
+      const d = j.data;
+      setChartDashboardDraft((prev) => ({
+        ...(prev || {}),
+        _id: String(d._id),
+        dashboard_name: d.dashboard_name ?? prev?.dashboard_name,
+        page_heading: d.page_heading ?? prev?.page_heading ?? "",
+        layout: d.layout && typeof d.layout === "object" ? d.layout : prev?.layout,
+        theme: d.theme && typeof d.theme === "object" ? d.theme : prev?.theme,
+        data_set_id: d.data_set_id ? String(d.data_set_id) : prev?.data_set_id,
+        public_slug: d.public_slug || "",
+        is_public: !!d.is_public,
+      }));
+      setActiveChartDashboardId?.(String(d._id));
       setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
       toast.success("Dashboard saved");
     } catch {
@@ -263,16 +312,74 @@ export default function DashboardComposerPage({ user }) {
     return list.map((d) => ({ id: String(d._id), name: d.data_set_name || "Dataset" }));
   }, [savedDataSets]);
 
+  const savedDashboardOptions = useMemo(() => {
+    const list = Array.isArray(savedChartDashboards) ? savedChartDashboards : [];
+    return list.map((d) => ({
+      id: String(d._id),
+      label: (d.dashboard_name || d.page_heading || "Untitled dashboard").trim(),
+    }));
+  }, [savedChartDashboards]);
+
   if (!draft) {
+    if (activeChartDashboardId && hasDbUser) {
+      return (
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-6">
+          <p className="text-center text-sm font-medium text-muted-foreground">{dashboardLoadStage}</p>
+          <div className="w-full max-w-sm space-y-1">
+            <Progress value={dashboardLoadProgress} className="h-2 w-full" />
+            <p className="text-center text-xs text-muted-foreground">
+              {Math.max(1, Math.min(100, dashboardLoadProgress))}%
+            </p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6">
-        <p className="text-sm text-muted-foreground">No dashboard loaded.</p>
-        <Button type="button" onClick={handleCreateNew}>
-          New dashboard
-        </Button>
+        {savedDashboardOptions.length > 0 ? (
+          <div className="flex w-full max-w-xl flex-col gap-2">
+            <Label htmlFor="load-saved-dashboard" className="text-xs text-muted-foreground">
+              Open a saved dashboard
+            </Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                onValueChange={(id) => {
+                  if (!id) return;
+                  setChartDashboardDraft(null);
+                  setActiveChartDashboardId?.(String(id));
+                  setSelectedDashboardCard?.(null);
+                }}
+              >
+                <SelectTrigger id="load-saved-dashboard" className="h-10 min-w-[12rem] flex-1 sm:min-w-[16rem]">
+                  <SelectValue placeholder="Choose a dashboard…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedDashboardOptions.map((opt) => (
+                    <SelectItem key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" className="h-10 shrink-0" onClick={handleCreateNew}>
+                <Plus className="h-4 w-4" />
+                New
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="max-w-sm text-center text-xs text-muted-foreground">
+              No saved dashboards yet. Create one below or use <span className="font-medium">Your Work</span>.
+            </p>
+            <Button type="button" className="h-10" onClick={handleCreateNew}>
+              <Plus className="h-4 w-4" />
+              New
+            </Button>
+          </>
+        )}
         <p className="max-w-md text-center text-xs text-muted-foreground">
-          New dashboards use your currently loaded project when possible. Load a data project from Your Work first if
-          creation fails.
+          Load a saved dashboard or start a new dashboard.
         </p>
       </div>
     );
@@ -284,17 +391,6 @@ export default function DashboardComposerPage({ user }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-6 py-6">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="grid gap-1.5">
-          <Label htmlFor="dash-name" className="text-xs">
-            Internal name
-          </Label>
-          <Input
-            id="dash-name"
-            className="h-9 w-[200px]"
-            value={draft.dashboard_name || ""}
-            onChange={(e) => setDraft((d) => ({ ...d, dashboard_name: e.target.value }))}
-          />
-        </div>
         <div className="grid min-w-[240px] flex-1 gap-1.5">
           <Label htmlFor="dash-h1" className="text-xs">
             Page title (H1)
