@@ -21,6 +21,10 @@ import {
   getPageTitlePublicClassName,
   getPageTitlePublicStyle,
 } from "@/lib/pageTitleTheme";
+import {
+  getFreeTextRowPublicClassName,
+  getFreeTextRowPublicStyle,
+} from "@/lib/dashboardFreeTextTheme";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -51,7 +55,13 @@ type Column = {
 };
 
 type Row =
-  | { id?: string; type: "text"; body?: string }
+  | {
+      id?: string;
+      type: "text";
+      body?: string;
+      textVariant?: "heading" | "paragraph";
+      textTheme?: Record<string, unknown>;
+    }
   | { id?: string; type: "cards"; columns?: Column[] };
 
 type Payload = {
@@ -169,13 +179,32 @@ export default function PublicDashboardEmbedClient({
 
           {rows.map((row) => {
             if (row.type === "text") {
+              const variant = row.textVariant === "heading" ? "heading" : "paragraph";
+              const body = row.body || "";
+              const rowForTheme = {
+                textVariant: variant,
+                textTheme: row.textTheme,
+              };
+              const key = row.id || `text-${body.slice(0, 8)}`;
+              if (variant === "heading") {
+                return (
+                  <h2
+                    key={key}
+                    className={getFreeTextRowPublicClassName(rowForTheme)}
+                    style={getFreeTextRowPublicStyle(rowForTheme)}
+                  >
+                    {body}
+                  </h2>
+                );
+              }
               return (
-                <div
-                  key={row.id || `text-${row.body?.slice(0, 8)}`}
-                  className="prose prose-sm max-w-none text-foreground dark:prose-invert"
+                <p
+                  key={key}
+                  className={cn("whitespace-pre-wrap", getFreeTextRowPublicClassName(rowForTheme))}
+                  style={getFreeTextRowPublicStyle(rowForTheme)}
                 >
-                  <p className="whitespace-pre-wrap">{row.body || ""}</p>
-                </div>
+                  {body}
+                </p>
               );
             }
             if (row.type !== "cards" || !Array.isArray(row.columns)) return null;

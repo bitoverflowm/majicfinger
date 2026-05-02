@@ -20,3 +20,10 @@ export function removeDashboardChartSlotFromDraft(draft, rowId, colId) {
   rows[rowIdx] = { ...row, columns: nextCols };
   return { ...draft, layout: { ...layout, rows } };
 }
+
+/** Remove an entire layout row (cards or text) by id. */
+export function removeDashboardLayoutRowFromDraft(draft, rowId) {
+  const layout = draft.layout && typeof draft.layout === "object" ? draft.layout : { version: 1, rows: [] };
+  const rows = Array.isArray(layout.rows) ? layout.rows.filter((r) => r.id !== rowId) : [];
+  return { ...draft, layout: { ...layout, rows } };
+}

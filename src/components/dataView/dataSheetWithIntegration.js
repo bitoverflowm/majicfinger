@@ -49,7 +49,6 @@ import {
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import DashboardComposerPage from "@/components/dashboardComposer/DashboardComposerPage";
-import { PageTitleFormatDock } from "@/components/dashboardComposer/PageTitleFormatDock";
 import { ChartComposerDock } from "@/components/dashboardComposer/ChartComposerDock";
 import {
   getPageTextBlockSidebarClasses,
@@ -68,9 +67,16 @@ import {
   YellowIconButton,
 } from "@/components/primitives/destructive-icon-button";
 import { toast } from "sonner";
-import { removeDashboardChartSlotFromDraft } from "@/lib/removeDashboardChartSlot";
+import {
+  removeDashboardChartSlotFromDraft,
+  removeDashboardLayoutRowFromDraft,
+} from "@/lib/removeDashboardChartSlot";
 import { patchChartDashboardColumn } from "@/lib/patchChartDashboardColumn";
-import { reorderChartDashboardSlots } from "@/lib/reorderChartDashboardSlots";
+import {
+  flattenDashboardLayers,
+  findRowIdForColumn,
+  reorderDashboardPageBlocks,
+} from "@/lib/reorderDashboardPageBlocks";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 /** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
 const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
@@ -98,8 +104,9 @@ const PANEL_CLOSE_MS = 300;
 function pageFormatDockTargetKey(t) {
   if (t == null) return "";
   if (t === "pageTitle" || t === "pageSubheading") return t;
-  if (typeof t === "object" && t.type && t.rowId && t.colId) {
-    return `${t.type}:${t.rowId}:${t.colId}`;
+  if (typeof t === "object" && t.type && t.rowId) {
+    if (t.colId) return `${t.type}:${t.rowId}:${t.colId}`;
+    return `${t.type}:${t.rowId}`;
   }
   return String(t);
 }
@@ -183,15 +190,30 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       if (result.source.index === result.destination.index) return;
       setChartDashboardDraft?.((prev) => {
         if (!prev?.layout) return prev;
-        const layout = reorderChartDashboardSlots(
+        const nextLayout = reorderDashboardPageBlocks(
           prev.layout,
           result.source.index,
           result.destination.index,
         );
-        return { ...prev, layout };
+        const reconcile = (pick) => {
+          if (!pick?.colId) return pick;
+          const rowId = findRowIdForColumn(nextLayout, pick.colId);
+          return rowId ? { rowId, colId: pick.colId } : null;
+        };
+        queueMicrotask(() => {
+          setChartComposerDock?.((dock) => reconcile(dock));
+          setSelectedDashboardCard?.((sel) => reconcile(sel));
+          setChartPickerEmphasis?.((em) => reconcile(em));
+        });
+        return { ...prev, layout: nextLayout };
       });
     },
-    [setChartDashboardDraft],
+    [
+      setChartDashboardDraft,
+      setChartComposerDock,
+      setSelectedDashboardCard,
+      setChartPickerEmphasis,
+    ],
   );
 
   /** Sidebar "Headings" collapsible: expand when user edits title/subheading (canvas dock or sidebar fields). */
@@ -207,10 +229,16 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
       (pageFormatDockTarget.type === "chartHeading" ||
         pageFormatDockTarget.type === "chartSubheading" ||
         pageFormatDockTarget.type === "chartMicrotext");
+    const freeTextDock =
+      pageFormatDockTarget &&
+      typeof pageFormatDockTarget === "object" &&
+      (pageFormatDockTarget.type === "freeTextHeading" ||
+        pageFormatDockTarget.type === "freeTextParagraph");
     if (
       (pageFormatDockTarget === "pageTitle" ||
         pageFormatDockTarget === "pageSubheading" ||
-        chartTextDock) &&
+        chartTextDock ||
+        freeTextDock) &&
       nextKey !== prevKey
     ) {
       setHeadingsPanelOpen(true);
@@ -1263,20 +1291,16 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                               </Collapsible>
 
                               <div className="rounded-md border border-border/70 bg-muted/15 px-2 py-2">
-                                <p className="mb-2 text-xs font-medium text-foreground">Charts on page</p>
+                                <p className="mb-2 text-xs font-medium text-foreground">Layers</p>
                                 {(() => {
                                   const rows = chartDashboardDraft?.layout?.rows ?? [];
-                                  const chartRows = rows.filter((r) => r?.type === "cards");
-                                  const chartSlots = chartRows.flatMap((r) =>
-                                    (r.columns || []).map((col) => ({
-                                      rowId: r.id,
-                                      col,
-                                    })),
+                                  const layers = flattenDashboardLayers(
+                                    chartDashboardDraft?.layout || { version: 1, rows: [] },
                                   );
-                                  if (!chartSlots.length) {
+                                  if (!layers.length) {
                                     return (
                                       <p className="text-[11px] leading-snug text-muted-foreground">
-                                        No charts yet. Click Add Chart on the canvas.
+                                        No blocks yet. Use Chart or Text in the bottom bar.
                                       </p>
                                     );
                                   }
@@ -1288,17 +1312,179 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                             ref={dropProvided.innerRef}
                                             {...dropProvided.droppableProps}
                                             className="flex flex-col gap-1.5"
-                                            aria-label="Charts on dashboard in order"
+                                            aria-label="Dashboard layers in order"
                                           >
-                                            {chartSlots.map(({ rowId, col }, i) => {
+                                            {layers.map((item, i) => {
+                                              if (item.kind === "text") {
+                                                const block = rows.find(
+                                                  (r) => r.id === item.rowId && r.type === "text",
+                                                );
+                                                if (!block) {
+                                                  return (
+                                                    <Draggable
+                                                      key={`text-missing-${item.rowId}`}
+                                                      draggableId={`text-${item.rowId}`}
+                                                      index={i}
+                                                    >
+                                                      {(dragProvided, snapshot) => (
+                                                        <li
+                                                          ref={dragProvided.innerRef}
+                                                          {...dragProvided.draggableProps}
+                                                          className={cn(
+                                                            "rounded border border-border/50 px-2 py-1.5 text-[11px] text-muted-foreground",
+                                                            snapshot.isDragging &&
+                                                              "border-primary ring-1 ring-primary/20",
+                                                          )}
+                                                          style={dragProvided.draggableProps.style}
+                                                        >
+                                                          Text block (missing)
+                                                        </li>
+                                                      )}
+                                                    </Draggable>
+                                                  );
+                                                }
+                                                const draggableId = `text-${block.id}`;
+                                                const rowLabel =
+                                                  block.textVariant === "heading"
+                                                    ? "Heading"
+                                                    : "Paragraph";
+                                                return (
+                                                  <Draggable
+                                                    key={draggableId}
+                                                    draggableId={draggableId}
+                                                    index={i}
+                                                  >
+                                                    {(dragProvided, snapshot) => (
+                                                      <li
+                                                        ref={dragProvided.innerRef}
+                                                        {...dragProvided.draggableProps}
+                                                        className={cn(
+                                                          "flex flex-col gap-1.5 rounded border border-border/50 bg-background/80 px-2 py-1.5 text-xs text-foreground",
+                                                          snapshot.isDragging &&
+                                                            "border-primary shadow-md ring-1 ring-primary/20",
+                                                        )}
+                                                        style={dragProvided.draggableProps.style}
+                                                      >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                          <div className="flex min-w-0 flex-1 items-center gap-1">
+                                                            <button
+                                                              type="button"
+                                                              className={cn(
+                                                                "-ml-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                                                                "text-muted-foreground outline-none hover:bg-muted hover:text-foreground",
+                                                                "cursor-grab touch-none active:cursor-grabbing",
+                                                                "focus-visible:ring-2 focus-visible:ring-ring",
+                                                              )}
+                                                              aria-label={`Drag to reorder ${rowLabel}`}
+                                                              {...dragProvided.dragHandleProps}
+                                                            >
+                                                              <GripVertical
+                                                                className="h-4 w-4"
+                                                                aria-hidden
+                                                              />
+                                                            </button>
+                                                            <span className="min-w-0 truncate font-medium">
+                                                              {rowLabel}
+                                                            </span>
+                                                          </div>
+                                                          <TooltipProvider delayDuration={200}>
+                                                            <Tooltip>
+                                                              <TooltipTrigger asChild>
+                                                                <span className="inline-flex shrink-0">
+                                                                  <DestructiveIconButton
+                                                                    className="h-2.5 w-2.5 shrink-0"
+                                                                    ariaLabel="Remove text block"
+                                                                    title="Remove text block"
+                                                                    onClick={() => {
+                                                                      setChartDashboardDraft?.((prev) => {
+                                                                        if (!prev) return prev;
+                                                                        return removeDashboardLayoutRowFromDraft(
+                                                                          prev,
+                                                                          block.id,
+                                                                        );
+                                                                      });
+                                                                      setSelectedDashboardCard?.((sel) =>
+                                                                        sel?.rowId === block.id ? null : sel,
+                                                                      );
+                                                                      setChartComposerDock?.((dock) =>
+                                                                        dock?.rowId === block.id ? null : dock,
+                                                                      );
+                                                                      setChartPickerEmphasis?.((em) =>
+                                                                        em?.rowId === block.id ? null : em,
+                                                                      );
+                                                                      setPageFormatDockTarget?.((t) =>
+                                                                        t &&
+                                                                        typeof t === "object" &&
+                                                                        t.rowId === block.id
+                                                                          ? null
+                                                                          : t,
+                                                                      );
+                                                                    }}
+                                                                  />
+                                                                </span>
+                                                              </TooltipTrigger>
+                                                              <TooltipContent
+                                                                side="bottom"
+                                                                sideOffset={6}
+                                                                className="z-[100] text-xs"
+                                                              >
+                                                                Remove text block
+                                                              </TooltipContent>
+                                                            </Tooltip>
+                                                          </TooltipProvider>
+                                                        </div>
+                                                      </li>
+                                                    )}
+                                                  </Draggable>
+                                                );
+                                              }
+
+                                              const col = (() => {
+                                                const r = rows.find(
+                                                  (x) => x.id === item.rowId && x.type === "cards",
+                                                );
+                                                return r?.columns?.find((c) => c.id === item.colId) ?? null;
+                                              })();
+                                              if (!col) {
+                                                return (
+                                                  <Draggable
+                                                    key={`slot-missing-${item.rowId}-${item.colId}`}
+                                                    draggableId={`slot-${item.rowId}-${item.colId}`}
+                                                    index={i}
+                                                  >
+                                                    {(dragProvided, snapshot) => (
+                                                      <li
+                                                        ref={dragProvided.innerRef}
+                                                        {...dragProvided.draggableProps}
+                                                        className={cn(
+                                                          "rounded border border-border/50 px-2 py-1.5 text-[11px] text-muted-foreground",
+                                                          snapshot.isDragging &&
+                                                            "border-primary ring-1 ring-primary/20",
+                                                        )}
+                                                        style={dragProvided.draggableProps.style}
+                                                      >
+                                                        Chart (missing)
+                                                      </li>
+                                                    )}
+                                                  </Draggable>
+                                                );
+                                              }
+                                              const draggableId = `slot-${item.rowId}-${item.colId}`;
+                                              const chartIdStr = col.chart_id ? String(col.chart_id) : "";
+                                              const pickedName = dashboardChartPickerOptions.find(
+                                                (c) => c.id === chartIdStr,
+                                              )?.name;
+                                              const rowLabel =
+                                                pickedName?.trim() ||
+                                                col.h2?.trim() ||
+                                                "Chart";
                                               const emphasizePicker =
-                                                chartPickerEmphasis?.rowId === rowId &&
+                                                chartPickerEmphasis?.rowId === item.rowId &&
                                                 chartPickerEmphasis?.colId === col.id;
-                                              const slotKey = col.id ? String(col.id) : `chart-slot-${i}`;
                                               return (
                                                 <Draggable
-                                                  key={slotKey}
-                                                  draggableId={slotKey}
+                                                  key={draggableId}
+                                                  draggableId={draggableId}
                                                   index={i}
                                                 >
                                                   {(dragProvided, snapshot) => (
@@ -1322,13 +1508,16 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                               "cursor-grab touch-none active:cursor-grabbing",
                                                               "focus-visible:ring-2 focus-visible:ring-ring",
                                                             )}
-                                                            aria-label={`Drag to reorder chart ${i + 1}`}
+                                                            aria-label={`Drag to reorder ${rowLabel}`}
                                                             {...dragProvided.dragHandleProps}
                                                           >
-                                                            <GripVertical className="h-4 w-4" aria-hidden />
+                                                            <GripVertical
+                                                              className="h-4 w-4"
+                                                              aria-hidden
+                                                            />
                                                           </button>
                                                           <span className="min-w-0 truncate font-medium">
-                                                            Chart {i + 1}
+                                                            {rowLabel}
                                                           </span>
                                                         </div>
                                                         <TooltipProvider delayDuration={200}>
@@ -1337,32 +1526,32 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                               <span className="inline-flex shrink-0">
                                                                 <DestructiveIconButton
                                                                   className="h-2.5 w-2.5 shrink-0"
-                                                                  ariaLabel={`Remove chart ${i + 1}`}
-                                                                  title={`Remove chart ${i + 1}`}
+                                                                  ariaLabel={`Remove ${rowLabel}`}
+                                                                  title={`Remove ${rowLabel}`}
                                                                   onClick={() => {
                                                                     setChartDashboardDraft?.((prev) => {
                                                                       if (!prev) return prev;
                                                                       return removeDashboardChartSlotFromDraft(
                                                                         prev,
-                                                                        rowId,
-                                                                        col.id,
+                                                                        item.rowId,
+                                                                        item.colId,
                                                                       );
                                                                     });
                                                                     setSelectedDashboardCard?.((sel) =>
-                                                                      sel?.rowId === rowId &&
-                                                                      sel?.colId === col.id
+                                                                      sel?.rowId === item.rowId &&
+                                                                      sel?.colId === item.colId
                                                                         ? null
                                                                         : sel,
                                                                     );
                                                                     setChartComposerDock?.((dock) =>
-                                                                      dock?.rowId === rowId &&
-                                                                      dock?.colId === col.id
+                                                                      dock?.rowId === item.rowId &&
+                                                                      dock?.colId === item.colId
                                                                         ? null
                                                                         : dock,
                                                                     );
                                                                     setChartPickerEmphasis?.((em) =>
-                                                                      em?.rowId === rowId &&
-                                                                      em?.colId === col.id
+                                                                      em?.rowId === item.rowId &&
+                                                                      em?.colId === item.colId
                                                                         ? null
                                                                         : em,
                                                                     );
@@ -1382,18 +1571,15 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                       </div>
                                                       <Select
                                                         value={
-                                                          col.chart_id
-                                                            ? String(col.chart_id)
-                                                            : undefined
+                                                          col.chart_id ? String(col.chart_id) : undefined
                                                         }
                                                         onValueChange={(v) => {
                                                           patchChartDashboardColumn(
                                                             setChartDashboardDraft,
-                                                            rowId,
+                                                            item.rowId,
                                                             col.id,
                                                             {
-                                                              chart_id:
-                                                                v === "__none__" ? null : v,
+                                                              chart_id: v === "__none__" ? null : v,
                                                             },
                                                           );
                                                           if (v !== "__none__")
@@ -1407,7 +1593,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                               "border-green-500 ring-2 ring-green-500 ring-offset-2 ring-offset-background dark:border-green-400 dark:ring-green-400",
                                                           )}
                                                         >
-                                                          <SelectValue placeholder="Select Chart" />
+                                                          <SelectValue placeholder="Select chart" />
                                                         </SelectTrigger>
                                                         <SelectContent className="z-[200]">
                                                           <SelectItem value="__none__">No chart</SelectItem>
@@ -1451,7 +1637,6 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
           </>
         )}
       </div>
-      {dashboardMode ? <PageTitleFormatDock editorInset={mainColumnRect} /> : null}
       {dashboardMode ? <ChartComposerDock editorInset={mainColumnRect} /> : null}
     </div>
   );

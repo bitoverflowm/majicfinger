@@ -12,6 +12,12 @@ import {
   mergeChartCardSubheadingTheme,
   patchChartDashboardCardTextTheme,
 } from "@/lib/chartCardTextTheme";
+import {
+  isPageFormatDockFreeTextHeadingTarget,
+  isPageFormatDockFreeTextParagraphTarget,
+  mergeFreeTextRowTheme,
+  patchDashboardFreeTextRowTheme,
+} from "@/lib/dashboardFreeTextTheme";
 
 /**
  * Resolved state for the page/chart text format toolbar.
@@ -99,6 +105,19 @@ export function resolveFormatDockTarget(t, draft, setChartDashboardDraft) {
       ariaLabel: "Microtext formatting",
       patchPartial: (partial) =>
         patchChartDashboardCardTextTheme(setChartDashboardDraft, t.rowId, t.colId, "microtext", partial),
+    };
+  }
+
+  if (isPageFormatDockFreeTextHeadingTarget(t) || isPageFormatDockFreeTextParagraphTarget(t)) {
+    const rows = draft.layout?.rows;
+    const row = Array.isArray(rows) ? rows.find((r) => r.id === t.rowId && r.type === "text") : null;
+    if (!row) return null;
+    const isHeading = isPageFormatDockFreeTextHeadingTarget(t);
+    return {
+      pt: mergeFreeTextRowTheme(row),
+      dockLabel: isHeading ? "Heading" : "Paragraph",
+      ariaLabel: isHeading ? "Heading formatting" : "Paragraph formatting",
+      patchPartial: (partial) => patchDashboardFreeTextRowTheme(setChartDashboardDraft, t.rowId, partial),
     };
   }
 

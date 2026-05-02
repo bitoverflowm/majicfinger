@@ -23,10 +23,9 @@ import {
 } from "@/lib/persistChartDashboardDraft";
 import { IsolatedChartPreview } from "./IsolatedChartPreview";
 import DotPattern from "@/components/magicui/dot-pattern";
-import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   getPageTextBlockEditorClasses,
   getPageTextBlockEditorStyle,
@@ -40,6 +39,11 @@ import {
   getChartCardSubheadingEditorClasses,
   getChartCardSubheadingEditorStyle,
 } from "@/lib/chartCardTextTheme";
+import {
+  DASHBOARD_FREE_TEXT_PLACEHOLDER,
+  getFreeTextRowEditorClasses,
+  getFreeTextRowEditorStyle,
+} from "@/lib/dashboardFreeTextTheme";
 
 function rid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -134,6 +138,7 @@ export default function DashboardComposerPage({ user }) {
     setPageFormatDockTarget,
     setChartComposerDock,
     setChartPickerEmphasis,
+    setDashboardComposerLayoutActions,
   } = useMyStateV2();
 
   const hasDbUser =
@@ -143,8 +148,6 @@ export default function DashboardComposerPage({ user }) {
 
   const [dashboardLoadProgress, setDashboardLoadProgress] = useState(8);
   const [dashboardLoadStage, setDashboardLoadStage] = useState("Loading dashboard");
-  /** Row ids with expanded editor; new rows start collapsed. */
-  const [expandedRowIds, setExpandedRowIds] = useState(() => new Set());
   const openPageTitleDock = useCallback(() => {
     setPageTitleFormatDockOpen?.(true);
   }, [setPageTitleFormatDockOpen]);
@@ -259,60 +262,68 @@ export default function DashboardComposerPage({ user }) {
   );
 
   /** Add Chart: pack into the last 12-col cards row when possible; otherwise new row. */
-  const addChart = () => {
+  const addChart = useCallback(() => {
     setPageFormatDockTarget?.(null);
-    const layout = draftRef.current?.layout || chartDashboardDraft?.layout;
+    const layout = draftRef.current?.layout;
     const { rows: nextRows, selection } = computeRowsAfterAddChart(layout);
     setSelectedDashboardCard?.(selection);
     setChartComposerDock?.(selection);
     setChartPickerEmphasis?.(selection);
-    setDraft((d) => {
-      const curLayout = d.layout || createEmptyDashboardLayout();
+    setChartDashboardDraft((d) => {
+      const cur = d || {};
+      const curLayout = cur.layout || createEmptyDashboardLayout();
       return {
-        ...d,
+        ...cur,
         layout: {
           ...curLayout,
           rows: nextRows,
         },
       };
     });
-  };
+  }, [
+    setPageFormatDockTarget,
+    setSelectedDashboardCard,
+    setChartComposerDock,
+    setChartPickerEmphasis,
+    setChartDashboardDraft,
+  ]);
 
-  const addTextRow = () => {
-    setDraft((d) => {
-      const layout = d.layout || createEmptyDashboardLayout();
-      return {
-        ...d,
-        layout: {
-          ...layout,
-          rows: [...layout.rows, { id: rid("row"), type: "text", body: "" }],
-        },
+  const addTextBlock = useCallback(
+    (textVariant) => {
+      setPageFormatDockTarget?.(null);
+      const variant = textVariant === "heading" ? "heading" : "paragraph";
+      const newRow = {
+        id: rid("row"),
+        type: "text",
+        textVariant: variant,
+        body: DASHBOARD_FREE_TEXT_PLACEHOLDER,
       };
-    });
-  };
+      setChartDashboardDraft((d) => {
+        const cur = d || {};
+        const layout = cur.layout || createEmptyDashboardLayout();
+        return {
+          ...cur,
+          layout: {
+            ...layout,
+            rows: [...layout.rows, newRow],
+          },
+        };
+      });
+    },
+    [setPageFormatDockTarget, setChartDashboardDraft],
+  );
 
-  const removeRow = (rowId) => {
-    setDraft((d) => {
-      const layout = d.layout || createEmptyDashboardLayout();
-      return { ...d, layout: { ...layout, rows: layout.rows.filter((r) => r.id !== rowId) } };
+  useEffect(() => {
+    if (!draft) {
+      setDashboardComposerLayoutActions?.(null);
+      return undefined;
+    }
+    setDashboardComposerLayoutActions?.({
+      addChart,
+      addText: addTextBlock,
     });
-    setSelectedDashboardCard?.(null);
-    setChartComposerDock?.((prev) => (prev?.rowId === rowId ? null : prev));
-    setChartPickerEmphasis?.((em) => (em?.rowId === rowId ? null : em));
-  };
-
-  const moveRow = (rowId, dir) => {
-    setDraft((d) => {
-      const layout = d.layout || createEmptyDashboardLayout();
-      const idx = layout.rows.findIndex((r) => r.id === rowId);
-      if (idx < 0) return d;
-      const j = idx + dir;
-      if (j < 0 || j >= layout.rows.length) return d;
-      const next = [...layout.rows];
-      [next[idx], next[j]] = [next[j], next[idx]];
-      return { ...d, layout: { ...layout, rows: next } };
-    });
-  };
+    return () => setDashboardComposerLayoutActions?.(null);
+  }, [draft, addChart, addTextBlock, setDashboardComposerLayoutActions]);
 
   const handleCreateNew = () => {
     if (!hasDbUser) {
@@ -537,17 +548,6 @@ export default function DashboardComposerPage({ user }) {
             )}
           />
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={addChart}>
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              Add Chart
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={addTextRow}>
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              Add Text
-            </Button>
-          </div>
-
           {rows.map((row) => {
             if (row.type === "cards" && Array.isArray(row.columns)) {
               const cols = row.columns || [];
@@ -687,90 +687,61 @@ export default function DashboardComposerPage({ user }) {
             }
 
             if (row.type === "text") {
-              const rowExpanded = expandedRowIds.has(row.id);
-              const collapsedSummary = row.body?.trim()
-                ? `${row.body.trim().slice(0, 100)}${row.body.trim().length > 100 ? "…" : ""}`
-                : "Empty text row";
-              return (
-                <Collapsible
-                  key={row.id}
-                  open={rowExpanded}
-                  onOpenChange={(open) => {
-                    setExpandedRowIds((prev) => {
-                      const next = new Set(prev);
-                      if (open) next.add(row.id);
-                      else next.delete(row.id);
-                      return next;
-                    });
-                  }}
-                >
-                  <div className="rounded-lg border border-border/80 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          aria-expanded={rowExpanded}
-                          aria-label={rowExpanded ? "Collapse row" : "Expand row"}
-                        >
-                          <ChevronDown
-                            className={cn(
-                              "h-4 w-4 transition-transform duration-200",
-                              rowExpanded ? "rotate-0" : "-rotate-90",
-                            )}
-                          />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <span className="text-xs font-medium uppercase text-muted-foreground">Text row</span>
-                      <div className="ml-auto flex gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          onClick={() => moveRow(row.id, -1)}
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          onClick={() => moveRow(row.id, 1)}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-destructive"
-                          onClick={() => removeRow(row.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {!rowExpanded ? (
-                      <p className="text-xs text-muted-foreground">{collapsedSummary}</p>
-                    ) : null}
-
-                    <CollapsibleContent>
-                      <Textarea
-                        value={row.body || ""}
-                        onChange={(e) =>
-                          updateRow(row.id, (r) => ({ ...r, body: e.target.value }))
-                        }
-                        placeholder="Descriptive text for this row…"
-                        className="min-h-[100px]"
-                      />
-                    </CollapsibleContent>
+              const variant = row.textVariant === "heading" ? "heading" : "paragraph";
+              const dockTarget =
+                variant === "heading"
+                  ? { type: "freeTextHeading", rowId: row.id }
+                  : { type: "freeTextParagraph", rowId: row.id };
+              const onFocusFormatting = () => {
+                setSelectedDashboardCard?.(null);
+                setChartComposerDock?.(null);
+                setPageFormatDockTarget?.(dockTarget);
+              };
+              if (variant === "heading") {
+                return (
+                  <div key={row.id} className="min-w-0 py-1">
+                    <input
+                      type="text"
+                      aria-label="Heading"
+                      value={row.body ?? ""}
+                      placeholder={DASHBOARD_FREE_TEXT_PLACEHOLDER}
+                      onChange={(e) =>
+                        updateRow(row.id, (r) => ({ ...r, body: e.target.value }))
+                      }
+                      onFocus={onFocusFormatting}
+                      style={getFreeTextRowEditorStyle(row)}
+                      className={cn(
+                        "w-full min-w-0 border-0 bg-transparent p-0 shadow-none outline-none",
+                        "text-foreground placeholder:text-muted-foreground/80",
+                        "focus:outline-none focus-visible:outline-none focus-visible:ring-0",
+                        getFreeTextRowEditorClasses(row),
+                      )}
+                    />
                   </div>
-                </Collapsible>
+                );
+              }
+              return (
+                <div key={row.id} className="min-w-0 py-1">
+                  <Textarea
+                    aria-label="Paragraph"
+                    autoComplete="off"
+                    spellCheck={false}
+                    rows={3}
+                    value={row.body ?? ""}
+                    placeholder={DASHBOARD_FREE_TEXT_PLACEHOLDER}
+                    onChange={(e) =>
+                      updateRow(row.id, (r) => ({ ...r, body: e.target.value }))
+                    }
+                    onFocus={onFocusFormatting}
+                    style={getFreeTextRowEditorStyle(row)}
+                    className={cn(
+                      "!min-h-0 w-full min-w-0 resize-y border-0 bg-transparent p-0 shadow-none outline-none",
+                      "text-foreground placeholder:text-muted-foreground/80",
+                      "focus:outline-none focus-visible:outline-none focus-visible:ring-0",
+                      getFreeTextRowEditorClasses(row),
+                    )}
+                  />
+                </div>
               );
             }
 
