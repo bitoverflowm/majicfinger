@@ -98,7 +98,8 @@ const DockIcon = ({
   ...props
 }) => {
   const ref = useRef(null)
-  const padding = Math.max(6, size * 0.2)
+  /** Tight inset so the inner control can stay square (wide padding was shrinking the content box vs fixed-size buttons). */
+  const padding = Math.max(2, Math.round(size * 0.06))
   const defaultMouseX = useMotionValue(Infinity)
   const fallbackLayoutTick = useMotionValue(0)
   const layoutTick = useContext(DockLayoutTickContext) ?? fallbackLayoutTick

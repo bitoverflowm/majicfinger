@@ -54,6 +54,7 @@ export function DashboardExportPanel() {
         body: JSON.stringify({
           dashboard_name: draft.dashboard_name,
           page_heading: draft.page_heading,
+          page_subheading: draft.page_subheading,
           layout: draft.layout,
           theme: draft.theme,
           data_set_id: draft.data_set_id,

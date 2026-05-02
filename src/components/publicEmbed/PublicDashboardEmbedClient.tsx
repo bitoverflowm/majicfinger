@@ -6,7 +6,20 @@ import DotPattern from "@/components/magicui/dot-pattern";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
 import { Progress } from "@/components/ui/progress";
-import { getPageTitlePublicClassName, getPageTitlePublicStyle } from "@/lib/pageTitleTheme";
+import {
+  getChartCardHeadingPublicClassName,
+  getChartCardHeadingPublicStyle,
+  getChartCardMicrotextPublicClassName,
+  getChartCardMicrotextPublicStyle,
+  getChartCardSubheadingPublicClassName,
+  getChartCardSubheadingPublicStyle,
+} from "@/lib/chartCardTextTheme";
+import {
+  getPageTextBlockPublicClassName,
+  getPageTextBlockPublicStyle,
+  getPageTitlePublicClassName,
+  getPageTitlePublicStyle,
+} from "@/lib/pageTitleTheme";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -27,6 +40,9 @@ type Column = {
   rowSpan?: number;
   h2?: string;
   caption?: string;
+  chartHeadingTheme?: Record<string, unknown>;
+  chartSubheadingTheme?: Record<string, unknown>;
+  chartMicrotextTheme?: Record<string, unknown>;
   microtext?: string;
   link?: { mode?: string; url?: string };
   chartPayload?: ChartPayload | null;
@@ -41,6 +57,7 @@ type Payload = {
   success: boolean;
   data?: {
     page_heading?: string;
+    page_subheading?: string;
     dashboard_name?: string;
     theme?: { background?: string; background_color?: string };
     layout?: { rows?: Row[] };
@@ -128,13 +145,25 @@ export default function PublicDashboardEmbedClient({
           />
         ) : null}
         <div className="relative z-[1] mx-auto max-w-6xl space-y-8">
-          {d.page_heading ? (
-            <h1
-              className={getPageTitlePublicClassName(d.theme)}
-              style={getPageTitlePublicStyle(d.theme)}
-            >
-              {d.page_heading}
-            </h1>
+          {d.page_heading?.trim() || d.page_subheading?.trim() ? (
+            <div className="space-y-3">
+              {d.page_heading?.trim() ? (
+                <h1
+                  className={getPageTitlePublicClassName(d.theme)}
+                  style={getPageTitlePublicStyle(d.theme)}
+                >
+                  {d.page_heading}
+                </h1>
+              ) : null}
+              {d.page_subheading?.trim() ? (
+                <p
+                  className={getPageTextBlockPublicClassName(d.theme, "pageSubheading")}
+                  style={getPageTextBlockPublicStyle(d.theme, "pageSubheading")}
+                >
+                  {d.page_subheading}
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           {rows.map((row) => {
@@ -162,7 +191,20 @@ export default function PublicDashboardEmbedClient({
                   const inner = (
                     <div className="flex h-full min-w-0 flex-col gap-2 rounded-lg border border-border/70 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
                       {col.h2 ? (
-                        <h2 className="text-lg font-semibold leading-snug text-foreground">{col.h2}</h2>
+                        <h2
+                          className={getChartCardHeadingPublicClassName(col)}
+                          style={getChartCardHeadingPublicStyle(col)}
+                        >
+                          {col.h2}
+                        </h2>
+                      ) : null}
+                      {col.caption ? (
+                        <p
+                          className={getChartCardSubheadingPublicClassName(col)}
+                          style={getChartCardSubheadingPublicStyle(col)}
+                        >
+                          {col.caption}
+                        </p>
                       ) : null}
                       {col.chartPayload ? (
                         <PublicDashboardChartBlock chartPayload={col.chartPayload} />
@@ -171,11 +213,13 @@ export default function PublicDashboardEmbedClient({
                           Chart unavailable
                         </div>
                       )}
-                      {col.caption ? (
-                        <p className="text-sm text-muted-foreground">{col.caption}</p>
-                      ) : null}
                       {col.microtext ? (
-                        <p className="text-xs text-muted-foreground">{col.microtext}</p>
+                        <p
+                          className={getChartCardMicrotextPublicClassName(col)}
+                          style={getChartCardMicrotextPublicStyle(col)}
+                        >
+                          {col.microtext}
+                        </p>
                       ) : null}
                     </div>
                   );

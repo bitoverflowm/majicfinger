@@ -141,6 +141,23 @@ module.exports = {
   					height: '0px'
   				}
   			},
+  			/** Radix `@radix-ui/react-collapsible` exposes `--radix-collapsible-content-height` on content */
+  			'collapsible-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-collapsible-content-height)'
+  				}
+  			},
+  			'collapsible-up': {
+  				from: {
+  					height: 'var(--radix-collapsible-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			},
   			marquee: {
   				from: {
   					transform: 'translateX(0)'
@@ -227,6 +244,8 @@ module.exports = {
   			meteor: 'meteor 5s linear infinite',
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'collapsible-down': 'collapsible-down 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  			'collapsible-up': 'collapsible-up 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   			'slide-down': 'slide-down 0.2s ease-out',
   			'slide-up': 'slide-up 0.2s ease-out',
   			marquee: 'marquee var(--duration) linear infinite',

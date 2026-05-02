@@ -26,6 +26,7 @@ export async function persistChartDashboardDraft({ draft, userId }) {
         body: JSON.stringify({
           dashboard_name: draft.dashboard_name,
           page_heading: draft.page_heading,
+          page_subheading: draft.page_subheading,
           layout: draft.layout,
           theme: draft.theme,
           data_set_id: draft.data_set_id,
@@ -46,6 +47,7 @@ export async function persistChartDashboardDraft({ draft, userId }) {
         data_set_id: draft.data_set_id,
         dashboard_name: draft.dashboard_name || "Untitled dashboard",
         page_heading: draft.page_heading || "",
+        page_subheading: draft.page_subheading || "",
         layout: draft.layout && typeof draft.layout === "object" ? draft.layout : createEmptyDashboardLayout(),
         theme:
           draft.theme && typeof draft.theme === "object"
@@ -70,6 +72,7 @@ export function mergeCreatedChartDashboardDraft(prev, d) {
     _id: String(d._id),
     dashboard_name: d.dashboard_name ?? prev?.dashboard_name,
     page_heading: d.page_heading ?? prev?.page_heading ?? "",
+    page_subheading: d.page_subheading ?? prev?.page_subheading ?? "",
     layout: d.layout && typeof d.layout === "object" ? d.layout : prev?.layout,
     theme: d.theme && typeof d.theme === "object" ? d.theme : prev?.theme,
     data_set_id: d.data_set_id ? String(d.data_set_id) : prev?.data_set_id,

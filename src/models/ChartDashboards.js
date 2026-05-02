@@ -12,6 +12,11 @@ const ChartDashboardSchema = new mongoose.Schema({
     maxLength: [200, "Page heading cannot be more than 200 characters"],
     default: "",
   },
+  page_subheading: {
+    type: String,
+    maxLength: [2000, "Page subheading cannot be more than 2000 characters"],
+    default: "",
+  },
   /** { version: 1, rows: [...] } — see dashboardComposer defaults */
   layout: {
     type: Schema.Types.Mixed,

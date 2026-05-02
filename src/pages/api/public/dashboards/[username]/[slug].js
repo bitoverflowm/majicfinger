@@ -97,6 +97,7 @@ export default async function handler(req, res) {
       success: true,
       data: {
         page_heading: dash.page_heading || "",
+        page_subheading: dash.page_subheading || "",
         dashboard_name: dash.dashboard_name || "",
         theme: dash.theme || {},
         layout: layoutOut,

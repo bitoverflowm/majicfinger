@@ -23,6 +23,9 @@ export function ChartColorPalettePopover({
   ariaLabel,
   onClear,
   align = "start",
+  /** Passed to PopoverContent (e.g. `"top"` when the trigger sits at the bottom of the viewport). */
+  side,
+  sideOffset,
   contentClassName,
   triggerClassName,
 }) {
@@ -43,6 +46,8 @@ export function ChartColorPalettePopover({
       </PopoverTrigger>
       <PopoverContent
         align={align}
+        side={side}
+        sideOffset={sideOffset}
         className={cn("max-h-[min(72vh,480px)] w-[min(100vw-2rem,20rem)] overflow-y-auto p-2", contentClassName)}
       >
         <div className="space-y-3">

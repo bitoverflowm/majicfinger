@@ -83,6 +83,7 @@ export default async function handler(req, res) {
         const $set = { last_edited_date: new Date() };
         if (typeof req.body.dashboard_name === "string") $set.dashboard_name = req.body.dashboard_name;
         if (typeof req.body.page_heading === "string") $set.page_heading = req.body.page_heading;
+        if (typeof req.body.page_subheading === "string") $set.page_subheading = req.body.page_subheading;
         if (req.body.layout && typeof req.body.layout === "object") $set.layout = req.body.layout;
         if (req.body.theme && typeof req.body.theme === "object") $set.theme = req.body.theme;
 

@@ -57,6 +57,7 @@ export default async function handler(req, res) {
         const {
           dashboard_name,
           page_heading,
+          page_subheading,
           layout,
           theme,
           user_id,
@@ -78,6 +79,7 @@ export default async function handler(req, res) {
         const doc = await ChartDashboard.create({
           dashboard_name: dashboard_name || "Untitled dashboard",
           page_heading: page_heading || "",
+          page_subheading: typeof page_subheading === "string" ? page_subheading : "",
           layout: layout && typeof layout === "object" ? layout : createEmptyDashboardLayout(),
           theme:
             theme && typeof theme === "object"

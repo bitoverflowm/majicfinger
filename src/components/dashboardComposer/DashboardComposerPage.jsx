@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -25,7 +24,19 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { getPageTitleEditorClasses, getPageTitleEditorStyle } from "@/lib/pageTitleTheme";
+import {
+  getPageTextBlockEditorClasses,
+  getPageTextBlockEditorStyle,
+  PAGE_SUBHEADING_PLACEHOLDER,
+} from "@/lib/pageTitleTheme";
+import {
+  getChartCardHeadingEditorClasses,
+  getChartCardHeadingEditorStyle,
+  getChartCardMicrotextEditorClasses,
+  getChartCardMicrotextEditorStyle,
+  getChartCardSubheadingEditorClasses,
+  getChartCardSubheadingEditorStyle,
+} from "@/lib/chartCardTextTheme";
 
 function rid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -50,7 +61,6 @@ export default function DashboardComposerPage({ user }) {
     setChartDashboardDraft,
     activeChartDashboardId,
     setActiveChartDashboardId,
-    savedCharts,
     savedDataSets,
     loadedDataMeta,
     selectedDashboardCard,
@@ -58,6 +68,9 @@ export default function DashboardComposerPage({ user }) {
     setRefetchChartDashboardsTick,
     savedChartDashboards,
     setPageTitleFormatDockOpen,
+    setPageFormatDockTarget,
+    setChartComposerDock,
+    setChartPickerEmphasis,
   } = useMyStateV2();
 
   const hasDbUser =
@@ -72,6 +85,25 @@ export default function DashboardComposerPage({ user }) {
   const openPageTitleDock = useCallback(() => {
     setPageTitleFormatDockOpen?.(true);
   }, [setPageTitleFormatDockOpen]);
+
+  const openPageSubheadingDock = useCallback(() => {
+    setPageFormatDockTarget?.("pageSubheading");
+  }, [setPageFormatDockTarget]);
+
+  const pageSubheadingTextareaRef = useRef(null);
+  /** Grow subheading field with content (theme font size / line wrap). */
+  useLayoutEffect(() => {
+    const el = pageSubheadingTextareaRef.current;
+    if (!el) return;
+    const sync = () => {
+      el.style.height = "0px";
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    sync();
+    const ro = new ResizeObserver(() => sync());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [draft?.page_subheading, draft?.theme?.pageSubheading]);
 
   useEffect(() => {
     if (!activeChartDashboardId || !hasDbUser) return;
@@ -95,10 +127,14 @@ export default function DashboardComposerPage({ user }) {
         setDashboardLoadProgress(82);
         setDashboardLoadStage("Applying dashboard");
         const d = j.data;
+        setSelectedDashboardCard?.(null);
+        setChartComposerDock?.(null);
+        setChartPickerEmphasis?.(null);
         setChartDashboardDraft({
           _id: d._id,
           dashboard_name: d.dashboard_name || "",
           page_heading: d.page_heading || "",
+          page_subheading: d.page_subheading || "",
           layout: d.layout && typeof d.layout === "object" ? d.layout : createEmptyDashboardLayout(),
           theme: d.theme && typeof d.theme === "object" ? d.theme : { background: "none", background_color: "" },
           data_set_id: d.data_set_id ? String(d.data_set_id) : "",
@@ -116,7 +152,14 @@ export default function DashboardComposerPage({ user }) {
     return () => {
       cancelled = true;
     };
-  }, [activeChartDashboardId, hasDbUser, setChartDashboardDraft, setActiveChartDashboardId]);
+  }, [
+    activeChartDashboardId,
+    hasDbUser,
+    setChartDashboardDraft,
+    setActiveChartDashboardId,
+    setSelectedDashboardCard,
+    setChartComposerDock,
+  ]);
 
   const setDraft = useCallback(
     (updater) => {
@@ -152,17 +195,21 @@ export default function DashboardComposerPage({ user }) {
     [updateRow],
   );
 
-  const addCardsRow = () => {
+  /** One layout row = one or more chart cards; "Add Chart" adds a single square chart by default. */
+  const addChart = () => {
+    setPageFormatDockTarget?.(null);
+    const rowId = rid("row");
+    const col = emptyColumn();
+    setSelectedDashboardCard?.({ rowId, colId: col.id });
+    setChartComposerDock?.({ rowId, colId: col.id });
+    setChartPickerEmphasis?.({ rowId, colId: col.id });
     setDraft((d) => {
       const layout = d.layout || createEmptyDashboardLayout();
       return {
         ...d,
         layout: {
           ...layout,
-          rows: [
-            ...layout.rows,
-            { id: rid("row"), type: "cards", columns: [emptyColumn()] },
-          ],
+          rows: [...layout.rows, { id: rowId, type: "cards", columns: [col] }],
         },
       };
     });
@@ -187,6 +234,8 @@ export default function DashboardComposerPage({ user }) {
       return { ...d, layout: { ...layout, rows: layout.rows.filter((r) => r.id !== rowId) } };
     });
     setSelectedDashboardCard?.(null);
+    setChartComposerDock?.((prev) => (prev?.rowId === rowId ? null : prev));
+    setChartPickerEmphasis?.((em) => (em?.rowId === rowId ? null : em));
   };
 
   const moveRow = (rowId, dir) => {
@@ -202,22 +251,6 @@ export default function DashboardComposerPage({ user }) {
     });
   };
 
-  const addColumn = (rowId) => {
-    updateRow(rowId, (r) => {
-      if (r.type !== "cards") return r;
-      return { ...r, columns: [...(r.columns || []), emptyColumn()] };
-    });
-  };
-
-  const removeColumn = (rowId, colId) => {
-    updateRow(rowId, (r) => {
-      if (r.type !== "cards" || !Array.isArray(r.columns)) return r;
-      const columns = r.columns.filter((c) => c.id !== colId);
-      return { ...r, columns: columns.length ? columns : [emptyColumn()] };
-    });
-    setSelectedDashboardCard?.(null);
-  };
-
   const handleCreateNew = () => {
     if (!hasDbUser) {
       toast.error("Sign in to create a dashboard.");
@@ -225,10 +258,13 @@ export default function DashboardComposerPage({ user }) {
     }
     const dataSetId = draft?.data_set_id || loadedDataMeta?._id || savedDataSets?.[0]?._id;
     setSelectedDashboardCard?.(null);
+    setChartComposerDock?.(null);
+    setChartPickerEmphasis?.(null);
     setActiveChartDashboardId?.(null);
     setChartDashboardDraft({
       dashboard_name: "",
       page_heading: "",
+      page_subheading: "",
       layout: createEmptyDashboardLayout(),
       theme: { background: "none", background_color: "" },
       data_set_id: dataSetId ? String(dataSetId) : "",
@@ -285,6 +321,7 @@ export default function DashboardComposerPage({ user }) {
   }, [
     draft?.dashboard_name,
     draft?.page_heading,
+    draft?.page_subheading,
     draft?.data_set_id,
     draft?.layout,
     draft?.theme,
@@ -295,11 +332,6 @@ export default function DashboardComposerPage({ user }) {
     setActiveChartDashboardId,
     setRefetchChartDashboardsTick,
   ]);
-
-  const chartOptions = useMemo(() => {
-    const list = Array.isArray(savedCharts) ? savedCharts : [];
-    return list.map((c) => ({ id: String(c._id), name: c.chart_name || "Chart" }));
-  }, [savedCharts]);
 
   const savedDashboardOptions = useMemo(() => {
     const list = Array.isArray(savedChartDashboards) ? savedChartDashboards : [];
@@ -382,7 +414,7 @@ export default function DashboardComposerPage({ user }) {
   const showDots = draft.theme?.background === "dotPattern";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-6 py-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto scroll-pb-40 px-6 pt-6 pb-40">
       <div
         className="relative rounded-lg border p-6 shadow-sm"
         style={{ backgroundColor: bg || undefined }}
@@ -392,7 +424,7 @@ export default function DashboardComposerPage({ user }) {
             className={cn("[mask-image:radial-gradient(500px_circle_at_center,white,transparent)]")}
           />
         ) : null}
-        <div className="relative z-[1] mx-auto max-w-6xl space-y-6">
+        <div className="relative z-0 mx-auto max-w-6xl space-y-6">
           <input
             type="text"
             aria-label="Page title"
@@ -407,18 +439,43 @@ export default function DashboardComposerPage({ user }) {
               }))
             }
             onFocus={openPageTitleDock}
-            style={getPageTitleEditorStyle(draft?.theme)}
+            style={getPageTextBlockEditorStyle(draft?.theme, "pageTitle")}
             className={cn(
               "w-full min-w-0 cursor-text border-0 bg-transparent p-0 shadow-none outline-none",
               "tracking-tight text-foreground",
               "placeholder:text-muted-foreground/80",
               "focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
-              getPageTitleEditorClasses(draft?.theme),
+              getPageTextBlockEditorClasses(draft?.theme, "pageTitle"),
+            )}
+          />
+
+          <Textarea
+            ref={pageSubheadingTextareaRef}
+            aria-label="Page subheading"
+            autoComplete="off"
+            spellCheck={false}
+            rows={1}
+            value={draft.page_subheading ?? ""}
+            placeholder={PAGE_SUBHEADING_PLACEHOLDER}
+            onChange={(e) =>
+              setDraft((d) => ({
+                ...d,
+                page_subheading: e.target.value,
+              }))
+            }
+            onFocus={openPageSubheadingDock}
+            style={getPageTextBlockEditorStyle(draft?.theme, "pageSubheading")}
+            className={cn(
+              "!min-h-0 overflow-hidden",
+              "w-full min-w-0 cursor-text resize-y border-0 bg-transparent p-0 shadow-none outline-none",
+              "text-foreground placeholder:text-muted-foreground/80",
+              "focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+              getPageTextBlockEditorClasses(draft?.theme, "pageSubheading"),
             )}
           />
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={addCardsRow}>
+            <Button type="button" size="sm" variant="outline" onClick={addChart}>
               <Plus className="mr-1 h-3.5 w-3.5" />
               Add Chart
             </Button>
@@ -429,85 +486,221 @@ export default function DashboardComposerPage({ user }) {
           </div>
 
           {rows.map((row) => {
-            const rowExpanded = expandedRowIds.has(row.id);
-            const collapsedSummary =
-              row.type === "cards"
-                ? `${(row.columns || []).length} column${(row.columns || []).length !== 1 ? "s" : ""}`
-                : row.body?.trim()
-                  ? `${row.body.trim().slice(0, 100)}${row.body.trim().length > 100 ? "…" : ""}`
-                  : "Empty text row";
-            return (
-              <Collapsible
-                key={row.id}
-                open={rowExpanded}
-                onOpenChange={(open) => {
-                  setExpandedRowIds((prev) => {
-                    const next = new Set(prev);
-                    if (open) next.add(row.id);
-                    else next.delete(row.id);
-                    return next;
-                  });
-                }}
-              >
-                <div className="rounded-lg border border-border/80 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        aria-expanded={rowExpanded}
-                        aria-label={rowExpanded ? "Collapse row" : "Expand row"}
-                      >
-                        <ChevronDown
-                          className={cn(
-                            "h-4 w-4 transition-transform duration-200",
-                            rowExpanded ? "rotate-0" : "-rotate-90",
-                          )}
-                        />
-                      </Button>
-                    </CollapsibleTrigger>
-                    <span className="text-xs font-medium uppercase text-muted-foreground">
-                      {row.type === "cards" ? "Chart row" : "Text row"}
-                    </span>
-                    <div className="ml-auto flex gap-1">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => moveRow(row.id, -1)}
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => moveRow(row.id, 1)}
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => removeRow(row.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+            if (row.type === "cards" && Array.isArray(row.columns)) {
+              const cols = row.columns || [];
+              return (
+                <div
+                  key={row.id}
+                  className="grid gap-4"
+                  style={{ gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}
+                >
+                  {cols.map((col) => {
+                      return (
+                        <div
+                          key={col.id}
+                          role="button"
+                          tabIndex={0}
+                          style={{
+                            gridColumn: `span ${Math.min(12, Math.max(1, col.colSpan ?? 12))}`,
+                            gridRow: `span ${Math.max(1, col.rowSpan ?? 1)}`,
+                          }}
+                          onClick={() => {
+                            setPageFormatDockTarget?.(null);
+                            setSelectedDashboardCard?.({ rowId: row.id, colId: col.id });
+                            setChartComposerDock?.({ rowId: row.id, colId: col.id });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              setPageFormatDockTarget?.(null);
+                              setSelectedDashboardCard?.({ rowId: row.id, colId: col.id });
+                              setChartComposerDock?.({ rowId: row.id, colId: col.id });
+                            }
+                          }}
+                          className="flex min-w-0 flex-col gap-2 py-1 transition-colors outline-none focus-visible:outline-none"
+                        >
+                          <input
+                            type="text"
+                            aria-label="Chart heading"
+                            autoComplete="off"
+                            spellCheck={false}
+                            value={col.h2 ?? ""}
+                            placeholder="Chart Heading"
+                            onChange={(e) =>
+                              updateColumn(row.id, col.id, (c) => ({
+                                ...c,
+                                h2: e.target.value,
+                              }))
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={(e) => {
+                              e.stopPropagation();
+                              setSelectedDashboardCard?.({ rowId: row.id, colId: col.id });
+                              setChartComposerDock?.({ rowId: row.id, colId: col.id });
+                              setPageFormatDockTarget?.({
+                                type: "chartHeading",
+                                rowId: row.id,
+                                colId: col.id,
+                              });
+                            }}
+                            style={getChartCardHeadingEditorStyle(col)}
+                            className={cn(
+                              "w-full min-w-0 cursor-text border-0 bg-transparent p-0 shadow-none outline-none",
+                              "tracking-tight text-foreground",
+                              "placeholder:text-muted-foreground/80",
+                              "focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                              getChartCardHeadingEditorClasses(col),
+                            )}
+                          />
+                          <Textarea
+                            aria-label="Chart sub-heading"
+                            autoComplete="off"
+                            spellCheck={false}
+                            rows={2}
+                            value={col.caption ?? ""}
+                            placeholder="sub-heading"
+                            onChange={(e) =>
+                              updateColumn(row.id, col.id, (c) => ({
+                                ...c,
+                                caption: e.target.value,
+                              }))
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={(e) => {
+                              e.stopPropagation();
+                              setSelectedDashboardCard?.({ rowId: row.id, colId: col.id });
+                              setChartComposerDock?.({ rowId: row.id, colId: col.id });
+                              setPageFormatDockTarget?.({
+                                type: "chartSubheading",
+                                colId: col.id,
+                                rowId: row.id,
+                              });
+                            }}
+                            style={getChartCardSubheadingEditorStyle(col)}
+                            className={cn(
+                              "!min-h-0 overflow-hidden",
+                              "w-full min-w-0 cursor-text resize-y border-0 bg-transparent p-0 shadow-none outline-none",
+                              "text-foreground placeholder:text-muted-foreground/80",
+                              "focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                              getChartCardSubheadingEditorClasses(col),
+                            )}
+                          />
+                          <div className="min-h-0" onClick={(e) => e.stopPropagation()}>
+                            <IsolatedChartPreview chartId={col.chart_id} />
+                          </div>
+                          <input
+                            type="text"
+                            aria-label="Chart caption text, click to edit"
+                            autoComplete="off"
+                            spellCheck={false}
+                            value={col.microtext ?? ""}
+                            placeholder="Chart caption text, click to edit"
+                            onChange={(e) =>
+                              updateColumn(row.id, col.id, (c) => ({
+                                ...c,
+                                microtext: e.target.value,
+                              }))
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={(e) => {
+                              e.stopPropagation();
+                              setSelectedDashboardCard?.({ rowId: row.id, colId: col.id });
+                              setChartComposerDock?.({ rowId: row.id, colId: col.id });
+                              setPageFormatDockTarget?.({
+                                type: "chartMicrotext",
+                                rowId: row.id,
+                                colId: col.id,
+                              });
+                            }}
+                            style={getChartCardMicrotextEditorStyle(col)}
+                            className={cn(
+                              "w-full min-w-0 cursor-text border-0 bg-transparent p-0 shadow-none outline-none",
+                              "tracking-tight text-foreground",
+                              "placeholder:text-muted-foreground/80",
+                              "focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                              getChartCardMicrotextEditorClasses(col),
+                            )}
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              );
+            }
+
+            if (row.type === "text") {
+              const rowExpanded = expandedRowIds.has(row.id);
+              const collapsedSummary = row.body?.trim()
+                ? `${row.body.trim().slice(0, 100)}${row.body.trim().length > 100 ? "…" : ""}`
+                : "Empty text row";
+              return (
+                <Collapsible
+                  key={row.id}
+                  open={rowExpanded}
+                  onOpenChange={(open) => {
+                    setExpandedRowIds((prev) => {
+                      const next = new Set(prev);
+                      if (open) next.add(row.id);
+                      else next.delete(row.id);
+                      return next;
+                    });
+                  }}
+                >
+                  <div className="rounded-lg border border-border/80 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          aria-expanded={rowExpanded}
+                          aria-label={rowExpanded ? "Collapse row" : "Expand row"}
+                        >
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 transition-transform duration-200",
+                              rowExpanded ? "rotate-0" : "-rotate-90",
+                            )}
+                          />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <span className="text-xs font-medium uppercase text-muted-foreground">Text row</span>
+                      <div className="ml-auto flex gap-1">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => moveRow(row.id, -1)}
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => moveRow(row.id, 1)}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => removeRow(row.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  {!rowExpanded ? (
-                    <p className="text-xs text-muted-foreground">{collapsedSummary}</p>
-                  ) : null}
+                    {!rowExpanded ? (
+                      <p className="text-xs text-muted-foreground">{collapsedSummary}</p>
+                    ) : null}
 
-                  <CollapsibleContent>
-                    {row.type === "text" && (
+                    <CollapsibleContent>
                       <Textarea
                         value={row.body || ""}
                         onChange={(e) =>
@@ -516,201 +709,13 @@ export default function DashboardComposerPage({ user }) {
                         placeholder="Descriptive text for this row…"
                         className="min-h-[100px]"
                       />
-                    )}
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              );
+            }
 
-                    {row.type === "cards" && (
-                      <>
-                        <div className="mb-3">
-                          <Button type="button" size="sm" variant="secondary" onClick={() => addColumn(row.id)}>
-                            <Plus className="mr-1 h-3.5 w-3.5" />
-                            Add column
-                          </Button>
-                        </div>
-                        <div
-                          className="grid gap-4"
-                          style={{
-                            gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
-                          }}
-                        >
-                          {(row.columns || []).map((col) => {
-                            const selected =
-                              selectedDashboardCard?.rowId === row.id &&
-                              selectedDashboardCard?.colId === col.id;
-                            return (
-                              <div
-                                key={col.id}
-                                role="button"
-                                tabIndex={0}
-                                style={{
-                                  gridColumn: `span ${Math.min(12, Math.max(1, col.colSpan ?? 12))}`,
-                                  gridRow: `span ${Math.max(1, col.rowSpan ?? 1)}`,
-                                }}
-                                onClick={() => setSelectedDashboardCard?.({ rowId: row.id, colId: col.id })}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ")
-                                    setSelectedDashboardCard?.({ rowId: row.id, colId: col.id });
-                                }}
-                                className={cn(
-                                  "flex min-w-0 flex-col gap-2 rounded-md border p-3 transition-colors",
-                                  selected ? "border-primary ring-1 ring-primary/30" : "border-border/60 bg-card/50",
-                                )}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-[10px] font-medium text-muted-foreground">Card</span>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      removeColumn(row.id, col.id);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="grid gap-1">
-                                    <Label className="text-[10px]">Grid span (12 cols)</Label>
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      max={12}
-                                      className="h-8 text-xs"
-                                      value={col.colSpan ?? 12}
-                                      onChange={(e) =>
-                                        updateColumn(row.id, col.id, (c) => ({
-                                          ...c,
-                                          colSpan: Math.min(12, Math.max(1, Number(e.target.value) || 1)),
-                                        }))
-                                      }
-                                    />
-                                  </div>
-                                  <div className="grid gap-1">
-                                    <Label className="text-[10px]">Row span</Label>
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      max={4}
-                                      className="h-8 text-xs"
-                                      value={col.rowSpan ?? 1}
-                                      onChange={(e) =>
-                                        updateColumn(row.id, col.id, (c) => ({
-                                          ...c,
-                                          rowSpan: Math.min(4, Math.max(1, Number(e.target.value) || 1)),
-                                        }))
-                                      }
-                                    />
-                                  </div>
-                                </div>
-                                <div className="grid gap-1">
-                                  <Label className="text-[10px]">Chart</Label>
-                                  <Select
-                                    value={col.chart_id ? String(col.chart_id) : "__none__"}
-                                    onValueChange={(v) =>
-                                      updateColumn(row.id, col.id, (c) => ({
-                                        ...c,
-                                        chart_id: v === "__none__" ? null : v,
-                                      }))
-                                    }
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue placeholder="Pick chart" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__none__">None</SelectItem>
-                                      {chartOptions.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                          {c.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <Input
-                                  className="h-8 text-sm font-semibold"
-                                  placeholder="H2 heading"
-                                  value={col.h2 || ""}
-                                  onChange={(e) =>
-                                    updateColumn(row.id, col.id, (c) => ({ ...c, h2: e.target.value }))
-                                  }
-                                />
-                                <Input
-                                  className="h-8 text-xs"
-                                  placeholder="Caption"
-                                  value={col.caption || ""}
-                                  onChange={(e) =>
-                                    updateColumn(row.id, col.id, (c) => ({ ...c, caption: e.target.value }))
-                                  }
-                                />
-                                <Input
-                                  className="h-8 text-[11px] text-muted-foreground"
-                                  placeholder="Microtext"
-                                  value={col.microtext || ""}
-                                  onChange={(e) =>
-                                    updateColumn(row.id, col.id, (c) => ({ ...c, microtext: e.target.value }))
-                                  }
-                                />
-                                <div className="grid gap-1">
-                                  <Label className="text-[10px]">Link</Label>
-                                  <Select
-                                    value={col.link?.mode || "none"}
-                                    onValueChange={(v) =>
-                                      updateColumn(row.id, col.id, (c) => ({
-                                        ...c,
-                                        link: { mode: v, url: c.link?.url || "" },
-                                      }))
-                                    }
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">None</SelectItem>
-                                      <SelectItem value="chart_public">Published chart page</SelectItem>
-                                      <SelectItem value="custom">Custom URL</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  {col.link?.mode === "custom" && (
-                                    <Input
-                                      className="h-8 text-xs"
-                                      placeholder="https://…"
-                                      value={col.link?.url || ""}
-                                      onChange={(e) =>
-                                        updateColumn(row.id, col.id, (c) => ({
-                                          ...c,
-                                          link: { ...c.link, url: e.target.value },
-                                        }))
-                                      }
-                                    />
-                                  )}
-                                </div>
-                                {col.h2 ? (
-                                  <h2 className="pt-1 text-base font-semibold leading-tight">{col.h2}</h2>
-                                ) : null}
-                                <div
-                                  className="min-h-0"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <IsolatedChartPreview chartId={col.chart_id} />
-                                </div>
-                                {col.caption ? (
-                                  <p className="text-xs text-muted-foreground">{col.caption}</p>
-                                ) : null}
-                                {col.microtext ? (
-                                  <p className="text-[10px] text-muted-foreground">{col.microtext}</p>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </CollapsibleContent>
-                </div>
-              </Collapsible>
-            );
+            return null;
           })}
         </div>
       </div>
