@@ -45,7 +45,18 @@ function rid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function emptyColumn() {
+function clampChartColSpan(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 12;
+  return Math.min(12, Math.max(1, Math.round(x)));
+}
+
+function sumChartRowColSpans(columns) {
+  if (!Array.isArray(columns)) return 0;
+  return columns.reduce((s, c) => s + clampChartColSpan(c?.colSpan), 0);
+}
+
+function emptyColumn(overrides = {}) {
   return {
     id: rid("col"),
     chart_id: null,
@@ -55,7 +66,57 @@ function emptyColumn() {
     caption: "",
     microtext: "",
     link: { mode: "none", url: "" },
+    ...overrides,
   };
+}
+
+/**
+ * Append a chart slot using a 12-col grid: fill the last `cards` row if sum(colSpan) < 12;
+ * if the row is a single full-width chart (12), split to 6+6; otherwise start a new row.
+ * @returns {{ rows: object[], selection: { rowId: string, colId: string } }}
+ */
+function computeRowsAfterAddChart(layout) {
+  const base = layout && typeof layout === "object" ? layout : createEmptyDashboardLayout();
+  const rows = Array.isArray(base.rows) ? [...base.rows] : [];
+
+  let lastCardsIdx = -1;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i]?.type === "cards" && Array.isArray(rows[i].columns)) {
+      lastCardsIdx = i;
+      break;
+    }
+  }
+
+  if (lastCardsIdx < 0) {
+    const rowId = rid("row");
+    const col = emptyColumn({ colSpan: 12 });
+    rows.push({ id: rowId, type: "cards", columns: [col] });
+    return { rows, selection: { rowId, colId: col.id } };
+  }
+
+  const row = rows[lastCardsIdx];
+  const cols = Array.isArray(row.columns) ? [...row.columns] : [];
+  const sum = sumChartRowColSpans(cols);
+
+  if (sum < 12) {
+    const remaining = 12 - sum;
+    const col = emptyColumn({ colSpan: remaining });
+    const updatedRow = { ...row, columns: [...cols, col] };
+    rows[lastCardsIdx] = updatedRow;
+    return { rows, selection: { rowId: row.id, colId: col.id } };
+  }
+
+  if (sum === 12 && cols.length === 1 && clampChartColSpan(cols[0].colSpan) === 12) {
+    const first = { ...cols[0], colSpan: 6 };
+    const col = emptyColumn({ colSpan: 6 });
+    rows[lastCardsIdx] = { ...row, columns: [first, col] };
+    return { rows, selection: { rowId: row.id, colId: col.id } };
+  }
+
+  const rowId = rid("row");
+  const col = emptyColumn({ colSpan: 12 });
+  rows.push({ id: rowId, type: "cards", columns: [col] });
+  return { rows, selection: { rowId, colId: col.id } };
 }
 
 export default function DashboardComposerPage({ user }) {
@@ -197,21 +258,21 @@ export default function DashboardComposerPage({ user }) {
     [updateRow],
   );
 
-  /** One layout row = one or more chart cards; "Add Chart" adds a single square chart by default. */
+  /** Add Chart: pack into the last 12-col cards row when possible; otherwise new row. */
   const addChart = () => {
     setPageFormatDockTarget?.(null);
-    const rowId = rid("row");
-    const col = emptyColumn();
-    setSelectedDashboardCard?.({ rowId, colId: col.id });
-    setChartComposerDock?.({ rowId, colId: col.id });
-    setChartPickerEmphasis?.({ rowId, colId: col.id });
+    const layout = draftRef.current?.layout || chartDashboardDraft?.layout;
+    const { rows: nextRows, selection } = computeRowsAfterAddChart(layout);
+    setSelectedDashboardCard?.(selection);
+    setChartComposerDock?.(selection);
+    setChartPickerEmphasis?.(selection);
     setDraft((d) => {
-      const layout = d.layout || createEmptyDashboardLayout();
+      const curLayout = d.layout || createEmptyDashboardLayout();
       return {
         ...d,
         layout: {
-          ...layout,
-          rows: [...layout.rows, { id: rowId, type: "cards", columns: [col] }],
+          ...curLayout,
+          rows: nextRows,
         },
       };
     });
