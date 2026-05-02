@@ -18,6 +18,10 @@ import {
   createEmptyDashboardLayout,
 } from "@/lib/dashboardLayoutDefaults";
 import {
+  flattenDashboardLayers,
+  rebuildLayoutFromFlatLayers,
+} from "@/lib/reorderDashboardPageBlocks";
+import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft";
@@ -196,12 +200,15 @@ export default function DashboardComposerPage({ user }) {
         setSelectedDashboardCard?.(null);
         setChartComposerDock?.(null);
         setChartPickerEmphasis?.(null);
+        const rawLayout =
+          d.layout && typeof d.layout === "object" ? d.layout : createEmptyDashboardLayout();
+        const layout = rebuildLayoutFromFlatLayers(flattenDashboardLayers(rawLayout), rawLayout);
         setChartDashboardDraft({
           _id: d._id,
           dashboard_name: d.dashboard_name || "",
           page_heading: d.page_heading || "",
           page_subheading: d.page_subheading || "",
-          layout: d.layout && typeof d.layout === "object" ? d.layout : createEmptyDashboardLayout(),
+          layout,
           theme: d.theme && typeof d.theme === "object" ? d.theme : { background: "none", background_color: "" },
           data_set_id: d.data_set_id ? String(d.data_set_id) : "",
           public_slug: d.public_slug || "",

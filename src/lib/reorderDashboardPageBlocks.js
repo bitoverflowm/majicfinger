@@ -1,10 +1,17 @@
 /**
  * Dashboard "Layers" sidebar: flatten to one entry per text row and per chart column,
- * reorder, then rebuild layout so each chart lives in its own `cards` row (full width).
+ * reorder, then rebuild `layout.rows`. Consecutive chart slots whose `colSpan` values sum
+ * to ≤ 12 are packed into a single `cards` row (e.g. two 50% charts stay one row).
  */
 
 function makeRowId() {
   return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function clampColSpan(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 12;
+  return Math.min(12, Math.max(1, Math.round(x)));
 }
 
 /** @typedef {{ kind: 'text', rowId: string } | { kind: 'slot', rowId: string, colId: string }} DashboardLayerItem */
@@ -49,33 +56,63 @@ export function findRowIdForColumn(layout, colId) {
  */
 export function rebuildLayoutFromFlatLayers(flat, layout) {
   const rowMap = new Map((layout.rows || []).map((r) => [r.id, r]));
-  const seenSourceRowForSlot = new Set();
   const newRows = [];
+  let idx = 0;
 
-  for (const item of flat) {
+  while (idx < flat.length) {
+    const item = flat[idx];
+
     if (item.kind === "text") {
       const r = rowMap.get(item.rowId);
       if (r?.type === "text") {
         newRows.push({ ...r });
       }
+      idx += 1;
       continue;
     }
 
-    const parentRow = rowMap.get(item.rowId);
-    if (!parentRow || parentRow.type !== "cards") continue;
-    const col = parentRow.columns?.find((c) => c.id === item.colId);
-    if (!col) continue;
+    const batch = [];
+    let spanSum = 0;
 
-    const colCopy = { ...col, colSpan: 12 };
-    const firstSlotFromThisSourceRow = !seenSourceRowForSlot.has(item.rowId);
-    seenSourceRowForSlot.add(item.rowId);
-    const assignedRowId = firstSlotFromThisSourceRow ? item.rowId : makeRowId();
+    while (idx < flat.length && flat[idx].kind === "slot") {
+      const slotItem = flat[idx];
+      const parentRow = rowMap.get(slotItem.rowId);
+      if (!parentRow || parentRow.type !== "cards") {
+        idx += 1;
+        break;
+      }
+      const col = parentRow.columns?.find((c) => c.id === slotItem.colId);
+      if (!col) {
+        idx += 1;
+        continue;
+      }
+      const sp = clampColSpan(col.colSpan);
+      if (batch.length > 0 && spanSum + sp > 12) {
+        break;
+      }
+      batch.push({ slotItem, col: { ...col } });
+      spanSum += sp;
+      idx += 1;
+    }
 
-    newRows.push({
-      id: assignedRowId,
-      type: "cards",
-      columns: [colCopy],
-    });
+    if (batch.length === 0) {
+      continue;
+    }
+
+    if (batch.length === 1) {
+      newRows.push({
+        id: batch[0].slotItem.rowId,
+        type: "cards",
+        columns: [batch[0].col],
+      });
+    } else {
+      const sameSourceRow = batch.every((b) => b.slotItem.rowId === batch[0].slotItem.rowId);
+      newRows.push({
+        id: sameSourceRow ? batch[0].slotItem.rowId : makeRowId(),
+        type: "cards",
+        columns: batch.map((b) => b.col),
+      });
+    }
   }
 
   return { ...layout, rows: newRows };

@@ -1290,31 +1290,43 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                 </CollapsibleContent>
                               </Collapsible>
 
-                              <div className="rounded-md border border-border/70 bg-muted/15 px-2 py-2">
-                                <p className="mb-2 text-xs font-medium text-foreground">Layers</p>
-                                {(() => {
-                                  const rows = chartDashboardDraft?.layout?.rows ?? [];
-                                  const layers = flattenDashboardLayers(
-                                    chartDashboardDraft?.layout || { version: 1, rows: [] },
-                                  );
-                                  if (!layers.length) {
-                                    return (
-                                      <p className="text-[11px] leading-snug text-muted-foreground">
-                                        No blocks yet. Use Chart or Text in the bottom bar.
-                                      </p>
+                              <Collapsible
+                                defaultOpen
+                                className="rounded-md border border-border/70 bg-muted/15"
+                              >
+                                <CollapsibleTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left text-xs font-medium text-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180"
+                                  >
+                                    <span>Layers</span>
+                                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+                                  </button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="border-t border-border/60 px-2 pb-3 pt-2">
+                                  {(() => {
+                                    const rows = chartDashboardDraft?.layout?.rows ?? [];
+                                    const layers = flattenDashboardLayers(
+                                      chartDashboardDraft?.layout || { version: 1, rows: [] },
                                     );
-                                  }
-                                  return (
-                                    <DragDropContext onDragEnd={onDashboardChartSlotsDragEnd}>
-                                      <Droppable droppableId="dashboard-chart-slots">
-                                        {(dropProvided) => (
-                                          <ul
-                                            ref={dropProvided.innerRef}
-                                            {...dropProvided.droppableProps}
-                                            className="flex flex-col gap-1.5"
-                                            aria-label="Dashboard layers in order"
-                                          >
-                                            {layers.map((item, i) => {
+                                    if (!layers.length) {
+                                      return (
+                                        <p className="text-[11px] leading-snug text-muted-foreground">
+                                          No blocks yet. Use Chart or Text in the bottom bar.
+                                        </p>
+                                      );
+                                    }
+                                    return (
+                                      <DragDropContext onDragEnd={onDashboardChartSlotsDragEnd}>
+                                        <Droppable droppableId="dashboard-chart-slots">
+                                          {(dropProvided) => (
+                                            <ul
+                                              ref={dropProvided.innerRef}
+                                              {...dropProvided.droppableProps}
+                                              className="flex flex-col gap-1.5"
+                                              aria-label="Dashboard layers in order"
+                                            >
+                                              {layers.map((item, i) => {
                                               if (item.kind === "text") {
                                                 const block = rows.find(
                                                   (r) => r.id === item.rowId && r.type === "text",
@@ -1616,7 +1628,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                     </DragDropContext>
                                   );
                                 })()}
-                              </div>
+                                </CollapsibleContent>
+                              </Collapsible>
                             </div>
                           ) : (
                             <p>Load or create a dashboard to edit settings in this tab.</p>
