@@ -13,7 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { createEmptyDashboardLayout } from "@/lib/dashboardLayoutDefaults";
+import {
+  CHART_CARDS_GRID_STYLE,
+  createEmptyDashboardLayout,
+} from "@/lib/dashboardLayoutDefaults";
 import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
@@ -63,7 +66,6 @@ export default function DashboardComposerPage({ user }) {
     setActiveChartDashboardId,
     savedDataSets,
     loadedDataMeta,
-    selectedDashboardCard,
     setSelectedDashboardCard,
     setRefetchChartDashboardsTick,
     savedChartDashboards,
@@ -489,11 +491,7 @@ export default function DashboardComposerPage({ user }) {
             if (row.type === "cards" && Array.isArray(row.columns)) {
               const cols = row.columns || [];
               return (
-                <div
-                  key={row.id}
-                  className="grid gap-4"
-                  style={{ gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}
-                >
+                <div key={row.id} className="grid gap-4" style={CHART_CARDS_GRID_STYLE}>
                   {cols.map((col) => {
                       return (
                         <div
@@ -502,7 +500,7 @@ export default function DashboardComposerPage({ user }) {
                           tabIndex={0}
                           style={{
                             gridColumn: `span ${Math.min(12, Math.max(1, col.colSpan ?? 12))}`,
-                            gridRow: `span ${Math.max(1, col.rowSpan ?? 1)}`,
+                            gridRow: `span ${Math.min(4, Math.max(1, Number(col.rowSpan) || 1))}`,
                           }}
                           onClick={() => {
                             setPageFormatDockTarget?.(null);
@@ -516,7 +514,7 @@ export default function DashboardComposerPage({ user }) {
                               setChartComposerDock?.({ rowId: row.id, colId: col.id });
                             }
                           }}
-                          className="flex min-w-0 flex-col gap-2 py-1 transition-colors outline-none focus-visible:outline-none"
+                          className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto py-1 transition-colors outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
                         >
                           <input
                             type="text"
@@ -584,7 +582,7 @@ export default function DashboardComposerPage({ user }) {
                               getChartCardSubheadingEditorClasses(col),
                             )}
                           />
-                          <div className="min-h-0" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-hidden">
                             <IsolatedChartPreview chartId={col.chart_id} />
                           </div>
                           <input

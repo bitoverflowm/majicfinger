@@ -21,8 +21,10 @@ function DataSheetsLoader({ rows, dataSheets }) {
   return null;
 }
 
-const PLACEHOLDER_FRAME = "min-h-0 w-full h-[220px] min-h-[220px]";
-const CHART_INNER = "flex h-[260px] min-h-[220px] w-full flex-col";
+const PLACEHOLDER_FRAME =
+  "flex min-h-[160px] w-full flex-1 items-center justify-center rounded-md border border-dashed bg-muted/20 text-xs text-muted-foreground";
+/** min-h-0 + overflow so the preview can shrink when row span decreases (grid cell height is capped). */
+const CHART_INNER = "flex min-h-0 w-full flex-1 flex-col overflow-auto";
 
 /**
  * Nested StateProviderV2 so ChartBuilderProvider reads isolated connectedData / dataSheets.
@@ -73,36 +75,20 @@ export function IsolatedChartPreview({ chartId }) {
   }, [bundle]);
 
   if (!chartId) {
-    return (
-      <div
-        className={`flex items-center justify-center rounded-md border border-dashed bg-muted/20 text-xs text-muted-foreground ${PLACEHOLDER_FRAME}`}
-      >
-        Select a chart
-      </div>
-    );
+    return <div className={PLACEHOLDER_FRAME}>Select a chart</div>;
   }
   if (err) {
     return (
-      <div
-        className={`flex items-center justify-center rounded-md border border-destructive/30 bg-destructive/5 text-xs text-destructive ${PLACEHOLDER_FRAME}`}
-      >
-        {err}
-      </div>
+      <div className={`${PLACEHOLDER_FRAME} border-destructive/30 bg-destructive/5 text-destructive`}>{err}</div>
     );
   }
   if (!bundle) {
-    return (
-      <div
-        className={`flex items-center justify-center rounded-md border bg-muted/10 text-xs text-muted-foreground ${PLACEHOLDER_FRAME}`}
-      >
-        Loading…
-      </div>
-    );
+    return <div className={`${PLACEHOLDER_FRAME} border bg-muted/10`}>Loading…</div>;
   }
 
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
-      <div className="min-h-0 w-full">
+      <div className="flex min-h-0 w-full flex-1 flex-col">
         <DataSheetsLoader rows={bundle.rows} dataSheets={bundle.dataSheets} />
         <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot}>
           <div className={CHART_INNER}>

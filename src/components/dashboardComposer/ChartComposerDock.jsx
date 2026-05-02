@@ -143,7 +143,7 @@ export function ChartComposerDock({ editorInset = null }) {
 
   const { rowId, colId } = chartComposerDock;
   const colSpan = Math.min(12, Math.max(1, column.colSpan ?? 12));
-  const rowSpan = Math.min(4, Math.max(1, column.rowSpan ?? 1));
+  const rowSpan = Math.min(4, Math.max(1, Number(column.rowSpan) || 1));
   const widthIsPreset = CHART_WIDTH_PRESETS.some((p) => p.colSpan === colSpan);
   const chartIdStr = column.chart_id ? String(column.chart_id) : "";
   const linkMode = column.link?.mode || "none";

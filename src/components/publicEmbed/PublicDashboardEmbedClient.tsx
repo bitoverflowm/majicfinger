@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import DotPattern from "@/components/magicui/dot-pattern";
+import { CHART_CARDS_GRID_STYLE } from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
 import { Progress } from "@/components/ui/progress";
@@ -179,17 +180,13 @@ export default function PublicDashboardEmbedClient({
             }
             if (row.type !== "cards" || !Array.isArray(row.columns)) return null;
             return (
-              <div
-                key={row.id || "cards"}
-                className="grid gap-4"
-                style={{ gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}
-              >
+              <div key={row.id || "cards"} className="grid gap-4" style={CHART_CARDS_GRID_STYLE}>
                 {row.columns.map((col) => {
                   const href = resolveCardHref(col, ownerHandle);
                   const span = Math.min(12, Math.max(1, col.colSpan ?? 12));
-                  const rSpan = Math.max(1, col.rowSpan ?? 1);
+                  const rSpan = Math.min(4, Math.max(1, Number(col.rowSpan) || 1));
                   const inner = (
-                    <div className="flex h-full min-w-0 flex-col gap-2 rounded-lg border border-border/70 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
+                    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto rounded-lg border border-border/70 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
                       {col.h2 ? (
                         <h2
                           className={getChartCardHeadingPublicClassName(col)}
@@ -207,9 +204,11 @@ export default function PublicDashboardEmbedClient({
                         </p>
                       ) : null}
                       {col.chartPayload ? (
-                        <PublicDashboardChartBlock chartPayload={col.chartPayload} />
+                        <div className="flex min-h-0 flex-1 flex-col">
+                          <PublicDashboardChartBlock chartPayload={col.chartPayload} />
+                        </div>
                       ) : (
-                        <div className="flex h-[120px] items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
+                        <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
                           Chart unavailable
                         </div>
                       )}
@@ -227,10 +226,10 @@ export default function PublicDashboardEmbedClient({
                     <div
                       key={col.id || String(col.chart_id)}
                       style={{ gridColumn: `span ${span}`, gridRow: `span ${rSpan}` }}
-                      className="min-w-0"
+                      className="min-h-0 min-w-0 h-full"
                     >
                       {href ? (
-                        <a href={href} className="block h-full rounded-lg no-underline hover:opacity-95">
+                        <a href={href} className="block h-full min-h-0 rounded-lg no-underline hover:opacity-95">
                           {inner}
                         </a>
                       ) : (

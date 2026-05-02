@@ -57,7 +57,7 @@ export function PublicDashboardChartBlock({ chartPayload }) {
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
-        className="w-full rounded-md border bg-card/50 p-2"
+        className="flex min-h-0 w-full flex-1 flex-col rounded-md border bg-card/50 p-2"
         style={{
           backgroundColor: cp0.bgColor || undefined,
           color: cp0.textColor || undefined,
@@ -65,7 +65,7 @@ export function PublicDashboardChartBlock({ chartPayload }) {
       >
         <DataSheetsLoader rows={rows} dataSheets={dataSheets} />
         <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot}>
-          <div className="flex h-[280px] min-h-[220px] w-full flex-col">
+          <div className="flex min-h-0 w-full flex-1 flex-col overflow-auto">
             <ChartCanvas />
           </div>
         </ChartBuilderProvider>
