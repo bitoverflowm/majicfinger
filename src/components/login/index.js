@@ -11,10 +11,12 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Progress } from '../ui/progress';
 import {
-  DEV_UNPAID_TEST_EMAIL,
-  DEV_UNPAID_TEST_NAME,
+  DEV_LOGIN_BYPASS_EMAIL,
+  DEV_LOGIN_BYPASS_NAME,
   isDevMagicLinkBypassEmail,
 } from '@/lib/devLoginBypass';
+
+const isDev = process.env.NODE_ENV !== 'production';
 
 const Login = ({ fromHome }) => {
   const router = useRouter();
@@ -24,11 +26,11 @@ const Login = ({ fromHome }) => {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Dev: pre-fill unpaid test user (magic link skipped) to exercise locked-dashboard flow. Use rikesh@bitoverflow.org for full access.
+  // Dev: pre-fill main bypass user (magic link skipped) for local sign-in.
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      setEmail(DEV_UNPAID_TEST_EMAIL);
-      setName(DEV_UNPAID_TEST_NAME);
+    if (isDev) {
+      setEmail(DEV_LOGIN_BYPASS_EMAIL);
+      setName(DEV_LOGIN_BYPASS_NAME);
     }
   }, []);
   const [progress, setProgress] = useState(0);
@@ -103,11 +105,26 @@ const Login = ({ fromHome }) => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" type="text" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} className="h-10" />
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder={isDev ? DEV_LOGIN_BYPASS_NAME : 'Your name'}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="h-10"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-10" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder={isDev ? DEV_LOGIN_BYPASS_EMAIL : 'name@example.com'}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="h-10"
+                />
               </div>
               <Button type="submit" className="w-full">
                 Continue with Email
