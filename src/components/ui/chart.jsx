@@ -93,6 +93,10 @@ const ChartTooltipContent = React.forwardRef((
     color,
     nameKey,
     labelKey,
+    /** When set (e.g. X axis column), show "name: label" above series rows. */
+    pivotName = null,
+    /** Recharts often passes raw `label` into custom content; use the same formatter as the X axis (e.g. chart builder `xTooltipLabelFormatter`). */
+    pivotLabelFormatter = null,
   },
   ref
 ) => {
@@ -109,7 +113,9 @@ const ChartTooltipContent = React.forwardRef((
     const value =
       !labelKey && typeof label === "string"
         ? config[label]?.label || label
-        : itemConfig?.label
+        : typeof label === "number" && Number.isFinite(label)
+          ? String(label)
+          : itemConfig?.label
 
     if (labelFormatter) {
       return (
@@ -134,6 +140,32 @@ const ChartTooltipContent = React.forwardRef((
     labelKey,
   ])
 
+  const pivotHeader = React.useMemo(() => {
+    if (!pivotName || hideLabel) return null
+    if (label == null || label === "") return null
+    let text
+    if (typeof pivotLabelFormatter === "function") {
+      text = pivotLabelFormatter(label, payload)
+    } else if (label instanceof Date && !Number.isNaN(label.getTime())) {
+      text = label.toISOString()
+    } else {
+      text = String(label)
+    }
+    if (text == null || text === "") return null
+    return (
+      <div
+        className={cn(
+          "mb-1 grid gap-0.5 border-b border-slate-200/80 pb-1.5 dark:border-slate-700/80",
+          labelClassName,
+        )}>
+        <div className="leading-snug">
+          <span className="text-slate-500 dark:text-slate-400">{pivotName}:</span>{" "}
+          <span className="font-medium text-slate-950 dark:text-slate-50">{text}</span>
+        </div>
+      </div>
+    )
+  }, [pivotName, pivotLabelFormatter, hideLabel, label, labelClassName, payload])
+
   if (!active || !payload?.length) {
     return null
   }
@@ -147,7 +179,8 @@ const ChartTooltipContent = React.forwardRef((
         "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-slate-200 border-slate-200/50 bg-white px-2.5 py-1.5 text-xs shadow-xl dark:border-slate-800 dark:border-slate-800/50 dark:bg-slate-950",
         className
       )}>
-      {!nestLabel ? tooltipLabel : null}
+      {pivotHeader}
+      {!pivotName && !nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
         {payload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || "value"}`
@@ -185,24 +218,41 @@ const ChartTooltipContent = React.forwardRef((
                         } />
                     )
                   )}
-                  <div
-                    className={cn(
-                      "flex flex-1 justify-between leading-none",
-                      nestLabel ? "items-end" : "items-center"
-                    )}>
-                    <div className="grid gap-1.5">
-                      {nestLabel ? tooltipLabel : null}
+                  {pivotName ? (
+                    <div className="min-w-0 flex-1 leading-snug">
                       <span className="text-slate-500 dark:text-slate-400">
-                        {itemConfig?.label || item.name}
+                        {itemConfig?.label || item.name}:
+                      </span>{" "}
+                      <span className="font-mono font-medium tabular-nums text-slate-950 dark:text-slate-50">
+                        {item.value != null && item.value !== ""
+                          ? typeof item.value === "number"
+                            ? item.value.toLocaleString()
+                            : String(item.value)
+                          : "—"}
                       </span>
                     </div>
-                    {item.value && (
-                      <span
-                        className="font-mono font-medium tabular-nums text-slate-950 dark:text-slate-50">
-                        {item.value.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
+                  ) : (
+                    <div
+                      className={cn(
+                        "flex flex-1 justify-between leading-none",
+                        nestLabel ? "items-end" : "items-center",
+                      )}
+                    >
+                      <div className="grid gap-1.5">
+                        {nestLabel ? tooltipLabel : null}
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {itemConfig?.label || item.name}
+                        </span>
+                      </div>
+                      {item.value != null && item.value !== "" ? (
+                        <span className="font-mono font-medium tabular-nums text-slate-950 dark:text-slate-50">
+                          {typeof item.value === "number"
+                            ? item.value.toLocaleString()
+                            : String(item.value)}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
                 </>
               )}
             </div>)

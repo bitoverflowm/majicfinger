@@ -74,13 +74,29 @@ const BAR_X_AXIS_PADDING = { left: 28, right: 28 };
 /** Select sentinel: no X axis chosen yet (must not match a real column name). */
 export const CHART_X_AXIS_NONE = "__chart_x_axis_none__";
 
+/** Sheet rows store plain column names; axis keys from the builder are often `sheetId::column`. */
+function rowValueForDataKey(row, key) {
+  if (!row || key == null || key === "") return undefined;
+  if (Object.prototype.hasOwnProperty.call(row, key)) return row[key];
+  const s = String(key);
+  const splitIdx = s.indexOf("::");
+  if (splitIdx > 0) {
+    const col = s.slice(splitIdx + 2);
+    if (col && Object.prototype.hasOwnProperty.call(row, col)) return row[col];
+  }
+  return undefined;
+}
+
 export function getAxisType(key, dataTypes, data) {
-  if (dataTypes && dataTypes[key]) {
-    const t = dataTypes[key];
+  const skey = String(key || "");
+  const descoped = skey.includes("::") ? skey.slice(skey.indexOf("::") + 2) : null;
+  const dt = dataTypes && (dataTypes[skey] ?? (descoped ? dataTypes[descoped] : undefined));
+  if (dt) {
+    const t = dt;
     if (t === "number" || t === "date") return t;
     // Stale/wrong "string" in context — infer from actual rows so charts sort and scale correctly.
     if (data?.length) {
-      const v = data[0][key];
+      const v = rowValueForDataKey(data[0], key);
       if (typeof v === "number" && Number.isFinite(v)) return "number";
       if (v instanceof Date) return "date";
       const n = Number(v);
@@ -90,7 +106,7 @@ export function getAxisType(key, dataTypes, data) {
     return "string";
   }
   if (!data || !data.length) return "string";
-  const v = data[0][key];
+  const v = rowValueForDataKey(data[0], key);
   if (v instanceof Date) return "date";
   if (typeof v === "number" && Number.isFinite(v)) return "number";
   if (typeof v === "string" && /^\d{4}-\d{2}/.test(v)) return "date";
@@ -104,17 +120,18 @@ function isLikelyTemporalKey(key, dataTypes, data) {
   if (getAxisType(key, dataTypes, data) === "date") return true;
   const keyNorm = String(key).toLowerCase();
   if (keyNorm === "t") return true;
-  if (/(time|timestamp|date|datetime|createdat|updatedat|ts)/.test(keyNorm)) return true;
+  const keyTail = keyNorm.includes("::") ? keyNorm.slice(keyNorm.indexOf("::") + 2) : keyNorm;
+  if (/(time|timestamp|date|datetime|createdat|updatedat|ts)/.test(keyTail)) return true;
   const rows = Array.isArray(data) ? data : [];
   for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
-    const raw = rows[i]?.[key];
+    const raw = rowValueForDataKey(rows[i], key);
     if (raw == null || raw === "") continue;
     if (typeof raw === "string" && Number.isFinite(temporalToMs(raw))) return true;
   }
   let temporalLikeCount = 0;
   let nonEmptyCount = 0;
   for (let i = 0; i < Math.min(rows.length, 50); i += 1) {
-    const raw = rows[i]?.[key];
+    const raw = rowValueForDataKey(rows[i], key);
     if (raw == null || raw === "") continue;
     nonEmptyCount += 1;
     const n = Number(raw);
@@ -1500,7 +1517,14 @@ export function ChartCanvas() {
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
-                          content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />}
+                          content={
+                            <ChartTooltipContent
+                              indicator="line"
+                              className={CHART_CHROME_TEXT_CLASS}
+                              pivotName={stripSheetScopedColumnKey(xKey)}
+                              pivotLabelFormatter={xTooltipLabelFormatter}
+                            />
+                          }
                         />
                         {yKeys.map((yKey, idx) => (
                           <Area
@@ -1547,7 +1571,14 @@ export function ChartCanvas() {
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
-                          content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />}
+                          content={
+                            <ChartTooltipContent
+                              indicator="line"
+                              className={CHART_CHROME_TEXT_CLASS}
+                              pivotName={stripSheetScopedColumnKey(xKey)}
+                              pivotLabelFormatter={xTooltipLabelFormatter}
+                            />
+                          }
                         />
                         {yKeys.map((yKey, idx) => (
                           <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorFor(yKey, idx)} radius={4} stackId={stackedBar ? "a" : idx}>
@@ -1602,7 +1633,14 @@ export function ChartCanvas() {
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
-                          content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />}
+                          content={
+                            <ChartTooltipContent
+                              indicator="line"
+                              className={CHART_CHROME_TEXT_CLASS}
+                              pivotName={stripSheetScopedColumnKey(xKey)}
+                              pivotLabelFormatter={xTooltipLabelFormatter}
+                            />
+                          }
                         />
                         {yKeys.map((yKey, idx) => (
                           <Line
