@@ -91,12 +91,12 @@ export function getAxisType(key, dataTypes, data) {
   }
   if (!data || !data.length) return "string";
   const v = data[0][key];
-  if (v instanceof Date) return 'date';
-  if (typeof v === 'number' && Number.isFinite(v)) return 'number';
-  if (typeof v === 'string' && /^\d{4}-\d{2}/.test(v)) return 'date';
+  if (v instanceof Date) return "date";
+  if (typeof v === "number" && Number.isFinite(v)) return "number";
+  if (typeof v === "string" && /^\d{4}-\d{2}/.test(v)) return "date";
   const n = Number(v);
-  if (v != null && v !== '' && !Number.isNaN(n) && Number.isFinite(n)) return 'number';
-  return 'string';
+  if (v != null && v !== "" && !Number.isNaN(n) && Number.isFinite(n)) return "number";
+  return "string";
 }
 
 function isLikelyTemporalKey(key, dataTypes, data) {
@@ -669,7 +669,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
     const relevantSheetEntries = sheetEntries.filter(([sheetId]) => neededSheetIds.has(sheetId));
     const sourceEntries = relevantSheetEntries.length ? relevantSheetEntries : sheetEntries;
-    const maxRows = Math.max(0, ...sourceEntries.map(([, sheet]) => sheet.data.length));
+    // Unscoped columns read only from the active sheet; other sheets' row counts must not extend the
+    // synthetic frame or we pad with row indices as fake X values and corrupt time scales.
+    const maxRows =
+      neededSheetIds.size > 0
+        ? Math.max(0, ...sourceEntries.map(([, sheet]) => sheet.data.length))
+        : activeRows.length;
     const rows = [];
     for (let idx = 0; idx < maxRows; idx += 1) {
       const row = {};
