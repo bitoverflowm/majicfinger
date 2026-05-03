@@ -27,7 +27,7 @@ export const ATHENA_KALSHI_SAMPLE_OPTIONS = [
 /** Fixed server row cap for integration samples (matches product expectation). */
 export const ATHENA_SAMPLE_ROW_LIMIT = 100;
 
-/** Client asks for this many rows when the user has dashboard / subscription access; server still validates and clamps. */
+/** Default max rows for subscriber Athena pulls (select + compose) and for DuckDB materialization of Athena JSON; server/env may raise further up to 500k. */
 export const ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT = 50000;
 
 /** AG Grid shows this many rows per page; full dataset stays in sheet state for charts and transforms. */

@@ -1,4 +1,5 @@
 import { arrowTableToRows } from "@/lib/duckdb/arrowTableToRows";
+import { ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 
 /** @type {{ db: import('@duckdb/duckdb-wasm').AsyncDuckDB; conn: import('@duckdb/duckdb-wasm').AsyncDuckDBConnection } | null} */
 let instance = null;
@@ -241,7 +242,10 @@ export function athenaRowsToObjects(columns, rows) {
 export async function ingestAthenaResultAsView(opts) {
   const { dataset, sampleId, columns, rows } = opts;
   const full = opts.ingestFullResult === true;
-  const limit = full ? null : Math.min(5000, Math.max(1, Number(opts.limit) || 200));
+  /** Align with Athena subscriber pull cap — previously 5000 hid most of large compose results in DuckDB/sheet. */
+  const limit = full
+    ? null
+    : Math.min(ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT, Math.max(1, Number(opts.limit) || 200));
 
   if (!Array.isArray(columns) || !Array.isArray(rows)) {
     throw new Error("Athena ingest expects columns and rows arrays.");

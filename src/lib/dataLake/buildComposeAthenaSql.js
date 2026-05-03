@@ -127,6 +127,9 @@ const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
 /** Max rows for compose queries that are a plain SELECT over a table (no SUM/COUNT, no join preset) — avoids huge result pulls. */
 export const COMPOSE_UNCONSTRAINED_ROW_CAP = 100;
 
+/** Hard ceiling for `LIMIT` in generated compose SQL (must stay aligned with `validateAthenaLakeQueryBody`). */
+export const COMPOSE_SQL_LIMIT_ABSOLUTE_MAX = 500000;
+
 /**
  * True when compose has no SQL-level row collapsing (aggregates) and no join subquery.
  * Such queries have no WHERE in `buildComposeAthenaSelectSql` and can return one row per table row.
@@ -811,7 +814,7 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
 
   const lim =
     limit != null && Number.isFinite(Number(limit))
-      ? Math.min(1000, Math.max(1, Math.floor(Number(limit))))
+      ? Math.min(COMPOSE_SQL_LIMIT_ABSOLUTE_MAX, Math.max(1, Math.floor(Number(limit))))
       : null;
   const limitSql = lim != null ? ` LIMIT ${lim}` : "";
   const w = typeof whereSql === "string" ? whereSql : "";

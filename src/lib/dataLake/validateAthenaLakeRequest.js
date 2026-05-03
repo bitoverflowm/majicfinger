@@ -20,6 +20,7 @@ const KALSHI_TRADES_JOIN_PRESETS = new Set([
 import {
   buildComposeAthenaSelectSql,
   composeUnboundedSelectShouldCapRows,
+  COMPOSE_SQL_LIMIT_ABSOLUTE_MAX,
   COMPOSE_UNCONSTRAINED_ROW_CAP,
 } from "./buildComposeAthenaSql";
 import { ATHENA_DEMO_ROW_LIMIT, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
@@ -72,11 +73,11 @@ export function validateAthenaLakeQueryBody(body, access) {
   const accessOpts = access && typeof access === "object" ? access : {};
   const maxSelectRows =
     typeof accessOpts.maxSelectRows === "number" && Number.isFinite(accessOpts.maxSelectRows)
-      ? Math.min(500000, Math.max(1, Math.floor(accessOpts.maxSelectRows)))
+      ? Math.min(COMPOSE_SQL_LIMIT_ABSOLUTE_MAX, Math.max(1, Math.floor(accessOpts.maxSelectRows)))
       : ATHENA_SAMPLE_ROW_LIMIT;
   const maxComposeRowsCap =
     typeof accessOpts.maxComposeRows === "number" && Number.isFinite(accessOpts.maxComposeRows)
-      ? Math.min(500000, Math.max(1, Math.floor(accessOpts.maxComposeRows)))
+      ? Math.min(COMPOSE_SQL_LIMIT_ABSOLUTE_MAX, Math.max(1, Math.floor(accessOpts.maxComposeRows)))
       : COMPOSE_UNCONSTRAINED_ROW_CAP;
 
   const lake = String(body.lake || "").toLowerCase().trim();
