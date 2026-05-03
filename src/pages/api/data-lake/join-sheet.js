@@ -18,6 +18,7 @@
 import { validateAthenaLakeQueryBody, AthenaLakeRequestError } from "../../../lib/dataLake/validateAthenaLakeRequest";
 import { runAthenaBoundedSelect } from "../../../lib/dataLake/runAthenaSelect";
 import { athenaRowsToObjects } from "../../../lib/duckdb/duckdbWasmClient";
+import { getAthenaAccessFromRequest } from "../../../lib/athenaAccess";
 
 function parseBody(req) {
   if (typeof req.body === "string") {
@@ -94,7 +95,8 @@ export default async function handler(req, res) {
 
   let validated;
   try {
-    validated = validateAthenaLakeQueryBody(composedBody);
+    const access = await getAthenaAccessFromRequest(req);
+    validated = validateAthenaLakeQueryBody(composedBody, access);
   } catch (e) {
     if (e instanceof AthenaLakeRequestError) {
       return res.status(e.statusCode).json({ error: e.message, code: e.code });
@@ -124,6 +126,7 @@ export default async function handler(req, res) {
       limit: validated.limit,
       maxWaitMs,
       demo: validated.demo,
+      composeSqlCap: validated.maxComposeRows,
     });
 
     const pullObjects = athenaRowsToObjects(result.columns, result.rows);

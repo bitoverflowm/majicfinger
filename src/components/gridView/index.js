@@ -73,7 +73,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
-import { ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { SHEET_GRID_PAGE_SIZE } from "@/config/dataLakeParquetSamples";
 import { athenaRowsToObjects } from "@/lib/duckdb/duckdbWasmClient";
 import * as XLSX from 'xlsx';
 
@@ -839,7 +839,7 @@ const GridView = ({startNew}) => {
 
           const rawRows = Array.isArray(j.rows) ? j.rows : [];
           const colNames = Array.isArray(j.columns) ? j.columns : [];
-          const outRows = athenaRowsToObjects(colNames, rawRows).slice(0, ATHENA_SAMPLE_ROW_LIMIT);
+          const outRows = athenaRowsToObjects(colNames, rawRows);
           const joinAthenaElapsedMs = Math.max(
             0,
             (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - joinAthenaStarted,
@@ -904,7 +904,7 @@ const GridView = ({startNew}) => {
                 },
               };
             });
-            toast.success(`Combined on Athena (up to ${ATHENA_SAMPLE_ROW_LIMIT} rows).`);
+            toast.success(`Combined on Athena (${outRows.length} rows).`);
           } else {
             addNewSheetAndActivate((newId) => {
               setSheetData(newId, outRows);
@@ -923,7 +923,7 @@ const GridView = ({startNew}) => {
                 };
               });
             });
-            toast.success(`Combined on Athena into a new sheet (up to ${ATHENA_SAMPLE_ROW_LIMIT} rows).`);
+            toast.success(`Combined on Athena into a new sheet (${outRows.length} rows).`);
           }
 
           setCombineProgress(100);
@@ -1378,7 +1378,7 @@ const GridView = ({startNew}) => {
               };
             });
           });
-          toast.success(`New sheet: ${outRows.length} rows from Athena (capped at ${ATHENA_SAMPLE_ROW_LIMIT}).`);
+          toast.success(`New sheet: ${outRows.length} rows from Athena.`);
         } else {
           replaceCurrentSheetData?.(outRows);
           setConnectedData?.(outRows);
@@ -1392,7 +1392,7 @@ const GridView = ({startNew}) => {
               [activeSheetId]: { ...sh, requestCards: [...existing, refineCard] },
             };
           });
-          toast.success(`Loaded ${outRows.length} rows from Athena (capped at ${ATHENA_SAMPLE_ROW_LIMIT}).`);
+          toast.success(`Loaded ${outRows.length} rows from Athena.`);
         }
         setRefineProgress(100);
         setRefineProgressLabel("Done");
@@ -1606,13 +1606,12 @@ const GridView = ({startNew}) => {
         }),
     }))
 
-    const updateCellData = (rowIndex, field, newValue) => {
+    const updateCellData = (row, field, newValue) => {
         if (field === '_origIndex') return;
         if (newValue === "PRETTY PLEASE DELETE ROW") {
-            handleDeleteRow(rowIndex);
+            handleDeleteRow(row);
             return;
         }
-        const row = displayData[rowIndex];
         const origIndex = row && row._origIndex;
         if (origIndex == null) return;
         setConnectedData((prevData) => {
@@ -1670,8 +1669,7 @@ const GridView = ({startNew}) => {
         setColumnName('');
     };
 
-    const handleDeleteRow = (displayRowIndex) => {
-        const row = displayData[displayRowIndex];
+    const handleDeleteRow = (row) => {
         const origIndex = row && row._origIndex;
         if (origIndex == null) return;
         setConnectedData((prevData) => prevData.filter((_, index) => index !== origIndex));
@@ -2358,7 +2356,7 @@ const GridView = ({startNew}) => {
                       <DialogTitle>Combine Sheets</DialogTitle>
                       <DialogDescription>
                         Join two sheets. Use loaded rows only for any join type, or run Inner/Left on the full dataset in Athena
-                        (same lake, compose provenance; result capped at {ATHENA_SAMPLE_ROW_LIMIT} rows in a new sheet).
+                        (same lake, compose provenance; row cap depends on your plan — subscribers pull larger result sets).
                       </DialogDescription>
                     </DialogHeader>
 
@@ -2626,7 +2624,7 @@ const GridView = ({startNew}) => {
                       <DialogTitle>Refine query</DialogTitle>
                       <DialogDescription>
                         Select columns and an optional numeric filter. Run on loaded rows only, or re-query the full dataset in
-                        Athena using this sheet&apos;s provenance (results capped at {ATHENA_SAMPLE_ROW_LIMIT} rows). Choose
+                        Athena using this sheet&apos;s provenance (row cap depends on your plan). Choose
                         whether to replace the active sheet or open a new one with the result.
                       </DialogDescription>
                     </DialogHeader>
@@ -2968,11 +2966,11 @@ const GridView = ({startNew}) => {
                     rowData={displayData} 
                     columnDefs={columnDefsWithMeta} 
                     pagination={true}
+                    paginationPageSize={SHEET_GRID_PAGE_SIZE}
                     onCellValueChanged={(event) => {
-                        const rowIndex = event.rowIndex;
                         const field = event.colDef?.field;
                         const newValue = event.newValue;
-                        if (field) updateCellData(rowIndex, field, newValue);
+                        if (field && event.data) updateCellData(event.data, field, newValue);
                     }}
                     gridOptions={gridOptions}
                     autoSizeStrategy={autoSizeStrategy}

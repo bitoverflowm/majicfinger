@@ -22,7 +22,7 @@ import {
   composeUnboundedSelectShouldCapRows,
   COMPOSE_UNCONSTRAINED_ROW_CAP,
 } from "./buildComposeAthenaSql";
-import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { ATHENA_DEMO_ROW_LIMIT, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { validateAndNormalizeEquation } from "./composeEquationAst";
 
 export class AthenaLakeRequestError extends Error {
@@ -61,12 +61,23 @@ export function databaseForLake(lake) {
  *   compose: object | null;
  *   physical: string;
  *   database: string
+ *   maxComposeRows: number
  * }}
  */
-export function validateAthenaLakeQueryBody(body) {
+export function validateAthenaLakeQueryBody(body, access) {
   if (!body || typeof body !== "object") {
     throw new AthenaLakeRequestError("Invalid JSON body");
   }
+
+  const accessOpts = access && typeof access === "object" ? access : {};
+  const maxSelectRows =
+    typeof accessOpts.maxSelectRows === "number" && Number.isFinite(accessOpts.maxSelectRows)
+      ? Math.min(500000, Math.max(1, Math.floor(accessOpts.maxSelectRows)))
+      : ATHENA_SAMPLE_ROW_LIMIT;
+  const maxComposeRowsCap =
+    typeof accessOpts.maxComposeRows === "number" && Number.isFinite(accessOpts.maxComposeRows)
+      ? Math.min(500000, Math.max(1, Math.floor(accessOpts.maxComposeRows)))
+      : COMPOSE_UNCONSTRAINED_ROW_CAP;
 
   const lake = String(body.lake || "").toLowerCase().trim();
   const table = String(body.table || "").toLowerCase().trim();
@@ -271,7 +282,7 @@ export function validateAthenaLakeQueryBody(body) {
     );
   }
 
-  let limClamped = Math.min(1000, Math.max(1, Math.floor(Number(limit) || 100)));
+  let limClamped = Math.min(maxSelectRows, Math.max(1, Math.floor(Number(limit) || 100)));
   if (demo) limClamped = Math.min(limClamped, ATHENA_DEMO_ROW_LIMIT);
 
   if (queryType === "compose") {
@@ -771,7 +782,7 @@ export function validateAthenaLakeQueryBody(body) {
     };
 
     try {
-      const capRows = composeUnboundedSelectShouldCapRows(validatedCompose) ? COMPOSE_UNCONSTRAINED_ROW_CAP : null;
+      const capRows = composeUnboundedSelectShouldCapRows(validatedCompose) ? maxComposeRowsCap : null;
       buildComposeAthenaSelectSql({
         physicalTableName: physical,
         limit: capRows,
@@ -788,6 +799,7 @@ export function validateAthenaLakeQueryBody(body) {
     lake,
     table,
     limit: limClamped,
+    maxComposeRows: maxComposeRowsCap,
     demo,
     columns: queryType === "compose" ? null : columns && columns.length ? columns : null,
     queryType,

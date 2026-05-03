@@ -34,8 +34,9 @@
 import AWS from "aws-sdk";
 import { ATHENA_DEMO_ROW_LIMIT } from "../../../config/dataLakeParquetSamples";
 import { validateAthenaLakeQueryBody, AthenaLakeRequestError } from "../../../lib/dataLake/validateAthenaLakeRequest";
-import { buildComposeAthenaSelectSql, COMPOSE_UNCONSTRAINED_ROW_CAP } from "../../../lib/dataLake/buildComposeAthenaSql";
+import { buildComposeAthenaSelectSql } from "../../../lib/dataLake/buildComposeAthenaSql";
 import { getAthenaQueryState, fetchAthenaQueryResultRows } from "../../../lib/dataLake/runAthenaSelect";
+import { getAthenaAccessFromRequest } from "../../../lib/athenaAccess";
 
 function parseBody(req) {
   if (typeof req.body === "string") {
@@ -249,7 +250,6 @@ export default async function handler(req, res) {
   const joins = Array.isArray(body.joins) ? body.joins : [];
   const sheetGraph = body.sheetGraph && typeof body.sheetGraph === "object" ? body.sheetGraph : {};
   const demo = body.demo === true;
-  const composeRowCap = demo ? ATHENA_DEMO_ROW_LIMIT : COMPOSE_UNCONSTRAINED_ROW_CAP;
   if (!joins.length) {
     return res.status(400).json({ error: "Missing joins", code: "BAD_REQUEST" });
   }
@@ -260,6 +260,9 @@ export default async function handler(req, res) {
   );
 
   try {
+    const access = await getAthenaAccessFromRequest(req);
+    const composeRowCap = demo ? ATHENA_DEMO_ROW_LIMIT : access.maxComposeRows;
+
     const sheetIds = Array.from(new Set(joins.map((j) => j?.targetSheetId).filter(Boolean)));
     for (const id of sheetIds) {
       if (!sheetGraph[id]) {
@@ -331,15 +334,18 @@ export default async function handler(req, res) {
         ...(depCteJoins.length ? { cteJoins: depCteJoins } : {}),
       };
 
-      const validated = validateAthenaLakeQueryBody({
-        lake: prov.lake,
-        table: prov.table,
-        queryType: "compose",
-        compose: sheetCompose,
-        filters: prov.composeFilters && typeof prov.composeFilters === "object" ? prov.composeFilters : null,
-        caseSensitive: true,
-        demo,
-      });
+      const validated = validateAthenaLakeQueryBody(
+        {
+          lake: prov.lake,
+          table: prov.table,
+          queryType: "compose",
+          compose: sheetCompose,
+          filters: prov.composeFilters && typeof prov.composeFilters === "object" ? prov.composeFilters : null,
+          caseSensitive: true,
+          demo,
+        },
+        access,
+      );
 
       const whereSql = buildComposeWhereSql({
         filters: validated.filters,
@@ -378,15 +384,18 @@ export default async function handler(req, res) {
 
     const mainCompose = { ...(composeIn || {}), ...(mainCteJoins.length ? { cteJoins: mainCteJoins } : {}) };
 
-    const validatedMain = validateAthenaLakeQueryBody({
-      lake,
-      table,
-      queryType: "compose",
-      compose: mainCompose,
-      filters: filtersIn,
-      caseSensitive: true,
-      demo,
-    });
+    const validatedMain = validateAthenaLakeQueryBody(
+      {
+        lake,
+        table,
+        queryType: "compose",
+        compose: mainCompose,
+        filters: filtersIn,
+        caseSensitive: true,
+        demo,
+      },
+      access,
+    );
 
     const mainWhereSql = buildComposeWhereSql({
       filters: validatedMain.filters,

@@ -52,6 +52,7 @@ function assertAthenaConfig() {
  * @param {{ and: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }>; or: Array<{ column: string; kind: "date" | "string" | "number"; op: string; value: any }> } | null | undefined} [opts.filters]
  * @param {boolean} [opts.caseSensitive]
  * @param {boolean} [opts.demo] — when true, compose queries use ATHENA_DEMO_ROW_LIMIT as SQL row cap
+ * @param {number} [opts.composeSqlCap] — max rows for compose when the query is an unbounded SELECT (subscriber tier)
  * @param {number} opts.limit
  * @returns {Promise<{ queryExecutionId: string; sql: string; rowLimit: number | null }>}
  */
@@ -70,6 +71,7 @@ export async function startAthenaBoundedQuery({
   caseSensitive = false,
   limit,
   demo = false,
+  composeSqlCap,
 }) {
   const output = assertAthenaConfig();
 
@@ -138,7 +140,7 @@ export async function startAthenaBoundedQuery({
   }
   const sqlTable = `"${safeTable}"`;
 
-  const lim = Math.min(Math.max(1, Math.floor(Number(limit) || 1)), 1000);
+  const lim = Math.max(1, Math.floor(Number(limit) || 1));
 
   const escapeSqlString = (s) => String(s).replace(/'/g, "''");
   const escapeLike = (s) => String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
@@ -228,9 +230,12 @@ export async function startAthenaBoundedQuery({
       err.code = "BAD_REQUEST";
       throw err;
     }
-    // For now we hard-cap all compose queries to keep requests compact (Free plan UX).
     // Demo embeds use a smaller cap so marketing visitors see a tiny sample only.
-    const capRows = demo ? ATHENA_DEMO_ROW_LIMIT : COMPOSE_UNCONSTRAINED_ROW_CAP;
+    const capRows = demo
+      ? ATHENA_DEMO_ROW_LIMIT
+      : typeof composeSqlCap === "number" && Number.isFinite(composeSqlCap)
+        ? Math.floor(composeSqlCap)
+        : COMPOSE_UNCONSTRAINED_ROW_CAP;
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
       limit: capRows,
@@ -293,7 +298,7 @@ export async function getAthenaQueryState(queryExecutionId) {
  */
 export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
   const unlimited = rowLimit == null;
-  const lim = unlimited ? Number.MAX_SAFE_INTEGER : Math.min(1000, Math.max(1, Math.floor(Number(rowLimit) || 1)));
+  const lim = unlimited ? Number.MAX_SAFE_INTEGER : Math.max(1, Math.floor(Number(rowLimit) || 1));
   const athena = new AWS.Athena({ region: getRegion() });
 
   const columnNames = [];
@@ -388,6 +393,7 @@ export async function runAthenaBoundedSelect({
   limit,
   maxWaitMs,
   demo = false,
+  composeSqlCap,
 }) {
   const { queryExecutionId, sql, rowLimit } = await startAthenaBoundedQuery({
     physicalTableName,
@@ -404,6 +410,7 @@ export async function runAthenaBoundedSelect({
     caseSensitive,
     limit,
     demo,
+    composeSqlCap,
   });
 
   const deadline = Date.now() + maxWaitMs;

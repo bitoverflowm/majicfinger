@@ -2,7 +2,7 @@
  * Single poll: Athena execution state; when SUCCEEDED, returns result rows (capped).
  *
  * GET ?queryExecutionId=…&limit=…
- *   limit — row cap for GetQueryResults (default 100, max 1000), or "all" to paginate entire result
+ *   limit — row cap for GetQueryResults pagination (default 100), or "all" to paginate entire result
  */
 import {
   getAthenaQueryState,
@@ -33,7 +33,9 @@ export default async function handler(req, res) {
   const limStr = Array.isArray(rawLim) ? rawLim[0] : rawLim;
   const limNorm = String(limStr ?? "").trim().toLowerCase();
   const rowLimit =
-    limNorm === "all" || limNorm === "full" ? null : Math.min(1000, Math.max(1, parseInt(String(limStr || "100"), 10) || 100));
+    limNorm === "all" || limNorm === "full"
+      ? null
+      : Math.min(500000, Math.max(1, parseInt(String(limStr || "100"), 10) || 100));
 
   try {
     const { state, reason, dataScannedBytes } = await getAthenaQueryState(qeid);

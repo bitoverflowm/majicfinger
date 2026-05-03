@@ -38,7 +38,10 @@ import {
   glueTableNamesForDataset,
   ATHENA_SAMPLE_ROW_LIMIT,
   ATHENA_DEMO_ROW_LIMIT,
+  ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT,
 } from "@/config/dataLakeParquetSamples";
+import { useUser } from "@/lib/hooks";
+import { userHasExpandedAthenaAccess } from "@/lib/athenaEntitlement";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
@@ -490,7 +493,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const activeSheetId = ctx?.activeSheetId;
   const setActiveSheetId = ctx?.setActiveSheetId;
   const isDemo = !!ctx?.isDemo;
-  const athenaRowLimit = isDemo ? ATHENA_DEMO_ROW_LIMIT : ATHENA_SAMPLE_ROW_LIMIT;
+  const user = useUser();
+  const athenaRowLimit = useMemo(() => {
+    if (isDemo) return ATHENA_DEMO_ROW_LIMIT;
+    if (userHasExpandedAthenaAccess(user)) return ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
+    return ATHENA_SAMPLE_ROW_LIMIT;
+  }, [isDemo, user]);
 
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
   const hasLiveConnection =

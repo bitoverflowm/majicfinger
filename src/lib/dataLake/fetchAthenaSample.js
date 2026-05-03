@@ -51,7 +51,7 @@ export async function fetchAthenaLakeSample(
   const { signal, pollIntervalMs = 900, maxWaitMs = 180000 } = pollOpts;
 
   const isCompose = queryType === "compose";
-  const lim = isCompose ? null : Math.min(1000, Math.max(1, Number(limit) || 100));
+  const lim = isCompose ? null : Math.min(500000, Math.max(1, Number(limit) || 100));
 
   const startRes = await fetch("/api/data-lake/athena-query/start", {
     method: "POST",

@@ -9,6 +9,7 @@ import {
   AthenaLakeRequestError,
 } from "../../../../lib/dataLake/validateAthenaLakeRequest";
 import { startAthenaBoundedQuery } from "../../../../lib/dataLake/runAthenaSelect";
+import { getAthenaAccessFromRequest } from "../../../../lib/athenaAccess";
 
 function parseBody(req) {
   if (typeof req.body === "string") {
@@ -34,7 +35,8 @@ export default async function handler(req, res) {
 
   let validated;
   try {
-    validated = validateAthenaLakeQueryBody(body);
+    const access = await getAthenaAccessFromRequest(req);
+    validated = validateAthenaLakeQueryBody(body, access);
   } catch (e) {
     if (e instanceof AthenaLakeRequestError) {
       return res.status(e.statusCode).json({ error: e.message, code: e.code });
@@ -58,6 +60,7 @@ export default async function handler(req, res) {
       caseSensitive: validated.caseSensitive,
       limit: validated.limit,
       demo: validated.demo,
+      composeSqlCap: validated.maxComposeRows,
     });
 
     return res.status(202).json({

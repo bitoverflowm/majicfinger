@@ -15,6 +15,7 @@ import AWS from "aws-sdk";
 import { validateAthenaLakeQueryBody, AthenaLakeRequestError } from "../../../lib/dataLake/validateAthenaLakeRequest";
 import { buildComposeAthenaSelectSql } from "../../../lib/dataLake/buildComposeAthenaSql";
 import { getAthenaQueryState, fetchAthenaQueryResultRows } from "../../../lib/dataLake/runAthenaSelect";
+import { getAthenaAccessFromRequest } from "../../../lib/athenaAccess";
 
 function parseBody(req) {
   if (typeof req.body === "string") {
@@ -250,6 +251,9 @@ export default async function handler(req, res) {
   );
 
   try {
+    const access = await getAthenaAccessFromRequest(req);
+    const outerLimit = Math.max(1, Math.floor(access.maxSelectRows));
+
     const SAFE_ALIAS = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
     const cteSqlById = new Map();
     const cteDefsInOrder = [];
@@ -314,14 +318,17 @@ export default async function handler(req, res) {
         ...(depCteJoins.length ? { cteJoins: depCteJoins } : {}),
       };
 
-      const validated = validateAthenaLakeQueryBody({
-        lake: prov.lake,
-        table: prov.table,
-        queryType: "compose",
-        compose: sheetCompose,
-        filters: prov.composeFilters && typeof prov.composeFilters === "object" ? prov.composeFilters : null,
-        caseSensitive: true,
-      });
+      const validated = validateAthenaLakeQueryBody(
+        {
+          lake: prov.lake,
+          table: prov.table,
+          queryType: "compose",
+          compose: sheetCompose,
+          filters: prov.composeFilters && typeof prov.composeFilters === "object" ? prov.composeFilters : null,
+          caseSensitive: true,
+        },
+        access,
+      );
 
       if (sheetId === rootSheetId) {
         rootDatabase = validated.database;
@@ -358,7 +365,7 @@ export default async function handler(req, res) {
 
     const selectList = selectColumns.map((c) => `"${c}"`).join(", ");
     const outerWhere = buildRefineOuterWhereSql(rootCteName, refineFilters);
-    const fullSql = `WITH ${cteDefsSql.join(", ")} SELECT ${selectList} FROM ${rootCteName}${outerWhere} LIMIT 100`;
+    const fullSql = `WITH ${cteDefsSql.join(", ")} SELECT ${selectList} FROM ${rootCteName}${outerWhere} LIMIT ${outerLimit}`;
 
     if (!String(rootDatabase || "").trim()) {
       return res.status(400).json({ error: "Could not resolve Athena database for root sheet", code: "BAD_REQUEST" });
