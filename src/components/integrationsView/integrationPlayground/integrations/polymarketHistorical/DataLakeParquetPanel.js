@@ -32,7 +32,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import { Play, AlertCircle, HelpCircle, ChevronDown, ChevronUp, Minus, Plus, Pencil, Trash2, Wrench, X } from "lucide-react";
+import {
+  Play,
+  AlertCircle,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Minus,
+  Plus,
+  Pencil,
+  Trash2,
+  Wrench,
+  X,
+  XCircle,
+} from "lucide-react";
 import {
   getDataLakeDatasetConfig,
   glueTableNamesForDataset,
@@ -577,6 +590,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; composeFilters?: any; sheetJoinSpec?: any; sheetProvenance?: any; requestCard?: any; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
+  const ingestAbortControllerRef = useRef(null);
+
+  const cancelActiveIngest = useCallback(() => {
+    ingestAbortControllerRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     setSampleId((prev) => (prev && sampleOptions.some((s) => s.id === prev) ? prev : ""));
@@ -1365,8 +1383,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaOpSpecs,
       kalshiIngestExtras = null,
       sheetJoinSpec = null,
+      signal,
     ) => {
       return runParquetSheetLoadWithProgress({
+        signal,
         onLabel: setLoadLabel,
         onProgress: setLoadProgress,
         loadFn: async () => {
@@ -1378,19 +1398,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               for (let i = 0; i < metaOpSpecs.length; i++) {
                 const op = metaOpSpecs[i];
                 const filters = isDemo ? null : resolveFiltersForMetaSpec(op);
-                const { columns: resultColumns, rows } = await fetchAthenaLakeSample({
-                  lake: lakeVal,
-                  table,
-                  limit: athenaRowLimit,
-                  queryType: op.kind === "sum" ? "sum" : "count",
-                  countAlias: "count",
-                  countDistinctColumn: op.kind === "count_distinct" ? op.aggregateColumn : null,
-                  sumColumn: op.kind === "sum" ? op.aggregateColumn : null,
-                  sumAlias: "sum",
-                  caseSensitive: true,
-                  filters,
-                  demo: isDemo,
-                });
+                const { columns: resultColumns, rows } = await fetchAthenaLakeSample(
+                  {
+                    lake: lakeVal,
+                    table,
+                    limit: athenaRowLimit,
+                    queryType: op.kind === "sum" ? "sum" : "count",
+                    countAlias: "count",
+                    countDistinctColumn: op.kind === "count_distinct" ? op.aggregateColumn : null,
+                    sumColumn: op.kind === "sum" ? op.aggregateColumn : null,
+                    sumAlias: "sum",
+                    caseSensitive: true,
+                    filters,
+                    demo: isDemo,
+                  },
+                  { signal, maxWaitMs: 900000 },
+                );
                 const resultKey = op.kind === "sum" ? "sum" : "count";
                 const valueIdx = resultColumns.indexOf(resultKey);
                 const val = rows[0]?.[valueIdx >= 0 ? valueIdx : 0] ?? "";
@@ -1406,19 +1429,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             }
             // Meta table (count): a single-cell COUNT(*) result (optionally with filters).
             const isFilterMode = metaQueryMode === "filter" && !isDemo;
-            const { columns: resultColumns, rows } = await fetchAthenaLakeSample({
-              lake: lakeVal,
-              table,
-              limit: athenaRowLimit,
-              queryType: metaOperationKind === "sum" ? "sum" : "count",
-              countAlias: "count",
-              countDistinctColumn: metaOperationKind === "count_distinct" ? metaOperationColumn : null,
-              sumColumn: metaOperationKind === "sum" ? metaOperationColumn : null,
-              sumAlias: "sum",
-              caseSensitive: true,
-              filters: isFilterMode ? metaFilters : null,
-              demo: isDemo,
-            });
+            const { columns: resultColumns, rows } = await fetchAthenaLakeSample(
+              {
+                lake: lakeVal,
+                table,
+                limit: athenaRowLimit,
+                queryType: metaOperationKind === "sum" ? "sum" : "count",
+                countAlias: "count",
+                countDistinctColumn: metaOperationKind === "count_distinct" ? metaOperationColumn : null,
+                sumColumn: metaOperationKind === "sum" ? metaOperationColumn : null,
+                sumAlias: "sum",
+                caseSensitive: true,
+                filters: isFilterMode ? metaFilters : null,
+                demo: isDemo,
+              },
+              { signal, maxWaitMs: 900000 },
+            );
             return ingestAthenaResultAsView({
               dataset,
               sampleId: `${sid}-meta-count`,
@@ -1452,6 +1478,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "same-origin",
+                    signal,
                     body: JSON.stringify({
                       lake: lakeVal,
                       table,
@@ -1477,6 +1504,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "same-origin",
+                    signal,
                     body: JSON.stringify({
                       lake: lakeVal,
                       table,
@@ -1509,7 +1537,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   caseSensitive: true,
                   demo: isDemo,
                 },
-                { maxWaitMs: 900000 },
+                { signal, maxWaitMs: 900000 },
               );
 
           let outRows = rows;
@@ -1577,6 +1605,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setSheetDialogOpen(false);
     setError(null);
     setLastRowCount(null);
+    ingestAbortControllerRef.current?.abort();
+    const ingestAbort = new AbortController();
+    ingestAbortControllerRef.current = ingestAbort;
+    const signal = ingestAbort.signal;
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
@@ -1593,6 +1625,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaOpSpecs,
         kalshiIngestExtras,
         sheetJoinSpec,
+        signal,
       );
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         applyRowsToActiveSheet(finalRows, sheetProvenance);
@@ -1619,9 +1652,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         refreshBeckerViews();
       });
     } catch (e) {
+      if (e?.name === "AbortError") {
+        setError(null);
+        toast("Request cancelled");
+        return;
+      }
       const msg = e?.message || String(e);
       setError(msg);
     } finally {
+      ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
     }
@@ -1648,6 +1687,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setSheetDialogOpen(false);
     setError(null);
     setLastRowCount(null);
+    ingestAbortControllerRef.current?.abort();
+    const ingestAbort = new AbortController();
+    ingestAbortControllerRef.current = ingestAbort;
+    const signal = ingestAbort.signal;
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
@@ -1664,6 +1707,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaOpSpecs,
         kalshiIngestExtras,
         sheetJoinSpec,
+        signal,
       );
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         if (mode === "meta") {
@@ -1686,9 +1730,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         refreshBeckerViews();
       });
     } catch (e) {
+      if (e?.name === "AbortError") {
+        setError(null);
+        toast("Request cancelled");
+        return;
+      }
       const msg = e?.message || String(e);
       setError(msg);
     } finally {
+      ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
     }
@@ -1723,6 +1773,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setSheetDialogOpen(false);
     setError(null);
     setLastRowCount(null);
+    ingestAbortControllerRef.current?.abort();
+    const ingestAbort = new AbortController();
+    ingestAbortControllerRef.current = ingestAbort;
+    const signal = ingestAbort.signal;
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
@@ -1743,6 +1797,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaOpSpecs,
         kalshiIngestExtras,
         sheetJoinSpec,
+        signal,
       );
 
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
@@ -1778,9 +1833,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         refreshBeckerViews();
       });
     } catch (e) {
+      if (e?.name === "AbortError") {
+        setError(null);
+        toast("Request cancelled");
+        return;
+      }
       const msg = e?.message || String(e);
       setError(msg);
     } finally {
+      ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
     }
@@ -4048,6 +4109,26 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   </Button>
                   <div className="flex-1 min-w-2" />
                   <div className="flex items-center gap-2 shrink-0">
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 shrink-0"
+                              disabled={!loading}
+                              onClick={cancelActiveIngest}
+                              aria-label="Cancel request"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">cancel request</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <Button
                       type="button"
                       size="sm"
@@ -5800,19 +5881,61 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       </div>
 
       {loading && selectionTab === "meta" ? (
-        <div className="px-2">
+        <div className="px-2 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 shrink-0"
+                      disabled={!loading}
+                      onClick={cancelActiveIngest}
+                      aria-label="Cancel request"
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">cancel request</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="pt-0.5" />
         </div>
       ) : (
         selectionTab === "meta" && (
           <div className="flex gap-2 items-end flex-wrap min-w-0 max-w-full px-2">
             <div className="flex gap-2 items-center">
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 shrink-0"
+                        disabled={!loading}
+                        onClick={cancelActiveIngest}
+                        aria-label="Cancel request"
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">cancel request</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Button
                 type="button"
                 size="sm"
                 className="h-8 text-xs shrink-0"
                 onClick={handleLoad}
-                disabled={!canRunRequest}
+                disabled={!canRunRequest || loading}
               >
                 <Play className="h-3.5 w-3.5 shrink-0" />
                 <span className="ml-1.5">Run request</span>

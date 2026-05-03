@@ -71,11 +71,17 @@ export async function runParquetSheetLoadWithProgress({ signal, onLabel, onProgr
 
   try {
     const result = await loadFn();
-    if (aborted()) return result;
+    if (aborted()) {
+      clearAll();
+      throw new DOMException("Aborted", "AbortError");
+    }
     clearAll();
     onLabel("Writing results to your sheet…");
     onProgress(100);
     await new Promise((r) => setTimeout(r, 220));
+    if (aborted()) {
+      throw new DOMException("Aborted", "AbortError");
+    }
     return result;
   } catch (e) {
     clearAll();

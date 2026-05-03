@@ -669,14 +669,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
     const relevantSheetEntries = sheetEntries.filter(([sheetId]) => neededSheetIds.has(sheetId));
     const sourceEntries = relevantSheetEntries.length ? relevantSheetEntries : sheetEntries;
-    // Unscoped columns read only from the active sheet; other sheets' row counts must not extend the
-    // synthetic frame or we pad with row indices as fake X values and corrupt time scales.
-    const maxRows =
-      neededSheetIds.size > 0
-        ? Math.max(0, ...sourceEntries.map(([, sheet]) => sheet.data.length))
+    // Row-aligned merge: use the shortest contributing sheet. Using max() extended the frame with
+    // synthetic rows and we filled missing pivot X with row indices — that mixes 0…N with epoch-ms
+    // timestamps and collapses time series to a vertical spike at the right edge.
+    const sheetLengths = sourceEntries.map(([, sheet]) => (Array.isArray(sheet?.data) ? sheet.data.length : 0));
+    const alignedRowCount =
+      neededSheetIds.size > 0 && sheetLengths.length
+        ? Math.max(0, Math.min(...sheetLengths))
         : activeRows.length;
     const rows = [];
-    for (let idx = 0; idx < maxRows; idx += 1) {
+    for (let idx = 0; idx < alignedRowCount; idx += 1) {
       const row = {};
       for (const key of neededKeys) {
         const parsed = parseScopedColumnKey(key, contextStateV2?.activeSheetId);
@@ -685,7 +687,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
           : activeRows;
         row[key] = sourceRows[idx]?.[parsed.column] ?? null;
       }
-      if (selX && row[selX] == null) {
+      if (selX && row[selX] == null && !lineIsTemporalX) {
         row[selX] = idx;
       }
       rows.push(row);
@@ -696,6 +698,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     chartFilterColumn,
     contextStateV2?.activeSheetId,
     contextStateV2?.dataSheets,
+    lineIsTemporalX,
     lineSeriesColumn,
     selX,
     selY,
