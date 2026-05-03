@@ -3,12 +3,16 @@
  * With `connectNulls` on Line/Area, the stroke bridges across those points (continuous lines).
  */
 
+import { temporalToMs } from "@/lib/temporalParse";
+
 function sanitizePlotNumericOrDate(value, treatAsDate) {
   if (value === undefined) return null;
   if (value === null || value === "") return null;
   if (treatAsDate) {
     if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-    const ms = Date.parse(String(value));
+    // Pivot step converts buckets to epoch ms (numbers). Date.parse(String(ms)) is NaN — keep numbers.
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    const ms = temporalToMs(value);
     return Number.isFinite(ms) ? value : null;
   }
   if (typeof value === "number") return Number.isFinite(value) ? value : null;

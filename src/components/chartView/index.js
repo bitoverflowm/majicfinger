@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { sanitizeCartesianRowsForPlotting } from "@/lib/chartDataSanitize";
 import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
+import { temporalToMs } from "@/lib/temporalParse";
 
 const ChartBuilderContext = createContext(null);
 
@@ -84,6 +85,7 @@ export function getAxisType(key, dataTypes, data) {
       if (v instanceof Date) return "date";
       const n = Number(v);
       if (v != null && v !== "" && !Number.isNaN(n) && Number.isFinite(n)) return "number";
+      if (typeof v === "string" && Number.isFinite(temporalToMs(v))) return "date";
     }
     return "string";
   }
@@ -104,6 +106,11 @@ function isLikelyTemporalKey(key, dataTypes, data) {
   if (keyNorm === "t") return true;
   if (/(time|timestamp|date|datetime|createdat|updatedat|ts)/.test(keyNorm)) return true;
   const rows = Array.isArray(data) ? data : [];
+  for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
+    const raw = rows[i]?.[key];
+    if (raw == null || raw === "") continue;
+    if (typeof raw === "string" && Number.isFinite(temporalToMs(raw))) return true;
+  }
   let temporalLikeCount = 0;
   let nonEmptyCount = 0;
   for (let i = 0; i < Math.min(rows.length, 50); i += 1) {
@@ -127,61 +134,6 @@ function isLikelyTemporalKey(key, dataTypes, data) {
     if (nonEmptyCount >= 3 && temporalLikeCount >= 2) return true;
   }
   return false;
-}
-
-function temporalToMs(value) {
-  if (value == null || value === "") return NaN;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const abs = Math.abs(value);
-    if (abs >= 1e11) return value; // epoch ms (covers modern dates incl. year 2000)
-    if (abs >= 1e9) return value * 1000; // epoch sec
-  }
-  const s = String(value).trim();
-  const monthMap = {
-    jan: 0, january: 0,
-    feb: 1, february: 1,
-    mar: 2, march: 2,
-    apr: 3, april: 3,
-    may: 4,
-    jun: 5, june: 5,
-    jul: 6, july: 6,
-    aug: 7, august: 7,
-    sep: 8, sept: 8, september: 8,
-    oct: 9, october: 9,
-    nov: 10, november: 10,
-    dec: 11, december: 11,
-  };
-  const monthYear = s.match(/^([A-Za-z]+)(?:\s+(\d{1,2}))?(?:,?\s+(\d{4}))?$/);
-  if (monthYear) {
-    const monthToken = String(monthYear[1]).toLowerCase();
-    if (Object.prototype.hasOwnProperty.call(monthMap, monthToken)) {
-      const monthIdx = monthMap[monthToken];
-      const day = monthYear[2] ? Math.min(31, Math.max(1, Number(monthYear[2]) || 1)) : 1;
-      const year = monthYear[3] ? Number(monthYear[3]) : 2000;
-      const ms = Date.UTC(year, monthIdx, day);
-      if (Number.isFinite(ms)) return ms;
-    }
-  }
-  const isoYearMonth = s.match(/^(\d{4})[-/](\d{1,2})$/);
-  if (isoYearMonth) {
-    const year = Number(isoYearMonth[1]);
-    const month = Number(isoYearMonth[2]);
-    if (month >= 1 && month <= 12) return Date.UTC(year, month - 1, 1);
-  }
-  const monthYearNumeric = s.match(/^(\d{1,2})[-/](\d{4})$/);
-  if (monthYearNumeric) {
-    const month = Number(monthYearNumeric[1]);
-    const year = Number(monthYearNumeric[2]);
-    if (month >= 1 && month <= 12) return Date.UTC(year, month - 1, 1);
-  }
-  if (/^\d+(\.\d+)?$/.test(s)) {
-    const n = Number(s);
-    const abs = Math.abs(n);
-    if (abs >= 1e11) return n;
-    if (abs >= 1e9) return n * 1000;
-  }
-  return Date.parse(s);
 }
 
 /** Pick tick label granularity from span so intraday series show time, not only "Apr 13, 2026" on every tick. */
@@ -686,8 +638,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     return chartData
       .map((row, idx) => {
         const rawT = row?.[selX];
-        const parsed = typeof rawT === "number" ? rawT : Date.parse(String(rawT));
-        const timeSec = Number.isFinite(parsed) ? parsed / 1000 : idx;
+        const ms = temporalToMs(rawT);
+        const timeSec = Number.isFinite(ms) ? ms / 1000 : idx;
         const vNum = Number(row?.[valueKey]);
         const value = Number.isFinite(vNum) ? vNum : null;
         return { time: timeSec, value };
