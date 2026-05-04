@@ -13,6 +13,7 @@
  *     pullColumn: string,     // column name in the *underlying Glue table* to join on
  *     joinType?: "left" | "inner"
  *   }
+ *   limit?: number,           // optional SQL LIMIT on the compose pull (clamped server-side)
  * }
  */
 import { validateAthenaLakeQueryBody, AthenaLakeRequestError } from "../../../lib/dataLake/validateAthenaLakeRequest";
@@ -83,6 +84,10 @@ export default async function handler(req, res) {
         },
       ];
 
+  const rawLim = body.limit;
+  const optionalLimit =
+    rawLim != null && rawLim !== "" && Number.isFinite(Number(rawLim)) ? Number(rawLim) : null;
+
   const composedBody = {
     lake: body.lake,
     table: body.table,
@@ -91,6 +96,7 @@ export default async function handler(req, res) {
     filters: body.filters && typeof body.filters === "object" ? body.filters : null,
     caseSensitive: true,
     demo: body.demo === true,
+    ...(optionalLimit != null ? { limit: optionalLimit } : {}),
   };
 
   let validated;

@@ -236,9 +236,11 @@ export async function startAthenaBoundedQuery({
       : typeof composeSqlCap === "number" && Number.isFinite(composeSqlCap)
         ? Math.floor(composeSqlCap)
         : COMPOSE_UNCONSTRAINED_ROW_CAP;
+    const requestLim = Math.max(1, Math.floor(Number(limit) || capRows));
+    const sqlLimit = Math.min(capRows, requestLim);
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
-      limit: capRows,
+      limit: sqlLimit,
       compose,
       lake,
       whereSql,
@@ -252,7 +254,7 @@ export async function startAthenaBoundedQuery({
         QueryExecutionContext: { Catalog: catalog, Database: db },
       })
       .promise();
-    return { queryExecutionId: QueryExecutionId, sql, rowLimit: capRows };
+    return { queryExecutionId: QueryExecutionId, sql, rowLimit: sqlLimit };
   }
 
   const sql =

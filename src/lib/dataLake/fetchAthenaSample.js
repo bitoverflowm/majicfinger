@@ -1,5 +1,6 @@
 /**
  * Browser → POST start → poll GET status until SUCCEEDED (serverless-friendly).
+ * For `queryType: "compose"`, omit `limit` to use the server tier cap; pass a positive integer to add SQL LIMIT.
  * @param {{
  *   lake: "polymarket" | "kalshi";
  *   table: string;
@@ -34,7 +35,7 @@ export async function fetchAthenaLakeSample(
   {
     lake,
     table,
-    limit = 100,
+    limit,
     columns = null,
     queryType = "select",
     countAlias = null,
@@ -51,7 +52,14 @@ export async function fetchAthenaLakeSample(
   const { signal, pollIntervalMs = 900, maxWaitMs = 180000 } = pollOpts;
 
   const isCompose = queryType === "compose";
-  const lim = isCompose ? null : Math.min(500000, Math.max(1, Number(limit) || 100));
+  let lim;
+  if (isCompose) {
+    if (limit != null && limit !== "" && Number.isFinite(Number(limit))) {
+      lim = Math.min(500000, Math.max(1, Math.floor(Number(limit))));
+    }
+  } else {
+    lim = Math.min(500000, Math.max(1, Number(limit ?? 100) || 100));
+  }
 
   const startRes = await fetch("/api/data-lake/athena-query/start", {
     method: "POST",
@@ -61,7 +69,7 @@ export async function fetchAthenaLakeSample(
     body: JSON.stringify({
       lake,
       table,
-      ...(isCompose ? {} : { limit: lim }),
+      ...(isCompose ? (lim != null ? { limit: lim } : {}) : { limit: lim }),
       columns: Array.isArray(columns) && columns.length ? columns : null,
       queryType,
       countAlias,

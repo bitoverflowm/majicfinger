@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   SHADCN_CHART_BASE_ORDER,
   getShadcnChartPaletteArray,
+  getShadcnRainbowBarPalette,
 } from '@/components/chartView/panels/shadcnChartPalettes';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, Treemap, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -242,6 +243,23 @@ function getDistinctValues(data, colKey) {
   return Array.from(set).sort();
 }
 
+/**
+ * Palette pick per bar (row × series). `shuffleNonce` lets the user reshuffle assignments
+ * without changing data; 0 gives the default deterministic mapping.
+ */
+function rainbowBarFillFromPalette(activePalette, rowIndex, seriesIndex, xPivot, shuffleNonce = 0) {
+  if (!Array.isArray(activePalette) || !activePalette.length) return null;
+  const key = String(xPivot ?? rowIndex) + "\0" + String(seriesIndex);
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i += 1) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const nonce = Number(shuffleNonce) || 0;
+  const mixed = (h ^ rowIndex * 0x9e3779b1 ^ seriesIndex * 0x85ebca77 ^ nonce * 0xc2b2ae35) >>> 0;
+  return activePalette[mixed % activePalette.length];
+}
+
 function formatCompactNumber(value) {
   if (!Number.isFinite(value)) return "";
   const abs = Math.abs(value);
@@ -320,6 +338,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [expanded, setExpanded] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
   const [stackedBar, setStackedBar] = useState(false);
+  /** Bar chart: each bar (per Y series) picks from the active Shadcn palette via a stable hash. */
+  const [rainbowBar, setRainbowBar] = useState(false);
+  /** Bump to reshuffle rainbow bar colors (same palette, new pseudo-random assignment). */
+  const [rainbowBarShuffleNonce, setRainbowBarShuffleNonce] = useState(0);
   const [dots, setDots] = useState(true);
   const [labelLine, setLabelLine] = useState(false);
   const [donut, setDonut] = useState(false);
@@ -407,6 +429,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.expanded !== undefined) setExpanded(!!s.expanded);
     if (s.legendVisible !== undefined) setLegendVisible(!!s.legendVisible);
     if (s.stackedBar !== undefined) setStackedBar(!!s.stackedBar);
+    if (s.rainbowBar !== undefined) setRainbowBar(!!s.rainbowBar);
+    if (s.rainbowBarShuffleNonce != null && Number.isFinite(Number(s.rainbowBarShuffleNonce))) {
+      setRainbowBarShuffleNonce(Math.max(0, Math.floor(Number(s.rainbowBarShuffleNonce))));
+    }
     if (s.dots !== undefined) setDots(!!s.dots);
     if (s.labelLine !== undefined) setLabelLine(!!s.labelLine);
     if (s.donut !== undefined) setDonut(!!s.donut);
@@ -782,6 +808,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     expanded,
     legendVisible,
     stackedBar,
+    rainbowBar,
+    rainbowBarShuffleNonce,
     dots,
     labelLine,
     donut,
@@ -1027,6 +1055,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     handleToggleHorizontal: () => {},
     stackedBar,
     handleToggleStack: setStackedBar,
+    rainbowBar,
+    setRainbowBar,
+    rainbowBarShuffleNonce,
+    setRainbowBarShuffleNonce,
     dots,
     handleToggleDots: setDots,
     labelLine,
@@ -1128,6 +1160,8 @@ export function ChartCanvas() {
     expanded,
     legendVisible,
     stackedBar,
+    rainbowBar,
+    rainbowBarShuffleNonce,
     dots,
     labelLine,
     donut,
@@ -1277,6 +1311,8 @@ export function ChartCanvas() {
     ? ["#ffffff", "#000000", "#000000", "#ffffff"]
     : ["#000000", "#ffffff", "#ffffff", "#000000"];
   const activePalette = hasSelectedPalette ? selectedPalette : defaultPalette;
+  /** Full-hue pool for rainbow bars (default sheet palette is often neutral = grey-only ramp). */
+  const rainbowBarHuePalette = useMemo(() => getShadcnRainbowBarPalette(600), []);
   const fallbackSeriesColor = dark ? "#ffffff" : "#000000";
   /**
    * Shadcn palettes are ordered light → dark (50 … 950). Outer chrome uses the first stops; series
@@ -1587,9 +1623,19 @@ export function ChartCanvas() {
                         />
                         {yKeys.map((yKey, idx) => (
                           <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorFor(yKey, idx)} radius={4} stackId={stackedBar ? "a" : idx}>
-                            {(finalRenderedData || []).map((_, i) => (
-                              <Cell key={`cell-${i}`} fill={seriesColorFor(yKey, idx)} />
-                            ))}
+                            {(finalRenderedData || []).map((row, i) => {
+                              const rainbowFill = rainbowBar
+                                ? rainbowBarFillFromPalette(
+                                    rainbowBarHuePalette.length ? rainbowBarHuePalette : activePalette,
+                                    i,
+                                    idx,
+                                    row?.[xKey],
+                                    rainbowBarShuffleNonce,
+                                  )
+                                : null;
+                              const fill = rainbowFill || seriesColorFor(yKey, idx);
+                              return <Cell key={`cell-${i}`} fill={fill} />;
+                            })}
                           </Bar>
                         ))}
                         {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}

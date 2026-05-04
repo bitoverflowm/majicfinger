@@ -69,6 +69,7 @@ import {
   Pencil,
   Trash,
   Database,
+  FileJson,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
@@ -257,6 +258,7 @@ const GridView = ({startNew}) => {
     const [refineBusy, setRefineBusy] = useState(false);
     const [refineProgress, setRefineProgress] = useState(0);
     const [refineProgressLabel, setRefineProgressLabel] = useState("");
+    const [sheetJsonViewerOpen, setSheetJsonViewerOpen] = useState(false);
 
     const sheetColumnsForProps = useMemo(() => {
       const row0 = Array.isArray(connectedData) && connectedData.length ? connectedData[0] : null;
@@ -264,6 +266,19 @@ const GridView = ({startNew}) => {
       return Object.keys(row0)
         .filter((k) => k !== "_origIndex")
         .sort();
+    }, [connectedData]);
+
+    const activeSheetJsonText = useMemo(() => {
+      const rows = Array.isArray(connectedData) ? connectedData : [];
+      try {
+        return JSON.stringify(rows, null, 2);
+      } catch (e) {
+        return JSON.stringify(
+          { error: "Could not serialize sheet rows", detail: String(e?.message || e) },
+          null,
+          2,
+        );
+      }
     }, [connectedData]);
 
     const getColField = (col) => (col && typeof col === "object" && "field" in col ? col.field : col);
@@ -2645,6 +2660,60 @@ const GridView = ({startNew}) => {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label="View sheet as JSON"
+                        onClick={() => {
+                          if (!Array.isArray(connectedData)) {
+                            toast.error("No sheet data to show.");
+                            return;
+                          }
+                          setSheetJsonViewerOpen(true);
+                        }}
+                      >
+                        <FileJson className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      View sheet as JSON
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <Dialog open={sheetJsonViewerOpen} onOpenChange={setSheetJsonViewerOpen}>
+                  <DialogContent className="sm:max-w-[min(90vw,720px)] max-h-[min(85dvh,640px)] flex flex-col gap-3">
+                    <DialogHeader>
+                      <DialogTitle>Sheet as JSON</DialogTitle>
+                      <DialogDescription>
+                        {(() => {
+                          const nm =
+                            activeSheetId && dataSheets?.[activeSheetId]?.name
+                              ? String(dataSheets[activeSheetId].name)
+                              : null;
+                          const n = Array.isArray(connectedData) ? connectedData.length : 0;
+                          return nm
+                            ? `Active sheet “${nm}” — read-only snapshot of ${n} row${n === 1 ? "" : "s"} loaded in the grid.`
+                            : `Active sheet — ${n} row${n === 1 ? "" : "s"} loaded in the grid.`;
+                        })()}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <pre className="min-h-0 max-h-[min(55dvh,480px)] flex-1 overflow-auto rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] leading-snug font-mono whitespace-pre break-words">
+                      {activeSheetJsonText}
+                    </pre>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setSheetJsonViewerOpen(false)}>
+                        Close
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 <Dialog open={refineQueryOpen} onOpenChange={setRefineQueryOpen}>
                   <DialogContent className="sm:max-w-lg max-h-[min(90dvh,640px)] overflow-y-auto">

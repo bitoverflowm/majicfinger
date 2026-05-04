@@ -80,5 +80,10 @@ export function temporalToMs(value) {
     if (abs >= 1e11) return n;
     if (abs >= 1e9) return n * 1000;
   }
-  return Date.parse(s);
+  // `Date.parse` is overly permissive on long prose (e.g. Kalshi/Polymarket `title` cells): it can
+  // match substrings like "May" inside "Mayor" plus a year and yield bogus instants. Only use it
+  // for compact strings that might be browser-specific date literals — not full-sentence labels.
+  if (s.length > 72) return NaN;
+  const parsed = Date.parse(s);
+  return Number.isFinite(parsed) ? parsed : NaN;
 }

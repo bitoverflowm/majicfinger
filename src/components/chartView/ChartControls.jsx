@@ -9,7 +9,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid, Shuffle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -134,6 +134,9 @@ export default function ChartControls() {
     handleToggleHorizontal,
     stackedBar,
     handleToggleStack,
+    rainbowBar,
+    setRainbowBar,
+    setRainbowBarShuffleNonce,
     dots,
     handleToggleDots,
     labelLine,
@@ -982,6 +985,42 @@ export default function ChartControls() {
                       onClear={() => setInnerBoxColor(null)}
                     />
                   </div>
+
+                  {selChartType === "bar" && (
+                    <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/60 pb-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Switch
+                          id="chart-design-rainbow-bar"
+                          checked={rainbowBar}
+                          onCheckedChange={setRainbowBar}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-design-rainbow-bar" className="cursor-pointer text-xs text-muted-foreground">
+                          Rainbow bar
+                        </Label>
+                      </div>
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              disabled={!rainbowBar}
+                              aria-label="Shuffle rainbow bar colors"
+                              onClick={() => setRainbowBarShuffleNonce((n) => n + 1)}
+                            >
+                              <Shuffle className="h-3.5 w-3.5" aria-hidden />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="text-xs max-w-[200px]">
+                            New random color assignment from the active palette
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
 
                   {(selChartType === "area" || selChartType === "line") && (
                     <div className="min-w-0 border-b border-border/60 pb-3">

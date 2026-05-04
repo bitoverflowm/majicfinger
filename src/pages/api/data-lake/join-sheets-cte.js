@@ -16,6 +16,7 @@
  *     leftColumn: string,     // column from the main base table
  *     rightColumn: string     // column from the target sheet CTE output
  *   }>,
+ *   limit?: number,            // optional SQL LIMIT on the main compose SELECT (clamped to tier cap server-side)
  *   sheetGraph: {
  *     [sheetId: string]: {
  *       name: string,          // CTE name to use in SQL
@@ -384,6 +385,13 @@ export default async function handler(req, res) {
 
     const mainCompose = { ...(composeIn || {}), ...(mainCteJoins.length ? { cteJoins: mainCteJoins } : {}) };
 
+    const rawMainLim = body.limit;
+    const userMainLim =
+      rawMainLim != null && rawMainLim !== "" && Number.isFinite(Number(rawMainLim))
+        ? Math.max(1, Math.floor(Number(rawMainLim)))
+        : null;
+    const mainSqlLimit = userMainLim != null ? Math.min(composeRowCap, userMainLim) : composeRowCap;
+
     const validatedMain = validateAthenaLakeQueryBody(
       {
         lake,
@@ -393,6 +401,7 @@ export default async function handler(req, res) {
         filters: filtersIn,
         caseSensitive: true,
         demo,
+        ...(userMainLim != null ? { limit: userMainLim } : {}),
       },
       access,
     );
@@ -405,7 +414,7 @@ export default async function handler(req, res) {
 
     const mainSql = buildComposeAthenaSelectSql({
       physicalTableName: validatedMain.physical,
-      limit: composeRowCap,
+      limit: mainSqlLimit,
       compose: validatedMain.compose,
       lake: validatedMain.lake,
       whereSql: mainWhereSql,

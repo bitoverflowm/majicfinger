@@ -57,6 +57,31 @@ export function getShadcnChartPaletteArray(baseId) {
   return SHADCN_CHART_SHADE_KEYS.map((k) => row[String(k)]).filter(Boolean);
 }
 
+/** Grey / near-grey Shadcn bases (ramps are achromatic). */
+const SHADCN_CHART_GREY_BASE_IDS = new Set([
+  "neutral",
+  "stone",
+  "zinc",
+  "slate",
+  "gray",
+  "mauve",
+  "olive",
+  "mist",
+  "taupe",
+]);
+
+/**
+ * One saturated swatch per chromatic chart base (default shade 600) for bar "rainbow" mode.
+ * Avoids sampling only greys when the active palette is neutral/stone/zinc/etc.
+ * @param {number} [shadeKey]
+ * @returns {string[]}
+ */
+export function getShadcnRainbowBarPalette(shadeKey = 600) {
+  const singles = getShadcnSingleColors(shadeKey);
+  const chromatic = singles.filter((x) => !SHADCN_CHART_GREY_BASE_IDS.has(x.baseId)).map((x) => x.color);
+  return chromatic.length ? chromatic : singles.map((x) => x.color);
+}
+
 /** Darkest swatch for base picker UI. */
 export function getShadcnChartBaseSwatch950(baseId) {
   const row = shadcnChartPalettesJson[baseId];

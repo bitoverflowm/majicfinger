@@ -83,7 +83,6 @@ export function validateAthenaLakeQueryBody(body, access) {
   const lake = String(body.lake || "").toLowerCase().trim();
   const table = String(body.table || "").toLowerCase().trim();
   const demo = body.demo === true;
-  const limit = body.limit != null ? Number(body.limit) : 100;
   const queryTypeRaw = String(body.queryType || "select").toLowerCase().trim();
   const queryType =
     queryTypeRaw === "count"
@@ -283,8 +282,25 @@ export function validateAthenaLakeQueryBody(body, access) {
     );
   }
 
-  let limClamped = Math.min(maxSelectRows, Math.max(1, Math.floor(Number(limit) || 100)));
-  if (demo) limClamped = Math.min(limClamped, ATHENA_DEMO_ROW_LIMIT);
+  let limClamped;
+  if (queryType === "compose") {
+    const limitProvided = body.limit != null && body.limit !== "";
+    if (!limitProvided) {
+      limClamped = maxComposeRowsCap;
+    } else {
+      const n = Number(body.limit);
+      if (!Number.isFinite(n)) {
+        throw new AthenaLakeRequestError("Invalid limit", { statusCode: 400, code: "BAD_REQUEST" });
+      }
+      limClamped = Math.min(maxComposeRowsCap, maxSelectRows, Math.max(1, Math.floor(n)));
+    }
+    if (demo) limClamped = Math.min(limClamped, ATHENA_DEMO_ROW_LIMIT);
+  } else {
+    const base =
+      body.limit != null && body.limit !== "" ? Number(body.limit) : 100;
+    limClamped = Math.min(maxSelectRows, Math.max(1, Math.floor(Number.isFinite(base) ? base : 100)));
+    if (demo) limClamped = Math.min(limClamped, ATHENA_DEMO_ROW_LIMIT);
+  }
 
   if (queryType === "compose") {
     const raw = body.compose;

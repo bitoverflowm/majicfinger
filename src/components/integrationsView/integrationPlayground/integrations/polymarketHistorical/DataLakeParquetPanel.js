@@ -528,6 +528,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [columnComposeItems, setColumnComposeItems] = useState([]);
   /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
   const [columnComposeOrderBy, setColumnComposeOrderBy] = useState([]);
+  /** Optional SQL LIMIT on composed Athena SELECT (clamped server-side to tier cap). */
+  const [composeLimitRuleOpen, setComposeLimitRuleOpen] = useState(false);
+  const [composeLimitRuleValue, setComposeLimitRuleValue] = useState("");
   /** @type {Array<{ id: string; column: string; kind: "date" | "string" | "number"; op: string; value: any }>} */
   const [composeWhereFilters, setComposeWhereFilters] = useState([]);
   /** @type {Array<{ id: string; havingAlias: string; op: string; value: any }>} */
@@ -588,7 +591,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
   const [beckerViews, setBeckerViews] = useState(() => listBeckerParquetViews());
 
-  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; composeFilters?: any; sheetJoinSpec?: any; sheetProvenance?: any; requestCard?: any; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
+  /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; composeFilters?: any; composeAthenaRowLimit?: number | null; sheetJoinSpec?: any; sheetProvenance?: any; requestCard?: any; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
   const ingestAbortControllerRef = useRef(null);
 
@@ -898,6 +901,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           ],
           sheetGraph,
           demo: isDemo,
+          ...(leftProv.composeAthenaRowLimit != null ? { limit: leftProv.composeAthenaRowLimit } : {}),
         }),
       });
       const j = await res.json().catch(() => ({}));
@@ -920,6 +924,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         table: leftProv.table,
         composeSpec: leftProv.composeSpec,
         composeFilters: leftProv.composeFilters || null,
+        ...(leftProv.composeAthenaRowLimit != null ? { composeAthenaRowLimit: leftProv.composeAthenaRowLimit } : {}),
         serverSheetJoins: [
           ...(Array.isArray(leftProv.serverSheetJoins) ? leftProv.serverSheetJoins : []),
           { targetSheetId: rightId, joinType, leftColumn: leftKey, rightColumn: rightKey },
@@ -1185,6 +1190,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     if (!selected?.table) return;
     setColumnComposeItems([]);
     setColumnComposeOrderBy([]);
+    setComposeLimitRuleOpen(false);
+    setComposeLimitRuleValue("");
     setComposeWhereFilters([]);
     setComposeHavingFilters([]);
     setMetaQueryMode("all");
@@ -1383,6 +1390,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaOpSpecs,
       kalshiIngestExtras = null,
       sheetJoinSpec = null,
+      composeAthenaRowLimit = null,
       signal,
     ) => {
       return runParquetSheetLoadWithProgress({
@@ -1487,6 +1495,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       sheetRows: sheetJoin.sheetRows,
                       join: sheetJoin.join,
                       demo: isDemo,
+                      ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                     }),
                   });
                   let j = {};
@@ -1513,6 +1522,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       joins: sheetJoin.joins || [],
                       sheetGraph: sheetJoin.sheetGraph || {},
                       demo: isDemo,
+                      ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                     }),
                   });
                   let j = {};
@@ -1536,6 +1546,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   filters: safeComposeFilters || null,
                   caseSensitive: true,
                   demo: isDemo,
+                  ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                 },
                 { signal, maxWaitMs: 900000 },
               );
@@ -1596,6 +1607,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaOpSpecs,
       kalshiIngestExtras,
       sheetJoinSpec,
+      composeAthenaRowLimit: pendingComposeLimit,
       sheetProvenance,
       requestStartMs,
       requestCard,
@@ -1625,6 +1637,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaOpSpecs,
         kalshiIngestExtras,
         sheetJoinSpec,
+        pendingComposeLimit ?? null,
         signal,
       );
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
@@ -1682,6 +1695,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaAppendTargetIndex,
       kalshiIngestExtras,
       sheetJoinSpec,
+      composeAthenaRowLimit: pendingComposeLimitAppend,
     } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
@@ -1707,6 +1721,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaOpSpecs,
         kalshiIngestExtras,
         sheetJoinSpec,
+        pendingComposeLimitAppend ?? null,
         signal,
       );
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
@@ -1768,6 +1783,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaFilters,
       metaOpSpecs,
       kalshiIngestExtras,
+      composeAthenaRowLimit: pendingComposeLimitNew,
     } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
@@ -1797,6 +1813,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         metaOpSpecs,
         kalshiIngestExtras,
         sheetJoinSpec,
+        pendingComposeLimitNew ?? null,
         signal,
       );
 
@@ -2194,6 +2211,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       return;
     }
     const isComposeTab = selectionTab === "columns" || selectionTab === "recipes";
+    let composeAthenaRowLimit = null;
     if (isComposeTab) {
       if (columnComposeItems.length === 0) {
         setError("Add at least one column to SELECT.");
@@ -2240,6 +2258,20 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           return;
         }
         seen.add(a);
+      }
+
+      if (composeLimitRuleOpen) {
+        const rawLim = String(composeLimitRuleValue ?? "").trim();
+        if (!rawLim) {
+          setError("Enter a maximum row count for the limit, or remove the row limit.");
+          return;
+        }
+        const n = Math.floor(Number(rawLim));
+        if (!Number.isFinite(n) || n < 1) {
+          setError("Row limit must be a positive whole number.");
+          return;
+        }
+        composeAthenaRowLimit = n;
       }
     }
     if (selectionTab === "meta") {
@@ -2308,6 +2340,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               : [],
             hasWhere: whereSummary.hasWhere,
             whereText: whereSummary.text,
+            composeRowLimit: composeAthenaRowLimit,
           }
         : null;
     pendingIngestRef.current = {
@@ -2317,6 +2350,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       sampleId: selected.id,
       composeSpec: composeSpecForRun,
       composeFilters: composeFiltersForRun,
+      composeAthenaRowLimit,
       requestStartMs,
       requestCard,
       sheetJoinSpec: (() => {
@@ -2420,6 +2454,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   table: selected.table,
                   composeSpec: composeSpecForRun,
                   composeFilters: composeFiltersForRun,
+                  ...(composeAthenaRowLimit != null ? { composeAthenaRowLimit } : {}),
                   serverSheetJoins,
                   browserSheetJoins,
                 };
@@ -2432,6 +2467,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 table: selected.table,
                 composeSpec: composeSpecForRun,
                 composeFilters: composeFiltersForRun,
+                ...(composeAthenaRowLimit != null ? { composeAthenaRowLimit } : {}),
                 serverSheetJoins,
                 browserSheetJoins,
               };
@@ -2528,6 +2564,17 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     ) {
       reasons.push("Enter a value for each HAVING filter.");
     }
+    if (
+      (selectionTab === "columns" || selectionTab === "recipes") &&
+      composeLimitRuleOpen
+    ) {
+      const rawLim = String(composeLimitRuleValue ?? "").trim();
+      if (!rawLim) reasons.push("Enter a row limit or remove the row limit control.");
+      else {
+        const n = Math.floor(Number(rawLim));
+        if (!Number.isFinite(n) || n < 1) reasons.push("Row limit must be a positive whole number.");
+      }
+    }
     if (selectionTab === "meta") {
       const allSpecs = buildAllMetaOpSpecsForRun();
       if (allSpecs.length === 0) reasons.push("Select Count → All or add filters.");
@@ -2547,6 +2594,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     columnComposeItems.length,
     composeWhereFilters,
     composeHavingFilters,
+    composeLimitRuleOpen,
+    composeLimitRuleValue,
     buildAllMetaOpSpecsForRun,
     isDemo,
   ]);
@@ -4107,6 +4156,55 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     <Plus className="h-3 w-3 mr-1" />
                     Add sort rule
                   </Button>
+                  {!composeLimitRuleOpen ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs shrink-0"
+                      disabled={composeSelectAliasChoices.length === 0}
+                      onClick={() => {
+                        setComposeLimitRuleOpen(true);
+                        setComposeLimitRuleValue((v) => (String(v || "").trim() ? v : String(Math.min(1000, athenaRowLimit))));
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Row limit
+                    </Button>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">Max rows</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className="h-8 w-[5.5rem] text-xs min-w-0"
+                        value={composeLimitRuleValue}
+                        onChange={(e) => setComposeLimitRuleValue(e.target.value)}
+                        aria-label="Maximum rows returned from Athena (SQL LIMIT)"
+                      />
+                      <TooltipProvider delayDuration={250}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground hover:bg-muted/60"
+                              onClick={() => {
+                                setComposeLimitRuleOpen(false);
+                                setComposeLimitRuleValue("");
+                              }}
+                              aria-label="Remove row limit"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            Remove limit (use your tier default cap)
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
                   <div className="flex-1 min-w-2" />
                   <div className="flex items-center gap-2 shrink-0">
                     <TooltipProvider delayDuration={300}>
