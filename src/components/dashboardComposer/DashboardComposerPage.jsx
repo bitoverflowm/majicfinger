@@ -719,6 +719,8 @@ export default function DashboardComposerPage({ user }) {
                             <IsolatedChartPreview
                               chartId={col.chart_id}
                               savedCharts={savedCharts}
+                              savedDataSets={savedDataSets}
+                              loadedDataMeta={loadedDataMeta}
                               onSelectChart={(nextId) => {
                                 updateColumn(row.id, col.id, (c) => ({
                                   ...c,

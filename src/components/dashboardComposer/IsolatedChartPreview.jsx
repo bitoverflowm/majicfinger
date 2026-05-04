@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { mapSavedChartsToPickerOptions } from "@/lib/dashboardChartPickerLabels";
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
@@ -40,16 +41,22 @@ const CHART_SLOT_INNER = "flex min-h-0 w-full flex-1 flex-col overflow-y-auto ov
 
 /**
  * Nested StateProviderV2 so ChartBuilderProvider reads isolated connectedData / dataSheets.
- * @param {{ chartId?: string | null; savedCharts?: unknown[]; onSelectChart?: (chartId: string) => void }} props
+ * @param {{ chartId?: string | null; savedCharts?: unknown[]; savedDataSets?: unknown[]; loadedDataMeta?: unknown; onSelectChart?: (chartId: string) => void }} props
  */
-export function IsolatedChartPreview({ chartId, savedCharts = [], onSelectChart }) {
+export function IsolatedChartPreview({
+  chartId,
+  savedCharts = [],
+  savedDataSets = [],
+  loadedDataMeta = null,
+  onSelectChart,
+}) {
   const [err, setErr] = useState(null);
   const [bundle, setBundle] = useState(null);
 
-  const chartOptions = useMemo(() => {
-    const list = Array.isArray(savedCharts) ? savedCharts : [];
-    return list.map((c) => ({ id: String(c._id), name: c.chart_name || "Chart" }));
-  }, [savedCharts]);
+  const chartOptions = useMemo(
+    () => mapSavedChartsToPickerOptions(savedCharts, savedDataSets, loadedDataMeta),
+    [savedCharts, savedDataSets, loadedDataMeta],
+  );
 
   useEffect(() => {
     let cancelled = false;

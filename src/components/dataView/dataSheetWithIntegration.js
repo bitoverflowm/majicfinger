@@ -77,6 +77,10 @@ import {
   findRowIdForColumn,
   reorderDashboardPageBlocks,
 } from "@/lib/reorderDashboardPageBlocks";
+import {
+  mapSavedChartsToPickerOptions,
+  projectNameForDataSetId,
+} from "@/lib/dashboardChartPickerLabels";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 /** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
 const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
@@ -259,10 +263,16 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     setChartPickerEmphasis,
   ]);
 
-  const dashboardChartPickerOptions = useMemo(() => {
-    const list = Array.isArray(savedCharts) ? savedCharts : [];
-    return list.map((c) => ({ id: String(c._id), name: c.chart_name || "Chart" }));
-  }, [savedCharts]);
+  const dashboardChartPickerOptions = useMemo(
+    () => mapSavedChartsToPickerOptions(savedCharts, savedDataSets, loadedDataMeta),
+    [savedCharts, savedDataSets, loadedDataMeta],
+  );
+
+  const layersComposerProjectName = useMemo(
+    () =>
+      projectNameForDataSetId(chartDashboardDraft?.data_set_id, savedDataSets, loadedDataMeta),
+    [chartDashboardDraft?.data_set_id, savedDataSets, loadedDataMeta],
+  );
 
   useEffect(() => {
     if (dashboardMode && !prevDashboardModeRef.current) {
@@ -1489,7 +1499,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                               const rowLabel =
                                                 pickedName?.trim() ||
                                                 col.h2?.trim() ||
-                                                "Chart";
+                                                (layersComposerProjectName
+                                                  ? `${layersComposerProjectName}: Chart`
+                                                  : "Chart");
                                               const emphasizePicker =
                                                 chartPickerEmphasis?.rowId === item.rowId &&
                                                 chartPickerEmphasis?.colId === col.id;
@@ -1605,7 +1617,13 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                               "border-green-500 ring-2 ring-green-500 ring-offset-2 ring-offset-background dark:border-green-400 dark:ring-green-400",
                                                           )}
                                                         >
-                                                          <SelectValue placeholder="Select chart" />
+                                                          <SelectValue
+                                                            placeholder={
+                                                              layersComposerProjectName
+                                                                ? `${layersComposerProjectName}: select chart`
+                                                                : "Select chart"
+                                                            }
+                                                          />
                                                         </SelectTrigger>
                                                         <SelectContent className="z-[200]">
                                                           <SelectItem value="__none__">No chart</SelectItem>

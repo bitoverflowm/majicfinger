@@ -27,6 +27,7 @@ import { clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
 import { chartSlotLabel } from "@/lib/chartSlotLabel";
 import { CHART_WIDTH_PRESETS } from "@/lib/chartWidthPresets";
 import { patchChartDashboardColumn } from "@/lib/patchChartDashboardColumn";
+import { mapSavedChartsToPickerOptions } from "@/lib/dashboardChartPickerLabels";
 import { resolveFormatDockTarget } from "@/lib/formatDockResolve";
 import {
   isPageFormatDockChartHeadingTarget,
@@ -67,16 +68,18 @@ export function ChartComposerDock({ editorInset = null }) {
     chartDashboardDraft,
     setChartDashboardDraft,
     savedCharts,
+    savedDataSets,
+    loadedDataMeta,
     setChartPickerEmphasis,
     pageFormatDockTarget,
     setPageFormatDockTarget,
     dashboardComposerLayoutActions,
   } = useMyStateV2();
 
-  const chartOptions = useMemo(() => {
-    const list = Array.isArray(savedCharts) ? savedCharts : [];
-    return list.map((c) => ({ id: String(c._id), name: c.chart_name || "Chart" }));
-  }, [savedCharts]);
+  const chartOptions = useMemo(
+    () => mapSavedChartsToPickerOptions(savedCharts, savedDataSets, loadedDataMeta),
+    [savedCharts, savedDataSets, loadedDataMeta],
+  );
 
   const isChartTextTarget =
     isPageFormatDockChartHeadingTarget(pageFormatDockTarget) ||

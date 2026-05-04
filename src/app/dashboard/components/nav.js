@@ -20,7 +20,7 @@ import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
-import { Pause, Play, RotateCw, Square, ArrowLeft, Trash2, ExternalLink, Loader2 } from "lucide-react"
+import { Pause, Play, RotateCw, Square, Trash2, ExternalLink, Loader2 } from "lucide-react"
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
 import {
   applyDataSetToWorkspace,
@@ -57,12 +57,6 @@ const Nav = () => {
   //what component are we viewing
   const viewing = contextStateV2?.viewing
   const setViewing = contextStateV2?.setViewing
-  const integrationSidebar = contextStateV2?.integrationSidebar
-  const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar
-  const rightPanelOpen = contextStateV2?.rightPanelOpen
-  const setRightPanelOpen = contextStateV2?.setRightPanelOpen
-
-
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
   const setDataSetName = contextStateV2?.setDataSetName
@@ -650,22 +644,23 @@ const Nav = () => {
 
   return (
     <div className="w-full flex flex-col items-start gap-2 px-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2 md:h-16">
-          <div className="w-full flex items-center gap-2 min-w-0 pl-2">
-            {(viewing === "dataStart" || viewing === "charts" || viewing === "dashboardComposer") && rightPanelOpen && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => {
-                  setRightPanelOpen?.(false)
-                  setIntegrationSidebar?.(null)
-                }}
-                title="Close right panel"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <div className="w-full min-w-0 text-sm font-semibold truncate">{breadcrumb}</div>
+          <div className="flex min-w-0 flex-1 items-center gap-2 pl-2">
+            <div className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
+              <span className="text-sm font-semibold truncate">{breadcrumb}</span>
+              {loadedDataMeta?.data_set_name && (
+                <>
+                  <span className="hidden shrink-0 text-sm text-muted-foreground/50 sm:inline" aria-hidden>
+                    ·
+                  </span>
+                  <span
+                    className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline"
+                    title={loadedDataMeta.data_set_name}
+                  >
+                    {loadedDataMeta.data_set_name}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
           { user ? (
               <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:ml-auto sm:flex-nowrap">
@@ -703,12 +698,21 @@ const Nav = () => {
                     <span className="text-[7pt] px-2 py-1 rounded-sm bg-rose-100 text-rose-500  dark:text-amber-400 font-bold shrink-0">Viewing Unsaved Data</span>
                   )}
                   {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
-                      <Button variant="outline" size="sm" onClick={handleStartNewProject}>Start New Project</Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-xs font-medium"
+                        onClick={handleStartNewProject}
+                      >
+                        Start New Project
+                      </Button>
                   )}
                   {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
                       <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
                         <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">Save Project</Button>
+                          <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs font-medium">
+                            Save Project
+                          </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
@@ -751,17 +755,17 @@ const Nav = () => {
                   )}
                   <Sheet open={isOpen} onOpenChange={setIsOpen}>
                     <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-1.5">
+                      <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs font-medium">
                         Your Work
                         {savedWorkCountLoading ? (
                           <span
-                            className="ml-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center"
+                            className="ml-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center"
                             aria-label="Loading saved work"
                           >
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                           </span>
                         ) : (
-                          <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-[10px]">
+                          <Badge variant="secondary" className="ml-0.5 h-4 min-h-4 px-1 py-0 text-[9px] leading-none">
                             {(savedDataSets?.length ?? 0) +
                               (savedCharts?.length ?? 0) +
                               (savedPresentations?.length ?? 0) +
@@ -1019,11 +1023,6 @@ const Nav = () => {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-
-
-                {loadedDataMeta && loadedDataMeta.data_set_name && (
-                  <span className="text-xs text-muted-foreground hidden sm:inline">Loaded: {loadedDataMeta.data_set_name}</span>
-                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="secondary" size="icon" className="rounded-full h-9 w-9 overflow-hidden">
