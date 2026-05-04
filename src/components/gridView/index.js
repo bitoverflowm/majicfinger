@@ -218,6 +218,9 @@ const GridView = ({startNew}) => {
     const [statsStdOutCol, setStatsStdOutCol] = useState("");
     const [statsStdMode, setStatsStdMode] = useState("full"); // full | rolling
     const [statsRollCount, setStatsRollCount] = useState("4");
+    const [statsCumsumActive, setStatsCumsumActive] = useState(false);
+    const [statsCumsumSourceCol, setStatsCumsumSourceCol] = useState("");
+    const [statsCumsumOutCol, setStatsCumsumOutCol] = useState("");
 
     // Combine Sheets (client-side join across already-loaded sheets)
     const [combineSheetsDialogOpen, setCombineSheetsDialogOpen] = useState(false);
@@ -493,6 +496,31 @@ const GridView = ({startNew}) => {
       statsStdNumericValues.length > 0 &&
       (statsStdMode !== "rolling" || statsRollCountParsed != null);
 
+    const statsCumsumNumericValues = useMemo(
+      () => columnNumericValuesForStats(connectedData, statsCumsumSourceCol),
+      [connectedData, statsCumsumSourceCol],
+    );
+
+    const statsCumsumCanSubmit =
+      statsCumsumActive &&
+      Boolean(String(statsCumsumSourceCol || "").trim()) &&
+      Boolean(String(statsCumsumOutCol || "").trim()) &&
+      statsCumsumNumericValues.length > 0;
+
+    const statsCumsumPreviewHead = useMemo(() => {
+      if (!statsCumsumSourceCol || !Array.isArray(connectedData) || !connectedData.length) return null;
+      let running = 0;
+      const samples = [];
+      for (const row of connectedData) {
+        const n = parseCellFiniteForStat(row, statsCumsumSourceCol);
+        if (n == null) continue;
+        running += n;
+        samples.push(running);
+        if (samples.length >= 4) break;
+      }
+      return samples.length ? samples : null;
+    }, [connectedData, statsCumsumSourceCol]);
+
     const applySheetMathOperation = useCallback(() => {
       const rows = Array.isArray(connectedData) ? [...connectedData] : [];
       if (!rows.length) {
@@ -701,6 +729,71 @@ const GridView = ({startNew}) => {
       statsRollCount,
       mathDestination,
       nextFreeResultColumnName,
+      addNewSheetAndActivate,
+      replaceCurrentSheetData,
+      setConnectedData,
+      setDataSheets,
+      setDataTypes,
+      setSheetData,
+    ]);
+
+    const applyStatsCumsum = useCallback(() => {
+      const rows = Array.isArray(connectedData) ? [...connectedData] : [];
+      if (!rows.length) {
+        toast.error("Load sheet data before running a column calculation.");
+        return;
+      }
+      const src = String(statsCumsumSourceCol || "").trim();
+      const out = String(statsCumsumOutCol || "").trim() || "cumsum";
+      if (!src || !out) {
+        toast.error("Choose a source column and output column name.");
+        return;
+      }
+      const nums = columnNumericValuesForStats(rows, src);
+      if (!nums.length) {
+        toast.error("Selected column has no numeric values.");
+        return;
+      }
+      let running = 0;
+      const next = rows.map((row) => {
+        if (!row || typeof row !== "object") return row;
+        const n = parseCellFiniteForStat(row, src);
+        if (n == null) return { ...row, [out]: null };
+        running += n;
+        return { ...row, [out]: running };
+      });
+      if (setDataTypes) {
+        setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
+      }
+      if (mathDestination === "new_sheet") {
+        const sheetName = `${out} cumsum`.slice(0, 80);
+        addNewSheetAndActivate?.((newId) => {
+          setSheetData?.(newId, next);
+          setDataSheets?.((prev) => {
+            const p = prev || {};
+            const sheet = p[newId];
+            if (!sheet) return prev;
+            return {
+              ...p,
+              [newId]: {
+                ...sheet,
+                name: sheetName,
+              },
+            };
+          });
+        });
+        toast.success("Added cumulative sum column in a new sheet.");
+      } else {
+        replaceCurrentSheetData?.(next);
+        setConnectedData?.(next);
+        toast.success("Added cumulative sum column to current sheet.");
+      }
+      setMathDialogOpen(false);
+    }, [
+      connectedData,
+      statsCumsumSourceCol,
+      statsCumsumOutCol,
+      mathDestination,
       addNewSheetAndActivate,
       replaceCurrentSheetData,
       setConnectedData,
@@ -1956,7 +2049,10 @@ const GridView = ({startNew}) => {
                         value={mathDialogTab}
                         onValueChange={(v) => {
                           setMathDialogTab(v);
-                          if (v !== "stats") setStatsStdDevActive(false);
+                          if (v !== "stats") {
+                            setStatsStdDevActive(false);
+                            setStatsCumsumActive(false);
+                          }
                           if (v === "basic" && mathOp === "pct_growth") setMathOp("subtract");
                         }}
                         className="w-full"
@@ -2159,8 +2255,8 @@ const GridView = ({startNew}) => {
                           </div>
                         </TabsContent>
                         <TabsContent value="stats" className="mt-2 space-y-4">
-                          {!statsStdDevActive ? (
-                            <div className="flex justify-center py-2">
+                          {!statsStdDevActive && !statsCumsumActive ? (
+                            <div className="flex justify-center gap-3 py-2 flex-wrap">
                               <TooltipProvider delayDuration={200}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -2172,6 +2268,7 @@ const GridView = ({startNew}) => {
                                       aria-label="Standard deviation"
                                       onClick={() => {
                                         setStatsStdDevActive(true);
+                                        setStatsCumsumActive(false);
                                         setStatsStdOutCol((prev) => (String(prev || "").trim() ? prev : nextFreeResultColumnName()));
                                         if (!statsStdSourceCol && sheetColumnNamesForMath.length > 0) {
                                           setStatsStdSourceCol(sheetColumnNamesForMath[0]);
@@ -2186,8 +2283,33 @@ const GridView = ({startNew}) => {
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-14 w-14 rounded-lg px-1"
+                                      aria-label="Cumulative sum"
+                                      onClick={() => {
+                                        setStatsCumsumActive(true);
+                                        setStatsStdDevActive(false);
+                                        setStatsCumsumOutCol((prev) => (String(prev || "").trim() ? prev : "cumsum"));
+                                        if (!statsCumsumSourceCol && sheetColumnNamesForMath.length > 0) {
+                                          setStatsCumsumSourceCol(sheetColumnNamesForMath[0]);
+                                        }
+                                      }}
+                                    >
+                                      <span className="font-mono text-[11px] leading-tight">cumsum()</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="text-xs">
+                                    cumulative
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
-                          ) : (
+                          ) : statsStdDevActive ? (
                             <div className="space-y-3">
                               <div className="space-y-1">
                                 <Label className="text-xs">Source column</Label>
@@ -2304,6 +2426,56 @@ const GridView = ({startNew}) => {
                                 </div>
                               ) : null}
                             </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Source column</Label>
+                                <Select
+                                  value={statsCumsumSourceCol || "__"}
+                                  onValueChange={(v) => setStatsCumsumSourceCol(v === "__" ? "" : v)}
+                                >
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue placeholder="Select column" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__">—</SelectItem>
+                                    {sheetColumnNamesForMath.map((c) => (
+                                      <SelectItem key={`stats-cumsum-src-${c}`} value={c} className="font-mono text-xs">
+                                        {c}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {statsCumsumSourceCol && statsCumsumNumericValues.length === 0 ? (
+                                <Alert variant="destructive" className="py-2">
+                                  <AlertTitle className="text-xs">Not a numeric column</AlertTitle>
+                                  <AlertDescription className="text-xs">
+                                    This column has no numeric values. Choose a column with numbers to compute a cumulative sum.
+                                  </AlertDescription>
+                                </Alert>
+                              ) : null}
+                              <div className="space-y-1">
+                                <Label className="text-xs">New column name</Label>
+                                <Input
+                                  className="h-9 text-xs"
+                                  value={statsCumsumOutCol}
+                                  onChange={(e) => setStatsCumsumOutCol(e.target.value)}
+                                  spellCheck={false}
+                                  placeholder="cumsum"
+                                />
+                              </div>
+                              {statsCumsumSourceCol && statsCumsumPreviewHead ? (
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Preview</Label>
+                                  <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs font-mono text-muted-foreground">
+                                    {statsCumsumOutCol || "cumsum"} = cumsum({statsCumsumSourceCol}) → first values:{" "}
+                                    {statsCumsumPreviewHead.map((x) => Number(x).toLocaleString(undefined, { maximumFractionDigits: 8 })).join(", ")}
+                                    …
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
                           )}
                         </TabsContent>
                       </Tabs>
@@ -2337,9 +2509,17 @@ const GridView = ({startNew}) => {
                       </Button>
                       <Button
                         type="button"
-                        onClick={mathDialogTab === "stats" ? applyStatsStdDev : applySheetMathOperation}
+                        onClick={() => {
+                          if (mathDialogTab === "stats") {
+                            if (statsCumsumActive) applyStatsCumsum();
+                            else applyStatsStdDev();
+                          } else applySheetMathOperation();
+                        }}
                         disabled={
-                          (mathDialogTab === "stats" && !statsStdCanSubmit) ||
+                          (mathDialogTab === "stats" &&
+                            ((!statsStdDevActive && !statsCumsumActive) ||
+                              (statsStdDevActive && !statsStdCanSubmit) ||
+                              (statsCumsumActive && !statsCumsumCanSubmit))) ||
                           (mathDialogTab === "basic" &&
                             (!String(mathBasicColA || "").trim() ||
                               !String(mathBasicColB || "").trim() ||
