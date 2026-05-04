@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import moment from "moment"
@@ -15,10 +15,7 @@ import { useUser } from '@/lib/hooks';
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet"
-import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { Progress } from "@/components/ui/progress"
 import { Pause, Play, RotateCw, Square, Trash2, ExternalLink, Loader2 } from "lucide-react"
@@ -44,6 +41,91 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+function attachPublicAssetsToProjectRow(row) {
+  row.publicCharts = (row.charts || []).filter((c) => c?.is_public && c?.public_slug)
+  row.publicDashboards = (row.dashboards || []).filter((d) => d?.is_public && d?.public_slug)
+}
+
+/**
+ * One row per saved dataset (project), with charts and dashboards grouped by data_set_id.
+ * Assets with missing or unknown data_set_id get numbered "Unnamed project N" rows.
+ */
+function buildProjectRows(savedDataSets, savedCharts, savedChartDashboards) {
+  const datasets = Array.isArray(savedDataSets) ? savedDataSets.filter((d) => d?._id) : []
+  const sorted = [...datasets].sort((a, b) => {
+    const ta = new Date(a?.last_saved_date || 0).getTime()
+    const tb = new Date(b?.last_saved_date || 0).getTime()
+    return tb - ta
+  })
+  const charts = Array.isArray(savedCharts) ? savedCharts : []
+  const dashboards = Array.isArray(savedChartDashboards) ? savedChartDashboards : []
+  const idSet = new Set(sorted.map((d) => String(d._id)))
+
+  const rowById = new Map()
+  const rows = []
+  for (const ds of sorted) {
+    const id = String(ds._id)
+    const row = {
+      key: `dataset-${id}`,
+      kind: "dataset",
+      dataSet: ds,
+      charts: [],
+      dashboards: [],
+    }
+    rowById.set(id, row)
+    rows.push(row)
+  }
+
+  const targetRow = (dataSetId) => {
+    const id = dataSetId != null && String(dataSetId).trim() !== "" ? String(dataSetId) : ""
+    if (!id || !idSet.has(id)) return null
+    return rowById.get(id)
+  }
+
+  const orphanCharts = []
+  const orphanDashboards = []
+  for (const ch of charts) {
+    const t = targetRow(ch?.data_set_id)
+    if (t) t.charts.push(ch)
+    else orphanCharts.push(ch)
+  }
+  for (const d of dashboards) {
+    const t = targetRow(d?.data_set_id)
+    if (t) t.dashboards.push(d)
+    else orphanDashboards.push(d)
+  }
+
+  rows.forEach((r) => attachPublicAssetsToProjectRow(r))
+
+  let unnamedIdx = 0
+  if (orphanCharts.length) {
+    const r = {
+      key: `orphan-charts-${unnamedIdx}`,
+      kind: "orphan",
+      name: `Unnamed project ${unnamedIdx}`,
+      dataSet: null,
+      charts: orphanCharts,
+      dashboards: [],
+    }
+    attachPublicAssetsToProjectRow(r)
+    rows.push(r)
+    unnamedIdx += 1
+  }
+  if (orphanDashboards.length) {
+    const r = {
+      key: `orphan-dashboards-${unnamedIdx}`,
+      kind: "orphan",
+      name: `Unnamed project ${unnamedIdx}`,
+      dataSet: null,
+      charts: [],
+      dashboards: orphanDashboards,
+    }
+    attachPublicAssetsToProjectRow(r)
+    rows.push(r)
+  }
+
+  return rows
+}
 
 const Nav = () => {
   const user = useUser()
@@ -71,7 +153,6 @@ const Nav = () => {
   const loadedDataId = contextStateV2?.loadedDataId
   const setLoadedDataId = contextStateV2?.setLoadedDataId
 
-  const savedPresentations = contextStateV2?.savedPresentations
   const loadedPresentationMeta = contextStateV2?.loadedPresentationMeta
   const setLoadedPresentationMeta = contextStateV2?.setLoadedPresentationMeta
   const connectedPresentation = contextStateV2?.connectedPresentation
@@ -91,10 +172,12 @@ const Nav = () => {
 
   const savedWorkCountLoading =
     hasDbBackedUserId &&
-    (savedDataSets === undefined ||
-      savedCharts === undefined ||
-      savedPresentations === undefined ||
-      savedChartDashboards === undefined)
+    (savedDataSets === undefined || savedCharts === undefined || savedChartDashboards === undefined)
+
+  const projectRows = useMemo(
+    () => buildProjectRows(savedDataSets, savedCharts, savedChartDashboards),
+    [savedDataSets, savedCharts, savedChartDashboards],
+  )
 
   // chart properties used by legacy save flow
   const chartOptions = contextStateV2?.chartOptions
@@ -151,8 +234,6 @@ const Nav = () => {
   const [deleteDownstream, setDeleteDownstream] = useState(false)
   const [isDeleteBusy, setIsDeleteBusy] = useState(false)
 
-  const publicCharts = (savedCharts || []).filter((c) => c?.is_public && c?.public_slug)
-  const publicDashboards = (savedChartDashboards || []).filter((d) => d?.is_public && d?.public_slug)
   const publicBase =
     process.env.NODE_ENV === "development" && runtimeOrigin
       ? runtimeOrigin
@@ -427,6 +508,7 @@ const Nav = () => {
 
   const loadDataSheet = async (dataSetId, dataSet) => {
     if(loadedDataMeta && dataSetId === loadedDataMeta._id){
+      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1)
       setViewing('dataStart')
       setIsOpen(false)
     }else{
@@ -440,6 +522,7 @@ const Nav = () => {
           applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData })
           setLoadedDataMeta(res.data || dataSet)
           hydrateProjectCharts(dataSetId)
+          setRefetchChartDashboardsTick?.((t) => (t || 0) + 1)
           toast.success(`Data: ${res.data.data_set_name} loaded`, {
             duration: 99999999
           })
@@ -447,6 +530,20 @@ const Nav = () => {
           setViewing('dataStart')
         })
     }    
+  }
+
+  const loadOrphanProjectBucket = (row) => {
+    if (!row || row.kind !== "orphan") return
+    if (row.charts?.length) {
+      const ch = row.charts[0]
+      loadChart(ch._id, ch)
+      return
+    }
+    if (row.dashboards?.length) {
+      loadChartDashboard(row.dashboards[0]._id)
+      return
+    }
+    toast.info("Nothing to load in this bucket yet.")
   }
 
   const loadChart = async (chartId, chartMeta) => {
@@ -506,36 +603,6 @@ const Nav = () => {
     setIsOpen(false);
     toast.success("Loading dashboard…", { duration: 4000 });
   };
-
-  const loadPresentation = async (presentationId, presentationMeta) => {
-    if(loadedPresentationMeta && presentationId === loadedPresentationMeta._id){
-      //set the data
-      //set the presentation 
-      setViewing('presentation')
-      setIsOpen(false)
-    }else{
-      fetch(`/api/presentations/presentation/${presentationId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }).then(response => response.json())
-        .then(res =>{
-          console.log(res.data)
-          //letting system know that a new chart has been propogated
-          setLoadedPresentationMeta(presentationMeta)
-          setConnectedData(res.data.data_snap_shot)
-          setLoadedDataMeta(res.data.data_meta)
-          setConnectedPresentation(res.data)
-          toast.success(`Presentation: ${res.data.project_name} loaded`, {
-            duration: 99999999
-          })
-
-          setIsOpen(false)
-          setViewing('presentation')
-        })
-    }    
-  }
 
   const openDeleteDialog = async (type, item, event) => {
     event?.stopPropagation?.()
@@ -819,10 +886,7 @@ const Nav = () => {
                           </span>
                         ) : (
                           <Badge variant="secondary" className="ml-0.5 h-4 min-h-4 px-1 py-0 text-[9px] leading-none">
-                            {(savedDataSets?.length ?? 0) +
-                              (savedCharts?.length ?? 0) +
-                              (savedPresentations?.length ?? 0) +
-                              (savedChartDashboards?.length ?? 0)}
+                            {projectRows.length}
                           </Badge>
                         )}
                       </Button>
@@ -831,199 +895,223 @@ const Nav = () => {
                           <SheetHeader>
                             <SheetTitle>Your Saved Work</SheetTitle>
                             <SheetDescription>
-                              Click on a project to load and begin work.
+                              Load a project to open its workbook, charts, and dashboards together. Use the lists below to open a single chart or dashboard.
                             </SheetDescription>
                           </SheetHeader>
-                          <Tabs defaultValue="data" className="h-5/6 overflow-y-auto h-screen">
-                            <TabsList className="">
-                              <TabsTrigger value="data">Data Sheets</TabsTrigger>
-                              <TabsTrigger value="charts">Charts</TabsTrigger>
-                              <TabsTrigger value="dashboards">Dashboards</TabsTrigger>
-                              <TabsTrigger value="persentations">Presentations</TabsTrigger>
-                              <TabsTrigger value="publicPages">Live Public Pages</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="data">
-                              <div className="flex flex-wrap gap-2">
-                                {
-                                    savedDataSets && savedDataSets.length > 0 && savedDataSets.map(
-                                      (dataSet)=> 
-                                        <Card key={dataSet._id} className="w-sm text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadDataSheet(dataSet._id, dataSet)}>
-                                          <CardHeader>
-                                            <div className="flex items-center gap-2">
-                                              <span className="truncate">{dataSet.data_set_name}</span>
-                                              <div className="ml-auto flex items-center gap-2">
-                                                {loadedDataMeta && loadedDataMeta._id === dataSet._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}
-                                                {renderDeleteButton("dataset", dataSet)}
+                          <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
+                            {savedWorkCountLoading ? (
+                              <div className="flex justify-center py-16" aria-label="Loading saved work">
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : (
+                              <>
+                            {!projectRows.length && (
+                              <p className="py-6 text-sm text-muted-foreground">No saved projects yet.</p>
+                            )}
+                            <div className="space-y-4 pb-6">
+                              {projectRows.map((row) => {
+                                const title =
+                                  row.kind === "dataset"
+                                    ? String(row.dataSet?.data_set_name || "").trim() || "Untitled project"
+                                    : row.name
+                                const ds = row.dataSet
+                                return (
+                                  <div
+                                    key={row.key}
+                                    className="rounded-lg border border-border bg-card/40 p-4 text-sm shadow-sm"
+                                  >
+                                    <div className="flex flex-wrap items-start gap-2">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="font-semibold leading-tight">{title}</div>
+                                        {row.kind === "dataset" && ds?.last_saved_date && (
+                                          <div className="mt-0.5 text-xs text-muted-foreground">
+                                            Edited: {moment(ds.last_saved_date).format("ddd MMM YY h:mm a")}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                        {row.kind === "dataset" && ds?._id && (
+                                          <Button
+                                            type="button"
+                                            variant="default"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={() => loadDataSheet(ds._id, ds)}
+                                          >
+                                            Load project
+                                          </Button>
+                                        )}
+                                        {row.kind === "orphan" && (
+                                          <Button
+                                            type="button"
+                                            variant="default"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={() => loadOrphanProjectBucket(row)}
+                                          >
+                                            Load project
+                                          </Button>
+                                        )}
+                                        {row.kind === "dataset" && ds && renderDeleteButton("dataset", ds)}
+                                      </div>
+                                    </div>
+
+                                    {row.kind === "dataset" && ds && (
+                                      <button
+                                        type="button"
+                                        className="mt-3 w-full rounded-md border border-dashed border-muted-foreground/25 bg-muted/30 px-3 py-2 text-left text-xs transition hover:bg-muted/50"
+                                        onClick={() => loadDataSheet(ds._id, ds)}
+                                      >
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className="font-medium">Workbook</span>
+                                          {loadedDataMeta && String(loadedDataMeta._id) === String(ds._id) && (
+                                            <Badge className="bg-green-200 text-black">Loaded</Badge>
+                                          )}
+                                        </div>
+                                        <div className="text-muted-foreground">{ds.source || "project"}</div>
+                                        {(ds.labels || []).length > 0 && (
+                                          <div className="mt-1 flex flex-wrap gap-1">
+                                            {(ds.labels || []).map((label) => (
+                                              <Badge key={String(label)} variant="secondary" className="text-[10px]">
+                                                {label}
+                                              </Badge>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </button>
+                                    )}
+                                    {row.kind === "orphan" && (
+                                      <p className="mt-3 text-xs text-muted-foreground">
+                                        These items are not linked to a saved project. Load opens the first chart (if any),
+                                        otherwise the first dashboard.
+                                      </p>
+                                    )}
+
+                                    <div className="mt-3 space-y-2">
+                                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Charts
+                                      </div>
+                                      {row.charts.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground">None in this project.</p>
+                                      ) : (
+                                        <ul className="flex flex-col gap-1.5">
+                                          {row.charts.map((chart) => (
+                                            <li key={chart._id}>
+                                              <div className="flex flex-wrap items-center gap-2 rounded-md border border-transparent px-1 py-0.5 hover:border-muted">
+                                                <button
+                                                  type="button"
+                                                  className="min-w-0 flex-1 truncate text-left text-xs underline-offset-2 hover:underline"
+                                                  onClick={() => loadChart(chart._id, chart)}
+                                                >
+                                                  {chart.chart_name || "Untitled chart"}
+                                                </button>
+                                                {loadedChartMeta && String(loadedChartMeta._id) === String(chart._id) && (
+                                                  <Badge className="bg-green-200 text-[10px] text-black">Loaded</Badge>
+                                                )}
+                                                {renderDeleteButton("chart", chart)}
                                               </div>
-                                            </div>
-                                          </CardHeader>
-                                          <CardContent>
-                                            <div className="font-muted">{dataSet.source}</div>
-                                            <div className="py-1">Edited: {moment(dataSet.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                          </CardContent>
-                                          <CardFooter>
-                                            <div className="flex">{dataSet.labels.map((label)=> <Badge>{label}</Badge>)}</div>
-                                          </CardFooter>
-                                        </Card>
-                                        )
-                                  }                            
-                              </div>                                
-                            </TabsContent>
-                            <TabsContent value="charts">
-                              <div className="flex flex-wrap gap-2">
-                                { 
-                                  savedCharts && savedCharts.length > 0 && savedCharts.map(
-                                    (chart)=> 
-                                      <Card key={chart._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadChart(chart._id, chart)}>
-                                        <CardHeader>
-                                          <div className="flex items-center gap-2">
-                                            <span className="truncate">{chart.chart_name}</span>
-                                            <div className="ml-auto flex items-center gap-2">
-                                              {loadedChartMeta && loadedChartMeta._id === chart._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}
-                                              {renderDeleteButton("chart", chart)}
-                                            </div>
-                                          </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                          <div className="py-1">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                        </CardContent>
-                                        <CardFooter>
-                                          <div className="flex">{chart.labels.map((label)=> <Badge>{label}</Badge>)}</div>
-                                        </CardFooter>
-                                      </Card>
-                                      )
-                                }
-                              </div>
-                            </TabsContent>
-                            <TabsContent value="dashboards">
-                              <div className="flex flex-wrap gap-2">
-                                {savedChartDashboards &&
-                                  savedChartDashboards.length > 0 &&
-                                  savedChartDashboards.map((dash) => (
-                                    <Card
-                                      key={dash._id}
-                                      className="w-sm cursor-pointer text-sm hover:bg-green-100"
-                                      onClick={() => loadChartDashboard(dash._id)}
-                                    >
-                                      <CardHeader>
-                                        <div className="flex items-center gap-2">
-                                          <span className="truncate">
-                                            {dash.dashboard_name || dash.page_heading || "Dashboard"}
-                                          </span>
-                                          <div className="ml-auto">
-                                            {activeChartDashboardId &&
-                                            String(activeChartDashboardId) === String(dash._id) ? (
-                                              <Badge className={"bg-green-200 text-black"}>Loaded</Badge>
-                                            ) : null}
-                                          </div>
+                                              <div className="pl-1 text-[10px] text-muted-foreground">
+                                                {chart.last_saved_date
+                                                  ? `Edited: ${moment(chart.last_saved_date).format("ddd MMM YY h:mm a")}`
+                                                  : null}
+                                              </div>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
+                                    </div>
+
+                                    <div className="mt-3 space-y-2">
+                                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Dashboards
+                                      </div>
+                                      {row.dashboards.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground">None in this project.</p>
+                                      ) : (
+                                        <ul className="flex flex-col gap-1.5">
+                                          {row.dashboards.map((dash) => (
+                                            <li key={dash._id}>
+                                              <div className="flex flex-wrap items-center gap-2 rounded-md border border-transparent px-1 py-0.5 hover:border-muted">
+                                                <button
+                                                  type="button"
+                                                  className="min-w-0 flex-1 truncate text-left text-xs underline-offset-2 hover:underline"
+                                                  onClick={() => loadChartDashboard(dash._id)}
+                                                >
+                                                  {dash.dashboard_name || dash.page_heading || "Dashboard"}
+                                                </button>
+                                                {activeChartDashboardId &&
+                                                  String(activeChartDashboardId) === String(dash._id) && (
+                                                    <Badge className="bg-green-200 text-[10px] text-black">Loaded</Badge>
+                                                  )}
+                                              </div>
+                                              <div className="pl-1 text-[10px] text-muted-foreground">
+                                                {dash.last_edited_date
+                                                  ? `Edited: ${moment(dash.last_edited_date).format("ddd MMM YY h:mm a")}`
+                                                  : "—"}
+                                              </div>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
+                                    </div>
+
+                                    {(row.publicCharts?.length > 0 || row.publicDashboards?.length > 0) && (
+                                      <div className="mt-3 space-y-2 border-t pt-3">
+                                        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                          Live public pages
                                         </div>
-                                      </CardHeader>
-                                      <CardContent>
-                                        <div className="py-1 text-xs text-muted-foreground">
-                                          Edited:{" "}
-                                          {dash.last_edited_date
-                                            ? moment(dash.last_edited_date).format("ddd MMM YY h:mm a")
-                                            : "—"}
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                {(!savedChartDashboards || savedChartDashboards.length === 0) && (
-                                  <div className="py-4 text-sm text-muted-foreground">No saved dashboards yet.</div>
-                                )}
-                              </div>
-                            </TabsContent>
-                            <TabsContent value="persentations"><div className="flex flex-wrap gap-2">
-                                { 
-                                  savedPresentations && savedPresentations.length > 0 && savedPresentations.map(
-                                    (pressie)=> 
-                                      <Card key={pressie._id} className="text-sm hover:bg-green-100 cursor-pointer" onClick={()=>loadPresentation(pressie._id, pressie)}>
-                                        <CardHeader>
-                                          <div className="flex items-center gap-2">
-                                            <span className="truncate">{pressie.presentation_name}</span>
-                                            <div className="ml-auto flex items-center gap-2">
-                                              {loadedPresentationMeta && loadedPresentationMeta._id === pressie._id && <Badge className={"bg-green-200 text-black"}>Loaded | Click to View</Badge>}
-                                              {renderDeleteButton("presentation", pressie)}
-                                            </div>
-                                          </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                          <div>{pressie.project_name}</div>
-                                          <div></div>
-                                          <div></div>
-                                          <div className="py-1">Edited: {moment(pressie.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                        </CardContent>
-                                        <CardFooter>
-                                          <div className="flex">{pressie.deployed && <Badge>Deployed</Badge>}</div>
-                                        </CardFooter>
-                                      </Card>
-                                      )
-                                }
-                              </div></TabsContent>
-                            <TabsContent value="publicPages">
-                              <div className="flex flex-wrap gap-2">
-                                {publicCharts.map((chart) => {
-                                  const publicUrl = `${publicBase.replace(/\/$/, "")}/${encodeURIComponent(userHandle || "handle")}/charts/${encodeURIComponent(chart.public_slug)}`
-                                  return (
-                                    <Card key={`public-${chart._id}`} className="w-sm text-sm">
-                                      <CardHeader>
-                                        <div className="flex items-center gap-2">
-                                          <span className="truncate">{chart.chart_name}</span>
-                                          <div className="ml-auto">{renderDeleteButton("publicPage", chart)}</div>
-                                        </div>
-                                      </CardHeader>
-                                      <CardContent>
-                                        <a
-                                          href={publicUrl}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="inline-flex items-center gap-1 break-all text-xs text-primary underline underline-offset-2"
-                                        >
-                                          {publicUrl}
-                                          <ExternalLink className="h-3 w-3 shrink-0" />
-                                        </a>
-                                        <div className="py-1 text-xs">Edited: {moment(chart.last_saved_date).format('ddd MMM YY h:mm a')}</div>
-                                      </CardContent>
-                                    </Card>
-                                  )
-                                })}
-                                {publicDashboards.map((dash) => {
-                                  const publicUrl = `${publicBase.replace(/\/$/, "")}/${encodeURIComponent(userHandle || "handle")}/dashboards/${encodeURIComponent(dash.public_slug)}`
-                                  return (
-                                    <Card key={`public-dash-${dash._id}`} className="w-sm text-sm">
-                                      <CardHeader>
-                                        <div className="flex items-center gap-2">
-                                          <span className="truncate">
-                                            {dash.page_heading || dash.dashboard_name || "Dashboard"}
-                                          </span>
-                                        </div>
-                                      </CardHeader>
-                                      <CardContent>
-                                        <a
-                                          href={publicUrl}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="inline-flex items-center gap-1 break-all text-xs text-primary underline underline-offset-2"
-                                        >
-                                          {publicUrl}
-                                          <ExternalLink className="h-3 w-3 shrink-0" />
-                                        </a>
-                                        <div className="py-1 text-xs">
-                                          Edited:{" "}
-                                          {dash.last_edited_date
-                                            ? moment(dash.last_edited_date).format("ddd MMM YY h:mm a")
-                                            : "—"}
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  )
-                                })}
-                                {publicCharts.length === 0 && publicDashboards.length === 0 && (
-                                  <div className="py-4 text-sm text-muted-foreground">No live public pages yet.</div>
-                                )}
-                              </div>
-                            </TabsContent>
-                          </Tabs>
+                                        <ul className="space-y-2">
+                                          {row.publicCharts.map((chart) => {
+                                            const publicUrl = `${publicBase.replace(/\/$/, "")}/${encodeURIComponent(userHandle || "handle")}/charts/${encodeURIComponent(chart.public_slug)}`
+                                            return (
+                                              <li key={`pub-ch-${chart._id}`} className="rounded-md border bg-muted/20 p-2 text-xs">
+                                                <div className="flex flex-wrap items-start gap-2">
+                                                  <span className="min-w-0 flex-1 font-medium">{chart.chart_name}</span>
+                                                  {renderDeleteButton("publicPage", chart)}
+                                                </div>
+                                                <a
+                                                  href={publicUrl}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="mt-1 inline-flex max-w-full items-center gap-1 break-all text-primary underline underline-offset-2"
+                                                >
+                                                  {publicUrl}
+                                                  <ExternalLink className="h-3 w-3 shrink-0" />
+                                                </a>
+                                              </li>
+                                            )
+                                          })}
+                                          {row.publicDashboards.map((dash) => {
+                                            const publicUrl = `${publicBase.replace(/\/$/, "")}/${encodeURIComponent(userHandle || "handle")}/dashboards/${encodeURIComponent(dash.public_slug)}`
+                                            return (
+                                              <li key={`pub-d-${dash._id}`} className="rounded-md border bg-muted/20 p-2 text-xs">
+                                                <div className="flex flex-wrap items-start gap-2">
+                                                  <span className="min-w-0 flex-1 font-medium">
+                                                    {dash.page_heading || dash.dashboard_name || "Dashboard"}
+                                                  </span>
+                                                </div>
+                                                <a
+                                                  href={publicUrl}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="mt-1 inline-flex max-w-full items-center gap-1 break-all text-primary underline underline-offset-2"
+                                                >
+                                                  {publicUrl}
+                                                  <ExternalLink className="h-3 w-3 shrink-0" />
+                                                </a>
+                                              </li>
+                                            )
+                                          })}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                              </>
+                            )}
+                          </div>
                         </SheetContent>
                   </Sheet>
                   <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
