@@ -15,7 +15,9 @@ import {
 import { cn } from "@/lib/utils";
 import {
   CHART_CARDS_GRID_STYLE,
+  clampChartCardRowSpan,
   createEmptyDashboardLayout,
+  DEFAULT_CHART_CARD_ROW_SPAN,
 } from "@/lib/dashboardLayoutDefaults";
 import {
   flattenDashboardLayers,
@@ -25,6 +27,11 @@ import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft";
+import {
+  applyDataSetToWorkspace,
+  firstDashboardLayoutChartId,
+  hydrateChartSheetsForDataSet,
+} from "@/lib/hydrateProjectWorkspace";
 import { IsolatedChartPreview } from "./IsolatedChartPreview";
 import DotPattern from "@/components/magicui/dot-pattern";
 import { Plus } from "lucide-react";
@@ -69,7 +76,7 @@ function emptyColumn(overrides = {}) {
     id: rid("col"),
     chart_id: null,
     colSpan: 12,
-    rowSpan: 1,
+    rowSpan: DEFAULT_CHART_CARD_ROW_SPAN,
     h2: "",
     caption: "",
     microtext: "",
@@ -135,6 +142,11 @@ export default function DashboardComposerPage({ user }) {
     setActiveChartDashboardId,
     savedDataSets,
     loadedDataMeta,
+    setLoadedDataMeta,
+    setLoadedDataId,
+    setConnectedData,
+    setDataSheets,
+    setActiveSheetId,
     setSelectedDashboardCard,
     setRefetchChartDashboardsTick,
     savedChartDashboards,
@@ -143,6 +155,12 @@ export default function DashboardComposerPage({ user }) {
     setChartComposerDock,
     setChartPickerEmphasis,
     setDashboardComposerLayoutActions,
+    savedCharts,
+    setSavedCharts,
+    setChartSheets,
+    setActiveChartSheetId,
+    setLoadedChartMeta,
+    setLoadedChartBuilderSnapshot,
   } = useMyStateV2();
 
   const hasDbUser =
@@ -214,6 +232,41 @@ export default function DashboardComposerPage({ user }) {
           public_slug: d.public_slug || "",
           is_public: !!d.is_public,
         });
+
+        const dataSetId = d.data_set_id ? String(d.data_set_id) : "";
+        if (dataSetId && user?.userId) {
+          if (!cancelled) setDashboardLoadStage("Loading project data");
+          try {
+            const dsRes = await fetch(`/api/dataSets/dataSet/${dataSetId}`);
+            const dsJson = await dsRes.json();
+            if (cancelled) return;
+            if (dsJson?.success && dsJson?.data) {
+              applyDataSetToWorkspace(dsJson.data, {
+                setDataSheets,
+                setActiveSheetId,
+                setConnectedData,
+              });
+              setLoadedDataMeta?.(dsJson.data);
+              setLoadedDataId?.(String(dsJson.data._id ?? dataSetId));
+              const preferredChartId = firstDashboardLayoutChartId(layout);
+              await hydrateChartSheetsForDataSet({
+                dataSetId,
+                userId: user.userId,
+                preferredChartId,
+                setSavedCharts,
+                setChartSheets,
+                setActiveChartSheetId,
+                setLoadedChartMeta,
+                setLoadedChartBuilderSnapshot,
+              });
+            } else if (!cancelled) {
+              toast.warning(dsJson?.message || "Could not load the project linked to this dashboard.");
+            }
+          } catch {
+            if (!cancelled) toast.warning("Could not load the project linked to this dashboard.");
+          }
+        }
+
         if (!cancelled) setDashboardLoadProgress(100);
       } catch {
         if (!cancelled) {
@@ -228,10 +281,22 @@ export default function DashboardComposerPage({ user }) {
   }, [
     activeChartDashboardId,
     hasDbUser,
+    user?.userId,
     setChartDashboardDraft,
     setActiveChartDashboardId,
     setSelectedDashboardCard,
     setChartComposerDock,
+    setChartPickerEmphasis,
+    setConnectedData,
+    setDataSheets,
+    setActiveSheetId,
+    setLoadedDataMeta,
+    setLoadedDataId,
+    setSavedCharts,
+    setChartSheets,
+    setActiveChartSheetId,
+    setLoadedChartMeta,
+    setLoadedChartBuilderSnapshot,
   ]);
 
   const setDraft = useCallback(
@@ -568,7 +633,7 @@ export default function DashboardComposerPage({ user }) {
                           tabIndex={0}
                           style={{
                             gridColumn: `span ${Math.min(12, Math.max(1, col.colSpan ?? 12))}`,
-                            gridRow: `span ${Math.min(4, Math.max(1, Number(col.rowSpan) || 1))}`,
+                            gridRow: `span ${clampChartCardRowSpan(col.rowSpan)}`,
                           }}
                           onClick={() => {
                             setPageFormatDockTarget?.(null);
@@ -582,7 +647,7 @@ export default function DashboardComposerPage({ user }) {
                               setChartComposerDock?.({ rowId: row.id, colId: col.id });
                             }
                           }}
-                          className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto py-1 transition-colors outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                          className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden py-1 transition-colors outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
                         >
                           <input
                             type="text"
@@ -651,7 +716,17 @@ export default function DashboardComposerPage({ user }) {
                             )}
                           />
                           <div className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-hidden">
-                            <IsolatedChartPreview chartId={col.chart_id} />
+                            <IsolatedChartPreview
+                              chartId={col.chart_id}
+                              savedCharts={savedCharts}
+                              onSelectChart={(nextId) => {
+                                updateColumn(row.id, col.id, (c) => ({
+                                  ...c,
+                                  chart_id: nextId,
+                                }));
+                                setChartPickerEmphasis?.(null);
+                              }}
+                            />
                           </div>
                           <input
                             type="text"

@@ -23,6 +23,10 @@ import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { Pause, Play, RotateCw, Square, ArrowLeft, Trash2, ExternalLink, Loader2 } from "lucide-react"
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
 import {
+  applyDataSetToWorkspace,
+  hydrateChartSheetsForDataSet,
+} from "@/lib/hydrateProjectWorkspace"
+import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
@@ -208,25 +212,6 @@ const Nav = () => {
     toast.success("Started a new blank project.");
   };
 
-  const hydrateDataSheetsFromDataSet = (ds) => {
-    const incomingSheets = ds?.data_sheets && typeof ds.data_sheets === "object"
-      ? ds.data_sheets
-      : null;
-    if (incomingSheets && Object.keys(incomingSheets).length > 0) {
-      setDataSheets?.(incomingSheets);
-      const firstId = Object.keys(incomingSheets)[0];
-      setActiveSheetId?.(firstId);
-      const firstRows = incomingSheets?.[firstId]?.data || [];
-      setConnectedData?.(firstRows);
-      return;
-    }
-    const rows = Array.isArray(ds?.data) ? ds.data : [];
-    const fallback = { "sheet-1": { name: "Sheet 1", data: rows, provenance: null } };
-    setDataSheets?.(fallback);
-    setActiveSheetId?.("sheet-1");
-    setConnectedData?.(rows);
-  };
-
   const saveAllChartsForProject = async (dataSetId, forceCreate = false, chartSheetsForSave = chartSheets) => {
     const entries = Object.entries(chartSheetsForSave || {});
     const nextSheets = {};
@@ -404,66 +389,17 @@ const Nav = () => {
     handleSave();
   };
 
-  const hydrateProjectCharts = async (dataSetId, preferredChartId = null) => {
-    let allCharts = savedCharts || [];
-    if (user?.userId) {
-      try {
-        const freshRes = await fetch(`/api/charts?uid=${user.userId}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
-        const freshJson = await freshRes.json();
-        if (freshJson?.success && Array.isArray(freshJson?.data)) {
-          allCharts = freshJson.data;
-          setSavedCharts?.(freshJson.data);
-        }
-      } catch {}
-    }
-    const scoped = (allCharts || []).filter((chart) => String(chart?.data_set_id) === String(dataSetId));
-    if (!scoped.length) {
-      setChartSheets?.({
-        "chart-1": { name: "Chart 1", snapshot: null, chartMeta: null },
-      });
-      setActiveChartSheetId?.("chart-1");
-      setLoadedChartMeta?.(null);
-      setLoadedChartBuilderSnapshot?.(null);
-      return;
-    }
-
-    const detailed = await Promise.all(
-      scoped.map(async (meta) => {
-        try {
-          const res = await fetch(`/api/charts/chart/${meta._id}`, {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-          });
-          const json = await res.json();
-          const full = json?.data || null;
-          const cp0 = Array.isArray(full?.chart_properties) ? full.chart_properties[0] : full?.chart_properties;
-          const snapshot = cp0?.rechartsBuilder || null;
-          return { meta: full || meta, snapshot };
-        } catch {
-          return { meta, snapshot: null };
-        }
-      }),
-    );
-
-    const nextSheets = {};
-    detailed.forEach((entry, idx) => {
-      const id = `chart-${idx + 1}`;
-      nextSheets[id] = {
-        name: entry?.meta?.chart_name || `Chart ${idx + 1}`,
-        chartMeta: entry?.meta || null,
-        snapshot: entry?.snapshot || null,
-      };
+  const hydrateProjectCharts = async (dataSetId, preferredChartId = null) =>
+    hydrateChartSheetsForDataSet({
+      dataSetId,
+      userId: user?.userId,
+      preferredChartId,
+      setSavedCharts,
+      setChartSheets,
+      setActiveChartSheetId,
+      setLoadedChartMeta,
+      setLoadedChartBuilderSnapshot,
     });
-    setChartSheets?.(nextSheets);
-    const preferred = detailed.find((d) => String(d?.meta?._id) === String(preferredChartId)) || detailed[0];
-    const activeId = Object.keys(nextSheets).find((k) => nextSheets[k]?.chartMeta?._id === preferred?.meta?._id) || "chart-1";
-    setActiveChartSheetId?.(activeId);
-    setLoadedChartMeta?.(preferred?.meta || null);
-    setLoadedChartBuilderSnapshot?.(preferred?.snapshot || null);
-  };
 
   const loadDataSheet = async (dataSetId, dataSet) => {
     if(loadedDataMeta && dataSetId === loadedDataMeta._id){
@@ -477,7 +413,7 @@ const Nav = () => {
         },
       }).then(response => response.json())
         .then(res =>{
-          hydrateDataSheetsFromDataSet(res.data)
+          applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData })
           setLoadedDataMeta(res.data || dataSet)
           hydrateProjectCharts(dataSetId)
           toast.success(`Data: ${res.data.data_set_name} loaded`, {
@@ -517,7 +453,7 @@ const Nav = () => {
           }).then(response => response.json())
             .then(dataSheetRes =>{
               const rows = dataSheetRes?.data?.data || []
-              hydrateDataSheetsFromDataSet(dataSheetRes?.data || {})
+              applyDataSetToWorkspace(dataSheetRes?.data || {}, { setDataSheets, setActiveSheetId, setConnectedData })
               setLoadedDataMeta(savedDataSets.find(ds => ds._id === chartMeta.data_set_id))
               hydrateProjectCharts(chartMeta.data_set_id, chartMeta._id).then(() => {
                 const incomingSnapshot = cp0?.rechartsBuilder

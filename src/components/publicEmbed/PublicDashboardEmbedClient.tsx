@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import DotPattern from "@/components/magicui/dot-pattern";
-import { CHART_CARDS_GRID_STYLE } from "@/lib/dashboardLayoutDefaults";
+import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
 import { Progress } from "@/components/ui/progress";
@@ -213,7 +213,7 @@ export default function PublicDashboardEmbedClient({
                 {row.columns.map((col) => {
                   const href = resolveCardHref(col, ownerHandle);
                   const span = Math.min(12, Math.max(1, col.colSpan ?? 12));
-                  const rSpan = Math.min(4, Math.max(1, Number(col.rowSpan) || 1));
+                  const rSpan = clampChartCardRowSpan(col.rowSpan);
                   const inner = (
                     <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto rounded-lg border border-border/70 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
                       {col.h2 ? (

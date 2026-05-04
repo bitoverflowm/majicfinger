@@ -47,7 +47,7 @@ const FONT_FAMILIES = [
 export { composerBottomDockChromeClass } from "@/lib/composerBottomDockChromeClass";
 
 export const textFormatDockSegmentClassName =
-  "mt-0 h-12 min-h-12 shrink-0 flex-nowrap justify-start gap-1 !px-1.5 !py-1 !mx-0 max-sm:justify-center !border-0 !shadow-none items-end bg-transparent";
+  "mt-0 h-12 min-h-12 shrink-0 flex-nowrap justify-start gap-1 !px-1.5 !py-1 !mx-0 max-sm:justify-center !border-0 !shadow-none items-center bg-transparent";
 
 const dockIconButtonClass = cn(
   buttonVariants({ variant: "ghost", size: "icon" }),
@@ -84,7 +84,7 @@ export function TextFormatDockStrip({ pt, patchPartial, className }) {
 
   return (
     <Dock
-      direction="bottom"
+      direction="middle"
       iconSize={36}
       iconMagnification={46}
       iconDistance={110}

@@ -1481,10 +1481,15 @@ export function ChartCanvas() {
                     config={chartConfig || dfltChartConfig}
                     className={cn(
                       // `max-w` only applies when the card is wider than this cap; narrow layouts are widened via CardContent `px-*` above.
-                      "flex flex-col items-center justify-start aspect-auto mx-auto h-full min-h-[200px] w-full max-w-[min(100%,67.2rem)] flex-1 transition-[min-height,padding] duration-300 ease-out md:min-h-[220px]",
+                      "flex flex-col items-center justify-start aspect-auto mx-auto h-full w-full max-w-[min(100%,67.2rem)] flex-1 transition-[min-height,padding] duration-300 ease-out",
+                      embedCompact ? "min-h-0" : "min-h-[200px] md:min-h-[220px]",
                       xAxisTicksAngled
-                        ? "py-4 sm:py-5 md:min-h-[240px]"
-                        : (embedCompact ? "py-5 sm:py-6" : "py-12"),
+                        ? embedCompact
+                          ? "py-3 sm:py-4"
+                          : "py-4 sm:py-5 md:min-h-[240px]"
+                        : embedCompact
+                          ? "py-3 sm:py-4"
+                          : "py-12",
                       dark && !chartTextColor && "text-slate-200",
                     )}
                     style={chartTextColor ? { color: chartTextColor } : undefined}

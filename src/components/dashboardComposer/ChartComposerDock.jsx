@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
 import { chartSlotLabel } from "@/lib/chartSlotLabel";
 import { CHART_WIDTH_PRESETS } from "@/lib/chartWidthPresets";
 import { patchChartDashboardColumn } from "@/lib/patchChartDashboardColumn";
@@ -49,7 +50,6 @@ const ROW_SPAN_OPTIONS = [
   { value: 1, label: "1 row" },
   { value: 2, label: "2 rows" },
   { value: 3, label: "3 rows" },
-  { value: 4, label: "4 rows" },
 ];
 
 /**
@@ -194,7 +194,7 @@ export function ChartComposerDock({ editorInset = null }) {
   const rowId = chartComposerDock?.rowId;
   const colId = chartComposerDock?.colId;
   const colSpan = column ? Math.min(12, Math.max(1, column.colSpan ?? 12)) : 12;
-  const rowSpan = column ? Math.min(4, Math.max(1, Number(column.rowSpan) || 1)) : 1;
+  const rowSpan = column ? clampChartCardRowSpan(column.rowSpan) : clampChartCardRowSpan(null);
   const widthIsPreset = CHART_WIDTH_PRESETS.some((p) => p.colSpan === colSpan);
   const chartIdStr = column?.chart_id ? String(column.chart_id) : "";
   const linkMode = column?.link?.mode || "none";
@@ -221,18 +221,18 @@ export function ChartComposerDock({ editorInset = null }) {
       aria-label={toolbarAriaLabel}
     >
       <div className="flex max-w-full justify-center overflow-visible">
-        <div className="inline-flex max-w-full min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible overscroll-x-contain">
+        <div className="inline-flex max-w-full min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto overflow-y-visible overscroll-x-contain">
           <div className={composerBottomDockChromeClass}>
             <TooltipProvider delayDuration={200}>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-9 shrink-0"
+                className="h-7 shrink-0 gap-1 px-2 text-[11px] font-medium leading-none [&_svg]:size-3"
                 aria-label="Add chart"
                 onClick={() => dashboardComposerLayoutActions.addChart()}
               >
-                <Plus className="mr-1 h-3.5 w-3.5" />
+                <Plus className="shrink-0" aria-hidden />
                 Chart
               </Button>
               <Popover open={textBlockMenuOpen} onOpenChange={setTextBlockMenuOpen}>
@@ -241,10 +241,10 @@ export function ChartComposerDock({ editorInset = null }) {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-9 shrink-0"
+                    className="h-7 shrink-0 gap-1 px-2 text-[11px] font-medium leading-none [&_svg]:size-3"
                     aria-label="Insert text block"
                   >
-                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    <Plus className="shrink-0" aria-hidden />
                     Text
                   </Button>
                 </PopoverTrigger>
@@ -283,8 +283,8 @@ export function ChartComposerDock({ editorInset = null }) {
 
               {showPageExtension ? (
                 <>
-                  <Separator orientation="vertical" className="h-8 w-px shrink-0 self-center" />
-                  <span className="shrink-0 select-none self-center text-sm font-medium text-muted-foreground">
+                  <Separator orientation="vertical" className="h-6 w-px shrink-0 self-center" />
+                  <span className="shrink-0 select-none self-center text-[11px] font-medium text-muted-foreground">
                     {pageFormatResolved.dockLabel ?? "Title"}
                   </span>
                   <TextFormatDockStrip
@@ -294,12 +294,12 @@ export function ChartComposerDock({ editorInset = null }) {
                 </>
               ) : showChartExtension && column ? (
                 <>
-                  <Separator orientation="vertical" className="h-8 w-px shrink-0 self-center" />
-                  <span className="shrink-0 select-none self-center text-sm font-medium text-muted-foreground">
+                  <Separator orientation="vertical" className="h-6 w-px shrink-0 self-center" />
+                  <span className="shrink-0 select-none self-center text-[11px] font-medium text-muted-foreground">
                     {dockLabel}
                   </span>
                   <Dock
-                    direction="bottom"
+                    direction="middle"
                     iconSize={36}
                     iconMagnification={46}
                     iconDistance={110}
@@ -373,7 +373,7 @@ export function ChartComposerDock({ editorInset = null }) {
                       </Popover>
                     </DockIcon>
 
-                    <Separator orientation="vertical" className="h-8 w-px shrink-0 self-center" />
+                    <Separator orientation="vertical" className="h-6 w-px shrink-0 self-center" />
 
                     <DockIcon>
                       <Popover>
@@ -423,7 +423,7 @@ export function ChartComposerDock({ editorInset = null }) {
                       </Popover>
                     </DockIcon>
 
-                    <Separator orientation="vertical" className="h-8 w-px shrink-0 self-center" />
+                    <Separator orientation="vertical" className="h-6 w-px shrink-0 self-center" />
 
                     <DockIcon>
                       <Popover>
@@ -466,7 +466,7 @@ export function ChartComposerDock({ editorInset = null }) {
                       </Popover>
                     </DockIcon>
 
-                    <Separator orientation="vertical" className="h-8 w-px shrink-0 self-center" />
+                    <Separator orientation="vertical" className="h-6 w-px shrink-0 self-center" />
 
                     <DockIcon>
                       <Popover open={linkPopoverOpen} onOpenChange={setLinkPopoverOpen}>
@@ -535,8 +535,8 @@ export function ChartComposerDock({ editorInset = null }) {
                   </Dock>
                   {textFormatExtension ? (
                     <>
-                      <Separator orientation="vertical" className="h-8 w-px shrink-0 self-center" />
-                      <span className="shrink-0 select-none self-center text-sm font-medium text-muted-foreground">
+                      <Separator orientation="vertical" className="h-6 w-px shrink-0 self-center" />
+                      <span className="shrink-0 select-none self-center text-[11px] font-medium text-muted-foreground">
                         {textFormatExtension.dockLabel}
                       </span>
                       <TextFormatDockStrip

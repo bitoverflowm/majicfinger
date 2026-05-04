@@ -57,6 +57,8 @@ export function findRowIdForColumn(layout, colId) {
 export function rebuildLayoutFromFlatLayers(flat, layout) {
   const rowMap = new Map((layout.rows || []).map((r) => [r.id, r]));
   const newRows = [];
+  /** When layer reorder splits one `cards` row into multiple rows, each must get a unique id. */
+  const usedCardsRowIds = new Set();
   let idx = 0;
 
   while (idx < flat.length) {
@@ -99,19 +101,28 @@ export function rebuildLayoutFromFlatLayers(flat, layout) {
       continue;
     }
 
+    const allocateCardsRowId = (preferredId) =>
+      usedCardsRowIds.has(preferredId) ? makeRowId() : preferredId;
+
     if (batch.length === 1) {
+      const preferred = batch[0].slotItem.rowId;
+      const rowIdToUse = allocateCardsRowId(preferred);
       newRows.push({
-        id: batch[0].slotItem.rowId,
+        id: rowIdToUse,
         type: "cards",
         columns: [batch[0].col],
       });
+      usedCardsRowIds.add(rowIdToUse);
     } else {
       const sameSourceRow = batch.every((b) => b.slotItem.rowId === batch[0].slotItem.rowId);
+      const preferred = sameSourceRow ? batch[0].slotItem.rowId : makeRowId();
+      const rowIdToUse = allocateCardsRowId(preferred);
       newRows.push({
-        id: sameSourceRow ? batch[0].slotItem.rowId : makeRowId(),
+        id: rowIdToUse,
         type: "cards",
         columns: batch.map((b) => b.col),
       });
+      usedCardsRowIds.add(rowIdToUse);
     }
   }
 
