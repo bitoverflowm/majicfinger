@@ -102,6 +102,12 @@ export default function ChartControls() {
     chartFilterDistinct,
     chartFilterConfig,
     setChartFilterConfig,
+    tooltipShowXValue,
+    setTooltipShowXValue,
+    tooltipShowYValue,
+    setTooltipShowYValue,
+    tooltipExtraColumns,
+    setTooltipExtraColumns,
 
     sortXDir,
     setSortXDir,
@@ -137,6 +143,8 @@ export default function ChartControls() {
     rainbowBar,
     setRainbowBar,
     setRainbowBarShuffleNonce,
+    rainbowLegendLabelColumn,
+    setRainbowLegendLabelColumn,
     dots,
     handleToggleDots,
     labelLine,
@@ -176,6 +184,8 @@ export default function ChartControls() {
     setGridVisible,
     yAxisLineVisible,
     setYAxisLineVisible,
+    hideXAxisLabels,
+    setHideXAxisLabels,
     gridLineColor,
     setGridLineColor,
     chartTextColor,
@@ -1022,6 +1032,34 @@ export default function ChartControls() {
                     </div>
                   )}
 
+                  {selChartType === "bar" && !demo && xOptions?.length > 0 && (
+                    <div className="min-w-0 space-y-1 border-b border-border/60 pb-3 pt-1">
+                      <Label className="text-xs text-muted-foreground">Rainbow legend labels</Label>
+                      <p className="text-[10px] leading-snug text-muted-foreground">
+                        Column shown next to each color when Rainbow bar and the legend are on (default matches the X
+                        axis).
+                      </p>
+                      <Select
+                        value={rainbowLegendLabelColumn ?? "__x_axis__"}
+                        onValueChange={(v) => setRainbowLegendLabelColumn(v === "__x_axis__" ? null : v)}
+                      >
+                        <SelectTrigger className="mt-0.5 h-8 min-w-0 text-xs">
+                          <SelectValue placeholder="Label column" />
+                        </SelectTrigger>
+                        <SelectContent className="text-xs" position="popper">
+                          <SelectItem value="__x_axis__" className="text-xs">
+                            Same as X axis
+                          </SelectItem>
+                          {xOptions.map((k) => (
+                            <SelectItem key={k} value={k} className="text-xs">
+                              {formatColumnLabel(k)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   {(selChartType === "area" || selChartType === "line") && (
                     <div className="min-w-0 border-b border-border/60 pb-3">
                       <Label className="text-xs font-semibold text-muted-foreground">Line style</Label>
@@ -1062,6 +1100,17 @@ export default function ChartControls() {
                         />
                         <Label htmlFor="chart-design-y-axis-line" className="cursor-pointer text-xs text-muted-foreground">
                           Show Y-axis line
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-design-hide-x-axis-labels"
+                          checked={hideXAxisLabels}
+                          onCheckedChange={setHideXAxisLabels}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-design-hide-x-axis-labels" className="cursor-pointer text-xs text-muted-foreground">
+                          Hide X-axis labels
                         </Label>
                       </div>
                       <div className="flex min-w-0 items-center gap-2">
@@ -1368,6 +1417,89 @@ export default function ChartControls() {
                   )}
                 </div>
               )}
+              {!demo && effectiveData?.length > 0 && xOptions?.length > 0 &&
+                (selChartType === "bar" ||
+                  selChartType === "area" ||
+                  selChartType === "line" ||
+                  selChartType === "pie") && (
+                  <div className="min-w-0 space-y-3 border-b border-border/60 py-3">
+                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Tooltip design</p>
+                    <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+                      Controls what appears in the <span className="font-medium text-foreground/90">hover tooltip</span> when
+                      you point at the chart. X / Y lines use the same formatters as the axes. Extra sheet columns are read
+                      from the hovered data row and are not plotted. If the tooltip already shows the category header (X),
+                      the extra X line is omitted so it does not duplicate; the same applies to Y when every series is already
+                      listed. The separate legend toggle only affects the color key beside the chart.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-tooltip-show-x"
+                          checked={tooltipShowXValue}
+                          onCheckedChange={setTooltipShowXValue}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-tooltip-show-x" className="cursor-pointer text-xs text-muted-foreground">
+                          Show X value in tooltip
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-tooltip-show-y"
+                          checked={tooltipShowYValue}
+                          onCheckedChange={setTooltipShowYValue}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-tooltip-show-y" className="cursor-pointer text-xs text-muted-foreground">
+                          Show Y value in tooltip
+                        </Label>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>
+                        Add to tooltip
+                      </p>
+                      <Select
+                        key={`tooltip-extra-pick-${tooltipExtraColumns.join("||")}`}
+                        onValueChange={(v) => {
+                          if (!v) return;
+                          setTooltipExtraColumns((prev) => (prev.includes(v) ? prev : [...prev, v]));
+                        }}
+                        disabled={xOptions.filter((k) => !tooltipExtraColumns.includes(k)).length === 0}
+                      >
+                        <SelectTrigger className="h-8 min-w-0 text-xs">
+                          <SelectValue placeholder="+ Add column to tooltip (not plotted)" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[200] text-xs">
+                          {xOptions
+                            .filter((k) => !tooltipExtraColumns.includes(k))
+                            .map((k) => (
+                              <SelectItem key={k} value={k} className="text-xs">
+                                {formatColumnLabel(k)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      {tooltipExtraColumns.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {tooltipExtraColumns.map((col) => (
+                            <Badge key={col} variant="secondary" className="gap-1 pr-0.5 text-[10px] font-normal">
+                              {formatColumnLabel(col)}
+                              <button
+                                type="button"
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
+                                aria-label={`Remove ${formatColumnLabel(col)} from tooltip`}
+                                onClick={() => setTooltipExtraColumns((prev) => prev.filter((c) => c !== col))}
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
               {!demo && effectiveData?.length > 0 && xOptions?.length > 0 && (
                 <div className="min-w-0 py-2 space-y-2">
                   <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Filter by column</p>

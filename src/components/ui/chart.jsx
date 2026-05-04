@@ -78,6 +78,12 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip
 
+function formatTooltipRowCell(v) {
+  if (v == null || v === "") return "—";
+  if (v instanceof Date) return v.toISOString();
+  return String(v);
+}
+
 const ChartTooltipContent = React.forwardRef((
   {
     active,
@@ -97,6 +103,16 @@ const ChartTooltipContent = React.forwardRef((
     pivotName = null,
     /** Recharts often passes raw `label` into custom content; use the same formatter as the X axis (e.g. chart builder `xTooltipLabelFormatter`). */
     pivotLabelFormatter = null,
+    /** Chart builder: add hovered row's X column (skipped when `pivotName` already shows it). */
+    rowDetailX = false,
+    /** Chart builder: add hovered row's Y columns (skipped when pivot + multi-series already list values). */
+    rowDetailY = false,
+    /** Chart builder: extra sheet column keys to show from the hovered row (not plotted). */
+    rowDetailExtraKeys = [],
+    rowDetailXKey = undefined,
+    rowDetailYKeys = undefined,
+    rowDetailFormatX = undefined,
+    rowDetailFormatY = undefined,
   },
   ref
 ) => {
@@ -171,6 +187,19 @@ const ChartTooltipContent = React.forwardRef((
   }
 
   const nestLabel = payload.length === 1 && indicator !== "dot"
+  const firstRow = payload[0]?.payload
+  const hasDataRow = firstRow != null && typeof firstRow === "object" && !Array.isArray(firstRow)
+  const showRowDetailX =
+    rowDetailX && rowDetailXKey && hasDataRow && !pivotName
+  const showRowDetailY =
+    rowDetailY &&
+    Array.isArray(rowDetailYKeys) &&
+    rowDetailYKeys.length > 0 &&
+    hasDataRow &&
+    !(pivotName && payload.length > 1)
+  const extraKeys = Array.isArray(rowDetailExtraKeys) ? rowDetailExtraKeys : []
+  const showRowExtras = extraKeys.length > 0 && hasDataRow
+  const hasRowDetailBlock = showRowDetailX || showRowDetailY || showRowExtras
 
   return (
     (<div
@@ -180,6 +209,61 @@ const ChartTooltipContent = React.forwardRef((
         className
       )}>
       {pivotHeader}
+      {hasRowDetailBlock ? (
+        <div className="mb-1.5 grid gap-0.5 border-b border-slate-200/80 pb-1.5 dark:border-slate-700/80">
+          {showRowDetailX ? (
+            <div className="leading-snug">
+              <span className="text-slate-500 dark:text-slate-400">
+                {stripSheetScopedColumnKey(rowDetailXKey)}:
+              </span>{" "}
+              <span className="font-medium text-slate-950 dark:text-slate-50">
+                {(() => {
+                  const raw = firstRow[rowDetailXKey]
+                  try {
+                    return typeof rowDetailFormatX === "function"
+                      ? rowDetailFormatX(raw)
+                      : formatTooltipRowCell(raw)
+                  } catch {
+                    return formatTooltipRowCell(raw)
+                  }
+                })()}
+              </span>
+            </div>
+          ) : null}
+          {showRowDetailY
+            ? rowDetailYKeys.map((yk) => (
+                <div key={yk} className="leading-snug">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {stripSheetScopedColumnKey(yk)}:
+                  </span>{" "}
+                  <span className="font-mono font-medium tabular-nums text-slate-950 dark:text-slate-50">
+                    {(() => {
+                      const raw = firstRow[yk]
+                      const n = Number(raw)
+                      try {
+                        return typeof rowDetailFormatY === "function" && Number.isFinite(n)
+                          ? rowDetailFormatY(n)
+                          : formatTooltipRowCell(raw)
+                      } catch {
+                        return formatTooltipRowCell(raw)
+                      }
+                    })()}
+                  </span>
+                </div>
+              ))
+            : null}
+          {showRowExtras
+            ? extraKeys.map((k) => (
+                <div key={k} className="leading-snug">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {stripSheetScopedColumnKey(k)}:
+                  </span>{" "}
+                  <span className="text-slate-950 dark:text-slate-50">{formatTooltipRowCell(firstRow[k])}</span>
+                </div>
+              ))
+            : null}
+        </div>
+      ) : null}
       {!pivotName && !nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
         {payload.map((item, index) => {

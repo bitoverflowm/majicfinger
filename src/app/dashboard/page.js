@@ -2,7 +2,7 @@
 
 import Script from 'next/script'
 
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
 
@@ -15,13 +15,11 @@ import LiveStreamManager from './components/liveStreamManager';
 import { Toaster } from "@/components/ui/sonner"
 import { Progress } from "@/components/ui/progress"
 
-import { toast } from "sonner"
 import { userSwrFetcher } from "@/lib/hooks"
 
 const Dashbaord = () => {
     const router = useRouter()
     const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher)
-    const hasShownWelcomeToastRef = useRef(false);
 
     useEffect(() => {
         if (isLoading) return
@@ -29,28 +27,6 @@ const Dashbaord = () => {
             router.replace("/login")
         }
     }, [isLoading, user, router])
-
-    useEffect(() => {
-        if (!user) return
-        if (hasShownWelcomeToastRef.current) return
-
-        // Session-level guard: avoid duplicate welcome toasts on remounts.
-        const key = "dashboard_welcome_toast_shown";
-        if (typeof window !== "undefined" && window.sessionStorage.getItem(key) === "1") {
-            hasShownWelcomeToastRef.current = true;
-            return;
-        }
-
-        toast('Hey!', {
-            description: `Welcome ${user.email}`,
-            duration: 10000
-        })
-
-        hasShownWelcomeToastRef.current = true;
-        if (typeof window !== "undefined") {
-            window.sessionStorage.setItem(key, "1");
-        }
-    }, [user])
 
     if (isLoading || !user) {
         return (

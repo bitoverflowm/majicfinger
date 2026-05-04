@@ -8,6 +8,8 @@ import {
 } from '@/components/chartView/panels/shadcnChartPalettes';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, Treemap, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { RainbowBarLegendContent } from "@/components/chartView/RainbowBarLegendContent";
+import { rainbowBarFillFromPalette } from "@/components/chartView/rainbowBarFill";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Square, Radio } from 'lucide-react';
 import { Liveline } from 'liveline';
@@ -243,23 +245,6 @@ function getDistinctValues(data, colKey) {
   return Array.from(set).sort();
 }
 
-/**
- * Palette pick per bar (row × series). `shuffleNonce` lets the user reshuffle assignments
- * without changing data; 0 gives the default deterministic mapping.
- */
-function rainbowBarFillFromPalette(activePalette, rowIndex, seriesIndex, xPivot, shuffleNonce = 0) {
-  if (!Array.isArray(activePalette) || !activePalette.length) return null;
-  const key = String(xPivot ?? rowIndex) + "\0" + String(seriesIndex);
-  let h = 2166136261;
-  for (let i = 0; i < key.length; i += 1) {
-    h ^= key.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const nonce = Number(shuffleNonce) || 0;
-  const mixed = (h ^ rowIndex * 0x9e3779b1 ^ seriesIndex * 0x85ebca77 ^ nonce * 0xc2b2ae35) >>> 0;
-  return activePalette[mixed % activePalette.length];
-}
-
 function formatCompactNumber(value) {
   if (!Number.isFinite(value)) return "";
   const abs = Math.abs(value);
@@ -338,10 +323,14 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [expanded, setExpanded] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
   const [stackedBar, setStackedBar] = useState(false);
+  /** Recharts `layout="vertical"` — bars extend horizontally; category axis moves to Y. */
+  const [horizontal, setHorizontal] = useState(false);
   /** Bar chart: each bar (per Y series) picks from the active Shadcn palette via a stable hash. */
   const [rainbowBar, setRainbowBar] = useState(false);
   /** Bump to reshuffle rainbow bar colors (same palette, new pseudo-random assignment). */
   const [rainbowBarShuffleNonce, setRainbowBarShuffleNonce] = useState(0);
+  /** Rainbow legend: show this sheet column next to each color; null = use X axis (with tick formatter). */
+  const [rainbowLegendLabelColumn, setRainbowLegendLabelColumn] = useState(null);
   const [dots, setDots] = useState(true);
   const [labelLine, setLabelLine] = useState(false);
   const [donut, setDonut] = useState(false);
@@ -366,6 +355,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const [gridVisible, setGridVisible] = useState(true);
   const [yAxisLineVisible, setYAxisLineVisible] = useState(false);
+  /** When true, category / time tick text on the X dimension is not drawn (area, line, bar). */
+  const [hideXAxisLabels, setHideXAxisLabels] = useState(false);
   const [gridLineColor, setGridLineColor] = useState(null);
   const [chartTextColor, setChartTextColor] = useState(null);
   const [xAxisTickColor, setXAxisTickColor] = useState(null);
@@ -391,6 +382,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
+  /** Hover tooltip: optional X / Y / extra sheet columns from the hovered data row (not plotted). */
+  const [tooltipShowXValue, setTooltipShowXValue] = useState(true);
+  const [tooltipShowYValue, setTooltipShowYValue] = useState(true);
+  const [tooltipExtraColumns, setTooltipExtraColumns] = useState([]);
 
   const snapshotAppliedRef = useRef(false);
   const snapshotPayloadRef = useRef(null);
@@ -429,10 +424,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.expanded !== undefined) setExpanded(!!s.expanded);
     if (s.legendVisible !== undefined) setLegendVisible(!!s.legendVisible);
     if (s.stackedBar !== undefined) setStackedBar(!!s.stackedBar);
+    if (s.horizontal !== undefined) setHorizontal(!!s.horizontal);
     if (s.rainbowBar !== undefined) setRainbowBar(!!s.rainbowBar);
     if (s.rainbowBarShuffleNonce != null && Number.isFinite(Number(s.rainbowBarShuffleNonce))) {
       setRainbowBarShuffleNonce(Math.max(0, Math.floor(Number(s.rainbowBarShuffleNonce))));
     }
+    if (s.rainbowLegendLabelColumn !== undefined) setRainbowLegendLabelColumn(s.rainbowLegendLabelColumn);
     if (s.dots !== undefined) setDots(!!s.dots);
     if (s.labelLine !== undefined) setLabelLine(!!s.labelLine);
     if (s.donut !== undefined) setDonut(!!s.donut);
@@ -453,6 +450,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.innerBoxColor !== undefined) setInnerBoxColor(s.innerBoxColor);
     if (s.gridVisible !== undefined) setGridVisible(!!s.gridVisible);
     if (s.yAxisLineVisible !== undefined) setYAxisLineVisible(!!s.yAxisLineVisible);
+    if (s.hideXAxisLabels !== undefined) setHideXAxisLabels(!!s.hideXAxisLabels);
     if (s.gridLineColor !== undefined) setGridLineColor(s.gridLineColor);
     if (s.chartTextColor !== undefined) setChartTextColor(s.chartTextColor);
     if (s.xAxisTickColor !== undefined) setXAxisTickColor(s.xAxisTickColor);
@@ -473,6 +471,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
     if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
     if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
+    if (s.tooltipShowXValue !== undefined) setTooltipShowXValue(!!s.tooltipShowXValue);
+    else if (s.legendShowXValue !== undefined) setTooltipShowXValue(!!s.legendShowXValue);
+    if (s.tooltipShowYValue !== undefined) setTooltipShowYValue(!!s.tooltipShowYValue);
+    else if (s.legendShowYValue !== undefined) setTooltipShowYValue(!!s.legendShowYValue);
+    if (Array.isArray(s.tooltipExtraColumns)) setTooltipExtraColumns(s.tooltipExtraColumns);
+    else if (Array.isArray(s.legendExtraColumns)) setTooltipExtraColumns(s.legendExtraColumns);
+    else if (s.legendLabelColumn) setTooltipExtraColumns([s.legendLabelColumn]);
   }, [demo, effectiveData, initialBuilderSnapshot]);
 
   useEffect(() => {
@@ -584,6 +589,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     });
   }, [demo, effectiveData, globalColumnOptions]);
 
+  useEffect(() => {
+    if (!rainbowLegendLabelColumn) return;
+    const cols = globalColumnOptions || [];
+    if (!cols.length) return;
+    if (!new Set(cols).has(rainbowLegendLabelColumn)) setRainbowLegendLabelColumn(null);
+  }, [globalColumnOptions, rainbowLegendLabelColumn]);
+
   // Auto-trim Y for single-series chart types (keeps filters/sorts intact).
   useEffect(() => {
     const singleSeries =
@@ -693,9 +705,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const lineIsTemporalX = useMemo(() => isLikelyTemporalKey(selX, dataTypes, chartData), [selX, dataTypes, chartData]);
 
   const scopedKeysInUse = useMemo(() => {
-    const keys = [selX, ...(selY || []), lineSeriesColumn, chartFilterColumn].filter(Boolean);
+    const keys = [
+      selX,
+      ...(selY || []),
+      lineSeriesColumn,
+      chartFilterColumn,
+      ...tooltipExtraColumns,
+      rainbowLegendLabelColumn,
+    ].filter(Boolean);
     return keys.some((k) => String(k).includes("::"));
-  }, [selX, selY, lineSeriesColumn, chartFilterColumn]);
+  }, [selX, selY, lineSeriesColumn, chartFilterColumn, tooltipExtraColumns, rainbowLegendLabelColumn]);
 
   const crossSheetChartData = useMemo(() => {
     const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
@@ -703,7 +722,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const activeRows = Array.isArray(contextStateV2?.dataSheets?.[contextStateV2?.activeSheetId]?.data)
       ? contextStateV2.dataSheets[contextStateV2.activeSheetId].data
       : [];
-    const neededKeys = new Set([selX, ...(selY || []), lineSeriesColumn, chartFilterColumn].filter(Boolean));
+    const neededKeys = new Set(
+      [
+        selX,
+        ...(selY || []),
+        lineSeriesColumn,
+        chartFilterColumn,
+        ...tooltipExtraColumns,
+        rainbowLegendLabelColumn,
+      ].filter(Boolean),
+    );
     if (!neededKeys.size) return chartData || dfltChartData;
     const neededSheetIds = new Set();
     for (const key of neededKeys) {
@@ -743,6 +771,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     contextStateV2?.dataSheets,
     lineIsTemporalX,
     lineSeriesColumn,
+    tooltipExtraColumns,
+    rainbowLegendLabelColumn,
     selX,
     selY,
   ]);
@@ -808,8 +838,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     expanded,
     legendVisible,
     stackedBar,
+    horizontal,
     rainbowBar,
     rainbowBarShuffleNonce,
+    rainbowLegendLabelColumn,
     dots,
     labelLine,
     donut,
@@ -830,6 +862,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     innerBoxColor,
     gridVisible,
     yAxisLineVisible,
+    hideXAxisLabels,
     gridLineColor,
     chartTextColor,
     xAxisTickColor,
@@ -850,6 +883,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     livelineColorChoice,
     chartFilterColumn,
     chartFilterConfig,
+    tooltipShowXValue,
+    tooltipShowYValue,
+    tooltipExtraColumns,
   };
 
   const getBuilderSnapshot = useCallback(() => ({ v: 1, ...builderStateRef.current }), []);
@@ -988,6 +1024,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     chartFilterDistinct,
     chartFilterConfig,
     setChartFilterConfig,
+    tooltipShowXValue,
+    setTooltipShowXValue,
+    tooltipShowYValue,
+    setTooltipShowYValue,
+    tooltipExtraColumns,
+    setTooltipExtraColumns,
 
     sortXDir,
     setSortXDir,
@@ -1027,6 +1069,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setGridVisible,
     yAxisLineVisible,
     setYAxisLineVisible,
+    hideXAxisLabels,
+    setHideXAxisLabels,
     gridLineColor,
     setGridLineColor,
     chartTextColor,
@@ -1051,14 +1095,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     handleToggleChange: setExpanded,
     legendVisible,
     handleToggleLegend: setLegendVisible,
-    horizontal: false,
-    handleToggleHorizontal: () => {},
     stackedBar,
     handleToggleStack: setStackedBar,
+    horizontal,
+    handleToggleHorizontal: setHorizontal,
     rainbowBar,
     setRainbowBar,
     rainbowBarShuffleNonce,
     setRainbowBarShuffleNonce,
+    rainbowLegendLabelColumn,
+    setRainbowLegendLabelColumn,
     dots,
     handleToggleDots: setDots,
     labelLine,
@@ -1149,6 +1195,9 @@ export function ChartCanvas() {
     livelineBadge,
     livelineBadgeVariant,
     chartConfig,
+    tooltipShowXValue,
+    tooltipShowYValue,
+    tooltipExtraColumns,
     selChartType,
     chartData,
     dataTypes,
@@ -1160,8 +1209,10 @@ export function ChartCanvas() {
     expanded,
     legendVisible,
     stackedBar,
+    horizontal,
     rainbowBar,
     rainbowBarShuffleNonce,
+    rainbowLegendLabelColumn,
     dots,
     labelLine,
     donut,
@@ -1175,6 +1226,7 @@ export function ChartCanvas() {
     innerBoxColor,
     gridVisible,
     yAxisLineVisible,
+    hideXAxisLabels,
     gridLineColor,
     chartTextColor,
     xAxisTickColor,
@@ -1193,7 +1245,7 @@ export function ChartCanvas() {
 
   const xAxisTickAngle = xAxisTicksAngled ? -45 : 0;
   /** Angled labels need extra bottom space inside the SVG; value tuned for dd-mmm at −45°. */
-  const cartesianBottomAngled = xAxisTicksAngled ? 88 : 0;
+  const cartesianBottomAngled = hideXAxisLabels ? 12 : xAxisTicksAngled ? 88 : 0;
   const cartesianMarginWithAngledTicks = useMemo(
     () => ({ ...CARTESIAN_MARGIN_AREA_LINE, bottom: cartesianBottomAngled }),
     [cartesianBottomAngled],
@@ -1202,6 +1254,14 @@ export function ChartCanvas() {
     () => ({ ...CARTESIAN_MARGIN_BAR, bottom: cartesianBottomAngled }),
     [cartesianBottomAngled],
   );
+  /** Horizontal bars: category axis is Y; leave room for labels (wider when slanted). */
+  const cartesianBarMarginHorizontal = useMemo(() => {
+    if (hideXAxisLabels) {
+      return { left: 48, right: CARTESIAN_MARGIN_BAR.right, top: 4, bottom: 20 };
+    }
+    const left = xAxisTicksAngled ? 108 : 84;
+    return { left, right: CARTESIAN_MARGIN_BAR.right, top: 4, bottom: 20 };
+  }, [xAxisTicksAngled, hideXAxisLabels]);
   const xAxisTickMargin = xAxisTicksAngled ? 12 : 8;
 
   const rawData = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
@@ -1421,6 +1481,19 @@ export function ChartCanvas() {
   const gridStroke = gridLineColor || (dark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
   const labelListFill = chartTextColor || (dark ? "#e2e8f0" : "#0f172a");
 
+  const chartTooltipRowDetails = useMemo(
+    () => ({
+      rowDetailX: tooltipShowXValue,
+      rowDetailY: tooltipShowYValue,
+      rowDetailExtraKeys: tooltipExtraColumns,
+      rowDetailXKey: xKey,
+      rowDetailYKeys: yKeys,
+      rowDetailFormatX: xTickFormatter,
+      rowDetailFormatY: yAxisFormatter,
+    }),
+    [tooltipShowXValue, tooltipShowYValue, tooltipExtraColumns, xKey, yKeys, xTickFormatter, yAxisFormatter],
+  );
+
   const chartBuilderRechartsChromeCss = useMemo(() => {
     const sel = `[data-chart="chart-${CHART_BUILDER_DOM_ID}"]`;
     const axisRules = [
@@ -1542,8 +1615,8 @@ export function ChartCanvas() {
                           axisLine={false}
                           tickMargin={xAxisTickMargin}
                           angle={xAxisTickAngle}
-                          tickFormatter={xTickFormatter}
-                          tick={{ fill: tickFillX }}
+                          tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
+                          tick={hideXAxisLabels ? false : { fill: tickFillX }}
                         />
                         <YAxis
                           tickLine={false}
@@ -1564,6 +1637,7 @@ export function ChartCanvas() {
                               className={CHART_CHROME_TEXT_CLASS}
                               pivotName={stripSheetScopedColumnKey(xKey)}
                               pivotLabelFormatter={xTooltipLabelFormatter}
+                              {...chartTooltipRowDetails}
                             />
                           }
                         />
@@ -1579,36 +1653,85 @@ export function ChartCanvas() {
                             stackId={"a"}
                           />
                         ))}
-                        {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}
+                        {legendVisible && (
+                          <ChartLegend
+                            content={
+                              <ChartLegendContent
+                                className={CHART_CHROME_TEXT_CLASS}
+                              />
+                            }
+                          />
+                        )}
                       </AreaChart>
                     )}
 
                     {selChartType === "bar" && (
-                      <BarChart accessibilityLayer data={finalRenderedData} margin={cartesianBarMarginWithAngledTicks}>
-                        {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
-                        <XAxis
-                          type={rechartsXAxisType}
-                          dataKey={xKey}
-                          domain={xAxisNumberDomain}
-                          ticks={xAxisTicks}
-                          tickLine={false}
-                          axisLine={false}
-                          tickMargin={xAxisTickMargin}
-                          angle={xAxisTickAngle}
-                          tickFormatter={xTickFormatter}
-                          tick={{ fill: tickFillX }}
-                          padding={BAR_X_AXIS_PADDING}
-                        />
-                        <YAxis
-                          tickLine={false}
-                          axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
-                          tickMargin={8}
-                          width={74}
-                          tickFormatter={yAxisFormatter}
-                          scale={scaleY === "log" ? "log" : "auto"}
-                          domain={scaleY === "log" ? ["auto", "auto"] : undefined}
-                          tick={{ fill: tickFillY }}
-                        />
+                      <BarChart
+                        accessibilityLayer
+                        data={finalRenderedData}
+                        layout={horizontal ? "vertical" : "horizontal"}
+                        margin={horizontal ? cartesianBarMarginHorizontal : cartesianBarMarginWithAngledTicks}
+                      >
+                        {gridVisible ? (
+                          <CartesianGrid
+                            stroke={gridStroke}
+                            {...(horizontal ? { vertical: true, horizontal: false } : { vertical: false })}
+                          />
+                        ) : null}
+                        {horizontal ? (
+                          <>
+                            <XAxis
+                              type="number"
+                              tickLine={false}
+                              axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
+                              tickMargin={8}
+                              tickFormatter={yAxisFormatter}
+                              tick={{ fill: tickFillY }}
+                              scale={scaleY === "log" ? "log" : "auto"}
+                              domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                            />
+                            <YAxis
+                              type={rechartsXAxisType}
+                              dataKey={xKey}
+                              domain={rechartsXAxisType === "number" ? xAxisNumberDomain : undefined}
+                              ticks={rechartsXAxisType === "number" ? xAxisTicks : undefined}
+                              tickLine={false}
+                              axisLine={false}
+                              tickMargin={xAxisTickMargin}
+                              angle={xAxisTickAngle}
+                              tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
+                              tick={hideXAxisLabels ? false : { fill: tickFillX }}
+                              width={xAxisTicksAngled ? 120 : 96}
+                              padding={BAR_X_AXIS_PADDING}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <XAxis
+                              type={rechartsXAxisType}
+                              dataKey={xKey}
+                              domain={xAxisNumberDomain}
+                              ticks={xAxisTicks}
+                              tickLine={false}
+                              axisLine={false}
+                              tickMargin={xAxisTickMargin}
+                              angle={xAxisTickAngle}
+                              tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
+                              tick={hideXAxisLabels ? false : { fill: tickFillX }}
+                              padding={BAR_X_AXIS_PADDING}
+                            />
+                            <YAxis
+                              tickLine={false}
+                              axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
+                              tickMargin={8}
+                              width={74}
+                              tickFormatter={yAxisFormatter}
+                              scale={scaleY === "log" ? "log" : "auto"}
+                              domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                              tick={{ fill: tickFillY }}
+                            />
+                          </>
+                        )}
                         <ChartTooltip
                           cursor={false}
                           labelFormatter={xTooltipLabelFormatter}
@@ -1618,11 +1741,18 @@ export function ChartCanvas() {
                               className={CHART_CHROME_TEXT_CLASS}
                               pivotName={stripSheetScopedColumnKey(xKey)}
                               pivotLabelFormatter={xTooltipLabelFormatter}
+                              {...chartTooltipRowDetails}
                             />
                           }
                         />
                         {yKeys.map((yKey, idx) => (
-                          <Bar key={yKey + idx} dataKey={yKey} fill={seriesColorFor(yKey, idx)} radius={4} stackId={stackedBar ? "a" : idx}>
+                          <Bar
+                            key={yKey + idx}
+                            dataKey={yKey}
+                            fill={seriesColorFor(yKey, idx)}
+                            radius={horizontal ? [0, 4, 4, 0] : 4}
+                            stackId={stackedBar ? "a" : idx}
+                          >
                             {(finalRenderedData || []).map((row, i) => {
                               const rainbowFill = rainbowBar
                                 ? rainbowBarFillFromPalette(
@@ -1638,7 +1768,29 @@ export function ChartCanvas() {
                             })}
                           </Bar>
                         ))}
-                        {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}
+                        {legendVisible &&
+                          (rainbowBar ? (
+                            <ChartLegend
+                              content={() => (
+                                <RainbowBarLegendContent
+                                  className={CHART_CHROME_TEXT_CLASS}
+                                  rows={finalRenderedData}
+                                  xKey={xKey}
+                                  yKeys={yKeys}
+                                  palette={rainbowBarHuePalette.length ? rainbowBarHuePalette : activePalette}
+                                  shuffleNonce={rainbowBarShuffleNonce}
+                                  xTickFormatter={xTickFormatter}
+                                  legendLabelColumn={rainbowLegendLabelColumn}
+                                />
+                              )}
+                            />
+                          ) : (
+                            <ChartLegend
+                              content={
+                                <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />
+                              }
+                            />
+                          ))}
                       </BarChart>
                     )}
 
@@ -1652,7 +1804,15 @@ export function ChartCanvas() {
                         isAnimationActive={finalRenderedData.length < 100}
                         content={(nodeProps) => <TreemapCategoryRect {...nodeProps} leafColors={treemapLeafFills ?? undefined} />}
                       >
-                        <ChartTooltip content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />} />
+                        <ChartTooltip
+                          content={
+                            <ChartTooltipContent
+                              indicator="line"
+                              className={CHART_CHROME_TEXT_CLASS}
+                              {...chartTooltipRowDetails}
+                            />
+                          }
+                        />
                       </Treemap>
                     )}
 
@@ -1668,8 +1828,8 @@ export function ChartCanvas() {
                           axisLine={false}
                           tickMargin={xAxisTickMargin}
                           angle={xAxisTickAngle}
-                          tickFormatter={xTickFormatter}
-                          tick={{ fill: tickFillX }}
+                          tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
+                          tick={hideXAxisLabels ? false : { fill: tickFillX }}
                         />
                         <YAxis
                           tickLine={false}
@@ -1690,6 +1850,7 @@ export function ChartCanvas() {
                               className={CHART_CHROME_TEXT_CLASS}
                               pivotName={stripSheetScopedColumnKey(xKey)}
                               pivotLabelFormatter={xTooltipLabelFormatter}
+                              {...chartTooltipRowDetails}
                             />
                           }
                         />
@@ -1708,15 +1869,36 @@ export function ChartCanvas() {
                             )}
                           </Line>
                         ))}
-                        {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}
+                        {legendVisible && (
+                          <ChartLegend
+                            content={
+                              <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />
+                            }
+                          />
+                        )}
                       </LineChart>
                     )}
 
                     {selChartType === "pie" && (
                       <PieChart accessibilityLayer>
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" className={CHART_CHROME_TEXT_CLASS} />} />
+                        <ChartTooltip
+                          cursor={false}
+                          content={
+                            <ChartTooltipContent
+                              indicator="line"
+                              className={CHART_CHROME_TEXT_CLASS}
+                              {...chartTooltipRowDetails}
+                            />
+                          }
+                        />
                         <Pie data={rawData} dataKey={yKeys[0]} nameKey={xKey} innerRadius={donut ? 120 : 0} strokeWidth={donut ? 5 : 1} />
-                        {legendVisible && <ChartLegend content={<ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />} />}
+                        {legendVisible && (
+                          <ChartLegend
+                            content={
+                              <ChartLegendContent nameKey="value" className={CHART_CHROME_TEXT_CLASS} />
+                            }
+                          />
+                        )}
                       </PieChart>
                     )}
                   </ChartContainer>

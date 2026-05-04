@@ -896,7 +896,7 @@ const Nav = () => {
                   <Sheet open={isOpen} onOpenChange={setIsOpen}>
                     <SheetTrigger asChild>
                       <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs font-medium">
-                        Your Work
+                        Your Projects
                         {savedWorkCountLoading ? (
                           <span
                             className="ml-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center"

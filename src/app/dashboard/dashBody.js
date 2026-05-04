@@ -102,11 +102,6 @@ const DashBody = ({ user }) => {
             .then(data => {
                 if (data.success) {
                     setSavedDataSets(data.data); // Assuming you have a state to hold the fetched data
-                    toast('Project History Loaded!', {
-                        description: `We just pulled your saved project history.`,
-                        closeButton: true,
-                        duration: 3000
-                      });
                 } else {
                     console.error('Failed to fetch saved projects:', data.message);
                 }
@@ -127,11 +122,6 @@ const DashBody = ({ user }) => {
             .then(data => {
                 if (data.success) {
                     setSavedCharts(data.data);
-                    toast('Chart History Loaded!', {
-                        description: `We just pulled your saved charts.`,
-                        closeButton: true,
-                        duration: 3000
-                      });
                 } else {
                     console.error('Failed to fetch saved Charts:', data.message);
                 }
@@ -173,11 +163,6 @@ const DashBody = ({ user }) => {
                 if (data.success) {
                     setSavedPresentations(data.data);
                     console.log(data.data)
-                    toast('Saved Presentations Loaded!', {
-                        description: `We just pulled your saved presentations.`,
-                        closeButton: true,
-                        duration: 3000
-                      });
                 } else {
                     console.error('Failed to fetch saved Charts:', data.message);
                 }
