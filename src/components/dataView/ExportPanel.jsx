@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Link from "next/link";
-import { ExternalLink, Trash2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -545,13 +545,9 @@ function ShareEmbedSection() {
             <TooltipProvider delayDuration={120}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <DestructiveIconButton
-                    icon={Trash2}
-                    ariaLabel="Delete"
-                    onClick={() => setShowDeleteEmbedDialog(true)}
-                  />
+                  <DestructiveIconButton onClick={() => setShowDeleteEmbedDialog(true)} />
                 </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">Delete</TooltipContent>
+                <TooltipContent side="top" className="text-xs">delete</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           ) : null}

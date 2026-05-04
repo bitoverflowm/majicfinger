@@ -2911,11 +2911,9 @@ const GridView = ({startNew}) => {
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <DestructiveIconButton
-                        className="h-2.5 w-2.5 shrink-0"
-                        ariaLabel="Clear sheet"
-                        onClick={handleClearSheet}
-                      />
+                      <span className="inline-flex shrink-0">
+                        <DestructiveIconButton ariaLabel="clear sheet" onClick={handleClearSheet} />
+                      </span>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" className="text-xs">
                       clear sheet

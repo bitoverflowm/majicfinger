@@ -1,16 +1,71 @@
+import shadcnChartPalettesJson from "./panels/shadcnChartPalettes.json";
+
 /**
- * Palette pick per bar (row × series). `shuffleNonce` lets the user reshuffle assignments
- * without changing data; 0 gives the default deterministic mapping.
+ * Rainbow bar hue order: predictable chromatic walk (matches Shadcn palette JSON keys).
  */
-export function rainbowBarFillFromPalette(activePalette, rowIndex, seriesIndex, xPivot, shuffleNonce = 0) {
-  if (!Array.isArray(activePalette) || !activePalette.length) return null;
-  const key = String(xPivot ?? rowIndex) + "\0" + String(seriesIndex);
-  let h = 2166136261;
-  for (let i = 0; i < key.length; i += 1) {
-    h ^= key.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const nonce = Number(shuffleNonce) || 0;
-  const mixed = (h ^ rowIndex * 0x9e3779b1 ^ seriesIndex * 0x85ebca77 ^ nonce * 0xc2b2ae35) >>> 0;
-  return activePalette[mixed % activePalette.length];
+export const RAINBOW_BAR_HUE_ORDER = [
+  "mist",
+  "red",
+  "orange",
+  "amber",
+  "yellow",
+  "lime",
+  "green",
+  "emerald",
+  "teal",
+  "cyan",
+  "sky",
+  "blue",
+  "indigo",
+  "violet",
+  "purple",
+  "fuchsia",
+  "pink",
+  "rose",
+];
+
+/** One lightness step per full pass through {@link RAINBOW_BAR_HUE_ORDER}. */
+const RAINBOW_BAR_SHADE_ORDER = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+
+const RAINBOW_BAR_SLOT_COUNT = RAINBOW_BAR_HUE_ORDER.length * RAINBOW_BAR_SHADE_ORDER.length;
+
+function rainbowBarHexAtSlot(slotIndex) {
+  const nHue = RAINBOW_BAR_HUE_ORDER.length;
+  const nShade = RAINBOW_BAR_SHADE_ORDER.length;
+  const s = Math.floor(slotIndex / nHue) % nShade;
+  const h = slotIndex % nHue;
+  const baseId = RAINBOW_BAR_HUE_ORDER[h];
+  const shade = RAINBOW_BAR_SHADE_ORDER[s];
+  const row = shadcnChartPalettesJson[baseId];
+  return row?.[String(shade)] || row?.["500"] || "#94a3b8";
+}
+
+/**
+ * Deterministic rainbow fill: walk hues in order, then bump shade (100→…→900), repeat.
+ * Linear index per cell: `rowIndex * numSeries + seriesIndex`.
+ *
+ * `shuffleNonce` rotates the slot (same order, shifted) — not random.
+ *
+ * @param {unknown} _legacyPalette unused (kept for call-site stability)
+ * @param {number} rowIndex
+ * @param {number} seriesIndex
+ * @param {unknown} _xPivot unused
+ * @param {number} [shuffleNonce] added to linear index before wrapping
+ * @param {number} [numSeries] Y series count (stack width)
+ */
+export function rainbowBarFillFromPalette(
+  _legacyPalette,
+  rowIndex,
+  seriesIndex,
+  _xPivot,
+  shuffleNonce = 0,
+  numSeries = 1,
+) {
+  const n = Math.max(1, Math.floor(Number(numSeries)) || 1);
+  const ri = Math.max(0, Math.floor(Number(rowIndex)) || 0);
+  const si = Math.max(0, Math.floor(Number(seriesIndex)) || 0);
+  const k = ri * n + si;
+  const rot = Math.floor(Number(shuffleNonce)) || 0;
+  const slot = ((k + rot) % RAINBOW_BAR_SLOT_COUNT + RAINBOW_BAR_SLOT_COUNT) % RAINBOW_BAR_SLOT_COUNT;
+  return rainbowBarHexAtSlot(slot);
 }

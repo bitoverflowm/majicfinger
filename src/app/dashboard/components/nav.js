@@ -18,7 +18,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { toast } from "sonner"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { Progress } from "@/components/ui/progress"
-import { Pause, Play, RotateCw, Square, Trash2, ExternalLink, Loader2 } from "lucide-react"
+import { Pause, Play, RotateCw, Square, ExternalLink, Loader2, ChevronDown, ChevronUp } from "lucide-react"
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
 import {
   applyDataSetToWorkspace,
@@ -40,6 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 function attachPublicAssetsToProjectRow(row) {
   row.publicCharts = (row.charts || []).filter((c) => c?.is_public && c?.public_slug)
@@ -235,6 +236,8 @@ const Nav = () => {
   const [deleteUses, setDeleteUses] = useState([])
   const [deleteDownstream, setDeleteDownstream] = useState(false)
   const [isDeleteBusy, setIsDeleteBusy] = useState(false)
+  /** Your Projects sheet: per-row expansion for workbook / charts / dashboards (default collapsed). */
+  const [expandedProjectDetails, setExpandedProjectDetails] = useState({})
 
   const publicBase =
     process.env.NODE_ENV === "development" && runtimeOrigin
@@ -723,16 +726,16 @@ const Nav = () => {
   }
 
   const renderDeleteButton = (type, item) => (
-    <TooltipProvider delayDuration={120}>
+    <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <DestructiveIconButton
-            icon={Trash2}
-            ariaLabel="Delete"
-            onClick={(e) => openDeleteDialog(type, item, e)}
-          />
+          <span className="inline-flex shrink-0">
+            <DestructiveIconButton onClick={(e) => openDeleteDialog(type, item, e)} />
+          </span>
         </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">Delete</TooltipContent>
+        <TooltipContent side="top" sideOffset={6} className="z-[100] text-xs">
+          delete
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )
@@ -940,42 +943,69 @@ const Nav = () => {
                                     key={row.key}
                                     className="rounded-lg border border-border bg-card/40 p-4 text-sm shadow-sm"
                                   >
-                                    <div className="flex flex-wrap items-start gap-2">
-                                      <div className="min-w-0 flex-1">
-                                        <div className="font-semibold leading-tight">{title}</div>
-                                        {row.kind === "dataset" && ds?.last_saved_date && (
-                                          <div className="mt-0.5 text-xs text-muted-foreground">
-                                            Edited: {moment(ds.last_saved_date).format("ddd MMM YY h:mm a")}
-                                          </div>
-                                        )}
+                                    <Collapsible
+                                      open={!!expandedProjectDetails[row.key]}
+                                      onOpenChange={(open) =>
+                                        setExpandedProjectDetails((prev) => ({ ...prev, [row.key]: open }))
+                                      }
+                                    >
+                                      <div className="flex flex-wrap items-start gap-2">
+                                        <div className="min-w-0 flex-1">
+                                          <div className="font-semibold leading-tight">{title}</div>
+                                          {row.kind === "dataset" && ds?.last_saved_date && (
+                                            <div className="mt-0.5 text-xs text-muted-foreground">
+                                              Edited: {moment(ds.last_saved_date).format("ddd MMM YY h:mm a")}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                          {row.kind === "dataset" && ds?._id && (
+                                            <Button
+                                              type="button"
+                                              variant="default"
+                                              size="sm"
+                                              className="h-7 px-2 text-xs"
+                                              onClick={() => loadDataSheet(ds._id, ds)}
+                                            >
+                                              Load project
+                                            </Button>
+                                          )}
+                                          {row.kind === "orphan" && (
+                                            <Button
+                                              type="button"
+                                              variant="default"
+                                              size="sm"
+                                              className="h-7 px-2 text-xs"
+                                              onClick={() => loadOrphanProjectBucket(row)}
+                                            >
+                                              Load project
+                                            </Button>
+                                          )}
+                                          {row.kind === "dataset" && ds && renderDeleteButton("dataset", ds)}
+                                          <CollapsibleTrigger asChild>
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-7 w-7 shrink-0 text-muted-foreground"
+                                              aria-expanded={!!expandedProjectDetails[row.key]}
+                                              aria-label={
+                                                expandedProjectDetails[row.key]
+                                                  ? "Collapse project details"
+                                                  : "Expand project details"
+                                              }
+                                            >
+                                              {expandedProjectDetails[row.key] ? (
+                                                <ChevronUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                              ) : (
+                                                <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                              )}
+                                            </Button>
+                                          </CollapsibleTrigger>
+                                        </div>
                                       </div>
-                                      <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                        {row.kind === "dataset" && ds?._id && (
-                                          <Button
-                                            type="button"
-                                            variant="default"
-                                            size="sm"
-                                            className="h-7 px-2 text-xs"
-                                            onClick={() => loadDataSheet(ds._id, ds)}
-                                          >
-                                            Load project
-                                          </Button>
-                                        )}
-                                        {row.kind === "orphan" && (
-                                          <Button
-                                            type="button"
-                                            variant="default"
-                                            size="sm"
-                                            className="h-7 px-2 text-xs"
-                                            onClick={() => loadOrphanProjectBucket(row)}
-                                          >
-                                            Load project
-                                          </Button>
-                                        )}
-                                        {row.kind === "dataset" && ds && renderDeleteButton("dataset", ds)}
-                                      </div>
-                                    </div>
 
+                                      <CollapsibleContent className="mt-0 space-y-0">
                                     {row.kind === "dataset" && ds && (
                                       <button
                                         type="button"
@@ -1125,6 +1155,8 @@ const Nav = () => {
                                         </ul>
                                       </div>
                                     )}
+                                      </CollapsibleContent>
+                                    </Collapsible>
                                   </div>
                                 )
                               })}

@@ -4,7 +4,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   SHADCN_CHART_BASE_ORDER,
   getShadcnChartPaletteArray,
-  getShadcnRainbowBarPalette,
 } from '@/components/chartView/panels/shadcnChartPalettes';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, Treemap, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -331,6 +330,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [rainbowBarShuffleNonce, setRainbowBarShuffleNonce] = useState(0);
   /** Rainbow legend: show this sheet column next to each color; null = use X axis (with tick formatter). */
   const [rainbowLegendLabelColumn, setRainbowLegendLabelColumn] = useState(null);
+  /** Rainbow legend: centered wrap vs equal-width newspaper columns. */
+  const [rainbowLegendLayout, setRainbowLegendLayout] = useState("center");
   const [dots, setDots] = useState(true);
   const [labelLine, setLabelLine] = useState(false);
   const [donut, setDonut] = useState(false);
@@ -430,6 +431,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       setRainbowBarShuffleNonce(Math.max(0, Math.floor(Number(s.rainbowBarShuffleNonce))));
     }
     if (s.rainbowLegendLabelColumn !== undefined) setRainbowLegendLabelColumn(s.rainbowLegendLabelColumn);
+    if (s.rainbowLegendLayout === "center" || s.rainbowLegendLayout === "columns") {
+      setRainbowLegendLayout(s.rainbowLegendLayout);
+    }
     if (s.dots !== undefined) setDots(!!s.dots);
     if (s.labelLine !== undefined) setLabelLine(!!s.labelLine);
     if (s.donut !== undefined) setDonut(!!s.donut);
@@ -842,6 +846,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     rainbowBar,
     rainbowBarShuffleNonce,
     rainbowLegendLabelColumn,
+    rainbowLegendLayout,
     dots,
     labelLine,
     donut,
@@ -1105,6 +1110,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setRainbowBarShuffleNonce,
     rainbowLegendLabelColumn,
     setRainbowLegendLabelColumn,
+    rainbowLegendLayout,
+    setRainbowLegendLayout,
     dots,
     handleToggleDots: setDots,
     labelLine,
@@ -1213,6 +1220,7 @@ export function ChartCanvas() {
     rainbowBar,
     rainbowBarShuffleNonce,
     rainbowLegendLabelColumn,
+    rainbowLegendLayout,
     dots,
     labelLine,
     donut,
@@ -1371,8 +1379,6 @@ export function ChartCanvas() {
     ? ["#ffffff", "#000000", "#000000", "#ffffff"]
     : ["#000000", "#ffffff", "#ffffff", "#000000"];
   const activePalette = hasSelectedPalette ? selectedPalette : defaultPalette;
-  /** Full-hue pool for rainbow bars (default sheet palette is often neutral = grey-only ramp). */
-  const rainbowBarHuePalette = useMemo(() => getShadcnRainbowBarPalette(600), []);
   const fallbackSeriesColor = dark ? "#ffffff" : "#000000";
   /**
    * Shadcn palettes are ordered light → dark (50 … 950). Outer chrome uses the first stops; series
@@ -1756,11 +1762,12 @@ export function ChartCanvas() {
                             {(finalRenderedData || []).map((row, i) => {
                               const rainbowFill = rainbowBar
                                 ? rainbowBarFillFromPalette(
-                                    rainbowBarHuePalette.length ? rainbowBarHuePalette : activePalette,
+                                    null,
                                     i,
                                     idx,
                                     row?.[xKey],
                                     rainbowBarShuffleNonce,
+                                    yKeys.length,
                                   )
                                 : null;
                               const fill = rainbowFill || seriesColorFor(yKey, idx);
@@ -1777,10 +1784,10 @@ export function ChartCanvas() {
                                   rows={finalRenderedData}
                                   xKey={xKey}
                                   yKeys={yKeys}
-                                  palette={rainbowBarHuePalette.length ? rainbowBarHuePalette : activePalette}
                                   shuffleNonce={rainbowBarShuffleNonce}
                                   xTickFormatter={xTickFormatter}
                                   legendLabelColumn={rainbowLegendLabelColumn}
+                                  layout={rainbowLegendLayout}
                                 />
                               )}
                             />

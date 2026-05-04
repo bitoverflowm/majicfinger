@@ -145,6 +145,8 @@ export default function ChartControls() {
     setRainbowBarShuffleNonce,
     rainbowLegendLabelColumn,
     setRainbowLegendLabelColumn,
+    rainbowLegendLayout,
+    setRainbowLegendLayout,
     dots,
     handleToggleDots,
     labelLine,
@@ -1018,14 +1020,14 @@ export default function ChartControls() {
                               size="icon"
                               className="h-8 w-8 shrink-0"
                               disabled={!rainbowBar}
-                              aria-label="Shuffle rainbow bar colors"
+                              aria-label="Shift rainbow color cycle"
                               onClick={() => setRainbowBarShuffleNonce((n) => n + 1)}
                             >
                               <Shuffle className="h-3.5 w-3.5" aria-hidden />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="left" className="text-xs max-w-[200px]">
-                            New random color assignment from the active palette
+                            Offset the cycle: mist→…→rose at shades 100→…→900, then repeat
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -1057,6 +1059,30 @@ export default function ChartControls() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <div className="mt-2 space-y-1">
+                        <Label className="text-xs text-muted-foreground">Rainbow legend layout</Label>
+                        <p className="text-[10px] leading-snug text-muted-foreground">
+                          Center: wrapped rows. Columns: equal-width columns, items read top-to-bottom in each column.
+                        </p>
+                        <ToggleGroup
+                          type="single"
+                          variant="outline"
+                          size="sm"
+                          className="mt-0.5 flex w-full min-w-0 justify-stretch [&>button]:min-w-0 [&>button]:flex-1"
+                          value={rainbowLegendLayout}
+                          onValueChange={(v) => {
+                            if (v === "center" || v === "columns") setRainbowLegendLayout(v);
+                          }}
+                          aria-label="Rainbow legend layout"
+                        >
+                          <ToggleGroupItem value="center" className="text-xs">
+                            Center
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="columns" className="text-xs">
+                            Columns
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
                     </div>
                   )}
 

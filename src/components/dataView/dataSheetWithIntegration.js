@@ -1110,15 +1110,14 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                         <TooltipTrigger asChild>
                                           <span className="inline-flex shrink-0">
                                             <DestructiveIconButton
-                                              className="h-2.5 w-2.5 shrink-0"
-                                              ariaLabel="delete dashboard"
-                                              title="delete dashboard"
+                                              ariaLabel="delete"
+                                              title="delete"
                                               onClick={deleteDashboardFromComposer}
                                             />
                                           </span>
                                         </TooltipTrigger>
                                         <TooltipContent side="bottom" sideOffset={6} className="z-[100] text-xs">
-                                          delete dashboard
+                                          delete
                                         </TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
@@ -1414,9 +1413,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                               <TooltipTrigger asChild>
                                                                 <span className="inline-flex shrink-0">
                                                                   <DestructiveIconButton
-                                                                    className="h-2.5 w-2.5 shrink-0"
-                                                                    ariaLabel="Remove text block"
-                                                                    title="Remove text block"
+                                                                    ariaLabel="delete"
+                                                                    title="delete"
                                                                     onClick={() => {
                                                                       setChartDashboardDraft?.((prev) => {
                                                                         if (!prev) return prev;
@@ -1450,7 +1448,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                                 sideOffset={6}
                                                                 className="z-[100] text-xs"
                                                               >
-                                                                Remove text block
+                                                                delete
                                                               </TooltipContent>
                                                             </Tooltip>
                                                           </TooltipProvider>
@@ -1549,9 +1547,8 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                             <TooltipTrigger asChild>
                                                               <span className="inline-flex shrink-0">
                                                                 <DestructiveIconButton
-                                                                  className="h-2.5 w-2.5 shrink-0"
-                                                                  ariaLabel={`Remove ${rowLabel}`}
-                                                                  title={`Remove ${rowLabel}`}
+                                                                  ariaLabel="delete"
+                                                                  title="delete"
                                                                   onClick={() => {
                                                                     setChartDashboardDraft?.((prev) => {
                                                                       if (!prev) return prev;
@@ -1588,7 +1585,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                                               sideOffset={6}
                                                               className="z-[100] text-xs"
                                                             >
-                                                              Remove chart
+                                                              delete
                                                             </TooltipContent>
                                                           </Tooltip>
                                                         </TooltipProvider>

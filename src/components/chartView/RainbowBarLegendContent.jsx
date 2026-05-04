@@ -10,7 +10,18 @@ import { rainbowBarFillFromPalette } from "@/components/chartView/rainbowBarFill
  * `legendLabelColumn` to use another sheet column instead.
  */
 export const RainbowBarLegendContent = React.forwardRef(function RainbowBarLegendContent(
-  { className, verticalAlign = "bottom", rows, xKey, yKeys, palette, shuffleNonce, xTickFormatter, legendLabelColumn },
+  {
+    className,
+    verticalAlign = "bottom",
+    rows,
+    xKey,
+    yKeys,
+    shuffleNonce,
+    xTickFormatter,
+    legendLabelColumn,
+    /** `"center"` — wrapped row, centered. `"columns"` — equal-width CSS columns, top-to-bottom fill. */
+    layout = "center",
+  },
   ref,
 ) {
   const labelKey = legendLabelColumn || xKey;
@@ -18,7 +29,6 @@ export const RainbowBarLegendContent = React.forwardRef(function RainbowBarLegen
 
   const entries = React.useMemo(() => {
     if (!Array.isArray(rows) || !rows.length || !Array.isArray(yKeys) || !yKeys.length) return [];
-    if (!Array.isArray(palette) || !palette.length) return [];
 
     const list = [];
     const colorIndex = new Map();
@@ -45,7 +55,7 @@ export const RainbowBarLegendContent = React.forwardRef(function RainbowBarLegen
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
       for (let idx = 0; idx < yKeys.length; idx += 1) {
-        const color = rainbowBarFillFromPalette(palette, i, idx, row?.[xKey], shuffleNonce);
+        const color = rainbowBarFillFromPalette(null, i, idx, row?.[xKey], shuffleNonce, yKeys.length);
         if (!color) continue;
         const legendText = formatLegendLabel(row);
 
@@ -63,9 +73,11 @@ export const RainbowBarLegendContent = React.forwardRef(function RainbowBarLegen
       color: e.color,
       legendTexts: Array.from(e.legendTexts),
     }));
-  }, [rows, xKey, yKeys, palette, shuffleNonce, xTickFormatter, labelKey, useXTickFormatter]);
+  }, [rows, xKey, yKeys, shuffleNonce, xTickFormatter, labelKey, useXTickFormatter]);
 
   if (!entries.length) return null;
+
+  const columnar = layout === "columns";
 
   return (
     <div
@@ -79,9 +91,24 @@ export const RainbowBarLegendContent = React.forwardRef(function RainbowBarLegen
       <p className="text-center text-[10px] font-medium tracking-wide text-slate-500 dark:text-slate-400">
         Legend
       </p>
-      <div className="flex flex-wrap items-start justify-center gap-x-5 gap-y-2">
+      <div
+        className={cn(
+          "w-full min-w-0",
+          columnar
+            ? "columns-1 gap-y-0 [column-gap:1.5rem] sm:columns-2 lg:columns-3"
+            : "flex flex-wrap items-start justify-center gap-x-5 gap-y-2",
+        )}
+      >
         {entries.map(({ color, legendTexts }) => (
-          <div key={color} className="flex min-w-0 max-w-[min(100%,18rem)] items-start gap-2">
+          <div
+            key={color}
+            className={cn(
+              "flex items-start gap-2",
+              columnar
+                ? "mb-2 w-full min-w-0 break-inside-avoid"
+                : "min-w-0 max-w-[min(100%,18rem)]",
+            )}
+          >
             <div className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: color }} />
             <span className="text-xs leading-snug text-slate-700 dark:text-slate-200">{legendTexts.join(", ")}</span>
           </div>

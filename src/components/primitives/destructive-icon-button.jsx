@@ -4,32 +4,27 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Canonical destructive icon control for compact delete actions.
- * Reuse this primitive anywhere you need the small red delete circle.
+ * Small solid destructive control — empty red circle, same visual weight as the
+ * DataLakeParquetPanel Athena / sample connection status dots (`h-2.5 w-2.5`).
+ * No icon; pair with a tooltip (e.g. "delete").
  */
-export function DestructiveIconButton({
-  className,
-  icon: Icon,
-  ariaLabel = "Delete",
-  size = "compact",
-  ...props
-}) {
-  const sizing = size === "compact" ? "h-6 w-6" : "h-7 w-7";
+export function DestructiveIconButton({ className, ariaLabel = "delete", ...props }) {
   return (
     <Button
       type="button"
-      size="icon"
       variant="destructive"
-      className={cn("rounded-full p-0 [&_svg]:size-3.5", sizing, className)}
+      className={cn(
+        "h-2.5 w-2.5 min-h-2.5 min-w-2.5 shrink-0 rounded-full border-0 p-0 shadow-none",
+        "focus-visible:ring-1 focus-visible:ring-red-500 focus-visible:ring-offset-1",
+        className,
+      )}
       aria-label={ariaLabel}
       {...props}
-    >
-      {Icon ? <Icon /> : null}
-    </Button>
+    />
   );
 }
 
-/** Compact yellow circle control (same shape as DestructiveIconButton) for secondary navigation. */
+/** Compact yellow circle control for secondary navigation. */
 export function YellowIconButton({
   className,
   icon: Icon,
