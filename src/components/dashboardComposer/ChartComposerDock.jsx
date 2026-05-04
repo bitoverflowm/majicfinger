@@ -181,9 +181,10 @@ export function ChartComposerDock({ editorInset = null }) {
     return resolveFormatDockTarget(t, chartDashboardDraft, setChartDashboardDraft);
   }, [chartComposerDock, chartDashboardDraft, pageFormatDockTarget, setChartDashboardDraft]);
 
-  if (!chartDashboardDraft || !dashboardComposerLayoutActions) {
+  if (!chartDashboardDraft) {
     return null;
   }
+  const layoutActions = dashboardComposerLayoutActions;
 
   const barPositionStyle = editorInset
     ? { position: "fixed", left: editorInset.left, width: editorInset.width, bottom: 24 }
@@ -233,7 +234,8 @@ export function ChartComposerDock({ editorInset = null }) {
                 variant="outline"
                 className="h-7 shrink-0 gap-1 px-2 text-[11px] font-medium leading-none [&_svg]:size-3"
                 aria-label="Add chart"
-                onClick={() => dashboardComposerLayoutActions.addChart()}
+                disabled={!layoutActions}
+                onClick={() => layoutActions?.addChart()}
               >
                 <Plus className="shrink-0" aria-hidden />
                 Chart
@@ -246,6 +248,7 @@ export function ChartComposerDock({ editorInset = null }) {
                     variant="outline"
                     className="h-7 shrink-0 gap-1 px-2 text-[11px] font-medium leading-none [&_svg]:size-3"
                     aria-label="Insert text block"
+                    disabled={!layoutActions}
                   >
                     <Plus className="shrink-0" aria-hidden />
                     Text
@@ -264,7 +267,7 @@ export function ChartComposerDock({ editorInset = null }) {
                       type="button"
                       className="rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
                       onClick={() => {
-                        dashboardComposerLayoutActions.addText("heading");
+                        layoutActions?.addText("heading");
                         setTextBlockMenuOpen(false);
                       }}
                     >
@@ -274,7 +277,7 @@ export function ChartComposerDock({ editorInset = null }) {
                       type="button"
                       className="rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
                       onClick={() => {
-                        dashboardComposerLayoutActions.addText("paragraph");
+                        layoutActions?.addText("paragraph");
                         setTextBlockMenuOpen(false);
                       }}
                     >

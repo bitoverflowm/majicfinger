@@ -385,18 +385,6 @@ export default function DashboardComposerPage({ user }) {
     [setPageFormatDockTarget, setChartDashboardDraft],
   );
 
-  useEffect(() => {
-    if (!draft) {
-      setDashboardComposerLayoutActions?.(null);
-      return undefined;
-    }
-    setDashboardComposerLayoutActions?.({
-      addChart,
-      addText: addTextBlock,
-    });
-    return () => setDashboardComposerLayoutActions?.(null);
-  }, [draft, addChart, addTextBlock, setDashboardComposerLayoutActions]);
-
   const handleCreateNew = () => {
     if (!hasDbUser) {
       toast.error("Sign in to create a dashboard.");
@@ -429,6 +417,20 @@ export default function DashboardComposerPage({ user }) {
   const lastAutoToastAtRef = useRef(0);
   const draftRef = useRef(draft);
   draftRef.current = draft;
+
+  /** Presence-only deps: avoid clearing actions on every draft object identity change (sidebar typing). */
+  const draftPresent = Boolean(draft);
+  useLayoutEffect(() => {
+    if (!draftPresent) {
+      setDashboardComposerLayoutActions?.(null);
+      return undefined;
+    }
+    setDashboardComposerLayoutActions?.({
+      addChart,
+      addText: addTextBlock,
+    });
+    return () => setDashboardComposerLayoutActions?.(null);
+  }, [draftPresent, addChart, addTextBlock, setDashboardComposerLayoutActions]);
 
   useEffect(() => {
     if (!draft || !hasDbUser || !user?.userId) return;
@@ -730,11 +732,11 @@ export default function DashboardComposerPage({ user }) {
                               }}
                             />
                           </div>
-                          <input
-                            type="text"
+                          <Textarea
                             aria-label="Chart caption text, click to edit"
                             autoComplete="off"
                             spellCheck={false}
+                            rows={2}
                             value={col.microtext ?? ""}
                             placeholder="Chart caption text, click to edit"
                             onChange={(e) =>
@@ -756,8 +758,9 @@ export default function DashboardComposerPage({ user }) {
                             }}
                             style={getChartCardMicrotextEditorStyle(col)}
                             className={cn(
-                              "w-full min-w-0 cursor-text border-0 bg-transparent p-0 shadow-none outline-none",
-                              "tracking-tight text-foreground",
+                              "!min-h-0 overflow-hidden",
+                              "w-full min-w-0 cursor-text resize-y border-0 bg-transparent p-0 shadow-none outline-none",
+                              "whitespace-pre-wrap break-words text-foreground",
                               "placeholder:text-muted-foreground/80",
                               "focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                               getChartCardMicrotextEditorClasses(col),
