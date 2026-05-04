@@ -39,6 +39,7 @@ const DataView = ({ user }) => {
   const dataSheets = contextStateV2?.dataSheets;
   const activeSheetId = contextStateV2?.activeSheetId;
   const setActiveSheetId = contextStateV2?.setActiveSheetId;
+  const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setConnectedCols = contextStateV2?.setConnectedCols;
   const liveStreamState = contextStateV2?.liveStreamState;
   const hasChainlinkStream = Object.values(liveStreamState?.streamsBySheetId || {}).some(
@@ -114,7 +115,7 @@ const DataView = ({ user }) => {
   return (
     <div className="min-w-0 max-w-full min-h-0 px-2 sm:px-4 md:px-6">
       {showSheetTabs && (
-        <div className="flex flex-wrap gap-1 mb-2">
+        <div className="flex flex-wrap items-center gap-1 mb-2">
           {dataSheetIds.map((id) => (
             <code
               key={id}
@@ -124,6 +125,15 @@ const DataView = ({ user }) => {
               {dataSheets[id]?.name || id}
             </code>
           ))}
+          <button
+            type="button"
+            aria-label="Add sheet"
+            title="Add sheet"
+            className="relative rounded px-[0.35rem] py-[0.2rem] font-mono text-sm font-semibold leading-none bg-yellow-200/30 text-foreground cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"
+            onClick={() => addNewSheetAndActivate?.()}
+          >
+            +
+          </button>
         </div>
       )}
 
