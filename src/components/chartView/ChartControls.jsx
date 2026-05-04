@@ -737,12 +737,16 @@ export default function ChartControls() {
                         </Select>
                       </div>
                       <div className="py-2">
+                        <p className={`mb-1 text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Areas</p>
                         {selY.length > 0 &&
                           selY.map((yValue, index) => (
-                            <div className="flex min-w-0 place-items-center gap-2 py-1 text-foreground" key={index}>
+                            <div
+                              className="flex min-w-0 place-items-center gap-2 py-1 text-foreground"
+                              key={`${yValue}-${index}`}
+                            >
                               <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
                                 <SelectTrigger className="min-w-0 flex-1">
-                                <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
+                                  <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent className="text-xs">
                                   {availableYOptions &&
@@ -753,8 +757,26 @@ export default function ChartControls() {
                                     ))}
                                 </SelectContent>
                               </Select>
+                              <ChartColorPalettePopover
+                                value={lineColorOverrides?.[yValue] ?? null}
+                                swatchColor={getSeriesColor(yValue, index)}
+                                onChange={(color) =>
+                                  setLineColorOverrides((prev) => ({
+                                    ...(prev || {}),
+                                    [yValue]: color,
+                                  }))
+                                }
+                                onClear={() =>
+                                  setLineColorOverrides((prev) => {
+                                    const next = { ...(prev || {}) };
+                                    delete next[yValue];
+                                    return next;
+                                  })
+                                }
+                                ariaLabel={`Pick color for area ${index + 1}`}
+                              />
                               {!(selY.length === 1) && (
-                                <div className="p-1 text-red-400 cursor-pointer hover:text-red-700">
+                                <div className="cursor-pointer p-1 text-red-400 hover:text-red-700">
                                   <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
                                 </div>
                               )}

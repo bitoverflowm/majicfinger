@@ -292,6 +292,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const effectiveData = (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length) ? chartDataOverride : connectedData;
   const effectiveCols = (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length) ? Object.keys(chartDataOverride[0] || {}).map((field) => ({ field })) : connectedCols;
+  const activeSheetId = contextStateV2?.activeSheetId;
 
   const [selChartType, setSelChartType] = useState('area');
 
@@ -501,7 +502,15 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const globalSheetColumnGroups = useMemo(() => {
     const groups = [];
     const dataSheets = contextStateV2?.dataSheets || {};
-    for (const [sheetId, sheet] of Object.entries(dataSheets)) {
+    let entries = Object.entries(dataSheets);
+    if (activeSheetId) {
+      entries = [...entries].sort(([a], [b]) => {
+        if (a === activeSheetId) return -1;
+        if (b === activeSheetId) return 1;
+        return 0;
+      });
+    }
+    for (const [sheetId, sheet] of entries) {
       const rows = Array.isArray(sheet?.data) ? sheet.data : [];
       if (!rows.length) continue;
       const first = rows[0] || {};
@@ -534,7 +543,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       }
     }
     return groups;
-  }, [contextStateV2?.dataSheets, effectiveCols]);
+  }, [contextStateV2?.dataSheets, effectiveCols, activeSheetId]);
 
   const globalColumnOptions = useMemo(
     () => globalSheetColumnGroups.flatMap((g) => g.options.map((o) => o.value)),
@@ -569,12 +578,17 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const plain = deScope(value);
       if (plain && colSet.has(plain)) return plain;
       if (!plain) return null;
-      // Back-compat: legacy snapshots stored unscoped keys (e.g. "created_time") but options are now scoped ("sheet-1::created_time").
-      // If any scoped option matches by deScoped column name, pick the first matching key.
-      for (const k of cols) {
-        if (deScope(k) === plain) return k;
+      // Back-compat: legacy snapshots stored unscoped keys but options are scoped (`sheet-1::col`).
+      // If several sheets share the same column name, prefer the active grid sheet so line charts
+      // use the same row count as the sheet you're viewing (avoids min-row merge with a short sheet).
+      const matches = cols.filter((k) => deScope(k) === plain);
+      if (!matches.length) return null;
+      if (matches.length === 1) return matches[0];
+      if (activeSheetId) {
+        const onActive = matches.find((k) => k.startsWith(`${activeSheetId}::`));
+        if (onActive) return onActive;
       }
-      return null;
+      return matches[0];
     };
     setSelX((x) => {
       if (!x) return x;
@@ -591,7 +605,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const stable = next.length === curr.length && next.every((v, i) => v === curr[i]);
       return stable ? curr : next;
     });
-  }, [demo, effectiveData, globalColumnOptions]);
+  }, [demo, effectiveData, globalColumnOptions, activeSheetId]);
 
   useEffect(() => {
     if (!rainbowLegendLabelColumn) return;
@@ -656,15 +670,46 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     return xOptions.filter((k) => k !== selX && k !== selY?.[0]);
   }, [xOptions, selX, selY]);
 
+  /** Sheets referenced by X / Y. Line-series split must stay on these sheets or row-merge uses min(lengths) and truncates (e.g. 1600 vs 90 rows). */
+  const axisSheetIdsForLineSeries = useMemo(() => {
+    const keys = [selX, ...(Array.isArray(selY) ? selY : [])].filter(Boolean);
+    const ids = new Set();
+    for (const k of keys) {
+      const parsed = parseScopedColumnKey(k, activeSheetId);
+      const sid = parsed.sheetId || activeSheetId;
+      if (sid) ids.add(sid);
+    }
+    return ids;
+  }, [selX, selY, activeSheetId]);
+
   const inferredLineSeriesColumn = useMemo(() => {
     if (!lineSeriesColumnOptions.length) return null;
-    const byType = lineSeriesColumnOptions.find((k) => getAxisType(k, dataTypes, chartData) === "string");
-    return byType || lineSeriesColumnOptions[0];
-  }, [lineSeriesColumnOptions, dataTypes, chartData]);
+    if (!selX || !Array.isArray(selY) || selY.length === 0) return null;
+    let pool = lineSeriesColumnOptions;
+    if (axisSheetIdsForLineSeries.size > 0) {
+      const filtered = lineSeriesColumnOptions.filter((k) => {
+        const p = parseScopedColumnKey(k, activeSheetId);
+        const sid = p.sheetId || activeSheetId;
+        return axisSheetIdsForLineSeries.has(sid);
+      });
+      if (!filtered.length) return null;
+      pool = filtered;
+    }
+    const byType = pool.find((k) => getAxisType(k, dataTypes, chartData) === "string");
+    return byType || pool[0];
+  }, [lineSeriesColumnOptions, dataTypes, chartData, axisSheetIdsForLineSeries, activeSheetId, selX, selY]);
 
   useEffect(() => {
     if (!lineSeriesColumn && inferredLineSeriesColumn) setLineSeriesColumn(inferredLineSeriesColumn);
   }, [lineSeriesColumn, inferredLineSeriesColumn]);
+
+  useEffect(() => {
+    if (!lineSeriesColumn) return;
+    if (axisSheetIdsForLineSeries.size === 0) return;
+    const p = parseScopedColumnKey(lineSeriesColumn, activeSheetId);
+    const sid = p.sheetId || activeSheetId;
+    if (!axisSheetIdsForLineSeries.has(sid)) setLineSeriesColumn(null);
+  }, [lineSeriesColumn, axisSheetIdsForLineSeries, activeSheetId]);
 
   const lineSeriesCandidates = useMemo(() => {
     if (!lineSeriesColumn || !chartData?.length) return [];
@@ -723,43 +768,44 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const crossSheetChartData = useMemo(() => {
     const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
     if (!sheetEntries.length) return chartData || dfltChartData;
-    const activeRows = Array.isArray(contextStateV2?.dataSheets?.[contextStateV2?.activeSheetId]?.data)
-      ? contextStateV2.dataSheets[contextStateV2.activeSheetId].data
-      : [];
-    const neededKeys = new Set(
-      [
-        selX,
-        ...(selY || []),
-        lineSeriesColumn,
-        chartFilterColumn,
-        ...tooltipExtraColumns,
-        rainbowLegendLabelColumn,
-      ].filter(Boolean),
-    );
+    const activeSheetId = contextStateV2?.activeSheetId;
+    const dataSheets = contextStateV2?.dataSheets || {};
+    const activeRows = Array.isArray(dataSheets?.[activeSheetId]?.data) ? dataSheets[activeSheetId].data : [];
+    const plotKeyList = [
+      selX,
+      ...(selY || []),
+      lineSeriesColumn,
+      chartFilterColumn,
+      rainbowLegendLabelColumn,
+    ].filter(Boolean);
+    const tooltipKeys = Array.isArray(tooltipExtraColumns) ? tooltipExtraColumns.filter(Boolean) : [];
+    const neededKeys = new Set([...plotKeyList, ...tooltipKeys]);
     if (!neededKeys.size) return chartData || dfltChartData;
-    const neededSheetIds = new Set();
-    for (const key of neededKeys) {
-      const parsed = parseScopedColumnKey(key, contextStateV2?.activeSheetId);
-      if (parsed?.sheetId) neededSheetIds.add(parsed.sheetId);
+    /** Only X/Y (and other plot keys) determine row count. Tooltip-only scoped columns must not truncate the series. */
+    const sheetRowCount = (sheetId) => {
+      const d = dataSheets?.[sheetId]?.data;
+      return Array.isArray(d) ? d.length : 0;
+    };
+    const plotSheetLengths = [];
+    const seenPlotSheets = new Set();
+    for (const key of plotKeyList) {
+      const parsed = parseScopedColumnKey(key, activeSheetId);
+      const sid = parsed.sheetId || activeSheetId;
+      if (!sid || seenPlotSheets.has(sid)) continue;
+      seenPlotSheets.add(sid);
+      plotSheetLengths.push(sheetRowCount(sid));
     }
-    const relevantSheetEntries = sheetEntries.filter(([sheetId]) => neededSheetIds.has(sheetId));
-    const sourceEntries = relevantSheetEntries.length ? relevantSheetEntries : sheetEntries;
-    // Row-aligned merge: use the shortest contributing sheet. Using max() extended the frame with
-    // synthetic rows and we filled missing pivot X with row indices — that mixes 0…N with epoch-ms
-    // timestamps and collapses time series to a vertical spike at the right edge.
-    const sheetLengths = sourceEntries.map(([, sheet]) => (Array.isArray(sheet?.data) ? sheet.data.length : 0));
     const alignedRowCount =
-      neededSheetIds.size > 0 && sheetLengths.length
-        ? Math.max(0, Math.min(...sheetLengths))
-        : activeRows.length;
+      plotSheetLengths.length > 0 ? Math.max(0, Math.min(...plotSheetLengths)) : Math.max(0, activeRows.length);
     const rows = [];
     for (let idx = 0; idx < alignedRowCount; idx += 1) {
       const row = {};
       for (const key of neededKeys) {
-        const parsed = parseScopedColumnKey(key, contextStateV2?.activeSheetId);
-        const sourceRows = parsed.sheetId && Array.isArray(contextStateV2?.dataSheets?.[parsed.sheetId]?.data)
-          ? contextStateV2.dataSheets[parsed.sheetId].data
-          : activeRows;
+        const parsed = parseScopedColumnKey(key, activeSheetId);
+        const sourceRows =
+          parsed.sheetId && Array.isArray(dataSheets?.[parsed.sheetId]?.data)
+            ? dataSheets[parsed.sheetId].data
+            : activeRows;
         row[key] = sourceRows[idx]?.[parsed.column] ?? null;
       }
       if (selX && row[selX] == null && !lineIsTemporalX) {

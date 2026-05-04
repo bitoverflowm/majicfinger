@@ -633,6 +633,36 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
     setLoadedChartMeta,
   ]);
 
+  const deleteActiveChartSheet = useCallback(() => {
+    if (!activeChartSheetId) return;
+    const ids = Object.keys(chartSheets || {});
+    if (ids.length <= 1) {
+      toast.message("Keep at least one chart.");
+      return;
+    }
+    const idx = ids.indexOf(activeChartSheetId);
+    if (idx < 0) return;
+    const removeId = activeChartSheetId;
+    const remaining = ids.filter((id) => id !== removeId);
+    const nextActive = idx > 0 ? remaining[idx - 1] : remaining[0];
+    const nextEntry = chartSheets?.[nextActive];
+    setChartSheets?.((prev) => {
+      const next = { ...(prev || {}) };
+      delete next[removeId];
+      return next;
+    });
+    setActiveChartSheetId?.(nextActive);
+    setLoadedChartBuilderSnapshot?.(nextEntry?.snapshot ?? null);
+    setLoadedChartMeta?.(nextEntry?.chartMeta ?? null);
+  }, [
+    activeChartSheetId,
+    chartSheets,
+    setChartSheets,
+    setActiveChartSheetId,
+    setLoadedChartBuilderSnapshot,
+    setLoadedChartMeta,
+  ]);
+
   useEffect(() => {
     if (!chartMode) return;
     if (!activeChartSheetId || chartSheets?.[activeChartSheetId]) return;
@@ -759,6 +789,27 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                 >
                   <Plus className="mr-1 h-3 w-3" /> New chart
                 </Button>
+                {chartSheetIds.length > 1 ? (
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex shrink-0">
+                          <DestructiveIconButton
+                            ariaLabel="Delete current chart"
+                            title="Delete current chart"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteActiveChartSheet();
+                            }}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={6} className="text-xs">
+                        Delete current chart
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
               </div>
               {isDemo ? (
                 <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 pb-2 sm:justify-start">
