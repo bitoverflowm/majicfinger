@@ -525,8 +525,9 @@ const GridView = ({startNew}) => {
           const refRow = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
 
           if (mathOp === "pct_growth") {
+            // No previous/next row at the sheet edge — leave blank (NaN breaks number cells in the grid).
             if (refRow == null) {
-              return { ...row, [out]: NaN };
+              return { ...row, [out]: null };
             }
             const current = parseCellFiniteForStat(row, baseCol);
             const relative = parseCellFiniteForStat(refRow, baseCol);
@@ -2131,7 +2132,7 @@ const GridView = ({startNew}) => {
                               <div className="min-h-9 rounded-md border border-border/60 bg-muted/20 px-2 py-1 text-xs flex items-center font-mono leading-snug">
                                 {mathOp === "pct_growth" ? (
                                   <span className="line-clamp-2">
-                                    {`${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"} · edge row → NaN`}
+                                    {`${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"} · first/last row → blank`}
                                   </span>
                                 ) : (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${mathBaseCol || "column"} (current row) ${

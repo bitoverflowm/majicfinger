@@ -31,6 +31,28 @@ function getColKeys(connectedCols) {
     .filter(Boolean);
 }
 
+function SaveProjectSection() {
+  const requestSaveProjectDialog = useMyStateV2()?.requestSaveProjectDialog;
+  return (
+    <div className="space-y-2 border-b border-border pb-3">
+      <p className="text-xs font-bold text-muted-foreground">Project</p>
+      <Button
+        type="button"
+        variant="default"
+        size="sm"
+        className="h-8 w-full px-2 text-[11px]"
+        onClick={() => requestSaveProjectDialog?.()}
+      >
+        Save project
+      </Button>
+      <p className="text-[10px] text-muted-foreground">
+        Saves your workbook, all charts in this project, and the open dashboard (including publish settings) from the
+        header dialog.
+      </p>
+    </div>
+  );
+}
+
 function ExportChartSection() {
   const { downloadChart } = useChartBuilder();
   return (
@@ -713,6 +735,7 @@ function ExportDataSection() {
 export default function ExportPanel() {
   return (
     <div className="flex min-w-0 flex-col gap-4 p-3">
+      <SaveProjectSection />
       <ExportChartSection />
       <ShareEmbedSection />
       <ExportDataSection />

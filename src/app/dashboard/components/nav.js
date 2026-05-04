@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import moment from "moment"
@@ -169,6 +169,8 @@ const Nav = () => {
   const chartDashboardDraft = contextStateV2?.chartDashboardDraft
   const activeChartDashboardId = contextStateV2?.activeChartDashboardId
   const setRefetchChartDashboardsTick = contextStateV2?.setRefetchChartDashboardsTick
+  const saveProjectDialogNonce = contextStateV2?.saveProjectDialogNonce ?? 0
+  const prevSaveProjectNonceRef = useRef(0)
 
   const savedWorkCountLoading =
     hasDbBackedUserId &&
@@ -243,6 +245,14 @@ const Nav = () => {
     if (typeof window === "undefined") return
     setRuntimeOrigin(window.location.origin)
   }, [])
+
+  useEffect(() => {
+    const n = saveProjectDialogNonce
+    if (n > prevSaveProjectNonceRef.current) {
+      prevSaveProjectNonceRef.current = n
+      setSaveIsOpen(true)
+    }
+  }, [saveProjectDialogNonce])
 
   const handleLogout = async () => {
     try {
@@ -455,11 +465,20 @@ const Nav = () => {
       setChartDataOverride?.(null);
       setChartDataOverrideMeta?.(null);
 
-      if (viewing === "dashboardComposer" && chartDashboardDraft) {
-        bump(88, "Saving dashboard layout…");
+      const dashDraft =
+        chartDashboardDraft && typeof chartDashboardDraft === "object"
+          ? { ...chartDashboardDraft, data_set_id: String(savedProject._id) }
+          : null;
+      const hasDashboardToSave =
+        dashDraft &&
+        dashDraft.data_set_id &&
+        (dashDraft._id || (dashDraft.layout && typeof dashDraft.layout === "object"));
+      if (hasDashboardToSave) {
+        bump(88, "Saving dashboard…");
         const dashResult = await persistChartDashboardDraft({
-          draft: chartDashboardDraft,
+          draft: dashDraft,
           userId: user.userId,
+          includePublishFields: true,
         });
         if (!dashResult.ok) {
           toast.warning(dashResult.message);
@@ -826,7 +845,8 @@ const Nav = () => {
                           <DialogHeader>
                             <DialogTitle>Save Project</DialogTitle>
                             <DialogDescription className={saveProjectBusy ? "sr-only" : ""}>
-                              Save all sheets and all charts together in one project.
+                              Save all sheets and charts, and the open dashboard (layout plus publish settings if set)
+                              in one project. Overwrite updates the loaded project; otherwise enter a new name.
                             </DialogDescription>
                           </DialogHeader>
                           {saveProjectBusy ? (

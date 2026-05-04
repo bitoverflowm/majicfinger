@@ -48,6 +48,7 @@ const EasyLychee = () => {
     let loadedDataMeta = contextStateV2?.loadedDataMeta
     let loadedPresentationMeta = contextStateV2?.loadedPresentationMeta
     let connectedPresentation = contextStateV2?.connectedPresentation
+    const requestSaveProjectDialog = contextStateV2?.requestSaveProjectDialog
     let setViewing = contextStateV2?.setViewing
 
     //handle used for saving and publishing website
@@ -286,7 +287,15 @@ const EasyLychee = () => {
         <div className='px-10 py-2'>
             <div className='flex pb-6 gap-2 text-xs place-items-center'>
                 <div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={() => setEdit(!edit)}> {edit ? 'Hide Edit' : 'Show Edit Panel'}</div>
-                <div className='bg-black text-white p-2 rounded-sm cursor-pointer' onClick={() => saveHandler()}>Save</div>
+                <div
+                    className='bg-black text-white p-2 rounded-sm cursor-pointer'
+                    onClick={async () => {
+                        await saveHandler();
+                        requestSaveProjectDialog?.();
+                    }}
+                >
+                    Save project
+                </div>
                 <div className='bg-slate-100/80 px-1 h-10'></div>
                 <Label className="text-xs text-slate-600">Template</Label><div className='bg-slate-100 text-black p-2 rounded-sm cursor-pointer' onClick={()=>setTemplate('classic')}>Classic</div>
             </div>

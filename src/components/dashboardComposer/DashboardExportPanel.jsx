@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ export function DashboardExportPanel() {
   const draft = v2?.chartDashboardDraft;
   const setDraft = v2?.setChartDashboardDraft;
   const userHandle = v2?.userHandle;
-  const setRefetch = v2?.setRefetchChartDashboardsTick;
+  const requestSaveProjectDialog = v2?.requestSaveProjectDialog;
 
   const [slugInput, setSlugInput] = useState("");
   const [pub, setPub] = useState(false);
@@ -37,48 +38,25 @@ export function DashboardExportPanel() {
     return `${String(SITE).replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/dashboards/${encodeURIComponent(s)}`;
   }, [slugInput, draft?.public_slug, userHandle]);
 
-  const saveAll = async () => {
+  const openSaveProject = () => {
     if (!draft?._id) {
       toast.error("Load or create a dashboard first.");
       return;
     }
-    const raw = normalizeChartEmbedSlug(slugInput || draft.dashboard_name || "");
+    const raw = normalizeChartEmbedSlug(slugInput || draft?.dashboard_name || "");
     if (pub && !isValidChartEmbedSlug(raw)) {
       toast.error("Invalid slug (lowercase letters, numbers, hyphens).");
       return;
     }
-    try {
-      const res = await fetch(`/api/chart-dashboards/${draft._id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dashboard_name: draft.dashboard_name,
-          page_heading: draft.page_heading,
-          page_subheading: draft.page_subheading,
-          layout: draft.layout,
-          theme: draft.theme,
-          data_set_id: draft.data_set_id,
-          is_public: pub,
-          public_slug: pub ? raw : undefined,
-        }),
-      });
-      const j = await res.json();
-      if (!j?.success) {
-        toast.error(j?.message || "Save failed");
-        return;
-      }
-      const d = j.data;
+    flushSync(() => {
       setDraft?.((prev) => ({
         ...(prev || {}),
-        ...d,
-        public_slug: d.public_slug || "",
-        is_public: !!d.is_public,
+        is_public: pub,
+        public_slug: pub ? raw : "",
       }));
-      setRefetch?.((t) => (t || 0) + 1);
-      toast.success(pub ? "Dashboard published" : "Dashboard updated");
-    } catch {
-      toast.error("Save failed");
-    }
+    });
+    requestSaveProjectDialog?.();
+    toast.info("Use Save Project in the header to save layout, data, charts, and publish settings.");
   };
 
   if (!draft?._id) {
@@ -94,7 +72,8 @@ export function DashboardExportPanel() {
       <div className="space-y-2">
         <p className="text-xs font-semibold text-muted-foreground">Publish dashboard</p>
         <p className="text-[11px] text-muted-foreground">
-          Save your layout from the canvas (Save button), then choose a URL slug and make it public.
+          Set your slug and public toggle here, then use <span className="font-medium">Save Project</span> in the header to
+          persist the dashboard with your workbook and charts.
         </p>
       </div>
       <div className="grid gap-2">
@@ -115,8 +94,8 @@ export function DashboardExportPanel() {
           Public
         </Label>
       </div>
-      <Button type="button" size="sm" className="w-full" onClick={saveAll}>
-        Save publish settings
+      <Button type="button" size="sm" className="w-full" onClick={openSaveProject}>
+        Save project
       </Button>
       {publicUrl && pub ? (
         <div className="rounded-md border bg-muted/40 p-2 text-xs">
