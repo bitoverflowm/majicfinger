@@ -10,7 +10,7 @@ export const CHART_CARDS_GRID_ROW_PX = 220;
 export const DEFAULT_CHART_CARD_ROW_SPAN = 3;
 
 /** Maximum `grid-row: span` allowed in the composer (dock + grid). */
-export const MAX_CHART_CARD_ROW_SPAN = 3;
+export const MAX_CHART_CARD_ROW_SPAN = 5;
 
 /** @param {unknown} rowSpan */
 export function clampChartCardRowSpan(rowSpan) {

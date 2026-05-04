@@ -51,6 +51,8 @@ const ROW_SPAN_OPTIONS = [
   { value: 1, label: "1 row" },
   { value: 2, label: "2 rows" },
   { value: 3, label: "3 rows" },
+  { value: 4, label: "4 rows" },
+  { value: 5, label: "5 rows" },
 ];
 
 /**
