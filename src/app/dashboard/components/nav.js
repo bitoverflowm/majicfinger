@@ -20,6 +20,7 @@ import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardFooter, CardDescription } from "@/components/ui/card"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
+import { Progress } from "@/components/ui/progress"
 import { Pause, Play, RotateCw, Square, Trash2, ExternalLink, Loader2 } from "lucide-react"
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
 import {
@@ -139,6 +140,9 @@ const Nav = () => {
 
   const [isOpen, setIsOpen] = useState(false) 
   const [saveIsOpen, setSaveIsOpen] = useState(false)
+  const [saveProjectBusy, setSaveProjectBusy] = useState(false)
+  const [saveProjectProgress, setSaveProjectProgress] = useState(0)
+  const [saveProjectMessage, setSaveProjectMessage] = useState("")
   const [projectNameInput, setProjectNameInput] = useState("")
   const [runtimeOrigin, setRuntimeOrigin] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -269,6 +273,10 @@ const Nav = () => {
   };
 
   const handleSave = async () => {
+    const bump = (pct, msg) => {
+      setSaveProjectProgress(pct);
+      setSaveProjectMessage(msg);
+    };
     try {
       const flushedSnapshot = typeof chartSnapshotFlusher === "function"
         ? await chartSnapshotFlusher()
@@ -293,6 +301,10 @@ const Nav = () => {
         return;
       }
 
+      setSaveProjectBusy(true);
+      bump(6, "Saving in progress…");
+      await new Promise((r) => requestAnimationFrame(r));
+
       const sanitizedSheets = Object.entries(dataSheets || {}).reduce((acc, [sheetId, sheet]) => {
         const rows = Array.isArray(sheet?.data) ? sheet.data : [];
         const name = String(sheet?.name || sheetId);
@@ -316,7 +328,11 @@ const Nav = () => {
         source: 'project',
       };
 
+      bump(18, "Preparing data sheets…");
+      await new Promise((r) => requestAnimationFrame(r));
+
       let savedProject = null;
+      bump(28, "Uploading project data…");
       if (shouldOverwrite) {
         const updateRes = await fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
           method: 'PUT',
@@ -344,19 +360,22 @@ const Nav = () => {
         return;
       }
 
+      bump(48, "Saving charts…");
       await saveAllChartsForProject(savedProject._id, !shouldOverwrite, chartSheetsForSave);
 
+      bump(68, "Indexing data…");
+      await new Promise((r) => setTimeout(r, 280));
+
+      bump(78, "Updating workspace…");
       setLoadedDataMeta(savedProject);
       setLoadedDataId(savedProject._id);
       setRefetchData(1);
       setRefetchChart(1);
       setChartDataOverride?.(null);
       setChartDataOverrideMeta?.(null);
-      setSaveIsOpen(false);
-      setProjectNameInput("");
-      toast.success(shouldOverwrite ? "Project overwritten." : "New project saved.");
 
       if (viewing === "dashboardComposer" && chartDashboardDraft) {
+        bump(88, "Saving dashboard layout…");
         const dashResult = await persistChartDashboardDraft({
           draft: chartDashboardDraft,
           userId: user.userId,
@@ -372,14 +391,25 @@ const Nav = () => {
           toast.success("Dashboard saved.");
         }
       }
+
+      bump(100, "Saved successfully.");
+      toast.success(shouldOverwrite ? "Project overwritten." : "New project saved.");
+      await new Promise((r) => setTimeout(r, 480));
+      setSaveIsOpen(false);
+      setProjectNameInput("");
     } catch (error) {
       console.error('Error saving project:', error);
       toast.error("Failed to save project.");
+    } finally {
+      setSaveProjectBusy(false);
+      setSaveProjectProgress(0);
+      setSaveProjectMessage("");
     }
   }
 
   const handleSaveProjectSubmit = (e) => {
     e.preventDefault();
+    if (saveProjectBusy) return;
     handleSave();
   };
 
@@ -704,11 +734,22 @@ const Nav = () => {
                         className="h-7 gap-1 px-2 text-xs font-medium"
                         onClick={handleStartNewProject}
                       >
-                        Start New Project
+                        New Project
                       </Button>
                   )}
                   {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
-                      <Dialog open={saveIsOpen} onOpenChange={setSaveIsOpen}>
+                      <Dialog
+                        open={saveIsOpen}
+                        onOpenChange={(open) => {
+                          if (!open && saveProjectBusy) return;
+                          setSaveIsOpen(open);
+                          if (open) {
+                            setSaveProjectBusy(false);
+                            setSaveProjectProgress(0);
+                            setSaveProjectMessage("");
+                          }
+                        }}
+                      >
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs font-medium">
                             Save Project
@@ -717,39 +758,51 @@ const Nav = () => {
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
                             <DialogTitle>Save Project</DialogTitle>
-                            <DialogDescription>
+                            <DialogDescription className={saveProjectBusy ? "sr-only" : ""}>
                               Save all sheets and all charts together in one project.
                             </DialogDescription>
                           </DialogHeader>
-                          <form onSubmit={handleSaveProjectSubmit}>
-                            <div className="grid gap-4 py-4">
-                              {loadedDataMeta?.data_set_name && (
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                  <Label htmlFor="overwrite" className="text-right">
-                                    Overwrite current project?
-                                  </Label>
-                                  <Checkbox id="overwrite" checked={!!overwrite} onCheckedChange={setOverwrite}/>
-                                </div>
-                              )}
-                              {(!loadedDataMeta?.data_set_name || !overwrite) && (
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                  <Label htmlFor="project-name" className="text-right">
-                                    Project Name
-                                  </Label>
-                                  <Input
-                                    id="project-name"
-                                    placeholder="myProject"
-                                    className="col-span-3"
-                                    value={projectNameInput}
-                                    onChange={(e)=>setProjectNameInput(e.target.value)}
-                                  />
-                                </div>
-                              )}
+                          {saveProjectBusy ? (
+                            <div className="grid gap-3 py-2">
+                              <p className="text-sm text-foreground" aria-live="polite">
+                                {saveProjectMessage || "Working…"}
+                              </p>
+                              <Progress value={saveProjectProgress} className="h-2" />
+                              <p className="text-xs text-muted-foreground tabular-nums">
+                                {Math.min(100, Math.round(saveProjectProgress))}%
+                              </p>
                             </div>
-                            <DialogFooter>
-                              <Button type="submit">Save Project</Button>
-                            </DialogFooter>
-                          </form>
+                          ) : (
+                            <form onSubmit={handleSaveProjectSubmit}>
+                              <div className="grid gap-4 py-4">
+                                {loadedDataMeta?.data_set_name && (
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="overwrite" className="text-right">
+                                      Overwrite current project?
+                                    </Label>
+                                    <Checkbox id="overwrite" checked={!!overwrite} onCheckedChange={setOverwrite}/>
+                                  </div>
+                                )}
+                                {(!loadedDataMeta?.data_set_name || !overwrite) && (
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="project-name" className="text-right">
+                                      Project Name
+                                    </Label>
+                                    <Input
+                                      id="project-name"
+                                      placeholder="myProject"
+                                      className="col-span-3"
+                                      value={projectNameInput}
+                                      onChange={(e)=>setProjectNameInput(e.target.value)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              <DialogFooter>
+                                <Button type="submit">Save Project</Button>
+                              </DialogFooter>
+                            </form>
+                          )}
                         </DialogContent>
                       </Dialog>
                   )}

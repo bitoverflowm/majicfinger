@@ -449,7 +449,8 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         if (value instanceof Date) return 'date';
         // If value is a long string representing a number, treat it as text
         if (typeof value === 'string' && value.length > 15 && !isNaN(parseFloat(value))) return 'text';
-        if (typeof value === 'number' && !isNaN(value) && isFinite(value)) return 'number';
+        if (typeof value === 'number' && Number.isNaN(value)) return 'number';
+        if (typeof value === 'number' && isFinite(value)) return 'number';
         if (typeof value === 'string' && value !== '' && !isNaN(parseFloat(value)) && isFinite(Number(value))) return 'number';
         if (typeof value === 'object' && value !== null) return 'object';
         return 'text';
@@ -457,11 +458,28 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
     const determineDataTypes = (data) => {
         const types = {};
-        if (data.length > 0) {
-          const sample = data[0];
-          Object.keys(sample).forEach(key => {
-            types[key] = detectDataType(sample[key]);
-          });
+        if (!data.length) return types;
+        const keySet = new Set();
+        for (const row of data) {
+          if (row && typeof row === 'object') Object.keys(row).forEach((k) => keySet.add(k));
+        }
+        for (const key of keySet) {
+          let t = 'text';
+          for (const row of data) {
+            if (!row || typeof row !== 'object') continue;
+            const v = row[key];
+            if (v == null || v === '') continue;
+            const dt = detectDataType(v);
+            if (dt === 'number' || dt === 'date' || dt === 'boolean') {
+              t = dt;
+              break;
+            }
+            if (dt !== 'text') {
+              t = dt;
+              break;
+            }
+          }
+          types[key] = t;
         }
         return types;
       };

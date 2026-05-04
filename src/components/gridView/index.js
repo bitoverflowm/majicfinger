@@ -523,6 +523,23 @@ const GridView = ({startNew}) => {
           if (!row || typeof row !== "object") return row;
           const refIdx = mathRelativeRowRef === "next_row" ? idx + 1 : idx - 1;
           const refRow = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
+
+          if (mathOp === "pct_growth") {
+            if (refRow == null) {
+              return { ...row, [out]: NaN };
+            }
+            const current = parseCellFiniteForStat(row, baseCol);
+            const relative = parseCellFiniteForStat(refRow, baseCol);
+            if (current == null || relative == null) {
+              return { ...row, [out]: null };
+            }
+            if (relative === 0) {
+              return { ...row, [out]: null };
+            }
+            const v = (current - relative) / relative;
+            return { ...row, [out]: Number.isFinite(v) ? v : null };
+          }
+
           if (refRow == null) {
             return { ...row, [out]: null };
           }
@@ -1924,6 +1941,7 @@ const GridView = ({startNew}) => {
                         onValueChange={(v) => {
                           setMathDialogTab(v);
                           if (v !== "stats") setStatsStdDevActive(false);
+                          if (v === "basic" && mathOp === "pct_growth") setMathOp("subtract");
                         }}
                         className="w-full"
                       >
@@ -2085,6 +2103,9 @@ const GridView = ({startNew}) => {
                                       <SelectItem value="subtract">-</SelectItem>
                                       <SelectItem value="divide">/</SelectItem>
                                       <SelectItem value="multiply">x</SelectItem>
+                                      <SelectItem value="pct_growth">
+                                        % ((current − relative) / relative)
+                                      </SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -2107,10 +2128,16 @@ const GridView = ({startNew}) => {
 
                             <div className="space-y-1">
                               <Label className="text-xs">Preview equation</Label>
-                              <div className="h-9 rounded-md border border-border/60 bg-muted/20 px-2 text-xs flex items-center font-mono">
-                                {`${mathOutCol || nextFreeResultColumnName()} = ${mathBaseCol || "column"} (current row) ${
-                                  mathOp === "add" ? "+" : mathOp === "subtract" ? "-" : mathOp === "multiply" ? "x" : "/"
-                                } ${mathRelativeRowRef === "next_row" ? "next row" : "prev row"}`}
+                              <div className="min-h-9 rounded-md border border-border/60 bg-muted/20 px-2 py-1 text-xs flex items-center font-mono leading-snug">
+                                {mathOp === "pct_growth" ? (
+                                  <span className="line-clamp-2">
+                                    {`${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"} · edge row → NaN`}
+                                  </span>
+                                ) : (
+                                  `${mathOutCol || nextFreeResultColumnName()} = ${mathBaseCol || "column"} (current row) ${
+                                    mathOp === "add" ? "+" : mathOp === "subtract" ? "-" : mathOp === "multiply" ? "x" : "/"
+                                  } ${mathRelativeRowRef === "next_row" ? "next row" : "prev row"}`
+                                )}
                               </div>
                             </div>
                           </div>

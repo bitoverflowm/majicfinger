@@ -31,6 +31,7 @@ function isLongTokenId(value) {
 function coerceCell(value, key) {
   if (value === null || value === undefined) return value;
   if (typeof value === "number") {
+    if (Number.isNaN(value)) return value;
     return Number.isFinite(value) ? value : null;
   }
   if (typeof value === "boolean") return value;
@@ -80,12 +81,18 @@ function coerceCell(value, key) {
  */
 export function coerceDataTypes(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return rows;
+  const keySet = new Set();
+  for (const row of rows) {
+    if (row && typeof row === "object") {
+      for (const k of Object.keys(row)) keySet.add(k);
+    }
+  }
+  const keys = Array.from(keySet);
   const out = [];
-  const keys = Object.keys(rows[0]);
   for (const row of rows) {
     const next = {};
     for (const k of keys) {
-      next[k] = coerceCell(row[k], k);
+      next[k] = coerceCell(row?.[k], k);
     }
     out.push(next);
   }
