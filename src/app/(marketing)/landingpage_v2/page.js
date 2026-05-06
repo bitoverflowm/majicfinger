@@ -11,6 +11,7 @@ import { GrowthSection } from "@/components/sections/growth-section";
 import { PricingSection } from "@/components/sections/pricing-section";
 import { FAQSection } from "@/components/sections/faq-section";
 import { TestimonialSection } from "@/components/sections/testimonial-section";
+import { DashboardsSection } from "@/components/sections/dashboards-section";
 
 export default function LandingPageV2() {
   let articles = [];
@@ -36,6 +37,7 @@ export default function LandingPageV2() {
       <PricingSection />
       <FAQSection />
       <TestimonialSection />
+      <DashboardsSection username="misterrpink1" />
       <GuidesSection articles={articles} />
       <CTASection />
       <FooterSection />

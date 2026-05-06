@@ -136,16 +136,16 @@ export default function GuidesSection({ articles = [] }: GuidesSectionProps) {
           />
         </div>
       </div>
-      {featureReleases.length > 0 && (
-        <div className="mb-8">
-          <h4 className="mb-4 text-left text-xl font-semibold">Feature Releases</h4>
-          {renderGrid(featureReleases)}
-        </div>
-      )}
       <div>
         <h4 className="mb-4 text-left text-xl font-semibold">Guides & Blogs</h4>
         {renderGrid(standardArticles)}
       </div>
+      {featureReleases.length > 0 && (
+        <div className="mt-12">
+          <h4 className="mb-4 text-left text-xl font-semibold">Feature Releases</h4>
+          {renderGrid(featureReleases)}
+        </div>
+      )}
     </section>
   );
 }
