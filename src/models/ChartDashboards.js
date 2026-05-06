@@ -7,6 +7,22 @@ const ChartDashboardSchema = new mongoose.Schema({
     type: String,
     maxLength: [120, "Dashboard name cannot be more than 120 characters"],
   },
+  /** Optional custom SEO title (defaults to page_heading). */
+  seo_title: {
+    type: String,
+    maxLength: [200, "SEO title cannot be more than 200 characters"],
+    default: "",
+  },
+  /** Tags/topics for discoverability (freeform). */
+  tags: {
+    type: [String],
+    default: () => [],
+  },
+  /** Keywords for search engines (freeform). */
+  keywords: {
+    type: [String],
+    default: () => [],
+  },
   page_heading: {
     type: String,
     maxLength: [200, "Page heading cannot be more than 200 characters"],
@@ -30,6 +46,10 @@ const ChartDashboardSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  /** First publish timestamp; set once when a dashboard is made public. */
+  published_at: {
+    type: Date,
+  },
   last_edited_date: {
     type: Date,
     default: Date.now,
@@ -51,6 +71,13 @@ const ChartDashboardSchema = new mongoose.Schema({
   is_public: {
     type: Boolean,
     default: false,
+  },
+  /** Optional generated OG/cover image stored as data URL (PNG). */
+  og_image_data: {
+    type: String,
+  },
+  og_image_updated_at: {
+    type: Date,
   },
 });
 

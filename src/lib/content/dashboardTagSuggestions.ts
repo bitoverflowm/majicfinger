@@ -1,0 +1,26 @@
+/** Suggested dashboard tags (union of guide `topics` frontmatter). */
+export const DASHBOARD_TAG_SUGGESTIONS = [
+  "analytics",
+  "api",
+  "backtesting",
+  "charts",
+  "data analysis",
+  "data export",
+  "events API",
+  "historical data",
+  "kalshi",
+  "market data",
+  "market structure",
+  "metadata",
+  "no-code",
+  "polymarket",
+  "prediction markets",
+  "probability",
+  "quant",
+  "real-time",
+  "sql",
+  "trading",
+  "volume",
+  "websockets",
+];
+

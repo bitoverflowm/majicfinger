@@ -24,6 +24,9 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
     if (draft._id) {
       const base = {
         dashboard_name: draft.dashboard_name,
+        seo_title: draft.seo_title,
+        tags: Array.isArray(draft.tags) ? draft.tags : [],
+        keywords: Array.isArray(draft.keywords) ? draft.keywords : [],
         page_heading: draft.page_heading,
         page_subheading: draft.page_subheading,
         layout: draft.layout,
@@ -71,6 +74,9 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
         user_id: userId,
         data_set_id: draft.data_set_id,
         dashboard_name: draft.dashboard_name || "Untitled dashboard",
+        seo_title: draft.seo_title || "",
+        tags: Array.isArray(draft.tags) ? draft.tags : [],
+        keywords: Array.isArray(draft.keywords) ? draft.keywords : [],
         page_heading: draft.page_heading || "",
         page_subheading: draft.page_subheading || "",
         layout: draft.layout && typeof draft.layout === "object" ? draft.layout : createEmptyDashboardLayout(),
@@ -96,6 +102,9 @@ export function mergeCreatedChartDashboardDraft(prev, d) {
     ...(prev || {}),
     _id: String(d._id),
     dashboard_name: d.dashboard_name ?? prev?.dashboard_name,
+    seo_title: d.seo_title ?? prev?.seo_title ?? "",
+    tags: Array.isArray(d.tags) ? d.tags : prev?.tags ?? [],
+    keywords: Array.isArray(d.keywords) ? d.keywords : prev?.keywords ?? [],
     page_heading: d.page_heading ?? prev?.page_heading ?? "",
     page_subheading: d.page_subheading ?? prev?.page_subheading ?? "",
     layout: d.layout && typeof d.layout === "object" ? d.layout : prev?.layout,
@@ -103,5 +112,6 @@ export function mergeCreatedChartDashboardDraft(prev, d) {
     data_set_id: d.data_set_id ? String(d.data_set_id) : prev?.data_set_id,
     public_slug: d.public_slug || "",
     is_public: !!d.is_public,
+    published_at: d.published_at ?? prev?.published_at ?? null,
   };
 }

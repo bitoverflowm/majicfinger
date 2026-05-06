@@ -56,6 +56,9 @@ export default async function handler(req, res) {
         }
         const {
           dashboard_name,
+          seo_title,
+          tags,
+          keywords,
           page_heading,
           page_subheading,
           layout,
@@ -78,6 +81,11 @@ export default async function handler(req, res) {
         }
         const doc = await ChartDashboard.create({
           dashboard_name: dashboard_name || "Untitled dashboard",
+          seo_title: typeof seo_title === "string" ? seo_title : "",
+          tags: Array.isArray(tags) ? tags.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim()).slice(0, 30) : [],
+          keywords: Array.isArray(keywords)
+            ? keywords.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim()).slice(0, 30)
+            : [],
           page_heading: page_heading || "",
           page_subheading: typeof page_subheading === "string" ? page_subheading : "",
           layout: layout && typeof layout === "object" ? layout : createEmptyDashboardLayout(),

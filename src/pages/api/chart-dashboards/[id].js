@@ -82,6 +82,19 @@ export default async function handler(req, res) {
 
         const $set = { last_edited_date: new Date() };
         if (typeof req.body.dashboard_name === "string") $set.dashboard_name = req.body.dashboard_name;
+        if (typeof req.body.seo_title === "string") $set.seo_title = req.body.seo_title;
+        if (Array.isArray(req.body.tags)) {
+          $set.tags = req.body.tags
+            .filter((t) => typeof t === "string" && t.trim())
+            .map((t) => t.trim())
+            .slice(0, 30);
+        }
+        if (Array.isArray(req.body.keywords)) {
+          $set.keywords = req.body.keywords
+            .filter((t) => typeof t === "string" && t.trim())
+            .map((t) => t.trim())
+            .slice(0, 30);
+        }
         if (typeof req.body.page_heading === "string") $set.page_heading = req.body.page_heading;
         if (typeof req.body.page_subheading === "string") $set.page_subheading = req.body.page_subheading;
         if (req.body.layout && typeof req.body.layout === "object") $set.layout = req.body.layout;
@@ -111,6 +124,9 @@ export default async function handler(req, res) {
           const pub = !!req.body.is_public;
           $set.is_public = pub;
           if (pub) {
+            if (!dash.is_public && !dash.published_at) {
+              $set.published_at = new Date();
+            }
             const raw = normalizeChartEmbedSlug(
               req.body.public_slug || req.body.dashboard_name || "",
             );

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +12,8 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { DASHBOARD_TAG_SUGGESTIONS } from "@/lib/content/dashboardTagSuggestions";
 
 const SITE =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL
@@ -26,11 +29,48 @@ export function DashboardExportPanel() {
 
   const [slugInput, setSlugInput] = useState("");
   const [pub, setPub] = useState(false);
+  const [tagInput, setTagInput] = useState("");
+  const [keywordInput, setKeywordInput] = useState("");
 
   useEffect(() => {
     setSlugInput(draft?.public_slug || "");
     setPub(!!draft?.is_public);
   }, [draft?._id, draft?.public_slug, draft?.is_public]);
+
+  useEffect(() => {
+    if (!draft?._id) return;
+    // Ensure arrays exist for the metadata UI.
+    setDraft?.((prev) => {
+      const p = prev || {};
+      const tags = Array.isArray(p.tags) ? p.tags : [];
+      const keywords = Array.isArray(p.keywords) ? p.keywords : [];
+      if (tags === p.tags && keywords === p.keywords) return prev;
+      return { ...p, tags, keywords, seo_title: p.seo_title || "" };
+    });
+  }, [draft?._id, setDraft]);
+
+  const tags = Array.isArray(draft?.tags) ? draft.tags : [];
+  const keywords = Array.isArray(draft?.keywords) ? draft.keywords : [];
+
+  const addChip = (kind, raw) => {
+    const v = String(raw || "").trim();
+    if (!v) return;
+    const max = 30;
+    setDraft?.((prev) => {
+      const p = prev || {};
+      const list = Array.isArray(p[kind]) ? p[kind] : [];
+      const exists = new Set(list.map((t) => String(t).toLowerCase()));
+      if (exists.has(v.toLowerCase())) return prev;
+      return { ...p, [kind]: [...list, v].slice(0, max) };
+    });
+  };
+  const removeChip = (kind, value) =>
+    setDraft?.((prev) => {
+      const p = prev || {};
+      const list = Array.isArray(p[kind]) ? p[kind] : [];
+      const next = list.filter((t) => String(t) !== String(value));
+      return { ...p, [kind]: next };
+    });
 
   const publicUrl = useMemo(() => {
     const s = normalizeChartEmbedSlug(slugInput || draft?.public_slug || "");
@@ -111,6 +151,116 @@ export function DashboardExportPanel() {
           </Link>
         </div>
       ) : null}
+
+      <Accordion type="single" collapsible defaultValue="metadata">
+        <AccordionItem value="metadata">
+          <AccordionTrigger className="py-2 text-xs font-semibold text-muted-foreground hover:no-underline">
+            Metadata
+          </AccordionTrigger>
+          <AccordionContent className="space-y-3 pt-2">
+            <div className="space-y-1">
+              <Label htmlFor="dash-seo-title" className="text-xs">
+                SEO title (optional)
+              </Label>
+              <Input
+                id="dash-seo-title"
+                className="h-9 text-sm"
+                value={draft?.seo_title || ""}
+                onChange={(e) =>
+                  setDraft?.((prev) => ({
+                    ...(prev || {}),
+                    seo_title: e.target.value,
+                  }))
+                }
+                placeholder="Defaults to Page title"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                If blank, Lychee will use your Page title (H1).
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Tags</Label>
+              <Input
+                className="h-9 text-sm"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                placeholder="Type a tag and press Enter"
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  addChip("tags", tagInput);
+                  setTagInput("");
+                }}
+              />
+              {DASHBOARD_TAG_SUGGESTIONS?.length ? (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {DASHBOARD_TAG_SUGGESTIONS.slice(0, 18).map((t) => (
+                    <button
+                      key={`tag-suggest-${t}`}
+                      type="button"
+                      className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+                      onClick={() => addChip("tags", t)}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {tags.length ? (
+                <div className="flex flex-wrap gap-1 pt-2">
+                  {tags.map((t) => (
+                    <Badge key={`tag-${t}`} variant="secondary" className="gap-1 text-[11px]">
+                      <span>{t}</span>
+                      <button
+                        type="button"
+                        className="rounded px-1 hover:bg-muted-foreground/20"
+                        aria-label={`Remove tag ${t}`}
+                        onClick={() => removeChip("tags", t)}
+                      >
+                        x
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Keywords</Label>
+              <Input
+                className="h-9 text-sm"
+                value={keywordInput}
+                onChange={(e) => setKeywordInput(e.target.value)}
+                placeholder="Type a keyword and press Enter"
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  addChip("keywords", keywordInput);
+                  setKeywordInput("");
+                }}
+              />
+              {keywords.length ? (
+                <div className="flex flex-wrap gap-1 pt-2">
+                  {keywords.map((t) => (
+                    <Badge key={`kw-${t}`} variant="outline" className="gap-1 text-[11px]">
+                      <span>{t}</span>
+                      <button
+                        type="button"
+                        className="rounded px-1 hover:bg-muted-foreground/20"
+                        aria-label={`Remove keyword ${t}`}
+                        onClick={() => removeChip("keywords", t)}
+                      >
+                        x
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }

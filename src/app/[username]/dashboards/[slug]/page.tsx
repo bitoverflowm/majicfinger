@@ -12,19 +12,52 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { username, slug } = await params;
   const meta = await getPublicDashboardMeta(username, slug);
-  const title = meta?.project_name ? `${meta.project_name} · ${username}` : `Dashboard · ${username}`;
+  const baseTitle = meta?.seo_title || meta?.project_name;
+  const title = baseTitle ? `${baseTitle} · ${username}` : `Dashboard · ${username}`;
+  const description = meta?.description
+    ? String(meta.description).slice(0, 300)
+    : `Dashboard by @${username} on Lychee Data.`;
   const path = `/${encodeURIComponent(username)}/dashboards/${encodeURIComponent(slug)}`;
   const canonical = `${SITE}${path}`;
+  const dynamicOgImagePath = `/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/og-image`;
+  const ogImage = meta?.has_og_image_data ? `${SITE}${dynamicOgImagePath}` : `${SITE}/ogImage2.png`;
   return {
     title,
-    description: `Dashboard by @${username} on Lychee Data.`,
+    description,
     alternates: { canonical },
     openGraph: {
       title,
+      description,
       url: canonical,
       siteName: "Lychee",
       type: "website",
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
     },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage],
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+    keywords: [
+      "dashboards",
+      "analytics",
+      username,
+      ...(Array.isArray(meta?.tags) ? meta.tags : []),
+      ...(Array.isArray(meta?.keywords) ? meta.keywords : []),
+      ...(baseTitle ? [baseTitle] : []),
+    ],
   };
 }
 

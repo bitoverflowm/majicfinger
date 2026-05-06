@@ -366,6 +366,99 @@ const Nav = () => {
     }
   };
 
+  const generateDashboardOgImageDataUrl = (title, subtitle) => {
+    try {
+      if (typeof document === "undefined") return null;
+      const w = 1200;
+      const h = 630;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, w, h);
+
+      const padX = 90;
+      const maxW = w - padX * 2;
+      const wrap = (text, font, lineHeight) => {
+        ctx.font = font;
+        const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+        const lines = [];
+        let line = "";
+        for (const word of words) {
+          const next = line ? `${line} ${word}` : word;
+          if (ctx.measureText(next).width <= maxW) {
+            line = next;
+            continue;
+          }
+          if (line) lines.push(line);
+          line = word;
+        }
+        if (line) lines.push(line);
+        return { lines, lineHeight };
+      };
+
+      const titleText = String(title || "").trim() || "Dashboard";
+      const subtitleText = String(subtitle || "").trim();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+
+      const titleFont = "800 64px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
+      const subFont = "500 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
+
+      const titleWrapped = wrap(titleText, titleFont, 78);
+      const maxTitleLines = 3;
+      const titleLines = titleWrapped.lines.slice(0, maxTitleLines);
+
+      const subWrapped = subtitleText ? wrap(subtitleText, subFont, 48) : { lines: [], lineHeight: 48 };
+      const maxSubLines = 3;
+      const subLines = subWrapped.lines.slice(0, maxSubLines);
+
+      let y = 120;
+      ctx.font = titleFont;
+      for (const ln of titleLines) {
+        ctx.fillText(ln, padX, y);
+        y += titleWrapped.lineHeight;
+      }
+
+      if (subLines.length) {
+        y += 26;
+        ctx.fillStyle = "rgba(255,255,255,0.82)";
+        ctx.font = subFont;
+        for (const ln of subLines) {
+          ctx.fillText(ln, padX, y);
+          y += subWrapped.lineHeight;
+        }
+      }
+
+      // Small brand line
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "500 22px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
+      ctx.fillText("lycheedata.com", padX, h - 70);
+
+      return canvas.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+  };
+
+  const uploadDashboardOgImage = async (dashboardId, title, subtitle) => {
+    if (!dashboardId) return false;
+    const imageDataUrl = generateDashboardOgImageDataUrl(title, subtitle);
+    if (!imageDataUrl) return false;
+    const ogRes = await fetch(`/api/chart-dashboards/og-image/${dashboardId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ imageDataUrl }),
+    });
+    const ogJson = await ogRes.json().catch(() => null);
+    return !!(ogRes.ok && ogJson?.success);
+  };
+
   const handleSave = async () => {
     const bump = (pct, msg) => {
       setSaveProjectProgress(pct);
@@ -486,9 +579,19 @@ const Nav = () => {
         if (!dashResult.ok) {
           toast.warning(dashResult.message);
         } else {
+          const savedDashId = String(dashResult.created?._id || dashDraft._id || "");
           if (dashResult.created) {
             setChartDashboardDraft?.((prev) => mergeCreatedChartDashboardDraft(prev, dashResult.created));
             setActiveChartDashboardId?.(String(dashResult.created._id));
+          }
+          // If public, generate an OG cover image for link previews / SEO.
+          if (dashDraft?.is_public && dashDraft?.public_slug && savedDashId) {
+            bump(94, "Generating dashboard cover image…");
+            await uploadDashboardOgImage(
+              savedDashId,
+              String(dashDraft.seo_title || dashDraft.page_heading || dashDraft.dashboard_name || "Dashboard"),
+              String(dashDraft.page_subheading || ""),
+            );
           }
           setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
           toast.success("Dashboard saved.");
