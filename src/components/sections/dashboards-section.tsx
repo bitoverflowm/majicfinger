@@ -103,8 +103,9 @@ export async function DashboardsSection({
       <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
         {dashboards.map((d, idx) => {
           const href = `/${encodeURIComponent(d.username)}/dashboards/${encodeURIComponent(d.slug)}`;
+          // Use a same-origin relative URL so `next/image` doesn't require remotePatterns.
           const ogImage = d.hasOgImage
-            ? `${SITE}/api/public/dashboards/${encodeURIComponent(d.username)}/${encodeURIComponent(d.slug)}/og-image`
+            ? `/api/public/dashboards/${encodeURIComponent(d.username)}/${encodeURIComponent(d.slug)}/og-image`
             : null;
           return (
             <Link
