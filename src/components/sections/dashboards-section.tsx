@@ -27,9 +27,13 @@ function formatDate(dateStr: string | undefined | null) {
 }
 
 export async function DashboardsSection({
-  username = "misterrpink1",
+  username = "misterrpink",
+  limit = 12,
+  showCta = true,
 }: {
   username?: string;
+  limit?: number;
+  showCta?: boolean;
 }) {
   let dashboards: DashboardCard[] = [];
   try {
@@ -45,7 +49,7 @@ export async function DashboardsSection({
       })
         .select("public_slug page_heading page_subheading published_at last_edited_date og_image_data")
         .sort({ published_at: -1, last_edited_date: -1 })
-        .limit(12)
+        .limit(Math.max(1, Math.min(120, Number(limit) || 12)))
         .lean()) as any[];
       dashboards = list
         .map((d) => {
@@ -83,6 +87,17 @@ export async function DashboardsSection({
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
           Live, shareable dashboards built with Lychee.
         </p>
+        {showCta ? (
+          <div className="pt-2">
+            <Link
+              href="/dashboards-gallery"
+              className="inline-flex items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
+              prefetch={false}
+            >
+              View all dashboards
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">

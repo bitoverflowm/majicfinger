@@ -11,6 +11,7 @@ export const siteConfig = {
       { id: "hero", name: "Home", href: "/#hero" },
       { id: "pricing", name: "Pricing", href: "/#pricing" },
       { id: "guides", name: "Guides", href: "/#guides" },
+      { id: "dashboards", name: "Dashboards", href: "/#dashboards" },
     ],
   },
   companyShowcase: {

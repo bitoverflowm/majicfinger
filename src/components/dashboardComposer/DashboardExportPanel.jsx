@@ -22,6 +22,7 @@ const SITE =
 
 export function DashboardExportPanel() {
   const v2 = useMyStateV2();
+  const isDemo = !!v2?.isDemo;
   const draft = v2?.chartDashboardDraft;
   const setDraft = v2?.setChartDashboardDraft;
   const userHandle = v2?.userHandle;
@@ -79,6 +80,10 @@ export function DashboardExportPanel() {
   }, [slugInput, draft?.public_slug, userHandle]);
 
   const openSaveProject = () => {
+    if (isDemo) {
+      toast.error("Demo mode: publishing dashboards is disabled.");
+      return;
+    }
     if (!draft?._id) {
       toast.error("Load or create a dashboard first.");
       return;
@@ -129,12 +134,15 @@ export function DashboardExportPanel() {
         />
       </div>
       <div className="flex items-center gap-2">
-        <Checkbox id="dash-pub" checked={pub} onCheckedChange={(c) => setPub(!!c)} />
+        <Checkbox id="dash-pub" checked={pub} onCheckedChange={(c) => setPub(!!c)} disabled={isDemo} />
         <Label htmlFor="dash-pub" className="text-xs font-normal">
           Public
         </Label>
+        {isDemo ? (
+          <span className="text-[11px] text-muted-foreground">(demo)</span>
+        ) : null}
       </div>
-      <Button type="button" size="sm" className="w-full" onClick={openSaveProject}>
+      <Button type="button" size="sm" className="w-full" onClick={openSaveProject} disabled={isDemo}>
         Save project
       </Button>
       {publicUrl && pub ? (

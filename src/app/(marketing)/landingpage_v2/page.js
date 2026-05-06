@@ -37,7 +37,7 @@ export default function LandingPageV2() {
       <PricingSection />
       <FAQSection />
       <TestimonialSection />
-      <DashboardsSection username="misterrpink1" />
+      <DashboardsSection username="misterrpink" />
       <GuidesSection articles={articles} />
       <CTASection />
       <FooterSection />
