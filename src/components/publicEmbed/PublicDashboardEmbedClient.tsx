@@ -89,15 +89,18 @@ function resolveCardHref(col: Column, ownerHandle: string | undefined) {
 export default function PublicDashboardEmbedClient({
   username,
   slug,
+  initialPayload = null,
 }: {
   username: string;
   slug: string;
+  initialPayload?: Payload | null;
 }) {
-  const [payload, setPayload] = useState<Payload | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [payload, setPayload] = useState<Payload | null>(() => initialPayload);
+  const [err, setErr] = useState<string | null>(() => (initialPayload && !initialPayload.success ? initialPayload.message || "Not found" : null));
 
   useEffect(() => {
     let cancelled = false;
+    if (initialPayload) return () => { cancelled = true; };
     setErr(null);
     setPayload(null);
     fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`)
@@ -116,7 +119,7 @@ export default function PublicDashboardEmbedClient({
     return () => {
       cancelled = true;
     };
-  }, [username, slug]);
+  }, [username, slug, initialPayload]);
 
   if (err) {
     return (

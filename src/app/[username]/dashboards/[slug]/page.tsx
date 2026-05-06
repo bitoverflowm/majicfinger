@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PublicDashboardEmbedClient from "@/components/publicEmbed/PublicDashboardEmbedClient";
 import { getPublicDashboardMeta } from "@/lib/server/publicDashboardMeta";
+import { getPublicDashboardPayload } from "@/lib/server/publicDashboardPayload";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -33,9 +34,14 @@ export default async function PublicDashboardPage({
   params: Promise<{ username: string; slug: string }>;
 }) {
   const { username, slug } = await params;
+  const initialPayload = await getPublicDashboardPayload(username, slug);
   return (
     <div className="min-h-screen bg-background">
-      <PublicDashboardEmbedClient username={username} slug={slug} />
+      <PublicDashboardEmbedClient
+        username={username}
+        slug={slug}
+        initialPayload={initialPayload}
+      />
     </div>
   );
 }
