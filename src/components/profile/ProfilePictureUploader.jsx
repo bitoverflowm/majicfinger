@@ -132,7 +132,7 @@ export function ProfilePictureUploader({ userId, handle, name, currentSrc, onUpd
     <div className="rounded-lg border border-border bg-background p-4 text-sm text-foreground">
       <div className="font-semibold">Profile picture</div>
       <div className="mt-3 flex items-center gap-3">
-        <UserAvatar src={src} handle={handle} name={name} className="h-12 w-12" />
+        <UserAvatar src={src} handle={handle} name={name} size={48} className="h-12 w-12" />
         <div className="flex flex-wrap gap-2">
           <input
             ref={inputRef}

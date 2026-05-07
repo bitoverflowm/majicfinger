@@ -1326,7 +1326,9 @@ const Nav = () => {
                         <UserAvatar
                           src={profilePic}
                           handle={userHandle}
-                          name={user?.email}
+                          name={user?.name}
+                          email={user?.email}
+                          size={36}
                           className="h-9 w-9"
                         />
                       </Button>
