@@ -22,6 +22,7 @@ import ComingSoon from "./components/comingSoon";
 import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
+import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
 
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,8 @@ const DashBody = ({ user }) => {
     const refetchChartDashboardsTick = contextStateV2?.refetchChartDashboardsTick
     const setUserHandle = contextStateV2?.setUserHandle
     const userHandle = contextStateV2?.userHandle
+    const profilePic = contextStateV2?.profilePic
+    const setProfilePic = contextStateV2?.setProfilePic
     const polymarketWsState = contextStateV2?.polymarketWsState
     const chainlinkWsState = contextStateV2?.chainlinkWsState
     const liveStreamState = contextStateV2?.liveStreamState
@@ -184,6 +187,7 @@ const DashBody = ({ user }) => {
             .then(data => {
                 if (data.success) {
                     setUserHandle(data.data.user_name);
+                    setProfilePic?.(data.data.profile_pic);
                     setIsLifeTimeMember(data.data.lifetimeMember);
                     setSubscriptionTier(data.data.subscriptionTier || null);
                     setBillingCycle(data.data.billingCycle || null);
@@ -303,6 +307,15 @@ const DashBody = ({ user }) => {
                 {!isDemo && viewing === 'pricing' && <div className="py-10"><PricingSection /></div>}
                 {!isDemo && viewing === 'profilePage' && <div className="p-56 text-black">
                     <div className="">
+                        <div className="mb-4 max-w-xl">
+                          <ProfilePictureUploader
+                            userId={hasDbBackedUserId ? user.userId : null}
+                            handle={userHandle}
+                            name={user?.email}
+                            currentSrc={profilePic}
+                            onUpdated={(nextUrl) => setProfilePic?.(nextUrl)}
+                          />
+                        </div>
                         <div className="mb-6 rounded-lg border border-border bg-background p-4 text-sm text-foreground">
                           <div className="font-semibold">Account plan</div>
                           <div className="mt-2 text-muted-foreground">

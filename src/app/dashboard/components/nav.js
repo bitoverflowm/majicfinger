@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import moment from "moment"
 
 
@@ -41,6 +40,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 function attachPublicAssetsToProjectRow(row) {
   row.publicCharts = (row.charts || []).filter((c) => c?.is_public && c?.public_slug)
@@ -151,6 +151,7 @@ const Nav = () => {
   const loadedDataMeta = contextStateV2?.loadedDataMeta
   const setLoadedDataMeta = contextStateV2?.setLoadedDataMeta
   const userHandle = contextStateV2?.userHandle
+  const profilePic = contextStateV2?.profilePic
   const loadedDataId = contextStateV2?.loadedDataId
   const setLoadedDataId = contextStateV2?.setLoadedDataId
 
@@ -1322,7 +1323,12 @@ const Nav = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="secondary" size="icon" className="rounded-full h-9 w-9 overflow-hidden">
-                        <Image src={'/mrpink_pfp.jpg'} height={36} width={36} alt="Profile" />
+                        <UserAvatar
+                          src={profilePic}
+                          handle={userHandle}
+                          name={user?.email}
+                          className="h-9 w-9"
+                        />
                       </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
