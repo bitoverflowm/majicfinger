@@ -9,7 +9,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid, Shuffle } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid, Shuffle, ChevronUp, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -201,6 +201,8 @@ export default function ChartControls() {
     setYAxisTickColor,
     xAxisTicksAngled,
     setXAxisTicksAngled,
+    xAxisLabelGapPx,
+    setXAxisLabelGapPx,
   } = useChartBuilder();
 
   const chartTypeLabel =
@@ -1234,6 +1236,45 @@ export default function ChartControls() {
                         <Label htmlFor="chart-design-x-tick-angle" className="cursor-pointer text-xs text-muted-foreground">
                           Angle X-axis labels (−45°)
                         </Label>
+                      </div>
+
+                      <div className="flex min-w-0 items-center justify-between gap-2">
+                        <Label className="text-xs text-muted-foreground">
+                          X-axis label gap
+                        </Label>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            aria-label="Decrease x-axis label gap"
+                            onClick={() => setXAxisLabelGapPx?.((v) => Math.max(0, (Number(v) || 0) - 2))}
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                          <Input
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className="h-7 w-16 text-center text-xs tabular-nums"
+                            value={String(Number(xAxisLabelGapPx) || 0)}
+                            onChange={(e) => {
+                              const n = Math.max(0, Math.min(60, Math.round(Number(e.target.value || 0))));
+                              setXAxisLabelGapPx?.(Number.isFinite(n) ? n : 0);
+                            }}
+                            aria-label="X-axis label gap in pixels"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            aria-label="Increase x-axis label gap"
+                            onClick={() => setXAxisLabelGapPx?.((v) => Math.min(60, (Number(v) || 0) + 2))}
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}

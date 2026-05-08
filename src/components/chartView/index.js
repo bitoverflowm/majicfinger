@@ -190,6 +190,7 @@ export const X_DATE_FORMAT_PRESETS = [
   { value: "mm/dd", label: "MM/DD" },
   { value: "mmm d", label: "MMM D" },
   { value: "dd-mmm", label: "DD-MMM" },
+  { value: "d-mm-yy", label: "D-MM-YY" },
   { value: "dd/mm/yy", label: "DD/MM/YY" },
   { value: "mm/dd/yy", label: "MM/DD/YY" },
   { value: "yyyy", label: "YYYY" },
@@ -217,6 +218,7 @@ function formatEpochMsWithPreset(ms, preset) {
   if (p === "mm/dd") return `${mm}/${dd}`;
   if (p === "mmm d") return `${mmm} ${Number(dd)}`;
   if (p === "dd-mmm") return `${dd}-${mmm}`;
+  if (p === "d-mm-yy") return `${Number(dd)}-${mm}-${yy}`;
   if (p === "dd/mm/yy") return `${dd}/${mm}/${yy}`;
   if (p === "mm/dd/yy") return `${mm}/${dd}/${yy}`;
   if (p === "yyyy") return String(yyyy);
@@ -410,6 +412,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [yAxisTickColor, setYAxisTickColor] = useState(null);
   /** Slanted X tick labels (Recharts `angle`, degrees; −45 is typical for bottom axis). */
   const [xAxisTicksAngled, setXAxisTicksAngled] = useState(false);
+  /** Additional px spacing between X axis line and tick labels (adds to the base margin). */
+  const [xAxisLabelGapPx, setXAxisLabelGapPx] = useState(0);
 
   const [chartConfig, setChartConfig] = useState({});
   const [lineSeriesColumn, setLineSeriesColumn] = useState(null);
@@ -507,6 +511,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.xAxisTickColor !== undefined) setXAxisTickColor(s.xAxisTickColor);
     if (s.yAxisTickColor !== undefined) setYAxisTickColor(s.yAxisTickColor);
     if (s.xAxisTicksAngled !== undefined) setXAxisTicksAngled(!!s.xAxisTicksAngled);
+    if (s.xAxisLabelGapPx !== undefined && Number.isFinite(Number(s.xAxisLabelGapPx))) {
+      setXAxisLabelGapPx(Math.max(0, Math.min(60, Math.round(Number(s.xAxisLabelGapPx)))));
+    }
     if (s.chartConfig && typeof s.chartConfig === "object") setChartConfig(s.chartConfig);
     if (s.lineSeriesColumn !== undefined) setLineSeriesColumn(s.lineSeriesColumn);
     if (Array.isArray(s.lineSeriesValues)) setLineSeriesValues(s.lineSeriesValues);
@@ -998,6 +1005,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     xAxisTickColor,
     yAxisTickColor,
     xAxisTicksAngled,
+    xAxisLabelGapPx,
     chartConfig,
     lineSeriesColumn,
     lineSeriesValues,
@@ -1211,6 +1219,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setYAxisTickColor,
     xAxisTicksAngled,
     setXAxisTicksAngled,
+    xAxisLabelGapPx,
+    setXAxisLabelGapPx,
     lineColorOverrides,
     setLineColorOverrides,
     handleToggleDark,
@@ -1341,6 +1351,7 @@ export function ChartCanvas() {
     lineStyle,
     lineHumanReadableTime,
     xTimeScale,
+    xDateFormatPreset,
     expanded,
     legendVisible,
     stackedBar,
@@ -1368,6 +1379,7 @@ export function ChartCanvas() {
     xAxisTickColor,
     yAxisTickColor,
     xAxisTicksAngled,
+    xAxisLabelGapPx,
     lineIsTemporalX,
     lineChartData,
     scopedKeysInUse,
@@ -1398,7 +1410,7 @@ export function ChartCanvas() {
     const left = xAxisTicksAngled ? 108 : 84;
     return { left, right: CARTESIAN_MARGIN_BAR.right, top: 4, bottom: 20 };
   }, [xAxisTicksAngled, hideXAxisLabels]);
-  const xAxisTickMargin = xAxisTicksAngled ? 12 : 8;
+  const xAxisTickMargin = (xAxisTicksAngled ? 12 : 8) + (Number.isFinite(Number(xAxisLabelGapPx)) ? Number(xAxisLabelGapPx) : 0);
 
   const rawData = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
