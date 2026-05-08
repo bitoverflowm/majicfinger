@@ -5,6 +5,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -42,6 +43,7 @@ import {
   getPageTextBlockEditorStyle,
   PAGE_SUBHEADING_PLACEHOLDER,
 } from "@/lib/pageTitleTheme";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   getChartCardHeadingEditorClasses,
   getChartCardHeadingEditorStyle,
@@ -70,6 +72,15 @@ function sumChartRowColSpans(columns) {
   if (!Array.isArray(columns)) return 0;
   return columns.reduce((s, c) => s + clampChartColSpan(c?.colSpan), 0);
 }
+
+const TAG_STYLES = [
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+  "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30",
+  "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+  "bg-lime-500/15 text-lime-800 dark:text-lime-300 border-lime-500/30",
+];
 
 function emptyColumn(overrides = {}) {
   return {
@@ -140,6 +151,8 @@ export default function DashboardComposerPage({ user }) {
     setChartDashboardDraft,
     activeChartDashboardId,
     setActiveChartDashboardId,
+    userHandle,
+    profilePic,
     savedDataSets,
     loadedDataMeta,
     setLoadedDataMeta,
@@ -224,6 +237,9 @@ export default function DashboardComposerPage({ user }) {
         setChartDashboardDraft({
           _id: d._id,
           dashboard_name: d.dashboard_name || "",
+          seo_title: d.seo_title || "",
+          tags: Array.isArray(d.tags) ? d.tags : [],
+          keywords: Array.isArray(d.keywords) ? d.keywords : [],
           page_heading: d.page_heading || "",
           page_subheading: d.page_subheading || "",
           layout,
@@ -397,6 +413,9 @@ export default function DashboardComposerPage({ user }) {
     setActiveChartDashboardId?.(null);
     setChartDashboardDraft({
       dashboard_name: "",
+      seo_title: "",
+      tags: [],
+      keywords: [],
       page_heading: "",
       page_subheading: "",
       layout: createEmptyDashboardLayout(),
@@ -468,6 +487,9 @@ export default function DashboardComposerPage({ user }) {
     };
   }, [
     draft?.dashboard_name,
+    draft?.seo_title,
+    draft?.tags,
+    draft?.keywords,
     draft?.page_heading,
     draft?.page_subheading,
     draft?.data_set_id,
@@ -560,6 +582,8 @@ export default function DashboardComposerPage({ user }) {
 
   const bg = draft.theme?.background_color || "";
   const showDots = draft.theme?.background === "dotPattern";
+  const createdByHandle = String(userHandle || "").trim();
+  const tags = Array.isArray(draft.tags) ? draft.tags.map((t) => String(t || "").trim()).filter(Boolean) : [];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto scroll-pb-40 px-6 pt-6 pb-40">
@@ -621,6 +645,37 @@ export default function DashboardComposerPage({ user }) {
               getPageTextBlockEditorClasses(draft?.theme, "pageSubheading"),
             )}
           />
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <UserAvatar
+              src={profilePic}
+              handle={createdByHandle}
+              name={user?.name}
+              email={user?.email}
+              size={24}
+              className="h-6 w-6 ring-1 ring-border"
+            />
+            <span className="min-w-0 truncate">
+              Created by{" "}
+              <span className="font-medium text-foreground">
+                {createdByHandle ? `@${createdByHandle}` : "you"}
+              </span>
+            </span>
+          </div>
+
+          {tags.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {tags.slice(0, 8).map((t, i) => (
+                <Badge
+                  key={`composer-tag-${t}-${i}`}
+                  variant="secondary"
+                  className={`border ${TAG_STYLES[i % TAG_STYLES.length]}`}
+                >
+                  {t}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
 
           {rows.map((row) => {
             if (row.type === "cards" && Array.isArray(row.columns)) {

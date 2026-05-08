@@ -3,6 +3,7 @@ import Image from "next/image";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
 import ChartDashboard from "@/models/ChartDashboards";
+import { Badge } from "@/components/ui/badge";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -182,12 +183,13 @@ export async function DashboardsSection({
                   {Array.isArray(d.tags) && d.tags.length ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {d.tags.slice(0, 6).map((t, i) => (
-                        <span
+                        <Badge
                           key={`${d.username}-${d.slug}-tag-${t}`}
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${TAG_STYLES[i % TAG_STYLES.length]}`}
+                          variant="secondary"
+                          className={`border ${TAG_STYLES[i % TAG_STYLES.length]}`}
                         >
                           {t}
-                        </span>
+                        </Badge>
                       ))}
                     </div>
                   ) : null}
