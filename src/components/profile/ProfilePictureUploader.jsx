@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 async function fileToSquareAvatarBlob(file, { size = 256, type = "image/webp", quality = 0.9 } = {}) {
   const f = file instanceof File ? file : null;
@@ -45,10 +47,19 @@ async function fileToSquareAvatarBlob(file, { size = 256, type = "image/webp", q
   }
 }
 
-export function ProfilePictureUploader({ userId, handle, name, currentSrc, onUpdated }) {
+export function ProfilePictureUploader({
+  userId,
+  handle,
+  name,
+  currentSrc,
+  onUpdated,
+  mode = "standalone", // "standalone" | "onboarding"
+  registerUpload,
+}) {
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [keepAutoAvatar, setKeepAutoAvatar] = useState(false);
 
   const previewUrl = useMemo(() => {
     if (!file) return null;
@@ -61,6 +72,17 @@ export function ProfilePictureUploader({ userId, handle, name, currentSrc, onUpd
       URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (typeof registerUpload !== "function") return;
+    registerUpload(async () => {
+      if (keepAutoAvatar) return false;
+      if (!file) return false;
+      await upload();
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerUpload, file, keepAutoAvatar]);
 
   const chooseFile = () => inputRef.current?.click?.();
 
@@ -130,7 +152,6 @@ export function ProfilePictureUploader({ userId, handle, name, currentSrc, onUpd
 
   return (
     <div className="rounded-lg border border-border bg-background p-4 text-sm text-foreground">
-      <div className="font-semibold">Profile picture</div>
       <div className="mt-3 flex items-center gap-3">
         <UserAvatar src={src} handle={handle} name={name} size={48} className="h-12 w-12" />
         <div className="flex flex-wrap gap-2">
@@ -144,16 +165,44 @@ export function ProfilePictureUploader({ userId, handle, name, currentSrc, onUpd
               setFile(f);
             }}
           />
-          <Button type="button" variant="outline" size="sm" onClick={chooseFile} disabled={busy}>
-            Choose image
-          </Button>
-          <Button type="button" size="sm" onClick={upload} disabled={busy || !file}>
-            {busy ? "Uploading…" : "Upload"}
-          </Button>
+          {mode === "onboarding" ? (
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={chooseFile}
+                disabled={busy || keepAutoAvatar}
+              >
+                Upload
+              </Button>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="keep-auto-avatar"
+                  checked={keepAutoAvatar}
+                  onCheckedChange={(v) => {
+                    const next = !!v;
+                    setKeepAutoAvatar(next);
+                    if (next) setFile(null);
+                  }}
+                  disabled={busy}
+                />
+                <Label htmlFor="keep-auto-avatar" className="text-xs font-normal text-muted-foreground">
+                  or keep your unique auto generated avatar
+                </Label>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={chooseFile} disabled={busy}>
+                Choose image
+              </Button>
+              <Button type="button" size="sm" onClick={upload} disabled={busy || !file}>
+                {busy ? "Uploading…" : "Upload"}
+              </Button>
+            </>
+          )}
         </div>
-      </div>
-      <div className="mt-2 text-[11px] text-muted-foreground">
-        Images are cropped to a square and resized for avatar use.
       </div>
     </div>
   );
