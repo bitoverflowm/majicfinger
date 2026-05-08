@@ -7,6 +7,8 @@ import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLa
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import {
   getChartCardHeadingPublicClassName,
   getChartCardHeadingPublicStyle,
@@ -73,9 +75,20 @@ type Payload = {
     theme?: { background?: string; background_color?: string };
     layout?: { rows?: Row[] };
     owner_handle?: string;
+    owner_profile_pic?: string | null;
+    tags?: string[];
   };
   message?: string;
 };
+
+const TAG_STYLES = [
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+  "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30",
+  "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+  "bg-lime-500/15 text-lime-800 dark:text-lime-300 border-lime-500/30",
+];
 
 function resolveCardHref(col: Column, ownerHandle: string | undefined) {
   const mode = col.link?.mode || "none";
@@ -146,11 +159,16 @@ export default function PublicDashboardEmbedClient({
   const bg = d.theme?.background_color || "";
   const showDots = d.theme?.background === "dotPattern";
   const ownerHandle = d.owner_handle || username;
+  const ownerPic = d.owner_profile_pic ? String(d.owner_profile_pic) : "";
+  const tags = Array.isArray(d.tags) ? d.tags : [];
 
   return (
-    <div className="w-full px-6 py-10 sm:px-10">
+    <div className="relative w-full px-6 py-10 sm:px-10">
+      <div className="absolute right-4 top-4 z-20">
+        <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
+      </div>
       <div
-        className="relative overflow-hidden rounded-lg border p-8 shadow-sm"
+        className="relative overflow-hidden rounded-lg p-8"
         style={{ backgroundColor: bg || undefined }}
       >
         {showDots ? (
@@ -177,6 +195,46 @@ export default function PublicDashboardEmbedClient({
                   {d.page_subheading}
                 </p>
               ) : null}
+
+              <div className="flex flex-col gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {ownerPic ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={ownerPic}
+                      alt={`@${ownerHandle}`}
+                      className="h-6 w-6 rounded-full object-cover ring-1 ring-border"
+                    />
+                  ) : (
+                    <div className="h-6 w-6 rounded-full bg-muted ring-1 ring-border flex items-center justify-center text-[11px] font-semibold text-muted-foreground">
+                      {(String(ownerHandle || "?")[0] || "?").toUpperCase()}
+                    </div>
+                  )}
+                  <span>
+                    Created by <span className="font-medium text-foreground">@{ownerHandle}</span> using{" "}
+                    <Link href={SITE} className="font-medium text-foreground underline underline-offset-2">
+                      Lychee
+                    </Link>
+                  </span>
+                </div>
+
+                {tags.length ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">Data sources</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.slice(0, 8).map((t, i) => (
+                        <Badge
+                          key={`dash-tag-${t}-${i}`}
+                          variant="secondary"
+                          className={`border ${TAG_STYLES[i % TAG_STYLES.length]}`}
+                        >
+                          {t}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -218,7 +276,7 @@ export default function PublicDashboardEmbedClient({
                   const span = Math.min(12, Math.max(1, col.colSpan ?? 12));
                   const rSpan = clampChartCardRowSpan(col.rowSpan);
                   const inner = (
-                    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto rounded-lg border border-border/70 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
+                    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto rounded-lg bg-background/80 p-4 backdrop-blur-sm">
                       {col.h2 ? (
                         <h2
                           className={getChartCardHeadingPublicClassName(col)}
@@ -278,14 +336,7 @@ export default function PublicDashboardEmbedClient({
       <footer className="mt-8 border-t border-border/60 pt-4 text-center text-xs text-muted-foreground">
         <span>Made with </span>
         <Link href={SITE} className="font-medium text-foreground underline">
-          Lychee Data
-        </Link>
-        <span> · </span>
-        <Link
-          href={`${SITE}/${encodeURIComponent(username)}/dashboards/${encodeURIComponent(slug)}`}
-          className="underline"
-        >
-          Open dashboard
+          Lychee
         </Link>
         {d.dashboard_name ? (
           <span className="block pt-1 opacity-80">{d.dashboard_name}</span>

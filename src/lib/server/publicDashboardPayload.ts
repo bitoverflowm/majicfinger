@@ -51,6 +51,8 @@ export type PublicDashboardPayload = {
     theme?: { background?: string; background_color?: string };
     layout?: { rows?: Row[] };
     owner_handle?: string;
+    owner_profile_pic?: string | null;
+    tags?: string[];
   };
   message?: string;
 };
@@ -142,6 +144,8 @@ export async function getPublicDashboardPayload(
       theme: dash.theme || {},
       layout: layoutOut,
       owner_handle: user.user_name,
+      owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
+      tags: Array.isArray(dash.tags) ? dash.tags.map((t: any) => String(t || "").trim()).filter(Boolean) : [],
     },
   };
 }

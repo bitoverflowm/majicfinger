@@ -33,12 +33,6 @@ function GalleryCta() {
 export default function DashboardsGalleryPage() {
   return (
     <main className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-        <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-          ← Back
-        </Link>
-      </div>
-
       <div className="pb-8">
         <GalleryCta />
       </div>

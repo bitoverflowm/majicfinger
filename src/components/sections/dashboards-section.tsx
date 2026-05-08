@@ -13,7 +13,22 @@ type DashboardCard = {
   description: string;
   publishedAt?: string | null;
   hasOgImage?: boolean;
+  tags?: string[];
 };
+
+function avatarInitial(username: string) {
+  const u = String(username || "").trim();
+  return (u ? u[0] : "?").toUpperCase();
+}
+
+const TAG_STYLES = [
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+  "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30",
+  "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+  "bg-lime-500/15 text-lime-800 dark:text-lime-300 border-lime-500/30",
+];
 
 function formatDate(dateStr: string | undefined | null) {
   if (!dateStr) return "";
@@ -36,18 +51,20 @@ export async function DashboardsSection({
   showCta?: boolean;
 }) {
   let dashboards: DashboardCard[] = [];
+  let profilePic: string | null = null;
   try {
     await dbConnect();
     const user = (await User.findOne({ user_name: String(username).trim() })
-      .select("_id user_name")
+      .select("_id user_name profile_pic")
       .lean()) as any;
     if (user?._id) {
+      profilePic = user.profile_pic ? String(user.profile_pic) : null;
       const list = (await ChartDashboard.find({
         user_id: user._id,
         is_public: true,
         public_slug: { $type: "string", $gt: "" },
       })
-        .select("public_slug page_heading page_subheading published_at last_edited_date og_image_data")
+        .select("public_slug page_heading page_subheading published_at last_edited_date og_image_data tags")
         .sort({ published_at: -1, last_edited_date: -1 })
         .limit(Math.max(1, Math.min(120, Number(limit) || 12)))
         .lean()) as any[];
@@ -57,6 +74,7 @@ export async function DashboardsSection({
           const title = String(d.page_heading || "").trim();
           const description = String(d.page_subheading || "").trim();
           if (!slug || !title || !description) return null;
+          const tags = Array.isArray(d.tags) ? d.tags.map((t) => String(t || "").trim()).filter(Boolean) : [];
           const publishedAt = (d.published_at || d.last_edited_date)
             ? new Date(d.published_at || d.last_edited_date).toISOString()
             : null;
@@ -67,6 +85,7 @@ export async function DashboardsSection({
             description,
             publishedAt,
             hasOgImage: !!d.og_image_data,
+            tags,
           } satisfies DashboardCard;
         })
         .filter(Boolean) as DashboardCard[];
@@ -100,7 +119,7 @@ export async function DashboardsSection({
         ) : null}
       </div>
 
-      <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 px-2 sm:px-0 md:grid-cols-2 lg:grid-cols-3">
         {dashboards.map((d, idx) => {
           const href = `/${encodeURIComponent(d.username)}/dashboards/${encodeURIComponent(d.slug)}`;
           // Use a same-origin relative URL so `next/image` doesn't require remotePatterns.
@@ -138,6 +157,41 @@ export async function DashboardsSection({
                 </p>
                 <h3 className="text-xl font-semibold mb-2">{d.title}</h3>
                 <p className="text-foreground mb-2 line-clamp-5">{d.description}</p>
+
+                <div className="mt-4 border-t border-border/60 pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {profilePic ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={profilePic}
+                          alt={`@${d.username}`}
+                          className="h-6 w-6 rounded-full object-cover ring-1 ring-border"
+                        />
+                      ) : (
+                        <div className="h-6 w-6 rounded-full bg-muted ring-1 ring-border flex items-center justify-center text-[11px] font-semibold text-muted-foreground">
+                          {avatarInitial(d.username)}
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground truncate">
+                        Created by <span className="font-medium text-foreground">@{d.username}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {Array.isArray(d.tags) && d.tags.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {d.tags.slice(0, 6).map((t, i) => (
+                        <span
+                          key={`${d.username}-${d.slug}-tag-${t}`}
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${TAG_STYLES[i % TAG_STYLES.length]}`}
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </Link>
           );
