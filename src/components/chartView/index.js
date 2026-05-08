@@ -181,6 +181,49 @@ export function temporalIntlFormatOptionsForRange(rangeMs) {
 
 const MONTH_ABBREV_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+export const X_DATE_FORMAT_PRESETS = [
+  { value: "auto", label: "Auto" },
+  { value: "dd", label: "DD" },
+  { value: "mm", label: "MM" },
+  { value: "mmm", label: "MMM" },
+  { value: "dd/mm", label: "DD/MM" },
+  { value: "mm/dd", label: "MM/DD" },
+  { value: "mmm d", label: "MMM D" },
+  { value: "dd-mmm", label: "DD-MMM" },
+  { value: "dd/mm/yy", label: "DD/MM/YY" },
+  { value: "mm/dd/yy", label: "MM/DD/YY" },
+  { value: "yyyy", label: "YYYY" },
+  { value: "yyyy-mm", label: "YYYY-MM" },
+];
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function formatEpochMsWithPreset(ms, preset) {
+  const p = String(preset || "auto").toLowerCase();
+  if (!Number.isFinite(ms)) return "";
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "";
+  const yyyy = d.getUTCFullYear();
+  const yy = String(yyyy).slice(-2);
+  const mm = pad2(d.getUTCMonth() + 1);
+  const dd = pad2(d.getUTCDate());
+  const mmm = MONTH_ABBREV_EN[d.getUTCMonth()] ?? "";
+  if (p === "dd") return dd;
+  if (p === "mm") return mm;
+  if (p === "mmm") return mmm;
+  if (p === "dd/mm") return `${dd}/${mm}`;
+  if (p === "mm/dd") return `${mm}/${dd}`;
+  if (p === "mmm d") return `${mmm} ${Number(dd)}`;
+  if (p === "dd-mmm") return `${dd}-${mmm}`;
+  if (p === "dd/mm/yy") return `${dd}/${mm}/${yy}`;
+  if (p === "mm/dd/yy") return `${mm}/${dd}/${yy}`;
+  if (p === "yyyy") return String(yyyy);
+  if (p === "yyyy-mm") return `${yyyy}-${mm}`;
+  return "";
+}
+
 /**
  * Local calendar label as dd-mmm (e.g. 08-Apr). Shorter than full datetime so angled ticks fit.
  * @param {number} _rangeMs reserved for future granularity (unused)
@@ -307,6 +350,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [lineHumanReadableTime, setLineHumanReadableTime] = useState(true);
   /** When on, pivot X is coerced to epoch ms and drawn on a numeric time scale (line/area/bar). */
   const [xTimeScale, setXTimeScale] = useState(true);
+  /** Display-only formatting override for temporal X axes (ticks + tooltip). */
+  const [xDateFormatPreset, setXDateFormatPreset] = useState("auto");
   const [scaleX, setScaleX] = useState("linear");
   const [scaleY, setScaleY] = useState("linear");
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
@@ -414,6 +459,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.lineStyle != null) setLineStyle(s.lineStyle);
     if (s.lineHumanReadableTime !== undefined) setLineHumanReadableTime(!!s.lineHumanReadableTime);
     if (s.xTimeScale !== undefined) setXTimeScale(!!s.xTimeScale);
+    if (s.xDateFormatPreset != null) setXDateFormatPreset(String(s.xDateFormatPreset || "auto"));
     if (s.scaleX != null) setScaleX(s.scaleX);
     if (s.scaleY != null) setScaleY(s.scaleY);
     if (s.yAxisDivisor != null) setYAxisDivisor(s.yAxisDivisor);
@@ -751,7 +797,39 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       .filter((p) => p.value != null && Number.isFinite(p.value));
   }, [chartData, selX, selY]);
 
-  const lineIsTemporalX = useMemo(() => isLikelyTemporalKey(selX, dataTypes, chartData), [selX, dataTypes, chartData]);
+  /**
+   * IMPORTANT: when X is sheet-scoped (e.g. `sheet-3::day`), `chartData` may point at the *active*
+   * (unscoped) sheet while the plotted rows come from another sheet. If we infer temporality from
+   * the wrong sheet, tooltips fall back to raw epoch (e.g. `1635704000000`).
+   */
+  const lineIsTemporalX = useMemo(() => {
+    if (!selX) return false;
+    const rawKey = String(selX || "");
+    const splitIdx = rawKey.indexOf("::");
+    if (splitIdx > 0) {
+      const sheetId = rawKey.slice(0, splitIdx);
+      const col = rawKey.slice(splitIdx + 2);
+      const rows = Array.isArray(contextStateV2?.dataSheets?.[sheetId]?.data)
+        ? contextStateV2.dataSheets[sheetId].data
+        : [];
+      // Use the actual column name for inference against raw sheet rows.
+      if (col && rows.length) {
+        // Fast path: unix-like epochs
+        for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
+          const v = rows[i]?.[col];
+          const n = typeof v === "number" ? v : Number(v);
+          if (Number.isFinite(n) && n > 1e9 && n < 1e13) return true;
+        }
+        // General path: anything parseable by our temporal parser.
+        for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
+          const v = rows[i]?.[col];
+          if (v == null || v === "") continue;
+          if (Number.isFinite(temporalToMs(v))) return true;
+        }
+      }
+    }
+    return isLikelyTemporalKey(selX, dataTypes, chartData);
+  }, [selX, dataTypes, chartData, contextStateV2?.dataSheets]);
 
   const scopedKeysInUse = useMemo(() => {
     const keys = [
@@ -876,6 +954,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     lineStyle,
     lineHumanReadableTime,
     xTimeScale,
+    xDateFormatPreset,
     scaleX,
     scaleY,
     yAxisDivisor,
@@ -1142,6 +1221,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setLineHumanReadableTime,
     xTimeScale,
     setXTimeScale,
+    xDateFormatPreset,
+    setXDateFormatPreset,
+    X_DATE_FORMAT_PRESETS,
     expanded,
     handleToggleChange: setExpanded,
     legendVisible,
@@ -1502,6 +1584,11 @@ export function ChartCanvas() {
   }, [rechartsXAxisType, finalRenderedData, xKey]);
 
   const xTickFormatter = (v) => {
+    if (xDateFormatPreset && xDateFormatPreset !== "auto") {
+      const ms = temporalToMs(v);
+      const forced = Number.isFinite(ms) ? formatEpochMsWithPreset(ms, xDateFormatPreset) : "";
+      if (forced) return forced;
+    }
     // When human-readable is on, never show the stored raw pivot string (often unix seconds);
     // the map is only for preserving non-formatted labels when the toggle is off.
     if (useTimeSeriesX && Number.isFinite(Number(v)) && !xHumanReadable) {
@@ -1518,9 +1605,20 @@ export function ChartCanvas() {
   };
 
   const xTooltipLabelFormatter = (label) => {
+    if (xDateFormatPreset && xDateFormatPreset !== "auto") {
+      const ms = temporalToMs(label);
+      const forced = Number.isFinite(ms) ? formatEpochMsWithPreset(ms, xDateFormatPreset) : "";
+      if (forced) return forced;
+    }
     if (useTimeSeriesX && Number.isFinite(Number(label)) && !xHumanReadable) {
       const rawLabel = xOriginalTemporalLabelByMs.get(Number(label));
       if (rawLabel) return rawLabel;
+    }
+    if ((!effectiveTemporalSort || !xHumanReadable) && Number.isFinite(Number(label))) {
+      const ms = temporalToMs(Number(label));
+      if (Number.isFinite(ms) && xHumanReadable) {
+        return String(formatXAxisValue(ms, true, true, xTickIntlOptions, xPivotSpanMs));
+      }
     }
     if (!effectiveTemporalSort || !xHumanReadable) return label == null ? "" : String(label);
     return String(

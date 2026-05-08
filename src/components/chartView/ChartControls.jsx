@@ -132,6 +132,9 @@ export default function ChartControls() {
     setLineHumanReadableTime,
     xTimeScale,
     setXTimeScale,
+    xDateFormatPreset,
+    setXDateFormatPreset,
+    X_DATE_FORMAT_PRESETS,
     expanded,
     handleToggleChange,
     legendVisible,
@@ -615,6 +618,30 @@ export default function ChartControls() {
                             </Tooltip>
                           </TooltipProvider>
                         </div>
+
+                        {selX ? (
+                          <div className="grid gap-1.5 pt-1">
+                            <Label className="text-xs text-muted-foreground">
+                              Date label format (display only)
+                            </Label>
+                            <Select
+                              value={String(xDateFormatPreset || "auto")}
+                              onValueChange={(v) => setXDateFormatPreset?.(v || "auto")}
+                            >
+                              <SelectTrigger className="h-8 min-w-0 text-xs font-normal">
+                                <SelectValue placeholder="Auto" className="text-xs font-normal" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                {(Array.isArray(X_DATE_FORMAT_PRESETS) ? X_DATE_FORMAT_PRESETS : []).map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value} className="text-xs font-normal">
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : null}
+
                         <div className="pt-2">
                           <p className="text-xs font-bold mb-1 text-muted-foreground">Lines</p>
 
