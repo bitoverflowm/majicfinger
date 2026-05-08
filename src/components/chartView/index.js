@@ -1584,9 +1584,13 @@ export function ChartCanvas() {
   }, [rechartsXAxisType, finalRenderedData, xKey]);
 
   const xTickFormatter = (v) => {
-    if (xDateFormatPreset && xDateFormatPreset !== "auto") {
+    const forcedPreset =
+      typeof xDateFormatPreset === "string" && xDateFormatPreset.trim()
+        ? xDateFormatPreset
+        : "auto";
+    if (forcedPreset !== "auto") {
       const ms = temporalToMs(v);
-      const forced = Number.isFinite(ms) ? formatEpochMsWithPreset(ms, xDateFormatPreset) : "";
+      const forced = Number.isFinite(ms) ? formatEpochMsWithPreset(ms, forcedPreset) : "";
       if (forced) return forced;
     }
     // When human-readable is on, never show the stored raw pivot string (often unix seconds);
@@ -1605,9 +1609,13 @@ export function ChartCanvas() {
   };
 
   const xTooltipLabelFormatter = (label) => {
-    if (xDateFormatPreset && xDateFormatPreset !== "auto") {
+    const forcedPreset =
+      typeof xDateFormatPreset === "string" && xDateFormatPreset.trim()
+        ? xDateFormatPreset
+        : "auto";
+    if (forcedPreset !== "auto") {
       const ms = temporalToMs(label);
-      const forced = Number.isFinite(ms) ? formatEpochMsWithPreset(ms, xDateFormatPreset) : "";
+      const forced = Number.isFinite(ms) ? formatEpochMsWithPreset(ms, forcedPreset) : "";
       if (forced) return forced;
     }
     if (useTimeSeriesX && Number.isFinite(Number(label)) && !xHumanReadable) {
