@@ -1,0 +1,29 @@
+extract category form markets
+
+SELECT
+    CASE
+        WHEN event_ticker IS NULL OR event_ticker = '' THEN 'independent'
+        ELSE regexp_extract(event_ticker, '^([A-Z0-9]+)', 1)
+    END AS category,
+    COUNT(*) AS market_count
+FROM '{kalshi_markets}/*.parquet'
+GROUP BY category
+
+
+For grouping Kalshi markets into high-level categories (Sports, Politics, Crypto, etc.):
+
+from src.analysis.kalshi.util.categories import get_group, get_hierarchy, GROUP_COLORS
+
+# Get high-level group
+group = get_group("NFLGAME")  # Returns "Sports"
+
+# Get full hierarchy (group, category, subcategory)
+hierarchy = get_hierarchy("NFLGAME")  # Returns ("Sports", "NFL", "Games")
+
+# Use predefined colors for consistent visualizations
+color = GROUP_COLORS["Sports"]  # Returns "#1f77b4"
+
+
+Schema
+
+Markets: 

@@ -5033,31 +5033,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               {/* No empty-state tip here by request. */}
               {showRequestComposer ? (
                 <div className="space-y-3">
-                  {allRequestCardEntries.length > 0 ? (
-                    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 dark:bg-slate-800/40 border border-border/60 p-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold truncate">
-                          {`New request for Sheet ${String(activeSheetId || "").replace("sheet-", "")}: ${String(
-                            dataSheets?.[activeSheetId]?.name || activeSheetId,
-                          )}`}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          When you click <span className="font-medium text-foreground">Load</span>, you’ll be prompted to{" "}
-                          <span className="font-medium text-foreground">Replace</span> or{" "}
-                          <span className="font-medium text-foreground">Create new sheet</span>.
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs shrink-0"
-                        onClick={() => setShowRequestComposer(false)}
-                      >
-                        Back to summary
-                      </Button>
-                    </div>
-                  ) : null}
                   {selected?.table && availableColumns.length > 0 ? renderColumnsComposeSection() : null}
                 </div>
               ) : null}
