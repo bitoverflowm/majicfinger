@@ -94,6 +94,7 @@ import { toast } from "sonner";
 /** Shown in the column picker / compose cards for server-computed Kalshi fields. */
 const KALSHI_VIRTUAL_COMPOSE_LABELS = {
   kalshi_event_ticker_category: "event ticker simplified",
+  kalshi_taxonomy_category: "Category",
   kalshi_resolved_centile_bin: "Price bucket index (1–10, equal-width on trade price ¢)",
   kalshi_resolved_centile_label: "Price bucket label (centile band, e.g. 1–10 pct)",
   kalshi_resolved_taker_notional: "Taker notional (count × taker price / 100)",
@@ -254,6 +255,7 @@ const KALSHI_MARKETS_COLUMNS = [
   { name: "ticker", type: "string" },
   { name: "kalshi_event_ticker_category", type: "string" },
   { name: "event_ticker", type: "string" },
+  { name: "kalshi_taxonomy_category", type: "string" },
   { name: "market_type", type: "string" },
   { name: "title", type: "string" },
   { name: "yes_sub_title", type: "string" },
@@ -674,6 +676,23 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     return getColumnMetaForTable(dataset, selected.table);
   }, [dataset, selected?.table, kalshiTradesJoinPreset]);
   const availableColumns = useMemo(() => availableColumnMeta.map((c) => c.name), [availableColumnMeta]);
+  /** Kalshi markets: surface ticker, event_ticker, prefix, then Category before the rest. */
+  const kalshiMarketsSelectOrderedColumns = useMemo(() => {
+    if (dataset !== "kalshi" || selected?.table !== "markets") return null;
+    const priority = ["ticker", "event_ticker", "kalshi_event_ticker_category", "kalshi_taxonomy_category"];
+    const seen = new Set();
+    const out = [];
+    for (const c of priority) {
+      if (availableColumns.includes(c)) {
+        out.push(c);
+        seen.add(c);
+      }
+    }
+    for (const c of availableColumns) {
+      if (!seen.has(c)) out.push(c);
+    }
+    return out;
+  }, [dataset, selected?.table, availableColumns]);
   const availableColumnTypesByName = useMemo(() => {
     const map = {};
     for (const c of availableColumnMeta) map[c.name] = c.type;
@@ -1141,6 +1160,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       }
       if (it.column === "kalshi_event_ticker_category") {
         return `“${title}” = leading A–Z/0–9 token from event_ticker (Athena regexp_extract)`;
+      }
+      if (it.column === "kalshi_taxonomy_category") {
+        return `“${title}” = taxonomy bucket from prefix (Sports, Weather, …; matches kalshiPatterns.json)`;
       }
       if (String(it.column || "").startsWith("kalshi_resolved_")) {
         return `“${title}” = ${KALSHI_VIRTUAL_COMPOSE_LABELS[it.column] || it.column} (trades ⟕ resolved markets join)`;
@@ -3061,10 +3083,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-[30rem] p-0 overflow-hidden" align="start">
                       {(() => {
+                        const colsForDropdown = kalshiMarketsSelectOrderedColumns ?? availableColumns;
                         const selectedSet = new Set(columnComposeItems.map((i) => i.column));
                         const selectedCount = selectedSet.size;
-                        const composeCols = Object.keys(KALSHI_VIRTUAL_COMPOSE_LABELS).filter((c) => availableColumns.includes(c));
-                        const restCols = availableColumns.filter((c) => !Object.prototype.hasOwnProperty.call(KALSHI_VIRTUAL_COMPOSE_LABELS, c));
+                        const composeCols = colsForDropdown.filter((c) =>
+                          Object.prototype.hasOwnProperty.call(KALSHI_VIRTUAL_COMPOSE_LABELS, c),
+                        );
+                        const restCols = colsForDropdown.filter(
+                          (c) => !Object.prototype.hasOwnProperty.call(KALSHI_VIRTUAL_COMPOSE_LABELS, c),
+                        );
                         // WHERE filters are statement-level: you can filter on any column,
                         // including columns that are also selected in the output.
                         const filterCandidates = availableColumns;

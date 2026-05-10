@@ -51,6 +51,8 @@ const META = {
       /** Computed in Athena compose SQL from `event_ticker` (leading A-Z0-9 token); not a physical Glue column. */
       { name: "kalshi_event_ticker_category", type: "string" },
       { name: "event_ticker", type: "string" },
+      /** Computed taxonomy bucket (Sports, Weather, …) from prefix + kalshiPatterns.json; not a physical Glue column. */
+      { name: "kalshi_taxonomy_category", type: "string" },
       { name: "market_type", type: "string" },
       { name: "title", type: "string" },
       { name: "yes_sub_title", type: "string" },

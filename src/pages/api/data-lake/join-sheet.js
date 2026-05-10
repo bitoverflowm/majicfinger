@@ -127,6 +127,7 @@ export default async function handler(req, res) {
       sumAlias: null,
       compose: validated.compose,
       lake: validated.lake,
+      table: validated.table,
       filters: validated.filters,
       caseSensitive: validated.caseSensitive,
       limit: validated.limit,

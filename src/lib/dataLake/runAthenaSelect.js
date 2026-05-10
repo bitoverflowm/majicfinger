@@ -10,7 +10,12 @@ import {
   composeUnboundedSelectShouldCapRows,
   COMPOSE_UNCONSTRAINED_ROW_CAP,
 } from "./buildComposeAthenaSql";
+import { buildComposeFiltersWhereSql, collectKalshiMarketsMaterializedVirtuals } from "./composeWherePredicateSql";
 import { sortRowsChronologicallyByDetectedBucketColumn } from "./sortAthenaDateBuckets";
+import {
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
+  KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
+} from "./lakeTableColumns";
 
 function getRegion() {
   return process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
@@ -44,7 +49,9 @@ function assertAthenaConfig() {
  * @param {string[] | null | undefined} opts.columns
  * @param {"select" | "count" | "sum" | "compose"} [opts.queryType]
  * @param {object | null | undefined} [opts.compose]
- * @param {string | null | undefined} [opts.lake] — required for compose queries that use compose.join (Kalshi presets).
+ * @param {string | null | undefined} [opts.lake]
+ * @param {string | null | undefined} [opts.table] — required for compose queries that use compose.join (Kalshi presets).
+ * @param {string | null | undefined} [opts.table] — logical lake table (e.g. markets) for virtual-column WHERE expansion on compose.
  * @param {string | null | undefined} [opts.countAlias]
  * @param {string | null | undefined} [opts.countDistinctColumn]
  * @param {string | null | undefined} [opts.sumColumn]
@@ -67,6 +74,7 @@ export async function startAthenaBoundedQuery({
   sumAlias,
   compose = null,
   lake = null,
+  table = null,
   filters = null,
   caseSensitive = false,
   limit,
@@ -200,27 +208,50 @@ export async function startAthenaBoundedQuery({
     return `${colMaybeLower} ${opSql} ${litMaybeLower}`;
   };
 
+  const kalshiComposeVirtuals =
+    queryType === "compose" && compose && typeof compose === "object"
+      ? collectKalshiMarketsMaterializedVirtuals({ compose, filters, lake, table })
+      : new Set();
+
   let whereSql = "";
   if (filters) {
-    const andPreds = Array.isArray(filters.and) ? filters.and : [];
-    const orPreds = Array.isArray(filters.or) ? filters.or : [];
-    const mergeAndPreds = Array.isArray(filters.mergeAnd) ? filters.mergeAnd : [];
-    const mergeOrBranchPreds = Array.isArray(filters.mergeOrBranch) ? filters.mergeOrBranch : [];
-
-    const andExpr = andPreds.length ? andPreds.map(predicateToSql).join(" AND ") : null;
-    const orExpr = orPreds.length ? orPreds.map(predicateToSql).join(" OR ") : null;
-    const baseExpr = andExpr && orExpr ? `(${andExpr}) AND (${orExpr})` : andExpr ? `(${andExpr})` : orExpr ? `(${orExpr})` : "TRUE";
-
-    if (mergeAndPreds.length > 0 || mergeOrBranchPreds.length > 0) {
-      const baseWithAnd =
-        mergeAndPreds.length > 0 ? `((${baseExpr}) AND (${mergeAndPreds.map(predicateToSql).join(" AND ")}))` : `(${baseExpr})`;
-      if (mergeOrBranchPreds.length > 0) {
-        whereSql = ` WHERE ${baseWithAnd} OR (${mergeOrBranchPreds.map(predicateToSql).join(" OR ")})`;
-      } else {
-        whereSql = ` WHERE ${baseWithAnd}`;
+    if (queryType === "compose") {
+      let composeFilterBaseAlias = "t0";
+      if (compose && typeof compose === "object") {
+        const jp = compose.join && typeof compose.join === "object" ? String(compose.join.preset || "").trim() : "";
+        if (jp === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET || jp === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT) {
+          composeFilterBaseAlias = "kalshi_trades_joined";
+        }
       }
-    } else if (andPreds.length > 0 || orPreds.length > 0) {
-      whereSql = ` WHERE ${baseExpr}`;
+      whereSql = buildComposeFiltersWhereSql({
+        filters,
+        caseSensitive,
+        baseAlias: composeFilterBaseAlias,
+        lake,
+        table,
+        materializedVirtualColumns: kalshiComposeVirtuals,
+      });
+    } else {
+      const andPreds = Array.isArray(filters.and) ? filters.and : [];
+      const orPreds = Array.isArray(filters.or) ? filters.or : [];
+      const mergeAndPreds = Array.isArray(filters.mergeAnd) ? filters.mergeAnd : [];
+      const mergeOrBranchPreds = Array.isArray(filters.mergeOrBranch) ? filters.mergeOrBranch : [];
+
+      const andExpr = andPreds.length ? andPreds.map(predicateToSql).join(" AND ") : null;
+      const orExpr = orPreds.length ? orPreds.map(predicateToSql).join(" OR ") : null;
+      const baseExpr = andExpr && orExpr ? `(${andExpr}) AND (${orExpr})` : andExpr ? `(${andExpr})` : orExpr ? `(${orExpr})` : "TRUE";
+
+      if (mergeAndPreds.length > 0 || mergeOrBranchPreds.length > 0) {
+        const baseWithAnd =
+          mergeAndPreds.length > 0 ? `((${baseExpr}) AND (${mergeAndPreds.map(predicateToSql).join(" AND ")}))` : `(${baseExpr})`;
+        if (mergeOrBranchPreds.length > 0) {
+          whereSql = ` WHERE ${baseWithAnd} OR (${mergeOrBranchPreds.map(predicateToSql).join(" OR ")})`;
+        } else {
+          whereSql = ` WHERE ${baseWithAnd}`;
+        }
+      } else if (andPreds.length > 0 || orPreds.length > 0) {
+        whereSql = ` WHERE ${baseExpr}`;
+      }
     }
   }
 
@@ -243,7 +274,9 @@ export async function startAthenaBoundedQuery({
       limit: sqlLimit,
       compose,
       lake,
+      table,
       whereSql,
+      kalshiMaterializedVirtuals: kalshiComposeVirtuals,
     });
     const athena = new AWS.Athena({ region: getRegion() });
     const { QueryExecutionId } = await athena
@@ -390,6 +423,7 @@ export async function runAthenaBoundedSelect({
   sumAlias = null,
   compose = null,
   lake = null,
+  table = null,
   filters = null,
   caseSensitive = false,
   limit,
@@ -408,6 +442,7 @@ export async function runAthenaBoundedSelect({
     sumAlias,
     compose,
     lake,
+    table,
     filters,
     caseSensitive,
     limit,

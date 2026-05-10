@@ -6,6 +6,12 @@ import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
 } from "./lakeTableColumns";
+import { kalshiEventTickerCategorySql } from "@/lib/kalshi/kalshiPrefixSql";
+import {
+  buildKalshiTaxonomyGroupCaseSqlForPrefixRef,
+  buildKalshiTaxonomyGroupSqlExpr,
+  KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN,
+} from "@/lib/kalshi/kalshiTaxonomySql";
 
 /** @typedef {"day" | "week" | "month" | "quarter" | "year"} DateBucket */
 /** @typedef {"dmy" | "ym" | "dm"} DateFormat */
@@ -110,16 +116,6 @@ function buildEquationExprSql(expr, colRef) {
       throw err;
     }
   }
-}
-
-/** Virtual Kalshi markets column: leading token from event_ticker (Athena/Presto regexp_extract). */
-function kalshiEventTickerCategorySql(eventTickerExpr) {
-  return `(CASE
-    WHEN ${eventTickerExpr} IS NULL
-      OR CAST(${eventTickerExpr} AS VARCHAR) = '' THEN 'independent'
-    WHEN regexp_extract(CAST(${eventTickerExpr} AS VARCHAR), '^([A-Z0-9]+)', 1) = '' THEN 'independent'
-    ELSE regexp_extract(CAST(${eventTickerExpr} AS VARCHAR), '^([A-Z0-9]+)', 1)
-  END)`;
 }
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
@@ -348,9 +344,28 @@ function buildSelectExpression(opts) {
     sumCase,
     equation,
     baseAlias = null,
+    kalshiMaterializedVirtuals = null,
   } = opts;
 
-  const colRef = (c) => (baseAlias ? `${baseAlias}."${c}"` : `"${c}"`);
+  const mat = kalshiMaterializedVirtuals instanceof Set ? kalshiMaterializedVirtuals : null;
+  const eventTickerSql = baseAlias ? `${baseAlias}."event_ticker"` : `"event_ticker"`;
+  /** Resolves physical + Kalshi virtual columns; virtuals use materialized aliases when present. */
+  const colRef = (c) => {
+    const name = String(c || "").trim();
+    if (name === KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN) {
+      if (mat?.has(KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN)) {
+        return baseAlias ? `${baseAlias}."${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"` : `"${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"`;
+      }
+      return buildKalshiTaxonomyGroupSqlExpr(eventTickerSql);
+    }
+    if (name === KALSHI_VIRTUAL_CATEGORY) {
+      if (mat?.has(KALSHI_VIRTUAL_CATEGORY)) {
+        return baseAlias ? `${baseAlias}."${KALSHI_VIRTUAL_CATEGORY}"` : `"${KALSHI_VIRTUAL_CATEGORY}"`;
+      }
+      return kalshiEventTickerCategorySql(eventTickerSql);
+    }
+    return baseAlias ? `${baseAlias}."${name}"` : `"${name}"`;
+  };
 
   if (column === KALSHI_VIRTUAL_CATEGORY) {
     if (aggregate && aggregate !== "count" && aggregate !== "count_distinct") {
@@ -358,13 +373,30 @@ function buildSelectExpression(opts) {
       err.code = "BAD_REQUEST";
       throw err;
     }
+    const catExpr = colRef(KALSHI_VIRTUAL_CATEGORY);
     if (aggregate === "count") {
-      return { innerSql: `COUNT(${kalshiEventTickerCategorySql(colRef("event_ticker"))})`, isAggregate: true };
+      return { innerSql: `COUNT(${catExpr})`, isAggregate: true };
     }
     if (aggregate === "count_distinct") {
-      return { innerSql: `COUNT(DISTINCT ${kalshiEventTickerCategorySql(colRef("event_ticker"))})`, isAggregate: true };
+      return { innerSql: `COUNT(DISTINCT ${catExpr})`, isAggregate: true };
     }
-    return { innerSql: kalshiEventTickerCategorySql(colRef("event_ticker")), isAggregate: false };
+    return { innerSql: catExpr, isAggregate: false };
+  }
+
+  if (column === KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN) {
+    const taxonomyExpr = colRef(KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN);
+    if (aggregate && aggregate !== "count" && aggregate !== "count_distinct") {
+      const err = new Error(`Cannot ${String(aggregate).toUpperCase()} the computed taxonomy category column`);
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    if (aggregate === "count") {
+      return { innerSql: `COUNT(${taxonomyExpr})`, isAggregate: true };
+    }
+    if (aggregate === "count_distinct") {
+      return { innerSql: `COUNT(DISTINCT ${taxonomyExpr})`, isAggregate: true };
+    }
+    return { innerSql: taxonomyExpr, isAggregate: false };
   }
 
   if (!isValidColumnIdentifier(column)) {
@@ -580,7 +612,15 @@ function buildGroupExpression(opts) {
  * @param {{ physicalTableName: string; limit?: number | null; compose: object; lake?: string | null }} params
  * @returns {string}
  */
-export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose, lake = null, whereSql = "" }) {
+export function buildComposeAthenaSelectSql({
+  physicalTableName,
+  limit,
+  compose,
+  lake = null,
+  table = null,
+  whereSql = "",
+  kalshiMaterializedVirtuals = null,
+}) {
   const safeTable = String(physicalTableName).trim();
   if (!/^[a-zA-Z0-9_]+$/.test(safeTable)) {
     const err = new Error("Invalid table name");
@@ -589,6 +629,16 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
   }
 
   const joinPreset = compose?.join && typeof compose.join === "object" ? String(compose.join.preset || "").trim() : "";
+  const kalshiMatIn = kalshiMaterializedVirtuals instanceof Set ? kalshiMaterializedVirtuals : new Set();
+  let kalshiMat = new Set();
+  if (
+    !joinPreset &&
+    String(lake || "").toLowerCase() === "kalshi" &&
+    String(table || "").toLowerCase() === "markets"
+  ) {
+    kalshiMat = new Set(kalshiMatIn);
+  }
+
   let fromClause;
   let baseAlias = "t0";
   if (
@@ -619,7 +669,31 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
   } else {
     const joins = Array.isArray(compose?.joins) ? compose.joins : [];
     const cteJoins = Array.isArray(compose?.cteJoins) ? compose.cteJoins : [];
-    fromClause = `FROM "${safeTable}" ${baseAlias}`;
+
+    let innerFrom = `FROM "${safeTable}" ${baseAlias}`;
+    if (kalshiMat.size > 0) {
+      const kb = "kb";
+      const kfb = "_kfb";
+      const hasTax = kalshiMat.has(KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN);
+      const hasPre = kalshiMat.has(KALSHI_VIRTUAL_CATEGORY);
+
+      if (hasTax) {
+        // Two-level derived table: compute prefix once as _kf_p, then CASE on _kfb._kf_p only.
+        // A correlated scalar subquery in `SELECT kb.*, (SELECT …)` triggered Athena INTERNAL_ERROR_QUERY_ENGINE.
+        const pExpr = kalshiEventTickerCategorySql(`${kb}."event_ticker"`);
+        const prepped = `(SELECT ${kb}.*, ${pExpr} AS _kf_p FROM "${safeTable}" ${kb})`;
+        const taxCase = buildKalshiTaxonomyGroupCaseSqlForPrefixRef(`${kfb}._kf_p`);
+        const outerParts = [];
+        if (hasPre) {
+          outerParts.push(`${kfb}._kf_p AS "${KALSHI_VIRTUAL_CATEGORY}"`);
+        }
+        outerParts.push(`${taxCase} AS "${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"`);
+        innerFrom = `FROM (SELECT ${kfb}.*, ${outerParts.join(", ")} FROM ${prepped} ${kfb}) ${baseAlias}`;
+      } else if (hasPre) {
+        innerFrom = `FROM (SELECT ${kb}.*, ${kalshiEventTickerCategorySql(`${kb}."event_ticker"`)} AS "${KALSHI_VIRTUAL_CATEGORY}" FROM "${safeTable}" ${kb}) ${baseAlias}`;
+      }
+    }
+    fromClause = innerFrom;
 
     if (joins.length > 0 || cteJoins.length > 0) {
       const joinSqlParts = [];
@@ -711,6 +785,7 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
       sumCase: row.sumCase || null,
       equation: row.equation || null,
       baseAlias,
+      kalshiMaterializedVirtuals: kalshiMat,
     }).innerSql;
 
     const isAggregate = row.aggregate != null;
@@ -726,6 +801,7 @@ export function buildComposeAthenaSelectSql({ physicalTableName, limit, compose,
       sumCase: row.sumCase || null,
       equation: row.equation || null,
       baseAlias,
+      kalshiMaterializedVirtuals: kalshiMat,
     });
 
     byAlias.set(alias, { groupExpr, isAggregate });

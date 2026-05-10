@@ -36,6 +36,10 @@ import AWS from "aws-sdk";
 import { ATHENA_DEMO_ROW_LIMIT } from "../../../config/dataLakeParquetSamples";
 import { validateAthenaLakeQueryBody, AthenaLakeRequestError } from "../../../lib/dataLake/validateAthenaLakeRequest";
 import { buildComposeAthenaSelectSql } from "../../../lib/dataLake/buildComposeAthenaSql";
+import {
+  buildComposeFiltersWhereSql,
+  collectKalshiMarketsMaterializedVirtuals,
+} from "../../../lib/dataLake/composeWherePredicateSql";
 import { getAthenaQueryState, fetchAthenaQueryResultRows } from "../../../lib/dataLake/runAthenaSelect";
 import { getAthenaAccessFromRequest } from "../../../lib/athenaAccess";
 
@@ -74,102 +78,6 @@ function assertAthenaConfig() {
     throw err;
   }
   return output;
-}
-
-function escapeSqlString(s) {
-  return String(s).replace(/'/g, "''");
-}
-
-function escapeLike(s) {
-  return String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-}
-
-/**
- * Build Athena WHERE clause from already-normalized filter predicates.
- * Matches the filter->SQL behavior used by `runAthenaSelect`.
- */
-function buildComposeWhereSql({ filters, caseSensitive, baseAlias = null }) {
-  if (!filters) return "";
-  const andPreds = Array.isArray(filters.and) ? filters.and : [];
-  const orPreds = Array.isArray(filters.or) ? filters.or : [];
-  const mergeAndPreds = Array.isArray(filters.mergeAnd) ? filters.mergeAnd : [];
-  const mergeOrBranchPreds = Array.isArray(filters.mergeOrBranch) ? filters.mergeOrBranch : [];
-
-  const predicateToSql = (p) => {
-    const colSql = baseAlias ? `${baseAlias}."${p.column}"` : `"${p.column}"`;
-
-    if (p.op === "in" || p.op === "not_in") {
-      const opSql = p.op === "in" ? "IN" : "NOT IN";
-      if (p.kind === "number") {
-        const values = Array.isArray(p.value) ? p.value : [];
-        if (!values.length) return "TRUE";
-        const list = values
-          .map((v) => Number(v))
-          .map((n) => (Number.isFinite(n) ? String(n) : "NULL"))
-          .join(", ");
-        return `${colSql} ${opSql} (${list})`;
-      }
-
-      if (p.kind === "string") {
-        const values = Array.isArray(p.value) ? p.value : [];
-        if (!values.length) return "TRUE";
-        const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
-        const lits = values.map((v) => {
-          const s = String(v);
-          return caseSensitive ? `'${escapeSqlString(s)}'` : `LOWER('${escapeSqlString(s)}')`;
-        });
-        return `${colMaybeLower} ${opSql} (${lits.join(", ")})`;
-      }
-
-      // date IN/NOT IN not supported
-      return "TRUE";
-    }
-
-    if (p.kind === "date") {
-      const colMs = `CASE WHEN ${colSql} < 1000000000000 THEN ${colSql} * 1000 ELSE ${colSql} END`;
-      const opSql = p.op === "gt" ? ">" : p.op === "lt" ? "<" : p.op === "eq" ? "=" : "<>";
-      return `${colMs} ${opSql} ${Number(p.value)}`;
-    }
-
-    if (p.kind === "number") {
-      const opSql = p.op === "gt" ? ">" : p.op === "lt" ? "<" : p.op === "eq" ? "=" : "<>";
-      return `${colSql} ${opSql} ${Number(p.value)}`;
-    }
-
-    // string
-    const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
-    if (p.op === "contains" || p.op === "not_contains") {
-      const pattern = `%${escapeLike(p.value)}%`;
-      const litMaybeLower = caseSensitive ? `'${escapeSqlString(pattern)}'` : `LOWER('${escapeSqlString(pattern)}')`;
-      const opSql = p.op === "contains" ? "LIKE" : "NOT LIKE";
-      return `${colMaybeLower} ${opSql} ${litMaybeLower} ESCAPE '\\\\'`;
-    }
-
-    const litMaybeLower = caseSensitive ? `'${escapeSqlString(p.value)}'` : `LOWER('${escapeSqlString(p.value)}')`;
-    const opSql = p.op === "eq" ? "=" : "!=";
-    return `${colMaybeLower} ${opSql} ${litMaybeLower}`;
-  };
-
-  const andExpr = andPreds.length ? andPreds.map(predicateToSql).join(" AND ") : null;
-  const orExpr = orPreds.length ? orPreds.map(predicateToSql).join(" OR ") : null;
-  const baseExpr = andExpr && orExpr ? `(${andExpr}) AND (${orExpr})` : andExpr ? `(${andExpr})` : orExpr ? `(${orExpr})` : "TRUE";
-
-  if (mergeAndPreds.length > 0 || mergeOrBranchPreds.length > 0) {
-    const baseWithAnd =
-      mergeAndPreds.length > 0
-        ? `((${baseExpr}) AND (${mergeAndPreds.map(predicateToSql).join(" AND ")}))`
-        : `(${baseExpr})`;
-    if (mergeOrBranchPreds.length > 0) {
-      return ` WHERE ${baseWithAnd} OR (${mergeOrBranchPreds.map(predicateToSql).join(" OR ")})`;
-    }
-    return ` WHERE ${baseWithAnd}`;
-  }
-
-  if (andPreds.length > 0 || orPreds.length > 0) {
-    return ` WHERE ${baseExpr}`;
-  }
-
-  return "";
 }
 
 async function executeAthenaSql({ database, sql, maxWaitMs }) {
@@ -348,10 +256,19 @@ export default async function handler(req, res) {
         access,
       );
 
-      const whereSql = buildComposeWhereSql({
+      const kalshiMat = collectKalshiMarketsMaterializedVirtuals({
+        compose: validated.compose,
+        filters: validated.filters,
+        lake: validated.lake,
+        table: validated.table,
+      });
+      const whereSql = buildComposeFiltersWhereSql({
         filters: validated.filters,
         caseSensitive: validated.caseSensitive,
         baseAlias: "t0",
+        lake: validated.lake,
+        table: validated.table,
+        materializedVirtualColumns: kalshiMat,
       });
 
       const cteSql = buildComposeAthenaSelectSql({
@@ -359,7 +276,9 @@ export default async function handler(req, res) {
         limit: null,
         compose: validated.compose,
         lake: validated.lake,
+        table: validated.table,
         whereSql,
+        kalshiMaterializedVirtuals: kalshiMat,
       });
 
       cteSqlById.set(sheetId, { cteName, cteSql });
@@ -406,10 +325,19 @@ export default async function handler(req, res) {
       access,
     );
 
-    const mainWhereSql = buildComposeWhereSql({
+    const mainKalshiMat = collectKalshiMarketsMaterializedVirtuals({
+      compose: validatedMain.compose,
+      filters: validatedMain.filters,
+      lake: validatedMain.lake,
+      table: validatedMain.table,
+    });
+    const mainWhereSql = buildComposeFiltersWhereSql({
       filters: validatedMain.filters,
       caseSensitive: validatedMain.caseSensitive,
       baseAlias: "t0",
+      lake: validatedMain.lake,
+      table: validatedMain.table,
+      materializedVirtualColumns: mainKalshiMat,
     });
 
     const mainSql = buildComposeAthenaSelectSql({
@@ -417,7 +345,9 @@ export default async function handler(req, res) {
       limit: mainSqlLimit,
       compose: validatedMain.compose,
       lake: validatedMain.lake,
+      table: validatedMain.table,
       whereSql: mainWhereSql,
+      kalshiMaterializedVirtuals: mainKalshiMat,
     });
 
     const fullSql = cteDefsSql.length ? `WITH ${cteDefsSql.join(", ")} ${mainSql}` : mainSql;

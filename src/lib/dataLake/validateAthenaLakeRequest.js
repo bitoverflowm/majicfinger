@@ -23,6 +23,7 @@ import {
   COMPOSE_SQL_LIMIT_ABSOLUTE_MAX,
   COMPOSE_UNCONSTRAINED_ROW_CAP,
 } from "./buildComposeAthenaSql";
+import { collectKalshiMarketsMaterializedVirtuals } from "./composeWherePredicateSql";
 import { ATHENA_DEMO_ROW_LIMIT, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { validateAndNormalizeEquation } from "./composeEquationAst";
 
@@ -805,6 +806,13 @@ export function validateAthenaLakeQueryBody(body, access) {
         limit: capRows,
         compose: validatedCompose,
         lake,
+        table,
+        kalshiMaterializedVirtuals: collectKalshiMarketsMaterializedVirtuals({
+          compose: validatedCompose,
+          filters: validatedFilters,
+          lake,
+          table,
+        }),
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
