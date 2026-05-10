@@ -193,7 +193,7 @@ export function buildComposeFiltersWhereSql(opts) {
       const pattern = `%${escapeLike(p.value)}%`;
       const litMaybeLower = caseSensitive ? `'${escapeSqlString(pattern)}'` : `LOWER('${escapeSqlString(pattern)}')`;
       const opLike = p.op === "contains" ? "LIKE" : "NOT LIKE";
-      return `${colMaybeLower} ${opLike} ${litMaybeLower} ESCAPE '\\\\'`;
+      return `${colMaybeLower} ${opLike} ${litMaybeLower} ESCAPE '\\'`;
     }
 
     const litMaybeLower = caseSensitive ? `'${escapeSqlString(p.value)}'` : `LOWER('${escapeSqlString(p.value)}')`;

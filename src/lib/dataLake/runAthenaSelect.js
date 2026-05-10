@@ -199,8 +199,8 @@ export async function startAthenaBoundedQuery({
       const pattern = `%${escapeLike(p.value)}%`;
       const litMaybeLower = caseSensitive ? `'${escapeSqlString(pattern)}'` : `LOWER('${escapeSqlString(pattern)}')`;
       const opSql = p.op === "contains" ? "LIKE" : "NOT LIKE";
-      // Use backslash as ESCAPE char so escaped %/_ are treated literally.
-      return `${colMaybeLower} ${opSql} ${litMaybeLower} ESCAPE '\\\\'`;
+      // Use backslash as ESCAPE char so escaped %/_ are treated literally (SQL literal must be one char).
+      return `${colMaybeLower} ${opSql} ${litMaybeLower} ESCAPE '\\'`;
     }
 
     const litMaybeLower = caseSensitive ? `'${escapeSqlString(p.value)}'` : `LOWER('${escapeSqlString(p.value)}')`;
