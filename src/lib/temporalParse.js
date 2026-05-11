@@ -1,15 +1,23 @@
 /**
  * Parse dashboard time-bucket labels and timestamps to UTC milliseconds for chart scales.
- * Covers Athena compose buckets (month, quarter, year, day), named months, and epoch sec/ms.
+ * Covers Athena compose buckets (month, quarter, year, day), named months, and epoch sec/ms/us/ns.
  */
+
+function epochNumberToMs(value) {
+  if (!Number.isFinite(value)) return NaN;
+  const abs = Math.abs(value);
+  if (abs >= 1e17) return value / 1e6; // epoch ns
+  if (abs >= 1e14) return value / 1e3; // epoch us
+  if (abs >= 1e11) return value; // epoch ms
+  if (abs >= 1e9) return value * 1000; // epoch sec
+  return NaN;
+}
 
 export function temporalToMs(value) {
   if (value == null || value === "") return NaN;
   if (value instanceof Date) return value.getTime();
   if (typeof value === "number" && Number.isFinite(value)) {
-    const abs = Math.abs(value);
-    if (abs >= 1e11) return value; // epoch ms
-    if (abs >= 1e9) return value * 1000; // epoch sec
+    return epochNumberToMs(value);
   }
   const s = String(value).trim();
   const monthMap = {
@@ -75,10 +83,7 @@ export function temporalToMs(value) {
     if (Number.isFinite(year)) return Date.UTC(year, 0, 1);
   }
   if (/^\d+(\.\d+)?$/.test(s)) {
-    const n = Number(s);
-    const abs = Math.abs(n);
-    if (abs >= 1e11) return n;
-    if (abs >= 1e9) return n * 1000;
+    return epochNumberToMs(Number(s));
   }
   // `Date.parse` is overly permissive on long prose (e.g. Kalshi/Polymarket `title` cells): it can
   // match substrings like "May" inside "Mayor" plus a year and yield bogus instants. Only use it

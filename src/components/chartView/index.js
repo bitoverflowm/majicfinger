@@ -38,6 +38,15 @@ export const LIVELINE_WINDOWS = [
   { label: '15m', secs: 900 },
 ];
 
+export const CHART_TIMEFRAME_OPTIONS = [
+  { label: "15m", value: "15m", ms: 15 * 60 * 1000 },
+  { label: "1h", value: "1h", ms: 60 * 60 * 1000 },
+  { label: "1d", value: "1d", ms: 24 * 60 * 60 * 1000 },
+  { label: "1w", value: "1w", ms: 7 * 24 * 60 * 60 * 1000 },
+  { label: "1m", value: "1mo", calendar: "month" },
+  { label: "1y", value: "1y", calendar: "year" },
+];
+
 export const LIVELINE_COLOR_OPTIONS = [
   { label: 'Palette (auto)', value: '__palette__' },
   { label: 'Blue', value: '#3b82f6' },
@@ -138,7 +147,7 @@ function isLikelyTemporalKey(key, dataTypes, data) {
     nonEmptyCount += 1;
     const n = Number(raw);
     if (Number.isFinite(n)) {
-      if (n > 1e9 && n < 1e13) return true; // unix sec/ms-like
+      if (Number.isFinite(temporalToMs(n))) return true; // unix epoch sec/ms/us/ns-like
     } else if (typeof raw === "string") {
       const s = raw.trim();
       if (
@@ -255,7 +264,7 @@ function toSortableXAxisValue(value, axisType, isTemporal) {
 }
 
 /**
- * Recharts line/area/bar need a numeric X scale for time series. Date objects and unix seconds
+ * Recharts line/area/bar need a numeric X scale for time series. Date objects and unix epochs
  * otherwise fall back to category mode and can collapse to a single visible point.
  */
 function normalizeCartesianPivotToEpochMs(rows, xKey, xAxisType, lineIsTemporalX, enabled) {
@@ -269,15 +278,79 @@ function normalizeCartesianPivotToEpochMs(rows, xKey, xAxisType, lineIsTemporalX
     const raw = row?.[xKey];
     let ms = NaN;
     if (raw instanceof Date) ms = raw.getTime();
-    else if (typeof raw === "number" && Number.isFinite(raw)) {
-      if (raw > 1e12 && raw < 1e15) ms = raw;
-      else if (raw > 1e9 && raw < 1e12) ms = raw * 1000;
-    } else if (raw != null && raw !== "") {
-      ms = temporalToMs(raw);
-    }
+    else if (raw != null && raw !== "") ms = temporalToMs(raw);
     if (!Number.isFinite(ms)) return { ...row };
     return { ...row, [xKey]: ms };
   });
+}
+
+function getChartTimeframeOption(value) {
+  const v = String(value || "");
+  return CHART_TIMEFRAME_OPTIONS.find((opt) => opt.value === v) || CHART_TIMEFRAME_OPTIONS[0];
+}
+
+function bucketStartMs(ms, option) {
+  if (!Number.isFinite(ms) || !option) return NaN;
+  if (option.calendar === "year") return Date.UTC(new Date(ms).getUTCFullYear(), 0, 1);
+  if (option.calendar === "month") {
+    const d = new Date(ms);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  }
+  const step = Number(option.ms);
+  if (!Number.isFinite(step) || step <= 0) return NaN;
+  if (option.value === "1w") {
+    const dayStart = Math.floor(ms / (24 * 60 * 60 * 1000)) * (24 * 60 * 60 * 1000);
+    const dayOfWeek = new Date(dayStart).getUTCDay();
+    const daysSinceMonday = (dayOfWeek + 6) % 7;
+    return dayStart - daysSinceMonday * 24 * 60 * 60 * 1000;
+  }
+  return Math.floor(ms / step) * step;
+}
+
+function bucketTemporalRowsForChart(rows, xKey, yKeys, timeframeValue, sortDir = "asc") {
+  if (!Array.isArray(rows) || rows.length <= 1 || !xKey) return rows;
+  const option = getChartTimeframeOption(timeframeValue);
+  const buckets = new Map();
+  for (let idx = 0; idx < rows.length; idx += 1) {
+    const row = rows[idx];
+    const ms = temporalToMs(row?.[xKey]);
+    if (!Number.isFinite(ms)) continue;
+    const bucketMs = bucketStartMs(ms, option);
+    if (!Number.isFinite(bucketMs)) continue;
+    const key = String(bucketMs);
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        bucketMs,
+        lastIdx: idx,
+        lastRow: row,
+        sums: Object.create(null),
+        counts: Object.create(null),
+      });
+    }
+    const bucket = buckets.get(key);
+    if (idx >= bucket.lastIdx) {
+      bucket.lastIdx = idx;
+      bucket.lastRow = row;
+    }
+    for (const yKey of yKeys || []) {
+      const n = Number(row?.[yKey]);
+      if (!Number.isFinite(n)) continue;
+      bucket.sums[yKey] = (bucket.sums[yKey] || 0) + n;
+      bucket.counts[yKey] = (bucket.counts[yKey] || 0) + 1;
+    }
+  }
+  if (!buckets.size) return rows;
+  const ordered = Array.from(buckets.values())
+    .sort((a, b) => a.bucketMs - b.bucketMs)
+    .map((bucket) => {
+      const out = { ...(bucket.lastRow || {}), [xKey]: bucket.bucketMs };
+      for (const yKey of yKeys || []) {
+        const count = bucket.counts[yKey] || 0;
+        out[yKey] = count > 0 ? bucket.sums[yKey] / count : null;
+      }
+      return out;
+    });
+  return sortDir === "desc" ? ordered.reverse() : ordered;
 }
 
 function getDistinctValues(data, colKey) {
@@ -354,6 +427,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [xTimeScale, setXTimeScale] = useState(true);
   /** Display-only formatting override for temporal X axes (ticks + tooltip). */
   const [xDateFormatPreset, setXDateFormatPreset] = useState("auto");
+  /** Chart-only temporal bucketing; does not mutate or persist sheet rows. */
+  const [chartTimeframesEnabled, setChartTimeframesEnabled] = useState(false);
+  const [chartTimeframe, setChartTimeframe] = useState("15m");
   const [scaleX, setScaleX] = useState("linear");
   const [scaleY, setScaleY] = useState("linear");
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
@@ -464,6 +540,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.lineHumanReadableTime !== undefined) setLineHumanReadableTime(!!s.lineHumanReadableTime);
     if (s.xTimeScale !== undefined) setXTimeScale(!!s.xTimeScale);
     if (s.xDateFormatPreset != null) setXDateFormatPreset(String(s.xDateFormatPreset || "auto"));
+    if (s.chartTimeframesEnabled !== undefined) setChartTimeframesEnabled(!!s.chartTimeframesEnabled);
+    if (s.chartTimeframe != null && CHART_TIMEFRAME_OPTIONS.some((opt) => opt.value === s.chartTimeframe)) {
+      setChartTimeframe(s.chartTimeframe);
+    }
     if (s.scaleX != null) setScaleX(s.scaleX);
     if (s.scaleY != null) setScaleY(s.scaleY);
     if (s.yAxisDivisor != null) setYAxisDivisor(s.yAxisDivisor);
@@ -821,11 +901,11 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
         : [];
       // Use the actual column name for inference against raw sheet rows.
       if (col && rows.length) {
-        // Fast path: unix-like epochs
+        // Fast path: unix-like epochs, including raw trade timestamps in micro/nanoseconds.
         for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
           const v = rows[i]?.[col];
           const n = typeof v === "number" ? v : Number(v);
-          if (Number.isFinite(n) && n > 1e9 && n < 1e13) return true;
+          if (Number.isFinite(n) && Number.isFinite(temporalToMs(n))) return true;
         }
         // General path: anything parseable by our temporal parser.
         for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
@@ -917,6 +997,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     return chartData;
   }, [selChartType, scopedKeysInUse, crossSheetChartData, chartData]);
 
+  const chartTimeframesAvailable = useMemo(() => {
+    const rows = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
+    const axisType = selX ? getAxisType(selX, dataTypes, rows) : "string";
+    const cartesian = selChartType === "line" || selChartType === "area" || selChartType === "bar";
+    return cartesian && !!selX && (lineIsTemporalX || axisType === "date");
+  }, [selChartType, scopedKeysInUse, lineChartData, chartData, selX, dataTypes, lineIsTemporalX]);
+
   const selectedPaletteHandler = (baseId) => {
     const id = String(baseId || "").trim();
     if (!id) return;
@@ -962,6 +1049,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
+    chartTimeframesEnabled,
+    chartTimeframe,
     scaleX,
     scaleY,
     yAxisDivisor,
@@ -1234,6 +1323,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     xDateFormatPreset,
     setXDateFormatPreset,
     X_DATE_FORMAT_PRESETS,
+    chartTimeframesEnabled,
+    setChartTimeframesEnabled,
+    chartTimeframe,
+    setChartTimeframe,
+    chartTimeframesAvailable,
+    CHART_TIMEFRAME_OPTIONS,
     expanded,
     handleToggleChange: setExpanded,
     legendVisible,
@@ -1352,6 +1447,10 @@ export function ChartCanvas() {
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
+    chartTimeframesEnabled,
+    chartTimeframe,
+    setChartTimeframe,
+    chartTimeframesAvailable,
     expanded,
     legendVisible,
     stackedBar,
@@ -1429,11 +1528,12 @@ export function ChartCanvas() {
 
   const cartesianChart =
     selChartType === "line" || selChartType === "area" || selChartType === "bar";
+  const chartUsesTimeframes = chartTimeframesEnabled && chartTimeframesAvailable;
 
   const plotRows = useMemo(() => {
     if (!cartesianChart) return rawData;
-    return normalizeCartesianPivotToEpochMs(rawData, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX);
-  }, [rawData, cartesianChart, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX]);
+    return normalizeCartesianPivotToEpochMs(rawData, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX || chartUsesTimeframes);
+  }, [rawData, cartesianChart, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX, chartUsesTimeframes]);
 
   const sortedPlotRows = useMemo(() => {
     if (!selX || !Array.isArray(plotRows) || plotRows.length <= 1) return plotRows;
@@ -1448,17 +1548,22 @@ export function ChartCanvas() {
     });
   }, [plotRows, xAxisType, xKey, selX, sortXDir, effectiveTemporalSort]);
 
+  const timeframedPlotRows = useMemo(() => {
+    if (!chartUsesTimeframes) return sortedPlotRows;
+    return bucketTemporalRowsForChart(sortedPlotRows, xKey, yKeys, chartTimeframe, sortXDir);
+  }, [chartUsesTimeframes, sortedPlotRows, xKey, yKeys, chartTimeframe, sortXDir]);
+
   /** Drop non-finite Y (and numeric/date X) so Recharts draws gaps instead of bogus points. */
   const finalRenderedData = useMemo(() => {
-    if (!cartesianChart) return sortedPlotRows;
-    return sanitizeCartesianRowsForPlotting(sortedPlotRows, {
+    if (!cartesianChart) return timeframedPlotRows;
+    return sanitizeCartesianRowsForPlotting(timeframedPlotRows, {
       xKey,
       yKeys,
       xAxisType,
       dataTypes,
       getAxisType,
     });
-  }, [cartesianChart, sortedPlotRows, xKey, yKeys, xAxisType, dataTypes]);
+  }, [cartesianChart, timeframedPlotRows, xKey, yKeys, xAxisType, dataTypes]);
 
   /** Treemap keeps raw pivot labels (not epoch ms). */
   const treemapRows = useMemo(() => {
@@ -1484,7 +1589,7 @@ export function ChartCanvas() {
 
   const xAxisNumberDomain =
     rechartsXAxisType === "number"
-      ? (useTimeSeriesX && sortXDir === "desc" ? ["dataMax", "dataMin"] : ["dataMin", "dataMax"])
+      ? ((useTimeSeriesX || chartUsesTimeframes) && sortXDir === "desc" ? ["dataMax", "dataMin"] : ["dataMin", "dataMax"])
       : undefined;
 
   /** Recharts Treemap: one synthetic root whose children are sheet rows (name ← X, value ← Y). */
@@ -1724,7 +1829,7 @@ export function ChartCanvas() {
                   ) : null}
                 </CardHeader>
               ) : null}
-              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-1.5 pb-2 pt-0 sm:px-2">
+              <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-1.5 pb-2 pt-0 sm:px-2">
                 {!axesConfigured ? (
                   <div className="flex min-h-[200px] w-full flex-1 flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
                     Select an X axis and at least one Y column under Data to plot your sheet.
@@ -1755,6 +1860,26 @@ export function ChartCanvas() {
                 ) : (
                   <>
                     <style dangerouslySetInnerHTML={{ __html: chartBuilderRechartsChromeCss }} />
+                    {chartTimeframesEnabled && chartTimeframesAvailable ? (
+                      <div className="absolute left-3 top-2 z-20 flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/85">
+                        {CHART_TIMEFRAME_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[10px] font-semibold leading-5 transition-colors",
+                              chartTimeframe === opt.value
+                                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950"
+                                : "text-muted-foreground hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+                            )}
+                            onClick={() => setChartTimeframe(opt.value)}
+                            aria-pressed={chartTimeframe === opt.value}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                     <ChartContainer
                     id={CHART_BUILDER_DOM_ID}
                     config={chartConfig || dfltChartConfig}

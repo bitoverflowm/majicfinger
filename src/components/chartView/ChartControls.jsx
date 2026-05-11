@@ -135,6 +135,12 @@ export default function ChartControls() {
     xDateFormatPreset,
     setXDateFormatPreset,
     X_DATE_FORMAT_PRESETS,
+    chartTimeframesEnabled,
+    setChartTimeframesEnabled,
+    chartTimeframe,
+    setChartTimeframe,
+    chartTimeframesAvailable,
+    CHART_TIMEFRAME_OPTIONS,
     expanded,
     handleToggleChange,
     legendVisible,
@@ -1152,6 +1158,43 @@ export default function ChartControls() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  )}
+
+                  {chartTimeframesAvailable && (
+                    <div className="space-y-2 border-b border-border/60 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-design-timeframes"
+                          checked={chartTimeframesEnabled}
+                          onCheckedChange={setChartTimeframesEnabled}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-design-timeframes" className="cursor-pointer text-xs text-muted-foreground">
+                          Add time frames
+                        </Label>
+                      </div>
+                      {chartTimeframesEnabled ? (
+                        <Select
+                          value={String(chartTimeframe || "15m")}
+                          onValueChange={(v) => setChartTimeframe?.(v || "15m")}
+                        >
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
+                            <SelectValue placeholder="Time frame" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            {(Array.isArray(CHART_TIMEFRAME_OPTIONS) ? CHART_TIMEFRAME_OPTIONS : []).map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-[10px] leading-snug text-muted-foreground">
+                          Bucket the visible chart by time without changing the sheet data.
+                        </p>
+                      )}
                     </div>
                   )}
 
