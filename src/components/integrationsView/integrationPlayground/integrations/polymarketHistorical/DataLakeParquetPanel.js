@@ -3248,6 +3248,321 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   ) : null}
                 </div>
 
+                {!isDemo && composeWhereFilters.length > 0 && (
+                  <div className="space-y-2 min-w-0">
+                    <Label className="text-xs text-muted-foreground">Where (filter)</Label>
+                    <div className="space-y-2">
+                      {composeWhereFilters.map((f) => (
+                        <div key={f.id} className="flex items-center gap-1">
+                          <Select
+                            value={f.column}
+                            onValueChange={(val) => {
+                              const kind = kindForColumn(val);
+                              const isInListOp = f.op === "in" || f.op === "not_in";
+                              const defaultValue = isInListOp
+                                ? kind === "number"
+                                  ? "1, 2, 3"
+                                  : kind === "string"
+                                    ? '"yes", "no"'
+                                    : String(Date.now())
+                                : kind === "date"
+                                  ? Date.now()
+                                  : kind === "number"
+                                    ? 0
+                                    : "";
+
+                              const nextOp =
+                                kind === "string"
+                                  ? isInListOp
+                                    ? f.op
+                                    : f.op === "neq"
+                                      ? "neq"
+                                      : "eq"
+                                  : kind === "number"
+                                    ? ["gt", "lt", "eq", "neq", "in", "not_in"].includes(f.op)
+                                      ? f.op
+                                      : "gt"
+                                    : // date (epoch ms): keep scalar ops; map IN list to eq
+                                      ["gt", "lt", "eq", "neq"].includes(f.op) ? f.op : "eq";
+
+                              updateComposeWhereFilter(f.id, { column: val, kind, op: nextOp, value: defaultValue });
+                            }}
+                          >
+                            <SelectTrigger className="h-7 text-[11px] min-w-0 w-16">
+                              <SelectValue placeholder="Column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableColumns.map((c) => (
+                                <SelectItem key={c} value={c} className="text-[13px]">
+                                  {composeSourceColumnLabel(c)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] min-w-8">
+                                {operatorSymbol(f.op)}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-44">
+                              {(
+                                f.kind === "string"
+                                  ? [
+                                      { id: "eq", label: "is equal to" },
+                                      { id: "neq", label: "not equal to" },
+                                      { id: "in", label: "in set" },
+                                      { id: "not_in", label: "not in set" },
+                                    ]
+                                  : [
+                                      { id: "gt", label: "greater than" },
+                                      { id: "lt", label: "less than" },
+                                      { id: "eq", label: "is equal to" },
+                                      { id: "neq", label: "not equal to" },
+                                      { id: "in", label: "in set" },
+                                      { id: "not_in", label: "not in set" },
+                                    ]
+                              ).map((op) => (
+                                <DropdownMenuItem
+                                  key={op.id}
+                                  className="text-[13px]"
+                                  onSelect={() => updateComposeWhereFilter(f.id, { op: op.id })}
+                                >
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                      {operatorSymbol(op.id)}
+                                    </span>
+                                    <span>{op.label}</span>
+                                  </span>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+
+                          {f.kind === "date" ? (
+                            <Input
+                              type="datetime-local"
+                              className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
+                                !Number.isFinite(Number(f.value)) ? "border-destructive focus-visible:ring-destructive" : ""
+                              }`}
+                              value={
+                                Number.isFinite(Number(f.value))
+                                  ? new Date(Number(f.value)).toISOString().slice(0, 16)
+                                  : ""
+                              }
+                              onChange={(e) => {
+                                const ms = new Date(String(e.target.value)).getTime();
+                                updateComposeWhereFilter(f.id, { value: Number.isFinite(ms) ? ms : "" });
+                              }}
+                              placeholder="Value"
+                            />
+                          ) : f.op === "in" || f.op === "not_in" ? (
+                            <Input
+                              type="text"
+                              className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
+                                !String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""
+                              }`}
+                              value={String(f.value ?? "")}
+                              onClick={() => {
+                                if (f.kind === "string") {
+                                  toast(
+                                    'Strings: use double quotes, e.g. "yes", "no" (comma-separated).'
+                                  );
+                                } else {
+                                  toast('Numbers: use raw numbers (no quotes), e.g. 1, 2, 3 (comma-separated).');
+                                }
+                              }}
+                              onChange={(e) => updateComposeWhereFilter(f.id, { value: e.target.value })}
+                              placeholder={f.kind === "string" ? '"yes", "no"' : "1, 2, 3"}
+                            />
+                          ) : f.kind === "number" ? (
+                            <Input
+                              type="number"
+                              step="1"
+                              className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
+                                f.value === "" ? "border-destructive focus-visible:ring-destructive" : ""
+                              }`}
+                              value={f.value}
+                              onChange={(e) =>
+                                updateComposeWhereFilter(f.id, { value: e.target.value === "" ? "" : Number(e.target.value) })
+                              }
+                              placeholder="Value"
+                            />
+                          ) : (
+                            <Input
+                              type="text"
+                              className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
+                                !String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""
+                              }`}
+                              value={String(f.value ?? "")}
+                              onChange={(e) => updateComposeWhereFilter(f.id, { value: e.target.value })}
+                              placeholder="Value"
+                            />
+                          )}
+
+                          <TooltipProvider delayDuration={250}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                  onClick={() => removeComposeWhereFilter(f.id)}
+                                >
+                                  <Minus className="h-2 w-2" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                remove filter
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-start">
+                      <DropdownMenu open={addWhereFilterMenuOpen} onOpenChange={setAddWhereFilterMenuOpen}>
+                        <DropdownMenuTrigger asChild>
+                          <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]">
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add another filter
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-64 max-h-[320px] overflow-y-auto">
+                          <DropdownMenuLabel className="text-xs">Column</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {availableColumns.map((filterCol) => {
+                            const filterKind = kindForColumn(filterCol);
+                            const ops =
+                              filterKind === "string"
+                                ? [
+                                    { id: "eq", label: "is equal to" },
+                                    { id: "neq", label: "not equal to" },
+                                    { id: "in", label: "in set" },
+                                    { id: "not_in", label: "not in set" },
+                                  ]
+                                : [
+                                    { id: "gt", label: "greater than" },
+                                    { id: "lt", label: "less than" },
+                                    { id: "eq", label: "is equal to" },
+                                    { id: "neq", label: "not equal to" },
+                                    { id: "in", label: "in set" },
+                                    { id: "not_in", label: "not in set" },
+                                  ];
+                            return (
+                              <DropdownMenuSub key={`where-add-${filterCol}`}>
+                                <DropdownMenuSubTrigger className="text-xs">
+                                  {composeSourceColumnLabel(filterCol)}
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                  <DropdownMenuSubContent className="w-56 max-h-[280px] overflow-y-auto">
+                                    <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {ops.map((op) => (
+                                      <DropdownMenuItem
+                                        key={`${filterCol}-${op.id}`}
+                                        className="text-[13px]"
+                                        onSelect={(e) => {
+                                          e.preventDefault();
+                                          addComposeWhereFilterPreset(filterCol, op.id);
+                                          setAddWhereFilterMenuOpen(false);
+                                        }}
+                                      >
+                                        <span className="inline-flex items-center gap-2">
+                                          <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
+                                            {operatorSymbol(op.id)}
+                                          </span>
+                                          <span>{op.label}</span>
+                                        </span>
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                              </DropdownMenuSub>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs shrink-0"
+                      disabled={!selected?.table || availableColumns.length === 0}
+                      onClick={addComposeJoinRule}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Join
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs shrink-0"
+                      disabled={composeSelectAliasChoices.length === 0}
+                      onClick={addComposeOrderByClause}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add sort rule
+                    </Button>
+                    {!composeLimitRuleOpen ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs shrink-0"
+                        disabled={composeSelectAliasChoices.length === 0}
+                        onClick={() => {
+                          setComposeLimitRuleOpen(true);
+                          setComposeLimitRuleValue((v) => (String(v || "").trim() ? v : String(Math.min(1000, athenaRowLimit))));
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Row limit
+                      </Button>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">Max rows</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          step={1}
+                          className="h-8 w-[5.5rem] text-xs min-w-0"
+                          value={composeLimitRuleValue}
+                          onChange={(e) => setComposeLimitRuleValue(e.target.value)}
+                          aria-label="Maximum rows returned from Athena (SQL LIMIT)"
+                        />
+                        <TooltipProvider delayDuration={250}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground hover:bg-muted/60"
+                                onClick={() => {
+                                  setComposeLimitRuleOpen(false);
+                                  setComposeLimitRuleValue("");
+                                }}
+                                aria-label="Remove row limit"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              Remove limit (use your tier default cap)
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {columnComposeItems.length !== 0 && (
                   <div className="space-y-3">
                     {columnComposeItems.map((item) => {
@@ -3771,245 +4086,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 )}
               </div>
 
-              {!isDemo && composeWhereFilters.length > 0 && (
-                <div className="space-y-2 min-w-0">
-                  <Label className="text-xs text-muted-foreground">Where (filter)</Label>
-                  <div className="space-y-2">
-                    {composeWhereFilters.map((f) => (
-                      <div key={f.id} className="flex items-center gap-1">
-                        <Select
-                          value={f.column}
-                          onValueChange={(val) => {
-                            const kind = kindForColumn(val);
-                            const isInListOp = f.op === "in" || f.op === "not_in";
-                            const defaultValue = isInListOp
-                              ? kind === "number"
-                                ? "1, 2, 3"
-                                : kind === "string"
-                                  ? '"yes", "no"'
-                                  : String(Date.now())
-                              : kind === "date"
-                                ? Date.now()
-                                : kind === "number"
-                                  ? 0
-                                  : "";
-
-                            const nextOp =
-                              kind === "string"
-                                ? isInListOp
-                                  ? f.op
-                                  : f.op === "neq"
-                                    ? "neq"
-                                    : "eq"
-                                : kind === "number"
-                                  ? ["gt", "lt", "eq", "neq", "in", "not_in"].includes(f.op)
-                                    ? f.op
-                                    : "gt"
-                                  : // date (epoch ms): keep scalar ops; map IN list to eq
-                                    ["gt", "lt", "eq", "neq"].includes(f.op) ? f.op : "eq";
-
-                            updateComposeWhereFilter(f.id, { column: val, kind, op: nextOp, value: defaultValue });
-                          }}
-                        >
-                          <SelectTrigger className="h-7 text-[11px] min-w-0 w-16">
-                            <SelectValue placeholder="Column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableColumns.map((c) => (
-                              <SelectItem key={c} value={c} className="text-[13px]">
-                                {composeSourceColumnLabel(c)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] min-w-8">
-                              {operatorSymbol(f.op)}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-44">
-                            {(
-                              f.kind === "string"
-                                ? [
-                                    { id: "eq", label: "is equal to" },
-                                    { id: "neq", label: "not equal to" },
-                                    { id: "in", label: "in set" },
-                                    { id: "not_in", label: "not in set" },
-                                  ]
-                                : [
-                                    { id: "gt", label: "greater than" },
-                                    { id: "lt", label: "less than" },
-                                    { id: "eq", label: "is equal to" },
-                                    { id: "neq", label: "not equal to" },
-                                    { id: "in", label: "in set" },
-                                    { id: "not_in", label: "not in set" },
-                                  ]
-                            ).map((op) => (
-                              <DropdownMenuItem
-                                key={op.id}
-                                className="text-[13px]"
-                                onSelect={() => updateComposeWhereFilter(f.id, { op: op.id })}
-                              >
-                                <span className="inline-flex items-center gap-2">
-                                  <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
-                                    {operatorSymbol(op.id)}
-                                  </span>
-                                  <span>{op.label}</span>
-                                </span>
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        {f.kind === "date" ? (
-                          <Input
-                            type="datetime-local"
-                            className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
-                              !Number.isFinite(Number(f.value)) ? "border-destructive focus-visible:ring-destructive" : ""
-                            }`}
-                            value={
-                              Number.isFinite(Number(f.value))
-                                ? new Date(Number(f.value)).toISOString().slice(0, 16)
-                                : ""
-                            }
-                            onChange={(e) => {
-                              const ms = new Date(String(e.target.value)).getTime();
-                              updateComposeWhereFilter(f.id, { value: Number.isFinite(ms) ? ms : "" });
-                            }}
-                            placeholder="Value"
-                          />
-                        ) : f.op === "in" || f.op === "not_in" ? (
-                          <Input
-                            type="text"
-                            className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
-                              !String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""
-                            }`}
-                            value={String(f.value ?? "")}
-                            onClick={() => {
-                              if (f.kind === "string") {
-                                toast(
-                                  'Strings: use double quotes, e.g. "yes", "no" (comma-separated).'
-                                );
-                              } else {
-                                toast('Numbers: use raw numbers (no quotes), e.g. 1, 2, 3 (comma-separated).');
-                              }
-                            }}
-                            onChange={(e) => updateComposeWhereFilter(f.id, { value: e.target.value })}
-                            placeholder={f.kind === "string" ? '"yes", "no"' : "1, 2, 3"}
-                          />
-                        ) : f.kind === "number" ? (
-                          <Input
-                            type="number"
-                            step="1"
-                            className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
-                              f.value === "" ? "border-destructive focus-visible:ring-destructive" : ""
-                            }`}
-                            value={f.value}
-                            onChange={(e) =>
-                              updateComposeWhereFilter(f.id, { value: e.target.value === "" ? "" : Number(e.target.value) })
-                            }
-                            placeholder="Value"
-                          />
-                        ) : (
-                          <Input
-                            type="text"
-                            className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
-                              !String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""
-                            }`}
-                            value={String(f.value ?? "")}
-                            onChange={(e) => updateComposeWhereFilter(f.id, { value: e.target.value })}
-                            placeholder="Value"
-                          />
-                        )}
-
-                        <TooltipProvider delayDuration={250}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                                onClick={() => removeComposeWhereFilter(f.id)}
-                              >
-                                <Minus className="h-2 w-2" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                              remove filter
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-start">
-                    <DropdownMenu open={addWhereFilterMenuOpen} onOpenChange={setAddWhereFilterMenuOpen}>
-                      <DropdownMenuTrigger asChild>
-                        <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]">
-                          <Plus className="h-3 w-3 mr-1" />
-                          Add another filter
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-64 max-h-[320px] overflow-y-auto">
-                        <DropdownMenuLabel className="text-xs">Column</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {availableColumns.map((filterCol) => {
-                          const filterKind = kindForColumn(filterCol);
-                          const ops =
-                            filterKind === "string"
-                              ? [
-                                  { id: "eq", label: "is equal to" },
-                                  { id: "neq", label: "not equal to" },
-                                  { id: "in", label: "in set" },
-                                  { id: "not_in", label: "not in set" },
-                                ]
-                              : [
-                                  { id: "gt", label: "greater than" },
-                                  { id: "lt", label: "less than" },
-                                  { id: "eq", label: "is equal to" },
-                                  { id: "neq", label: "not equal to" },
-                                  { id: "in", label: "in set" },
-                                  { id: "not_in", label: "not in set" },
-                                ];
-                          return (
-                            <DropdownMenuSub key={`where-add-${filterCol}`}>
-                              <DropdownMenuSubTrigger className="text-xs">
-                                {composeSourceColumnLabel(filterCol)}
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuPortal>
-                                <DropdownMenuSubContent className="w-56 max-h-[280px] overflow-y-auto">
-                                  <DropdownMenuLabel className="text-xs">Operator</DropdownMenuLabel>
-                                  <DropdownMenuSeparator />
-                                  {ops.map((op) => (
-                                    <DropdownMenuItem
-                                      key={`${filterCol}-${op.id}`}
-                                      className="text-[13px]"
-                                      onSelect={(e) => {
-                                        e.preventDefault();
-                                        addComposeWhereFilterPreset(filterCol, op.id);
-                                        setAddWhereFilterMenuOpen(false);
-                                      }}
-                                    >
-                                      <span className="inline-flex items-center gap-2">
-                                        <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
-                                          {operatorSymbol(op.id)}
-                                        </span>
-                                        <span>{op.label}</span>
-                                      </span>
-                                    </DropdownMenuItem>
-                                  ))}
-                                </DropdownMenuSubContent>
-                              </DropdownMenuPortal>
-                            </DropdownMenuSub>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              )}
-
               {composeAggregateAliasChoices.length > 0 && (
                 <div className="space-y-2 min-w-0">
                   <div className="flex items-center justify-between gap-2">
@@ -4161,77 +4237,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
               <div className="space-y-2 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs shrink-0"
-                    disabled={!selected?.table || availableColumns.length === 0}
-                    onClick={addComposeJoinRule}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Join
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs shrink-0"
-                    disabled={composeSelectAliasChoices.length === 0}
-                    onClick={addComposeOrderByClause}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add sort rule
-                  </Button>
-                  {!composeLimitRuleOpen ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs shrink-0"
-                      disabled={composeSelectAliasChoices.length === 0}
-                      onClick={() => {
-                        setComposeLimitRuleOpen(true);
-                        setComposeLimitRuleValue((v) => (String(v || "").trim() ? v : String(Math.min(1000, athenaRowLimit))));
-                      }}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Row limit
-                    </Button>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">Max rows</span>
-                      <Input
-                        type="number"
-                        min={1}
-                        step={1}
-                        className="h-8 w-[5.5rem] text-xs min-w-0"
-                        value={composeLimitRuleValue}
-                        onChange={(e) => setComposeLimitRuleValue(e.target.value)}
-                        aria-label="Maximum rows returned from Athena (SQL LIMIT)"
-                      />
-                      <TooltipProvider delayDuration={250}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground hover:bg-muted/60"
-                              onClick={() => {
-                                setComposeLimitRuleOpen(false);
-                                setComposeLimitRuleValue("");
-                              }}
-                              aria-label="Remove row limit"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-xs">
-                            Remove limit (use your tier default cap)
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  )}
                   <div className="flex-1 min-w-2" />
                   <div className="flex items-center gap-2 shrink-0">
                     <TooltipProvider delayDuration={300}>
