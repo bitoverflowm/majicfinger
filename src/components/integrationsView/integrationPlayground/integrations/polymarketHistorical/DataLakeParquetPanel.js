@@ -3154,7 +3154,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
                             {selectedCount > 0 && !isDemo ? (
                               <div className="w-64 min-w-64 overflow-y-auto p-1 border-l border-border/60">
-                                <DropdownMenuLabel className="text-xs">Where (filter)</DropdownMenuLabel>
+                                <DropdownMenuLabel className="text-xs">Where</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
 
                                 {filterCandidates.length === 0 ? (
@@ -3250,7 +3250,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
                 {!isDemo && composeWhereFilters.length > 0 && (
                   <div className="space-y-2 min-w-0">
-                    <Label className="text-xs text-muted-foreground">Where (filter)</Label>
+                    <Label className="text-xs text-muted-foreground">Where</Label>
                     <div className="space-y-2">
                       {composeWhereFilters.map((f) => (
                         <div key={f.id} className="flex items-center gap-1">
@@ -3425,7 +3425,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                         <DropdownMenuTrigger asChild>
                           <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]">
                             <Plus className="h-3 w-3 mr-1" />
-                            Add another filter
+                            where
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-64 max-h-[320px] overflow-y-auto">
