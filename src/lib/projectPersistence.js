@@ -1,5 +1,5 @@
 export const PROJECT_FULL_DATA_SAFE_BYTES = 12 * 1024 * 1024;
-export const PROJECT_PREVIEW_ROW_LIMIT = 1000;
+export const PROJECT_PREVIEW_ROW_LIMIT = 50000;
 export const PROJECT_MIN_PREVIEW_ROW_LIMIT = 25;
 
 function jsonStringifySafe(value) {
@@ -147,6 +147,78 @@ function buildSheets(dataSheets, previewLimit, forceProvenance) {
   }, {});
 }
 
+function shrinkProvenancePreviewsUntilWithinBudget(payload, safeBytes) {
+  let next = payload;
+  let estimatedBytes = estimateJsonBytes(next);
+  let previewLimit = PROJECT_MIN_PREVIEW_ROW_LIMIT;
+
+  while (estimatedBytes > safeBytes && previewLimit >= 0) {
+    const sheets = next?.data_sheets && typeof next.data_sheets === "object" ? next.data_sheets : {};
+    const trimmedSheets = Object.entries(sheets).reduce((acc, [sheetId, sheet]) => {
+      const rows = Array.isArray(sheet?.data) ? sheet.data : [];
+      const isProvenance = sheet?.storageMode === "provenance";
+      acc[sheetId] = {
+        ...sheet,
+        data: isProvenance ? rows.slice(0, previewLimit) : rows,
+        previewRowCount: isProvenance ? Math.min(rows.length, previewLimit) : sheet?.previewRowCount,
+        saveMeta: {
+          ...(sheet?.saveMeta || {}),
+          previewHash: isProvenance ? hashJson(rows.slice(0, previewLimit)) : sheet?.saveMeta?.previewHash,
+        },
+      };
+      return acc;
+    }, {});
+    next = {
+      ...next,
+      data: Array.isArray(next?.data) ? next.data.slice(0, previewLimit) : [],
+      data_sheets: trimmedSheets,
+    };
+    estimatedBytes = estimateJsonBytes(next);
+    if (previewLimit === 0) break;
+    previewLimit = Math.floor(previewLimit / 2);
+  }
+
+  return { payload: next, estimatedBytes };
+}
+
+function convertLargestInlineSheetsToPreview(payload, safeBytes) {
+  let next = payload;
+  let estimatedBytes = estimateJsonBytes(next);
+  const sheets = next?.data_sheets && typeof next.data_sheets === "object" ? next.data_sheets : {};
+  const candidates = Object.entries(sheets)
+    .filter(([, sheet]) => sheet?.storageMode !== "provenance" && Array.isArray(sheet?.data) && sheet.data.length > PROJECT_MIN_PREVIEW_ROW_LIMIT)
+    .map(([sheetId, sheet]) => [sheetId, sheet, estimateJsonBytes(sheet.data)])
+    .sort((a, b) => b[2] - a[2]);
+
+  for (const [sheetId, sheet, estimatedFullBytes] of candidates) {
+    if (estimatedBytes <= safeBytes) break;
+    const previewRows = sheet.data.slice(0, PROJECT_MIN_PREVIEW_ROW_LIMIT);
+    next = {
+      ...next,
+      data_sheets: {
+        ...(next.data_sheets || {}),
+        [sheetId]: {
+          ...sheet,
+          data: previewRows,
+          storageMode: "provenance",
+          previewRowCount: previewRows.length,
+          rehydrationStatus: "preview",
+          saveMeta: {
+            ...(sheet.saveMeta || {}),
+            truncated: true,
+            estimatedFullBytes,
+            previewHash: hashJson(previewRows),
+            columnHash: sheet.saveMeta?.columnHash || hashJson(sheet.columns || inferColumnsFromRows(previewRows)),
+          },
+        },
+      },
+    };
+    estimatedBytes = estimateJsonBytes(next);
+  }
+
+  return { payload: next, estimatedBytes };
+}
+
 export function prepareProjectDataPayload({
   projectName,
   connectedData,
@@ -189,16 +261,22 @@ export function prepareProjectDataPayload({
     previewLimit = Math.floor(previewLimit / 2);
   }
 
-  const sheets = payload?.data_sheets || {};
+  const previewTrimmed = estimatedBytes > safeBytes ? shrinkProvenancePreviewsUntilWithinBudget(payload, safeBytes) : { payload, estimatedBytes };
+  const final = previewTrimmed.estimatedBytes > safeBytes
+    ? convertLargestInlineSheetsToPreview(previewTrimmed.payload, safeBytes)
+    : previewTrimmed;
+  const sheets = final.payload?.data_sheets || {};
   const warnings = Object.entries(sheets)
     .filter(([, sheet]) => sheet?.storageMode === "provenance" && !sheet?.provenance)
     .map(([sheetId, sheet]) => `Sheet "${sheet?.name || sheetId}" is too large and has no Data Lake provenance; only its preview can be saved.`);
 
   return {
-    payload,
+    payload: final.payload,
     mode: "hybrid",
-    estimatedBytes,
-    warnings,
+    estimatedBytes: final.estimatedBytes,
+    warnings: final.estimatedBytes > safeBytes
+      ? [...warnings, "Project is still large after preview truncation; save may fail until external storage is added."]
+      : warnings,
   };
 }
 
@@ -309,7 +387,112 @@ export function applyBrowserOperationToRows(rows, op) {
       return String(key) !== String(rowKey);
     });
   }
+  if (op.type === "computed.column") {
+    return applyComputedColumnOperation(list, op);
+  }
   return list;
+}
+
+function finiteNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function populationStdDev(values) {
+  const nums = (Array.isArray(values) ? values : []).map(finiteNumber).filter((v) => v != null);
+  if (!nums.length) return null;
+  const mean = nums.reduce((sum, v) => sum + v, 0) / nums.length;
+  const variance = nums.reduce((sum, v) => sum + (v - mean) ** 2, 0) / nums.length;
+  const out = Math.sqrt(variance);
+  return Number.isFinite(out) ? out : null;
+}
+
+function rollingPopulationStdDev(rows, column, idx, windowSize) {
+  const n = Math.max(2, Math.floor(Number(windowSize) || 0));
+  const start = idx - n + 1;
+  if (start < 0) return null;
+  const values = [];
+  for (let i = start; i <= idx; i += 1) {
+    const v = finiteNumber(rows?.[i]?.[column]);
+    if (v == null) return null;
+    values.push(v);
+  }
+  return populationStdDev(values);
+}
+
+function applyBinaryMath(op, a, b) {
+  if (op === "add") return a + b;
+  if (op === "subtract") return a - b;
+  if (op === "multiply") return a * b;
+  if (op === "divide") return b === 0 ? null : a / b;
+  return null;
+}
+
+function applyComputedColumnOperation(rows, op) {
+  const out = String(op?.column || "").trim();
+  const expr = op?.expression && typeof op.expression === "object" ? op.expression : null;
+  if (!out || !expr) return rows;
+
+  if (expr.kind === "manual-empty-column") {
+    return rows.map((row) => (row && typeof row === "object" ? { ...row, [out]: "" } : row));
+  }
+
+  if (expr.kind === "binary") {
+    const left = String(expr.leftColumn || "");
+    const right = String(expr.rightColumn || "");
+    const opName = String(expr.op || "");
+    return rows.map((row) => {
+      if (!row || typeof row !== "object") return row;
+      const a = finiteNumber(row[left]) ?? 0;
+      const b = finiteNumber(row[right]) ?? 0;
+      const value = applyBinaryMath(opName, a, b);
+      return { ...row, [out]: Number.isFinite(value) ? value : null };
+    });
+  }
+
+  if (expr.kind === "relative-row") {
+    const base = String(expr.baseColumn || "");
+    const rowRef = String(expr.rowRef || "previous");
+    const opName = String(expr.op || "");
+    return rows.map((row, idx) => {
+      if (!row || typeof row !== "object") return row;
+      const refIdx = rowRef === "next" ? idx + 1 : idx - 1;
+      const ref = rows[refIdx];
+      if (!ref) return { ...row, [out]: null };
+      const a = finiteNumber(row[base]);
+      const b = finiteNumber(ref[base]);
+      if (a == null || b == null) return { ...row, [out]: null };
+      const value = applyBinaryMath(opName, a, b);
+      return { ...row, [out]: Number.isFinite(value) ? value : null };
+    });
+  }
+
+  if (expr.kind === "standard-deviation") {
+    const source = String(expr.sourceColumn || "");
+    if (expr.mode === "rolling") {
+      return rows.map((row, idx) => (
+        row && typeof row === "object"
+          ? { ...row, [out]: rollingPopulationStdDev(rows, source, idx, expr.window) }
+          : row
+      ));
+    }
+    const value = populationStdDev(rows.map((row) => row?.[source]));
+    return rows.map((row) => (row && typeof row === "object" ? { ...row, [out]: value } : row));
+  }
+
+  if (expr.kind === "cumulative-sum") {
+    const source = String(expr.sourceColumn || "");
+    let running = 0;
+    return rows.map((row) => {
+      if (!row || typeof row !== "object") return row;
+      const v = finiteNumber(row[source]);
+      if (v == null) return { ...row, [out]: null };
+      running += v;
+      return { ...row, [out]: running };
+    });
+  }
+
+  return rows;
 }
 
 export function replayOperations({ rows, operations }) {

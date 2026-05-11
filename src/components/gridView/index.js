@@ -76,6 +76,7 @@ import { ConnectProgressWithLabel } from "@/components/integrationsView/integrat
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
 import { SHEET_GRID_PAGE_SIZE } from "@/config/dataLakeParquetSamples";
 import { athenaRowsToObjects } from "@/lib/duckdb/duckdbWasmClient";
+import { appendSheetOperation, createSheetOperation } from "@/lib/projectPersistence";
 import * as XLSX from 'xlsx';
 
 
@@ -196,6 +197,85 @@ const GridView = ({startNew}) => {
     const dataTypes = contextStateV2?.dataTypes || {}
     let dataSheets = contextStateV2?.dataSheets || {}
     const activeSheetId = contextStateV2?.activeSheetId
+    const activeSheet = activeSheetId ? dataSheets?.[activeSheetId] : null;
+    const isProvenancePreviewSheet =
+      activeSheet?.storageMode === "provenance" && activeSheet?.rehydrationStatus !== "complete";
+    const [rehydrateBusy, setRehydrateBusy] = useState(false);
+    const appendActiveSheetOperation = useCallback(
+      (type, payload = {}) => {
+        if (!activeSheetId || !setDataSheets) return;
+        const op = createSheetOperation(type, payload);
+        setDataSheets((prev) => appendSheetOperation(prev, activeSheetId, op));
+      },
+      [activeSheetId, setDataSheets],
+    );
+
+    const rehydrateActiveSheet = useCallback(async () => {
+      if (!activeSheetId || !activeSheet?.provenance) {
+        toast.error("This sheet does not have saved Data Lake provenance.");
+        return;
+      }
+      const sheetGraph = {};
+      const safeName = (name, id) => {
+        let t = String(name || id || "sheet").replace(/[^a-zA-Z0-9_]+/g, "_");
+        if (/^[0-9]/.test(t)) t = `s_${t}`;
+        const out = t.slice(0, 60);
+        return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(out) ? out : `sheet_${String(id).replace(/\W/g, "")}`.slice(0, 60);
+      };
+      const collectSheetGraph = (id) => {
+        if (!id || sheetGraph[id]) return;
+        const sheet = dataSheets?.[id];
+        if (!sheet?.provenance) return;
+        sheetGraph[id] = { name: safeName(sheet.name, id), provenance: sheet.provenance };
+        for (const dep of sheet.provenance.serverSheetJoins || []) {
+          if (dep?.targetSheetId) collectSheetGraph(dep.targetSheetId);
+        }
+      };
+      collectSheetGraph(activeSheetId);
+      setRehydrateBusy(true);
+      try {
+        const res = await fetch("/api/data-lake/rehydrate-sheet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            sheetId: activeSheetId,
+            provenance: activeSheet.provenance,
+            sheetGraph,
+            operationHistory: activeSheet.operationHistory || [],
+            maxRows: activeSheet.fullRowCount || activeSheet.rowCount || undefined,
+            previewRows: activeSheet.data || [],
+            saveMeta: activeSheet.saveMeta || null,
+          }),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(json?.error || res.statusText || `Rehydrate ${res.status}`);
+        const rows = Array.isArray(json?.rows) ? json.rows : [];
+        setConnectedData?.(rows);
+        setDataSheets?.((prev) => {
+          const p = prev || {};
+          const sheet = p[activeSheetId] || activeSheet;
+          return {
+            ...p,
+            [activeSheetId]: {
+              ...sheet,
+              data: rows,
+              storageMode: "inline",
+              rehydrationStatus: "complete",
+              rowCount: rows.length,
+              fullRowCount: json?.rowCount ?? rows.length,
+              columns: Array.isArray(json?.columns) ? json.columns : sheet.columns,
+            },
+          };
+        });
+        if (json?.warning) toast.warning(json.warning);
+        else toast.success("Reloaded full sheet data from saved query.");
+      } catch (e) {
+        toast.error(e?.message || "Failed to reload saved query.");
+      } finally {
+        setRehydrateBusy(false);
+      }
+    }, [activeSheet, activeSheetId, dataSheets, setConnectedData, setDataSheets]);
     
     const [columnName, setColumnName] = useState('');
     const [colAddOpen, setColAddOpen] = useState()
@@ -346,6 +426,7 @@ const GridView = ({startNew}) => {
         setEditingColIndex(null);
         setEditingColName("");
       }
+      appendActiveSheetOperation("delete.column", { column: colName });
       toast(`Column "${colName}" deleted!`, { duration: 5000 });
     };
 
@@ -392,6 +473,7 @@ const GridView = ({startNew}) => {
 
       setEditingColIndex(null);
       setEditingColName("");
+      appendActiveSheetOperation("rename.column", { from: oldColName, to: nextName });
       toast(`Column name updated to "${nextName}"`, { duration: 5000 });
     };
 
@@ -410,6 +492,7 @@ const GridView = ({startNew}) => {
         }));
       }
 
+      appendActiveSheetOperation("cast.column", { column: colName, dataType: newType });
       toast(`Column "${colName}" type updated to "${newType}"`, { duration: 5000 });
     };
 
@@ -604,6 +687,13 @@ const GridView = ({startNew}) => {
       if (setDataTypes) {
         setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
       }
+      const operation = createSheetOperation("computed.column", {
+        column: out,
+        expression:
+          mathDialogTab === "basic"
+            ? { kind: "binary", op: mathOp, leftColumn: mathBasicColA, rightColumn: mathBasicColB }
+            : { kind: "relative-row", op: mathOp, baseColumn: mathBaseCol, rowRef: mathRelativeRowRef },
+      });
       if (mathDestination === "new_sheet") {
         const sheetName = `${out} calc`;
         addNewSheetAndActivate?.((newId) => {
@@ -617,6 +707,7 @@ const GridView = ({startNew}) => {
               [newId]: {
                 ...sheet,
                 name: sheetName.slice(0, 80),
+                operationHistory: [...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []), operation],
               },
             };
           });
@@ -625,6 +716,7 @@ const GridView = ({startNew}) => {
       } else {
         replaceCurrentSheetData?.(next);
         setConnectedData?.(next);
+        appendActiveSheetOperation("computed.column", operation);
         toast.success("Applied calculation to current sheet.");
       }
       setMathDialogOpen(false);
@@ -645,6 +737,7 @@ const GridView = ({startNew}) => {
       setDataSheets,
       setDataTypes,
       setSheetData,
+      appendActiveSheetOperation,
     ]);
 
     const applyStatsStdDev = useCallback(() => {
@@ -689,6 +782,10 @@ const GridView = ({startNew}) => {
       if (setDataTypes) {
         setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
       }
+      const operation = createSheetOperation("computed.column", {
+        column: out,
+        expression: { kind: "standard-deviation", mode: statsStdMode, sourceColumn: src, window: statsStdMode === "rolling" ? Number(statsRollCount) : null },
+      });
       if (mathDestination === "new_sheet") {
         const sheetName = statsStdMode === "rolling" ? `${out} rolling σ` : `${out} σ`;
         addNewSheetAndActivate?.((newId) => {
@@ -702,6 +799,7 @@ const GridView = ({startNew}) => {
               [newId]: {
                 ...sheet,
                 name: sheetName.slice(0, 80),
+                operationHistory: [...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []), operation],
               },
             };
           });
@@ -714,6 +812,7 @@ const GridView = ({startNew}) => {
       } else {
         replaceCurrentSheetData?.(next);
         setConnectedData?.(next);
+        appendActiveSheetOperation("computed.column", operation);
         toast.success(
           statsStdMode === "rolling"
             ? "Added rolling standard deviation column to current sheet."
@@ -735,6 +834,7 @@ const GridView = ({startNew}) => {
       setDataSheets,
       setDataTypes,
       setSheetData,
+      appendActiveSheetOperation,
     ]);
 
     const applyStatsCumsum = useCallback(() => {
@@ -765,6 +865,10 @@ const GridView = ({startNew}) => {
       if (setDataTypes) {
         setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
       }
+      const operation = createSheetOperation("computed.column", {
+        column: out,
+        expression: { kind: "cumulative-sum", sourceColumn: src },
+      });
       if (mathDestination === "new_sheet") {
         const sheetName = `${out} cumsum`.slice(0, 80);
         addNewSheetAndActivate?.((newId) => {
@@ -778,6 +882,7 @@ const GridView = ({startNew}) => {
               [newId]: {
                 ...sheet,
                 name: sheetName,
+                operationHistory: [...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []), operation],
               },
             };
           });
@@ -786,6 +891,7 @@ const GridView = ({startNew}) => {
       } else {
         replaceCurrentSheetData?.(next);
         setConnectedData?.(next);
+        appendActiveSheetOperation("computed.column", operation);
         toast.success("Added cumulative sum column to current sheet.");
       }
       setMathDialogOpen(false);
@@ -800,6 +906,7 @@ const GridView = ({startNew}) => {
       setDataSheets,
       setDataTypes,
       setSheetData,
+      appendActiveSheetOperation,
     ]);
 
     const collectColumnNames = (rows) => {
@@ -1746,6 +1853,7 @@ const GridView = ({startNew}) => {
           );
           return newData;
         });
+        appendActiveSheetOperation("manual.cell.patch", { rowKey: origIndex, column: field, value: newValue });
         toast('Data updated. Chart updated!', { duration: 5000 });
     };
 
@@ -1779,6 +1887,10 @@ const GridView = ({startNew}) => {
               });
         }
         setColAddOpen(false)
+        appendActiveSheetOperation("computed.column", {
+            column: name,
+            expression: { kind: "manual-empty-column" },
+        });
 
         toast(`New Column added!`, {
             duration: 5000
@@ -1799,6 +1911,7 @@ const GridView = ({startNew}) => {
         const origIndex = row && row._origIndex;
         if (origIndex == null) return;
         setConnectedData((prevData) => prevData.filter((_, index) => index !== origIndex));
+        appendActiveSheetOperation("manual.row.delete", { rowKey: origIndex });
         toast('Row deleted!', { duration: 5000 });
     };
 
@@ -2016,6 +2129,30 @@ const GridView = ({startNew}) => {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+
+                {isProvenancePreviewSheet ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+                    <span>
+                      Preview loaded from saved project.
+                      {activeSheet?.fullRowCount != null ? ` Full sheet has ${Number(activeSheet.fullRowCount).toLocaleString()} rows.` : ""}
+                    </span>
+                    {Array.isArray(activeSheet?.operationHistory) && activeSheet.operationHistory.length > 0 ? (
+                      <span className="text-amber-800/80 dark:text-amber-200/80">
+                        {activeSheet.operationHistory.length} saved operation{activeSheet.operationHistory.length === 1 ? "" : "s"}.
+                      </span>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs bg-background"
+                      disabled={rehydrateBusy}
+                      onClick={rehydrateActiveSheet}
+                    >
+                      {rehydrateBusy ? "Reloading..." : "Reload full data"}
+                    </Button>
+                  </div>
+                ) : null}
 
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>

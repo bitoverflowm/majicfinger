@@ -1,6 +1,14 @@
 import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
 
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: "16mb",
+        },
+    },
+};
+
 export default async function handler(req, res) {
     const {
         query: { id },
@@ -43,7 +51,7 @@ export default async function handler(req, res) {
                 }
                 res.status(200).json({ success: true, data: updatedDataSet });
             } catch (error) {
-                res.status(400).json({ success: false});
+                res.status(400).json({ success: false, message: error.message });
             }
             break;
         case "DELETE":

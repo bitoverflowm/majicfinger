@@ -1,13 +1,22 @@
 import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
 import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
+import { summarizeDataSetForList } from "@/lib/projectPersistence";
+
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: "16mb",
+        },
+    },
+};
 
 export default async function handler(req, res) {
     const {
         query: { uid },
         method,
-        body: { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source, user_id }, // Destructure these from req.body
     } = req;
+    const { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source, user_id } = req.body || {};
 
     await dbConnect();
 
@@ -16,15 +25,16 @@ export default async function handler(req, res) {
             try {
                 const savedDataSets = await DataSet.find({ user_id: uid })
                     .select('data_set_name created_date last_saved_date labels source user_id data_sheets')
+                    .lean()
                     .exec();
 
                 if (!savedDataSets || savedDataSets.length === 0) {
                     return res.status(404).json({ success: false, message: "No Saved Projects" });
                 }
 
-                res.status(200).json({ success: true, data: savedDataSets });
+                res.status(200).json({ success: true, data: savedDataSets.map(summarizeDataSetForList) });
             } catch (error) {
-                res.status(400).json({ success: false });
+                res.status(400).json({ success: false, message: error.message });
             }
             break;
         case "POST":

@@ -27,7 +27,7 @@ import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
-import { prepareProjectDataPayload } from "@/lib/projectPersistence"
+import { prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button"
 import {
@@ -127,6 +127,76 @@ function buildProjectRows(savedDataSets, savedCharts, savedChartDashboards) {
   }
 
   return rows
+}
+
+function formatCompactNumber(n) {
+  const value = Number(n);
+  if (!Number.isFinite(value)) return "0";
+  return new Intl.NumberFormat("en-US", { notation: value >= 100000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value);
+}
+
+function formatBytes(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = n;
+  let idx = 0;
+  while (value >= 1024 && idx < units.length - 1) {
+    value /= 1024;
+    idx += 1;
+  }
+  return `${value >= 10 || idx === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[idx]}`;
+}
+
+function summarizeProjectSizeFromSheets(dataSheets) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  let totalRows = 0;
+  let previewRows = 0;
+  let estimatedBytes = 0;
+  let provenanceSheets = 0;
+  let inlineSheets = 0;
+
+  for (const sheet of Object.values(sheets)) {
+    const rows = Array.isArray(sheet?.data) ? sheet.data : [];
+    const fullRows = Number(sheet?.fullRowCount ?? sheet?.rowCount ?? rows.length);
+    const safeFullRows = Number.isFinite(fullRows) ? Math.max(0, fullRows) : rows.length;
+    totalRows += safeFullRows;
+    previewRows += Number(sheet?.previewRowCount ?? rows.length) || 0;
+    estimatedBytes += Number(sheet?.saveMeta?.estimatedFullBytes || 0);
+    if (sheet?.storageMode === "provenance") provenanceSheets += 1;
+    else inlineSheets += 1;
+  }
+
+  return {
+    sheetCount: Object.keys(sheets).length,
+    totalRows,
+    previewRows,
+    estimatedBytes,
+    provenanceSheets,
+    inlineSheets,
+  };
+}
+
+function ProjectDataUsageIndicator({ summary }) {
+  const rows = Number(summary?.totalRows || 0);
+  const pct = Math.max(0, Math.min(100, (rows / PROJECT_PREVIEW_ROW_LIMIT) * 100));
+  const isEliteConsumption = rows > PROJECT_PREVIEW_ROW_LIMIT;
+  const color = isEliteConsumption ? "rgb(239 68 68)" : "rgb(15 23 42)";
+
+  return (
+    <div className="flex items-center gap-1.5 shrink-0" title={`${rows.toLocaleString()} rows across ${summary?.sheetCount || 0} sheets`}>
+      <span
+        className="relative inline-flex h-5 w-5 items-center justify-center rounded-full"
+        style={{ background: `conic-gradient(${color} ${pct}%, rgb(226 232 240) ${pct}% 100%)` }}
+        aria-label={`Project data usage ${Math.round(pct)} percent of ${PROJECT_PREVIEW_ROW_LIMIT.toLocaleString()} preview rows`}
+      >
+        <span className="h-3 w-3 rounded-full bg-background" />
+      </span>
+      <span className={`text-[10px] font-medium ${isEliteConsumption ? "text-red-500" : "text-muted-foreground"}`}>
+        {isEliteConsumption ? "elite data tier consumption" : `${formatCompactNumber(rows)} rows`}
+      </span>
+    </div>
+  );
 }
 
 const Nav = () => {
@@ -278,6 +348,13 @@ const Nav = () => {
   const [overwrite, setOverwrite] = useState()
   const activeChartSheet = activeChartSheetId ? chartSheets?.[activeChartSheetId] : null;
   const activeChartMeta = activeChartSheet?.chartMeta || loadedChartMeta;
+  const currentProjectSizeSummary = useMemo(() => {
+    const summary = summarizeProjectSizeFromSheets(dataSheets);
+    if (summary.sheetCount === 0 && Array.isArray(connectedData) && connectedData.length > 0) {
+      return { ...summary, sheetCount: 1, totalRows: connectedData.length, previewRows: connectedData.length };
+    }
+    return summary;
+  }, [connectedData, dataSheets]);
 
   const handleStartNewProject = () => {
     const ok = window.confirm("Start a new project? This clears your current loaded workspace state.");
@@ -927,6 +1004,9 @@ const Nav = () => {
                       </Button>
                   )}
                   {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
+                    <ProjectDataUsageIndicator summary={currentProjectSizeSummary} />
+                  )}
+                  {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
                       <Dialog
                         open={saveIsOpen}
                         onOpenChange={(open) => {
@@ -1038,6 +1118,7 @@ const Nav = () => {
                                     ? String(row.dataSet?.data_set_name || "").trim() || "Untitled project"
                                     : row.name
                                 const ds = row.dataSet
+                                const projectSize = ds ? summarizeProjectSizeFromSheets(ds.data_sheets) : null
                                 return (
                                   <div
                                     key={row.key}
@@ -1057,6 +1138,26 @@ const Nav = () => {
                                               Edited: {moment(ds.last_saved_date).format("ddd MMM YY h:mm a")}
                                             </div>
                                           )}
+                                          {row.kind === "dataset" && projectSize ? (
+                                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                                              <span>
+                                                Project size: {formatCompactNumber(projectSize.totalRows)} rows
+                                              </span>
+                                              <span>•</span>
+                                              <span>{projectSize.sheetCount} sheet{projectSize.sheetCount === 1 ? "" : "s"}</span>
+                                              {projectSize.estimatedBytes > 0 ? (
+                                                <>
+                                                  <span>•</span>
+                                                  <span>{formatBytes(projectSize.estimatedBytes)} source estimate</span>
+                                                </>
+                                              ) : null}
+                                              {projectSize.provenanceSheets > 0 ? (
+                                                <Badge variant="secondary" className="h-4 px-1 py-0 text-[9px]">
+                                                  {projectSize.provenanceSheets} preview-backed
+                                                </Badge>
+                                              ) : null}
+                                            </div>
+                                          ) : null}
                                         </div>
                                         <div className="flex shrink-0 flex-wrap items-center gap-2">
                                           {row.kind === "dataset" && ds?._id && (

@@ -10,10 +10,20 @@
 export function applyDataSetToWorkspace(ds, { setDataSheets, setActiveSheetId, setConnectedData }) {
   const incomingSheets = ds?.data_sheets && typeof ds.data_sheets === "object" ? ds.data_sheets : null;
   if (incomingSheets && Object.keys(incomingSheets).length > 0) {
-    setDataSheets?.(incomingSheets);
+    const normalizedSheets = Object.entries(incomingSheets).reduce((acc, [sheetId, sheet]) => {
+      const mode = sheet?.storageMode === "provenance" ? "provenance" : "inline";
+      acc[sheetId] = {
+        ...sheet,
+        data: Array.isArray(sheet?.data) ? sheet.data : [],
+        storageMode: mode,
+        rehydrationStatus: mode === "provenance" ? (sheet?.rehydrationStatus || "preview") : "complete",
+      };
+      return acc;
+    }, {});
+    setDataSheets?.(normalizedSheets);
     const firstId = Object.keys(incomingSheets)[0];
     setActiveSheetId?.(firstId);
-    const firstRows = incomingSheets?.[firstId]?.data || [];
+    const firstRows = normalizedSheets?.[firstId]?.data || [];
     setConnectedData?.(firstRows);
     return;
   }
