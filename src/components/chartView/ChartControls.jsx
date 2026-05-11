@@ -288,7 +288,27 @@ export default function ChartControls() {
     const pick = Math.min(n - 1, Math.max(chromeSlots, fromEnd));
     return p[pick] ?? p[n - 1] ?? fallbackSeriesColor;
   };
-  const getSeriesColor = (seriesColumn, index) => lineColorOverrides?.[seriesColumn] || defaultSeriesColorAt(index);
+  const seriesInstanceKey = (index) => `line:${index}`;
+  const getSeriesColor = (seriesColumn, index) =>
+    lineColorOverrides?.[seriesInstanceKey(index)] ||
+    lineColorOverrides?.[seriesColumn] ||
+    defaultSeriesColorAt(index);
+  const setSeriesColorOverride = (index, color) => {
+    const key = seriesInstanceKey(index);
+    setLineColorOverrides((prev) => ({
+      ...(prev || {}),
+      [key]: color,
+    }));
+  };
+  const clearSeriesColorOverride = (index, legacyKey = null) => {
+    const key = seriesInstanceKey(index);
+    setLineColorOverrides((prev) => {
+      const next = { ...(prev || {}) };
+      delete next[key];
+      if (legacyKey) delete next[legacyKey];
+      return next;
+    });
+  };
   const getLineColor = (lineColumn, index) => getSeriesColor(lineColumn, index);
   const filterOperatorOptions = [
     { value: "=", label: "=" },
@@ -722,21 +742,10 @@ export default function ChartControls() {
                                   ) : null}
                                 </Badge>
                                 <ChartColorPalettePopover
-                                  value={lineColorOverrides?.[lineColumn] ?? null}
+                                  value={lineColorOverrides?.[seriesInstanceKey(index)] ?? lineColorOverrides?.[lineColumn] ?? null}
                                   swatchColor={getLineColor(lineColumn, index)}
-                                  onChange={(color) =>
-                                    setLineColorOverrides((prev) => ({
-                                      ...(prev || {}),
-                                      [lineColumn]: color,
-                                    }))
-                                  }
-                                  onClear={() =>
-                                    setLineColorOverrides((prev) => {
-                                      const next = { ...(prev || {}) };
-                                      delete next[lineColumn];
-                                      return next;
-                                    })
-                                  }
+                                  onChange={(color) => setSeriesColorOverride(index, color)}
+                                  onClear={() => clearSeriesColorOverride(index, lineColumn)}
                                   ariaLabel={`Pick color for line ${index + 1}`}
                                 />
                               </div>
@@ -832,21 +841,10 @@ export default function ChartControls() {
                                 </SelectContent>
                               </Select>
                               <ChartColorPalettePopover
-                                value={lineColorOverrides?.[yValue] ?? null}
+                                value={lineColorOverrides?.[seriesInstanceKey(index)] ?? lineColorOverrides?.[yValue] ?? null}
                                 swatchColor={getSeriesColor(yValue, index)}
-                                onChange={(color) =>
-                                  setLineColorOverrides((prev) => ({
-                                    ...(prev || {}),
-                                    [yValue]: color,
-                                  }))
-                                }
-                                onClear={() =>
-                                  setLineColorOverrides((prev) => {
-                                    const next = { ...(prev || {}) };
-                                    delete next[yValue];
-                                    return next;
-                                  })
-                                }
+                                onChange={(color) => setSeriesColorOverride(index, color)}
+                                onClear={() => clearSeriesColorOverride(index, yValue)}
                                 ariaLabel={`Pick color for area ${index + 1}`}
                               />
                               {!(selY.length === 1) && (
@@ -964,21 +962,10 @@ export default function ChartControls() {
                                   ) : null}
                                 </Badge>
                                 <ChartColorPalettePopover
-                                  value={lineColorOverrides?.[seriesColumn] ?? null}
+                                  value={lineColorOverrides?.[seriesInstanceKey(index)] ?? lineColorOverrides?.[seriesColumn] ?? null}
                                   swatchColor={getSeriesColor(seriesColumn, index)}
-                                  onChange={(color) =>
-                                    setLineColorOverrides((prev) => ({
-                                      ...(prev || {}),
-                                      [seriesColumn]: color,
-                                    }))
-                                  }
-                                  onClear={() =>
-                                    setLineColorOverrides((prev) => {
-                                      const next = { ...(prev || {}) };
-                                      delete next[seriesColumn];
-                                      return next;
-                                    })
-                                  }
+                                  onChange={(color) => setSeriesColorOverride(index, color)}
+                                  onClear={() => clearSeriesColorOverride(index, seriesColumn)}
                                   ariaLabel={`Pick color for bar ${index + 1}`}
                                 />
                               </div>

@@ -1782,7 +1782,8 @@ export function ChartCanvas() {
   };
 
   const seriesColorFor = (yKey, idx) => {
-    const override = yKey ? lineColorOverrides?.[yKey] : null;
+    const instanceKey = `line:${idx}`;
+    const override = lineColorOverrides?.[instanceKey] || (yKey ? lineColorOverrides?.[yKey] : null);
     return override || seriesColorAt(idx);
   };
   const yAxisFormatter = (raw) => {
