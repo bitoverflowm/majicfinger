@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -96,12 +95,8 @@ export default function ChartControls() {
     setLivelineColorChoice,
     LIVELINE_COLOR_OPTIONS,
 
-    chartFilterColumn,
-    setChartFilterColumn,
-    chartFilterType,
-    chartFilterDistinct,
-    chartFilterConfig,
-    setChartFilterConfig,
+    chartLineFilters,
+    setChartLineFilters,
     tooltipShowXValue,
     setTooltipShowXValue,
     tooltipShowYValue,
@@ -229,7 +224,6 @@ export default function ChartControls() {
   const xAxisSelectValue = selX ?? CHART_X_AXIS_NONE;
   const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
 
-  const addableLineColumns = (xOptions || []).filter((c) => c !== selX && !(selY || []).includes(c));
   const parseScopedLineKey = (value) => {
     const raw = String(value || "");
     const splitIdx = raw.indexOf("::");
@@ -240,7 +234,6 @@ export default function ChartControls() {
     .map((group) => {
       const sx = parseScopedLineKey(selX || "");
       const options = (group.options || []).filter((opt) => {
-        if ((selY || []).includes(opt.value)) return false;
         const ov = parseScopedLineKey(opt.value);
         if (selX) {
           if (sx.isScoped && ov.isScoped) {
@@ -297,6 +290,52 @@ export default function ChartControls() {
   };
   const getSeriesColor = (seriesColumn, index) => lineColorOverrides?.[seriesColumn] || defaultSeriesColorAt(index);
   const getLineColor = (lineColumn, index) => getSeriesColor(lineColumn, index);
+  const filterOperatorOptions = [
+    { value: "=", label: "=" },
+    { value: "!=", label: "!=" },
+    { value: ">", label: ">" },
+    { value: ">=", label: ">=" },
+    { value: "<", label: "<" },
+    { value: "<=", label: "<=" },
+    { value: "contains", label: "contains" },
+    { value: "not_contains", label: "does not contain" },
+    { value: "is_empty", label: "is empty" },
+    { value: "is_not_empty", label: "is not empty" },
+  ];
+  const normalizedChartLineFilters = Array.isArray(chartLineFilters) ? chartLineFilters : [];
+  const chartLineOptions = (selY || []).map((lineColumn, lineIdx) => ({
+    value: `line:${lineIdx}`,
+    lineColumn,
+    label: `Line ${lineIdx + 1}: ${formatColumnLabel(lineColumn)}`,
+  }));
+  const resolveRuleSeriesValue = (seriesKey) => {
+    const raw = String(seriesKey || "");
+    if (chartLineOptions.some((opt) => opt.value === raw)) return raw;
+    return chartLineOptions.find((opt) => opt.lineColumn === raw)?.value || raw;
+  };
+  const addChartLineFilter = (seriesKey = "") => {
+    const fallbackSeries = seriesKey || chartLineOptions[0]?.value || "";
+    const fallbackColumn = (xOptions || []).find(Boolean) || "";
+    if (!fallbackSeries) return;
+    setChartLineFilters((prev) => [
+      ...(Array.isArray(prev) ? prev : []),
+      {
+        id: `chart-filter-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        seriesKey: fallbackSeries,
+        column: fallbackColumn,
+        operator: "=",
+        value: "",
+      },
+    ]);
+  };
+  const updateChartLineFilter = (id, patch) => {
+    setChartLineFilters((prev) =>
+      (Array.isArray(prev) ? prev : []).map((rule) => (rule.id === id ? { ...rule, ...patch } : rule)),
+    );
+  };
+  const removeChartLineFilter = (id) => {
+    setChartLineFilters((prev) => (Array.isArray(prev) ? prev : []).filter((rule) => rule.id !== id));
+  };
 
   const showYAxisFormat =
     selY?.[0] && chartData?.length && getAxisType(selY[0], dataTypes, chartData) === "number";
@@ -1659,101 +1698,115 @@ export default function ChartControls() {
                     </div>
                   </div>
                 )}
-              {!demo && effectiveData?.length > 0 && xOptions?.length > 0 && (
-                <div className="min-w-0 py-2 space-y-2">
-                  <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Filter by column</p>
-                  <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Plot only rows matching filter</p>
-                  <Select
-                    value={chartFilterColumn ?? "__none__"}
-                    onValueChange={(v) => {
-                      setChartFilterColumn(v === "__none__" ? null : v);
-                      setChartFilterConfig({});
-                    }}
-                  >
-                    <SelectTrigger className="h-8 min-w-0 text-xs">
-                      <SelectValue placeholder="No filter" />
-                    </SelectTrigger>
-                    <SelectContent className="text-xs">
-                      <SelectItem value="__none__" className="text-xs">
-                        No filter
-                      </SelectItem>
-                      {xOptions.map((k) => (
-                        <SelectItem key={k} value={k} className="text-xs">
-                          {k}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {chartFilterColumn && chartFilterType === "string" && (
-                    <div className="max-h-[100px] overflow-y-auto space-y-1">
-                      {chartFilterDistinct.slice(0, 20).map((v) => {
-                        const selected = chartFilterConfig.selectedValues || [];
-                        const checked = selected.length === 0 || selected.includes(v);
+              {!demo && effectiveData?.length > 0 && xOptions?.length > 0 && (selY || []).length > 0 && (
+                <div className="min-w-0 space-y-3 py-2">
+                  <div className="space-y-1">
+                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Filter by line</p>
+                    <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+                      Filter chart series only. Sheet data is unchanged.
+                    </p>
+                  </div>
+                  {normalizedChartLineFilters.length > 0 ? (
+                    <div className="space-y-2">
+                      {normalizedChartLineFilters.map((rule, idx) => {
+                        const operatorNeedsValue = !["is_empty", "is_not_empty"].includes(rule.operator);
                         return (
-                          <label key={v} className="flex items-center gap-2 text-xs cursor-pointer">
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(c) => {
-                                const prev = chartFilterConfig.selectedValues || [];
-                                let next;
-                                if (c) {
-                                  next = prev.length === 0 ? prev : prev.includes(v) ? prev : [...prev, v];
-                                } else {
-                                  next = prev.length === 0 ? chartFilterDistinct.filter((x) => x !== v) : prev.filter((x) => x !== v);
-                                }
-                                setChartFilterConfig({ ...chartFilterConfig, selectedValues: next });
-                              }}
-                            />
-                            <span className="truncate">
-                              {String(v).slice(0, 40)}
-                              {String(v).length > 40 ? "…" : ""}
-                            </span>
-                          </label>
+                          <div key={rule.id} className="space-y-1.5 rounded-lg border border-border/70 p-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                Filter {idx + 1}
+                              </span>
+                              <button
+                                type="button"
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold leading-none text-white hover:bg-red-600"
+                                aria-label={`Remove filter ${idx + 1}`}
+                                onClick={() => removeChartLineFilter(rule.id)}
+                              >
+                                -
+                              </button>
+                            </div>
+                            <Select value={resolveRuleSeriesValue(rule.seriesKey)} onValueChange={(v) => updateChartLineFilter(rule.id, { seriesKey: v })}>
+                              <SelectTrigger className="h-8 min-w-0 text-xs">
+                                <SelectValue placeholder="Apply to line" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                {chartLineOptions.map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select value={rule.column || ""} onValueChange={(v) => updateChartLineFilter(rule.id, { column: v })}>
+                              <SelectTrigger className="h-8 min-w-0 text-xs">
+                                <SelectValue placeholder="Column" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                {xOptions.map((k) => (
+                                  <SelectItem key={k} value={k} className="text-xs">
+                                    {formatColumnLabel(k)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-1.5">
+                              <Select
+                                value={rule.operator || "="}
+                                onValueChange={(v) => updateChartLineFilter(rule.id, { operator: v })}
+                              >
+                                <SelectTrigger className="h-8 min-w-0 text-xs">
+                                  <SelectValue placeholder="Operator" />
+                                </SelectTrigger>
+                                <SelectContent className="text-xs">
+                                  {filterOperatorOptions.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                value={rule.value ?? ""}
+                                onChange={(e) => updateChartLineFilter(rule.id, { value: e.target.value })}
+                                placeholder={operatorNeedsValue ? "Value" : "No value needed"}
+                                className="h-8 text-xs"
+                                disabled={!operatorNeedsValue}
+                              />
+                            </div>
+                          </div>
                         );
                       })}
-                      {chartFilterDistinct.length > 20 && <p className="text-[10px] text-muted-foreground">+{chartFilterDistinct.length - 20} more</p>}
                     </div>
+                  ) : (
+                    <p className="rounded-lg border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                      No chart filters yet.
+                    </p>
                   )}
-                  {chartFilterColumn && chartFilterType === "number" && (
-                    <div className="space-y-1">
-                      <Select value={chartFilterConfig.operator ?? ""} onValueChange={(v) => setChartFilterConfig({ ...chartFilterConfig, operator: v })}>
-                        <SelectTrigger className="h-7 min-w-0 text-xs">
-                          <SelectValue placeholder="Operator" />
-                        </SelectTrigger>
-                        <SelectContent className="text-xs">
-                          <SelectItem value="gt">&gt;</SelectItem>
-                          <SelectItem value="gte">≥</SelectItem>
-                          <SelectItem value="lt">&lt;</SelectItem>
-                          <SelectItem value="lte">≤</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={chartFilterConfig.value ?? ""}
-                        onChange={(e) => setChartFilterConfig({ ...chartFilterConfig, value: parseFloat(e.target.value) || 0 })}
-                        placeholder="Value"
-                              className="h-8 text-xs"
-                        type="number"
-                      />
-                    </div>
-                  )}
-                  {chartFilterColumn && chartFilterType === "date" && (
-                    <div className="space-y-1">
-                      <Input
-                        value={chartFilterConfig.from ?? ""}
-                        onChange={(e) => setChartFilterConfig({ ...chartFilterConfig, from: e.target.value || undefined })}
-                        placeholder="From date"
-                        className="h-8 text-xs"
-                        type="date"
-                      />
-                      <Input
-                        value={chartFilterConfig.to ?? ""}
-                        onChange={(e) => setChartFilterConfig({ ...chartFilterConfig, to: e.target.value || undefined })}
-                        placeholder="To date"
-                        className="h-7 text-xs"
-                        type="date"
-                      />
-                    </div>
-                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => addChartLineFilter()}
+                    >
+                      + Add filter
+                    </Button>
+                    {chartLineOptions.length > 1
+                      ? chartLineOptions.map((opt, lineIdx) => (
+                          <Button
+                            key={opt.value}
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs text-muted-foreground"
+                            onClick={() => addChartLineFilter(opt.value)}
+                          >
+                            + Line {lineIdx + 1}
+                          </Button>
+                        ))
+                      : null}
+                  </div>
                 </div>
               )}
                   <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">

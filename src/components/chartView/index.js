@@ -333,7 +333,9 @@ function bucketTemporalRowsForChart(rows, xKey, yKeys, timeframeValue, sortDir =
       bucket.lastRow = row;
     }
     for (const yKey of yKeys || []) {
-      const n = Number(row?.[yKey]);
+      const rawY = row?.[yKey];
+      if (rawY == null || rawY === "") continue;
+      const n = Number(rawY);
       if (!Number.isFinite(n)) continue;
       bucket.sums[yKey] = (bucket.sums[yKey] || 0) + n;
       bucket.counts[yKey] = (bucket.counts[yKey] || 0) + 1;
@@ -351,6 +353,91 @@ function bucketTemporalRowsForChart(rows, xKey, yKeys, timeframeValue, sortDir =
       return out;
     });
   return sortDir === "desc" ? ordered.reverse() : ordered;
+}
+
+function normalizeChartLineFilters(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((rule, idx) => {
+      if (!rule || typeof rule !== "object") return null;
+      const id = String(rule.id || `filter-${idx}-${Date.now()}`);
+      const seriesKey = String(rule.seriesKey || "");
+      const column = String(rule.column || "");
+      const operator = String(rule.operator || "=");
+      const next = {
+        id,
+        seriesKey,
+        column,
+        operator,
+        value: rule.value ?? "",
+      };
+      return next.seriesKey ? next : null;
+    })
+    .filter(Boolean);
+}
+
+function coerceComparableValue(value) {
+  if (value == null || value === "") return { kind: "empty", value: "" };
+  const ms = temporalToMs(value);
+  if (Number.isFinite(ms)) return { kind: "number", value: ms };
+  const n = Number(value);
+  if (Number.isFinite(n)) return { kind: "number", value: n };
+  return { kind: "string", value: String(value).toLowerCase() };
+}
+
+function chartFilterRuleMatches(row, rule) {
+  if (!rule?.column || !rule?.operator) return true;
+  const raw = rowValueForDataKey(row, rule.column);
+  const op = String(rule.operator || "=");
+  if (op === "is_empty") return raw == null || raw === "";
+  if (op === "is_not_empty") return raw != null && raw !== "";
+  const expected = rule.value;
+  if (expected == null || expected === "") return true;
+  if (op === "contains" || op === "not_contains") {
+    const hit = String(raw ?? "").toLowerCase().includes(String(expected).toLowerCase());
+    return op === "not_contains" ? !hit : hit;
+  }
+  const left = coerceComparableValue(raw);
+  const right = coerceComparableValue(expected);
+  const comparable = left.kind === "number" && right.kind === "number";
+  const a = comparable ? left.value : String(raw ?? "").toLowerCase();
+  const b = comparable ? right.value : String(expected ?? "").toLowerCase();
+  if (op === "=" || op === "eq") return a === b;
+  if (op === "!=" || op === "ne") return a !== b;
+  if (op === ">" || op === "gt") return comparable ? a > b : String(a).localeCompare(String(b)) > 0;
+  if (op === ">=" || op === "gte") return comparable ? a >= b : String(a).localeCompare(String(b)) >= 0;
+  if (op === "<" || op === "lt") return comparable ? a < b : String(a).localeCompare(String(b)) < 0;
+  if (op === "<=" || op === "lte") return comparable ? a <= b : String(a).localeCompare(String(b)) <= 0;
+  return true;
+}
+
+function materializeChartSeriesRows(rows, ySeries, filters) {
+  if (!Array.isArray(rows) || !rows.length || !Array.isArray(ySeries) || !ySeries.length) return rows;
+  const seriesById = new Map(ySeries.map((series) => [series.id, series]));
+  const firstSeriesBySource = new Map();
+  for (const series of ySeries) {
+    if (!firstSeriesBySource.has(series.sourceKey)) firstSeriesBySource.set(series.sourceKey, series);
+  }
+  const normalized = normalizeChartLineFilters(filters)
+    .map((rule) => {
+      const target = seriesById.get(rule.seriesKey) || firstSeriesBySource.get(rule.seriesKey);
+      return target ? { ...rule, seriesKey: target.id } : null;
+    })
+    .filter((rule) => rule?.column);
+  const bySeries = new Map();
+  for (const rule of normalized) {
+    if (!bySeries.has(rule.seriesKey)) bySeries.set(rule.seriesKey, []);
+    bySeries.get(rule.seriesKey).push(rule);
+  }
+  return rows.map((row) => {
+    const next = { ...row };
+    for (const series of ySeries) {
+      const rules = bySeries.get(series.id);
+      const keep = !rules?.length || rules.every((rule) => chartFilterRuleMatches(row, rule));
+      next[series.renderKey] = keep ? row?.[series.sourceKey] : null;
+    }
+    return next;
+  }).filter((row) => ySeries.some((series) => row?.[series.renderKey] != null && row?.[series.renderKey] !== ""));
 }
 
 function getDistinctValues(data, colKey) {
@@ -509,6 +596,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
+  const [chartLineFilters, setChartLineFilters] = useState([]);
   /** Hover tooltip: optional X / Y / extra sheet columns from the hovered data row (not plotted). */
   const [tooltipShowXValue, setTooltipShowXValue] = useState(true);
   const [tooltipShowYValue, setTooltipShowYValue] = useState(true);
@@ -609,6 +697,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
     if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
     if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
+    if (Array.isArray(s.chartLineFilters)) setChartLineFilters(normalizeChartLineFilters(s.chartLineFilters));
     if (s.tooltipShowXValue !== undefined) setTooltipShowXValue(!!s.tooltipShowXValue);
     else if (s.legendShowXValue !== undefined) setTooltipShowXValue(!!s.legendShowXValue);
     if (s.tooltipShowYValue !== undefined) setTooltipShowYValue(!!s.tooltipShowYValue);
@@ -735,7 +824,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
         .map((y) => ({ raw: y, resolved: resolveToExistingKey(y) }))
         .filter((p) => !!p.resolved)
         .map((p) => p.resolved);
-      const stable = next.length === curr.length && next.every((v, i) => v === curr[i]);
+      const stable =
+        next.length === curr.length &&
+        next.every((v, i) => v === curr[i]);
       return stable ? curr : next;
     });
   }, [demo, effectiveData, globalColumnOptions, activeSheetId]);
@@ -869,6 +960,24 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     return getDistinctValues(chartData, chartFilterColumn);
   }, [chartFilterColumn, chartData, chartFilterType]);
 
+  useEffect(() => {
+    const selectedY = Array.isArray(selY) ? selY.filter(Boolean) : [];
+    const allowedSeries = new Set([
+      ...selectedY.map((_, idx) => `line:${idx}`),
+      ...selectedY,
+    ]);
+    const allowedColumns = new Set(globalColumnOptions || []);
+    setChartLineFilters((prev) => {
+      const curr = normalizeChartLineFilters(prev);
+      const next = curr.filter((rule) => {
+        if (!allowedSeries.has(rule.seriesKey)) return false;
+        if (rule.column && !allowedColumns.has(rule.column)) return false;
+        return true;
+      });
+      return next.length === curr.length ? prev : next;
+    });
+  }, [selY, globalColumnOptions]);
+
   const livelineData = useMemo(() => {
     if (!chartData?.length || !selX || !selY?.length) return [];
     const valueKey = selY[0];
@@ -919,16 +1028,20 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   }, [selX, dataTypes, chartData, contextStateV2?.dataSheets]);
 
   const scopedKeysInUse = useMemo(() => {
+    const filterColumns = normalizeChartLineFilters(chartLineFilters)
+      .map((rule) => rule.column)
+      .filter(Boolean);
     const keys = [
       selX,
       ...(selY || []),
       lineSeriesColumn,
       chartFilterColumn,
+      ...filterColumns,
       ...tooltipExtraColumns,
       rainbowLegendLabelColumn,
     ].filter(Boolean);
     return keys.some((k) => String(k).includes("::"));
-  }, [selX, selY, lineSeriesColumn, chartFilterColumn, tooltipExtraColumns, rainbowLegendLabelColumn]);
+  }, [selX, selY, lineSeriesColumn, chartFilterColumn, chartLineFilters, tooltipExtraColumns, rainbowLegendLabelColumn]);
 
   const crossSheetChartData = useMemo(() => {
     const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
@@ -944,7 +1057,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       rainbowLegendLabelColumn,
     ].filter(Boolean);
     const tooltipKeys = Array.isArray(tooltipExtraColumns) ? tooltipExtraColumns.filter(Boolean) : [];
-    const neededKeys = new Set([...plotKeyList, ...tooltipKeys]);
+    const filterKeys = normalizeChartLineFilters(chartLineFilters)
+      .map((rule) => rule.column)
+      .filter(Boolean);
+    const neededKeys = new Set([...plotKeyList, ...tooltipKeys, ...filterKeys]);
     if (!neededKeys.size) return chartData || dfltChartData;
     /** Only X/Y (and other plot keys) determine row count. Tooltip-only scoped columns must not truncate the series. */
     const sheetRowCount = (sheetId) => {
@@ -982,6 +1098,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   }, [
     chartData,
     chartFilterColumn,
+    chartLineFilters,
     contextStateV2?.activeSheetId,
     contextStateV2?.dataSheets,
     lineIsTemporalX,
@@ -1110,6 +1227,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     livelineColorChoice,
     chartFilterColumn,
     chartFilterConfig,
+    chartLineFilters,
     tooltipShowXValue,
     tooltipShowYValue,
     tooltipExtraColumns,
@@ -1251,6 +1369,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     chartFilterDistinct,
     chartFilterConfig,
     setChartFilterConfig,
+    chartLineFilters,
+    setChartLineFilters,
     tooltipShowXValue,
     setTooltipShowXValue,
     tooltipShowYValue,
@@ -1438,6 +1558,7 @@ export function ChartCanvas() {
     tooltipShowXValue,
     tooltipShowYValue,
     tooltipExtraColumns,
+    chartLineFilters,
     selChartType,
     chartData,
     dataTypes,
@@ -1513,6 +1634,17 @@ export function ChartCanvas() {
 
   const rawData = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
+  const ySeries = useMemo(
+    () =>
+      yKeys.map((sourceKey, idx) => ({
+        id: `line:${idx}`,
+        sourceKey,
+        renderKey: `__chart_line_${idx}`,
+        label: `Line ${idx + 1}: ${stripSheetScopedColumnKey(sourceKey)}`,
+      })),
+    [yKeys],
+  );
+  const renderedYKeys = useMemo(() => ySeries.map((series) => series.renderKey), [ySeries]);
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
   const axesConfigured = usingSampleFallback || (!!selX && yKeys.length > 0);
   const xKey = selX || "month";
@@ -1548,22 +1680,26 @@ export function ChartCanvas() {
     });
   }, [plotRows, xAxisType, xKey, selX, sortXDir, effectiveTemporalSort]);
 
+  const filteredPlotRows = useMemo(() => {
+    return materializeChartSeriesRows(sortedPlotRows, ySeries, chartLineFilters);
+  }, [sortedPlotRows, ySeries, chartLineFilters]);
+
   const timeframedPlotRows = useMemo(() => {
-    if (!chartUsesTimeframes) return sortedPlotRows;
-    return bucketTemporalRowsForChart(sortedPlotRows, xKey, yKeys, chartTimeframe, sortXDir);
-  }, [chartUsesTimeframes, sortedPlotRows, xKey, yKeys, chartTimeframe, sortXDir]);
+    if (!chartUsesTimeframes) return filteredPlotRows;
+    return bucketTemporalRowsForChart(filteredPlotRows, xKey, renderedYKeys, chartTimeframe, sortXDir);
+  }, [chartUsesTimeframes, filteredPlotRows, xKey, renderedYKeys, chartTimeframe, sortXDir]);
 
   /** Drop non-finite Y (and numeric/date X) so Recharts draws gaps instead of bogus points. */
   const finalRenderedData = useMemo(() => {
     if (!cartesianChart) return timeframedPlotRows;
     return sanitizeCartesianRowsForPlotting(timeframedPlotRows, {
       xKey,
-      yKeys,
+      yKeys: renderedYKeys,
       xAxisType,
       dataTypes,
       getAxisType,
     });
-  }, [cartesianChart, timeframedPlotRows, xKey, yKeys, xAxisType, dataTypes]);
+  }, [cartesianChart, timeframedPlotRows, xKey, renderedYKeys, xAxisType, dataTypes]);
 
   /** Treemap keeps raw pivot labels (not epoch ms). */
   const treemapRows = useMemo(() => {
@@ -1725,6 +1861,10 @@ export function ChartCanvas() {
     );
   };
 
+  const hasChartLineFilters = normalizeChartLineFilters(chartLineFilters).some(
+    (rule) => rule.seriesKey && rule.column,
+  );
+
   const xTooltipLabelFormatter = (label) => {
     const forcedPreset =
       typeof xDateFormatPreset === "string" && xDateFormatPreset.trim()
@@ -1762,11 +1902,11 @@ export function ChartCanvas() {
       rowDetailY: tooltipShowYValue,
       rowDetailExtraKeys: tooltipExtraColumns,
       rowDetailXKey: xKey,
-      rowDetailYKeys: yKeys,
+      rowDetailYKeys: renderedYKeys,
       rowDetailFormatX: xTickFormatter,
       rowDetailFormatY: yAxisFormatter,
     }),
-    [tooltipShowXValue, tooltipShowYValue, tooltipExtraColumns, xKey, yKeys, xTickFormatter, yAxisFormatter],
+    [tooltipShowXValue, tooltipShowYValue, tooltipExtraColumns, xKey, renderedYKeys, xTickFormatter, yAxisFormatter],
   );
 
   const chartBuilderRechartsChromeCss = useMemo(() => {
@@ -1936,15 +2076,16 @@ export function ChartCanvas() {
                             />
                           }
                         />
-                        {yKeys.map((yKey, idx) => (
+                        {ySeries.map((series, idx) => (
                           <Area
-                            key={yKey + idx}
-                            dataKey={yKey}
+                            key={series.id}
+                            dataKey={series.renderKey}
+                            name={series.label}
                             type={lineStyle}
-                            connectNulls
-                            fill={seriesColorFor(yKey, idx)}
+                            connectNulls={!hasChartLineFilters}
+                            fill={seriesColorFor(series.sourceKey, idx)}
                             fillOpacity={0.4}
-                            stroke={seriesColorFor(yKey, idx)}
+                            stroke={seriesColorFor(series.sourceKey, idx)}
                             stackId={"a"}
                           />
                         ))}
@@ -2040,11 +2181,12 @@ export function ChartCanvas() {
                             />
                           }
                         />
-                        {yKeys.map((yKey, idx) => (
+                        {ySeries.map((series, idx) => (
                           <Bar
-                            key={yKey + idx}
-                            dataKey={yKey}
-                            fill={seriesColorFor(yKey, idx)}
+                            key={series.id}
+                            dataKey={series.renderKey}
+                            name={series.label}
+                            fill={seriesColorFor(series.sourceKey, idx)}
                             radius={horizontal ? [0, 4, 4, 0] : 4}
                             stackId={stackedBar ? "a" : idx}
                           >
@@ -2059,7 +2201,7 @@ export function ChartCanvas() {
                                     yKeys.length,
                                   )
                                 : null;
-                              const fill = rainbowFill || seriesColorFor(yKey, idx);
+                              const fill = rainbowFill || seriesColorFor(series.sourceKey, idx);
                               return <Cell key={`cell-${i}`} fill={fill} />;
                             })}
                           </Bar>
@@ -2072,7 +2214,7 @@ export function ChartCanvas() {
                                   className={CHART_CHROME_TEXT_CLASS}
                                   rows={finalRenderedData}
                                   xKey={xKey}
-                                  yKeys={yKeys}
+                                  yKeys={renderedYKeys}
                                   shuffleNonce={rainbowBarShuffleNonce}
                                   xTickFormatter={xTickFormatter}
                                   legendLabelColumn={rainbowLegendLabelColumn}
@@ -2150,13 +2292,14 @@ export function ChartCanvas() {
                             />
                           }
                         />
-                        {yKeys.map((yKey, idx) => (
+                        {ySeries.map((series, idx) => (
                           <Line
-                            key={yKey + idx}
-                            dataKey={yKey}
+                            key={series.id}
+                            dataKey={series.renderKey}
+                            name={series.label}
                             type={lineStyle}
-                            connectNulls
-                            stroke={seriesColorFor(yKey, idx)}
+                            connectNulls={!hasChartLineFilters}
+                            stroke={seriesColorFor(series.sourceKey, idx)}
                             strokeWidth={2}
                             dot={dots && finalRenderedData.length <= 40}
                           >

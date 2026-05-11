@@ -61,6 +61,7 @@ import {
   ArrowDown,
   Calendar,
   X,
+  Copy,
   Download,
   BarChart2,
   Sigma,
@@ -86,6 +87,18 @@ const DATE_LIKE = /^\d{4}-\d{2}-\d{2}/;
 const QUARTER_LIKE = /^Q([1-4])\s*'?\s*(\d{2})$/i;
 const MONTH_LIKE = /^(\d{4})-(\d{2})$/;
 const YEAR_LIKE = /^(\d{4})$/;
+const SHEET_JSON_INITIAL_ROWS = 40;
+const SHEET_JSON_CHUNK_ROWS = 160;
+
+function stripInternalGridFields(row) {
+  if (!row || typeof row !== "object") return row;
+  const { _origIndex, ...clean } = row;
+  return clean;
+}
+
+function serializeRowsAsJson(rows) {
+  return JSON.stringify((Array.isArray(rows) ? rows : []).map(stripInternalGridFields), null, 2);
+}
 
 function dateBucketToSortKey(val) {
   if (val == null) return null;
@@ -342,6 +355,8 @@ const GridView = ({startNew}) => {
     const [refineProgress, setRefineProgress] = useState(0);
     const [refineProgressLabel, setRefineProgressLabel] = useState("");
     const [sheetJsonViewerOpen, setSheetJsonViewerOpen] = useState(false);
+    const [sheetJsonVisibleRows, setSheetJsonVisibleRows] = useState(SHEET_JSON_INITIAL_ROWS);
+    const [sheetJsonAppending, setSheetJsonAppending] = useState(false);
 
     const sheetColumnsForProps = useMemo(() => {
       const row0 = Array.isArray(connectedData) && connectedData.length ? connectedData[0] : null;
@@ -351,18 +366,69 @@ const GridView = ({startNew}) => {
         .sort();
     }, [connectedData]);
 
-    const activeSheetJsonText = useMemo(() => {
-      const rows = Array.isArray(connectedData) ? connectedData : [];
-      try {
-        return JSON.stringify(rows, null, 2);
-      } catch (e) {
-        return JSON.stringify(
-          { error: "Could not serialize sheet rows", detail: String(e?.message || e) },
-          null,
-          2,
-        );
+    useEffect(() => {
+      if (!sheetJsonViewerOpen) return;
+      setSheetJsonVisibleRows(SHEET_JSON_INITIAL_ROWS);
+      setSheetJsonAppending(false);
+    }, [sheetJsonViewerOpen, activeSheetId]);
+
+    const activeSheetRowsForJson = Array.isArray(connectedData) ? connectedData : [];
+    const sheetJsonLoadedCount = Math.min(sheetJsonVisibleRows, activeSheetRowsForJson.length);
+    const sheetJsonLoadPct = activeSheetRowsForJson.length
+      ? Math.round((sheetJsonLoadedCount / activeSheetRowsForJson.length) * 100)
+      : 100;
+    const visibleSheetJsonRows = useMemo(
+      () => activeSheetRowsForJson.slice(0, sheetJsonLoadedCount),
+      [activeSheetRowsForJson, sheetJsonLoadedCount],
+    );
+    const loadMoreSheetJsonRows = useCallback(() => {
+      if (!sheetJsonViewerOpen || sheetJsonAppending) return;
+      setSheetJsonAppending(true);
+      window.setTimeout(() => {
+        setSheetJsonVisibleRows((prev) => Math.min(activeSheetRowsForJson.length, prev + SHEET_JSON_CHUNK_ROWS));
+        setSheetJsonAppending(false);
+      }, 0);
+    }, [sheetJsonViewerOpen, sheetJsonAppending, activeSheetRowsForJson.length]);
+    const handleSheetJsonScroll = useCallback(
+      (event) => {
+        const el = event.currentTarget;
+        if (!el || sheetJsonLoadedCount >= activeSheetRowsForJson.length) return;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 120) {
+          loadMoreSheetJsonRows();
+        }
+      },
+      [activeSheetRowsForJson.length, loadMoreSheetJsonRows, sheetJsonLoadedCount],
+    );
+    const copySheetJson = useCallback(async () => {
+      if (!activeSheetRowsForJson.length) {
+        toast.error("No sheet data to copy.");
+        return;
       }
-    }, [connectedData]);
+      try {
+        await navigator.clipboard.writeText(serializeRowsAsJson(activeSheetRowsForJson));
+        toast.success("Sheet JSON copied");
+      } catch (e) {
+        toast.error("Could not copy JSON");
+      }
+    }, [activeSheetRowsForJson]);
+    const downloadSheetJson = useCallback(() => {
+      if (!activeSheetRowsForJson.length) {
+        toast.error("No sheet data to download.");
+        return;
+      }
+      const blob = new Blob([serializeRowsAsJson(activeSheetRowsForJson)], { type: "application/json;charset=utf-8;" });
+      const nm =
+        activeSheetId && dataSheets?.[activeSheetId]?.name
+          ? String(dataSheets[activeSheetId].name).replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "")
+          : "sheet";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${nm || "sheet"}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Sheet JSON downloaded");
+    }, [activeSheetRowsForJson, activeSheetId, dataSheets]);
 
     const getColField = (col) => (col && typeof col === "object" && "field" in col ? col.field : col);
     const setColField = (col, nextField) =>
@@ -3006,7 +3072,7 @@ const GridView = ({startNew}) => {
 
                 <Dialog open={sheetJsonViewerOpen} onOpenChange={setSheetJsonViewerOpen}>
                   <DialogContent className="sm:max-w-[min(90vw,720px)] max-h-[min(85dvh,640px)] flex flex-col gap-3">
-                    <DialogHeader>
+                    <DialogHeader className="pr-20">
                       <DialogTitle>Sheet as JSON</DialogTitle>
                       <DialogDescription>
                         {(() => {
@@ -3014,16 +3080,94 @@ const GridView = ({startNew}) => {
                             activeSheetId && dataSheets?.[activeSheetId]?.name
                               ? String(dataSheets[activeSheetId].name)
                               : null;
-                          const n = Array.isArray(connectedData) ? connectedData.length : 0;
+                          const n = activeSheetRowsForJson.length;
                           return nm
                             ? `Active sheet “${nm}” — read-only snapshot of ${n} row${n === 1 ? "" : "s"} loaded in the grid.`
                             : `Active sheet — ${n} row${n === 1 ? "" : "s"} loaded in the grid.`;
                         })()}
                       </DialogDescription>
+                      <div className="absolute right-12 top-5 flex items-center gap-1.5">
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label="Copy sheet JSON"
+                                onClick={copySheetJson}
+                              >
+                                <Copy className="h-4 w-4" aria-hidden />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              Copy JSON
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label="Download sheet JSON"
+                                onClick={downloadSheetJson}
+                              >
+                                <Download className="h-4 w-4" aria-hidden />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              Download JSON
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </DialogHeader>
-                    <pre className="min-h-0 max-h-[min(55dvh,480px)] flex-1 overflow-auto rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] leading-snug font-mono whitespace-pre break-words">
-                      {activeSheetJsonText}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                        <span>
+                          Showing {sheetJsonLoadedCount.toLocaleString()} of {activeSheetRowsForJson.length.toLocaleString()} rows
+                        </span>
+                        <span>{sheetJsonLoadPct}%</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-slate-900 transition-[width] duration-200 dark:bg-slate-100"
+                          style={{ width: `${sheetJsonLoadPct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <pre
+                      className="min-h-0 max-h-[min(55dvh,480px)] flex-1 overflow-auto rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] leading-snug font-mono whitespace-pre break-words"
+                      onScroll={handleSheetJsonScroll}
+                    >
+                      {`[\n`}
+                      {visibleSheetJsonRows.map((row, idx) => {
+                        let text = "";
+                        try {
+                          text = JSON.stringify(stripInternalGridFields(row), null, 2)
+                            .split("\n")
+                            .map((line) => `  ${line}`)
+                            .join("\n");
+                        } catch (e) {
+                          text = `  ${JSON.stringify({ error: "Could not serialize row", detail: String(e?.message || e) })}`;
+                        }
+                        const hasMoreRows = idx < visibleSheetJsonRows.length - 1;
+                        return `${text}${hasMoreRows ? "," : ""}\n`;
+                      })}
+                      {`]`}
                     </pre>
+                    <div className="min-h-4 text-[10px] text-muted-foreground">
+                      {sheetJsonAppending
+                        ? "Loading more JSON rows..."
+                        : sheetJsonLoadedCount < activeSheetRowsForJson.length
+                          ? `${(activeSheetRowsForJson.length - sheetJsonLoadedCount).toLocaleString()} more row${activeSheetRowsForJson.length - sheetJsonLoadedCount === 1 ? "" : "s"} available. Scroll to load more.`
+                          : "All loaded rows are visible."}
+                    </div>
                     <DialogFooter>
                       <Button type="button" variant="outline" onClick={() => setSheetJsonViewerOpen(false)}>
                         Close

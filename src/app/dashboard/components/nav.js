@@ -301,6 +301,10 @@ const Nav = () => {
   const [saveProjectBusy, setSaveProjectBusy] = useState(false)
   const [saveProjectProgress, setSaveProjectProgress] = useState(0)
   const [saveProjectMessage, setSaveProjectMessage] = useState("")
+  const [loadProjectBusy, setLoadProjectBusy] = useState(false)
+  const [loadProjectProgress, setLoadProjectProgress] = useState(0)
+  const [loadProjectMessage, setLoadProjectMessage] = useState("")
+  const [loadProjectTargetId, setLoadProjectTargetId] = useState(null)
   const [projectNameInput, setProjectNameInput] = useState("")
   const [runtimeOrigin, setRuntimeOrigin] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -706,29 +710,63 @@ const Nav = () => {
     });
 
   const loadDataSheet = async (dataSetId, dataSet) => {
-    if(loadedDataMeta && dataSetId === loadedDataMeta._id){
-      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1)
-      setViewing('dataStart')
-      setIsOpen(false)
-    }else{
-      fetch(`/api/dataSets/dataSet/${dataSetId}`, {
+    if (!dataSetId || loadProjectBusy) return;
+    const bumpLoad = (pct, message) => {
+      setLoadProjectProgress(pct);
+      setLoadProjectMessage(message);
+    };
+    setLoadProjectBusy(true);
+    setLoadProjectTargetId(String(dataSetId));
+    bumpLoad(6, "Preparing project load…");
+    try {
+      if (loadedDataMeta && dataSetId === loadedDataMeta._id) {
+        bumpLoad(40, "Project already loaded. Refreshing project links…");
+        setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+        bumpLoad(90, "Opening data sheets…");
+        setViewing('dataStart');
+        setIsOpen(false);
+        return;
+      }
+
+      bumpLoad(18, "Loading data sheets…");
+      const response = await fetch(`/api/dataSets/dataSet/${dataSetId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-      }).then(response => response.json())
-        .then(res =>{
-          applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData })
-          setLoadedDataMeta(res.data || dataSet)
-          hydrateProjectCharts(dataSetId)
-          setRefetchChartDashboardsTick?.((t) => (t || 0) + 1)
-          toast.success(`Data: ${res.data.data_set_name} loaded`, {
-            duration: 99999999
-          })
-          setIsOpen(false)
-          setViewing('dataStart')
-        })
-    }    
+      });
+      const res = await response.json();
+      if (!response.ok || !res?.data) {
+        throw new Error(res?.message || "Failed to load project");
+      }
+
+      bumpLoad(45, "Hydrating data sheets into the workspace…");
+      applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData });
+      setLoadedDataMeta(res.data || dataSet);
+
+      bumpLoad(68, "Loading charts…");
+      await hydrateProjectCharts(dataSetId);
+
+      bumpLoad(84, "Loading dashboards and publish settings…");
+      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+
+      bumpLoad(96, "Opening project workspace…");
+      toast.success(`Project: ${res.data.data_set_name || dataSet?.data_set_name || "Untitled"} loaded`, {
+        duration: 99999999
+      });
+      setIsOpen(false);
+      setViewing('dataStart');
+    } catch (error) {
+      console.error("Error loading project:", error);
+      toast.error(error?.message || "Failed to load project.");
+    } finally {
+      setTimeout(() => {
+        setLoadProjectBusy(false);
+        setLoadProjectProgress(0);
+        setLoadProjectMessage("");
+        setLoadProjectTargetId(null);
+      }, 300);
+    }
   }
 
   const loadOrphanProjectBucket = (row) => {
@@ -1101,6 +1139,20 @@ const Nav = () => {
                               Load a project to open its workbook, charts, and dashboards together. Use the lists below to open a single chart or dashboard.
                             </SheetDescription>
                           </SheetHeader>
+                          {loadProjectBusy ? (
+                            <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+                              <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+                                <span className="inline-flex min-w-0 items-center gap-2 font-medium">
+                                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                                  <span className="truncate">{loadProjectMessage || "Loading project…"}</span>
+                                </span>
+                                <span className="shrink-0 tabular-nums text-muted-foreground">
+                                  {Math.min(100, Math.round(loadProjectProgress))}%
+                                </span>
+                              </div>
+                              <Progress value={loadProjectProgress} className="h-2" />
+                            </div>
+                          ) : null}
                           <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
                             {savedWorkCountLoading ? (
                               <div className="flex justify-center py-16" aria-label="Loading saved work">
@@ -1166,9 +1218,17 @@ const Nav = () => {
                                               variant="default"
                                               size="sm"
                                               className="h-7 px-2 text-xs"
+                                              disabled={loadProjectBusy}
                                               onClick={() => loadDataSheet(ds._id, ds)}
                                             >
-                                              Load project
+                                              {loadProjectBusy && loadProjectTargetId === String(ds._id) ? (
+                                                <>
+                                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                                  Loading
+                                                </>
+                                              ) : (
+                                                "Load project"
+                                              )}
                                             </Button>
                                           )}
                                           {row.kind === "orphan" && (
@@ -1177,6 +1237,7 @@ const Nav = () => {
                                               variant="default"
                                               size="sm"
                                               className="h-7 px-2 text-xs"
+                                              disabled={loadProjectBusy}
                                               onClick={() => loadOrphanProjectBucket(row)}
                                             >
                                               Load project
