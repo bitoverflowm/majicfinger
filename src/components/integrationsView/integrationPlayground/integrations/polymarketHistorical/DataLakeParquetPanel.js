@@ -3488,6 +3488,308 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 )}
 
                 <div className="space-y-2 min-w-0">
+                  {composeJoins.length > 0 && (
+                    <div className="space-y-2">
+                      {composeJoins.map((jr, idx) => {
+                        const targetIsSheet = jr.targetKind === "sheet";
+                        const targetTable = String(jr.targetTable || "").trim().toLowerCase();
+                        const rightCols = targetIsSheet
+                          ? (() => {
+                              const sheet = dataSheets?.[jr.targetSheetId];
+                              const row0 = Array.isArray(sheet?.data) ? sheet.data[0] : null;
+                              return row0 && typeof row0 === "object" ? Object.keys(row0) : [];
+                            })()
+                          : getColumnMetaForTable(dataset, targetTable || "markets").map((c) => c.name);
+
+                        return (
+                          <div
+                            key={jr.id}
+                            className="flex flex-wrap items-center gap-2"
+                          >
+                            <Select
+                              value={jr.targetKind}
+                              onValueChange={(v) => {
+                                const kind = v === "sheet" ? "sheet" : "table";
+                                setComposeJoins((prev) =>
+                                  (prev || []).map((r) =>
+                                    r.id === jr.id
+                                      ? {
+                                          ...r,
+                                          targetKind: kind,
+                                          targetTable: kind === "table" ? (r.targetTable || "markets") : "",
+                                          targetSheetId: kind === "sheet" ? (r.targetSheetId || activeSheetId || "") : "",
+                                          rightColumn: "",
+                                        }
+                                      : r,
+                                  ),
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs w-[9rem] min-w-0">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="table" className="text-xs">
+                                  Glue table
+                                </SelectItem>
+                                <SelectItem value="sheet" className="text-xs">
+                                  Sheet
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {jr.targetKind === "table" ? (
+                              <Select
+                                value={jr.targetTable || ""}
+                                onValueChange={(v) =>
+                                  setComposeJoins((prev) =>
+                                    (prev || []).map((r) => (r.id === jr.id ? { ...r, targetTable: v, rightColumn: "" } : r)),
+                                  )
+                                }
+                              >
+                                <SelectTrigger className="h-8 text-xs w-[10rem] min-w-0">
+                                  <SelectValue placeholder="Table" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {glueJoinTableOptions.map((t) => (
+                                    <SelectItem key={t} value={t} className="text-xs">
+                                      {t}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Select
+                                value={jr.targetSheetId || ""}
+                                onValueChange={(v) =>
+                                  setComposeJoins((prev) =>
+                                    (prev || []).map((r) => (r.id === jr.id ? { ...r, targetSheetId: v, rightColumn: "" } : r)),
+                                  )
+                                }
+                              >
+                                <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
+                                  <SelectValue placeholder="Pick sheet" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {sheetJoinCandidates.map((s) => (
+                                    <SelectItem key={s.id} value={s.id} className="text-xs">
+                                      {s.name} ({s.rowCount})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+
+                            <Select
+                              value={jr.joinType}
+                              onValueChange={(v) => {
+                                const jt = v === "left" ? "left" : "inner";
+                                setComposeJoins((prev) =>
+                                  (prev || []).map((r) => (r.id === jr.id ? { ...r, joinType: jt } : r)),
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs w-[7rem] min-w-0">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="inner" className="text-xs">
+                                  Inner
+                                </SelectItem>
+                                <SelectItem value="left" className="text-xs">
+                                  Left
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {targetIsSheet && (
+                              <>
+                                <span className="text-xs text-muted-foreground">merge</span>
+                                <Select
+                                  value={jr.mergeStrategy || "server"}
+                                  onValueChange={(v) => {
+                                    const ms = v === "server" ? "server" : "browser";
+                                    setComposeJoins((prev) =>
+                                      (prev || []).map((r) => (r.id === jr.id ? { ...r, mergeStrategy: ms } : r)),
+                                    );
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 text-xs w-[11rem] min-w-0">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="browser" className="text-xs">
+                                      Browser ({athenaRowLimit}-row preview)
+                                    </SelectItem>
+                                    <SelectItem value="server" className="text-xs">
+                                      Server (full dataset via CTE)
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            )}
+
+                            <span className="text-xs text-muted-foreground">on</span>
+
+                            <Select
+                              value={jr.leftColumn || ""}
+                              onValueChange={(v) =>
+                                setComposeJoins((prev) =>
+                                  (prev || []).map((r) => (r.id === jr.id ? { ...r, leftColumn: v } : r)),
+                                )
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
+                                <SelectValue placeholder="Left column" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableColumns.map((c) => (
+                                  <SelectItem key={c} value={c} className="text-xs">
+                                    {c}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <span className="text-xs text-muted-foreground">=</span>
+
+                            <Select
+                              value={jr.rightColumn || ""}
+                              onValueChange={(v) =>
+                                setComposeJoins((prev) =>
+                                  (prev || []).map((r) => (r.id === jr.id ? { ...r, rightColumn: v } : r)),
+                                )
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
+                                <SelectValue placeholder="Right column" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(rightCols || []).map((c) => (
+                                  <SelectItem key={c} value={c} className="text-xs">
+                                    {c}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => setComposeJoins((prev) => (prev || []).filter((r) => r.id !== jr.id))}
+                              aria-label="Remove join"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+
+                            {targetIsSheet && (
+                              <p className="w-full text-[11px] text-muted-foreground leading-snug">
+                                Browser merges your current sheet preview rows; Server recomputes the join on the full dataset using Athena/Glue (CTE).
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {columnComposeOrderBy.length !== 0 && (
+                    <div className="space-y-2">
+                      {columnComposeOrderBy.map((ob, obIdx) => (
+                        <div
+                          key={`${ob.alias}-${obIdx}`}
+                          className="flex flex-wrap items-center gap-2"
+                        >
+                          <Select
+                            value={ob.alias}
+                            onValueChange={(v) => {
+                              setColumnComposeOrderBy((prev) =>
+                                prev.map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
+                              <SelectValue placeholder="Column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {composeSelectAliasChoices.map((c) => (
+                                <SelectItem key={c.alias} value={c.alias} className="text-xs">
+                                  {c.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={ob.direction}
+                            onValueChange={(v) => {
+                              setColumnComposeOrderBy((prev) =>
+                                prev.map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs w-[11rem] min-w-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="asc" className="text-xs">
+                                Ascending (A→Z, low→high)
+                              </SelectItem>
+                              <SelectItem value="desc" className="text-xs">
+                                Descending (Z→A, high→low)
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() =>
+                              setColumnComposeOrderBy((prev) => prev.filter((_, j) => j !== obIdx))
+                            }
+                            aria-label="Remove sort"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {composeLimitRuleOpen ? (
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">Max rows</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className="h-8 w-[5.5rem] text-xs min-w-0"
+                        value={composeLimitRuleValue}
+                        onChange={(e) => setComposeLimitRuleValue(e.target.value)}
+                        aria-label="Maximum rows returned from Athena (SQL LIMIT)"
+                      />
+                      <TooltipProvider delayDuration={250}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground hover:bg-muted/60"
+                              onClick={() => {
+                                setComposeLimitRuleOpen(false);
+                                setComposeLimitRuleValue("");
+                              }}
+                              aria-label="Remove row limit"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            Remove limit (use your tier default cap)
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
                     <Button
                       type="button"
@@ -3497,8 +3799,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       disabled={!selected?.table || availableColumns.length === 0}
                       onClick={addComposeJoinRule}
                     >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Join
+                      join
                     </Button>
                     <Button
                       type="button"
@@ -3508,8 +3809,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       disabled={composeSelectAliasChoices.length === 0}
                       onClick={addComposeOrderByClause}
                     >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add sort rule
+                      sort
                     </Button>
                     {!composeLimitRuleOpen ? (
                       <Button
@@ -3523,43 +3823,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                           setComposeLimitRuleValue((v) => (String(v || "").trim() ? v : String(Math.min(1000, athenaRowLimit))));
                         }}
                       >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Row limit
+                        row limit
                       </Button>
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">Max rows</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          step={1}
-                          className="h-8 w-[5.5rem] text-xs min-w-0"
-                          value={composeLimitRuleValue}
-                          onChange={(e) => setComposeLimitRuleValue(e.target.value)}
-                          aria-label="Maximum rows returned from Athena (SQL LIMIT)"
-                        />
-                        <TooltipProvider delayDuration={250}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground hover:bg-muted/60"
-                                onClick={() => {
-                                  setComposeLimitRuleOpen(false);
-                                  setComposeLimitRuleValue("");
-                                }}
-                                aria-label="Remove row limit"
-                              >
-                                <Minus className="h-3 w-3" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                              Remove limit (use your tier default cap)
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
@@ -4297,274 +4563,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 {loading && (selectionTab === "columns" || selectionTab === "recipes") ? (
                   <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pt-1" />
                 ) : null}
-                {composeJoins.length > 0 && (
-                  <div className="space-y-2">
-                    {composeJoins.map((jr, idx) => {
-                      const targetIsSheet = jr.targetKind === "sheet";
-                      const targetTable = String(jr.targetTable || "").trim().toLowerCase();
-                      const rightCols = targetIsSheet
-                        ? (() => {
-                            const sheet = dataSheets?.[jr.targetSheetId];
-                            const row0 = Array.isArray(sheet?.data) ? sheet.data[0] : null;
-                            return row0 && typeof row0 === "object" ? Object.keys(row0) : [];
-                          })()
-                        : getColumnMetaForTable(dataset, targetTable || "markets").map((c) => c.name);
-
-                      return (
-                        <div
-                          key={jr.id}
-                          className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/80 p-2"
-                        >
-                          <Select
-                            value={jr.targetKind}
-                            onValueChange={(v) => {
-                              const kind = v === "sheet" ? "sheet" : "table";
-                              setComposeJoins((prev) =>
-                                (prev || []).map((r) =>
-                                  r.id === jr.id
-                                    ? {
-                                        ...r,
-                                        targetKind: kind,
-                                        targetTable: kind === "table" ? (r.targetTable || "markets") : "",
-                                        targetSheetId: kind === "sheet" ? (r.targetSheetId || activeSheetId || "") : "",
-                                        rightColumn: "",
-                                      }
-                                    : r,
-                                ),
-                              );
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs w-[9rem] min-w-0">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="table" className="text-xs">
-                                Glue table
-                              </SelectItem>
-                              <SelectItem value="sheet" className="text-xs">
-                                Sheet
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          {jr.targetKind === "table" ? (
-                            <Select
-                              value={jr.targetTable || ""}
-                              onValueChange={(v) =>
-                                setComposeJoins((prev) =>
-                                  (prev || []).map((r) => (r.id === jr.id ? { ...r, targetTable: v, rightColumn: "" } : r)),
-                                )
-                              }
-                            >
-                              <SelectTrigger className="h-8 text-xs w-[10rem] min-w-0">
-                                <SelectValue placeholder="Table" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {glueJoinTableOptions.map((t) => (
-                                  <SelectItem key={t} value={t} className="text-xs">
-                                    {t}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Select
-                              value={jr.targetSheetId || ""}
-                              onValueChange={(v) =>
-                                setComposeJoins((prev) =>
-                                  (prev || []).map((r) => (r.id === jr.id ? { ...r, targetSheetId: v, rightColumn: "" } : r)),
-                                )
-                              }
-                            >
-                              <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
-                                <SelectValue placeholder="Pick sheet" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {sheetJoinCandidates.map((s) => (
-                                  <SelectItem key={s.id} value={s.id} className="text-xs">
-                                    {s.name} ({s.rowCount})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-
-                          <Select
-                            value={jr.joinType}
-                            onValueChange={(v) => {
-                              const jt = v === "left" ? "left" : "inner";
-                              setComposeJoins((prev) =>
-                                (prev || []).map((r) => (r.id === jr.id ? { ...r, joinType: jt } : r)),
-                              );
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs w-[7rem] min-w-0">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="inner" className="text-xs">
-                                Inner
-                              </SelectItem>
-                              <SelectItem value="left" className="text-xs">
-                                Left
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          {targetIsSheet && (
-                            <>
-                              <span className="text-xs text-muted-foreground">merge</span>
-                              <Select
-                                value={jr.mergeStrategy || "server"}
-                                onValueChange={(v) => {
-                                  const ms = v === "server" ? "server" : "browser";
-                                  setComposeJoins((prev) =>
-                                    (prev || []).map((r) => (r.id === jr.id ? { ...r, mergeStrategy: ms } : r)),
-                                  );
-                                }}
-                              >
-                                <SelectTrigger className="h-8 text-xs w-[11rem] min-w-0">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="browser" className="text-xs">
-                                    Browser ({athenaRowLimit}-row preview)
-                                  </SelectItem>
-                                  <SelectItem value="server" className="text-xs">
-                                    Server (full dataset via CTE)
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </>
-                          )}
-
-                          <span className="text-xs text-muted-foreground">on</span>
-
-                          <Select
-                            value={jr.leftColumn || ""}
-                            onValueChange={(v) =>
-                              setComposeJoins((prev) =>
-                                (prev || []).map((r) => (r.id === jr.id ? { ...r, leftColumn: v } : r)),
-                              )
-                            }
-                          >
-                            <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
-                              <SelectValue placeholder="Left column" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableColumns.map((c) => (
-                                <SelectItem key={c} value={c} className="text-xs">
-                                  {c}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-
-                          <span className="text-xs text-muted-foreground">=</span>
-
-                          <Select
-                            value={jr.rightColumn || ""}
-                            onValueChange={(v) =>
-                              setComposeJoins((prev) =>
-                                (prev || []).map((r) => (r.id === jr.id ? { ...r, rightColumn: v } : r)),
-                              )
-                            }
-                          >
-                            <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
-                              <SelectValue placeholder="Right column" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(rightCols || []).map((c) => (
-                                <SelectItem key={c} value={c} className="text-xs">
-                                  {c}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            onClick={() => setComposeJoins((prev) => (prev || []).filter((r) => r.id !== jr.id))}
-                            aria-label="Remove join"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-
-                          {targetIsSheet && (
-                            <p className="w-full text-[11px] text-muted-foreground leading-snug">
-                              Browser merges your current sheet preview rows; Server recomputes the join on the full dataset using Athena/Glue (CTE).
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {columnComposeOrderBy.length !== 0 && (
-                  <div className="space-y-2">
-                    {columnComposeOrderBy.map((ob, obIdx) => (
-                      <div
-                        key={`${ob.alias}-${obIdx}`}
-                        className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/80 p-2"
-                      >
-                        <Select
-                          value={ob.alias}
-                          onValueChange={(v) => {
-                            setColumnComposeOrderBy((prev) =>
-                              prev.map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
-                            );
-                          }}
-                        >
-                          <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
-                            <SelectValue placeholder="Column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {composeSelectAliasChoices.map((c) => (
-                              <SelectItem key={c.alias} value={c.alias} className="text-xs">
-                                {c.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select
-                          value={ob.direction}
-                          onValueChange={(v) => {
-                            setColumnComposeOrderBy((prev) =>
-                              prev.map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
-                            );
-                          }}
-                        >
-                          <SelectTrigger className="h-8 text-xs w-[11rem] min-w-0">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="asc" className="text-xs">
-                              Ascending (A→Z, low→high)
-                            </SelectItem>
-                            <SelectItem value="desc" className="text-xs">
-                              Descending (Z→A, high→low)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          onClick={() =>
-                            setColumnComposeOrderBy((prev) => prev.filter((_, j) => j !== obIdx))
-                          }
-                          aria-label="Remove sort"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
     </>
   );
