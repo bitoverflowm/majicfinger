@@ -27,6 +27,7 @@ import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
+import { prepareProjectDataPayload } from "@/lib/projectPersistence"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button"
 import {
@@ -493,28 +494,23 @@ const Nav = () => {
       bump(6, "Saving in progress…");
       await new Promise((r) => requestAnimationFrame(r));
 
-      const sanitizedSheets = Object.entries(dataSheets || {}).reduce((acc, [sheetId, sheet]) => {
-        const rows = Array.isArray(sheet?.data) ? sheet.data : [];
-        const name = String(sheet?.name || sheetId);
-        const hasData = rows.length > 0;
-        const hasName = !!name.trim();
-        if (!hasData && !hasName) return acc;
-        acc[sheetId] = {
-          name: hasName ? name : sheetId,
-          data: rows,
-          provenance: sheet?.provenance ?? null,
-        };
-        return acc;
-      }, {});
-
-      const dataPayload = {
-        data_set_name: projectName,
-        data: connectedData || [],
-        data_sheets: sanitizedSheets,
-        last_saved_date: new Date(),
-        labels: ['project'],
-        source: 'project',
-      };
+      const savePayloadResult = prepareProjectDataPayload({
+        projectName,
+        connectedData,
+        dataSheets,
+        baseFields: {
+          last_saved_date: new Date(),
+          labels: ['project'],
+          source: 'project',
+        },
+      });
+      const dataPayload = savePayloadResult.payload;
+      if (savePayloadResult.mode === "hybrid") {
+        toast.info("Large sheets will save as previews plus replayable query history.");
+      }
+      for (const warning of savePayloadResult.warnings || []) {
+        toast.warning(warning);
+      }
 
       bump(18, "Preparing data sheets…");
       await new Promise((r) => requestAnimationFrame(r));

@@ -62,6 +62,7 @@ import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
 import EquationExprBuilder from "./EquationExprBuilder";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
+import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
 import {
   Dialog,
   DialogClose,
@@ -596,6 +597,16 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; composeFilters?: any; composeAthenaRowLimit?: number | null; sheetJoinSpec?: any; sheetProvenance?: any; requestCard?: any; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
   const ingestAbortControllerRef = useRef(null);
+  const loadProgressRef = useRef(null);
+
+  const scrollToLoadProgress = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        loadProgressRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    });
+  }, []);
 
   const cancelActiveIngest = useCallback(() => {
     ingestAbortControllerRef.current?.abort();
@@ -1646,6 +1657,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
+    scrollToLoadProgress();
     try {
       const { rows, rowCount } = await runIngestWithProgress(
         lk,
@@ -1699,7 +1711,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       setLoading(false);
       setLoadProgress(0);
     }
-  }, [applyRowsToActiveSheet, finalizeIngestSheetRows, refreshBeckerViews, runIngestWithProgress]);
+  }, [applyRowsToActiveSheet, finalizeIngestSheetRows, refreshBeckerViews, runIngestWithProgress, scrollToLoadProgress]);
 
   const executeIngestAppend = useCallback(async () => {
     const pending = pendingIngestRef.current;
@@ -1730,6 +1742,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
+    scrollToLoadProgress();
     try {
       const { rows, rowCount } = await runIngestWithProgress(
         lk,
@@ -1784,6 +1797,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     finalizeIngestSheetRows,
     refreshBeckerViews,
     runIngestWithProgress,
+    scrollToLoadProgress,
     setConnectedData,
   ]);
 
@@ -1818,6 +1832,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
+    scrollToLoadProgress();
 
     const sampleLabel = sampleOptions.find((s) => s.id === sid)?.label || sid;
     const prefix = dataset === "kalshi" ? "Kalshi" : "Polymarket";
@@ -1891,6 +1906,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     refreshBeckerViews,
     runIngestWithProgress,
     sampleOptions,
+    scrollToLoadProgress,
     setDataSheets,
     setSheetData,
   ]);
@@ -3250,7 +3266,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
                 {!isDemo && composeWhereFilters.length > 0 && (
                   <div className="space-y-2 min-w-0">
-                    <Label className="text-xs text-muted-foreground">Where</Label>
+                    <Label className="text-xs text-muted-foreground">where</Label>
                     <div className="space-y-2">
                       {composeWhereFilters.map((f) => (
                         <div key={f.id} className="flex items-center gap-1">
@@ -3288,7 +3304,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               updateComposeWhereFilter(f.id, { column: val, kind, op: nextOp, value: defaultValue });
                             }}
                           >
-                            <SelectTrigger className="h-7 text-[11px] min-w-0 w-16">
+                            <SelectTrigger className="h-7 text-[11px] min-w-[7rem] w-1/4">
                               <SelectValue placeholder="Column" />
                             </SelectTrigger>
                             <SelectContent>
@@ -3502,10 +3518,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                           : getColumnMetaForTable(dataset, targetTable || "markets").map((c) => c.name);
 
                         return (
-                          <div
-                            key={jr.id}
-                            className="flex flex-wrap items-center gap-2"
-                          >
+                          <div key={jr.id} className="space-y-1 min-w-0">
+                            <Label className="text-xs text-muted-foreground">join</Label>
+                            <div className="flex flex-wrap items-center gap-2">
                             <Select
                               value={jr.targetKind}
                               onValueChange={(v) => {
@@ -3525,7 +3540,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                 );
                               }}
                             >
-                              <SelectTrigger className="h-8 text-xs w-[9rem] min-w-0">
+                              <SelectTrigger className="h-8 text-xs min-w-[7rem] w-1/4">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -3673,22 +3688,21 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               </SelectContent>
                             </Select>
 
-                            <Button
+                            <button
                               type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                               onClick={() => setComposeJoins((prev) => (prev || []).filter((r) => r.id !== jr.id))}
                               aria-label="Remove join"
                             >
-                              <Minus className="h-4 w-4" />
-                            </Button>
+                              <Minus className="h-2 w-2" />
+                            </button>
 
                             {targetIsSheet && (
                               <p className="w-full text-[11px] text-muted-foreground leading-snug">
                                 Browser merges your current sheet preview rows; Server recomputes the join on the full dataset using Athena/Glue (CTE).
                               </p>
                             )}
+                            </div>
                           </div>
                         );
                       })}
@@ -3697,97 +3711,98 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   {columnComposeOrderBy.length !== 0 && (
                     <div className="space-y-2">
                       {columnComposeOrderBy.map((ob, obIdx) => (
-                        <div
-                          key={`${ob.alias}-${obIdx}`}
-                          className="flex flex-wrap items-center gap-2"
-                        >
-                          <Select
-                            value={ob.alias}
-                            onValueChange={(v) => {
-                              setColumnComposeOrderBy((prev) =>
-                                prev.map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
-                              );
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs w-[min(100%,14rem)] min-w-0">
-                              <SelectValue placeholder="Column" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {composeSelectAliasChoices.map((c) => (
-                                <SelectItem key={c.alias} value={c.alias} className="text-xs">
-                                  {c.label}
+                        <div key={`${ob.alias}-${obIdx}`} className="space-y-1 min-w-0">
+                          <Label className="text-xs text-muted-foreground">sort</Label>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Select
+                              value={ob.alias}
+                              onValueChange={(v) => {
+                                setColumnComposeOrderBy((prev) =>
+                                  prev.map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs min-w-[7rem] w-1/4">
+                                <SelectValue placeholder="Column" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {composeSelectAliasChoices.map((c) => (
+                                  <SelectItem key={c.alias} value={c.alias} className="text-xs">
+                                    {c.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={ob.direction}
+                              onValueChange={(v) => {
+                                setColumnComposeOrderBy((prev) =>
+                                  prev.map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs min-w-[14rem] w-1/3">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="asc" className="text-xs">
+                                  Ascending (A→Z, low→high)
                                 </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Select
-                            value={ob.direction}
-                            onValueChange={(v) => {
-                              setColumnComposeOrderBy((prev) =>
-                                prev.map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
-                              );
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs w-[11rem] min-w-0">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="asc" className="text-xs">
-                                Ascending (A→Z, low→high)
-                              </SelectItem>
-                              <SelectItem value="desc" className="text-xs">
-                                Descending (Z→A, high→low)
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            onClick={() =>
-                              setColumnComposeOrderBy((prev) => prev.filter((_, j) => j !== obIdx))
-                            }
-                            aria-label="Remove sort"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
+                                <SelectItem value="desc" className="text-xs">
+                                  Descending (Z→A, high→low)
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <button
+                              type="button"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                              onClick={() =>
+                                setColumnComposeOrderBy((prev) => prev.filter((_, j) => j !== obIdx))
+                              }
+                              aria-label="Remove sort"
+                            >
+                              <Minus className="h-2 w-2" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
                   {composeLimitRuleOpen ? (
-                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">Max rows</span>
-                      <Input
-                        type="number"
-                        min={1}
-                        step={1}
-                        className="h-8 w-[5.5rem] text-xs min-w-0"
-                        value={composeLimitRuleValue}
-                        onChange={(e) => setComposeLimitRuleValue(e.target.value)}
-                        aria-label="Maximum rows returned from Athena (SQL LIMIT)"
-                      />
-                      <TooltipProvider delayDuration={250}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground hover:bg-muted/60"
-                              onClick={() => {
-                                setComposeLimitRuleOpen(false);
-                                setComposeLimitRuleValue("");
-                              }}
-                              aria-label="Remove row limit"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-xs">
-                            Remove limit (use your tier default cap)
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    <div className="space-y-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground">row limit</Label>
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <Input
+                          type="number"
+                          min={1}
+                          step={1}
+                          className="h-8 w-1/4 min-w-[7rem] text-xs"
+                          value={composeLimitRuleValue}
+                          onChange={(e) => setComposeLimitRuleValue(e.target.value)}
+                          aria-label="Maximum rows returned from Athena (SQL LIMIT)"
+                          placeholder="Max rows"
+                        />
+                        <TooltipProvider delayDuration={250}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                onClick={() => {
+                                  setComposeLimitRuleOpen(false);
+                                  setComposeLimitRuleValue("");
+                                }}
+                                aria-label="Remove row limit"
+                              >
+                                <Minus className="h-2 w-2" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              Remove limit (use your tier default cap)
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </div>
                   ) : null}
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
@@ -3855,12 +3870,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 shrink-0 text-muted-foreground"
+                              className="group h-3 w-3 shrink-0 rounded-full bg-red-300/35 text-red-900/70 hover:bg-red-400/80 focus-visible:ring-1 focus-visible:ring-red-300"
                               onClick={() => removeComposeItem(item.id)}
                               aria-label={`Remove ${item.column}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            />
                           </div>
 
                           <div className="grid gap-3 sm:grid-cols-2">
@@ -4561,7 +4574,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   </div>
                 </div>
                 {loading && (selectionTab === "columns" || selectionTab === "recipes") ? (
-                  <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pt-1" />
+                  <div ref={loadProgressRef}>
+                    <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pt-1" />
+                  </div>
                 ) : null}
               </div>
     </>
@@ -5054,7 +5069,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 </TabsList>
               </div>
               {loading ? (
-                <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pb-1" />
+                <div ref={loadProgressRef}>
+                  <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pb-1" />
+                </div>
               ) : null}
             </div>
             )}
@@ -5125,15 +5142,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               </p>
                             ) : null}
                           </div>
-                          <div className="flex flex-col items-stretch gap-1 shrink-0">
+                          <div className="flex flex-nowrap items-center gap-1 shrink-0">
                             <TooltipProvider delayDuration={200}>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     type="button"
-                                    variant="outline"
                                     size="icon"
-                                    className="h-8 w-8"
+                                    variant="ghost"
+                                    className="h-2.5 w-2.5 min-h-2.5 min-w-2.5 shrink-0 rounded-full border border-border bg-white p-0 text-muted-foreground shadow-none hover:bg-slate-50 hover:text-muted-foreground focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:ring-offset-1 dark:bg-slate-950 dark:hover:bg-slate-900"
                                     aria-label="Expand"
                                     onClick={() => {
                                       setExpandedRequestKey((prev) => (prev === rowKey ? null : rowKey));
@@ -5142,7 +5159,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                       setConnectedData?.(Array.isArray(rows) ? rows : []);
                                     }}
                                   >
-                                    {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                    {expanded ? <ChevronUp className="h-1.5 w-1.5" /> : <ChevronDown className="h-1.5 w-1.5" />}
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="left" className="text-xs">
@@ -5154,16 +5171,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             <TooltipProvider delayDuration={200}>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive border-destructive/40 hover:bg-destructive/10"
-                                    aria-label="Delete"
+                                  <DestructiveIconButton
+                                    ariaLabel="Delete"
                                     onClick={() => openDeleteSheetDialog(cardSheetId)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  />
                                 </TooltipTrigger>
                                 <TooltipContent side="left" className="text-xs">
                                   Delete
@@ -5181,18 +5192,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                         >
                           {expanded ? (
                             <div className="space-y-2 min-w-0">
-                              <div className="flex justify-end">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 text-xs gap-1 text-destructive"
-                                  onClick={() => deleteRequestCardAndClearSheet(cardSheetId, card?.id)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Remove this pull
-                                </Button>
-                              </div>
                               {selected?.table && availableColumns.length > 0 ? renderColumnsComposeSection() : null}
                             </div>
                           ) : null}
@@ -6007,7 +6006,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               </Tooltip>
             </TooltipProvider>
           </div>
-          <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="pt-0.5" />
+          <div ref={loadProgressRef}>
+            <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="pt-0.5" />
+          </div>
         </div>
       ) : (
         selectionTab === "meta" && (
