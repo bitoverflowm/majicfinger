@@ -123,6 +123,8 @@ export default function ChartControls() {
 
     lineStyle,
     setLineStyle,
+    lineAliasing,
+    setLineAliasing,
     lineHumanReadableTime,
     setLineHumanReadableTime,
     xTimeScale,
@@ -1170,7 +1172,7 @@ export default function ChartControls() {
                   )}
 
                   {(selChartType === "area" || selChartType === "line") && (
-                    <div className="min-w-0 border-b border-border/60 pb-3">
+                    <div className="min-w-0 space-y-3 border-b border-border/60 pb-3">
                       <Label className="text-xs font-semibold text-muted-foreground">Line style</Label>
                       <Select value={lineStyle} onValueChange={(value) => setLineStyle(value)}>
                         <SelectTrigger className="mt-1 h-8 min-w-0 text-xs">
@@ -1184,6 +1186,20 @@ export default function ChartControls() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-design-line-aliasing"
+                          checked={lineAliasing}
+                          onCheckedChange={setLineAliasing}
+                          className="scale-75 origin-left"
+                        />
+                        <Label htmlFor="chart-design-line-aliasing" className="cursor-pointer text-xs text-muted-foreground">
+                          Aliasing
+                        </Label>
+                      </div>
+                      <p className="text-[10px] leading-snug text-muted-foreground">
+                        Connect line segments across null or filtered-out values so the chart appears continuous.
+                      </p>
                     </div>
                   )}
 

@@ -509,6 +509,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [xOptions, setXOptions] = useState([]);
   const [availableYOptions, setAvailableYOptons] = useState([]);
   const [lineStyle, setLineStyle] = useState("natural");
+  const [lineAliasing, setLineAliasing] = useState(false);
   const [lineHumanReadableTime, setLineHumanReadableTime] = useState(true);
   /** When on, pivot X is coerced to epoch ms and drawn on a numeric time scale (line/area/bar). */
   const [xTimeScale, setXTimeScale] = useState(true);
@@ -625,6 +626,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.selX !== undefined) setSelX(s.selX);
     if (Array.isArray(s.selY)) setSelY(s.selY);
     if (s.lineStyle != null) setLineStyle(s.lineStyle);
+    if (s.lineAliasing !== undefined) setLineAliasing(!!s.lineAliasing);
     if (s.lineHumanReadableTime !== undefined) setLineHumanReadableTime(!!s.lineHumanReadableTime);
     if (s.xTimeScale !== undefined) setXTimeScale(!!s.xTimeScale);
     if (s.xDateFormatPreset != null) setXDateFormatPreset(String(s.xDateFormatPreset || "auto"));
@@ -1163,6 +1165,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     selX,
     selY,
     lineStyle,
+    lineAliasing,
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
@@ -1436,6 +1439,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
     lineStyle,
     setLineStyle,
+    lineAliasing,
+    setLineAliasing,
     lineHumanReadableTime,
     setLineHumanReadableTime,
     xTimeScale,
@@ -1565,6 +1570,7 @@ export function ChartCanvas() {
     selX,
     selY,
     lineStyle,
+    lineAliasing,
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
@@ -2083,7 +2089,7 @@ export function ChartCanvas() {
                             dataKey={series.renderKey}
                             name={series.label}
                             type={lineStyle}
-                            connectNulls={!hasChartLineFilters}
+                            connectNulls={lineAliasing || !hasChartLineFilters}
                             fill={seriesColorFor(series.sourceKey, idx)}
                             fillOpacity={0.4}
                             stroke={seriesColorFor(series.sourceKey, idx)}
@@ -2299,7 +2305,7 @@ export function ChartCanvas() {
                             dataKey={series.renderKey}
                             name={series.label}
                             type={lineStyle}
-                            connectNulls={!hasChartLineFilters}
+                            connectNulls={lineAliasing || !hasChartLineFilters}
                             stroke={seriesColorFor(series.sourceKey, idx)}
                             strokeWidth={2}
                             dot={dots && finalRenderedData.length <= 40}
