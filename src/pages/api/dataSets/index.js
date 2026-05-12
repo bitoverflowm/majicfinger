@@ -1,7 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
 import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
-import { summarizeDataSetForList } from "@/lib/projectPersistence";
+import { buildProjectRevision, summarizeDataSetForList } from "@/lib/projectPersistence";
 
 export const config = {
     api: {
@@ -51,6 +51,11 @@ export default async function handler(req, res) {
                     last_saved_date: new Date(last_saved_date),
                     labels,
                     source,
+                    save_revision: buildProjectRevision({ data_set_name, data_sheets, labels, source }),
+                    save_meta: {
+                        saveMode: "full",
+                        savedAt: new Date().toISOString(),
+                    },
                     user_id: new mongoose.Types.ObjectId(user_id)  // Convert user_id string to ObjectId
                 });
 

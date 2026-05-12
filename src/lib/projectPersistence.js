@@ -31,6 +31,76 @@ export function hashJson(value) {
   return hashString(jsonStringifySafe(value));
 }
 
+function stableSheetForRevision(sheet) {
+  if (!sheet || typeof sheet !== "object") return sheet;
+  const saveMeta = sheet.saveMeta && typeof sheet.saveMeta === "object"
+    ? { ...sheet.saveMeta }
+    : null;
+  if (saveMeta) delete saveMeta.savedAt;
+  return {
+    ...sheet,
+    saveMeta,
+  };
+}
+
+export function buildProjectRevision(project) {
+  const sheets = project?.data_sheets && typeof project.data_sheets === "object" ? project.data_sheets : {};
+  const sheetHashes = Object.entries(sheets)
+    .sort(([a], [b]) => String(a).localeCompare(String(b)))
+    .map(([sheetId, sheet]) => [sheetId, hashJson(stableSheetForRevision(sheet))]);
+  return hashJson({
+    data_set_name: project?.data_set_name || "",
+    labels: Array.isArray(project?.labels) ? project.labels : [],
+    source: project?.source || "",
+    sheetHashes,
+  });
+}
+
+export function buildProjectDeltaPayload({ baseProject, currentPayload }) {
+  const baseSheets = baseProject?.data_sheets && typeof baseProject.data_sheets === "object" ? baseProject.data_sheets : {};
+  const nextSheets = currentPayload?.data_sheets && typeof currentPayload.data_sheets === "object" ? currentPayload.data_sheets : {};
+  const changedSheets = {};
+  const deletedSheetIds = [];
+
+  for (const [sheetId, sheet] of Object.entries(nextSheets)) {
+    const before = baseSheets[sheetId];
+    if (!before || hashJson(stableSheetForRevision(before)) !== hashJson(stableSheetForRevision(sheet))) {
+      changedSheets[sheetId] = sheet;
+    }
+  }
+
+  for (const sheetId of Object.keys(baseSheets)) {
+    if (!Object.prototype.hasOwnProperty.call(nextSheets, sheetId)) {
+      deletedSheetIds.push(sheetId);
+    }
+  }
+
+  const changedTopLevel = {};
+  for (const key of ["data_set_name", "labels", "source"]) {
+    if (hashJson(baseProject?.[key]) !== hashJson(currentPayload?.[key])) {
+      changedTopLevel[key] = currentPayload?.[key];
+    }
+  }
+
+  const hasChanges =
+    Object.keys(changedSheets).length > 0 ||
+    deletedSheetIds.length > 0 ||
+    Object.keys(changedTopLevel).length > 0;
+
+  return {
+    baseRevision: baseProject?.save_revision || buildProjectRevision(baseProject || {}),
+    patch: {
+      ...changedTopLevel,
+      changedSheets,
+      deletedSheetIds,
+      last_saved_date: currentPayload?.last_saved_date || new Date(),
+    },
+    hasChanges,
+    changedSheetCount: Object.keys(changedSheets).length,
+    deletedSheetCount: deletedSheetIds.length,
+  };
+}
+
 export function inferColumnsFromRows(rows) {
   const seen = new Set();
   const out = [];

@@ -32,6 +32,14 @@ const DataSetSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    save_revision: {
+        type: String,
+        default: ""
+    },
+    save_meta: {
+        type: Schema.Types.Mixed,
+        default: {}
+    },
     user_id: {
         type: Schema.Types.ObjectId, // Defines the type as ObjectId
         ref: 'User', // References the User model

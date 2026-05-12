@@ -27,7 +27,7 @@ import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
-import { prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
+import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button"
 import {
@@ -199,6 +199,15 @@ function ProjectDataUsageIndicator({ summary }) {
   );
 }
 
+const PROJECT_LOAD_PROGRESS_MESSAGES = [
+  "Loading data sheets…",
+  "Fetching saved rows from the project store…",
+  "Preparing sheet metadata and previews…",
+  "Reconstructing workbook tabs…",
+  "Hydrating rows into the grid…",
+  "Large projects can take a moment. Still loading…",
+];
+
 const Nav = () => {
   const user = useUser()
   const router = useRouter();
@@ -305,6 +314,7 @@ const Nav = () => {
   const [loadProjectProgress, setLoadProjectProgress] = useState(0)
   const [loadProjectMessage, setLoadProjectMessage] = useState("")
   const [loadProjectTargetId, setLoadProjectTargetId] = useState(null)
+  const loadProjectTickerRef = useRef(null)
   const [projectNameInput, setProjectNameInput] = useState("")
   const [runtimeOrigin, setRuntimeOrigin] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -332,6 +342,14 @@ const Nav = () => {
       setSaveIsOpen(true)
     }
   }, [saveProjectDialogNonce])
+
+  useEffect(() => {
+    return () => {
+      if (loadProjectTickerRef.current) {
+        window.clearInterval(loadProjectTickerRef.current)
+      }
+    }
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -402,6 +420,20 @@ const Nav = () => {
       const hasNamedChart = String(chartName || "").trim() !== "" && String(chartName || "").trim() !== `Chart ${idx + 1}`;
       const hasExistingChart = !!chartMeta?._id;
       if (!hasChartState && !hasNamedChart && !hasExistingChart) continue;
+      const previousSnapshot = Array.isArray(chartMeta?.chart_properties)
+        ? chartMeta.chart_properties[0]?.rechartsBuilder
+        : chartMeta?.chart_properties?.rechartsBuilder;
+      const chartNameUnchanged = String(chartMeta?.chart_name || chartName) === String(chartName);
+      const chartSnapshotUnchanged = JSON.stringify(previousSnapshot || null) === JSON.stringify(snapshot || null);
+      if (!forceCreate && hasExistingChart && chartNameUnchanged && chartSnapshotUnchanged) {
+        nextSheets[chartId] = {
+          ...(sheet || {}),
+          name: chartName,
+          chartMeta,
+          snapshot,
+        };
+        continue;
+      }
       const payload = {
         chart_name: chartName,
         chart_properties: [{ title: chartName, rechartsBuilder: snapshot }],
@@ -597,14 +629,30 @@ const Nav = () => {
       await new Promise((r) => requestAnimationFrame(r));
 
       let savedProject = null;
-      bump(28, "Uploading project data…");
+      bump(28, shouldOverwrite ? "Preparing changed sheets…" : "Uploading project data…");
       if (shouldOverwrite) {
+        const delta = buildProjectDeltaPayload({
+          baseProject: loadedDataMeta,
+          currentPayload: dataPayload,
+        });
         const updateRes = await fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
-          method: 'PUT',
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dataPayload),
+          body: JSON.stringify(delta),
         });
         const updateJson = await updateRes.json();
+        if (updateRes.status === 409) {
+          toast.error(updateJson?.message || "Project changed since you loaded it. Reload before saving.");
+          return;
+        }
+        if (!updateRes.ok || !updateJson?.success) {
+          throw new Error(updateJson?.message || "Failed to save project changes.");
+        }
+        if (delta.hasChanges) {
+          toast.info(`Saved ${delta.changedSheetCount} changed sheet${delta.changedSheetCount === 1 ? "" : "s"}${delta.deletedSheetCount ? ` and ${delta.deletedSheetCount} deletion${delta.deletedSheetCount === 1 ? "" : "s"}` : ""}.`);
+        } else {
+          toast.info("No data sheet changes detected. Saving charts and dashboard changes.");
+        }
         savedProject = updateJson?.data || null;
       } else {
         const createRes = await fetch('/api/dataSets', {
@@ -709,6 +757,29 @@ const Nav = () => {
       setLoadedChartBuilderSnapshot,
     });
 
+  const stopProjectLoadTicker = () => {
+    if (loadProjectTickerRef.current) {
+      window.clearInterval(loadProjectTickerRef.current);
+      loadProjectTickerRef.current = null;
+    }
+  };
+
+  const startProjectLoadTicker = ({ min = 18, max = 64 } = {}) => {
+    stopProjectLoadTicker();
+    let tick = 0;
+    loadProjectTickerRef.current = window.setInterval(() => {
+      tick += 1;
+      setLoadProjectProgress((prev) => {
+        const current = Number.isFinite(Number(prev)) ? Number(prev) : min;
+        if (current >= max) return current;
+        const remaining = max - current;
+        const step = Math.max(0.2, Math.min(1.8, remaining * 0.08));
+        return Math.min(max, current + step);
+      });
+      setLoadProjectMessage(PROJECT_LOAD_PROGRESS_MESSAGES[tick % PROJECT_LOAD_PROGRESS_MESSAGES.length]);
+    }, 900);
+  };
+
   const loadDataSheet = async (dataSetId, dataSet) => {
     if (!dataSetId || loadProjectBusy) return;
     const bumpLoad = (pct, message) => {
@@ -729,6 +800,7 @@ const Nav = () => {
       }
 
       bumpLoad(18, "Loading data sheets…");
+      startProjectLoadTicker({ min: 18, max: 64 });
       const response = await fetch(`/api/dataSets/dataSet/${dataSetId}`, {
         method: 'GET',
         headers: {
@@ -736,18 +808,20 @@ const Nav = () => {
         },
       });
       const res = await response.json();
+      stopProjectLoadTicker();
       if (!response.ok || !res?.data) {
         throw new Error(res?.message || "Failed to load project");
       }
 
-      bumpLoad(45, "Hydrating data sheets into the workspace…");
+      bumpLoad(66, "Hydrating data sheets into the workspace…");
+      await new Promise((r) => requestAnimationFrame(r));
       applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData });
       setLoadedDataMeta(res.data || dataSet);
 
-      bumpLoad(68, "Loading charts…");
+      bumpLoad(78, "Loading charts…");
       await hydrateProjectCharts(dataSetId);
 
-      bumpLoad(84, "Loading dashboards and publish settings…");
+      bumpLoad(88, "Loading dashboards and publish settings…");
       setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
 
       bumpLoad(96, "Opening project workspace…");
@@ -757,9 +831,11 @@ const Nav = () => {
       setIsOpen(false);
       setViewing('dataStart');
     } catch (error) {
+      stopProjectLoadTicker();
       console.error("Error loading project:", error);
       toast.error(error?.message || "Failed to load project.");
     } finally {
+      stopProjectLoadTicker();
       setTimeout(() => {
         setLoadProjectBusy(false);
         setLoadProjectProgress(0);
