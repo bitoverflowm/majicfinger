@@ -1964,7 +1964,13 @@ export function ChartCanvas() {
           stroke: line.color,
           strokeWidth: line.strokeWidth,
           strokeDasharray: referenceLineDash(line.style),
-          ifOverflow: "extendDomain",
+          ifOverflow: "visible",
+          isFront: true,
+          style: {
+            stroke: line.color,
+            strokeWidth: line.strokeWidth,
+            strokeDasharray: referenceLineDash(line.style),
+          },
           label: line.label
             ? {
                 value: line.label,
@@ -2208,7 +2214,6 @@ export function ChartCanvas() {
                             />
                           }
                         />
-                        {renderedReferenceLines}
                         {ySeries.map((series, idx) => (
                           <Area
                             key={series.id}
@@ -2222,6 +2227,7 @@ export function ChartCanvas() {
                             stackId={"a"}
                           />
                         ))}
+                        {renderedReferenceLines}
                         {legendVisible && (
                           <ChartLegend
                             content={
@@ -2314,7 +2320,6 @@ export function ChartCanvas() {
                             />
                           }
                         />
-                        {renderedReferenceLines}
                         {ySeries.map((series, idx) => (
                           <Bar
                             key={series.id}
@@ -2340,6 +2345,7 @@ export function ChartCanvas() {
                             })}
                           </Bar>
                         ))}
+                        {renderedReferenceLines}
                         {legendVisible &&
                           (rainbowBar ? (
                             <ChartLegend
@@ -2426,7 +2432,6 @@ export function ChartCanvas() {
                             />
                           }
                         />
-                        {renderedReferenceLines}
                         {ySeries.map((series, idx) => (
                           <Line
                             key={series.id}
@@ -2443,6 +2448,7 @@ export function ChartCanvas() {
                             )}
                           </Line>
                         ))}
+                        {renderedReferenceLines}
                         {legendVisible && (
                           <ChartLegend
                             content={

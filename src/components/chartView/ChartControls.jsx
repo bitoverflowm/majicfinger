@@ -1061,7 +1061,7 @@ export default function ChartControls() {
                           </TooltipProvider>
                         </div>
 
-                        {selX ? (
+                        {canUseTimeSeriesX ? (
                           <div className="grid gap-1.5 pt-1">
                             <Label className="text-xs text-muted-foreground">
                               Date label format (display only)
