@@ -102,6 +102,8 @@ export default function ChartControls() {
 
     chartLineFilters,
     setChartLineFilters,
+    referenceLines,
+    setReferenceLines,
     tooltipShowXValue,
     setTooltipShowXValue,
     tooltipShowYValue,
@@ -228,9 +230,12 @@ export default function ChartControls() {
   // Only one section open at a time; default to Chart Type.
   const [openSection, setOpenSection] = useState("chartType");
   const [lineAddValue, setLineAddValue] = useState("");
+  const [linesOpen, setLinesOpen] = useState(true);
+  const [lineAdvancedOpen, setLineAdvancedOpen] = useState(false);
   const [yAxisFormatOpen, setYAxisFormatOpen] = useState(true);
   const xAxisSelectValue = selX ?? CHART_X_AXIS_NONE;
   const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
+  const canUseTimeSeriesX = !!selX && !!lineIsTemporalX;
 
   const parseScopedLineKey = (value) => {
     const raw = String(value || "");
@@ -462,6 +467,35 @@ export default function ChartControls() {
   const removeChartLineFilter = (id) => {
     setChartLineFilters((prev) => (Array.isArray(prev) ? prev : []).filter((rule) => rule.id !== id));
   };
+  const normalizedReferenceLines = Array.isArray(referenceLines) ? referenceLines : [];
+  const addReferenceLine = () => {
+    setReferenceLines((prev) => [
+      ...(Array.isArray(prev) ? prev : []),
+      {
+        id: `reference-line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        enabled: true,
+        kind: "y",
+        y: "",
+        x: "",
+        x1: "",
+        y1: "",
+        x2: "",
+        y2: "",
+        label: "",
+        color: "#ef4444",
+        style: "dashed",
+        strokeWidth: 1,
+      },
+    ]);
+  };
+  const updateReferenceLine = (id, patch) => {
+    setReferenceLines((prev) =>
+      (Array.isArray(prev) ? prev : []).map((line) => (line.id === id ? { ...line, ...patch } : line))
+    );
+  };
+  const removeReferenceLine = (id) => {
+    setReferenceLines((prev) => (Array.isArray(prev) ? prev : []).filter((line) => line.id !== id));
+  };
 
   const showYAxisFormat =
     selY?.[0] && chartData?.length && getAxisType(selY[0], dataTypes, chartData) === "number";
@@ -510,6 +544,224 @@ export default function ChartControls() {
             </SelectContent>
           </Select>
         </div>
+      </CollapsibleContent>
+    </Collapsible>
+  ) : null;
+  const lineSeriesControls = selChartType === "line" ? (
+    <Collapsible open={linesOpen} onOpenChange={setLinesOpen} className="border-t py-2">
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-md py-1 text-left text-xs font-bold ${
+            dark ? "text-slate-200 hover:text-white" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span>Lines</span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 transition-transform duration-200 ${linesOpen ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-2 pt-2">
+        <div className="flex flex-wrap gap-2">
+          {(selY || []).map((lineColumn, index) => (
+            <div key={`${lineColumn}-${index}`} className="inline-flex items-center gap-1">
+              <Badge variant="secondary" className="min-w-0 max-w-[13rem] gap-1 px-2 py-1 text-[10px] font-normal leading-none">
+                <span className="min-w-0 truncate whitespace-nowrap">
+                  {(() => {
+                    const parsed = parseScopedLineKey(lineColumn);
+                    const sheetLabel = parsed.isScoped
+                      ? (lineSheetColumnGroups || []).find((g) => g.sheetId === parsed.sheetId)?.sheetName || parsed.sheetId
+                      : null;
+                    const label = parsed.column || lineColumn;
+                    return `Line ${index + 1}: ${sheetLabel ? `${sheetLabel} • ` : ""}${label}`;
+                  })()}
+                </span>
+                {(selY || []).length > 1 ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
+                    aria-label={`Remove Line ${index + 1}`}
+                    onClick={() => removeY(lineColumn, index)}
+                  >
+                    x
+                  </button>
+                ) : null}
+              </Badge>
+              <ChartColorPalettePopover
+                value={lineColorOverrides?.[seriesInstanceKey(index)] ?? lineColorOverrides?.[lineColumn] ?? null}
+                swatchColor={getLineColor(lineColumn, index)}
+                onChange={(color) => setSeriesColorOverride(index, color)}
+                onClear={() => clearSeriesColorOverride(index, lineColumn)}
+                ariaLabel={`Pick color for line ${index + 1}`}
+                triggerClassName="h-4 w-4"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <Select
+            value={lineAddValue}
+            onValueChange={(val) => {
+              if (!val) return;
+              handleSelectY(val);
+              setLineAddValue("");
+            }}
+          >
+            <SelectTrigger
+              className="h-8 min-w-[140px] text-xs disabled:opacity-50"
+              disabled={!hasGroupedLineOptions}
+            >
+              <SelectValue placeholder="+ Add Line" className="text-xs" />
+            </SelectTrigger>
+            <SelectContent className="text-xs">
+              {groupedLineOptions.map((group, groupIdx) => (
+                <SelectGroup key={group.sheetId}>
+                  {groupIdx > 0 ? <SelectSeparator /> : null}
+                  <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {group.sheetName}
+                  </SelectLabel>
+                  {group.options.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                      {opt.column}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {!hasGroupedLineOptions && (
+            <span className="pl-2 text-[10px] text-muted-foreground">
+              No more columns to plot
+            </span>
+          )}
+        </div>
+        {lineNonNumericColumns.length > 0 && (
+          <p className="text-xs text-destructive">
+            non-numericl vlaue detected this does not work for line cahrt
+          </p>
+        )}
+        <Collapsible open={lineAdvancedOpen} onOpenChange={setLineAdvancedOpen} className="border-t pt-2">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-md py-1 text-left text-xs font-bold ${
+                dark ? "text-slate-200 hover:text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span>Advanced</span>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform duration-200 ${lineAdvancedOpen ? "rotate-180" : ""}`}
+                aria-hidden
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 pt-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground">Reference lines</p>
+                <p className="text-[10px] leading-snug text-muted-foreground">
+                  Add y-axis, x-axis, or segment guides to the chart.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 px-2 text-xs" onClick={addReferenceLine}>
+                + Reference
+              </Button>
+            </div>
+            {normalizedReferenceLines.length > 0 ? (
+              <div className="space-y-2">
+                {normalizedReferenceLines.map((line, refIdx) => {
+                  const kind = ["x", "y", "segment"].includes(line.kind) ? line.kind : "y";
+                  return (
+                    <div key={line.id || refIdx} className="space-y-2 rounded-lg border border-border/70 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Reference {refIdx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold leading-none text-white hover:bg-red-600"
+                          aria-label={`Remove reference line ${refIdx + 1}`}
+                          onClick={() => removeReferenceLine(line.id)}
+                        >
+                          -
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-1.5">
+                        <Select value={kind} onValueChange={(v) => updateReferenceLine(line.id, { kind: v })}>
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value="y" className="text-xs">Horizontal y</SelectItem>
+                            <SelectItem value="x" className="text-xs">Vertical x</SelectItem>
+                            <SelectItem value="segment" className="text-xs">Segment</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={line.label ?? ""}
+                          onChange={(e) => updateReferenceLine(line.id, { label: e.target.value })}
+                          placeholder="Label"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      {kind === "segment" ? (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <Input value={line.x1 ?? ""} onChange={(e) => updateReferenceLine(line.id, { x1: e.target.value })} placeholder="x1" className="h-8 text-xs" />
+                          <Input value={line.y1 ?? ""} onChange={(e) => updateReferenceLine(line.id, { y1: e.target.value })} placeholder="y1" className="h-8 text-xs" />
+                          <Input value={line.x2 ?? ""} onChange={(e) => updateReferenceLine(line.id, { x2: e.target.value })} placeholder="x2" className="h-8 text-xs" />
+                          <Input value={line.y2 ?? ""} onChange={(e) => updateReferenceLine(line.id, { y2: e.target.value })} placeholder="y2" className="h-8 text-xs" />
+                        </div>
+                      ) : (
+                        <Input
+                          value={kind === "x" ? (line.x ?? "") : (line.y ?? "")}
+                          onChange={(e) => updateReferenceLine(line.id, kind === "x" ? { x: e.target.value } : { y: e.target.value })}
+                          placeholder={kind === "x" ? "X value" : "Y value"}
+                          className="h-8 text-xs"
+                        />
+                      )}
+                      <div className="grid grid-cols-[2.2rem_minmax(0,1fr)_minmax(0,0.8fr)] gap-1.5">
+                        <Input
+                          type="color"
+                          value={line.color || "#ef4444"}
+                          onChange={(e) => updateReferenceLine(line.id, { color: e.target.value })}
+                          aria-label={`Reference line ${refIdx + 1} color`}
+                          className="h-8 w-9 p-1"
+                        />
+                        <Select value={line.style || "dashed"} onValueChange={(v) => updateReferenceLine(line.id, { style: v })}>
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
+                            <SelectValue placeholder="Style" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value="solid" className="text-xs">Solid</SelectItem>
+                            <SelectItem value="dashed" className="text-xs">Dashed</SelectItem>
+                            <SelectItem value="dotted" className="text-xs">Dotted</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="8"
+                          value={String(line.strokeWidth || 1)}
+                          onChange={(e) => updateReferenceLine(line.id, { strokeWidth: Math.max(1, Math.min(8, Number(e.target.value) || 1)) })}
+                          placeholder="Width"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                No reference lines yet.
+              </p>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
       </CollapsibleContent>
     </Collapsible>
   ) : null;
@@ -569,7 +821,9 @@ export default function ChartControls() {
                         className="flex-wrap"
                         value={selChartType}
                         onValueChange={(value) => {
-                          if (value) setSelChartType(value);
+                          if (!value) return;
+                          setSelChartType(value);
+                          setOpenSection("data");
                         }}
                       >
                         <Tooltip>
@@ -755,13 +1009,14 @@ export default function ChartControls() {
                         <div className="flex items-center">
                           <Switch
                             id="chart-line-time-series-x-axis"
-                            checked={xTimeScale}
-                            onCheckedChange={setXTimeScale}
+                            checked={canUseTimeSeriesX && xTimeScale}
+                            onCheckedChange={(checked) => setXTimeScale(canUseTimeSeriesX ? checked : false)}
                             className="scale-75 origin-left"
+                            disabled={!canUseTimeSeriesX}
                           />
                           <Label
                             htmlFor="chart-line-time-series-x-axis"
-                            className={`pr-1 cursor-pointer text-xs font-normal text-muted-foreground`}
+                            className={`pr-1 cursor-pointer text-xs font-normal text-muted-foreground ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
                           >
                             Set x-axis to timeseries format
                           </Label>
@@ -828,91 +1083,8 @@ export default function ChartControls() {
                           </div>
                         ) : null}
 
-                        <div className="pt-2">
-                          <p className="text-xs font-bold mb-1 text-muted-foreground">Lines</p>
-
-                          <div className="py-2 flex flex-wrap gap-2">
-                            {(selY || []).map((lineColumn, index) => (
-                              <div key={`${lineColumn}-${index}`} className="inline-flex items-center gap-1">
-                                <Badge variant="secondary" className="min-w-0 max-w-[13rem] gap-1 px-2 py-1 text-[10px] font-normal leading-none">
-                                  <span className="min-w-0 truncate whitespace-nowrap">
-                                    {(() => {
-                                      const parsed = parseScopedLineKey(lineColumn);
-                                      const sheetLabel = parsed.isScoped
-                                        ? (lineSheetColumnGroups || []).find((g) => g.sheetId === parsed.sheetId)?.sheetName || parsed.sheetId
-                                        : null;
-                                      const label = parsed.column || lineColumn;
-                                      return `Line ${index + 1}: ${sheetLabel ? `${sheetLabel} • ` : ""}${label}`;
-                                    })()}
-                                  </span>
-                                  {(selY || []).length > 1 ? (
-                                    <button
-                                      type="button"
-                                      className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
-                                      aria-label={`Remove Line ${index + 1}`}
-                                      onClick={() => removeY(lineColumn, index)}
-                                    >
-                                      x
-                                    </button>
-                                  ) : null}
-                                </Badge>
-                                <ChartColorPalettePopover
-                                  value={lineColorOverrides?.[seriesInstanceKey(index)] ?? lineColorOverrides?.[lineColumn] ?? null}
-                                  swatchColor={getLineColor(lineColumn, index)}
-                                  onChange={(color) => setSeriesColorOverride(index, color)}
-                                  onClear={() => clearSeriesColorOverride(index, lineColumn)}
-                                  ariaLabel={`Pick color for line ${index + 1}`}
-                                  triggerClassName="h-4 w-4"
-                                />
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="">
-                            <Select
-                              value={lineAddValue}
-                              onValueChange={(val) => {
-                                if (!val) return;
-                                handleSelectY(val);
-                                setLineAddValue("");
-                              }}
-                            >
-                              <SelectTrigger
-                                className="h-8 min-w-[140px] text-xs disabled:opacity-50"
-                                disabled={!hasGroupedLineOptions}
-                              >
-                                <SelectValue placeholder="+ Add Line" className="text-xs" />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                {groupedLineOptions.map((group, groupIdx) => (
-                                  <SelectGroup key={group.sheetId}>
-                                    {groupIdx > 0 ? <SelectSeparator /> : null}
-                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                      {group.sheetName}
-                                    </SelectLabel>
-                                    {group.options.map((opt) => (
-                                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                                        {opt.column}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectGroup>
-                                ))}
-                              </SelectContent>
-                            </Select>
-
-                            {!hasGroupedLineOptions && (
-                              <span className={`pl-2 text-[10px] text-muted-foreground`}>
-                                No more columns to plot
-                              </span>
-                            )}
-                          </div>
-                          {lineNonNumericColumns.length > 0 && (
-                            <p className="pt-2 text-xs text-destructive">
-                              non-numericl vlaue detected this does not work for line cahrt
-                            </p>
-                          )}
-                        </div>
                         {yAxisFormatControls}
+                        {lineSeriesControls}
                       </div>
                     </>
                   ) : (selChartType === "area") ? (

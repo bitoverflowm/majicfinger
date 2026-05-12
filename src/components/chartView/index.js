@@ -5,7 +5,7 @@ import {
   SHADCN_CHART_BASE_ORDER,
   getShadcnChartPaletteArray,
 } from '@/components/chartView/panels/shadcnChartPalettes';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, Treemap, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Treemap, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { RainbowBarLegendContent } from "@/components/chartView/RainbowBarLegendContent";
 import { rainbowBarFillFromPalette } from "@/components/chartView/rainbowBarFill";
@@ -376,6 +376,53 @@ function normalizeChartLineFilters(value) {
     .filter(Boolean);
 }
 
+function normalizeReferenceLines(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((line, idx) => {
+      if (!line || typeof line !== "object") return null;
+      const kind = ["x", "y", "segment"].includes(line.kind) ? line.kind : "y";
+      const color = typeof line.color === "string" && line.color.trim() ? line.color : "#ef4444";
+      const style = ["solid", "dashed", "dotted"].includes(line.style) ? line.style : "dashed";
+      const strokeWidth = Math.max(1, Math.min(8, Number(line.strokeWidth) || 1));
+      return {
+        id: String(line.id || `reference-line-${idx}`),
+        kind,
+        enabled: line.enabled !== false,
+        label: line.label == null ? "" : String(line.label),
+        color,
+        style,
+        strokeWidth,
+        x: line.x == null ? "" : String(line.x),
+        y: line.y == null ? "" : String(line.y),
+        x1: line.x1 == null ? "" : String(line.x1),
+        y1: line.y1 == null ? "" : String(line.y1),
+        x2: line.x2 == null ? "" : String(line.x2),
+        y2: line.y2 == null ? "" : String(line.y2),
+      };
+    })
+    .filter(Boolean);
+}
+
+function coerceReferenceAxisValue(value, axisType, isTemporal = false) {
+  if (value == null || value === "") return undefined;
+  if (isTemporal || axisType === "date") {
+    const ms = temporalToMs(value);
+    return Number.isFinite(ms) ? ms : value;
+  }
+  if (axisType === "number") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return value;
+}
+
+function referenceLineDash(style) {
+  if (style === "dotted") return "1 4";
+  if (style === "dashed") return "4 4";
+  return undefined;
+}
+
 function coerceComparableValue(value) {
   if (value == null || value === "") return { kind: "empty", value: "" };
   const ms = temporalToMs(value);
@@ -525,7 +572,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [lineAliasing, setLineAliasing] = useState(false);
   const [lineHumanReadableTime, setLineHumanReadableTime] = useState(true);
   /** When on, pivot X is coerced to epoch ms and drawn on a numeric time scale (line/area/bar). */
-  const [xTimeScale, setXTimeScale] = useState(true);
+  const [xTimeScale, setXTimeScale] = useState(false);
   /** Display-only formatting override for temporal X axes (ticks + tooltip). */
   const [xDateFormatPreset, setXDateFormatPreset] = useState("auto");
   /** Chart-only temporal bucketing; does not mutate or persist sheet rows. */
@@ -611,6 +658,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
   const [chartLineFilters, setChartLineFilters] = useState([]);
+  const [referenceLines, setReferenceLines] = useState([]);
   /** Hover tooltip: optional X / Y / extra sheet columns from the hovered data row (not plotted). */
   const [tooltipShowXValue, setTooltipShowXValue] = useState(true);
   const [tooltipShowYValue, setTooltipShowYValue] = useState(true);
@@ -713,6 +761,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
     if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
     if (Array.isArray(s.chartLineFilters)) setChartLineFilters(normalizeChartLineFilters(s.chartLineFilters));
+    if (Array.isArray(s.referenceLines)) setReferenceLines(normalizeReferenceLines(s.referenceLines));
     if (s.tooltipShowXValue !== undefined) setTooltipShowXValue(!!s.tooltipShowXValue);
     else if (s.legendShowXValue !== undefined) setTooltipShowXValue(!!s.legendShowXValue);
     if (s.tooltipShowYValue !== undefined) setTooltipShowYValue(!!s.tooltipShowYValue);
@@ -1042,6 +1091,14 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     return isLikelyTemporalKey(selX, dataTypes, chartData);
   }, [selX, dataTypes, chartData, contextStateV2?.dataSheets]);
 
+  useEffect(() => {
+    if (!selX || !lineIsTemporalX) {
+      setXTimeScale(false);
+      return;
+    }
+    setXTimeScale(true);
+  }, [selX, lineIsTemporalX]);
+
   const scopedKeysInUse = useMemo(() => {
     const filterColumns = normalizeChartLineFilters(chartLineFilters)
       .map((rule) => rule.column)
@@ -1244,6 +1301,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     chartFilterColumn,
     chartFilterConfig,
     chartLineFilters,
+    referenceLines,
     tooltipShowXValue,
     tooltipShowYValue,
     tooltipExtraColumns,
@@ -1387,6 +1445,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setChartFilterConfig,
     chartLineFilters,
     setChartLineFilters,
+    referenceLines,
+    setReferenceLines,
     tooltipShowXValue,
     setTooltipShowXValue,
     tooltipShowYValue,
@@ -1577,6 +1637,7 @@ export function ChartCanvas() {
     tooltipShowYValue,
     tooltipExtraColumns,
     chartLineFilters,
+    referenceLines,
     selChartType,
     chartData,
     dataTypes,
@@ -1881,9 +1942,63 @@ export function ChartCanvas() {
     );
   };
 
+  const tickFillX = xAxisTickColor || (dark ? "#94a3b8" : "#64748b");
+  const tickFillY = yAxisTickColor || (dark ? "#94a3b8" : "#64748b");
+  const gridStroke = gridLineColor || (dark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
+  const labelListFill = chartTextColor || (dark ? "#e2e8f0" : "#0f172a");
+
   const hasChartLineFilters = normalizeChartLineFilters(chartLineFilters).some(
     (rule) => rule.seriesKey && rule.column,
   );
+
+  const renderedReferenceLines = useMemo(() => {
+    const axisType = selX ? getAxisType(xKey, dataTypes, finalRenderedData) : "string";
+    const isTemporalX = useTimeSeriesX || chartUsesTimeframes || lineIsTemporalX || axisType === "date";
+    return normalizeReferenceLines(referenceLines)
+      .filter((line) => line.enabled)
+      .map((line) => {
+        const common = {
+          key: line.id,
+          stroke: line.color,
+          strokeWidth: line.strokeWidth,
+          strokeDasharray: referenceLineDash(line.style),
+          ifOverflow: "extendDomain",
+          label: line.label
+            ? {
+                value: line.label,
+                fill: chartTextColor || tickFillY || line.color,
+                position: line.kind === "segment" ? "middle" : "insideTopRight",
+              }
+            : false,
+        };
+        if (line.kind === "x") {
+          const x = coerceReferenceAxisValue(line.x, axisType, isTemporalX);
+          return x == null ? null : <ReferenceLine {...common} x={x} />;
+        }
+        if (line.kind === "segment") {
+          const x1 = coerceReferenceAxisValue(line.x1, axisType, isTemporalX);
+          const y1 = coerceReferenceAxisValue(line.y1, "number");
+          const x2 = coerceReferenceAxisValue(line.x2, axisType, isTemporalX);
+          const y2 = coerceReferenceAxisValue(line.y2, "number");
+          if (x1 == null || y1 == null || x2 == null || y2 == null) return null;
+          return <ReferenceLine {...common} segment={[{ x: x1, y: y1 }, { x: x2, y: y2 }]} />;
+        }
+        const y = coerceReferenceAxisValue(line.y, "number");
+        return y == null ? null : <ReferenceLine {...common} y={y} />;
+      })
+      .filter(Boolean);
+  }, [
+    chartTextColor,
+    chartUsesTimeframes,
+    dataTypes,
+    finalRenderedData,
+    lineIsTemporalX,
+    referenceLines,
+    selX,
+    tickFillY,
+    useTimeSeriesX,
+    xKey,
+  ]);
 
   const xTooltipLabelFormatter = (label) => {
     const forcedPreset =
@@ -1910,11 +2025,6 @@ export function ChartCanvas() {
       formatXAxisValue(label, effectiveTemporalSort, true, xTickIntlOptions, xPivotSpanMs),
     );
   };
-
-  const tickFillX = xAxisTickColor || (dark ? "#94a3b8" : "#64748b");
-  const tickFillY = yAxisTickColor || (dark ? "#94a3b8" : "#64748b");
-  const gridStroke = gridLineColor || (dark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
-  const labelListFill = chartTextColor || (dark ? "#e2e8f0" : "#0f172a");
 
   const chartTooltipRowDetails = useMemo(
     () => ({
@@ -2096,6 +2206,7 @@ export function ChartCanvas() {
                             />
                           }
                         />
+                        {renderedReferenceLines}
                         {ySeries.map((series, idx) => (
                           <Area
                             key={series.id}
@@ -2201,6 +2312,7 @@ export function ChartCanvas() {
                             />
                           }
                         />
+                        {renderedReferenceLines}
                         {ySeries.map((series, idx) => (
                           <Bar
                             key={series.id}
@@ -2312,6 +2424,7 @@ export function ChartCanvas() {
                             />
                           }
                         />
+                        {renderedReferenceLines}
                         {ySeries.map((series, idx) => (
                           <Line
                             key={series.id}
