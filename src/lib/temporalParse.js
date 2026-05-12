@@ -85,6 +85,11 @@ export function temporalToMs(value) {
   if (/^\d+(\.\d+)?$/.test(s)) {
     return epochNumberToMs(Number(s));
   }
+  // Bucket labels like "0-10" / "90-100" are categorical numeric ranges, not dates.
+  // Browser Date.parse is permissive enough to interpret some of these as old dates.
+  if (/^[+-]?\d+(?:\.\d+)?\s*-\s*[+-]?\d+(?:\.\d+)?$/.test(s)) {
+    return NaN;
+  }
   // `Date.parse` is overly permissive on long prose (e.g. Kalshi/Polymarket `title` cells): it can
   // match substrings like "May" inside "Mayor" plus a year and yield bogus instants. Only use it
   // for compact strings that might be browser-specific date literals — not full-sentence labels.
