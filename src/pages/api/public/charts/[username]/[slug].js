@@ -24,7 +24,9 @@ export default async function handler(req, res) {
 
   try {
     await dbConnect();
-    const user = await User.findOne({ user_name: String(username || "").trim() }).lean();
+    const user = await User.findOne({ user_name: String(username || "").trim() })
+      .select("user_name name profile_pic")
+      .lean();
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
@@ -71,6 +73,9 @@ export default async function handler(req, res) {
         chart: publicChart,
         rows: stripInternalFromRows(rows),
         dataSheets,
+        owner_handle: user.user_name ? String(user.user_name) : String(username || "").trim(),
+        owner_name: user.name ? String(user.name) : null,
+        owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
       },
     });
   } catch (e) {

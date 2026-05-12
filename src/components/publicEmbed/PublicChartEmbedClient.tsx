@@ -6,6 +6,7 @@ import { StateProviderV2 } from "@/context/stateContextV2";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { Progress } from "@/components/ui/progress";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
@@ -44,6 +45,9 @@ type PublicPayload = {
     };
     rows: unknown[];
     dataSheets?: Record<string, any>;
+    owner_handle?: string;
+    owner_name?: string | null;
+    owner_profile_pic?: string | null;
   };
   message?: string;
 };
@@ -136,6 +140,9 @@ export default function PublicChartEmbedClient({
   }
 
   const chart = payload.data.chart;
+  const ownerHandle = payload.data.owner_handle || username;
+  const ownerName = payload.data.owner_name ?? null;
+  const ownerProfilePic = payload.data.owner_profile_pic ?? null;
   const cp0 =
     Array.isArray(chart.chart_properties) && chart.chart_properties[0] && typeof chart.chart_properties[0] === "object"
       ? (chart.chart_properties[0] as Record<string, unknown>)
@@ -170,17 +177,32 @@ export default function PublicChartEmbedClient({
           </ChartBuilderProvider>
         </div>
         <footer className={`w-full border-t border-border/60 text-center text-xs text-muted-foreground ${isEmbedded ? "pt-2" : "mt-auto pt-3"}`}>
-          <span>{`Made by @${username} with `}</span>
-          <Link href={SITE} className="font-medium text-foreground underline">
-            Lychee
-          </Link>
-          <span> · </span>
-          <Link
-            href={`${SITE}/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`}
-            className="underline"
-          >
-            Open chart
-          </Link>
+          <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2">
+            <UserAvatar
+              src={ownerProfilePic || undefined}
+              handle={ownerHandle}
+              name={ownerName || undefined}
+              size={22}
+              className="shrink-0 ring-1 ring-border/60"
+            />
+            <span className="min-w-0 text-center">
+              <span>{`Made by @${ownerHandle} with `}</span>
+              <Link href={SITE} className="font-medium text-foreground underline">
+                Lychee
+              </Link>
+              {!isEmbedded ? (
+                <>
+                  <span> · </span>
+                  <Link
+                    href={`${SITE}/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`}
+                    className="underline"
+                  >
+                    Open chart
+                  </Link>
+                </>
+              ) : null}
+            </span>
+          </div>
           {chart.chart_name ? <span className="block pt-1 opacity-80">{chart.chart_name}</span> : null}
         </footer>
       </div>

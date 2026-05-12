@@ -26,6 +26,19 @@ import { temporalToMs } from "@/lib/temporalParse";
 
 const ChartBuilderContext = createContext(null);
 
+/** Open Graph / social previews (Facebook, LinkedIn, X) recommend 1200×630. */
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
+
+function loadImageFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("OG image load failed"));
+    img.src = dataUrl;
+  });
+}
+
 export function useChartBuilder() {
   const v = useContext(ChartBuilderContext);
   if (!v) throw new Error("useChartBuilder must be used within <ChartBuilderProvider>.");
@@ -1410,6 +1423,48 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
   }, []);
 
+  /** Rasterize the chart card, then letterbox into 1200×630 so the full chart fits social previews. */
+  const getChartOgImageDataUrl = useCallback(async () => {
+    const el = chartRef.current;
+    if (!el || typeof document === "undefined") return null;
+    try {
+      const sourceDataUrl = await toPng(el, { cacheBust: true, pixelRatio: 2 });
+      const img = await loadImageFromDataUrl(sourceDataUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = OG_IMAGE_WIDTH;
+      canvas.height = OG_IMAGE_HEIGHT;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+
+      const paletteChrome = Array.isArray(selectedPalette) && selectedPalette.length > 0 ? selectedPalette : null;
+      const padColor =
+        outerBoxColor ||
+        (paletteChrome && paletteChrome.length > 1 ? paletteChrome[1] : null) ||
+        (dark ? "#000000" : "#ffffff");
+
+      ctx.fillStyle = padColor;
+      ctx.fillRect(0, 0, OG_IMAGE_WIDTH, OG_IMAGE_HEIGHT);
+
+      const sw = img.naturalWidth;
+      const sh = img.naturalHeight;
+      if (!sw || !sh) return null;
+
+      const scale = Math.min(OG_IMAGE_WIDTH / sw, OG_IMAGE_HEIGHT / sh);
+      const dw = Math.round(sw * scale);
+      const dh = Math.round(sh * scale);
+      const dx = Math.round((OG_IMAGE_WIDTH - dw) / 2);
+      const dy = Math.round((OG_IMAGE_HEIGHT - dh) / 2);
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, sw, sh, dx, dy, dw, dh);
+
+      return canvas.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+  }, [outerBoxColor, dark, selectedPalette]);
+
   const wsStop = polymarketWsState?.stop ?? chainlinkWsState?.stop;
   const wsStart = polymarketWsState?.start ?? chainlinkWsState?.start;
   const wsRunning = polymarketWsState?.isRunning || chainlinkWsState?.isRunning;
@@ -1431,6 +1486,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     dark,
     downloadChart,
     getChartPngDataUrl,
+    getChartOgImageDataUrl,
     getBuilderSnapshot,
 
     selChartType,

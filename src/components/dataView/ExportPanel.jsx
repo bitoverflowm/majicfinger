@@ -109,7 +109,7 @@ function ShareEmbedSection() {
   const setChartSheets = v2?.setChartSheets;
   const activeChartSheetId = v2?.activeChartSheetId;
   const setRefetchChart = v2?.setRefetchChart;
-  const { getBuilderSnapshot, getChartPngDataUrl } = useChartBuilder();
+  const { getBuilderSnapshot, getChartOgImageDataUrl } = useChartBuilder();
   const activeChartMeta = activeChartSheetId ? (chartSheets?.[activeChartSheetId]?.chartMeta || loadedChartMeta) : loadedChartMeta;
 
   const syncActiveChartSheet = useCallback((chartMeta, snapshot = null) => {
@@ -129,8 +129,8 @@ function ShareEmbedSection() {
   }, [activeChartSheetId, setChartSheets]);
 
   const uploadOgImage = useCallback(async (chartId) => {
-    if (!chartId || typeof getChartPngDataUrl !== "function") return null;
-    const imageDataUrl = await getChartPngDataUrl();
+    if (!chartId || typeof getChartOgImageDataUrl !== "function") return null;
+    const imageDataUrl = await getChartOgImageDataUrl();
     if (!imageDataUrl) return null;
     const ogRes = await fetch(`/api/charts/og-image/${chartId}`, {
       method: "POST",
@@ -141,7 +141,7 @@ function ShareEmbedSection() {
     const ogJson = await ogRes.json();
     if (!ogRes.ok || !ogJson?.success) return null;
     return ogJson?.data?.og_image_url || null;
-  }, [getChartPngDataUrl]);
+  }, [getChartOgImageDataUrl]);
 
   const [slugInput, setSlugInput] = useState("");
   const [showSignupDialog, setShowSignupDialog] = useState(false);
