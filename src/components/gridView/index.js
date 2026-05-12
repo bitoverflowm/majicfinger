@@ -354,6 +354,7 @@ function aggregateBucketRows(rows, config) {
       const type = String(agg.type || "count");
       const valueColumn = String(agg.valueColumn || "").trim();
       const weightColumn = String(agg.weightColumn || "").trim();
+      const denominatorColumn = String(agg.denominatorColumn || "").trim();
       const outputColumn = String(agg.outputColumn || "").trim();
       if (!outputColumn) continue;
       const rowsForAgg = group.rows.filter((row) => rowMatchesAggregationFilter(row, agg));
@@ -369,6 +370,8 @@ function aggregateBucketRows(rows, config) {
       let count = 0;
       let weightedSum = 0;
       let weightSum = 0;
+      let productSum = 0;
+      let productCount = 0;
       for (const row of rowsForAgg) {
         const value = parseCellFiniteForStat(row, valueColumn);
         if (value == null) continue;
@@ -380,11 +383,20 @@ function aggregateBucketRows(rows, config) {
           if (weight == null) continue;
           weightedSum += value * weight;
           weightSum += weight;
+        } else if (type === "product_ratio") {
+          const weight = parseCellFiniteForStat(row, weightColumn);
+          if (weight == null) continue;
+          productSum += value * weight;
+          productCount += 1;
         }
       }
       if (type === "sum") out[outputColumn] = count > 0 ? sum : null;
       else if (type === "average") out[outputColumn] = count > 0 ? sum / count : null;
       else if (type === "weighted_average") out[outputColumn] = weightSum !== 0 ? weightedSum / weightSum : null;
+      else if (type === "product_ratio") {
+        const denom = Number(out[denominatorColumn]);
+        out[outputColumn] = productCount > 0 && Number.isFinite(denom) && denom !== 0 ? productSum / denom : null;
+      }
     }
     return out;
   });
@@ -596,7 +608,7 @@ const GridView = ({startNew}) => {
     const [statsBucketNumericSize, setStatsBucketNumericSize] = useState("");
     const [statsBucketPassthroughCols, setStatsBucketPassthroughCols] = useState(() => new Set());
     const [statsBucketAggregations, setStatsBucketAggregations] = useState([
-      { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" },
+      { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", denominatorColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" },
     ]);
 
     // Combine Sheets (client-side join across already-loaded sheets)
@@ -918,7 +930,7 @@ const GridView = ({startNew}) => {
         setStatsBucketNumericSize("");
         setStatsBucketPassthroughCols(new Set());
         setStatsBucketAggregations([
-          { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" },
+          { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", denominatorColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" },
         ]);
         setMathBasicColA("");
         setMathBasicColB("");
@@ -1034,6 +1046,7 @@ const GridView = ({startNew}) => {
           type: "count",
           valueColumn: "",
           weightColumn: "",
+          denominatorColumn: "",
           outputColumn: "count",
           filterEnabled: false,
           filterColumn: "",
@@ -1046,7 +1059,7 @@ const GridView = ({startNew}) => {
     const removeStatsBucketAggregation = useCallback((id) => {
       setStatsBucketAggregations((prev) => {
         const next = (Array.isArray(prev) ? prev : []).filter((agg) => agg.id !== id);
-        return next.length ? next : [{ id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" }];
+        return next.length ? next : [{ id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", denominatorColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" }];
       });
     }, []);
 
@@ -1066,6 +1079,7 @@ const GridView = ({startNew}) => {
           type: agg.type || "count",
           valueColumn: agg.valueColumn || "",
           weightColumn: agg.weightColumn || "",
+          denominatorColumn: agg.denominatorColumn || "",
           outputColumn: String(agg.outputColumn || "").trim(),
           filterEnabled: !!agg.filterEnabled,
           filterColumn: agg.filterColumn || "",
@@ -1096,6 +1110,7 @@ const GridView = ({startNew}) => {
         if (agg.type === "count") return true;
         if (!agg.valueColumn) return false;
         if (agg.type === "weighted_average") return Boolean(agg.weightColumn);
+        if (agg.type === "product_ratio") return Boolean(agg.weightColumn && agg.denominatorColumn);
         return true;
       });
     }, [
@@ -1331,8 +1346,9 @@ const GridView = ({startNew}) => {
       } else if (mathDialogTab === "basic" || (mathDialogTab === "functions" && mathFunctionType === "column")) {
         const colA = String(mathBasicColA || "").trim();
         const colB = String(mathBasicColB || "").trim();
-        if (!colA || !colB) {
-          toast.error("Choose column A and column B for the operation.");
+        const unaryAbs = mathOp === "abs";
+        if (!colA || (!unaryAbs && !colB)) {
+          toast.error(unaryAbs ? "Choose column A for the absolute value operation." : "Choose column A and column B for the operation.");
           return;
         }
         next = rows.map((row) => {
@@ -1344,6 +1360,7 @@ const GridView = ({startNew}) => {
           else if (mathOp === "subtract") v = a - b;
           else if (mathOp === "multiply") v = a * b;
           else if (mathOp === "divide") v = b === 0 ? null : a / b;
+          else if (mathOp === "abs") v = Math.abs(a);
           return { ...row, [out]: Number.isFinite(v) ? v : null };
         });
       } else {
@@ -1403,7 +1420,7 @@ const GridView = ({startNew}) => {
           mathDialogTab === "functions" && mathFunctionType === "if_else"
             ? normalizeIfElseExpressionForSave()
             : (mathDialogTab === "basic" || mathFunctionType === "column")
-              ? { kind: "binary", op: mathOp, leftColumn: mathBasicColA, rightColumn: mathBasicColB }
+              ? { kind: "binary", op: mathOp, leftColumn: mathBasicColA, rightColumn: mathOp === "abs" ? "" : mathBasicColB }
               : { kind: "relative-row", op: mathOp, baseColumn: mathBaseCol, rowRef: mathRelativeRowRef },
       });
       if (mathDestination === "new_sheet") {
@@ -3013,10 +3030,11 @@ const GridView = ({startNew}) => {
                                 <SelectItem value="subtract">Subtract (A − B)</SelectItem>
                                 <SelectItem value="multiply">Multiply (A × B)</SelectItem>
                                 <SelectItem value="divide">{"Divide (A \u00f7 B)"}</SelectItem>
+                                <SelectItem value="abs">Absolute value (|A|)</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="grid gap-3 sm:grid-cols-2">
+                          <div className={`grid gap-3 ${mathOp === "abs" ? "" : "sm:grid-cols-2"}`}>
                             <div className="space-y-1">
                               <Label className="text-xs">Column A</Label>
                               <Select
@@ -3036,25 +3054,27 @@ const GridView = ({startNew}) => {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Column B</Label>
-                              <Select
-                                value={mathBasicColB || "__"}
-                                onValueChange={(v) => setMathBasicColB(v === "__" ? "" : v)}
-                              >
-                                <SelectTrigger className="h-9 text-xs">
-                                  <SelectValue placeholder="Select column" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="__">—</SelectItem>
-                                  {sheetColumnNamesForMath.map((c) => (
-                                    <SelectItem key={`math-basic-b-${c}`} value={c} className="font-mono text-xs">
-                                      {c}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                            {mathOp !== "abs" ? (
+                              <div className="space-y-1">
+                                <Label className="text-xs">Column B</Label>
+                                <Select
+                                  value={mathBasicColB || "__"}
+                                  onValueChange={(v) => setMathBasicColB(v === "__" ? "" : v)}
+                                >
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue placeholder="Select column" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__">—</SelectItem>
+                                    {sheetColumnNamesForMath.map((c) => (
+                                      <SelectItem key={`math-basic-b-${c}`} value={c} className="font-mono text-xs">
+                                        {c}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ) : null}
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">New column name</Label>
@@ -3066,13 +3086,15 @@ const GridView = ({startNew}) => {
                               placeholder={nextFreeResultColumnName()}
                             />
                           </div>
-                          {mathBasicColA && mathBasicColB ? (
+                          {mathBasicColA && (mathOp === "abs" || mathBasicColB) ? (
                             <div className="space-y-1">
                               <Label className="text-xs">Preview</Label>
                               <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs font-mono text-muted-foreground">
-                                {`${mathOutCol || nextFreeResultColumnName()} = ${mathBasicColA} ${
-                                  mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
-                                } ${mathBasicColB} (per row)`}
+                                {mathOp === "abs"
+                                  ? `${mathOutCol || nextFreeResultColumnName()} = |${mathBasicColA}| (per row)`
+                                  : `${mathOutCol || nextFreeResultColumnName()} = ${mathBasicColA} ${
+                                      mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
+                                    } ${mathBasicColB} (per row)`}
                               </div>
                             </div>
                           ) : null}
@@ -3739,6 +3761,8 @@ const GridView = ({startNew}) => {
                                               const baseName =
                                                 v === "weighted_average"
                                                   ? "weighted_avg"
+                                                  : v === "product_ratio"
+                                                    ? "VWAP_price"
                                                   : v === "average"
                                                     ? "avg"
                                                     : v;
@@ -3756,6 +3780,7 @@ const GridView = ({startNew}) => {
                                               <SelectItem value="sum">Sum</SelectItem>
                                               <SelectItem value="average">Average</SelectItem>
                                               <SelectItem value="weighted_average">Value weighted avg</SelectItem>
+                                              <SelectItem value="product_ratio">SUM(A * B) / aggregation</SelectItem>
                                             </SelectContent>
                                           </Select>
                                         </div>
@@ -3780,9 +3805,11 @@ const GridView = ({startNew}) => {
                                             </SelectContent>
                                           </Select>
                                         </div>
-                                        {agg.type === "weighted_average" ? (
+                                        {agg.type === "weighted_average" || agg.type === "product_ratio" ? (
                                           <div className="space-y-1">
-                                            <Label className="text-[10px] text-muted-foreground">Weight column</Label>
+                                            <Label className="text-[10px] text-muted-foreground">
+                                              {agg.type === "product_ratio" ? "Multiplier column" : "Weight column"}
+                                            </Label>
                                             <Select
                                               value={agg.weightColumn || "__"}
                                               onValueChange={(v) => updateStatsBucketAggregation(agg.id, { weightColumn: v === "__" ? "" : v })}
@@ -3814,6 +3841,34 @@ const GridView = ({startNew}) => {
                                           />
                                         </div>
                                       </div>
+                                      {agg.type === "product_ratio" ? (
+                                        <div className="mt-2 space-y-1 rounded-md border border-border/50 bg-muted/10 p-2">
+                                          <Label className="text-[10px] text-muted-foreground">
+                                            Divide by generated aggregation
+                                          </Label>
+                                          <Select
+                                            value={agg.denominatorColumn || "__"}
+                                            onValueChange={(v) => updateStatsBucketAggregation(agg.id, { denominatorColumn: v === "__" ? "" : v })}
+                                          >
+                                            <SelectTrigger className="h-8 text-xs">
+                                              <SelectValue placeholder="Select denominator" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="__">—</SelectItem>
+                                              {normalizedStatsBucketAggregations
+                                                .filter((other, otherIdx) => otherIdx < idx && other.outputColumn)
+                                                .map((other, otherIdx) => (
+                                                  <SelectItem key={`bucket-agg-denom-${agg.id}-${other.id}`} value={other.outputColumn}>
+                                                    {`Aggregation ${otherIdx + 1}: ${other.outputColumn}`}
+                                                  </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                          </Select>
+                                          <p className="text-[10px] text-muted-foreground">
+                                            Example: SUM(yes_price * volume) / total_volume = VWAP_price.
+                                          </p>
+                                        </div>
+                                      ) : null}
                                       <div className="mt-2 space-y-2 rounded-md border border-border/50 bg-muted/10 p-2">
                                         <label className="flex items-center gap-2 text-xs">
                                           <Checkbox
@@ -4012,7 +4067,7 @@ const GridView = ({startNew}) => {
                               (statsBucketActive && !statsBucketCanSubmit))) ||
                           (mathDialogTab === "basic" &&
                             (!String(mathBasicColA || "").trim() ||
-                              !String(mathBasicColB || "").trim() ||
+                              (mathOp !== "abs" && !String(mathBasicColB || "").trim()) ||
                               !String(mathOutCol || "").trim())) ||
                           (mathDialogTab === "functions" &&
                             (!String(mathOutCol || "").trim() ||

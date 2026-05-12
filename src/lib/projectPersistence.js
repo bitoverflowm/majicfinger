@@ -495,6 +495,7 @@ function applyBinaryMath(op, a, b) {
   if (op === "subtract") return a - b;
   if (op === "multiply") return a * b;
   if (op === "divide") return b === 0 ? null : a / b;
+  if (op === "abs") return Math.abs(a);
   return null;
 }
 
@@ -574,7 +575,7 @@ function applyComputedColumnOperation(rows, op) {
     return rows.map((row) => {
       if (!row || typeof row !== "object") return row;
       const a = finiteNumber(row[left]) ?? 0;
-      const b = finiteNumber(row[right]) ?? 0;
+      const b = opName === "abs" ? 0 : finiteNumber(row[right]) ?? 0;
       const value = applyBinaryMath(opName, a, b);
       return { ...row, [out]: Number.isFinite(value) ? value : null };
     });
