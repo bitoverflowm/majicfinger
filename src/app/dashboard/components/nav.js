@@ -28,6 +28,10 @@ import {
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
 import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
+import {
+  summarizeAdvancedDataStorage,
+  userCanUseAdvancedDataStorage,
+} from "@/lib/projectStorageEntitlements"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button"
 import {
@@ -310,6 +314,8 @@ const Nav = () => {
   const [saveProjectBusy, setSaveProjectBusy] = useState(false)
   const [saveProjectProgress, setSaveProjectProgress] = useState(0)
   const [saveProjectMessage, setSaveProjectMessage] = useState("")
+  const [largeProjectUpgradeOpen, setLargeProjectUpgradeOpen] = useState(false)
+  const [largeProjectUpgradeSummary, setLargeProjectUpgradeSummary] = useState(null)
   const [loadProjectBusy, setLoadProjectBusy] = useState(false)
   const [loadProjectProgress, setLoadProjectProgress] = useState(0)
   const [loadProjectMessage, setLoadProjectMessage] = useState("")
@@ -377,6 +383,30 @@ const Nav = () => {
     }
     return summary;
   }, [connectedData, dataSheets]);
+  const currentAdvancedStorageSummary = useMemo(() => {
+    const hasSheets = dataSheets && typeof dataSheets === "object" && Object.keys(dataSheets).length > 0;
+    const sheetsForSummary = hasSheets
+      ? dataSheets
+      : (Array.isArray(connectedData) && connectedData.length > 0
+          ? { "sheet-1": { name: dataSetName || "Sheet 1", data: connectedData, rowCount: connectedData.length } }
+          : {});
+    return summarizeAdvancedDataStorage(sheetsForSummary);
+  }, [connectedData, dataSetName, dataSheets]);
+  const canUseAdvancedDataStorage = useMemo(
+    () => userCanUseAdvancedDataStorage(user),
+    [user],
+  );
+
+  const openLargeProjectUpgradeDialog = (summary = currentAdvancedStorageSummary) => {
+    setLargeProjectUpgradeSummary(summary);
+    setLargeProjectUpgradeOpen(true);
+  };
+
+  const handleGoToPricing = () => {
+    setLargeProjectUpgradeOpen(false);
+    setSaveIsOpen(false);
+    setViewing?.("pricing");
+  };
 
   const handleStartNewProject = () => {
     const ok = window.confirm("Start a new project? This clears your current loaded workspace state.");
@@ -645,6 +675,10 @@ const Nav = () => {
           toast.error(updateJson?.message || "Project changed since you loaded it. Reload before saving.");
           return;
         }
+        if (updateRes.status === 403 && updateJson?.code === "ADVANCED_DATA_STORAGE_REQUIRED") {
+          openLargeProjectUpgradeDialog(updateJson.storageSummary || currentAdvancedStorageSummary);
+          return;
+        }
         if (!updateRes.ok || !updateJson?.success) {
           throw new Error(updateJson?.message || "Failed to save project changes.");
         }
@@ -665,6 +699,13 @@ const Nav = () => {
           }),
         });
         const createJson = await createRes.json();
+        if (createRes.status === 403 && createJson?.code === "ADVANCED_DATA_STORAGE_REQUIRED") {
+          openLargeProjectUpgradeDialog(createJson.storageSummary || currentAdvancedStorageSummary);
+          return;
+        }
+        if (!createRes.ok || !createJson?.success) {
+          throw new Error(createJson?.message || "Failed to save project.");
+        }
         savedProject = createJson?.data || null;
       }
 
@@ -742,6 +783,10 @@ const Nav = () => {
   const handleSaveProjectSubmit = (e) => {
     e.preventDefault();
     if (saveProjectBusy) return;
+    if (currentAdvancedStorageSummary.requiresAdvancedStorage && !canUseAdvancedDataStorage) {
+      openLargeProjectUpgradeDialog(currentAdvancedStorageSummary);
+      return;
+    }
     handleSave();
   };
 
@@ -1051,8 +1096,12 @@ const Nav = () => {
     viewing ? `Lychee / ${viewing}` : 'Lychee';
 
   const showUnsavedFlag = connectedData && connectedData.length > 0 && !loadedDataMeta?.data_set_name && !loadedChartMeta?.chart_name;
+  const upgradeSummary = largeProjectUpgradeSummary || currentAdvancedStorageSummary;
+  const upgradeLargestSheet = upgradeSummary?.largestSheet;
+  const upgradeSizeLabel = formatBytes(upgradeSummary?.totalBytes || currentProjectSizeSummary?.estimatedBytes || 0);
 
   return (
+    <>
     <div className="w-full flex flex-col items-start gap-2 px-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2 md:h-16">
           <div className="flex min-w-0 flex-1 items-center gap-2 pl-2">
             <div className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
@@ -1591,6 +1640,32 @@ const Nav = () => {
               </div>
             )}
     </div>
+    <AlertDialog open={largeProjectUpgradeOpen} onOpenChange={setLargeProjectUpgradeOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Elite data tier required</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-3">
+            <span className="block">
+              Hey, upgrade your tier to Elite because you are working with extremely large data
+              ({upgradeSizeLabel} estimated), or use aggregations and operations to reduce data size.
+            </span>
+            {upgradeLargestSheet && (
+              <span className="block text-xs">
+                The largest sheet is {upgradeLargestSheet.name} with {upgradeLargestSheet.rows.toLocaleString()} rows.
+                Advanced data storage starts when a single sheet exceeds {upgradeSummary.rowLimit.toLocaleString()} rows.
+              </span>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleGoToPricing}>
+            Go to pricing
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
 

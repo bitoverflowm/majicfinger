@@ -1,7 +1,12 @@
 import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
+import User from "@/models/Users";
 import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
 import { buildProjectRevision, summarizeDataSetForList } from "@/lib/projectPersistence";
+import {
+    summarizeAdvancedDataStorage,
+    userCanUseAdvancedDataStorage,
+} from "@/lib/projectStorageEntitlements";
 
 export const config = {
     api: {
@@ -42,6 +47,19 @@ export default async function handler(req, res) {
                 // Validate user_id or assume it's already validated and is being sent in correct format
                 if (!mongoose.Types.ObjectId.isValid(user_id)) {
                     return res.status(400).json({ success: false, message: "Invalid user_id" });
+                }
+                const storageSummary = summarizeAdvancedDataStorage(data_sheets);
+                if (storageSummary.requiresAdvancedStorage) {
+                    const user = await User.findById(user_id).lean();
+                    if (!userCanUseAdvancedDataStorage(user)) {
+                        return res.status(403).json({
+                            success: false,
+                            code: "ADVANCED_DATA_STORAGE_REQUIRED",
+                            message: "Elite or lifetime access is required to save projects with sheets above the advanced data storage row limit.",
+                            requiredTier: "elite",
+                            storageSummary,
+                        });
+                    }
                 }
                 const newDataSet = await DataSet.create({
                     data_set_name,

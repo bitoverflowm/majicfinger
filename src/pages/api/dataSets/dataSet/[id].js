@@ -1,6 +1,11 @@
 import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
+import User from "@/models/Users";
 import { buildProjectRevision } from "@/lib/projectPersistence";
+import {
+    summarizeAdvancedDataStorage,
+    userCanUseAdvancedDataStorage,
+} from "@/lib/projectStorageEntitlements";
 
 export const config = {
     api: {
@@ -38,6 +43,20 @@ export default async function handler(req, res) {
                     labels: req.body.labels,
                     source: req.body.source,
                 });
+                const storageSummary = summarizeAdvancedDataStorage(req.body.data_sheets);
+                if (storageSummary.requiresAdvancedStorage) {
+                    const existing = await DataSet.findById(id).select("user_id").lean();
+                    const user = existing?.user_id ? await User.findById(existing.user_id).lean() : null;
+                    if (!userCanUseAdvancedDataStorage(user)) {
+                        return res.status(403).json({
+                            success: false,
+                            code: "ADVANCED_DATA_STORAGE_REQUIRED",
+                            message: "Elite or lifetime access is required to save projects with sheets above the advanced data storage row limit.",
+                            requiredTier: "elite",
+                            storageSummary,
+                        });
+                    }
+                }
                 // Prepare the update object
                 const update = {
                     $set: {
@@ -103,6 +122,19 @@ export default async function handler(req, res) {
                     labels: patch.labels ?? existing.labels,
                     source: patch.source ?? existing.source,
                 };
+                const storageSummary = summarizeAdvancedDataStorage(nextProject.data_sheets);
+                if (storageSummary.requiresAdvancedStorage) {
+                    const user = existing.user_id ? await User.findById(existing.user_id).lean() : null;
+                    if (!userCanUseAdvancedDataStorage(user)) {
+                        return res.status(403).json({
+                            success: false,
+                            code: "ADVANCED_DATA_STORAGE_REQUIRED",
+                            message: "Elite or lifetime access is required to save projects with sheets above the advanced data storage row limit.",
+                            requiredTier: "elite",
+                            storageSummary,
+                        });
+                    }
+                }
                 const nextRevision = buildProjectRevision(nextProject);
                 existing.data_set_name = nextProject.data_set_name;
                 existing.data = nextData;
