@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon } from "@radix-ui/react-icons";
 import { MinusCircle } from "react-feather";
 import { IoPieChartOutline, IoStatsChart } from "react-icons/io5";
@@ -9,7 +10,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid, Shuffle, ChevronUp, ChevronDown } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,9 @@ import {
 import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { temporalToMs } from "@/lib/temporalParse";
 
 export default function ChartControls() {
   const {
@@ -335,6 +339,104 @@ export default function ChartControls() {
     if (chartLineOptions.some((opt) => opt.value === raw)) return raw;
     return chartLineOptions.find((opt) => opt.lineColumn === raw)?.value || raw;
   };
+  const rowValueForFilterColumn = (row, column) => {
+    if (!row || !column) return undefined;
+    if (Object.prototype.hasOwnProperty.call(row, column)) return row[column];
+    const raw = String(column);
+    const splitIdx = raw.indexOf("::");
+    if (splitIdx > 0) {
+      const descoped = raw.slice(splitIdx + 2);
+      if (Object.prototype.hasOwnProperty.call(row, descoped)) return row[descoped];
+    }
+    return undefined;
+  };
+  const computeDateFilterColumnStats = (column) => {
+    const rows = Array.isArray(chartData) ? chartData : [];
+    const keyTail = String(column || "").includes("::")
+      ? String(column || "").slice(String(column || "").indexOf("::") + 2)
+      : String(column || "");
+    const keyLooksTemporal = /(time|timestamp|date|datetime|created_at|created_time|updated_at)/i.test(keyTail);
+    let nonEmpty = 0;
+    let temporal = 0;
+    let minMs = Number.POSITIVE_INFINITY;
+    let maxMs = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < rows.length; i += 1) {
+      const v = rowValueForFilterColumn(rows[i], column);
+      if (v == null || v === "") continue;
+      nonEmpty += 1;
+      const s = String(v).trim();
+      const valueLooksTemporal =
+        v instanceof Date ||
+        (typeof v === "number" && Math.abs(v) >= 1e9) ||
+        /^\d{4}-\d{1,2}([-/T\s]|$)/.test(s) ||
+        /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(s) ||
+        /^(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)(\s+\d{1,2})?(,?\s+\d{4})?$/i.test(s) ||
+        /^\d{10,}$/.test(s);
+      const ms = temporalToMs(v);
+      if (!Number.isFinite(ms) || (!keyLooksTemporal && !valueLooksTemporal)) continue;
+      temporal += 1;
+      minMs = Math.min(minMs, ms);
+      maxMs = Math.max(maxMs, ms);
+    }
+    const minDate = Number.isFinite(minMs) ? new Date(minMs) : undefined;
+    const maxDate = Number.isFinite(maxMs) ? new Date(maxMs) : undefined;
+    if (minDate) minDate.setHours(0, 0, 0, 0);
+    if (maxDate) maxDate.setHours(23, 59, 59, 999);
+    return {
+      nonEmpty,
+      temporal,
+      min: minDate,
+      max: maxDate,
+      keyLooksTemporal,
+    };
+  };
+  const dateFilterColumnKey = normalizedChartLineFilters
+    .map((rule) => rule?.column)
+    .filter(Boolean)
+    .join("\u0001");
+  const dateFilterColumnStatsByKey = useMemo(() => {
+    const columns = new Set(dateFilterColumnKey ? dateFilterColumnKey.split("\u0001") : []);
+    const next = Object.create(null);
+    for (const column of columns) {
+      next[column] = computeDateFilterColumnStats(column);
+    }
+    return next;
+  }, [chartData, dateFilterColumnKey]);
+  const getDateFilterColumnStats = (column) =>
+    dateFilterColumnStatsByKey[column] || computeDateFilterColumnStats(column);
+  const isDateLikeFilterColumn = (column) => {
+    if (!column) return false;
+    const stats = getDateFilterColumnStats(column);
+    if (stats.temporal <= 0) return false;
+    if (getAxisType?.(column, dataTypes, chartData) === "date") return true;
+    if (stats.keyLooksTemporal) return true;
+    return stats.nonEmpty > 0 && stats.temporal / stats.nonEmpty >= 0.8;
+  };
+  const normalizeDateRangeValue = (value) => {
+    if (!value || typeof value !== "object") return { from: undefined, to: undefined };
+    const fromMs = value.from ? temporalToMs(value.from) : NaN;
+    const toMs = value.to ? temporalToMs(value.to) : NaN;
+    return {
+      from: Number.isFinite(fromMs) ? new Date(fromMs) : undefined,
+      to: Number.isFinite(toMs) ? new Date(toMs) : undefined,
+    };
+  };
+  const formatDateRangeLabel = (range) => {
+    if (range?.from && range?.to) return `${format(range.from, "LLL dd, y")} - ${format(range.to, "LLL dd, y")}`;
+    if (range?.from) return format(range.from, "LLL dd, y");
+    if (range?.to) return `Until ${format(range.to, "LLL dd, y")}`;
+    return "Pick date range";
+  };
+  useEffect(() => {
+    if (!normalizedChartLineFilters.some((rule) => rule?.operator === "date_range" && !isDateLikeFilterColumn(rule.column))) return;
+    setChartLineFilters((prev) =>
+      (Array.isArray(prev) ? prev : []).map((rule) =>
+        rule?.operator === "date_range" && !isDateLikeFilterColumn(rule.column)
+          ? { ...rule, operator: "=", value: "" }
+          : rule
+      )
+    );
+  }, [chartData, dataTypes, normalizedChartLineFilters, setChartLineFilters]);
   const addChartLineFilter = (seriesKey = "") => {
     const fallbackSeries = seriesKey || chartLineOptions[0]?.value || "";
     const fallbackColumn = (xOptions || []).find(Boolean) || "";
@@ -1624,13 +1726,9 @@ export default function ChartControls() {
                   selChartType === "line" ||
                   selChartType === "pie") && (
                   <div className="min-w-0 space-y-3 border-b border-border/60 py-3">
-                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Tooltip design</p>
+                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Tooltip</p>
                     <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
-                      Controls what appears in the <span className="font-medium text-foreground/90">hover tooltip</span> when
-                      you point at the chart. X / Y lines use the same formatters as the axes. Extra sheet columns are read
-                      from the hovered data row and are not plotted. If the tooltip already shows the category header (X),
-                      the extra X line is omitted so it does not duplicate; the same applies to Y when every series is already
-                      listed. The separate legend toggle only affects the color key beside the chart.
+                      Hover over your chart to view tooltip
                     </p>
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
@@ -1713,6 +1811,11 @@ export default function ChartControls() {
                     <div className="space-y-2">
                       {normalizedChartLineFilters.map((rule, idx) => {
                         const operatorNeedsValue = !["is_empty", "is_not_empty"].includes(rule.operator);
+                        const dateFilterColumn = isDateLikeFilterColumn(rule.column);
+                        const selectedDateRange = normalizeDateRangeValue(rule.value);
+                        const dateColumnStats = dateFilterColumn ? getDateFilterColumnStats(rule.column) : null;
+                        const effectiveOperator = filterOperatorOptions.some((opt) => opt.value === rule.operator) ? rule.operator : "=";
+                        const scalarRuleValue = rule.value && typeof rule.value === "object" ? "" : (rule.value ?? "");
                         return (
                           <div key={rule.id} className="space-y-1.5 rounded-lg border border-border/70 p-2">
                             <div className="flex items-center justify-between gap-2">
@@ -1721,11 +1824,10 @@ export default function ChartControls() {
                               </span>
                               <button
                                 type="button"
-                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold leading-none text-white hover:bg-red-600"
+                                className="inline-flex h-2 w-2 items-center justify-center rounded-full bg-red-500 hover:bg-red-600"
                                 aria-label={`Remove filter ${idx + 1}`}
                                 onClick={() => removeChartLineFilter(rule.id)}
                               >
-                                -
                               </button>
                             </div>
                             <Select value={resolveRuleSeriesValue(rule.seriesKey)} onValueChange={(v) => updateChartLineFilter(rule.id, { seriesKey: v })}>
@@ -1740,7 +1842,17 @@ export default function ChartControls() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Select value={rule.column || ""} onValueChange={(v) => updateChartLineFilter(rule.id, { column: v })}>
+                            <Select
+                              value={rule.column || ""}
+                              onValueChange={(v) =>
+                                updateChartLineFilter(rule.id, {
+                                  column: v,
+                                  ...(isDateLikeFilterColumn(v)
+                                    ? { operator: "date_range", value: { from: undefined, to: undefined } }
+                                    : { operator: "=", value: "" }),
+                                })
+                              }
+                            >
                               <SelectTrigger className="h-8 min-w-0 text-xs">
                                 <SelectValue placeholder="Column" />
                               </SelectTrigger>
@@ -1752,30 +1864,70 @@ export default function ChartControls() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-1.5">
-                              <Select
-                                value={rule.operator || "="}
-                                onValueChange={(v) => updateChartLineFilter(rule.id, { operator: v })}
-                              >
-                                <SelectTrigger className="h-8 min-w-0 text-xs">
-                                  <SelectValue placeholder="Operator" />
-                                </SelectTrigger>
-                                <SelectContent className="text-xs">
-                                  {filterOperatorOptions.map((opt) => (
-                                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                                      {opt.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Input
-                                value={rule.value ?? ""}
-                                onChange={(e) => updateChartLineFilter(rule.id, { value: e.target.value })}
-                                placeholder={operatorNeedsValue ? "Value" : "No value needed"}
-                                className="h-8 text-xs"
-                                disabled={!operatorNeedsValue}
-                              />
-                            </div>
+                            {dateFilterColumn ? (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-8 w-full justify-start px-3 text-left text-xs font-normal"
+                                  >
+                                    <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0" />
+                                    <span className={selectedDateRange.from || selectedDateRange.to ? "truncate" : "truncate text-muted-foreground"}>
+                                      {formatDateRangeLabel(selectedDateRange)}
+                                    </span>
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="range"
+                                    selected={selectedDateRange}
+                                    onSelect={(range) =>
+                                      updateChartLineFilter(rule.id, {
+                                        operator: "date_range",
+                                        value: {
+                                          from: range?.from ? range.from.toISOString() : undefined,
+                                          to: range?.to ? range.to.toISOString() : undefined,
+                                        },
+                                      })
+                                    }
+                                    numberOfMonths={1}
+                                    defaultMonth={selectedDateRange.from || selectedDateRange.to || dateColumnStats?.min}
+                                    fromDate={dateColumnStats?.min}
+                                    toDate={dateColumnStats?.max}
+                                    disabled={(date) =>
+                                      (dateColumnStats?.min && date < dateColumnStats.min) ||
+                                      (dateColumnStats?.max && date > dateColumnStats.max)
+                                    }
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            ) : (
+                              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-1.5">
+                                <Select
+                                  value={effectiveOperator}
+                                  onValueChange={(v) => updateChartLineFilter(rule.id, { operator: v })}
+                                >
+                                  <SelectTrigger className="h-8 min-w-0 text-xs">
+                                    <SelectValue placeholder="Operator" />
+                                  </SelectTrigger>
+                                  <SelectContent className="text-xs">
+                                    {filterOperatorOptions.map((opt) => (
+                                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  value={scalarRuleValue}
+                                  onChange={(e) => updateChartLineFilter(rule.id, { value: e.target.value })}
+                                  placeholder={operatorNeedsValue ? "Value" : "No value needed"}
+                                  className="h-8 text-xs"
+                                  disabled={!operatorNeedsValue}
+                                />
+                              </div>
+                            )}
                           </div>
                         );
                       })}

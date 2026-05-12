@@ -392,6 +392,19 @@ function chartFilterRuleMatches(row, rule) {
   if (op === "is_empty") return raw == null || raw === "";
   if (op === "is_not_empty") return raw != null && raw !== "";
   const expected = rule.value;
+  if (op === "date_range" || (expected && typeof expected === "object" && ("from" in expected || "to" in expected))) {
+    const hasFrom = Boolean(expected?.from);
+    const hasTo = Boolean(expected?.to);
+    if (!hasFrom && !hasTo) return true;
+    const rawMs = temporalToMs(raw);
+    if (!Number.isFinite(rawMs)) return false;
+    const fromMs = expected?.from ? temporalToMs(expected.from) : NaN;
+    const toBaseMs = expected?.to ? temporalToMs(expected.to) : NaN;
+    const toMs = Number.isFinite(toBaseMs) ? toBaseMs + 24 * 60 * 60 * 1000 - 1 : NaN;
+    if (Number.isFinite(fromMs) && rawMs < fromMs) return false;
+    if (Number.isFinite(toMs) && rawMs > toMs) return false;
+    return Number.isFinite(fromMs) || Number.isFinite(toMs);
+  }
   if (expected == null || expected === "") return true;
   if (op === "contains" || op === "not_contains") {
     const hit = String(raw ?? "").toLowerCase().includes(String(expected).toLowerCase());
