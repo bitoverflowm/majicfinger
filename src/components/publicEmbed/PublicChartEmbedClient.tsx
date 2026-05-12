@@ -6,7 +6,7 @@ import { StateProviderV2 } from "@/context/stateContextV2";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { Progress } from "@/components/ui/progress";
-import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
+import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -48,81 +48,6 @@ type PublicPayload = {
   message?: string;
 };
 
-function collectAllColumnKeys(rows: unknown[], dataSheets?: Record<string, any>) {
-  const keys = new Set<string>();
-  const addRows = (arr: unknown[]) => {
-    if (!Array.isArray(arr)) return;
-    arr.forEach((row) => {
-      if (row && typeof row === "object") {
-        Object.keys(row as Record<string, unknown>).forEach((k) => keys.add(k));
-      }
-    });
-  };
-  addRows(rows || []);
-  Object.values(dataSheets || {}).forEach((sheet: any) => addRows(sheet?.data || []));
-  return Array.from(keys);
-}
-
-function normalizeSnapshotForRows(snapshot: any, rows: unknown[], dataSheets?: Record<string, any>) {
-  const fallback = inferDefaultBuilderSnapshot(rows as any[]);
-  const s = snapshot && typeof snapshot === "object" ? { ...snapshot } : { ...fallback };
-  const keys = collectAllColumnKeys(rows, dataSheets);
-  if (!keys.length) return fallback;
-
-  const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline"]);
-  const deScope = (k: unknown) => {
-    const raw = String(k || "");
-    const idx = raw.indexOf("::");
-    return idx > -1 ? raw.slice(idx + 2) : raw;
-  };
-
-  const t = String(s.selChartType || "").trim();
-  s.selChartType = allowedTypes.has(t) ? t : fallback.selChartType;
-
-  const normalizedX = deScope(s.selX);
-  if (String(s.selX || "").includes("::")) {
-    s.selX = String(s.selX);
-  } else {
-    s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
-  }
-
-  const normalizedY = (Array.isArray(s.selY) ? s.selY : []).filter((k: unknown) => {
-    const raw = String(k || "");
-    if (raw.includes("::")) return true;
-    return keys.includes(deScope(raw));
-  });
-  s.selY = normalizedY.length ? [...new Set(normalizedY)] : fallback.selY;
-
-  if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
-    const nextOverrides: Record<string, string> = {};
-    for (const [rawKey, color] of Object.entries(s.lineColorOverrides as Record<string, unknown>)) {
-      const raw = String(rawKey || "");
-      const key = raw.includes("::") ? raw : deScope(raw);
-      if ((raw.includes("::") || keys.includes(key)) && typeof color === "string" && color.trim()) {
-        nextOverrides[key] = color;
-      }
-    }
-    s.lineColorOverrides = nextOverrides;
-  }
-
-  if (s.chartConfig && typeof s.chartConfig === "object") {
-    const nextCfg: Record<string, unknown> = {};
-    for (const [rawKey, cfg] of Object.entries(s.chartConfig as Record<string, unknown>)) {
-      const raw = String(rawKey || "");
-      const key = raw.includes("::") ? raw : deScope(raw);
-      if ((raw.includes("::") || keys.includes(key)) && cfg && typeof cfg === "object") {
-        nextCfg[key] = cfg;
-      }
-    }
-    s.chartConfig = nextCfg;
-  }
-
-  if (!s.selX || !Array.isArray(s.selY) || s.selY.length === 0) {
-    return fallback;
-  }
-  return s;
-}
-
 export default function PublicChartEmbedClient({
   username,
   slug,
@@ -142,7 +67,7 @@ export default function PublicChartEmbedClient({
       ? payload.data.chart.rechartsBuilder
       : undefined;
   const chartSnapshot = useMemo(
-    () => normalizeSnapshotForRows(rb, rows, dataSheets),
+    () => normalizeBuilderSnapshot(rb, rows, dataSheets),
     [rb, rows, dataSheets],
   );
 

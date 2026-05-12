@@ -1,5 +1,10 @@
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 
+/** Per-series line colors in the builder UI are keyed as `line:0`, not as sheet columns; keep them when sanitizing snapshots. */
+function isLineSeriesInstanceOverrideKey(rawKey) {
+  return /^line:\d+$/.test(String(rawKey || "").trim());
+}
+
 function stripInternalFromRows(rows) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => {
@@ -56,6 +61,10 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     const nextOverrides = {};
     for (const [rawKey, color] of Object.entries(s.lineColorOverrides)) {
       const raw = String(rawKey || "");
+      if (isLineSeriesInstanceOverrideKey(raw) && typeof color === "string" && color.trim()) {
+        nextOverrides[raw] = color.trim();
+        continue;
+      }
       const key = raw.includes("::") ? raw : deScope(raw);
       if ((raw.includes("::") || keys.includes(key)) && typeof color === "string" && color.trim()) {
         nextOverrides[key] = color;

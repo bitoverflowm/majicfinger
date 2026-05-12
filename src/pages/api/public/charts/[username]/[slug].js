@@ -3,6 +3,7 @@ import Chart from "@/models/Charts";
 import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
+import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 
 function stripInternalFromRows(rows) {
   if (!Array.isArray(rows)) return [];
@@ -11,85 +12,6 @@ function stripInternalFromRows(rows) {
     const next = { ...row };
     return next;
   });
-}
-
-function collectAllColumnKeys(rows, dataSheets) {
-  const keys = new Set();
-  const addRows = (arr) => {
-    if (!Array.isArray(arr)) return;
-    arr.forEach((row) => {
-      if (row && typeof row === "object") Object.keys(row).forEach((k) => keys.add(k));
-    });
-  };
-  addRows(rows);
-  Object.values(dataSheets || {}).forEach((sheet) => addRows(sheet?.data));
-  return Array.from(keys);
-}
-
-function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
-  const fallback = inferDefaultBuilderSnapshot(rows);
-  const s = snapshot && typeof snapshot === "object" ? { ...snapshot } : { ...fallback };
-  const keys = collectAllColumnKeys(rows, dataSheets);
-  if (!keys.length) return fallback;
-
-  const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline"]);
-  const type = String(s.selChartType || "").trim();
-  s.selChartType = allowedTypes.has(type) ? type : fallback.selChartType;
-
-  const deScope = (k) => {
-    const raw = String(k || "");
-    const idx = raw.indexOf("::");
-    return idx > -1 ? raw.slice(idx + 2) : raw;
-  };
-
-  const normalizedX = deScope(s.selX);
-  if (String(s.selX || "").includes("::")) {
-    s.selX = String(s.selX);
-  } else {
-    s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
-  }
-
-  const rawY = Array.isArray(s.selY) ? s.selY : [];
-  const cleanY = rawY.filter((k) => {
-    const raw = String(k || "");
-    if (raw.includes("::")) return true;
-    return keys.includes(deScope(raw));
-  });
-  s.selY = cleanY.length ? [...new Set(cleanY)] : fallback.selY;
-
-  // Keep per-series visual config aligned when historical snapshots used scoped keys.
-  if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
-    const nextOverrides = {};
-    for (const [rawKey, color] of Object.entries(s.lineColorOverrides)) {
-      const raw = String(rawKey || "");
-      const key = raw.includes("::") ? raw : deScope(raw);
-      if ((raw.includes("::") || keys.includes(key)) && typeof color === "string" && color.trim()) {
-        nextOverrides[key] = color;
-      }
-    }
-    s.lineColorOverrides = nextOverrides;
-  }
-
-  if (s.chartConfig && typeof s.chartConfig === "object") {
-    const nextCfg = {};
-    for (const [rawKey, cfg] of Object.entries(s.chartConfig)) {
-      const raw = String(rawKey || "");
-      const key = raw.includes("::") ? raw : deScope(raw);
-      if ((raw.includes("::") || keys.includes(key)) && cfg && typeof cfg === "object") {
-        nextCfg[key] = cfg;
-      }
-    }
-    s.chartConfig = nextCfg;
-  }
-
-  // Guard against blank render when historical snapshots carried unsupported state.
-  if (!s.selX || !Array.isArray(s.selY) || s.selY.length === 0) {
-    s.selX = fallback.selX;
-    s.selY = fallback.selY;
-    s.selChartType = fallback.selChartType;
-  }
-
-  return s;
 }
 
 export default async function handler(req, res) {
