@@ -570,7 +570,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [availableYOptions, setAvailableYOptons] = useState([]);
   const [lineStyle, setLineStyle] = useState("natural");
   const [lineAliasing, setLineAliasing] = useState(false);
-  const [lineHumanReadableTime, setLineHumanReadableTime] = useState(true);
+  const [lineHumanReadableTime, setLineHumanReadableTime] = useState(false);
   /** When on, pivot X is coerced to epoch ms and drawn on a numeric time scale (line/area/bar). */
   const [xTimeScale, setXTimeScale] = useState(false);
   /** Display-only formatting override for temporal X axes (ticks + tooltip). */
@@ -1094,9 +1094,11 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   useEffect(() => {
     if (!selX || !lineIsTemporalX) {
       setXTimeScale(false);
+      setLineHumanReadableTime(false);
       return;
     }
     setXTimeScale(true);
+    setLineHumanReadableTime(true);
   }, [selX, lineIsTemporalX]);
 
   const scopedKeysInUse = useMemo(() => {

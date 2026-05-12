@@ -1036,13 +1036,14 @@ export default function ChartControls() {
                         <div className="flex items-center">
                           <Switch
                             id="chart-line-human-readable-time"
-                            checked={lineHumanReadableTime}
-                            onCheckedChange={setLineHumanReadableTime}
+                            checked={canUseTimeSeriesX && lineHumanReadableTime}
+                            onCheckedChange={(checked) => setLineHumanReadableTime(canUseTimeSeriesX ? checked : false)}
                             className="scale-75 origin-left"
+                            disabled={!canUseTimeSeriesX}
                           />
                           <Label
                             htmlFor="chart-line-human-readable-time"
-                            className={`pr-1 cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"}`}
+                            className={`pr-1 cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"} ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
                           >
                             Human readable time
                           </Label>
