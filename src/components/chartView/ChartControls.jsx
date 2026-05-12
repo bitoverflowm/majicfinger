@@ -683,12 +683,10 @@ export default function ChartControls() {
                         </span>
                         <button
                           type="button"
-                          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold leading-none text-white hover:bg-red-600"
+                          className="inline-flex h-2 w-2 items-center justify-center rounded-full bg-red-500 hover:bg-red-600"
                           aria-label={`Remove reference line ${refIdx + 1}`}
                           onClick={() => removeReferenceLine(line.id)}
-                        >
-                          -
-                        </button>
+                        />
                       </div>
                       <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-1.5">
                         <Select value={kind} onValueChange={(v) => updateReferenceLine(line.id, { kind: v })}>
