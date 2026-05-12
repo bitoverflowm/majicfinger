@@ -41,6 +41,7 @@ import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Calendar } from "@/components/ui/calendar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { temporalToMs } from "@/lib/temporalParse";
 
@@ -227,6 +228,7 @@ export default function ChartControls() {
   // Only one section open at a time; default to Chart Type.
   const [openSection, setOpenSection] = useState("chartType");
   const [lineAddValue, setLineAddValue] = useState("");
+  const [yAxisFormatOpen, setYAxisFormatOpen] = useState(true);
   const xAxisSelectValue = selX ?? CHART_X_AXIS_NONE;
   const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
 
@@ -464,9 +466,22 @@ export default function ChartControls() {
   const showYAxisFormat =
     selY?.[0] && chartData?.length && getAxisType(selY[0], dataTypes, chartData) === "number";
   const yAxisFormatControls = showYAxisFormat ? (
-    <div className="py-2 space-y-2">
-      <div className="space-y-2">
-        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Y-axis format</p>
+    <Collapsible open={yAxisFormatOpen} onOpenChange={setYAxisFormatOpen} className="border-t py-2">
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-md py-1 text-left text-xs font-bold ${
+            dark ? "text-slate-200 hover:text-white" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span>y-axis</span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 transition-transform duration-200 ${yAxisFormatOpen ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-2">
         <div className="grid grid-cols-2 gap-2">
           <Select
             value={String(yAxisDivisor || 1)}
@@ -495,8 +510,8 @@ export default function ChartControls() {
             </SelectContent>
           </Select>
         </div>
-      </div>
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   ) : null;
 
   return (
@@ -819,12 +834,8 @@ export default function ChartControls() {
                           <div className="py-2 flex flex-wrap gap-2">
                             {(selY || []).map((lineColumn, index) => (
                               <div key={`${lineColumn}-${index}`} className="inline-flex items-center gap-1">
-                                <Badge variant="secondary" className="text-xs gap-2 pr-1 pl-2 py-1">
-                                  <span className="inline-flex items-center gap-1">
-                                    <span
-                                      className="inline-block h-2 w-2 rounded-full"
-                                      style={{ backgroundColor: getLineColor(lineColumn, index) }}
-                                    />
+                                <Badge variant="secondary" className="min-w-0 max-w-[13rem] gap-1 px-2 py-1 text-[10px] font-normal leading-none">
+                                  <span className="min-w-0 truncate whitespace-nowrap">
                                     {(() => {
                                       const parsed = parseScopedLineKey(lineColumn);
                                       const sheetLabel = parsed.isScoped
@@ -851,6 +862,7 @@ export default function ChartControls() {
                                   onChange={(color) => setSeriesColorOverride(index, color)}
                                   onClear={() => clearSeriesColorOverride(index, lineColumn)}
                                   ariaLabel={`Pick color for line ${index + 1}`}
+                                  triggerClassName="h-4 w-4"
                                 />
                               </div>
                             ))}
