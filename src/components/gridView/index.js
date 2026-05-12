@@ -78,6 +78,7 @@ import { DestructiveIconButton } from "@/components/primitives/destructive-icon-
 import { SHEET_GRID_PAGE_SIZE } from "@/config/dataLakeParquetSamples";
 import { athenaRowsToObjects } from "@/lib/duckdb/duckdbWasmClient";
 import { appendSheetOperation, createSheetOperation } from "@/lib/projectPersistence";
+import { temporalToMs } from "@/lib/temporalParse";
 import * as XLSX from 'xlsx';
 
 
@@ -89,6 +90,28 @@ const MONTH_LIKE = /^(\d{4})-(\d{2})$/;
 const YEAR_LIKE = /^(\d{4})$/;
 const SHEET_JSON_INITIAL_ROWS = 40;
 const SHEET_JSON_CHUNK_ROWS = 160;
+const BUCKET_TIME_INTERVALS = [
+  { value: "second", label: "Seconds", ms: 1000 },
+  { value: "minute", label: "Minutes", ms: 60 * 1000 },
+  { value: "15_minutes", label: "15 mins", ms: 15 * 60 * 1000 },
+  { value: "hour", label: "Hour", ms: 60 * 60 * 1000 },
+  { value: "day", label: "Day", ms: 24 * 60 * 60 * 1000 },
+  { value: "week", label: "Week", ms: 7 * 24 * 60 * 60 * 1000 },
+  { value: "month", label: "Month", calendar: "month" },
+  { value: "year", label: "Year", calendar: "year" },
+];
+const BUCKET_AGG_FILTER_OPERATORS = [
+  { value: "=", label: "=" },
+  { value: "!=", label: "!=" },
+  { value: ">", label: ">" },
+  { value: ">=", label: ">=" },
+  { value: "<", label: "<" },
+  { value: "<=", label: "<=" },
+  { value: "contains", label: "contains" },
+  { value: "not_contains", label: "does not contain" },
+  { value: "is_empty", label: "is empty" },
+  { value: "is_not_empty", label: "is not empty" },
+];
 
 function stripInternalGridFields(row) {
   if (!row || typeof row !== "object") return row;
@@ -205,6 +228,95 @@ function bucketKeyForValue(value) {
   return String(value);
 }
 
+function niceBucketSize(rawSize) {
+  const n = Number(rawSize);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  const power = 10 ** Math.floor(Math.log10(n));
+  const scaled = n / power;
+  const nice = scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10;
+  return nice * power;
+}
+
+function formatBucketNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(6)));
+}
+
+function timeBucketStartMs(ms, intervalValue) {
+  const opt = BUCKET_TIME_INTERVALS.find((item) => item.value === intervalValue) || BUCKET_TIME_INTERVALS[4];
+  if (!Number.isFinite(ms)) return NaN;
+  if (opt.calendar === "year") return Date.UTC(new Date(ms).getUTCFullYear(), 0, 1);
+  if (opt.calendar === "month") {
+    const d = new Date(ms);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  }
+  const step = Number(opt.ms);
+  if (!Number.isFinite(step) || step <= 0) return NaN;
+  if (opt.value === "week") {
+    const dayStart = Math.floor(ms / (24 * 60 * 60 * 1000)) * (24 * 60 * 60 * 1000);
+    const dayOfWeek = new Date(dayStart).getUTCDay();
+    const daysSinceMonday = (dayOfWeek + 6) % 7;
+    return dayStart - daysSinceMonday * 24 * 60 * 60 * 1000;
+  }
+  return Math.floor(ms / step) * step;
+}
+
+function formatTimeBucketLabel(ms, intervalValue) {
+  if (!Number.isFinite(ms)) return "(invalid time)";
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "(invalid time)";
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const min = String(d.getUTCMinutes()).padStart(2, "0");
+  const sec = String(d.getUTCSeconds()).padStart(2, "0");
+  if (intervalValue === "year") return String(yyyy);
+  if (intervalValue === "month") return `${yyyy}-${mm}`;
+  if (intervalValue === "day" || intervalValue === "week") return `${yyyy}-${mm}-${dd}`;
+  if (intervalValue === "hour") return `${yyyy}-${mm}-${dd} ${hh}:00`;
+  if (intervalValue === "minute" || intervalValue === "15_minutes") return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${sec}`;
+}
+
+function getBucketForRow(row, config) {
+  const bucketColumn = String(config?.bucketColumn || "").trim();
+  const raw = row?.[bucketColumn];
+  const mode = String(config?.bucketMode || "category");
+  if (mode === "time") {
+    const ms = temporalToMs(raw);
+    const startMs = timeBucketStartMs(ms, config?.timeInterval || "day");
+    const label = formatTimeBucketLabel(startMs, config?.timeInterval || "day");
+    return { key: `time:${startMs}`, label, sortValue: Number.isFinite(startMs) ? startMs : Number.POSITIVE_INFINITY };
+  }
+  if (mode === "number") {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return { key: "number:(empty)", label: "(empty)", sortValue: Number.POSITIVE_INFINITY };
+    const size = Number(config?.numericBucketSize);
+    const step = Number.isFinite(size) && size > 0 ? size : 1;
+    const start = Math.floor(n / step) * step;
+    const end = start + step;
+    return {
+      key: `number:${start}`,
+      label: `${formatBucketNumber(start)}-${formatBucketNumber(end)}`,
+      sortValue: start,
+    };
+  }
+  const key = bucketKeyForValue(raw);
+  return { key: `category:${key}`, label: raw ?? "", sortValue: key };
+}
+
+function rowMatchesAggregationFilter(row, agg) {
+  if (!agg?.filterEnabled) return true;
+  const column = String(agg.filterColumn || "").trim();
+  const operator = String(agg.filterOperator || "=");
+  if (!column || !operator) return true;
+  const valueNeeded = !["is_empty", "is_not_empty"].includes(operator);
+  if (valueNeeded && String(agg.filterValue ?? "").trim() === "") return true;
+  return compareMathValues(row?.[column], operator, rawMathValue(agg.filterValue));
+}
+
 function aggregateBucketRows(rows, config) {
   const sourceRows = Array.isArray(rows) ? rows : [];
   const bucketColumn = String(config?.bucketColumn || "").trim();
@@ -220,15 +332,19 @@ function aggregateBucketRows(rows, config) {
   const groups = new Map();
   for (const row of sourceRows) {
     if (!row || typeof row !== "object") continue;
-    const rawBucket = row[bucketColumn];
-    const key = bucketKeyForValue(rawBucket);
-    if (!groups.has(key)) {
-      groups.set(key, { key, rawBucket, firstRow: row, rows: [] });
+    const bucket = getBucketForRow(row, config);
+    if (!groups.has(bucket.key)) {
+      groups.set(bucket.key, { key: bucket.key, rawBucket: bucket.label, sortValue: bucket.sortValue, firstRow: row, rows: [] });
     }
-    groups.get(key).rows.push(row);
+    groups.get(bucket.key).rows.push(row);
   }
 
-  return Array.from(groups.values()).map((group) => {
+  return Array.from(groups.values()).sort((a, b) => {
+    const av = a.sortValue;
+    const bv = b.sortValue;
+    if (typeof av === "number" && typeof bv === "number") return av - bv;
+    return String(av ?? "").localeCompare(String(bv ?? ""));
+  }).map((group) => {
     const out = { [bucketOutputColumn]: group.rawBucket ?? "" };
     for (const col of passthroughColumns) {
       if (!col || col === bucketColumn || col === "_origIndex") continue;
@@ -240,11 +356,12 @@ function aggregateBucketRows(rows, config) {
       const weightColumn = String(agg.weightColumn || "").trim();
       const outputColumn = String(agg.outputColumn || "").trim();
       if (!outputColumn) continue;
+      const rowsForAgg = group.rows.filter((row) => rowMatchesAggregationFilter(row, agg));
 
       if (type === "count") {
         out[outputColumn] = valueColumn
-          ? group.rows.reduce((count, row) => (row?.[valueColumn] == null || row?.[valueColumn] === "" ? count : count + 1), 0)
-          : group.rows.length;
+          ? rowsForAgg.reduce((count, row) => (row?.[valueColumn] == null || row?.[valueColumn] === "" ? count : count + 1), 0)
+          : rowsForAgg.length;
         continue;
       }
 
@@ -252,7 +369,7 @@ function aggregateBucketRows(rows, config) {
       let count = 0;
       let weightedSum = 0;
       let weightSum = 0;
-      for (const row of group.rows) {
+      for (const row of rowsForAgg) {
         const value = parseCellFiniteForStat(row, valueColumn);
         if (value == null) continue;
         if (type === "sum" || type === "average") {
@@ -474,9 +591,12 @@ const GridView = ({startNew}) => {
     const [statsBucketColumn, setStatsBucketColumn] = useState("");
     const [statsBucketOutputColumn, setStatsBucketOutputColumn] = useState("bucket");
     const [statsBucketSheetName, setStatsBucketSheetName] = useState("");
+    const [statsBucketMode, setStatsBucketMode] = useState("category");
+    const [statsBucketTimeInterval, setStatsBucketTimeInterval] = useState("day");
+    const [statsBucketNumericSize, setStatsBucketNumericSize] = useState("");
     const [statsBucketPassthroughCols, setStatsBucketPassthroughCols] = useState(() => new Set());
     const [statsBucketAggregations, setStatsBucketAggregations] = useState([
-      { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count" },
+      { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" },
     ]);
 
     // Combine Sheets (client-side join across already-loaded sheets)
@@ -793,9 +913,12 @@ const GridView = ({startNew}) => {
         setStatsBucketColumn("");
         setStatsBucketOutputColumn("bucket");
         setStatsBucketSheetName("");
+        setStatsBucketMode("category");
+        setStatsBucketTimeInterval("day");
+        setStatsBucketNumericSize("");
         setStatsBucketPassthroughCols(new Set());
         setStatsBucketAggregations([
-          { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count" },
+          { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" },
         ]);
         setMathBasicColA("");
         setMathBasicColB("");
@@ -856,6 +979,47 @@ const GridView = ({startNew}) => {
       return samples.length ? samples : null;
     }, [connectedData, statsCumsumSourceCol]);
 
+    const statsBucketColumnProfile = useMemo(() => {
+      const col = String(statsBucketColumn || "").trim();
+      const rows = Array.isArray(connectedData) ? connectedData : [];
+      const numeric = [];
+      let temporalCount = 0;
+      let nonEmpty = 0;
+      for (const row of rows.slice(0, 2000)) {
+        const raw = row?.[col];
+        if (raw == null || raw === "") continue;
+        nonEmpty += 1;
+        const n = Number(raw);
+        if (Number.isFinite(n)) numeric.push(n);
+        if (Number.isFinite(temporalToMs(raw))) temporalCount += 1;
+      }
+      const min = numeric.length ? Math.min(...numeric) : null;
+      const max = numeric.length ? Math.max(...numeric) : null;
+      const key = col.toLowerCase();
+      const typedDate = dataTypes?.[col] === "date" || dataTypes?.[col] === "dateString";
+      const namedTime = /(time|timestamp|date|datetime|created_at|created|updated_at|ts)/i.test(key);
+      const isTemporal = nonEmpty > 0 && (typedDate || namedTime) && temporalCount / nonEmpty >= 0.5;
+      const isNumeric = numeric.length > 0 && numeric.length / Math.max(1, nonEmpty) >= 0.7;
+      const suggestedSize = isNumeric && max != null && min != null
+        ? niceBucketSize(Math.max(1, (max - min) / 10))
+        : 1;
+      return { isTemporal, isNumeric, min, max, suggestedSize, nonEmpty };
+    }, [connectedData, dataTypes, statsBucketColumn]);
+
+    useEffect(() => {
+      if (!statsBucketActive || !statsBucketColumn) return;
+      if (statsBucketColumnProfile.isTemporal) {
+        setStatsBucketMode("time");
+        return;
+      }
+      if (statsBucketColumnProfile.isNumeric) {
+        setStatsBucketMode("number");
+        setStatsBucketNumericSize((prev) => (String(prev || "").trim() ? prev : String(statsBucketColumnProfile.suggestedSize || 1)));
+        return;
+      }
+      setStatsBucketMode("category");
+    }, [statsBucketActive, statsBucketColumn, statsBucketColumnProfile]);
+
     const updateStatsBucketAggregation = useCallback((id, patch) => {
       setStatsBucketAggregations((prev) =>
         (Array.isArray(prev) ? prev : []).map((agg) => (agg.id === id ? { ...agg, ...patch } : agg)),
@@ -871,6 +1035,10 @@ const GridView = ({startNew}) => {
           valueColumn: "",
           weightColumn: "",
           outputColumn: "count",
+          filterEnabled: false,
+          filterColumn: "",
+          filterOperator: "=",
+          filterValue: "",
         },
       ]);
     }, []);
@@ -878,7 +1046,7 @@ const GridView = ({startNew}) => {
     const removeStatsBucketAggregation = useCallback((id) => {
       setStatsBucketAggregations((prev) => {
         const next = (Array.isArray(prev) ? prev : []).filter((agg) => agg.id !== id);
-        return next.length ? next : [{ id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count" }];
+        return next.length ? next : [{ id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" }];
       });
     }, []);
 
@@ -899,6 +1067,10 @@ const GridView = ({startNew}) => {
           valueColumn: agg.valueColumn || "",
           weightColumn: agg.weightColumn || "",
           outputColumn: String(agg.outputColumn || "").trim(),
+          filterEnabled: !!agg.filterEnabled,
+          filterColumn: agg.filterColumn || "",
+          filterOperator: agg.filterOperator || "=",
+          filterValue: agg.filterValue ?? "",
         })),
       [statsBucketAggregations],
     );
@@ -908,9 +1080,19 @@ const GridView = ({startNew}) => {
       if (!String(statsBucketColumn || "").trim()) return false;
       if (!String(statsBucketOutputColumn || "").trim()) return false;
       if (!String(statsBucketSheetName || "").trim()) return false;
+      if (statsBucketMode === "number") {
+        const size = Number(statsBucketNumericSize || statsBucketColumnProfile.suggestedSize || 1);
+        if (!Number.isFinite(size) || size <= 0) return false;
+      }
+      if (statsBucketMode === "time" && !statsBucketTimeInterval) return false;
       if (!normalizedStatsBucketAggregations.length) return false;
       return normalizedStatsBucketAggregations.every((agg) => {
         if (!agg.outputColumn) return false;
+        if (agg.filterEnabled) {
+          const needsValue = !["is_empty", "is_not_empty"].includes(agg.filterOperator);
+          if (!agg.filterColumn) return false;
+          if (needsValue && String(agg.filterValue ?? "").trim() === "") return false;
+        }
         if (agg.type === "count") return true;
         if (!agg.valueColumn) return false;
         if (agg.type === "weighted_average") return Boolean(agg.weightColumn);
@@ -920,8 +1102,12 @@ const GridView = ({startNew}) => {
       normalizedStatsBucketAggregations,
       statsBucketActive,
       statsBucketColumn,
+      statsBucketColumnProfile.suggestedSize,
+      statsBucketMode,
+      statsBucketNumericSize,
       statsBucketOutputColumn,
       statsBucketSheetName,
+      statsBucketTimeInterval,
     ]);
 
     const statsBucketPreviewRows = useMemo(() => {
@@ -929,6 +1115,9 @@ const GridView = ({startNew}) => {
       return aggregateBucketRows(connectedData, {
         bucketColumn: statsBucketColumn,
         bucketOutputColumn: statsBucketOutputColumn,
+        bucketMode: statsBucketMode,
+        timeInterval: statsBucketTimeInterval,
+        numericBucketSize: statsBucketNumericSize || statsBucketColumnProfile.suggestedSize || 1,
         passthroughColumns: Array.from(statsBucketPassthroughCols || []),
         aggregations: normalizedStatsBucketAggregations,
       }).slice(0, 3);
@@ -937,8 +1126,12 @@ const GridView = ({startNew}) => {
       normalizedStatsBucketAggregations,
       statsBucketActive,
       statsBucketColumn,
+      statsBucketColumnProfile.suggestedSize,
+      statsBucketMode,
+      statsBucketNumericSize,
       statsBucketOutputColumn,
       statsBucketPassthroughCols,
+      statsBucketTimeInterval,
     ]);
 
     const updateMathIfClause = useCallback((id, patch) => {
@@ -1453,6 +1646,9 @@ const GridView = ({startNew}) => {
       const next = aggregateBucketRows(rows, {
         bucketColumn,
         bucketOutputColumn,
+        bucketMode: statsBucketMode,
+        timeInterval: statsBucketTimeInterval,
+        numericBucketSize: statsBucketNumericSize || statsBucketColumnProfile.suggestedSize || 1,
         passthroughColumns,
         aggregations,
       });
@@ -1464,6 +1660,9 @@ const GridView = ({startNew}) => {
         sourceSheetId: activeSheetId || null,
         bucketColumn,
         bucketOutputColumn,
+        bucketMode: statsBucketMode,
+        timeInterval: statsBucketTimeInterval,
+        numericBucketSize: statsBucketNumericSize || statsBucketColumnProfile.suggestedSize || 1,
         passthroughColumns,
         aggregations,
         outputSheetName: sheetName,
@@ -1496,9 +1695,13 @@ const GridView = ({startNew}) => {
       setSheetData,
       statsBucketCanSubmit,
       statsBucketColumn,
+      statsBucketColumnProfile.suggestedSize,
+      statsBucketMode,
+      statsBucketNumericSize,
       statsBucketOutputColumn,
       statsBucketPassthroughCols,
       statsBucketSheetName,
+      statsBucketTimeInterval,
     ]);
 
     const collectColumnNames = (rows) => {
@@ -2766,14 +2969,14 @@ const GridView = ({startNew}) => {
                   </Tooltip>
                 </TooltipProvider>
                 <Dialog open={mathDialogOpen} onOpenChange={setMathDialogOpen}>
-                  <DialogContent className="sm:max-w-2xl">
+                  <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-2xl">
                     <DialogHeader>
                       <DialogTitle>Mathematics Operations</DialogTitle>
                       <DialogDescription>
                         Build a row-wise equation for probability momentum and write the result as a new column.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 py-2">
+                    <div className="min-h-0 space-y-3 overflow-y-auto py-2 pr-1">
                       <Tabs
                         value={mathDialogTab}
                         onValueChange={(v) => {
@@ -3373,6 +3576,7 @@ const GridView = ({startNew}) => {
                                       const next = v === "__" ? "" : v;
                                       setStatsBucketColumn(next);
                                       setStatsBucketOutputColumn((prev) => (String(prev || "").trim() && prev !== "bucket" ? prev : next || "bucket"));
+                                      setStatsBucketNumericSize("");
                                     }}
                                   >
                                     <SelectTrigger className="h-9 text-xs">
@@ -3399,6 +3603,100 @@ const GridView = ({startNew}) => {
                                   />
                                 </div>
                               </div>
+                              {statsBucketColumn ? (
+                                <div className="space-y-2 rounded-md border border-border/70 p-2">
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="space-y-1">
+                                      <Label className="text-xs">Bucket style</Label>
+                                      <Select value={statsBucketMode} onValueChange={setStatsBucketMode}>
+                                        <SelectTrigger className="h-9 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="category">Exact values</SelectItem>
+                                          <SelectItem value="number" disabled={!statsBucketColumnProfile.isNumeric}>
+                                            Numeric ranges
+                                          </SelectItem>
+                                          <SelectItem value="time" disabled={!statsBucketColumnProfile.isTemporal}>
+                                            Time intervals
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        {statsBucketColumnProfile.isTemporal
+                                          ? "Detected as time-like. Choose the time window."
+                                          : statsBucketColumnProfile.isNumeric
+                                            ? `Detected numeric range ${formatBucketNumber(statsBucketColumnProfile.min)} to ${formatBucketNumber(statsBucketColumnProfile.max)}.`
+                                            : "Buckets will use each distinct value."}
+                                      </p>
+                                    </div>
+                                    {statsBucketMode === "time" ? (
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Time bucket</Label>
+                                        <Select value={statsBucketTimeInterval} onValueChange={setStatsBucketTimeInterval}>
+                                          <SelectTrigger className="h-9 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {BUCKET_TIME_INTERVALS.map((opt) => (
+                                              <SelectItem key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    ) : statsBucketMode === "number" ? (
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Range size</Label>
+                                        <div className="flex gap-2">
+                                          <Input
+                                            className="h-9 min-w-0 text-xs"
+                                            inputMode="decimal"
+                                            value={statsBucketNumericSize}
+                                            onChange={(e) => setStatsBucketNumericSize(e.target.value.replace(/[^0-9.\-]/g, ""))}
+                                            placeholder={String(statsBucketColumnProfile.suggestedSize || 1)}
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 shrink-0 text-xs"
+                                            onClick={() => {
+                                              const curr = Number(statsBucketNumericSize) || statsBucketColumnProfile.suggestedSize || 1;
+                                              setStatsBucketNumericSize(String(niceBucketSize(curr / 2)));
+                                            }}
+                                          >
+                                            More granular
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 shrink-0 text-xs"
+                                            onClick={() => {
+                                              const curr = Number(statsBucketNumericSize) || statsBucketColumnProfile.suggestedSize || 1;
+                                              setStatsBucketNumericSize(String(niceBucketSize(curr * 2)));
+                                            }}
+                                          >
+                                            Wider
+                                          </Button>
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground">
+                                          Suggested: {formatBucketNumber(statsBucketColumnProfile.suggestedSize)} per bucket.
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Exact value buckets</Label>
+                                        <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
+                                          One output row per distinct {statsBucketColumn} value.
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : null}
                               <div className="space-y-1">
                                 <Label className="text-xs">New sheet name</Label>
                                 <Input
@@ -3515,6 +3813,72 @@ const GridView = ({startNew}) => {
                                             spellCheck={false}
                                           />
                                         </div>
+                                      </div>
+                                      <div className="mt-2 space-y-2 rounded-md border border-border/50 bg-muted/10 p-2">
+                                        <label className="flex items-center gap-2 text-xs">
+                                          <Checkbox
+                                            checked={!!agg.filterEnabled}
+                                            onCheckedChange={(checked) =>
+                                              updateStatsBucketAggregation(agg.id, {
+                                                filterEnabled: !!checked,
+                                                filterColumn: agg.filterColumn || sheetColumnNamesForMath[0] || "",
+                                                filterOperator: agg.filterOperator || "=",
+                                              })
+                                            }
+                                          />
+                                          <span>Where condition for this aggregation</span>
+                                        </label>
+                                        {agg.filterEnabled ? (
+                                          <div className="grid gap-2 sm:grid-cols-[1fr_0.7fr_1fr]">
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px] text-muted-foreground">Where column</Label>
+                                              <Select
+                                                value={agg.filterColumn || "__"}
+                                                onValueChange={(v) => updateStatsBucketAggregation(agg.id, { filterColumn: v === "__" ? "" : v })}
+                                              >
+                                                <SelectTrigger className="h-8 text-xs">
+                                                  <SelectValue placeholder="Column" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  <SelectItem value="__">—</SelectItem>
+                                                  {sheetColumnNamesForMath.map((c) => (
+                                                    <SelectItem key={`bucket-agg-filter-col-${agg.id}-${c}`} value={c} className="font-mono text-xs">
+                                                      {c}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px] text-muted-foreground">Op</Label>
+                                              <Select
+                                                value={agg.filterOperator || "="}
+                                                onValueChange={(v) => updateStatsBucketAggregation(agg.id, { filterOperator: v })}
+                                              >
+                                                <SelectTrigger className="h-8 text-xs">
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {BUCKET_AGG_FILTER_OPERATORS.map((op) => (
+                                                    <SelectItem key={op.value} value={op.value}>
+                                                      {op.label}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px] text-muted-foreground">Value</Label>
+                                              <Input
+                                                className="h-8 text-xs"
+                                                value={agg.filterValue ?? ""}
+                                                onChange={(e) => updateStatsBucketAggregation(agg.id, { filterValue: e.target.value })}
+                                                placeholder="e.g. 100"
+                                                disabled={["is_empty", "is_not_empty"].includes(agg.filterOperator)}
+                                              />
+                                            </div>
+                                          </div>
+                                        ) : null}
                                       </div>
                                     </div>
                                   ))}
