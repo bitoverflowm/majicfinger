@@ -192,6 +192,72 @@ function rollingPopulationStdDevAtIndex(rows, colKey, rowIndex, windowSize) {
   return populationStandardDeviation(vals);
 }
 
+function rawMathValue(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  const n = Number(text);
+  return Number.isFinite(n) ? n : text;
+}
+
+function compareMathValues(left, operator, right) {
+  const op = String(operator || "=");
+  if (op === "is_empty") return left == null || left === "";
+  if (op === "is_not_empty") return left != null && left !== "";
+  if (op === "contains" || op === "not_contains") {
+    const hit = String(left ?? "").toLowerCase().includes(String(right ?? "").toLowerCase());
+    return op === "not_contains" ? !hit : hit;
+  }
+  const leftNum = Number(left);
+  const rightNum = Number(right);
+  const numeric = Number.isFinite(leftNum) && Number.isFinite(rightNum);
+  const a = numeric ? leftNum : String(left ?? "").toLowerCase();
+  const b = numeric ? rightNum : String(right ?? "").toLowerCase();
+  if (op === "=" || op === "eq") return a === b;
+  if (op === "!=" || op === "ne") return a !== b;
+  if (op === ">" || op === "gt") return numeric ? a > b : String(a).localeCompare(String(b)) > 0;
+  if (op === ">=" || op === "gte") return numeric ? a >= b : String(a).localeCompare(String(b)) >= 0;
+  if (op === "<" || op === "lt") return numeric ? a < b : String(a).localeCompare(String(b)) < 0;
+  if (op === "<=" || op === "lte") return numeric ? a <= b : String(a).localeCompare(String(b)) <= 0;
+  return false;
+}
+
+function applyMathBinaryOp(op, a, b) {
+  const left = Number(a);
+  const right = Number(b);
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return null;
+  if (op === "add") return left + right;
+  if (op === "subtract") return left - right;
+  if (op === "multiply") return left * right;
+  if (op === "divide") return right === 0 ? null : left / right;
+  return null;
+}
+
+function resolveMathOperand(row, operand) {
+  const spec = operand && typeof operand === "object" ? operand : { kind: "raw", value: "" };
+  if (spec.kind === "column") return row?.[spec.column];
+  if (spec.kind === "operation") {
+    const base = row?.[spec.column];
+    const rhs = spec.operandKind === "column" ? row?.[spec.operandColumn] : rawMathValue(spec.operandValue);
+    return applyMathBinaryOp(spec.op, base, rhs);
+  }
+  return rawMathValue(spec.value);
+}
+
+function evaluateIfElseExpression(row, expression) {
+  const clauses = Array.isArray(expression?.clauses) ? expression.clauses : [];
+  for (const clause of clauses) {
+    if (!clause?.condition) continue;
+    const left = row?.[clause.condition.leftColumn];
+    const right = clause.condition.rightKind === "column"
+      ? row?.[clause.condition.rightColumn]
+      : rawMathValue(clause.condition.rightValue);
+    if (compareMathValues(left, clause.condition.operator, right)) {
+      return resolveMathOperand(row, clause.then);
+    }
+  }
+  return resolveMathOperand(row, expression?.else);
+}
+
 const GridView = ({startNew}) => {
 
     const contextStateV2 = useMyStateV2()
@@ -306,6 +372,15 @@ const GridView = ({startNew}) => {
     const [mathBasicColB, setMathBasicColB] = useState("");
     const [mathDestination, setMathDestination] = useState("current_sheet");
     const [mathDialogTab, setMathDialogTab] = useState("basic");
+    const [mathFunctionType, setMathFunctionType] = useState("row_operation");
+    const [mathIfClauses, setMathIfClauses] = useState([
+      {
+        id: "if-1",
+        condition: { leftColumn: "", operator: "=", rightKind: "raw", rightColumn: "", rightValue: "" },
+        then: { kind: "raw", value: "" },
+      },
+    ]);
+    const [mathElseResult, setMathElseResult] = useState({ kind: "raw", value: "" });
     const [statsStdDevActive, setStatsStdDevActive] = useState(false);
     const [statsStdSourceCol, setStatsStdSourceCol] = useState("");
     const [statsStdOutCol, setStatsStdOutCol] = useState("");
@@ -622,6 +697,15 @@ const GridView = ({startNew}) => {
         setStatsRollCount("4");
         setMathBasicColA("");
         setMathBasicColB("");
+        setMathFunctionType("row_operation");
+        setMathIfClauses([
+          {
+            id: "if-1",
+            condition: { leftColumn: "", operator: "=", rightKind: "raw", rightColumn: "", rightValue: "" },
+            then: { kind: "raw", value: "" },
+          },
+        ]);
+        setMathElseResult({ kind: "raw", value: "" });
       }
     }, [mathDialogOpen]);
 
@@ -670,6 +754,173 @@ const GridView = ({startNew}) => {
       return samples.length ? samples : null;
     }, [connectedData, statsCumsumSourceCol]);
 
+    const updateMathIfClause = useCallback((id, patch) => {
+      setMathIfClauses((prev) =>
+        (Array.isArray(prev) ? prev : []).map((clause) =>
+          clause.id === id
+            ? {
+                ...clause,
+                ...patch,
+                condition: { ...(clause.condition || {}), ...(patch.condition || {}) },
+                then: { ...(clause.then || {}), ...(patch.then || {}) },
+              }
+            : clause,
+        ),
+      );
+    }, []);
+
+    const addMathElseIfClause = useCallback(() => {
+      setMathIfClauses((prev) => [
+        ...(Array.isArray(prev) ? prev : []),
+        {
+          id: `if-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          condition: { leftColumn: sheetColumnNamesForMath[0] || "", operator: "=", rightKind: "raw", rightColumn: "", rightValue: "" },
+          then: { kind: "raw", value: "" },
+        },
+      ]);
+    }, [sheetColumnNamesForMath]);
+
+    const removeMathIfClause = useCallback((id) => {
+      setMathIfClauses((prev) => {
+        const next = (Array.isArray(prev) ? prev : []).filter((clause) => clause.id !== id);
+        return next.length ? next : [
+          {
+            id: "if-1",
+            condition: { leftColumn: "", operator: "=", rightKind: "raw", rightColumn: "", rightValue: "" },
+            then: { kind: "raw", value: "" },
+          },
+        ];
+      });
+    }, []);
+
+    const normalizeIfElseExpressionForSave = useCallback(() => ({
+      kind: "if-else",
+      clauses: (Array.isArray(mathIfClauses) ? mathIfClauses : []).map((clause) => ({
+        condition: {
+          leftColumn: clause?.condition?.leftColumn || "",
+          operator: clause?.condition?.operator || "=",
+          rightKind: clause?.condition?.rightKind || "raw",
+          rightColumn: clause?.condition?.rightColumn || "",
+          rightValue: clause?.condition?.rightValue ?? "",
+        },
+        then: clause?.then || { kind: "raw", value: "" },
+      })),
+      else: mathElseResult || { kind: "raw", value: "" },
+    }), [mathIfClauses, mathElseResult]);
+
+    const ifElseCanSubmit = useMemo(() => {
+      if (mathFunctionType !== "if_else") return true;
+      const clauses = Array.isArray(mathIfClauses) ? mathIfClauses : [];
+      return clauses.some((clause) =>
+        String(clause?.condition?.leftColumn || "").trim() &&
+        (clause?.condition?.rightKind === "column"
+          ? String(clause?.condition?.rightColumn || "").trim()
+          : String(clause?.condition?.rightValue ?? "").trim() || ["is_empty", "is_not_empty"].includes(clause?.condition?.operator))
+      );
+    }, [mathFunctionType, mathIfClauses]);
+
+    const renderMathOperandEditor = (label, value, onChange) => {
+      const spec = value && typeof value === "object" ? value : { kind: "raw", value: "" };
+      const kind = spec.kind || "raw";
+      return (
+        <div className="space-y-1">
+          {label ? <Label className="text-xs">{label}</Label> : null}
+          <div className="grid gap-2 sm:grid-cols-[0.9fr_1.4fr]">
+            <Select value={kind} onValueChange={(v) => onChange({ ...spec, kind: v })}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="raw">Raw value</SelectItem>
+                <SelectItem value="column">Column value</SelectItem>
+                <SelectItem value="operation">Column operation</SelectItem>
+              </SelectContent>
+            </Select>
+            {kind === "column" ? (
+              <Select value={spec.column || "__"} onValueChange={(v) => onChange({ ...spec, kind, column: v === "__" ? "" : v })}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Select column" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__">—</SelectItem>
+                  {sheetColumnNamesForMath.map((c) => (
+                    <SelectItem key={`${label}-operand-col-${c}`} value={c} className="font-mono text-xs">
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : kind === "operation" ? (
+              <div className="grid gap-2 sm:grid-cols-[1fr_0.7fr_0.8fr_1fr]">
+                <Select value={spec.column || "__"} onValueChange={(v) => onChange({ ...spec, kind, column: v === "__" ? "" : v })}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__">—</SelectItem>
+                    {sheetColumnNamesForMath.map((c) => (
+                      <SelectItem key={`${label}-op-base-${c}`} value={c} className="font-mono text-xs">
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={spec.op || "add"} onValueChange={(v) => onChange({ ...spec, kind, op: v })}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="add">+</SelectItem>
+                    <SelectItem value="subtract">-</SelectItem>
+                    <SelectItem value="multiply">x</SelectItem>
+                    <SelectItem value="divide">/</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={spec.operandKind || "raw"} onValueChange={(v) => onChange({ ...spec, kind, operandKind: v })}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="raw">Raw</SelectItem>
+                    <SelectItem value="column">Col</SelectItem>
+                  </SelectContent>
+                </Select>
+                {spec.operandKind === "column" ? (
+                  <Select value={spec.operandColumn || "__"} onValueChange={(v) => onChange({ ...spec, kind, operandColumn: v === "__" ? "" : v })}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__">—</SelectItem>
+                      {sheetColumnNamesForMath.map((c) => (
+                        <SelectItem key={`${label}-op-rhs-${c}`} value={c} className="font-mono text-xs">
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    className="h-9 text-xs"
+                    value={spec.operandValue ?? ""}
+                    onChange={(e) => onChange({ ...spec, kind, operandValue: e.target.value })}
+                    placeholder="Value"
+                  />
+                )}
+              </div>
+            ) : (
+              <Input
+                className="h-9 text-xs"
+                value={spec.value ?? ""}
+                onChange={(e) => onChange({ ...spec, kind, value: e.target.value })}
+                placeholder='e.g. 10 or "Yes"'
+              />
+            )}
+          </div>
+        </div>
+      );
+    };
+
     const applySheetMathOperation = useCallback(() => {
       const rows = Array.isArray(connectedData) ? [...connectedData] : [];
       if (!rows.length) {
@@ -687,7 +938,17 @@ const GridView = ({startNew}) => {
       };
 
       let next;
-      if (mathDialogTab === "basic") {
+      if (mathDialogTab === "functions" && mathFunctionType === "if_else") {
+        const expression = normalizeIfElseExpressionForSave();
+        if (!ifElseCanSubmit) {
+          toast.error("Add at least one valid if / else condition.");
+          return;
+        }
+        next = rows.map((row) => {
+          if (!row || typeof row !== "object") return row;
+          return { ...row, [out]: evaluateIfElseExpression(row, expression) };
+        });
+      } else if (mathDialogTab === "basic" || (mathDialogTab === "functions" && mathFunctionType === "column")) {
         const colA = String(mathBasicColA || "").trim();
         const colB = String(mathBasicColB || "").trim();
         if (!colA || !colB) {
@@ -750,15 +1011,20 @@ const GridView = ({startNew}) => {
         });
       }
 
+      const inferredType = next.some((row) => row?.[out] != null && row?.[out] !== "" && !Number.isNaN(Number(row?.[out])))
+        ? "number"
+        : "string";
       if (setDataTypes) {
-        setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
+        setDataTypes((prev) => ({ ...(prev || {}), [out]: inferredType }));
       }
       const operation = createSheetOperation("computed.column", {
         column: out,
         expression:
-          mathDialogTab === "basic"
-            ? { kind: "binary", op: mathOp, leftColumn: mathBasicColA, rightColumn: mathBasicColB }
-            : { kind: "relative-row", op: mathOp, baseColumn: mathBaseCol, rowRef: mathRelativeRowRef },
+          mathDialogTab === "functions" && mathFunctionType === "if_else"
+            ? normalizeIfElseExpressionForSave()
+            : (mathDialogTab === "basic" || mathFunctionType === "column")
+              ? { kind: "binary", op: mathOp, leftColumn: mathBasicColA, rightColumn: mathBasicColB }
+              : { kind: "relative-row", op: mathOp, baseColumn: mathBaseCol, rowRef: mathRelativeRowRef },
       });
       if (mathDestination === "new_sheet") {
         const sheetName = `${out} calc`;
@@ -793,6 +1059,9 @@ const GridView = ({startNew}) => {
       mathBasicColB,
       mathBaseCol,
       mathDestination,
+      mathFunctionType,
+      normalizeIfElseExpressionForSave,
+      ifElseCanSubmit,
       mathOp,
       mathOutCol,
       mathRelativeRowRef,
@@ -2349,7 +2618,7 @@ const GridView = ({startNew}) => {
                         </TabsContent>
                         <TabsContent value="functions" className="mt-2">
                           <div className="space-y-3">
-                            <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 items-end">
                               <div className="space-y-1">
                                 <Label className="text-xs">Resulting column name</Label>
                                 <Input
@@ -2361,39 +2630,202 @@ const GridView = ({startNew}) => {
                                 />
                               </div>
                               <div className="h-9 px-2 flex items-center text-sm font-semibold text-muted-foreground">=</div>
-                            </div>
-
-                            <div className="grid gap-2 sm:grid-cols-[1.3fr_0.8fr_1fr_0.6fr_1fr] items-end">
                               <div className="space-y-1">
-                                <Label className="text-xs">Column</Label>
-                                <Select value={mathBaseCol || "__"} onValueChange={(v) => setMathBaseCol(v === "__" ? "" : v)}>
+                                <Label className="text-xs">Operation type</Label>
+                                <Select
+                                  value={mathFunctionType}
+                                  onValueChange={(v) => {
+                                    setMathFunctionType(v);
+                                    if (v === "column" && mathOp === "pct_growth") setMathOp("subtract");
+                                  }}
+                                >
                                   <SelectTrigger className="h-9 text-xs">
-                                    <SelectValue placeholder="Select column" />
+                                    <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="__">—</SelectItem>
-                                    {sheetColumnNamesForMath.map((c) => (
-                                      <SelectItem key={`math-base-${c}`} value={c} className="font-mono text-xs">
-                                        {c}
-                                      </SelectItem>
-                                    ))}
+                                    <SelectItem value="row_operation">Basic row operation</SelectItem>
+                                    <SelectItem value="column">Column</SelectItem>
+                                    <SelectItem value="if_else">If else</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
-                              {mathBaseCol ? (
+                            </div>
+
+                            {mathFunctionType === "column" ? (
+                              <>
                                 <div className="space-y-1">
-                                  <Label className="text-xs">Mode</Label>
-                                  <Select value={mathReferenceMode} onValueChange={setMathReferenceMode}>
+                                  <Label className="text-xs">Operation</Label>
+                                  <Select value={mathOp} onValueChange={setMathOp}>
                                     <SelectTrigger className="h-9 text-xs">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="row_wise">Row-wise</SelectItem>
+                                      <SelectItem value="add">Add (A + B)</SelectItem>
+                                      <SelectItem value="subtract">Subtract (A − B)</SelectItem>
+                                      <SelectItem value="multiply">Multiply (A × B)</SelectItem>
+                                      <SelectItem value="divide">{"Divide (A \u00f7 B)"}</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
-                              ) : null}
-                              {mathBaseCol && mathReferenceMode === "row_wise" ? (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">Column A</Label>
+                                    <Select value={mathBasicColA || "__"} onValueChange={(v) => setMathBasicColA(v === "__" ? "" : v)}>
+                                      <SelectTrigger className="h-9 text-xs">
+                                        <SelectValue placeholder="Select column" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__">—</SelectItem>
+                                        {sheetColumnNamesForMath.map((c) => (
+                                          <SelectItem key={`math-fn-basic-a-${c}`} value={c} className="font-mono text-xs">
+                                            {c}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">Column B</Label>
+                                    <Select value={mathBasicColB || "__"} onValueChange={(v) => setMathBasicColB(v === "__" ? "" : v)}>
+                                      <SelectTrigger className="h-9 text-xs">
+                                        <SelectValue placeholder="Select column" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__">—</SelectItem>
+                                        {sheetColumnNamesForMath.map((c) => (
+                                          <SelectItem key={`math-fn-basic-b-${c}`} value={c} className="font-mono text-xs">
+                                            {c}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                              </>
+                            ) : mathFunctionType === "if_else" ? (
+                              <div className="space-y-3">
+                                {(Array.isArray(mathIfClauses) ? mathIfClauses : []).map((clause, idx) => {
+                                  const condition = clause.condition || {};
+                                  return (
+                                    <div key={clause.id} className="space-y-2 rounded-lg border border-border/70 p-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                          {idx === 0 ? "If" : `Else if ${idx}`}
+                                        </span>
+                                        {(mathIfClauses || []).length > 1 ? (
+                                          <button
+                                            type="button"
+                                            className="inline-flex h-2 w-2 items-center justify-center rounded-full bg-red-500 hover:bg-red-600"
+                                            aria-label={`Remove condition ${idx + 1}`}
+                                            onClick={() => removeMathIfClause(clause.id)}
+                                          />
+                                        ) : null}
+                                      </div>
+                                      <div className="grid gap-2 sm:grid-cols-[1.1fr_0.7fr_0.8fr_1.1fr]">
+                                        <Select value={condition.leftColumn || "__"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { leftColumn: v === "__" ? "" : v } })}>
+                                          <SelectTrigger className="h-9 text-xs">
+                                            <SelectValue placeholder="Column" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="__">—</SelectItem>
+                                            {sheetColumnNamesForMath.map((c) => (
+                                              <SelectItem key={`if-left-${clause.id}-${c}`} value={c} className="font-mono text-xs">
+                                                {c}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <Select value={condition.operator || "="} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { operator: v } })}>
+                                          <SelectTrigger className="h-9 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="=">=</SelectItem>
+                                            <SelectItem value="!=">!=</SelectItem>
+                                            <SelectItem value=">">&gt;</SelectItem>
+                                            <SelectItem value=">=">&gt;=</SelectItem>
+                                            <SelectItem value="<">&lt;</SelectItem>
+                                            <SelectItem value="<=">&lt;=</SelectItem>
+                                            <SelectItem value="contains">contains</SelectItem>
+                                            <SelectItem value="not_contains">does not contain</SelectItem>
+                                            <SelectItem value="is_empty">is empty</SelectItem>
+                                            <SelectItem value="is_not_empty">is not empty</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <Select value={condition.rightKind || "raw"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { rightKind: v } })}>
+                                          <SelectTrigger className="h-9 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="raw">Raw</SelectItem>
+                                            <SelectItem value="column">Column</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        {condition.rightKind === "column" ? (
+                                          <Select value={condition.rightColumn || "__"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { rightColumn: v === "__" ? "" : v } })}>
+                                            <SelectTrigger className="h-9 text-xs">
+                                              <SelectValue placeholder="Column" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="__">—</SelectItem>
+                                              {sheetColumnNamesForMath.map((c) => (
+                                                <SelectItem key={`if-right-${clause.id}-${c}`} value={c} className="font-mono text-xs">
+                                                  {c}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        ) : (
+                                          <Input
+                                            className="h-9 text-xs"
+                                            value={condition.rightValue ?? ""}
+                                            onChange={(e) => updateMathIfClause(clause.id, { condition: { rightValue: e.target.value } })}
+                                            placeholder='Value, e.g. Yes'
+                                            disabled={["is_empty", "is_not_empty"].includes(condition.operator)}
+                                          />
+                                        )}
+                                      </div>
+                                      {renderMathOperandEditor("Then", clause.then, (next) => updateMathIfClause(clause.id, { then: next }))}
+                                    </div>
+                                  );
+                                })}
+                                <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={addMathElseIfClause}>
+                                  + Else if
+                                </Button>
+                                {renderMathOperandEditor("Else", mathElseResult, setMathElseResult)}
+                              </div>
+                            ) : (
+                              <div className="grid gap-2 sm:grid-cols-[1.3fr_0.8fr_1fr_0.6fr_1fr] items-end">
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Column</Label>
+                                  <Select value={mathBaseCol || "__"} onValueChange={(v) => setMathBaseCol(v === "__" ? "" : v)}>
+                                    <SelectTrigger className="h-9 text-xs">
+                                      <SelectValue placeholder="Select column" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__">—</SelectItem>
+                                      {sheetColumnNamesForMath.map((c) => (
+                                        <SelectItem key={`math-base-${c}`} value={c} className="font-mono text-xs">
+                                          {c}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                {mathBaseCol ? (
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">Mode</Label>
+                                    <Select value={mathReferenceMode} onValueChange={setMathReferenceMode}>
+                                      <SelectTrigger className="h-9 text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="row_wise">Row-wise</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                ) : null}
+                                {mathBaseCol && mathReferenceMode === "row_wise" ? (
                                 <div className="space-y-1">
                                   <Label className="text-xs">Anchor</Label>
                                   <Select value={mathCurrentRowRef} onValueChange={setMathCurrentRowRef}>
@@ -2405,8 +2837,8 @@ const GridView = ({startNew}) => {
                                     </SelectContent>
                                   </Select>
                                 </div>
-                              ) : null}
-                              {mathBaseCol && mathReferenceMode === "row_wise" && mathCurrentRowRef === "current_row" ? (
+                                ) : null}
+                                {mathBaseCol && mathReferenceMode === "row_wise" && mathCurrentRowRef === "current_row" ? (
                                 <div className="space-y-1">
                                   <Label className="text-xs">Op</Label>
                                   <Select value={mathOp} onValueChange={setMathOp}>
@@ -2424,8 +2856,8 @@ const GridView = ({startNew}) => {
                                     </SelectContent>
                                   </Select>
                                 </div>
-                              ) : null}
-                              {mathBaseCol && mathReferenceMode === "row_wise" && mathCurrentRowRef === "current_row" ? (
+                                ) : null}
+                                {mathBaseCol && mathReferenceMode === "row_wise" && mathCurrentRowRef === "current_row" ? (
                                 <div className="space-y-1">
                                   <Label className="text-xs">Relative row</Label>
                                   <Select value={mathRelativeRowRef} onValueChange={setMathRelativeRowRef}>
@@ -2438,13 +2870,22 @@ const GridView = ({startNew}) => {
                                     </SelectContent>
                                   </Select>
                                 </div>
-                              ) : null}
-                            </div>
+                                ) : null}
+                              </div>
+                            )}
 
                             <div className="space-y-1">
                               <Label className="text-xs">Preview equation</Label>
                               <div className="min-h-9 rounded-md border border-border/60 bg-muted/20 px-2 py-1 text-xs flex items-center font-mono leading-snug">
-                                {mathOp === "pct_growth" ? (
+                                {mathFunctionType === "if_else" ? (
+                                  <span className="line-clamp-2">
+                                    {`${mathOutCol || nextFreeResultColumnName()} = if ${mathIfClauses?.[0]?.condition?.leftColumn || "column"} ${mathIfClauses?.[0]?.condition?.operator || "="} ${mathIfClauses?.[0]?.condition?.rightKind === "column" ? (mathIfClauses?.[0]?.condition?.rightColumn || "column") : (mathIfClauses?.[0]?.condition?.rightValue || "value")} then ... else ...`}
+                                  </span>
+                                ) : mathFunctionType === "column" ? (
+                                  `${mathOutCol || nextFreeResultColumnName()} = ${mathBasicColA || "Column A"} ${
+                                    mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
+                                  } ${mathBasicColB || "Column B"} (per row)`
+                                ) : mathOp === "pct_growth" ? (
                                   <span className="line-clamp-2">
                                     {`${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"} · first/last row → blank`}
                                   </span>
@@ -2728,7 +3169,11 @@ const GridView = ({startNew}) => {
                               !String(mathBasicColB || "").trim() ||
                               !String(mathOutCol || "").trim())) ||
                           (mathDialogTab === "functions" &&
-                            (!String(mathBaseCol || "").trim() || !String(mathOutCol || "").trim()))
+                            (!String(mathOutCol || "").trim() ||
+                              (mathFunctionType === "row_operation" && !String(mathBaseCol || "").trim()) ||
+                              (mathFunctionType === "column" &&
+                                (!String(mathBasicColA || "").trim() || !String(mathBasicColB || "").trim())) ||
+                              (mathFunctionType === "if_else" && !ifElseCanSubmit)))
                         }
                       >
                         Apply to sheet

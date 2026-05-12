@@ -498,6 +498,66 @@ function applyBinaryMath(op, a, b) {
   return null;
 }
 
+function rawComputedValue(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  const n = Number(text);
+  return Number.isFinite(n) ? n : text;
+}
+
+function compareComputedValues(left, operator, right) {
+  const op = String(operator || "=");
+  if (op === "is_empty") return left == null || left === "";
+  if (op === "is_not_empty") return left != null && left !== "";
+  if (op === "contains" || op === "not_contains") {
+    const hit = String(left ?? "").toLowerCase().includes(String(right ?? "").toLowerCase());
+    return op === "not_contains" ? !hit : hit;
+  }
+  const leftNum = Number(left);
+  const rightNum = Number(right);
+  const numeric = Number.isFinite(leftNum) && Number.isFinite(rightNum);
+  const a = numeric ? leftNum : String(left ?? "").toLowerCase();
+  const b = numeric ? rightNum : String(right ?? "").toLowerCase();
+  if (op === "=" || op === "eq") return a === b;
+  if (op === "!=" || op === "ne") return a !== b;
+  if (op === ">" || op === "gt") return numeric ? a > b : String(a).localeCompare(String(b)) > 0;
+  if (op === ">=" || op === "gte") return numeric ? a >= b : String(a).localeCompare(String(b)) >= 0;
+  if (op === "<" || op === "lt") return numeric ? a < b : String(a).localeCompare(String(b)) < 0;
+  if (op === "<=" || op === "lte") return numeric ? a <= b : String(a).localeCompare(String(b)) <= 0;
+  return false;
+}
+
+function resolveComputedOperand(row, operand) {
+  const spec = operand && typeof operand === "object" ? operand : { kind: "raw", value: "" };
+  if (spec.kind === "column") return row?.[spec.column];
+  if (spec.kind === "operation") {
+    const base = row?.[spec.column];
+    const rhs = spec.operandKind === "column" ? row?.[spec.operandColumn] : rawComputedValue(spec.operandValue);
+    const a = finiteNumber(base);
+    const b = finiteNumber(rhs);
+    if (a == null || b == null) return null;
+    const value = applyBinaryMath(spec.op, a, b);
+    return Number.isFinite(value) ? value : null;
+  }
+  return rawComputedValue(spec.value);
+}
+
+function evaluateIfElseComputed(row, expr) {
+  const clauses = Array.isArray(expr?.clauses) ? expr.clauses : [];
+  for (const clause of clauses) {
+    const condition = clause?.condition;
+    if (!condition?.leftColumn) continue;
+    const left = row?.[condition.leftColumn];
+    const right = condition.rightKind === "column"
+      ? row?.[condition.rightColumn]
+      : rawComputedValue(condition.rightValue);
+    if (compareComputedValues(left, condition.operator, right)) {
+      return resolveComputedOperand(row, clause.then);
+    }
+  }
+  return resolveComputedOperand(row, expr?.else);
+}
+
 function applyComputedColumnOperation(rows, op) {
   const out = String(op?.column || "").trim();
   const expr = op?.expression && typeof op.expression === "object" ? op.expression : null;
@@ -560,6 +620,14 @@ function applyComputedColumnOperation(rows, op) {
       running += v;
       return { ...row, [out]: running };
     });
+  }
+
+  if (expr.kind === "if-else") {
+    return rows.map((row) => (
+      row && typeof row === "object"
+        ? { ...row, [out]: evaluateIfElseComputed(row, expr) }
+        : row
+    ));
   }
 
   return rows;
