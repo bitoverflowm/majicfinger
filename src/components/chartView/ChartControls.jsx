@@ -77,6 +77,10 @@ export default function ChartControls() {
     setSelColorCol,
     scaleZ,
     setScaleZ,
+    scatterZEnabled,
+    setScatterZEnabled,
+    scatterColorEnabled,
+    setScatterColorEnabled,
 
     livelineMomentum,
     setLivelineMomentum,
@@ -1268,43 +1272,71 @@ export default function ChartControls() {
                   {selChartType === "scatter" && (
                     <>
                       <div className="min-w-0 py-2">
-                        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Bubble size (Z)</p>
-                        <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Numeric column for bubble radius</p>
-                        <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
-                          <SelectTrigger className="mt-1 min-w-0">
-                            <SelectValue placeholder="Select Z column" className="text-xs" />
-                          </SelectTrigger>
-                          <SelectContent className="text-xs">
-                            {xOptions &&
-                              xOptions.filter((k) => k !== selX).map((i) => (
-                                <SelectItem key={i} value={i} className="text-xs">
-                                  {formatColumnLabel(i)}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Bubble size (Z)</p>
+                            <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional numeric column for bubble radius</p>
+                          </div>
+                          <Switch
+                            checked={!!scatterZEnabled}
+                            onCheckedChange={(checked) => {
+                              setScatterZEnabled(!!checked);
+                              if (!checked) setSelZ(null);
+                            }}
+                            aria-label="Enable bubble size Z column"
+                          />
+                        </div>
+                        {scatterZEnabled ? (
+                          <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
+                            <SelectTrigger className="mt-1 min-w-0">
+                              <SelectValue placeholder="Select Z column" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              {xOptions &&
+                                xOptions.filter((k) => k !== selX).map((i) => (
+                                  <SelectItem key={i} value={i} className="text-xs">
+                                    {formatColumnLabel(i)}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        ) : null}
                       </div>
                       <div className="min-w-0 py-2">
-                        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Color by</p>
-                        <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional column for point color</p>
-                        <Select value={selColorCol ?? "__none__"} onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}>
-                          <SelectTrigger className="mt-1 min-w-0">
-                            <SelectValue placeholder="None or select column" className="text-xs" />
-                          </SelectTrigger>
-                          <SelectContent className="text-xs">
-                            <SelectItem value="__none__" className="text-xs">
-                              None
-                            </SelectItem>
-                            {xOptions &&
-                              xOptions.map((i) => (
-                                <SelectItem key={i} value={i} className="text-xs">
-                                  {formatColumnLabel(i)}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Color by</p>
+                            <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional column for point color</p>
+                          </div>
+                          <Switch
+                            checked={!!scatterColorEnabled}
+                            onCheckedChange={(checked) => {
+                              setScatterColorEnabled(!!checked);
+                              if (!checked) setSelColorCol(null);
+                            }}
+                            aria-label="Enable scatter color by column"
+                          />
+                        </div>
+                        {scatterColorEnabled ? (
+                          <Select value={selColorCol ?? "__none__"} onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}>
+                            <SelectTrigger className="mt-1 min-w-0">
+                              <SelectValue placeholder="None or select column" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              <SelectItem value="__none__" className="text-xs">
+                                None
+                              </SelectItem>
+                              {xOptions &&
+                                xOptions.map((i) => (
+                                  <SelectItem key={i} value={i} className="text-xs">
+                                    {formatColumnLabel(i)}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        ) : null}
                       </div>
-                      {selZ && (
+                      {scatterZEnabled && selZ && (
                         <div className="py-2 flex items-center gap-2">
                           <span className={`text-xs ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Z scale:</span>
                           <TooltipProvider delayDuration={300}>
@@ -1765,43 +1797,71 @@ export default function ChartControls() {
               {selChartType === "scatter" && (
                 <>
                   <div className="min-w-0 py-2">
-                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Bubble size (Z)</p>
-                    <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Numeric column for bubble radius</p>
-                    <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
-                      <SelectTrigger className="mt-1 min-w-0">
-                        <SelectValue placeholder="Select Z column" className="text-xs" />
-                      </SelectTrigger>
-                      <SelectContent className="text-xs">
-                        {xOptions &&
-                          xOptions.filter((k) => k !== selX).map((i) => (
-                            <SelectItem key={i} value={i} className="text-xs">
-                              {formatColumnLabel(i)}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Bubble size (Z)</p>
+                        <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional numeric column for bubble radius</p>
+                      </div>
+                      <Switch
+                        checked={!!scatterZEnabled}
+                        onCheckedChange={(checked) => {
+                          setScatterZEnabled(!!checked);
+                          if (!checked) setSelZ(null);
+                        }}
+                        aria-label="Enable bubble size Z column"
+                      />
+                    </div>
+                    {scatterZEnabled ? (
+                      <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
+                        <SelectTrigger className="mt-1 min-w-0">
+                          <SelectValue placeholder="Select Z column" className="text-xs" />
+                        </SelectTrigger>
+                        <SelectContent className="text-xs">
+                          {xOptions &&
+                            xOptions.filter((k) => k !== selX).map((i) => (
+                              <SelectItem key={i} value={i} className="text-xs">
+                                {formatColumnLabel(i)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
                   </div>
                   <div className="min-w-0 py-2">
-                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Color by</p>
-                    <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional column for point color</p>
-                    <Select value={selColorCol ?? "__none__"} onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}>
-                      <SelectTrigger className="mt-1 min-w-0">
-                        <SelectValue placeholder="None or select column" className="text-xs" />
-                      </SelectTrigger>
-                      <SelectContent className="text-xs">
-                        <SelectItem value="__none__" className="text-xs">
-                          None
-                        </SelectItem>
-                        {xOptions &&
-                          xOptions.map((i) => (
-                            <SelectItem key={i} value={i} className="text-xs">
-                              {formatColumnLabel(i)}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Color by</p>
+                        <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional column for point color</p>
+                      </div>
+                      <Switch
+                        checked={!!scatterColorEnabled}
+                        onCheckedChange={(checked) => {
+                          setScatterColorEnabled(!!checked);
+                          if (!checked) setSelColorCol(null);
+                        }}
+                        aria-label="Enable scatter color by column"
+                      />
+                    </div>
+                    {scatterColorEnabled ? (
+                      <Select value={selColorCol ?? "__none__"} onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}>
+                        <SelectTrigger className="mt-1 min-w-0">
+                          <SelectValue placeholder="None or select column" className="text-xs" />
+                        </SelectTrigger>
+                        <SelectContent className="text-xs">
+                          <SelectItem value="__none__" className="text-xs">
+                            None
+                          </SelectItem>
+                          {xOptions &&
+                            xOptions.map((i) => (
+                              <SelectItem key={i} value={i} className="text-xs">
+                                {formatColumnLabel(i)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
                   </div>
-                  {selZ && (
+                  {scatterZEnabled && selZ && (
                     <div className="py-2 flex items-center gap-2">
                       <span className={`text-xs ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Z scale:</span>
                       <TooltipProvider delayDuration={300}>

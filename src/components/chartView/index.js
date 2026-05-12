@@ -5,7 +5,7 @@ import {
   SHADCN_CHART_BASE_ORDER,
   getShadcnChartPaletteArray,
 } from '@/components/chartView/panels/shadcnChartPalettes';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Treemap, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Scatter, ScatterChart, Treemap, XAxis, YAxis, ZAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { RainbowBarLegendContent } from "@/components/chartView/RainbowBarLegendContent";
 import { rainbowBarFillFromPalette } from "@/components/chartView/rainbowBarFill";
@@ -519,6 +519,16 @@ function formatCompactNumber(value) {
   return `${Math.round(value * 100) / 100}`;
 }
 
+function stableHashIndex(value, modulo) {
+  const n = Math.max(1, Number(modulo) || 1);
+  const s = String(value ?? "");
+  let hash = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) % n;
+}
+
 function parseScopedColumnKey(value, fallbackSheetId) {
   const raw = String(value || "");
   const splitIdx = raw.indexOf("::");
@@ -580,6 +590,11 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [chartTimeframe, setChartTimeframe] = useState("15m");
   const [scaleX, setScaleX] = useState("linear");
   const [scaleY, setScaleY] = useState("linear");
+  const [selZ, setSelZ] = useState(null);
+  const [selColorCol, setSelColorCol] = useState(null);
+  const [scaleZ, setScaleZ] = useState("linear");
+  const [scatterZEnabled, setScatterZEnabled] = useState(false);
+  const [scatterColorEnabled, setScatterColorEnabled] = useState(false);
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
   const [yAxisCompact, setYAxisCompact] = useState(true);
   const [sortXDir, setSortXDir] = useState("asc");
@@ -697,6 +712,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
     if (s.scaleX != null) setScaleX(s.scaleX);
     if (s.scaleY != null) setScaleY(s.scaleY);
+    if (s.selZ !== undefined) setSelZ(s.selZ);
+    if (s.selColorCol !== undefined) setSelColorCol(s.selColorCol);
+    if (s.scaleZ === "log" || s.scaleZ === "linear") setScaleZ(s.scaleZ);
+    if (s.scatterZEnabled !== undefined) setScatterZEnabled(!!s.scatterZEnabled);
+    else if (s.selZ) setScatterZEnabled(true);
+    if (s.scatterColorEnabled !== undefined) setScatterColorEnabled(!!s.scatterColorEnabled);
+    else if (s.selColorCol) setScatterColorEnabled(true);
     if (s.yAxisDivisor != null) setYAxisDivisor(s.yAxisDivisor);
     if (s.yAxisCompact !== undefined) setYAxisCompact(!!s.yAxisCompact);
     if (s.sortXDir != null) setSortXDir(s.sortXDir);
@@ -893,6 +915,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
         next.every((v, i) => v === curr[i]);
       return stable ? curr : next;
     });
+    setSelZ((z) => (z ? resolveToExistingKey(z) : z));
+    setSelColorCol((c) => (c ? resolveToExistingKey(c) : c));
   }, [demo, effectiveData, globalColumnOptions, activeSheetId]);
 
   useEffect(() => {
@@ -1108,6 +1132,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const keys = [
       selX,
       ...(selY || []),
+      selZ,
+      selColorCol,
       lineSeriesColumn,
       chartFilterColumn,
       ...filterColumns,
@@ -1115,7 +1141,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       rainbowLegendLabelColumn,
     ].filter(Boolean);
     return keys.some((k) => String(k).includes("::"));
-  }, [selX, selY, lineSeriesColumn, chartFilterColumn, chartLineFilters, tooltipExtraColumns, rainbowLegendLabelColumn]);
+  }, [selX, selY, selZ, selColorCol, lineSeriesColumn, chartFilterColumn, chartLineFilters, tooltipExtraColumns, rainbowLegendLabelColumn]);
 
   const crossSheetChartData = useMemo(() => {
     const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
@@ -1126,6 +1152,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const plotKeyList = [
       selX,
       ...(selY || []),
+      selZ,
+      selColorCol,
       lineSeriesColumn,
       chartFilterColumn,
       rainbowLegendLabelColumn,
@@ -1179,8 +1207,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     lineSeriesColumn,
     tooltipExtraColumns,
     rainbowLegendLabelColumn,
+    selColorCol,
     selX,
     selY,
+    selZ,
   ]);
 
   const lineChartData = useMemo(() => {
@@ -1245,6 +1275,11 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     chartTimeframe,
     scaleX,
     scaleY,
+    selZ,
+    selColorCol,
+    scaleZ,
+    scatterZEnabled,
+    scatterColorEnabled,
     yAxisDivisor,
     yAxisCompact,
     sortXDir,
@@ -1410,12 +1445,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     handleSelectY,
     removeY,
 
-    selZ: null,
-    setSelZ: () => {},
-    selColorCol: null,
-    setSelColorCol: () => {},
-    scaleZ: "linear",
-    setScaleZ: () => {},
+    selZ,
+    setSelZ,
+    selColorCol,
+    setSelColorCol,
+    scaleZ,
+    setScaleZ,
+    scatterZEnabled,
+    setScatterZEnabled,
+    scatterColorEnabled,
+    setScatterColorEnabled,
 
     livelineMomentum,
     setLivelineMomentum,
@@ -1688,6 +1727,11 @@ export function ChartCanvas() {
     formatXAxisValue,
     formatCompactNumber,
     scaleY,
+    selZ,
+    selColorCol,
+    scaleZ,
+    scatterZEnabled,
+    scatterColorEnabled,
     yAxisDivisor,
     yAxisCompact,
     sortXDir,
@@ -1741,7 +1785,7 @@ export function ChartCanvas() {
   const effectiveTemporalSort = lineIsTemporalX || useTimeSeriesX;
 
   const cartesianChart =
-    selChartType === "line" || selChartType === "area" || selChartType === "bar";
+    selChartType === "line" || selChartType === "area" || selChartType === "bar" || selChartType === "scatter";
   const chartUsesTimeframes = chartTimeframesEnabled && chartTimeframesAvailable;
 
   const plotRows = useMemo(() => {
@@ -1829,6 +1873,17 @@ export function ChartCanvas() {
     }
     return [{ name: "root", children: leaves }];
   }, [selChartType, treemapRows, xKey, yKeys]);
+  const scatterYKey = ySeries[0]?.renderKey || null;
+  const scatterPlotData = useMemo(() => {
+    if (selChartType !== "scatter" || !xKey || !scatterYKey || !Array.isArray(finalRenderedData)) return [];
+    return finalRenderedData.filter((row) => {
+      const x = row?.[xKey];
+      const y = row?.[scatterYKey];
+      if (x == null || x === "" || y == null || y === "") return false;
+      if (rechartsXAxisType === "number" && !Number.isFinite(Number(x))) return false;
+      return Number.isFinite(Number(y));
+    });
+  }, [selChartType, xKey, scatterYKey, finalRenderedData, rechartsXAxisType]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
   const treemapLeafFills = useMemo(() => {
     const leaves = treemapData?.[0]?.children;
@@ -1867,6 +1922,11 @@ export function ChartCanvas() {
     const instanceKey = `line:${idx}`;
     const override = lineColorOverrides?.[instanceKey] || (yKey ? lineColorOverrides?.[yKey] : null);
     return override || seriesColorAt(idx);
+  };
+  const scatterPointColorFor = (row, idx) => {
+    if (!scatterColorEnabled || !selColorCol) return seriesColorFor(ySeries[0]?.sourceKey, 0);
+    const value = rowValueForDataKey(row, selColorCol);
+    return seriesColorAt(stableHashIndex(value, Math.max(1, activePalette?.length || 1))) || seriesColorAt(idx);
   };
   const yAxisFormatter = (raw) => {
     const n = Number(raw);
@@ -2370,6 +2430,80 @@ export function ChartCanvas() {
                             />
                           ))}
                       </BarChart>
+                    )}
+
+                    {selChartType === "scatter" && (
+                      <ScatterChart accessibilityLayer data={scatterPlotData} margin={cartesianMarginWithAngledTicks}>
+                        {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
+                        <XAxis
+                          type={rechartsXAxisType}
+                          dataKey={xKey}
+                          name={stripSheetScopedColumnKey(xKey)}
+                          domain={xAxisNumberDomain}
+                          ticks={xAxisTicks}
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={xAxisTickMargin}
+                          angle={xAxisTickAngle}
+                          tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
+                          tick={hideXAxisLabels ? false : { fill: tickFillX }}
+                        />
+                        <YAxis
+                          type="number"
+                          dataKey={scatterYKey}
+                          name={stripSheetScopedColumnKey(ySeries[0]?.sourceKey || scatterYKey)}
+                          tickLine={false}
+                          axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
+                          tickMargin={8}
+                          width={72}
+                          tickFormatter={yAxisFormatter}
+                          scale={scaleY === "log" ? "log" : "auto"}
+                          domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                          tick={{ fill: tickFillY }}
+                        />
+                        {scatterZEnabled && selZ ? (
+                          <ZAxis
+                            type="number"
+                            dataKey={selZ}
+                            name={stripSheetScopedColumnKey(selZ)}
+                            range={[50, 400]}
+                            scale={scaleZ === "log" ? "log" : "auto"}
+                          />
+                        ) : (
+                          <ZAxis range={[72, 72]} />
+                        )}
+                        <ChartTooltip
+                          cursor={false}
+                          labelFormatter={xTooltipLabelFormatter}
+                          content={
+                            <ChartTooltipContent
+                              indicator="dot"
+                              className={CHART_CHROME_TEXT_CLASS}
+                              pivotName={stripSheetScopedColumnKey(xKey)}
+                              pivotLabelFormatter={xTooltipLabelFormatter}
+                              {...chartTooltipRowDetails}
+                            />
+                          }
+                        />
+                        <Scatter
+                          name={stripSheetScopedColumnKey(ySeries[0]?.sourceKey || "Scatter")}
+                          data={scatterPlotData}
+                          fill={seriesColorFor(ySeries[0]?.sourceKey, 0)}
+                          isAnimationActive={scatterPlotData.length < 2000}
+                        >
+                          {scatterPlotData.map((row, i) => (
+                            <Cell key={`scatter-cell-${i}`} fill={scatterPointColorFor(row, i)} />
+                          ))}
+                        </Scatter>
+                        {renderedReferenceLines}
+                        {legendVisible && (
+                          <ChartLegend
+                            content={
+                              <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />
+                            }
+                          />
+                        )}
+                      </ScatterChart>
                     )}
 
                     {selChartType === "treemap" && yKeys[0] && (

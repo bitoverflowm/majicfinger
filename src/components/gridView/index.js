@@ -192,6 +192,87 @@ function rollingPopulationStdDevAtIndex(rows, colKey, rowIndex, windowSize) {
   return populationStandardDeviation(vals);
 }
 
+function bucketKeyForValue(value) {
+  if (value == null || value === "") return "(empty)";
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "(empty)" : value.toISOString();
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function aggregateBucketRows(rows, config) {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  const bucketColumn = String(config?.bucketColumn || "").trim();
+  const bucketOutputColumn = String(config?.bucketOutputColumn || bucketColumn || "bucket").trim();
+  const passthroughColumns = Array.isArray(config?.passthroughColumns)
+    ? config.passthroughColumns.filter(Boolean)
+    : [];
+  const aggregations = Array.isArray(config?.aggregations)
+    ? config.aggregations.filter((agg) => agg && typeof agg === "object")
+    : [];
+  if (!bucketColumn || !bucketOutputColumn) return [];
+
+  const groups = new Map();
+  for (const row of sourceRows) {
+    if (!row || typeof row !== "object") continue;
+    const rawBucket = row[bucketColumn];
+    const key = bucketKeyForValue(rawBucket);
+    if (!groups.has(key)) {
+      groups.set(key, { key, rawBucket, firstRow: row, rows: [] });
+    }
+    groups.get(key).rows.push(row);
+  }
+
+  return Array.from(groups.values()).map((group) => {
+    const out = { [bucketOutputColumn]: group.rawBucket ?? "" };
+    for (const col of passthroughColumns) {
+      if (!col || col === bucketColumn || col === "_origIndex") continue;
+      out[col] = group.firstRow?.[col] ?? null;
+    }
+    for (const agg of aggregations) {
+      const type = String(agg.type || "count");
+      const valueColumn = String(agg.valueColumn || "").trim();
+      const weightColumn = String(agg.weightColumn || "").trim();
+      const outputColumn = String(agg.outputColumn || "").trim();
+      if (!outputColumn) continue;
+
+      if (type === "count") {
+        out[outputColumn] = valueColumn
+          ? group.rows.reduce((count, row) => (row?.[valueColumn] == null || row?.[valueColumn] === "" ? count : count + 1), 0)
+          : group.rows.length;
+        continue;
+      }
+
+      let sum = 0;
+      let count = 0;
+      let weightedSum = 0;
+      let weightSum = 0;
+      for (const row of group.rows) {
+        const value = parseCellFiniteForStat(row, valueColumn);
+        if (value == null) continue;
+        if (type === "sum" || type === "average") {
+          sum += value;
+          count += 1;
+        } else if (type === "weighted_average") {
+          const weight = parseCellFiniteForStat(row, weightColumn);
+          if (weight == null) continue;
+          weightedSum += value * weight;
+          weightSum += weight;
+        }
+      }
+      if (type === "sum") out[outputColumn] = count > 0 ? sum : null;
+      else if (type === "average") out[outputColumn] = count > 0 ? sum / count : null;
+      else if (type === "weighted_average") out[outputColumn] = weightSum !== 0 ? weightedSum / weightSum : null;
+    }
+    return out;
+  });
+}
+
 function rawMathValue(value) {
   const text = String(value ?? "").trim();
   if (!text) return "";
@@ -389,6 +470,14 @@ const GridView = ({startNew}) => {
     const [statsCumsumActive, setStatsCumsumActive] = useState(false);
     const [statsCumsumSourceCol, setStatsCumsumSourceCol] = useState("");
     const [statsCumsumOutCol, setStatsCumsumOutCol] = useState("");
+    const [statsBucketActive, setStatsBucketActive] = useState(false);
+    const [statsBucketColumn, setStatsBucketColumn] = useState("");
+    const [statsBucketOutputColumn, setStatsBucketOutputColumn] = useState("bucket");
+    const [statsBucketSheetName, setStatsBucketSheetName] = useState("");
+    const [statsBucketPassthroughCols, setStatsBucketPassthroughCols] = useState(() => new Set());
+    const [statsBucketAggregations, setStatsBucketAggregations] = useState([
+      { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count" },
+    ]);
 
     // Combine Sheets (client-side join across already-loaded sheets)
     const [combineSheetsDialogOpen, setCombineSheetsDialogOpen] = useState(false);
@@ -685,6 +774,11 @@ const GridView = ({startNew}) => {
           ? prev
           : sheetColumnNamesForMath[1] || sheetColumnNamesForMath[0] || "",
       );
+      setStatsBucketColumn((prev) =>
+        prev && sheetColumnNamesForMath.includes(prev) ? prev : sheetColumnNamesForMath[0] || "",
+      );
+      setStatsBucketOutputColumn((prev) => (String(prev || "").trim() ? prev : "bucket"));
+      setStatsBucketSheetName((prev) => (String(prev || "").trim() ? prev : "Bucketed sheet"));
     }, [mathDialogOpen, sheetColumnNamesForMath, nextFreeResultColumnName]);
 
     useEffect(() => {
@@ -695,6 +789,14 @@ const GridView = ({startNew}) => {
         setStatsStdOutCol("");
         setStatsStdMode("full");
         setStatsRollCount("4");
+        setStatsBucketActive(false);
+        setStatsBucketColumn("");
+        setStatsBucketOutputColumn("bucket");
+        setStatsBucketSheetName("");
+        setStatsBucketPassthroughCols(new Set());
+        setStatsBucketAggregations([
+          { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count" },
+        ]);
         setMathBasicColA("");
         setMathBasicColB("");
         setMathFunctionType("row_operation");
@@ -753,6 +855,91 @@ const GridView = ({startNew}) => {
       }
       return samples.length ? samples : null;
     }, [connectedData, statsCumsumSourceCol]);
+
+    const updateStatsBucketAggregation = useCallback((id, patch) => {
+      setStatsBucketAggregations((prev) =>
+        (Array.isArray(prev) ? prev : []).map((agg) => (agg.id === id ? { ...agg, ...patch } : agg)),
+      );
+    }, []);
+
+    const addStatsBucketAggregation = useCallback(() => {
+      setStatsBucketAggregations((prev) => [
+        ...(Array.isArray(prev) ? prev : []),
+        {
+          id: `bucket-agg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: "count",
+          valueColumn: "",
+          weightColumn: "",
+          outputColumn: "count",
+        },
+      ]);
+    }, []);
+
+    const removeStatsBucketAggregation = useCallback((id) => {
+      setStatsBucketAggregations((prev) => {
+        const next = (Array.isArray(prev) ? prev : []).filter((agg) => agg.id !== id);
+        return next.length ? next : [{ id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", outputColumn: "count" }];
+      });
+    }, []);
+
+    const toggleStatsBucketPassthrough = useCallback((column) => {
+      setStatsBucketPassthroughCols((prev) => {
+        const next = new Set(prev instanceof Set ? Array.from(prev) : []);
+        if (next.has(column)) next.delete(column);
+        else next.add(column);
+        return next;
+      });
+    }, []);
+
+    const normalizedStatsBucketAggregations = useMemo(
+      () =>
+        (Array.isArray(statsBucketAggregations) ? statsBucketAggregations : []).map((agg, idx) => ({
+          id: agg.id || `bucket-agg-${idx}`,
+          type: agg.type || "count",
+          valueColumn: agg.valueColumn || "",
+          weightColumn: agg.weightColumn || "",
+          outputColumn: String(agg.outputColumn || "").trim(),
+        })),
+      [statsBucketAggregations],
+    );
+
+    const statsBucketCanSubmit = useMemo(() => {
+      if (!statsBucketActive) return false;
+      if (!String(statsBucketColumn || "").trim()) return false;
+      if (!String(statsBucketOutputColumn || "").trim()) return false;
+      if (!String(statsBucketSheetName || "").trim()) return false;
+      if (!normalizedStatsBucketAggregations.length) return false;
+      return normalizedStatsBucketAggregations.every((agg) => {
+        if (!agg.outputColumn) return false;
+        if (agg.type === "count") return true;
+        if (!agg.valueColumn) return false;
+        if (agg.type === "weighted_average") return Boolean(agg.weightColumn);
+        return true;
+      });
+    }, [
+      normalizedStatsBucketAggregations,
+      statsBucketActive,
+      statsBucketColumn,
+      statsBucketOutputColumn,
+      statsBucketSheetName,
+    ]);
+
+    const statsBucketPreviewRows = useMemo(() => {
+      if (!statsBucketActive || !statsBucketColumn || !statsBucketOutputColumn) return [];
+      return aggregateBucketRows(connectedData, {
+        bucketColumn: statsBucketColumn,
+        bucketOutputColumn: statsBucketOutputColumn,
+        passthroughColumns: Array.from(statsBucketPassthroughCols || []),
+        aggregations: normalizedStatsBucketAggregations,
+      }).slice(0, 3);
+    }, [
+      connectedData,
+      normalizedStatsBucketAggregations,
+      statsBucketActive,
+      statsBucketColumn,
+      statsBucketOutputColumn,
+      statsBucketPassthroughCols,
+    ]);
 
     const updateMathIfClause = useCallback((id, patch) => {
       setMathIfClauses((prev) =>
@@ -1242,6 +1429,76 @@ const GridView = ({startNew}) => {
       setDataTypes,
       setSheetData,
       appendActiveSheetOperation,
+    ]);
+
+    const applyStatsBucket = useCallback(() => {
+      const rows = Array.isArray(connectedData) ? [...connectedData] : [];
+      if (!rows.length) {
+        toast.error("Load sheet data before bucketing.");
+        return;
+      }
+      const bucketColumn = String(statsBucketColumn || "").trim();
+      const bucketOutputColumn = String(statsBucketOutputColumn || "").trim();
+      const sheetName = String(statsBucketSheetName || "").trim();
+      if (!bucketColumn || !bucketOutputColumn || !sheetName) {
+        toast.error("Choose a bucket column, bucket output name, and new sheet name.");
+        return;
+      }
+      if (!statsBucketCanSubmit) {
+        toast.error("Finish configuring each bucket aggregation.");
+        return;
+      }
+      const passthroughColumns = Array.from(statsBucketPassthroughCols || []);
+      const aggregations = normalizedStatsBucketAggregations.map((agg) => ({ ...agg }));
+      const next = aggregateBucketRows(rows, {
+        bucketColumn,
+        bucketOutputColumn,
+        passthroughColumns,
+        aggregations,
+      });
+      if (!next.length) {
+        toast.error("No bucket rows were generated.");
+        return;
+      }
+      const operation = createSheetOperation("bucket.sheet", {
+        sourceSheetId: activeSheetId || null,
+        bucketColumn,
+        bucketOutputColumn,
+        passthroughColumns,
+        aggregations,
+        outputSheetName: sheetName,
+      });
+      addNewSheetAndActivate?.((newId) => {
+        setSheetData?.(newId, next);
+        setDataSheets?.((prev) => {
+          const p = prev || {};
+          const sheet = p[newId];
+          if (!sheet) return prev;
+          return {
+            ...p,
+            [newId]: {
+              ...sheet,
+              name: sheetName.slice(0, 80),
+              sourceSheetId: activeSheetId || sheet.sourceSheetId,
+              operationHistory: [...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []), operation],
+            },
+          };
+        });
+      });
+      toast.success(`Created bucket sheet with ${next.length.toLocaleString()} row${next.length === 1 ? "" : "s"}.`);
+      setMathDialogOpen(false);
+    }, [
+      activeSheetId,
+      addNewSheetAndActivate,
+      connectedData,
+      normalizedStatsBucketAggregations,
+      setDataSheets,
+      setSheetData,
+      statsBucketCanSubmit,
+      statsBucketColumn,
+      statsBucketOutputColumn,
+      statsBucketPassthroughCols,
+      statsBucketSheetName,
     ]);
 
     const collectColumnNames = (rows) => {
@@ -2509,7 +2766,7 @@ const GridView = ({startNew}) => {
                   </Tooltip>
                 </TooltipProvider>
                 <Dialog open={mathDialogOpen} onOpenChange={setMathDialogOpen}>
-                  <DialogContent className="sm:max-w-lg">
+                  <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                       <DialogTitle>Mathematics Operations</DialogTitle>
                       <DialogDescription>
@@ -2524,6 +2781,7 @@ const GridView = ({startNew}) => {
                           if (v !== "stats") {
                             setStatsStdDevActive(false);
                             setStatsCumsumActive(false);
+                            setStatsBucketActive(false);
                           }
                           if (v === "basic" && mathOp === "pct_growth") setMathOp("subtract");
                         }}
@@ -2899,7 +3157,7 @@ const GridView = ({startNew}) => {
                           </div>
                         </TabsContent>
                         <TabsContent value="stats" className="mt-2 space-y-4">
-                          {!statsStdDevActive && !statsCumsumActive ? (
+                          {!statsStdDevActive && !statsCumsumActive && !statsBucketActive ? (
                             <div className="flex justify-center gap-3 py-2 flex-wrap">
                               <TooltipProvider delayDuration={200}>
                                 <Tooltip>
@@ -2913,6 +3171,7 @@ const GridView = ({startNew}) => {
                                       onClick={() => {
                                         setStatsStdDevActive(true);
                                         setStatsCumsumActive(false);
+                                        setStatsBucketActive(false);
                                         setStatsStdOutCol((prev) => (String(prev || "").trim() ? prev : nextFreeResultColumnName()));
                                         if (!statsStdSourceCol && sheetColumnNamesForMath.length > 0) {
                                           setStatsStdSourceCol(sheetColumnNamesForMath[0]);
@@ -2938,6 +3197,7 @@ const GridView = ({startNew}) => {
                                       onClick={() => {
                                         setStatsCumsumActive(true);
                                         setStatsStdDevActive(false);
+                                        setStatsBucketActive(false);
                                         setStatsCumsumOutCol((prev) => (String(prev || "").trim() ? prev : "cumsum"));
                                         if (!statsCumsumSourceCol && sheetColumnNamesForMath.length > 0) {
                                           setStatsCumsumSourceCol(sheetColumnNamesForMath[0]);
@@ -2949,6 +3209,32 @@ const GridView = ({startNew}) => {
                                   </TooltipTrigger>
                                   <TooltipContent side="bottom" className="text-xs">
                                     cumulative
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-14 w-14 rounded-lg px-1"
+                                      aria-label="Bucket"
+                                      onClick={() => {
+                                        setStatsBucketActive(true);
+                                        setStatsStdDevActive(false);
+                                        setStatsCumsumActive(false);
+                                        const firstCol = sheetColumnNamesForMath[0] || "";
+                                        setStatsBucketColumn((prev) => (prev && sheetColumnNamesForMath.includes(prev) ? prev : firstCol));
+                                        setStatsBucketOutputColumn((prev) => (String(prev || "").trim() ? prev : "bucket"));
+                                        setStatsBucketSheetName((prev) => (String(prev || "").trim() ? prev : "Bucketed sheet"));
+                                      }}
+                                    >
+                                      <span className="font-mono text-[11px] leading-tight">Bucket</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="text-xs">
+                                    group rows into a new sheet
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -3070,6 +3356,198 @@ const GridView = ({startNew}) => {
                                 </div>
                               ) : null}
                             </div>
+                          ) : statsBucketActive ? (
+                            <div className="space-y-3">
+                              <Alert className="py-2">
+                                <AlertTitle className="text-xs">Bucket creates a new sheet</AlertTitle>
+                                <AlertDescription className="text-xs">
+                                  This groups the selected sheet into bucket rows. The current sheet will not be changed.
+                                </AlertDescription>
+                              </Alert>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Column to bucket</Label>
+                                  <Select
+                                    value={statsBucketColumn || "__"}
+                                    onValueChange={(v) => {
+                                      const next = v === "__" ? "" : v;
+                                      setStatsBucketColumn(next);
+                                      setStatsBucketOutputColumn((prev) => (String(prev || "").trim() && prev !== "bucket" ? prev : next || "bucket"));
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9 text-xs">
+                                      <SelectValue placeholder="Select bucket column" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__">—</SelectItem>
+                                      {sheetColumnNamesForMath.map((c) => (
+                                        <SelectItem key={`bucket-col-${c}`} value={c} className="font-mono text-xs">
+                                          {c}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">New bucket column name</Label>
+                                  <Input
+                                    className="h-9 text-xs"
+                                    value={statsBucketOutputColumn}
+                                    onChange={(e) => setStatsBucketOutputColumn(e.target.value)}
+                                    placeholder={statsBucketColumn || "bucket"}
+                                    spellCheck={false}
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">New sheet name</Label>
+                                <Input
+                                  className="h-9 text-xs"
+                                  value={statsBucketSheetName}
+                                  onChange={(e) => setStatsBucketSheetName(e.target.value)}
+                                  placeholder="Bucketed sheet"
+                                  spellCheck={false}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <Label className="text-xs">Aggregations</Label>
+                                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={addStatsBucketAggregation}>
+                                    + Add aggregation
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  {normalizedStatsBucketAggregations.map((agg, idx) => (
+                                    <div key={agg.id} className="rounded-lg border border-border/70 p-2">
+                                      <div className="mb-2 flex items-center justify-between gap-2">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                          Aggregation {idx + 1}
+                                        </span>
+                                        {normalizedStatsBucketAggregations.length > 1 ? (
+                                          <button
+                                            type="button"
+                                            className="inline-flex h-2 w-2 rounded-full bg-red-500 hover:bg-red-600"
+                                            aria-label={`Remove aggregation ${idx + 1}`}
+                                            onClick={() => removeStatsBucketAggregation(agg.id)}
+                                          />
+                                        ) : null}
+                                      </div>
+                                      <div className="grid gap-2 sm:grid-cols-4">
+                                        <div className="space-y-1">
+                                          <Label className="text-[10px] text-muted-foreground">Type</Label>
+                                          <Select
+                                            value={agg.type}
+                                            onValueChange={(v) => {
+                                              const baseName =
+                                                v === "weighted_average"
+                                                  ? "weighted_avg"
+                                                  : v === "average"
+                                                    ? "avg"
+                                                    : v;
+                                              updateStatsBucketAggregation(agg.id, {
+                                                type: v,
+                                                outputColumn: agg.outputColumn || baseName,
+                                              });
+                                            }}
+                                          >
+                                            <SelectTrigger className="h-8 text-xs">
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="count">Count</SelectItem>
+                                              <SelectItem value="sum">Sum</SelectItem>
+                                              <SelectItem value="average">Average</SelectItem>
+                                              <SelectItem value="weighted_average">Value weighted avg</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                        <div className="space-y-1">
+                                          <Label className="text-[10px] text-muted-foreground">
+                                            {agg.type === "count" ? "Count column (optional)" : "Value column"}
+                                          </Label>
+                                          <Select
+                                            value={agg.valueColumn || "__rows__"}
+                                            onValueChange={(v) => updateStatsBucketAggregation(agg.id, { valueColumn: v === "__rows__" ? "" : v })}
+                                          >
+                                            <SelectTrigger className="h-8 text-xs">
+                                              <SelectValue placeholder="Column" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {agg.type === "count" ? <SelectItem value="__rows__">Rows in bucket</SelectItem> : null}
+                                              {sheetColumnNamesForMath.map((c) => (
+                                                <SelectItem key={`bucket-agg-val-${agg.id}-${c}`} value={c} className="font-mono text-xs">
+                                                  {c}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                        {agg.type === "weighted_average" ? (
+                                          <div className="space-y-1">
+                                            <Label className="text-[10px] text-muted-foreground">Weight column</Label>
+                                            <Select
+                                              value={agg.weightColumn || "__"}
+                                              onValueChange={(v) => updateStatsBucketAggregation(agg.id, { weightColumn: v === "__" ? "" : v })}
+                                            >
+                                              <SelectTrigger className="h-8 text-xs">
+                                                <SelectValue placeholder="Weight" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="__">—</SelectItem>
+                                                {sheetColumnNamesForMath.map((c) => (
+                                                  <SelectItem key={`bucket-agg-weight-${agg.id}-${c}`} value={c} className="font-mono text-xs">
+                                                    {c}
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        ) : (
+                                          <div className="hidden sm:block" />
+                                        )}
+                                        <div className="space-y-1">
+                                          <Label className="text-[10px] text-muted-foreground">Generated column</Label>
+                                          <Input
+                                            className="h-8 text-xs"
+                                            value={agg.outputColumn}
+                                            onChange={(e) => updateStatsBucketAggregation(agg.id, { outputColumn: e.target.value })}
+                                            placeholder={agg.type === "weighted_average" ? "weighted_avg" : agg.type}
+                                            spellCheck={false}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Transfer columns as-is</Label>
+                                <p className="text-[10px] text-muted-foreground">
+                                  These values are copied from the first row in each bucket. Use this for labels that are stable inside a bucket.
+                                </p>
+                                <div className="grid max-h-32 gap-2 overflow-auto rounded-md border border-border/70 p-2 sm:grid-cols-2">
+                                  {sheetColumnNamesForMath
+                                    .filter((col) => col !== statsBucketColumn)
+                                    .map((col) => (
+                                      <label key={`bucket-pass-${col}`} className="flex min-w-0 items-center gap-2 text-xs">
+                                        <Checkbox
+                                          checked={statsBucketPassthroughCols.has(col)}
+                                          onCheckedChange={() => toggleStatsBucketPassthrough(col)}
+                                        />
+                                        <span className="truncate font-mono">{col}</span>
+                                      </label>
+                                    ))}
+                                </div>
+                              </div>
+                              {statsBucketPreviewRows.length ? (
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Preview</Label>
+                                  <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-[11px] font-mono text-muted-foreground">
+                                    {statsBucketPreviewRows.map((row) => JSON.stringify(row)).join(" · ")}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
                           ) : (
                             <div className="space-y-3">
                               <div className="space-y-1">
@@ -3123,29 +3601,31 @@ const GridView = ({startNew}) => {
                           )}
                         </TabsContent>
                       </Tabs>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Apply to</Label>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 text-xs"
-                            variant={mathDestination === "current_sheet" ? "default" : "outline"}
-                            onClick={() => setMathDestination("current_sheet")}
-                          >
-                            Current sheet
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 text-xs"
-                            variant={mathDestination === "new_sheet" ? "default" : "outline"}
-                            onClick={() => setMathDestination("new_sheet")}
-                          >
-                            New sheet
-                          </Button>
+                      {!(mathDialogTab === "stats" && statsBucketActive) ? (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Apply to</Label>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 text-xs"
+                              variant={mathDestination === "current_sheet" ? "default" : "outline"}
+                              onClick={() => setMathDestination("current_sheet")}
+                            >
+                              Current sheet
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 text-xs"
+                              variant={mathDestination === "new_sheet" ? "default" : "outline"}
+                              onClick={() => setMathDestination("new_sheet")}
+                            >
+                              New sheet
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                      ) : null}
                     </div>
                     <DialogFooter className="gap-2 sm:gap-0">
                       <Button type="button" variant="outline" onClick={() => setMathDialogOpen(false)}>
@@ -3155,15 +3635,17 @@ const GridView = ({startNew}) => {
                         type="button"
                         onClick={() => {
                           if (mathDialogTab === "stats") {
-                            if (statsCumsumActive) applyStatsCumsum();
+                            if (statsBucketActive) applyStatsBucket();
+                            else if (statsCumsumActive) applyStatsCumsum();
                             else applyStatsStdDev();
                           } else applySheetMathOperation();
                         }}
                         disabled={
                           (mathDialogTab === "stats" &&
-                            ((!statsStdDevActive && !statsCumsumActive) ||
+                            ((!statsStdDevActive && !statsCumsumActive && !statsBucketActive) ||
                               (statsStdDevActive && !statsStdCanSubmit) ||
-                              (statsCumsumActive && !statsCumsumCanSubmit))) ||
+                              (statsCumsumActive && !statsCumsumCanSubmit) ||
+                              (statsBucketActive && !statsBucketCanSubmit))) ||
                           (mathDialogTab === "basic" &&
                             (!String(mathBasicColA || "").trim() ||
                               !String(mathBasicColB || "").trim() ||
@@ -3176,7 +3658,7 @@ const GridView = ({startNew}) => {
                               (mathFunctionType === "if_else" && !ifElseCanSubmit)))
                         }
                       >
-                        Apply to sheet
+                        {mathDialogTab === "stats" && statsBucketActive ? "Create bucket sheet" : "Apply to sheet"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
