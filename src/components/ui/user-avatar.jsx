@@ -19,11 +19,11 @@ export function UserAvatar({
   src,
   handle,
   name,
-  email,
+  email = undefined,
   size = 36,
   className,
-  imageClassName,
-  fallbackClassName,
+  imageClassName = undefined,
+  fallbackClassName = undefined,
   ...props
 }) {
   const seed = pickDeterministicName({ handle, name, email });
