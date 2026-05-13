@@ -4,6 +4,7 @@ import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
+import { hydrateDataSetForPublicChartViewer } from "@/lib/server/hydratePublicChartDataset";
 
 function stripInternalFromRows(rows) {
   if (!Array.isArray(rows)) return [];
@@ -41,10 +42,12 @@ export default async function handler(req, res) {
       return res.status(404).json({ success: false, message: "Chart not found" });
     }
 
-    const dataSet = await DataSet.findById(chart.data_set_id).lean();
-    if (!dataSet) {
+    const dataSetRaw = await DataSet.findById(chart.data_set_id).lean();
+    if (!dataSetRaw) {
       return res.status(404).json({ success: false, message: "Dataset not found" });
     }
+
+    const dataSet = await hydrateDataSetForPublicChartViewer(chart, dataSetRaw);
 
     const cp = Array.isArray(chart.chart_properties) ? chart.chart_properties[0] : chart.chart_properties;
     const dataSheets = dataSet?.data_sheets && typeof dataSet.data_sheets === "object"

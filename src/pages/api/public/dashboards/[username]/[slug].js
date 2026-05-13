@@ -5,6 +5,7 @@ import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
 import mongoose from "mongoose";
 import { buildPublicChartBundle } from "@/lib/chartBundle";
+import { hydrateDataSetForPublicChartViewer } from "@/lib/server/hydratePublicChartDataset";
 
 function hydrateLayout(layout, chartBundlesById) {
   if (!layout || typeof layout !== "object") return { version: 1, rows: [] };
@@ -79,8 +80,9 @@ export default async function handler(req, res) {
         user_id: user._id,
       }).lean();
       if (!chart) continue;
-      const dataSet = await DataSet.findById(chart.data_set_id).lean();
-      if (!dataSet) continue;
+      const dataSetRaw = await DataSet.findById(chart.data_set_id).lean();
+      if (!dataSetRaw) continue;
+      const dataSet = await hydrateDataSetForPublicChartViewer(chart, dataSetRaw);
       const bundle = buildPublicChartBundle(chart, dataSet);
       chartBundlesById.set(cid, {
         ...bundle,

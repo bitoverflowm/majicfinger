@@ -31,6 +31,33 @@ function freeLimits() {
 }
 
 /**
+ * Athena row caps for routes that use the **chart/dataset owner's** subscription
+ * (e.g. public embed hydration), not the anonymous viewer session.
+ *
+ * @param {unknown} userId - Mongo ObjectId string or object
+ */
+export async function getAthenaAccessForUserId(userId) {
+  try {
+    const uid = userId != null ? String(userId) : "";
+    if (!uid || uid === "dev-bypass-no-db") {
+      return uid === "dev-bypass-no-db" ? subscriberLimits() : freeLimits();
+    }
+    if (!mongoose.Types.ObjectId.isValid(uid)) return freeLimits();
+
+    await dbConnect();
+    const dbUser = await User.findById(uid).lean();
+    if (!dbUser) return freeLimits();
+
+    if (userHasExpandedAthenaAccess({ ...dbUser, userId: uid })) {
+      return subscriberLimits();
+    }
+  } catch {
+    /* ignore */
+  }
+  return freeLimits();
+}
+
+/**
  * Row caps for Athena validate/start — **must** be computed server-side (do not trust client `limit`).
  */
 export async function getAthenaAccessFromRequest(req) {
