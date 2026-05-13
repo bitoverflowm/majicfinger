@@ -54,11 +54,20 @@ export function summarizeAdvancedDataStorage(dataSheets, rowLimit = ADVANCED_DAT
   };
 }
 
+/** Subscription states we treat as paid elite access for large project saves (matches Stripe subscription.status). */
+function subscriptionStatusAllowsEliteDataTier(statusRaw) {
+  const status = String(statusRaw || "").toLowerCase();
+  // paused / canceled / unpaid → false; past_due often still within Stripe retry grace
+  return status === "active" || status === "trialing" || status === "past_due";
+}
+
 export function userCanUseAdvancedDataStorage(userLike) {
   if (!userLike || typeof userLike !== "object") return false;
   if (isOwnerFullAccessUser(userLike)) return true;
   if (userLike.lifetimeMember) return true;
   const tier = String(userLike.subscriptionTier || "").toLowerCase();
   const status = String(userLike.subscriptionStatus || "").toLowerCase();
-  return tier === "elite" && (status === "active" || status === "trialing");
+  // Elite recurring must look “paid” in Stripe-shaped status; missing status → treat as not entitled
+  // (manual DB tier-only edits without webhook may fail here — reconcile via Stripe or scripts/reconcile-stripe-entitlements.cjs)
+  return tier === "elite" && subscriptionStatusAllowsEliteDataTier(status);
 }

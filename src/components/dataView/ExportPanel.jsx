@@ -24,6 +24,7 @@ import * as XLSX from "xlsx";
 import { useUser } from "@/lib/hooks";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { scrollToPricingSection } from "@/lib/scrollToPricing";
+import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport";
 
 function getColKeys(connectedCols) {
   return (connectedCols || [])
@@ -228,19 +229,20 @@ function ShareEmbedSection() {
           toast.error("No data found. Add data before saving and publishing.");
           return;
         }
+        const dsPayload = await prepareLargeJsonBody({
+          data_set_name: `${chartName} dataset`,
+          data: connectedData,
+          created_date: new Date(),
+          last_saved_date: new Date(),
+          labels: ["embed"],
+          source: "userUpload",
+          user_id: user.userId,
+        });
         const dsRes = await fetch("/api/dataSets", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: dsPayload.headers,
           credentials: "include",
-          body: JSON.stringify({
-            data_set_name: `${chartName} dataset`,
-            data: connectedData,
-            created_date: new Date(),
-            last_saved_date: new Date(),
-            labels: ["embed"],
-            source: "userUpload",
-            user_id: user.userId,
-          }),
+          body: dsPayload.body,
         });
         const dsJson = await dsRes.json();
         dataSetId = dsJson?.data?._id || dsJson?._id;

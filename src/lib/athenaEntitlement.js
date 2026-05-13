@@ -8,5 +8,5 @@ export function userHasExpandedAthenaAccess(userLike) {
   if (isOwnerFullAccessUser(userLike)) return true;
   if (userLike.lifetimeMember) return true;
   const s = String(userLike.subscriptionStatus || "").toLowerCase();
-  return s === "active" || s === "trialing";
+  return s === "active" || s === "trialing" || s === "past_due";
 }

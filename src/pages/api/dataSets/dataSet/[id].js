@@ -6,12 +6,15 @@ import {
     summarizeAdvancedDataStorage,
     userCanUseAdvancedDataStorage,
 } from "@/lib/projectStorageEntitlements";
+import { parseJsonBodyMaybeGzip } from "@/lib/parseJsonBodyMaybeGzip";
 
+/**
+ * Disabled so we can accept gzip-compressed JSON (`Content-Encoding: gzip`),
+ * which stays under Vercel's ~4.5MB body limit for large sheet payloads.
+ */
 export const config = {
     api: {
-        bodyParser: {
-            sizeLimit: "16mb",
-        },
+        bodyParser: false,
     },
 };
 
@@ -37,13 +40,19 @@ export default async function handler(req, res) {
             break;
         case "PUT":
             try {
+                let body;
+                try {
+                    body = await parseJsonBodyMaybeGzip(req);
+                } catch (parseErr) {
+                    return res.status(400).json({ success: false, message: parseErr?.message || "Invalid request body" });
+                }
                 const nextRevision = buildProjectRevision({
-                    data_set_name: req.body.data_set_name,
-                    data_sheets: req.body.data_sheets,
-                    labels: req.body.labels,
-                    source: req.body.source,
+                    data_set_name: body.data_set_name,
+                    data_sheets: body.data_sheets,
+                    labels: body.labels,
+                    source: body.source,
                 });
-                const storageSummary = summarizeAdvancedDataStorage(req.body.data_sheets);
+                const storageSummary = summarizeAdvancedDataStorage(body.data_sheets);
                 if (storageSummary.requiresAdvancedStorage) {
                     const existing = await DataSet.findById(id).select("user_id").lean();
                     const user = existing?.user_id ? await User.findById(existing.user_id).lean() : null;
@@ -57,15 +66,14 @@ export default async function handler(req, res) {
                         });
                     }
                 }
-                // Prepare the update object
                 const update = {
                     $set: {
-                        data_set_name: req.body.data_set_name,
-                        data: req.body.data,
-                        data_sheets: req.body.data_sheets,
+                        data_set_name: body.data_set_name,
+                        data: body.data,
+                        data_sheets: body.data_sheets,
                         last_saved_date: new Date(),
-                        labels: req.body.labels,
-                        source: req.body.source,
+                        labels: body.labels,
+                        source: body.source,
                         save_revision: nextRevision,
                         save_meta: {
                             saveMode: "full",
@@ -87,11 +95,16 @@ export default async function handler(req, res) {
             break;
         case "PATCH":
             try {
+                let body;
+                try {
+                    body = await parseJsonBodyMaybeGzip(req);
+                } catch (parseErr) {
+                    return res.status(400).json({ success: false, message: parseErr?.message || "Invalid request body" });
+                }
                 const existing = await DataSet.findById(id);
                 if (!existing) {
                     return res.status(400).json({ success: false, message: `No dataSet found for id: ${id}` });
                 }
-                const body = req.body || {};
                 const currentRevision = existing.save_revision || buildProjectRevision(existing);
                 if (body.baseRevision && currentRevision && body.baseRevision !== currentRevision) {
                     return res.status(409).json({

@@ -28,6 +28,7 @@ import {
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
 import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
+import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport"
 import {
   summarizeAdvancedDataStorage,
   userCanUseAdvancedDataStorage,
@@ -665,14 +666,24 @@ const Nav = () => {
           baseProject: loadedDataMeta,
           currentPayload: dataPayload,
         });
+        const deltaTransport = await prepareLargeJsonBody(delta);
         const updateRes = await fetch(`/api/dataSets/dataSet/${loadedDataMeta._id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(delta),
+          headers: deltaTransport.headers,
+          body: deltaTransport.body,
         });
-        const updateJson = await updateRes.json();
+        let updateJson = {};
+        try {
+          updateJson = await updateRes.json();
+        } catch {
+          updateJson = {};
+        }
         if (updateRes.status === 409) {
           toast.error(updateJson?.message || "Project changed since you loaded it. Reload before saving.");
+          return;
+        }
+        if (updateRes.status === 413) {
+          toast.error("Save payload too large for the hosting tier. Try trimming rows or contact support.");
           return;
         }
         if (updateRes.status === 403 && updateJson?.code === "ADVANCED_DATA_STORAGE_REQUIRED") {
@@ -689,16 +700,26 @@ const Nav = () => {
         }
         savedProject = updateJson?.data || null;
       } else {
+        const createTransport = await prepareLargeJsonBody({
+          ...dataPayload,
+          created_date: new Date(),
+          user_id: user.userId,
+        });
         const createRes = await fetch('/api/dataSets', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...dataPayload,
-            created_date: new Date(),
-            user_id: user.userId,
-          }),
+          headers: createTransport.headers,
+          body: createTransport.body,
         });
-        const createJson = await createRes.json();
+        let createJson = {};
+        try {
+          createJson = await createRes.json();
+        } catch {
+          createJson = {};
+        }
+        if (createRes.status === 413) {
+          toast.error("Save payload too large for the hosting tier. Try trimming rows or contact support.");
+          return;
+        }
         if (createRes.status === 403 && createJson?.code === "ADVANCED_DATA_STORAGE_REQUIRED") {
           openLargeProjectUpgradeDialog(createJson.storageSummary || currentAdvancedStorageSummary);
           return;

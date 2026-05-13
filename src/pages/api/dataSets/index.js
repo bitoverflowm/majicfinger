@@ -1,18 +1,18 @@
 import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
-import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
+import mongoose from 'mongoose';
 import { buildProjectRevision, summarizeDataSetForList } from "@/lib/projectPersistence";
 import {
     summarizeAdvancedDataStorage,
     userCanUseAdvancedDataStorage,
 } from "@/lib/projectStorageEntitlements";
+import { parseJsonBodyMaybeGzip } from "@/lib/parseJsonBodyMaybeGzip";
 
+/** Accept gzip-compressed JSON bodies (see `gzipJsonTransport.js`). */
 export const config = {
     api: {
-        bodyParser: {
-            sizeLimit: "16mb",
-        },
+        bodyParser: false,
     },
 };
 
@@ -21,7 +21,6 @@ export default async function handler(req, res) {
         query: { uid },
         method,
     } = req;
-    const { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source, user_id } = req.body || {};
 
     await dbConnect();
 
@@ -44,7 +43,13 @@ export default async function handler(req, res) {
             break;
         case "POST":
             try {
-                // Validate user_id or assume it's already validated and is being sent in correct format
+                let body;
+                try {
+                    body = await parseJsonBodyMaybeGzip(req);
+                } catch (parseErr) {
+                    return res.status(400).json({ success: false, message: parseErr?.message || "Invalid request body" });
+                }
+                const { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source, user_id } = body || {};
                 if (!mongoose.Types.ObjectId.isValid(user_id)) {
                     return res.status(400).json({ success: false, message: "Invalid user_id" });
                 }
@@ -74,17 +79,17 @@ export default async function handler(req, res) {
                         saveMode: "full",
                         savedAt: new Date().toISOString(),
                     },
-                    user_id: new mongoose.Types.ObjectId(user_id)  // Convert user_id string to ObjectId
+                    user_id: new mongoose.Types.ObjectId(user_id)
                 });
 
                 res.status(201).json({ success: true, data: newDataSet });
             } catch (error) {
-                res.status(400).json({ success: false, message: error.message }); // Include error message for debugging
+                res.status(400).json({ success: false, message: error.message });
             }
             break;
 
         default:
-            res.setHeader('Allow', ['GET', 'POST']); // Specify allowed method
-            res.status(405).end(`Method ${method} Not Allowed`); // Use 405 for method not allowed
+            res.setHeader('Allow', ['GET', 'POST']);
+            res.status(405).end(`Method ${method} Not Allowed`);
     }
 }
