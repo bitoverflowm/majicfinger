@@ -1,3 +1,6 @@
+import { isLakeBigintColumnName } from "@/lib/dataLake/lakeTableColumns";
+import { normalizeLakeBigintCellValue } from "@/lib/dataLake/lakeBigintNormalize";
+
 /** Keys that must stay as strings (ERC1155 tokens, condition IDs, etc.) */
 const TOKEN_ID_KEYS = new Set([
   "conditionid", "condition_id", "clobtokenids", "clob_token_ids",
@@ -30,6 +33,11 @@ function isLongTokenId(value) {
  */
 function coerceCell(value, key) {
   if (value === null || value === undefined) return value;
+
+  if (isLakeBigintColumnName(key)) {
+    return normalizeLakeBigintCellValue(value);
+  }
+
   if (typeof value === "number") {
     if (Number.isNaN(value)) return value;
     return Number.isFinite(value) ? value : null;

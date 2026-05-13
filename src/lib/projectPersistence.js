@@ -1,3 +1,6 @@
+import { isLakeBigintColumnName } from "@/lib/dataLake/lakeTableColumns";
+import { normalizeLakeBigintCellValue } from "@/lib/dataLake/lakeBigintNormalize";
+
 export const PROJECT_FULL_DATA_SAFE_BYTES = 12 * 1024 * 1024;
 export const PROJECT_PREVIEW_ROW_LIMIT = 50000;
 export const PROJECT_MIN_PREVIEW_ROW_LIMIT = 25;
@@ -435,8 +438,9 @@ export function applyBrowserOperationToRows(rows, op) {
     return list.map((row) => {
       if (!row || typeof row !== "object") return row;
       let value = row[col];
-      if (dataType === "number") value = Number(value);
-      else if (dataType === "boolean") value = Boolean(value);
+      if (dataType === "number") {
+        value = isLakeBigintColumnName(col) ? normalizeLakeBigintCellValue(value) : Number(value);
+      } else if (dataType === "boolean") value = Boolean(value);
       else if (dataType === "dateString") value = value ? new Date(value).toISOString() : value;
       else if (dataType === "text") value = String(value ?? "");
       return { ...row, [col]: value };

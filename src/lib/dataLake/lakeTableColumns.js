@@ -166,3 +166,34 @@ export function kalshiResolvedMarketsJoinColumnMeta(column) {
   const key = String(column || "").trim();
   return KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META.find((c) => c.name === key) || null;
 }
+
+/** @type {Set<string> | null} */
+let _lakeBigintColumnNameSet = null;
+
+/**
+ * Column names that are stored as Hive `bigint` somewhere in the lake metadata.
+ * Used to avoid `Number()` coercion (loses precision past 2^53-1) during grid casts / rehydrate.
+ */
+export function getLakeBigintColumnNameSet() {
+  if (_lakeBigintColumnNameSet) return _lakeBigintColumnNameSet;
+  const s = new Set();
+  for (const lake of Object.keys(META)) {
+    for (const table of Object.keys(META[lake])) {
+      for (const c of META[lake][table]) {
+        if (String(c.type || "").toLowerCase() === "bigint") s.add(c.name);
+      }
+    }
+  }
+  for (const c of KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META) {
+    if (String(c.type || "").toLowerCase() === "bigint") s.add(c.name);
+  }
+  _lakeBigintColumnNameSet = s;
+  return s;
+}
+
+/**
+ * @param {string} name
+ */
+export function isLakeBigintColumnName(name) {
+  return getLakeBigintColumnNameSet().has(String(name || "").trim());
+}

@@ -453,6 +453,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         if (Array.isArray(value)) return 'array';
         if (typeof value === 'boolean') return 'boolean';
         if (value instanceof Date) return 'date';
+        // Scientific notation parses as finite Number() but must not use AG Grid `number` cells with raw strings.
+        if (typeof value === 'string') {
+          const ts = value.trim();
+          if (ts && /^-?\d*\.?\d+[eE][+-]?\d+$/.test(ts)) return 'text';
+        }
         // If value is a long string representing a number, treat it as text
         if (typeof value === 'string' && value.length > 15 && !isNaN(parseFloat(value))) return 'text';
         if (typeof value === 'number' && Number.isNaN(value)) return 'number';

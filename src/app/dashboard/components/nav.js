@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import moment from "moment"
-
+import useSWR, { mutate } from "swr"
 
 //Shdcn
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,12 @@ import {
 } from "@/lib/persistChartDashboardDraft"
 import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport"
+import {
+  ELITE_WORKSPACE_CAP_BYTES,
+  WORKSPACE_ASSUMED_BYTES_PER_ROW,
+  userGetsWorkspaceQuotaMeter,
+  workspaceUsageIndicatorColor,
+} from "@/lib/workspaceStorageQuota"
 import {
   summarizeAdvancedDataStorage,
   userCanUseAdvancedDataStorage,
@@ -200,6 +206,48 @@ function ProjectDataUsageIndicator({ summary }) {
       <span className={`text-[10px] font-medium ${isEliteConsumption ? "text-red-500" : "text-muted-foreground"}`}>
         {isEliteConsumption ? "elite data tier consumption" : `${formatCompactNumber(rows)} rows`}
       </span>
+    </div>
+  );
+}
+
+function EliteWorkspaceUsageIndicator({ quota, isLoading }) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-1.5 shrink-0" aria-busy="true">
+        <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted animate-pulse" />
+        <span className="text-[10px] font-medium text-muted-foreground">Workspace storage…</span>
+      </div>
+    );
+  }
+
+  const eligible = quota?.eligible === true;
+  const used = eligible ? Number(quota.usedBytes) || 0 : 0;
+  const cap = eligible ? Number(quota.capBytes) || ELITE_WORKSPACE_CAP_BYTES : ELITE_WORKSPACE_CAP_BYTES;
+  const assumed = eligible ? Number(quota.assumedBytesPerRow) || WORKSPACE_ASSUMED_BYTES_PER_ROW : WORKSPACE_ASSUMED_BYTES_PER_ROW;
+  const pct = cap > 0 ? Math.max(0, Math.min(100, (used / cap) * 100)) : 0;
+  const color = workspaceUsageIndicatorColor(pct);
+  const estRows = Math.max(0, Math.round(used / Math.max(1, assumed)));
+
+  return (
+    <div
+      className="flex items-center gap-1.5 shrink-0 min-w-0"
+      title={`All saved projects: ${formatBytes(used)} of ${formatBytes(cap)} (${Math.round(pct)}%). ~${estRows.toLocaleString()} rows estimated from storage size.`}
+    >
+      <span
+        className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+        style={{ background: `conic-gradient(${color} ${pct}%, rgb(226 232 240) ${pct}% 100%)` }}
+        aria-label={`Workspace storage ${Math.round(pct)} percent of included cap`}
+      >
+        <span className="h-3 w-3 rounded-full bg-background" />
+      </span>
+      <div className="flex min-w-0 flex-col gap-0 leading-tight">
+        <span className="truncate text-[10px] font-medium text-muted-foreground">
+          {formatBytes(used)} / {formatBytes(cap)} · {Math.round(pct)}%
+        </span>
+        <span className="truncate text-[9px] text-muted-foreground/90">
+          ~{formatCompactNumber(estRows)} rows est.
+        </span>
+      </div>
     </div>
   );
 }
@@ -402,6 +450,19 @@ const Nav = () => {
     setLargeProjectUpgradeSummary(summary);
     setLargeProjectUpgradeOpen(true);
   };
+
+  const workspaceQuotaKey =
+    user && userGetsWorkspaceQuotaMeter(user) ? "/api/user/workspace-storage" : null;
+  const {
+    data: workspaceQuota,
+    isLoading: workspaceQuotaLoading,
+    error: workspaceQuotaError,
+  } = useSWR(workspaceQuotaKey, (url) =>
+    fetch(url, { credentials: "include" }).then((r) => {
+      if (!r.ok) throw new Error("workspace storage");
+      return r.json();
+    }),
+  );
 
   const handleGoToPricing = () => {
     setLargeProjectUpgradeOpen(false);
@@ -728,6 +789,10 @@ const Nav = () => {
           throw new Error(createJson?.message || "Failed to save project.");
         }
         savedProject = createJson?.data || null;
+      }
+
+      if (userGetsWorkspaceQuotaMeter(user)) {
+        mutate("/api/user/workspace-storage");
       }
 
       if (!savedProject?._id) {
@@ -1188,7 +1253,14 @@ const Nav = () => {
                       </Button>
                   )}
                   {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
-                    <ProjectDataUsageIndicator summary={currentProjectSizeSummary} />
+                    userGetsWorkspaceQuotaMeter(user) && !workspaceQuotaError ? (
+                      <EliteWorkspaceUsageIndicator
+                        quota={workspaceQuota}
+                        isLoading={!!workspaceQuotaKey && (workspaceQuotaLoading || workspaceQuota === undefined)}
+                      />
+                    ) : (
+                      <ProjectDataUsageIndicator summary={currentProjectSizeSummary} />
+                    )
                   )}
                   {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
                       <Dialog

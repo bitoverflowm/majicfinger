@@ -16,6 +16,7 @@ import {
 } from "../../../lib/dataLake/composeWherePredicateSql";
 import { getAthenaAccessFromRequest } from "../../../lib/athenaAccess";
 import { replayOperations, hashJson } from "../../../lib/projectPersistence";
+import { normalizeLakeBigintFieldsInRows } from "../../../lib/dataLake/lakeBigintNormalize";
 
 export const config = {
   api: {
@@ -311,10 +312,12 @@ export default async function handler(req, res) {
         })();
 
     const rawObjects = rowsToObjects(result.columns, result.rows);
-    const replayedRows = replayOperations({
-      rows: rawObjects,
-      operations: Array.isArray(body.operationHistory) ? body.operationHistory : [],
-    });
+    const replayedRows = normalizeLakeBigintFieldsInRows(
+      replayOperations({
+        rows: rawObjects,
+        operations: Array.isArray(body.operationHistory) ? body.operationHistory : [],
+      }),
+    );
     const replayedColumns = [];
     const seenColumns = new Set();
     for (const col of Array.isArray(result.columns) ? result.columns : []) {
