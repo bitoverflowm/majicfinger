@@ -302,24 +302,31 @@ How summer vs winter markets behave differently.
 
 ---
 
-### 🔴 [INSERT CHART: Volatility clustering in weather markets]
+### Volatility Clustering in Weather Prediction Markets
 
-**Type:**
-
-- Time series
-- X-axis: time
-- Y-axis: price volatility
-- Annotate major weather events
-
-**Insight:**
-
-Shows how uncertainty spikes during major weather disruptions.
-
-Example component:
 
 ```jsx
-<PublicChart username="misterrpink" slug="weather-market-volatility-over-time" />
+<PublicChart username="misterrpink" slug="nyc-weather-market-intraday-volatility-clustering" />
 ```
+
+This chart tracks how price volatility evolves over time in the Kalshi weather market:
+
+> “Will the high temperature in NYC be 68–69° on Oct 20, 2025?”
+
+Using hourly VWAP prices, we compute returns between consecutive hours and apply a rolling volatility measure to capture how uncertainty changes throughout the lifecycle of the market.
+
+Key mechanics:
+
+- Prices are aggregated into hourly VWAP values
+- Returns are calculated as hourly changes in VWAP
+- Volatility is derived from rolling standard deviation of returns
+
+The result shows a clear structure:
+
+- Early phase: low-to-moderate volatility as pricing begins forming
+- Mid-phase: sharp spikes in volatility as new information enters the market
+- Pre-settlement: extreme price movement as probability converges toward 99
+- Final phase: volatility collapses as uncertainty resolves
 
 ---
 
