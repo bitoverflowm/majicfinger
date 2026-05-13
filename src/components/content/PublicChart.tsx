@@ -4,6 +4,7 @@ const IS_DEV = process.env.NODE_ENV === "development";
 type PublicChartProps = {
   username: string;
   slug: string;
+  /** Pixel height of the embed iframe (chart + footer). Default tuned for guide layouts. */
   height?: number;
 };
 
@@ -11,7 +12,7 @@ type PublicChartProps = {
  * MDX: embed a published interactive chart with a visible dofollow-style link for SEO.
  * Usage in MDX: `<PublicChart username="MrPink" slug="my-chart" />`
  */
-export function PublicChart({ username, slug, height = 620 }: PublicChartProps) {
+export function PublicChart({ username, slug, height = 820 }: PublicChartProps) {
   const path = `/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`;
   const src = IS_DEV ? path : `${SITE.replace(/\/$/, "")}${path}`;
   return (
