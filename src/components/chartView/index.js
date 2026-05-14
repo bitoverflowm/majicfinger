@@ -217,6 +217,10 @@ export const X_DATE_FORMAT_PRESETS = [
   { value: "mm/dd/yy", label: "MM/DD/YY" },
   { value: "yyyy", label: "YYYY" },
   { value: "yyyy-mm", label: "YYYY-MM" },
+  { value: "time_hm", label: "Time (HH:mm)" },
+  { value: "datetime_dm", label: "Date & time (DD/MM/YY HH:mm)" },
+  { value: "day_hour", label: "Day & hour (DD HH)" },
+  { value: "day_hms", label: "Day, hour, minute, second (DD/MM/YY HH:mm:ss)" },
 ];
 
 function pad2(n) {
@@ -233,6 +237,9 @@ function formatEpochMsWithPreset(ms, preset) {
   const mm = pad2(d.getUTCMonth() + 1);
   const dd = pad2(d.getUTCDate());
   const mmm = MONTH_ABBREV_EN[d.getUTCMonth()] ?? "";
+  const HH = pad2(d.getUTCHours());
+  const MI = pad2(d.getUTCMinutes());
+  const SS = pad2(d.getUTCSeconds());
   if (p === "dd") return dd;
   if (p === "mm") return mm;
   if (p === "mmm") return mmm;
@@ -245,6 +252,10 @@ function formatEpochMsWithPreset(ms, preset) {
   if (p === "mm/dd/yy") return `${mm}/${dd}/${yy}`;
   if (p === "yyyy") return String(yyyy);
   if (p === "yyyy-mm") return `${yyyy}-${mm}`;
+  if (p === "time_hm") return `${HH}:${MI}`;
+  if (p === "datetime_dm") return `${dd}/${mm}/${yy} ${HH}:${MI}`;
+  if (p === "day_hour") return `${dd} ${HH}`;
+  if (p === "day_hms") return `${dd}/${mm}/${yy} ${HH}:${MI}:${SS}`;
   return "";
 }
 

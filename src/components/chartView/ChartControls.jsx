@@ -45,6 +45,98 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { temporalToMs } from "@/lib/temporalParse";
 
+function TimeseriesXAxisFormatSection({
+  dark,
+  canUseTimeSeriesX,
+  xTimeScale,
+  setXTimeScale,
+  lineHumanReadableTime,
+  setLineHumanReadableTime,
+  xDateFormatPreset,
+  setXDateFormatPreset,
+  X_DATE_FORMAT_PRESETS,
+}) {
+  return (
+    <>
+      <div className="flex items-center">
+        <Switch
+          id="chart-line-time-series-x-axis"
+          checked={canUseTimeSeriesX && xTimeScale}
+          onCheckedChange={(checked) => setXTimeScale(canUseTimeSeriesX ? checked : false)}
+          className="scale-75 origin-left"
+          disabled={!canUseTimeSeriesX}
+        />
+        <Label
+          htmlFor="chart-line-time-series-x-axis"
+          className={`pr-1 cursor-pointer text-xs font-normal text-muted-foreground ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
+        >
+          Set x-axis to timeseries format
+        </Label>
+        <TooltipProvider delayDuration={250}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
+                <CircleHelp className="h-3.5 w-3.5" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+              Uses a numeric time scale so each row maps along the full width. Turn off for categorical X (e.g. labels).
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+      <div className="flex items-center">
+        <Switch
+          id="chart-line-human-readable-time"
+          checked={canUseTimeSeriesX && lineHumanReadableTime}
+          onCheckedChange={(checked) => setLineHumanReadableTime(canUseTimeSeriesX ? checked : false)}
+          className="scale-75 origin-left"
+          disabled={!canUseTimeSeriesX}
+        />
+        <Label
+          htmlFor="chart-line-human-readable-time"
+          className={`pr-1 cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"} ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
+        >
+          Human readable time
+        </Label>
+        <TooltipProvider delayDuration={250}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
+                <CircleHelp className="h-3.5 w-3.5" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+              format time like dd-mm-yyyy instead of unix/ iso time stamp
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {canUseTimeSeriesX ? (
+        <div className="grid gap-1.5 pt-1">
+          <Label className="text-xs text-muted-foreground">Date label format (display only)</Label>
+          <Select
+            value={String(xDateFormatPreset || "auto")}
+            onValueChange={(v) => setXDateFormatPreset?.(v || "auto")}
+          >
+            <SelectTrigger className="h-8 min-w-0 text-xs font-normal">
+              <SelectValue placeholder="Auto" className="text-xs font-normal" />
+            </SelectTrigger>
+            <SelectContent className="text-xs">
+              {(Array.isArray(X_DATE_FORMAT_PRESETS) ? X_DATE_FORMAT_PRESETS : []).map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="text-xs font-normal">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export default function ChartControls() {
   const {
     demo,
@@ -1008,83 +1100,17 @@ export default function ChartControls() {
                             })()}
                           </div>
                         ) : null}
-                        <div className="flex items-center">
-                          <Switch
-                            id="chart-line-time-series-x-axis"
-                            checked={canUseTimeSeriesX && xTimeScale}
-                            onCheckedChange={(checked) => setXTimeScale(canUseTimeSeriesX ? checked : false)}
-                            className="scale-75 origin-left"
-                            disabled={!canUseTimeSeriesX}
-                          />
-                          <Label
-                            htmlFor="chart-line-time-series-x-axis"
-                            className={`pr-1 cursor-pointer text-xs font-normal text-muted-foreground ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
-                          >
-                            Set x-axis to timeseries format
-                          </Label>
-                          <TooltipProvider delayDuration={250}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
-                                  <CircleHelp className="h-3.5 w-3.5" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-[280px] text-xs">
-                                Uses a numeric time scale so each row maps along the full width. Turn off for categorical X (e.g. labels).
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                        <div className="flex items-center">
-                          <Switch
-                            id="chart-line-human-readable-time"
-                            checked={canUseTimeSeriesX && lineHumanReadableTime}
-                            onCheckedChange={(checked) => setLineHumanReadableTime(canUseTimeSeriesX ? checked : false)}
-                            className="scale-75 origin-left"
-                            disabled={!canUseTimeSeriesX}
-                          />
-                          <Label
-                            htmlFor="chart-line-human-readable-time"
-                            className={`pr-1 cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"} ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
-                          >
-                            Human readable time
-                          </Label>
-                          <TooltipProvider delayDuration={250}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
-                                  <CircleHelp className="h-3.5 w-3.5" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-[280px] text-xs">
-                                format time like dd-mm-yyyy instead of unix/ iso time stamp
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-
-                        {canUseTimeSeriesX ? (
-                          <div className="grid gap-1.5 pt-1">
-                            <Label className="text-xs text-muted-foreground">
-                              Date label format (display only)
-                            </Label>
-                            <Select
-                              value={String(xDateFormatPreset || "auto")}
-                              onValueChange={(v) => setXDateFormatPreset?.(v || "auto")}
-                            >
-                              <SelectTrigger className="h-8 min-w-0 text-xs font-normal">
-                                <SelectValue placeholder="Auto" className="text-xs font-normal" />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                {(Array.isArray(X_DATE_FORMAT_PRESETS) ? X_DATE_FORMAT_PRESETS : []).map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value} className="text-xs font-normal">
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        ) : null}
+                        <TimeseriesXAxisFormatSection
+                          dark={dark}
+                          canUseTimeSeriesX={canUseTimeSeriesX}
+                          xTimeScale={xTimeScale}
+                          setXTimeScale={setXTimeScale}
+                          lineHumanReadableTime={lineHumanReadableTime}
+                          setLineHumanReadableTime={setLineHumanReadableTime}
+                          xDateFormatPreset={xDateFormatPreset}
+                          setXDateFormatPreset={setXDateFormatPreset}
+                          X_DATE_FORMAT_PRESETS={X_DATE_FORMAT_PRESETS}
+                        />
 
                         {yAxisFormatControls}
                         {lineSeriesControls}
@@ -1162,6 +1188,19 @@ export default function ChartControls() {
                             </Select>
                           </div>
                         )}
+                      </div>
+                      <div className="min-w-0 space-y-2 py-2">
+                        <TimeseriesXAxisFormatSection
+                          dark={dark}
+                          canUseTimeSeriesX={canUseTimeSeriesX}
+                          xTimeScale={xTimeScale}
+                          setXTimeScale={setXTimeScale}
+                          lineHumanReadableTime={lineHumanReadableTime}
+                          setLineHumanReadableTime={setLineHumanReadableTime}
+                          xDateFormatPreset={xDateFormatPreset}
+                          setXDateFormatPreset={setXDateFormatPreset}
+                          X_DATE_FORMAT_PRESETS={X_DATE_FORMAT_PRESETS}
+                        />
                       </div>
                       {yAxisFormatControls}
                     </>
