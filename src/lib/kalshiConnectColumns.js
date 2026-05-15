@@ -26,7 +26,7 @@ export const KALSHI_MARKETS_CONNECT_COLUMNS = [
     label: "event ticker simplified",
     lycheeCustom: true,
     description:
-      "Simplified prefix parsed from event_ticker for grouping related markets (e.g. sports, politics, weather).",
+      "Simplified ticker parsed from event_ticker.",
   },
   {
     name: "event_ticker",
@@ -39,7 +39,7 @@ export const KALSHI_MARKETS_CONNECT_COLUMNS = [
     label: "Category",
     lycheeCustom: true,
     description:
-      "Top-level category bucket derived from event ticker (Sports, Weather, Politics, Crypto, …).",
+      "Market category bucket (Sports, Weather, Politics, Crypto, …).",
   },
   {
     name: "market_type",

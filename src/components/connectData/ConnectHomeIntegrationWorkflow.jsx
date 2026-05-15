@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check } from "lucide-react";
 
@@ -85,13 +85,22 @@ function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, 
   const selectedSet = new Set(selectedColumns);
   const allSelected = columns.length > 0 && selectedColumns.length === columns.length;
   const noneSelected = selectedColumns.length === 0;
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 220);
+    return () => window.clearTimeout(t);
+  }, [sampleId]);
 
   return (
     <motion.div
+      ref={pickerRef}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="mt-4 space-y-2"
+      className="mt-4 scroll-mt-6 space-y-2"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <h2 className="text-xs font-semibold tracking-tight text-foreground">
@@ -120,7 +129,7 @@ function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, 
           </Button>
         </div>
       </div>
-      <ul role="list" className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+      <ul role="list" className="grid grid-cols-1 items-stretch gap-1 sm:grid-cols-2">
         {columns.map((col) => {
           const isSelected = selectedSet.has(col.name);
           const displayLabel = getKalshiColumnDisplayLabel(col);
@@ -132,7 +141,7 @@ function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, 
                 aria-pressed={isSelected}
                 title={!isSelected ? col.description : displayLabel}
                 className={cn(
-                  "flex w-full items-start gap-1.5 rounded-md border px-2 py-1 text-left transition-colors duration-150",
+                  "flex h-[2.625rem] w-full items-start gap-1.5 rounded-md border px-2 py-1 text-left transition-colors duration-150",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
                   isSelected
                     ? "border-primary/35 bg-primary/5"
@@ -157,11 +166,15 @@ function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, 
                     </span>
                     <span className="shrink-0 text-[9px] leading-tight text-muted-foreground">{col.type}</span>
                   </span>
-                  {!isSelected ? (
-                    <span className="mt-0.5 block line-clamp-1 text-[10px] leading-tight text-muted-foreground">
-                      {col.description}
-                    </span>
-                  ) : null}
+                  <span
+                    className={cn(
+                      "mt-0.5 block h-3 line-clamp-1 text-[10px] leading-3 text-muted-foreground",
+                      isSelected && "invisible",
+                    )}
+                    aria-hidden={isSelected}
+                  >
+                    {col.description}
+                  </span>
                 </span>
               </button>
             </li>
@@ -225,15 +238,11 @@ function KalshiDataSourceCards({
                 )}
               >
                 {isSelected ? (
-                  <span
-                    className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border border-border/50 bg-background shadow-sm"
-                    title="Athena connection test"
-                  >
-                    <AthenaConnectionStatusDot
-                      state={athenaPingBySampleId?.[source.sampleId] || "loading"}
-                      size="sm"
-                    />
-                  </span>
+                  <AthenaConnectionStatusDot
+                    state={athenaPingBySampleId?.[source.sampleId] || "loading"}
+                    size="sm"
+                    className="absolute right-3 top-3"
+                  />
                 ) : null}
                 <span className="text-sm font-semibold tracking-tight text-foreground pr-6">{source.title}</span>
                 <span className="mt-1 text-xs leading-snug text-muted-foreground">{source.description}</span>
@@ -364,7 +373,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
         className,
       )}
     >
-      <div className={cn("mx-auto w-full", hasColumnPicker ? "max-w-4xl" : "max-w-2xl")}>
+      <div className="mx-auto w-full max-w-2xl">
         <h1
           className={cn(
             "text-balance text-left font-semibold tracking-tight text-foreground",
