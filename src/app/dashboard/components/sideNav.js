@@ -42,7 +42,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const dataViewKeys = ["dataStart", "newSheet", "upload", "integrations"];
+const dataViewKeys = ["dataStart", "newSheet", "upload", "integrations", "connectDataHome"];
 const chartViewKeys = ["charts"];
 const dashboardViewKeys = ["dashboardComposer", "presentation"];
 const underConstructionKeys = ["scrape", "generate", "ai"];

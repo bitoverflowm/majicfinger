@@ -23,8 +23,7 @@ import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { ExternalLink, Loader2 } from "lucide-react";
+import ConnectDataStep1 from "@/components/connectData/ConnectDataStep1";
 
 import { cn } from "@/lib/utils";
 
@@ -32,9 +31,6 @@ import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
 import { isDevLoginBypassUser } from "@/lib/devLoginBypass";
 import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
-
-/** TODO: set to `false` before shipping — only show onboarding when user has no handle / first login. */
-const FORCE_ONBOARDING_MODAL_FOR_TESTING = false;
 
 const DashBody = ({ user }) => {
     const contextStateV2 = useMyStateV2()
@@ -72,12 +68,6 @@ const DashBody = ({ user }) => {
     const [isButtonEnabled, setIsButtonEnabled] = useState(false);
     const [usernameExists, setUsernameExists] = useState(false);
     const [isCheckingHandle, setIsCheckingHandle] = useState(false);
-    const [onboardingOpen, setOnboardingOpen] = useState(false);
-    const [onboardingStep, setOnboardingStep] = useState(0); // 0 = handle/avatar, 1 = resources
-    const [onboardingHandle, setOnboardingHandle] = useState("");
-    const [onboardingHandleTaken, setOnboardingHandleTaken] = useState(false);
-    const [onboardingSubmitBusy, setOnboardingSubmitBusy] = useState(false);
-    const [onboardingUploadFn, setOnboardingUploadFn] = useState(null);
     const [subscriptionTier, setSubscriptionTier] = useState(null);
     const [billingCycle, setBillingCycle] = useState(null);
     const [subscriptionStatus, setSubscriptionStatus] = useState(null);
@@ -116,12 +106,16 @@ const DashBody = ({ user }) => {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    setSavedDataSets(data.data); // Assuming you have a state to hold the fetched data
+                    setSavedDataSets(data.data);
                 } else {
-                    console.error('Failed to fetch saved projects:', data.message);
+                    setSavedDataSets([]);
                 }
                 setRefetchData(0)
             })
+            .catch(() => {
+                setSavedDataSets([]);
+                setRefetchData(0);
+            });
         }
     }, [user, refetchData, isDemo, hasDbBackedUserId])
 
@@ -186,13 +180,6 @@ const DashBody = ({ user }) => {
         }
     }, [user, refetchPresentations, isDemo, hasDbBackedUserId])
 
-    // Temporary: always show onboarding modal for QA (see FORCE_ONBOARDING_MODAL_FOR_TESTING).
-    useEffect(() => {
-        if (!FORCE_ONBOARDING_MODAL_FOR_TESTING || isDemo || !hasDbBackedUserId) return;
-        setOnboardingOpen(true);
-        setOnboardingStep(0);
-    }, [isDemo, hasDbBackedUserId, user?.userId]);
-
     useEffect(() => {
         if (user && !isDemo && hasDbBackedUserId) {
             fetch(`/api/users/${user.userId}`, {
@@ -206,16 +193,6 @@ const DashBody = ({ user }) => {
                 if (data.success) {
                     setUserHandle(data.data.user_name);
                     setProfilePic?.(data.data.profile_pic);
-                    const dbHandle = String(data.data.user_name || "").trim();
-                    // First-time onboarding: enforce handle creation via modal.
-                    if (!dbHandle) {
-                      setOnboardingHandle("");
-                      setOnboardingHandleTaken(false);
-                      setOnboardingStep(0);
-                      setOnboardingOpen(true);
-                    } else if (!FORCE_ONBOARDING_MODAL_FOR_TESTING) {
-                      setOnboardingOpen(false);
-                    }
                     setIsLifeTimeMember(data.data.lifetimeMember);
                     setSubscriptionTier(data.data.subscriptionTier || null);
                     setBillingCycle(data.data.billingCycle || null);
@@ -269,89 +246,6 @@ const DashBody = ({ user }) => {
         }
     };
 
-    const checkOnboardingHandle = useCallback(
-      debounce((value) => {
-        const v = String(value || "").trim();
-        if (isReservedUserHandle(v)) {
-          setOnboardingHandleTaken(true);
-          return;
-        }
-        if (v.length < 3) {
-          setOnboardingHandleTaken(false);
-          return;
-        }
-        setIsCheckingHandle(true);
-        fetch(`/api/users/checkUserhandle?userHandle=${encodeURIComponent(v)}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            setOnboardingHandleTaken(!!data?.exists);
-            setIsCheckingHandle(false);
-          })
-          .catch(() => {
-            setOnboardingHandleTaken(false);
-            setIsCheckingHandle(false);
-          });
-      }, 450),
-      []
-    );
-
-    const onboardingHandleChange = (e) => {
-      const v = e.target.value;
-      setOnboardingHandle(v);
-      setOnboardingHandleTaken(false);
-      if (String(v || "").trim().length >= 3) {
-        checkOnboardingHandle(v);
-      }
-    };
-
-    const submitOnboardingHandle = async () => {
-      if (!hasDbBackedUserId) return;
-      const v = String(onboardingHandle || "").trim();
-      if (isReservedUserHandle(v)) {
-        setOnboardingHandleTaken(true);
-        return;
-      }
-      if (v.length < 3) return;
-      if (onboardingHandleTaken || isCheckingHandle) return;
-      try {
-        setOnboardingSubmitBusy(true);
-        // If user selected a profile picture, upload it now (owner-enforced bucket relies on bucket policy, no ACLs).
-        if (typeof onboardingUploadFn === "function") {
-          await onboardingUploadFn();
-        }
-        const res = await fetch(`/api/users/${user.userId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_name: v }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data?.success) {
-          toast.error(data?.message || "Failed to set handle");
-          return;
-        }
-        setUserHandle(data.data.user_name);
-        toast.success("Handle set!");
-        setOnboardingStep(1);
-      } catch {
-        toast.error("Failed to set handle");
-      } finally {
-        setOnboardingSubmitBusy(false);
-      }
-    };
-
-    const guides = [
-      { title: "Kalshi historical data", href: "/guides/kalshi-historical-data" },
-      { title: "Kalshi volume explained", href: "/guides/kalshi-volume" },
-      { title: "Polymarket live prices", href: "/guides/polymarket-live-prices" },
-      { title: "Every SQL query you ever need", href: "/guides/every-sql-query-you-ever-need" },
-    ];
-    // NOTE: adjust to your actual published dashboard slug if needed.
-    const exampleDashboard = { title: "Kalshi volume dashboard", href: "/misterrpink/dashboards/kalshi-volume" };
-
-
     const handleUpdateUserHandle = () => {
         if (isReservedUserHandle(newUserHandle)) {
             toast.error(reservedUserHandleMessage(newUserHandle));
@@ -399,6 +293,11 @@ const DashBody = ({ user }) => {
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
+                {!isDemo && viewing === 'connectDataHome' && (
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <ConnectDataStep1 user={user} />
+                  </div>
+                )}
                 { (viewing === 'dataStart' || viewing === 'charts' || viewing === 'dashboardComposer') && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration
@@ -498,177 +397,50 @@ const DashBody = ({ user }) => {
                     <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
                 </div>}
         </div>
-
-        {/* First-time onboarding modal (handle required) */}
-        {!isDemo && hasDbBackedUserId && (
-          <Dialog open={onboardingOpen} onOpenChange={(open) => {
-            // Prevent closing until handle exists.
-            if (!open) return;
-            setOnboardingOpen(true);
-          }}>
-            <DialogContent
-              className="sm:max-w-[680px]"
-              onInteractOutside={(e) => e.preventDefault()}
-              onEscapeKeyDown={(e) => e.preventDefault()}
-            >
-              <DialogHeader>
-                <DialogDescription>
-                  Welcome to Lychee. You made the right move.
-                  <br />
-                  <span className="italic">&ldquo;Without data, you're just another person with an opinion&rdquo; — W. Edwards Deming.</span>
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="relative overflow-hidden">
-                <div
-                  className={cn(
-                    "flex w-[200%] transition-transform duration-300 ease-in-out",
-                    onboardingStep === 0 ? "translate-x-0" : "-translate-x-1/2",
-                  )}
-                >
-                  {/* Step 1 */}
-                  <div className="w-1/2 pr-4">
-                    <div className="space-y-3">
-                      <div className="grid gap-2">
-                        <Label htmlFor="onboarding-handle">Please pick a unique handle</Label>
-                        <div className="relative">
-                          <Input
-                            id="onboarding-handle"
-                            placeholder="misterrpink"
-                            value={onboardingHandle}
-                            onChange={onboardingHandleChange}
-                          />
-                          {isCheckingHandle && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            </div>
-                          )}
-                        </div>
-                        {onboardingHandleTaken && (
-                          <div className="text-xs text-red-500">username already taken</div>
-                        )}
-                      </div>
-
-                      <div className="pt-2">
-                        <div className="text-sm font-medium">Profile picture</div>
-                        <div className="mt-2">
-                          <ProfilePictureUploader
-                            userId={user.userId}
-                            handle={String(onboardingHandle || "").trim() || userHandle}
-                            name={user?.name}
-                            currentSrc={profilePic}
-                            onUpdated={(nextUrl) => setProfilePic?.(nextUrl)}
-                            mode="onboarding"
-                            registerUpload={setOnboardingUploadFn}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Step 2 */}
-                  <div className="w-1/2 pl-4">
-                    <div className="space-y-4">
-                      <div className="text-sm">
-                        Don&apos;t forget to check out our guides if you want help learning how to use the platform.
-                      </div>
-
-                      <div className="space-y-2">
-                        {guides.map((g) => (
-                          <div key={g.href} className="flex items-center justify-between gap-3 rounded-md border p-2">
-                            <div className="text-sm font-medium">{g.title}</div>
-                            <Link href={g.href} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-md border px-2 py-1 text-xs hover:bg-muted">
-                              <ExternalLink className="h-4 w-4" />
-                            </Link>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="pt-2">
-                        <div className="text-sm font-medium">Want to see an example dashboard?</div>
-                        <div className="mt-2 flex items-center justify-between gap-3 rounded-md border p-2">
-                          <div className="text-sm font-medium">{exampleDashboard.title}</div>
-                          <Link href={exampleDashboard.href} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-md border px-2 py-1 text-xs hover:bg-muted">
-                            <ExternalLink className="h-4 w-4" />
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter className="flex items-center justify-between sm:justify-between">
-                <div className="text-xs text-muted-foreground">
-                  {onboardingStep === 0 ? "Step 1 of 2" : "Step 2 of 2"}
-                </div>
-                {onboardingStep === 0 ? (
-                  <Button
-                    type="button"
-                    onClick={submitOnboardingHandle}
-                    disabled={
-                      onboardingSubmitBusy ||
-                      isCheckingHandle ||
-                      onboardingHandleTaken ||
-                      String(onboardingHandle || "").trim().length < 3
-                    }
-                  >
-                    {onboardingSubmitBusy ? "Saving…" : "Submit"}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setOnboardingOpen(false);
-                      setViewing?.("dataStart");
-                    }}
-                  >
-                    Start using Lychee
-                  </Button>
-                )}
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
       </>
     );
 
+    const paywallOverlay =
+      !isDemo && isLocked && user ? (
+        <div className="pointer-events-auto fixed bottom-5 left-1/2 z-[999] w-[min(94vw,42rem)] -translate-x-1/2 rounded-xl border-2 border-primary/50 bg-card p-5 shadow-2xl ring-4 ring-primary/15">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-base font-semibold text-foreground">Choose a plan to unlock the dashboard</div>
+              <div className="mt-1 text-sm leading-snug text-muted-foreground">
+                Editing, saving, uploads, and integrations stay locked until you have an active paid plan (or lifetime
+                access).
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href="/#pricing"
+                className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-md hover:opacity-90"
+              >
+                View plans
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null;
+
     return isDemo ? (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
+    ) : viewing === "connectDataHome" ? (
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className={cn(isLocked && "pointer-events-none select-none")}>{content}</div>
+        {paywallOverlay}
+      </div>
     ) : (
       <SidebarProvider defaultOpen={false}>
         <div className="relative flex min-h-0 min-w-0 flex-1">
           <div className={cn("contents", isLocked && "pointer-events-none select-none")}>
-            <SideNav user={user} startNew={startNew} setStartNew={setStartNew}/>
+            <SideNav user={user} startNew={startNew} setStartNew={setStartNew} />
             <SidebarInset className="min-h-0">{content}</SidebarInset>
           </div>
-
-          {isLocked && user && (
-            <div className="pointer-events-auto fixed bottom-5 left-1/2 z-[999] w-[min(94vw,42rem)] -translate-x-1/2 rounded-xl border-2 border-primary/50 bg-card p-5 shadow-2xl ring-4 ring-primary/15">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-base font-semibold text-foreground">
-                    Choose a plan to unlock the dashboard
-                  </div>
-                  <div className="mt-1 text-sm leading-snug text-muted-foreground">
-                    Editing, saving, uploads, and integrations stay locked until you have an active paid plan (or lifetime access).
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Link
-                    href="/#pricing"
-                    className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-md hover:opacity-90"
-                  >
-                    View plans
-                  </Link>
-                </div>
-              </div>
-            </div>
-          )}
+          {paywallOverlay}
         </div>
       </SidebarProvider>
-    )
-
+    );
 }
 
 export default DashBody;

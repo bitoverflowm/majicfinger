@@ -139,3 +139,60 @@ export async function hydrateChartSheetsForDataSet({
   setLoadedChartMeta?.(preferred?.meta || null);
   setLoadedChartBuilderSnapshot?.(preferred?.snapshot || null);
 }
+
+/**
+ * Fetch a saved project by id and hydrate sheet + chart workspace (same core path as nav "Open project").
+ * @param {object} opts
+ * @param {string} opts.dataSetId
+ * @param {string} [opts.userId]
+ * @param {Function} [opts.setDataSheets]
+ * @param {Function} [opts.setActiveSheetId]
+ * @param {Function} [opts.setConnectedData]
+ * @param {Function} [opts.setLoadedDataMeta]
+ * @param {Function} [opts.setLoadedDataId]
+ * @param {Function} [opts.setSavedCharts]
+ * @param {Function} [opts.setChartSheets]
+ * @param {Function} [opts.setActiveChartSheetId]
+ * @param {Function} [opts.setLoadedChartMeta]
+ * @param {Function} [opts.setLoadedChartBuilderSnapshot]
+ * @param {Function} [opts.setRefetchChartDashboardsTick]
+ */
+export async function loadFullProjectFromApi({
+  dataSetId,
+  userId,
+  setDataSheets,
+  setActiveSheetId,
+  setConnectedData,
+  setLoadedDataMeta,
+  setLoadedDataId,
+  setSavedCharts,
+  setChartSheets,
+  setActiveChartSheetId,
+  setLoadedChartMeta,
+  setLoadedChartBuilderSnapshot,
+  setRefetchChartDashboardsTick,
+}) {
+  if (!dataSetId) throw new Error("Missing project id");
+  const response = await fetch(`/api/dataSets/dataSet/${dataSetId}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  const res = await response.json().catch(() => ({}));
+  if (!response.ok || !res?.data) {
+    throw new Error(res?.message || "Failed to load project");
+  }
+  applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData });
+  setLoadedDataMeta?.(res.data);
+  const rid = res.data?._id ?? dataSetId;
+  if (rid != null) setLoadedDataId?.(rid);
+  await hydrateChartSheetsForDataSet({
+    dataSetId,
+    userId,
+    setSavedCharts,
+    setChartSheets,
+    setActiveChartSheetId,
+    setLoadedChartMeta,
+    setLoadedChartBuilderSnapshot,
+  });
+  setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+}

@@ -18,7 +18,9 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [isLifeTimeMember, setIsLifeTimeMember] = useState()
     const [settings, setSettings] = useState(initialSettings)
     const [isDemo, setIsDemo] = useState(!!initialSettings?.demo)
-    const [viewing, setViewing] = useState(initialSettings?.viewing || 'dataStart')
+    const [viewing, setViewing] = useState(
+      initialSettings?.viewing || (initialSettings?.demo ? "dataStart" : "connectDataHome"),
+    )
     const [integrationSidebar, setIntegrationSidebar] = useState(initialSettings?.integrationSidebar ?? null) // 'polymarket' | 'polymarketHistorical' | 'kalshiHistorical' | 'coinGecko' | etc.
     const [rightPanelOpen, setRightPanelOpen] = useState(!!initialSettings?.rightPanelOpen) // unified right-side panel (integrations/charts)
     const [rightPanelTab, setRightPanelTab] = useState(initialSettings?.rightPanelTab || 'integrations') // 'integrations' | 'charts' | 'export'
