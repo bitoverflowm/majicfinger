@@ -1,16 +1,16 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
   ArrowUpFromLine,
   Braces,
-  Clock,
+  BookOpen,
   ExternalLink,
   FileImage,
   FilePlus2,
+  LayoutDashboard,
   LayoutTemplate,
   Loader2,
   Newspaper,
@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
 
 /** Wireframe order + News API (platform integration roadmap). */
@@ -91,6 +92,45 @@ const pillClass = cn(
 
 const pillLabelClass = "min-w-0 flex-1 truncate";
 
+const integrationsPillClass = cn(pillClass, "gap-2.5 pl-2 pr-2");
+
+const latestWorkPillClass = cn(integrationsPillClass, "w-auto max-w-[20rem] shrink-0");
+
+const latestWorkWhenClass =
+  "shrink-0 whitespace-nowrap px-1 text-[10px] font-light tabular-nums leading-none text-muted-foreground";
+
+function formatLatestWorkWhen(raw) {
+  const d = raw ? new Date(raw) : null;
+  if (!d || Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function LatestWorkPill({ label, when, title, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title={title || label}
+      className={latestWorkPillClass}
+    >
+      <span className={latestWorkWhenClass}>{when}</span>
+      <span className={pillLabelClass}>{label}</span>
+    </button>
+  );
+}
+
+function LatestWorkSkeleton() {
+  return <Skeleton className="h-[2.625rem] w-[12rem] shrink-0 rounded-md sm:w-[14rem]" />;
+}
+
+const templatesPillClass = cn(
+  pillClass,
+  "min-h-[2.75rem] gap-2.5 px-3 py-2",
+);
+
+const templatesPillLabelClass = "min-w-0 flex-1 text-left text-xs font-light leading-snug line-clamp-2 whitespace-normal";
+
 function IntegrationIconWrap({ children }) {
   return (
     <span className="flex h-full w-full items-center justify-center overflow-hidden [&_.integration-logo-avatar]:!h-7 [&_.integration-logo-avatar]:!w-7 [&_.integration-logo-avatar]:!rounded-md [&_.integration-logo-avatar]:!bg-transparent [&_.integration-logo-avatar]:shadow-none">
@@ -99,20 +139,22 @@ function IntegrationIconWrap({ children }) {
   );
 }
 
-function PillButton({ icon, label, title, onClick, disabled, iconClassName }) {
+function PillButton({ icon, label, title, onClick, disabled, iconClassName, className }) {
   return (
-    <button type="button" disabled={disabled} onClick={onClick} title={title || label} className={pillClass}>
+    <button type="button" disabled={disabled} onClick={onClick} title={title || label} className={cn(pillClass, className)}>
       <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
       <span className={pillLabelClass}>{label}</span>
     </button>
   );
 }
 
-function PillLink({ href, external, icon, label, title, iconClassName }) {
+function PillLink({ href, external, icon, label, title, iconClassName, wide = false }) {
+  const surfaceClass = wide ? templatesPillClass : pillClass;
+  const labelClass = wide ? templatesPillLabelClass : pillLabelClass;
   const body = (
     <>
       <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
-      <span className={pillLabelClass}>{label}</span>
+      <span className={labelClass}>{label}</span>
       {external ? (
         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={iconStroke} aria-hidden />
       ) : null}
@@ -120,15 +162,30 @@ function PillLink({ href, external, icon, label, title, iconClassName }) {
   );
   if (external) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" title={title || label} className={pillClass}>
+      <a href={href} target="_blank" rel="noreferrer" title={title || label} className={surfaceClass}>
         {body}
       </a>
     );
   }
   return (
-    <Link href={href} title={title || label} className={pillClass}>
+    <Link href={href} title={title || label} className={surfaceClass}>
       {body}
     </Link>
+  );
+}
+
+function PillButtonWide({ icon, label, title, onClick, disabled, iconClassName }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title={title || label}
+      className={templatesPillClass}
+    >
+      <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
+      <span className={templatesPillLabelClass}>{label}</span>
+    </button>
   );
 }
 
@@ -279,6 +336,8 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
     }).filter(Boolean);
   }, [integrationByHandler, kalshiHistoricalConnect, polymarketHistoricalConnect]);
 
+  const latestWorkLoading = hasDbBackedUserId && savedDataSets === undefined;
+
   const latestWork = useMemo(() => {
     const list = Array.isArray(savedDataSets) ? savedDataSets : [];
     const sorted = [...list].sort((a, b) => {
@@ -286,9 +345,10 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
       const tb = new Date(b?.last_saved_date || b?.created_date || 0).getTime();
       return tb - ta;
     });
-    return sorted.slice(0, 6);
+    return sorted.slice(0, 3);
   }, [savedDataSets]);
-  const showLatestWork = hasDbBackedUserId && latestWork.length > 0;
+
+  const showLatestWork = hasDbBackedUserId && (latestWorkLoading || latestWork.length > 0);
 
   const checkOnboardingHandle = useMemo(
     () =>
@@ -410,16 +470,9 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
     }
   };
 
-  const columnGridClass = cn(
-    "grid gap-y-1",
-    showLatestWork
-      ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 xl:gap-x-8"
-      : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 xl:gap-x-8",
-  );
+  const columnGridClass = "grid grid-cols-1 gap-y-1 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-8";
 
   const integrationsColClass = "flex flex-col gap-3";
-  const guidesScrollColClass =
-    "flex max-h-[min(52vh,26rem)] flex-col gap-3 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground)/0.35)_transparent]";
 
   return (
     <div
@@ -487,6 +540,29 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
               </div>
             </div>
           </Card>
+        ) : null}
+
+        {showLatestWork ? (
+          <section className="mb-8 w-full sm:mb-10 md:mb-12">
+            <SectionTitle>Your latest work</SectionTitle>
+            <div className="flex flex-wrap gap-3">
+              {latestWorkLoading
+                ? Array.from({ length: 3 }, (_, i) => <LatestWorkSkeleton key={i} />)
+                : latestWork.map((ds) => {
+                    const when = formatLatestWorkWhen(ds?.last_saved_date || ds?.created_date);
+                    return (
+                      <LatestWorkPill
+                        key={String(ds._id)}
+                        when={when}
+                        label={ds.data_set_name || "Untitled project"}
+                        title={`Last edited ${when}`}
+                        onClick={() => onOpenProject(ds._id)}
+                        disabled={loadProjectBusy}
+                      />
+                    );
+                  })}
+            </div>
+          </section>
         ) : null}
 
         <div className="w-full">
@@ -557,6 +633,7 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
                     </div>
                   ) : (
                     <PillButton
+                      className={integrationsPillClass}
                       icon={<IntegrationIconWrap>{row.icon}</IntegrationIconWrap>}
                       label={row.name}
                       title={row.description}
@@ -569,71 +646,52 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
             </div>
           </section>
 
-          <section className="min-w-0">
-            <SectionTitle>Prediction markets</SectionTitle>
-            <div className="flex flex-col gap-3">
-              {PREDICTION_TEMPLATES.map((t) => (
-                <PillButton
-                  key={t.id}
-                  icon={<LayoutTemplate className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
-                  label={t.title}
-                  title="Placeholder — templates ship later."
-                  onClick={() => toast.info("Templates are not available yet.")}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="min-w-0">
-            <SectionTitle>Guides</SectionTitle>
-            <div className={guidesScrollColClass}>
-              {CONNECT_HOME_GUIDES.slice(0, 5).map((g) => (
-                <PillLink
-                  key={g.slug}
-                  href={`/guides/${g.slug}`}
-                  icon={<Image src="/logo.png" alt="" width={14} height={14} className="rounded-sm object-cover opacity-90" />}
-                  label={g.title}
-                  title={g.publishedAt ? `${g.title} — published ${g.publishedAt}` : g.title}
-                />
-              ))}
-              <PillLink
-                href={EXAMPLE_DASHBOARD.href}
-                external
-                icon={<LayoutTemplate className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
-                label={EXAMPLE_DASHBOARD.title}
-                title="Public example dashboard"
-              />
-            </div>
-          </section>
-
-          {showLatestWork ? (
-            <section className="min-w-0">
-              <SectionTitle>Your latest work</SectionTitle>
-              <div className="flex flex-col gap-3">
-                {latestWork.map((ds) => {
-                  const raw = ds?.last_saved_date || ds?.created_date;
-                  const d = raw ? new Date(raw) : null;
-                  const when =
-                    d && !Number.isNaN(d.getTime())
-                      ? d.toLocaleString(undefined, {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })
-                      : "—";
-                  return (
-                    <PillButton
-                      key={String(ds._id)}
-                      icon={<Clock className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
-                      label={ds.data_set_name || "Untitled project"}
-                      title={`Last edited ${when}`}
-                      onClick={() => onOpenProject(ds._id)}
-                      disabled={loadProjectBusy}
-                    />
-                  );
-                })}
+          <section className="min-w-0 xl:min-w-[15rem] 2xl:min-w-[18rem]">
+            <div className="flex flex-col gap-8">
+              <div>
+                <SectionTitle>Dashboards</SectionTitle>
+                <div className="flex flex-col gap-3">
+                  <PillLink
+                    href={EXAMPLE_DASHBOARD.href}
+                    external
+                    wide
+                    icon={<LayoutDashboard className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
+                    label={EXAMPLE_DASHBOARD.title}
+                    title="Public example dashboard"
+                  />
+                </div>
               </div>
-            </section>
-          ) : null}
+              <div>
+                <SectionTitle>Guides</SectionTitle>
+                <div className="flex flex-col gap-3">
+                  {CONNECT_HOME_GUIDES.slice(0, 5).map((g) => (
+                    <PillLink
+                      key={g.slug}
+                      href={`/guides/${g.slug}`}
+                      wide
+                      icon={<BookOpen className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
+                      label={g.title}
+                      title={g.publishedAt ? `${g.title} — published ${g.publishedAt}` : g.title}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <SectionTitle>Templates</SectionTitle>
+                <div className="flex flex-col gap-3">
+                  {PREDICTION_TEMPLATES.map((t) => (
+                    <PillButtonWide
+                      key={t.id}
+                      icon={<LayoutTemplate className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
+                      label={t.title}
+                      title="Placeholder — templates ship later."
+                      onClick={() => toast.info("Templates are not available yet.")}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
