@@ -22,6 +22,7 @@ import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integra
 import { cn } from "@/lib/utils";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { scrollToPricingSection } from "@/lib/scrollToPricing";
+import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 import { useRouter } from "next/navigation";
 
 const DataView = ({ user }) => {
@@ -32,6 +33,7 @@ const DataView = ({ user }) => {
   const connectedData = contextStateV2?.connectedData;
   const setConnectedData = contextStateV2?.setConnectedData;
   const setViewing = contextStateV2?.setViewing;
+  const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
@@ -203,7 +205,10 @@ const DataView = ({ user }) => {
               <div className="flex flex-col gap-2 place-content-center p-2">
                 <Card
                   className="flex flex-col cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md"
-                  onClick={() => setViewing("upload")}
+                  onClick={() => {
+                    setViewing("connectDataHome");
+                    requestConnectWorkspace?.(CONNECT_WORKSPACE.UPLOAD);
+                  }}
                 >
                   <CardHeader
                     className={cn(
@@ -232,7 +237,10 @@ const DataView = ({ user }) => {
 
                 <Card
                   className="flex flex-col cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md"
-                  onClick={() => setViewing("newSheet")}
+                  onClick={() => {
+                    setViewing("connectDataHome");
+                    requestConnectWorkspace?.(CONNECT_WORKSPACE.BLANK);
+                  }}
                 >
                   <CardHeader
                     className={cn(

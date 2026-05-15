@@ -122,7 +122,14 @@ const RIGHT_PANEL_TAB_ITEMS = [
   { value: "export", label: "Export", Icon: Share2 },
 ];
 
-export default function DataSheetWithIntegration({ user, startNew, setStartNew, chartMode, dashboardMode = false }) {
+export default function DataSheetWithIntegration({
+  user,
+  startNew,
+  setStartNew,
+  chartMode,
+  dashboardMode = false,
+  connectHomeMode = false,
+}) {
   const hasDbBackedUserId =
     !!user?.userId && user.userId !== "dev-bypass-no-db" && /^[a-f0-9]{24}$/i.test(user.userId);
   const contextStateV2 = useMyStateV2();
@@ -738,13 +745,13 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
               onOpen={() => {
                 if (dashboardMode) {
                   setRightPanelTab?.("dashboard");
-                  setViewing?.("dashboardComposer");
+                  if (!connectHomeMode) setViewing?.("dashboardComposer");
                 } else if (chartMode) {
                   setRightPanelTab?.("charts");
-                  setViewing?.("charts");
+                  if (!connectHomeMode) setViewing?.("charts");
                 } else {
                   setRightPanelTab?.("integrations");
-                  setViewing?.("dataStart");
+                  if (!connectHomeMode) setViewing?.("dataStart");
                   setIntegrationSidebar?.((prev) => prev ?? "polymarket");
                 }
                 setRightPanelOpen?.(true);
@@ -850,7 +857,9 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
             />
             <aside
               className={cn(
-                isDemo
+                connectHomeMode
+                  ? "absolute inset-y-0 z-20 flex h-full flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
+                  : isDemo
                   ? "absolute inset-y-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
                   : "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out",
                 drawerExpanded
@@ -867,6 +876,12 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                     onValueChange={(v) => {
                       setRightPanelTab?.(v);
                       setRightPanelOpen?.(true);
+                      if (connectHomeMode) {
+                        if (v === "integrations") {
+                          setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+                        }
+                        return;
+                      }
                       if (v === "dashboard") {
                         setViewing?.("dashboardComposer");
                         return;
@@ -1083,7 +1098,7 @@ export default function DataSheetWithIntegration({ user, startNew, setStartNew, 
                                 variant="secondary"
                                 className="w-full"
                                 onClick={() => {
-                                  setViewing?.("charts");
+                                  if (!connectHomeMode) setViewing?.("charts");
                                   setRightPanelOpen?.(false);
                                 }}
                               >

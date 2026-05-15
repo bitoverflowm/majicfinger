@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 
 import {
   Sidebar,
@@ -51,11 +52,18 @@ const SideNav = () => {
   const contextStateV2 = useMyStateV2();
   const viewing = contextStateV2?.viewing;
   const setViewing = contextStateV2?.setViewing;
+  const connectWorkspace = contextStateV2?.connectWorkspace;
+  const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace;
   const isDemo = contextStateV2?.isDemo;
   const { state: sidebarState, toggleSidebar } = useSidebar();
 
   const viewHandler = (key) => {
     setViewing?.(key);
+  };
+
+  const openConnectWorkspace = (workspaceId) => {
+    setViewing?.("connectDataHome");
+    requestConnectWorkspace?.(workspaceId);
   };
 
   const isExpanded = sidebarState === "expanded";
@@ -120,8 +128,10 @@ const SideNav = () => {
                 <SidebarMenuSub>
                   <SidebarMenuSubItem>
                     <SidebarMenuSubButton
-                      isActive={viewing === "newSheet"}
-                      onClick={() => viewHandler("newSheet")}
+                      isActive={
+                        viewing === "connectDataHome" && connectWorkspace === CONNECT_WORKSPACE.BLANK
+                      }
+                      onClick={() => openConnectWorkspace(CONNECT_WORKSPACE.BLANK)}
                     >
                       <FilePlus2 className="h-4 w-4" />
                       <span>New Sheet</span>
@@ -129,8 +139,10 @@ const SideNav = () => {
                   </SidebarMenuSubItem>
                   <SidebarMenuSubItem>
                     <SidebarMenuSubButton
-                      isActive={viewing === "upload"}
-                      onClick={() => viewHandler("upload")}
+                      isActive={
+                        viewing === "connectDataHome" && connectWorkspace === CONNECT_WORKSPACE.UPLOAD
+                      }
+                      onClick={() => openConnectWorkspace(CONNECT_WORKSPACE.UPLOAD)}
                     >
                       <HardDriveUpload className="h-4 w-4" />
                       <span>Upload</span>

@@ -1177,7 +1177,7 @@ const Nav = () => {
   const breadcrumb = viewing === 'dashboardComposer' ? 'Lychee / Dashboard' :
     viewing === 'charts' ? 'Lychee / Charts' :
     viewing === 'connectDataHome' ? 'Lychee / Connect' :
-    (viewing === 'dataStart' || viewing === 'upload' || viewing === 'newSheet' || viewing === 'integrations') ? 'Lychee / Data' :
+    (viewing === 'dataStart' || viewing === 'integrations') ? 'Lychee / Data' :
     viewing === 'ai' ? 'Lychee / AI' :
     viewing === 'scrape' ? 'Lychee / Scrape' :
     viewing ? `Lychee / ${viewing}` : 'Lychee';

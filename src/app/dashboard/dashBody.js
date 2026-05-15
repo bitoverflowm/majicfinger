@@ -7,9 +7,9 @@ import SideNav from './components/sideNav'
 import Nav from './components/nav'
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
-import Upload from '@/components/dataView/upload'
 import IntegrationsView from "@/components/integrationsView";
-import NewSheetView from "@/components/newSheetView";
+import ConnectHomeShell from "@/components/connectData/ConnectHomeShell";
+import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,6 @@ import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
-import ConnectDataStep1 from "@/components/connectData/ConnectDataStep1";
 
 import { cn } from "@/lib/utils";
 
@@ -36,6 +35,7 @@ const DashBody = ({ user }) => {
     const contextStateV2 = useMyStateV2()
     const isDemo = contextStateV2?.isDemo
     const setViewing = contextStateV2?.setViewing
+    const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace
 
     const viewing = contextStateV2?.viewing
     const rightPanelOpen = contextStateV2?.rightPanelOpen
@@ -96,6 +96,16 @@ const DashBody = ({ user }) => {
         (!!tierForAccess && !normalizedSubscriptionStatus)
       ));
     const isLocked = !hasPaidAccess;
+
+    useEffect(() => {
+        if (viewing === "upload") {
+            setViewing?.("connectDataHome");
+            requestConnectWorkspace?.(CONNECT_WORKSPACE.UPLOAD);
+        } else if (viewing === "newSheet") {
+            setViewing?.("connectDataHome");
+            requestConnectWorkspace?.(CONNECT_WORKSPACE.BLANK);
+        }
+    }, [viewing, setViewing, requestConnectWorkspace]);
 
     useEffect(() => {
         if(user && !isDemo && hasDbBackedUserId){
@@ -308,7 +318,12 @@ const DashBody = ({ user }) => {
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
                 {!isDemo && viewing === 'connectDataHome' && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <ConnectDataStep1 user={user} userProfileFetchOk={userProfileFetchOk} />
+                    <ConnectHomeShell
+                      user={user}
+                      userProfileFetchOk={userProfileFetchOk}
+                      startNew={startNew}
+                      setStartNew={setStartNew}
+                    />
                   </div>
                 )}
                 { (viewing === 'dataStart' || viewing === 'charts' || viewing === 'dashboardComposer') && (
@@ -322,8 +337,6 @@ const DashBody = ({ user }) => {
                     />
                   </div>
                 ) }
-                { viewing === 'newSheet' && <div className="py-16"><NewSheetView user={user} startNew={true} setStartNew={setStartNew} /></div> }
-                { viewing === 'upload' && <div className="py-16 h-screen"><Upload user={user}/></div> }
                 { viewing === 'integrations' && <div className="py-10"><IntegrationsView/></div> }
                 {!isDemo && viewing === 'ai' && <AiView/> }
                 {!isDemo && viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }

@@ -22,6 +22,7 @@ import { ConnectProgressWithLabel } from "@/components/integrationsView/integrat
 import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
 import { loadFullProjectFromApi } from "@/lib/hydrateProjectWorkspace";
 import { CONNECT_HOME_GUIDES } from "@/lib/guidesConnectHomeManifest";
+import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,12 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
 
 /** Wireframe order + News API (platform integration roadmap). */
@@ -148,6 +155,27 @@ function PillButton({ icon, label, title, onClick, disabled, iconClassName, clas
   );
 }
 
+function PillButtonSoon({ icon, label }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex w-full">
+          <button
+            type="button"
+            disabled
+            className={cn(pillClass, "cursor-not-allowed opacity-45")}
+            aria-disabled
+          >
+            <span className={iconSlotClass}>{icon}</span>
+            <span className={pillLabelClass}>{label}</span>
+          </button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="right">Coming soon</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function PillLink({ href, external, icon, label, title, iconClassName, wide = false }) {
   const surfaceClass = wide ? templatesPillClass : pillClass;
   const labelClass = wide ? templatesPillLabelClass : pillLabelClass;
@@ -195,8 +223,14 @@ function SectionTitle({ children }) {
   );
 }
 
-export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
+export default function ConnectDataStep1({
+  user,
+  userProfileFetchOk = false,
+  onActivateWorkspace,
+  embeddedInShell = false,
+}) {
   const context = useMyStateV2();
+  const requestConnectWorkspace = context?.requestConnectWorkspace;
   const setViewing = context?.setViewing;
   const setIntegrationSidebar = context?.setIntegrationSidebar;
   const setConnectedData = context?.setConnectedData;
@@ -234,41 +268,42 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
   const [isCheckingHandle, setIsCheckingHandle] = useState(false);
   const [loadProjectBusy, setLoadProjectBusy] = useState(false);
 
+  const openConnectIntegration = useCallback(
+    (integrationId) => {
+      if (!API_INTEGRATIONS.includes(integrationId)) return;
+      setConnectedData?.([]);
+      setConnectedCols?.([]);
+      setIntegrationSidebar?.(integrationId);
+      setRightPanelTab?.("integrations");
+      setRightPanelOpen?.(true);
+      if (onActivateWorkspace) {
+        onActivateWorkspace(integrationId);
+      } else {
+        requestConnectWorkspace?.(integrationId);
+        setViewing?.("dataStart");
+      }
+    },
+    [
+      onActivateWorkspace,
+      requestConnectWorkspace,
+      setConnectedCols,
+      setConnectedData,
+      setIntegrationSidebar,
+      setRightPanelOpen,
+      setRightPanelTab,
+      setViewing,
+    ],
+  );
+
   const navigatePolymarketHistorical = useCallback(() => {
-    if (!API_INTEGRATIONS.includes("polymarketHistorical")) return;
-    setConnectedData?.([]);
-    setConnectedCols?.([]);
-    setViewing?.("dataStart");
-    setIntegrationSidebar?.("polymarketHistorical");
-    setRightPanelTab?.("integrations");
-    setRightPanelOpen?.(true);
-  }, [
-    setConnectedCols,
-    setConnectedData,
-    setIntegrationSidebar,
-    setRightPanelOpen,
-    setRightPanelTab,
-    setViewing,
-  ]);
+    openConnectIntegration("polymarketHistorical");
+  }, [openConnectIntegration]);
 
   const polymarketHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigatePolymarketHistorical);
 
   const navigateKalshiHistorical = useCallback(() => {
-    if (!API_INTEGRATIONS.includes("kalshiHistorical")) return;
-    setConnectedData?.([]);
-    setConnectedCols?.([]);
-    setViewing?.("dataStart");
-    setIntegrationSidebar?.("kalshiHistorical");
-    setRightPanelTab?.("integrations");
-    setRightPanelOpen?.(true);
-  }, [
-    setConnectedCols,
-    setConnectedData,
-    setIntegrationSidebar,
-    setRightPanelOpen,
-    setRightPanelTab,
-    setViewing,
-  ]);
+    openConnectIntegration("kalshiHistorical");
+  }, [openConnectIntegration]);
 
   const kalshiHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigateKalshiHistorical);
 
@@ -278,21 +313,9 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
         toast.info("This integration is not wired up yet.");
         return;
       }
-      setConnectedData?.([]);
-      setConnectedCols?.([]);
-      setViewing?.("dataStart");
-      setIntegrationSidebar?.(clickHandlerId);
-      setRightPanelTab?.("integrations");
-      setRightPanelOpen?.(true);
+      openConnectIntegration(clickHandlerId);
     },
-    [
-      setConnectedCols,
-      setConnectedData,
-      setIntegrationSidebar,
-      setRightPanelOpen,
-      setRightPanelTab,
-      setViewing,
-    ],
+    [openConnectIntegration],
   );
 
   const integrationByHandler = useMemo(() => {
@@ -474,10 +497,17 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
 
   const integrationsColClass = "flex flex-col gap-3";
 
+  const activate = onActivateWorkspace || requestConnectWorkspace;
+
   return (
+    <TooltipProvider delayDuration={200}>
     <div
       data-test="onboarding-container"
-      className="pt-16 min-h-0 flex-1 overflow-auto bg-gradient-to-b from-muted/20 via-background to-background"
+      className={cn(
+        embeddedInShell
+          ? "bg-transparent"
+          : "min-h-0 flex-1 overflow-auto bg-gradient-to-b from-muted/20 via-background to-background pt-16",
+      )}
     >
       <div className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 sm:px-10 sm:pb-24 sm:pt-16 md:px-16 md:pt-20 lg:px-24 xl:px-32 2xl:px-40">
         {showHandleSetup ? (
@@ -579,35 +609,21 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
                 icon={<ArrowUpFromLine className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
                 label="CSV / XLSX"
                 title="Upload a spreadsheet to start analyzing."
-                onClick={() => setViewing?.("upload")}
+                onClick={() => activate?.(CONNECT_WORKSPACE.UPLOAD)}
               />
-              <PillButton
+              <PillButtonSoon
                 icon={<FileImage className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
                 label="PDF & image"
-                title="Opens upload — richer parsers are on the way."
-                onClick={() => {
-                  setViewing?.("upload");
-                  toast.message("PDF and image parsing", {
-                    description: "Use upload for now; dedicated flows are coming soon.",
-                  });
-                }}
               />
-              <PillButton
+              <PillButtonSoon
                 icon={<Braces className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
                 label="JSON"
-                title="Opens upload for structured files."
-                onClick={() => {
-                  setViewing?.("upload");
-                  toast.message("JSON upload", {
-                    description: "Use CSV/XLSX today where possible; JSON workflows are expanding.",
-                  });
-                }}
               />
               <PillButton
                 icon={<FilePlus2 className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
                 label="Start from blank"
                 title="Empty sheet — build from scratch."
-                onClick={() => setViewing?.("newSheet")}
+                onClick={() => activate?.(CONNECT_WORKSPACE.BLANK)}
               />
             </div>
           </section>
@@ -695,5 +711,6 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 }
