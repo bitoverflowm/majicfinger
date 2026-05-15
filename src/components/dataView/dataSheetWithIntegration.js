@@ -709,12 +709,17 @@ export default function DataSheetWithIntegration({
     ? "max-md:w-auto max-md:min-w-0 max-md:max-w-none md:w-1/2 md:min-w-0 md:max-w-[50vw] 2xl:w-1/3 2xl:max-w-[33.333vw]"
     : drawerWidthCollapsed;
 
+  const connectHomeGridSurface =
+    "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";
+
   const layout = (
     <div className={cn(
       "flex min-h-0 w-full max-w-full flex-1 flex-col gap-4 overflow-x-hidden px-2 py-2 sm:gap-6 sm:px-4",
       // In demo embeds, treat this component as the "viewport" for the right panel.
       // The parent container should clip overflow; we still set relative here so `absolute` works.
       isDemo && "relative",
+      connectHomeMode && "bg-white dark:bg-slate-950",
+      connectHomeMode && connectHomeGridSurface,
     )}>
       <ReplaceOrNewSheetDialog
         open={replaceOrNewSheetOpen}
@@ -737,6 +742,7 @@ export default function DataSheetWithIntegration({
             "relative min-w-0 flex-1",
             chartMode ? "flex min-h-0 flex-col overflow-hidden" : "overflow-auto",
             dashboardMode && "scroll-pb-40",
+            connectHomeMode && "bg-white dark:bg-slate-950",
           )}
         >
           {!showSidebar && !isPanelClosing && (

@@ -66,7 +66,8 @@ const SideNav = () => {
     requestConnectWorkspace?.(workspaceId);
   };
 
-  const isExpanded = sidebarState === "expanded";
+  const isConnectHome = viewing === "connectDataHome";
+  const isExpanded = !isConnectHome && sidebarState === "expanded";
 
   const isDataActive = dataViewKeys.includes(viewing);
   const isChartActive = chartViewKeys.includes(viewing);
@@ -261,7 +262,7 @@ const SideNav = () => {
           </SidebarGroup>
         )}
       </SidebarContent>
-      <SidebarRail />
+      {!isConnectHome ? <SidebarRail /> : null}
     </Sidebar>
   );
 };

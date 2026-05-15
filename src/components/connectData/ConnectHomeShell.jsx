@@ -7,11 +7,14 @@ import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from "@/lib/connectH
 import { useConnectHomeScrollPanels } from "@/hooks/useConnectHomeScrollPanels";
 import { cn } from "@/lib/utils";
 
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import SideNav from "@/app/dashboard/components/sideNav";
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
 import ConnectDataStep1 from "@/components/connectData/ConnectDataStep1";
 import { ConnectHomeFileUpload } from "@/components/connectData/ConnectHomeFileUpload";
+
+/** Match Connect hub + nav header white; override AG Grid Balham grey canvas. */
+const CONNECT_HOME_SURFACE = "bg-white dark:bg-slate-950";
+const CONNECT_HOME_GRID_SURFACE =
+  "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-subheader-background-color:#ffffff]";
 
 export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, setStartNew }) {
   const context = useMyStateV2();
@@ -26,7 +29,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const hubRef = useRef(null);
   const workspaceRef = useRef(null);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [blankStartNew, setBlankStartNew] = useState(false);
 
   const workspaceActive = !!connectWorkspace;
@@ -38,6 +40,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     if (!connectWorkspace) return false;
     if (connectWorkspace === CONNECT_WORKSPACE.UPLOAD) return !!dataConnected;
     if (connectWorkspace === CONNECT_WORKSPACE.BLANK) return true;
+    if (connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER) return true;
     if (isConnectIntegrationWorkspace(connectWorkspace)) return true;
     return false;
   }, [connectWorkspace, dataConnected]);
@@ -60,10 +63,12 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
 
   useEffect(() => {
-    setSidebarOpen(panelsVisible);
     if (panelsVisible && workspaceActive) {
       setRightPanelOpen?.(true);
-      if (isConnectIntegrationWorkspace(connectWorkspace)) {
+      if (
+        connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER ||
+        isConnectIntegrationWorkspace(connectWorkspace)
+      ) {
         setRightPanelTab?.("integrations");
       } else if (showDataWorkspace) {
         setRightPanelTab?.("integrations");
@@ -100,13 +105,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [scrollToWorkspace]);
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} defaultOpen={false}>
-      <div className="flex min-h-0 min-w-0 flex-1">
-        <SideNav />
-        <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950">
           <div
             ref={scrollRef}
-            className="min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-muted/20 via-background to-background"
+            className={cn("min-h-0 flex-1 overflow-y-auto", CONNECT_HOME_SURFACE)}
           >
             <div ref={hubRef}>
               <ConnectDataStep1
@@ -121,7 +123,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
               <section
                 ref={workspaceRef}
                 id="connect-home-workspace"
-                className="relative min-h-[calc(100dvh-5.5rem)] scroll-mt-4 border-t border-border/40 bg-background"
+                className={cn(
+                  "relative min-h-[calc(100dvh-5.5rem)] scroll-mt-4",
+                  CONNECT_HOME_SURFACE,
+                )}
               >
                 {showUploadPanel ? (
                   <ConnectHomeFileUpload onParsed={handleUploadParsed} />
@@ -130,6 +135,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   <div
                     className={cn(
                       "relative flex min-h-[calc(100dvh-6rem)] flex-col",
+                      CONNECT_HOME_SURFACE,
+                      CONNECT_HOME_GRID_SURFACE,
                       showUploadPanel && "hidden",
                     )}
                   >
@@ -144,8 +151,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
               </section>
             ) : null}
           </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    </main>
   );
 }

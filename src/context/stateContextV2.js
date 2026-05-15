@@ -357,19 +357,37 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         setConnectWorkspace(null);
         return;
       }
-      if (id === CONNECT_WORKSPACE.BLANK || id === CONNECT_WORKSPACE.UPLOAD) {
+      if (
+        id === CONNECT_WORKSPACE.BLANK ||
+        id === CONNECT_WORKSPACE.UPLOAD ||
+        id === CONNECT_WORKSPACE.INTEGRATIONS_PICKER
+      ) {
         setDataSheets({ 'sheet-1': { name: 'Sheet 1', data: [], provenance: null } });
         setActiveSheetId('sheet-1');
         setDataConnected(false);
         setLoadedDataId(null);
         setLoadedDataMeta(null);
       }
+      if (id === CONNECT_WORKSPACE.INTEGRATIONS_PICKER) {
+        setIntegrationSidebar((prev) => prev ?? 'polymarket');
+        setRightPanelTab('integrations');
+        setRightPanelOpen(true);
+      }
       if (isConnectIntegrationWorkspace(id)) {
         setIntegrationSidebar(id);
       }
       setConnectWorkspace(id);
       setConnectWorkspaceScrollTick((t) => t + 1);
-    }, [setDataSheets, setActiveSheetId, setDataConnected, setLoadedDataId, setLoadedDataMeta, setIntegrationSidebar]);
+    }, [
+      setDataSheets,
+      setActiveSheetId,
+      setDataConnected,
+      setLoadedDataId,
+      setLoadedDataMeta,
+      setIntegrationSidebar,
+      setRightPanelTab,
+      setRightPanelOpen,
+    ]);
     const [connectedCols, setConnectedCols] = useState() //cols of fresh data
     const [tempData, setTempData] = useState() //holder state; whenver new data comes, tempData holds the previous state incase an action was a mistake
 

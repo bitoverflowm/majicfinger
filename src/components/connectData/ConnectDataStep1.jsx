@@ -22,7 +22,12 @@ import { ConnectProgressWithLabel } from "@/components/integrationsView/integrat
 import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
 import { loadFullProjectFromApi } from "@/lib/hydrateProjectWorkspace";
 import { CONNECT_HOME_GUIDES } from "@/lib/guidesConnectHomeManifest";
-import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
+import {
+  CONNECT_WORKSPACE,
+  isConnectHubIntegrationAvailable,
+} from "@/lib/connectHomeWorkspace";
+import { deriveConnectFlowStep } from "@/lib/connectHomeFlow";
+import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSteps";
 import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
 import { cn } from "@/lib/utils";
@@ -155,7 +160,7 @@ function PillButton({ icon, label, title, onClick, disabled, iconClassName, clas
   );
 }
 
-function PillButtonSoon({ icon, label }) {
+function PillButtonSoon({ icon, label, className, iconClassName }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -163,10 +168,10 @@ function PillButtonSoon({ icon, label }) {
           <button
             type="button"
             disabled
-            className={cn(pillClass, "cursor-not-allowed opacity-45")}
+            className={cn(pillClass, className, "cursor-not-allowed opacity-45")}
             aria-disabled
           >
-            <span className={iconSlotClass}>{icon}</span>
+            <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
             <span className={pillLabelClass}>{label}</span>
           </button>
         </span>
@@ -231,6 +236,11 @@ export default function ConnectDataStep1({
 }) {
   const context = useMyStateV2();
   const requestConnectWorkspace = context?.requestConnectWorkspace;
+  const viewing = context?.viewing;
+  const dataConnected = context?.dataConnected;
+  const connectedData = context?.connectedData;
+  const dataSheets = context?.dataSheets;
+  const rightPanelTab = context?.rightPanelTab;
   const setViewing = context?.setViewing;
   const setIntegrationSidebar = context?.setIntegrationSidebar;
   const setConnectedData = context?.setConnectedData;
@@ -484,10 +494,7 @@ export default function ConnectDataStep1({
       row.warmConnect.start();
       return;
     }
-    if (!row.live) {
-      toast.info("Coming soon");
-      return;
-    }
+    if (!isConnectHubIntegrationAvailable(row)) return;
     if (row.clickHandler) {
       openIntegrationPlayground(row.clickHandler);
     }
@@ -495,9 +502,39 @@ export default function ConnectDataStep1({
 
   const columnGridClass = "grid grid-cols-1 gap-y-1 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-8";
 
+  const connectHubPageClass = cn(
+    "mx-auto w-full max-w-7xl pb-20 pt-12 sm:pb-24 sm:pt-16 md:pt-20",
+    embeddedInShell
+      ? "pl-4 pr-6 sm:pl-5 sm:pr-8 md:pl-6 md:pr-12 lg:pl-8 lg:pr-16 xl:pl-10 xl:pr-20 2xl:pl-12 2xl:pr-28"
+      : "px-6 sm:px-10 md:px-16 lg:px-24 xl:px-32 2xl:px-40",
+  );
+
+  const connectHubLayoutClass = cn(
+    "grid w-full grid-cols-1",
+    "md:grid-cols-[8.5rem_minmax(0,1fr)] md:gap-x-6",
+    "lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
+    "xl:grid-cols-[11rem_minmax(0,1fr)] xl:gap-x-10",
+  );
+
+  const connectHubMainClass = cn(
+    "min-w-0 md:col-start-2 md:mx-auto md:w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl",
+  );
+
   const integrationsColClass = "flex flex-col gap-3";
 
   const activate = onActivateWorkspace || requestConnectWorkspace;
+
+  const connectFlowStep = useMemo(
+    () =>
+      deriveConnectFlowStep({
+        viewing,
+        dataConnected,
+        connectedData,
+        dataSheets,
+        rightPanelTab,
+      }),
+    [viewing, dataConnected, connectedData, dataSheets, rightPanelTab],
+  );
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -509,7 +546,7 @@ export default function ConnectDataStep1({
           : "min-h-0 flex-1 overflow-auto bg-gradient-to-b from-muted/20 via-background to-background pt-16",
       )}
     >
-      <div className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 sm:px-10 sm:pb-24 sm:pt-16 md:px-16 md:pt-20 lg:px-24 xl:px-32 2xl:px-40">
+      <div className={connectHubPageClass}>
         {showHandleSetup ? (
           <Card className="mb-14 w-full max-w-2xl rounded-2xl border-border/60 bg-card/95 p-6 shadow-sm sm:mb-16 sm:p-8 md:mb-20">
             <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
@@ -572,36 +609,49 @@ export default function ConnectDataStep1({
           </Card>
         ) : null}
 
-        {showLatestWork ? (
-          <section className="mb-8 w-full sm:mb-10 md:mb-12">
-            <SectionTitle>Your latest work</SectionTitle>
-            <div className="flex flex-wrap gap-3">
-              {latestWorkLoading
-                ? Array.from({ length: 3 }, (_, i) => <LatestWorkSkeleton key={i} />)
-                : latestWork.map((ds) => {
-                    const when = formatLatestWorkWhen(ds?.last_saved_date || ds?.created_date);
-                    return (
-                      <LatestWorkPill
-                        key={String(ds._id)}
-                        when={when}
-                        label={ds.data_set_name || "Untitled project"}
-                        title={`Last edited ${when}`}
-                        onClick={() => onOpenProject(ds._id)}
-                        disabled={loadProjectBusy}
-                      />
-                    );
-                  })}
-            </div>
-          </section>
-        ) : null}
+        <div className={connectHubLayoutClass}>
+          {showLatestWork ? (
+            <section className={cn("mb-8 w-full sm:mb-10", connectHubMainClass)}>
+              <SectionTitle>Your latest work</SectionTitle>
+              <div className="flex flex-wrap gap-3">
+                  {latestWorkLoading
+                    ? Array.from({ length: 3 }, (_, i) => <LatestWorkSkeleton key={i} />)
+                    : latestWork.map((ds) => {
+                        const when = formatLatestWorkWhen(ds?.last_saved_date || ds?.created_date);
+                        return (
+                          <LatestWorkPill
+                            key={String(ds._id)}
+                            when={when}
+                            label={ds.data_set_name || "Untitled project"}
+                            title={`Last edited ${when}`}
+                            onClick={() => onOpenProject(ds._id)}
+                            disabled={loadProjectBusy}
+                          />
+                        );
+                      })}
+                </div>
+              </section>
+          ) : null}
 
-        <div className="w-full">
-          <h1 className="text-balance text-left text-xl font-semibold tracking-tight text-foreground">
-            Hi, what do you want to discover?
-          </h1>
-        </div>
+          <ConnectHomeFlowSteps
+            currentStep={connectFlowStep}
+            className={cn(
+              "hidden shrink-0 self-start md:-ml-0.5 md:block",
+              showLatestWork ? "md:row-start-2" : "md:row-start-1",
+            )}
+          />
 
-        <div className={cn("mt-12 w-full sm:mt-14 md:mt-16", columnGridClass)}>
+          <div
+            className={cn(
+              connectHubMainClass,
+              showLatestWork ? "md:row-start-2" : "md:row-start-1",
+            )}
+          >
+            <h1 className="text-balance text-left text-xl font-semibold tracking-tight text-foreground">
+              Hi, what do you want to discover?
+            </h1>
+
+            <div className={cn("mt-12 w-full sm:mt-14 md:mt-16", columnGridClass)}>
           <section className="min-w-0">
             <SectionTitle>Import</SectionTitle>
             <div className="flex flex-col gap-3">
@@ -647,7 +697,7 @@ export default function ConnectDataStep1({
                         Try again
                       </Button>
                     </div>
-                  ) : (
+                  ) : isConnectHubIntegrationAvailable(row) ? (
                     <PillButton
                       className={integrationsPillClass}
                       icon={<IntegrationIconWrap>{row.icon}</IntegrationIconWrap>}
@@ -656,9 +706,26 @@ export default function ConnectDataStep1({
                       onClick={() => onIntegrationRowClick(row)}
                       iconClassName={connectIntegrationIconClass(row.key)}
                     />
+                  ) : (
+                    <PillButtonSoon
+                      className={integrationsPillClass}
+                      icon={<IntegrationIconWrap>{row.icon}</IntegrationIconWrap>}
+                      label={row.name}
+                      iconClassName={connectIntegrationIconClass(row.key)}
+                    />
                   )}
                 </div>
               ))}
+              <button
+                type="button"
+                onClick={() => activate?.(CONNECT_WORKSPACE.INTEGRATIONS_PICKER)}
+                className={cn(
+                  integrationsPillClass,
+                  "justify-center border-dashed text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground",
+                )}
+              >
+                + more
+              </button>
             </div>
           </section>
 
@@ -708,6 +775,8 @@ export default function ConnectDataStep1({
               </div>
             </div>
           </section>
+            </div>
+          </div>
         </div>
       </div>
     </div>
