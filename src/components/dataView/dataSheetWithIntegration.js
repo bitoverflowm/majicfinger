@@ -143,6 +143,11 @@ export default function DataSheetWithIntegration({
   const connectWorkspace = contextStateV2?.connectWorkspace;
   const showConnectIntegrationIntro =
     connectHomeMode && isConnectIntegrationWorkspace(connectWorkspace);
+  /** Mount pull handler when Connect home drawer is closed (same DataLakeParquetPanel + handleLoad). */
+  const connectHomeKalshiPullBridge =
+    connectHomeMode &&
+    connectWorkspace === "kalshiHistorical" &&
+    integrationSidebar === "kalshiHistorical";
   const connectedData = contextStateV2?.connectedData ?? [];
   const setConnectedDataRaw = contextStateV2?.setConnectedData;
   const dataSheets = contextStateV2?.dataSheets || {};
@@ -846,7 +851,17 @@ export default function DataSheetWithIntegration({
               <ChartCanvas />
             </div>
           ) : showConnectIntegrationIntro ? (
-            <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
+            <>
+              <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
+              {connectHomeKalshiPullBridge && !isPanelVisible ? (
+                <div
+                  className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
+                  aria-hidden
+                >
+                  <KalshiHistorical setConnectedData={setConnectedDataRaw} />
+                </div>
+              ) : null}
+            </>
           ) : (
             <>
               <DataView user={user} startNew={startNew} setStartNew={setStartNew} />

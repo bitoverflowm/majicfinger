@@ -23,6 +23,7 @@ import {
 import { ATHENA_KALSHI_SAMPLE_OPTIONS, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
+import { useSyncConnectKalshiComposeItems } from "@/hooks/useSyncConnectKalshiComposeItems";
 import {
   composeSourceColumnLabel,
   genComposeJoinId,
@@ -45,6 +46,7 @@ export function ConnectComposeOperationPanel({ className }) {
     connectActiveComposeOps = [],
     setConnectActiveComposeOps,
     connectDataLakeSampleId,
+    connectKalshiColumnSelections,
     setRightPanelOpen,
     setRightPanelTab,
     requestConnectDataLakePull,
@@ -82,9 +84,23 @@ export function ConnectComposeOperationPanel({ className }) {
   );
   const kindForColumn = useCallback((col) => kindForLakeColumn(col, typesByName), [typesByName]);
 
+  useSyncConnectKalshiComposeItems({
+    connectDataLakeSampleId,
+    connectKalshiColumnSelections,
+    setColumnComposeItems,
+    typesByName,
+  });
+
+  const pullColumns = useMemo(
+    () => columnComposeItems.map((i) => i.column).filter(Boolean),
+    [columnComposeItems],
+  );
+
+  const columnsForCompose = pullColumns.length > 0 ? pullColumns : availableColumns;
+
   const numericColumns = useMemo(
-    () => availableColumns.filter((c) => kindForColumn(c) === "number"),
-    [availableColumns, kindForColumn],
+    () => columnsForCompose.filter((c) => kindForColumn(c) === "number"),
+    [columnsForCompose, kindForColumn],
   );
 
   const glueJoinTableOptions = useMemo(() => glueTableNamesForDataset("kalshi"), []);
@@ -151,7 +167,7 @@ export function ConnectComposeOperationPanel({ className }) {
   );
 
   const addJoinRule = useCallback(() => {
-    const baseLeft = availableColumns[0] || "";
+    const baseLeft = columnsForCompose[0] || "";
     const defaultTargetTable = table === "markets" ? "trades" : "markets";
     setComposeJoins?.((prev) => [
       ...(prev || []),
@@ -161,11 +177,12 @@ export function ConnectComposeOperationPanel({ className }) {
         targetTable: defaultTargetTable,
         targetSheetId: "",
         joinType: "inner",
+        mergeStrategy: "server",
         leftColumn: baseLeft,
         rightColumn: "",
       },
     ]);
-  }, [availableColumns, table, setComposeJoins]);
+  }, [columnsForCompose, table, setComposeJoins]);
 
   const addSortClause = useCallback(() => {
     const first = composeSelectAliasChoices[0];
@@ -232,7 +249,7 @@ export function ConnectComposeOperationPanel({ className }) {
                     <SelectValue placeholder="Column" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableColumns.map((c) => (
+                    {columnsForCompose.map((c) => (
                       <SelectItem key={c} value={c} className="text-[13px]">
                         {composeSourceColumnLabel(c)}
                       </SelectItem>
@@ -294,7 +311,7 @@ export function ConnectComposeOperationPanel({ className }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 max-h-[280px] overflow-y-auto">
-                {availableColumns.map((col) => (
+                {columnsForCompose.map((col) => (
                   <DropdownMenuItem key={col} onSelect={() => addWhereFilter(col, "eq")}>
                     {composeSourceColumnLabel(col)}
                   </DropdownMenuItem>
@@ -363,7 +380,7 @@ export function ConnectComposeOperationPanel({ className }) {
                       <SelectValue placeholder="Left col" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableColumns.map((c) => (
+                      {columnsForCompose.map((c) => (
                         <SelectItem key={c} value={c} className="text-xs">
                           {composeSourceColumnLabel(c)}
                         </SelectItem>
@@ -538,7 +555,7 @@ export function ConnectComposeOperationPanel({ className }) {
             onRemoveItem={(id) =>
               setColumnComposeItems?.((prev) => (prev || []).filter((row) => row.id !== id))
             }
-            availableColumns={availableColumns}
+            availableColumns={columnsForCompose}
             numericColumns={numericColumns}
             kindForColumn={kindForColumn}
           />

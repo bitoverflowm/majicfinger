@@ -86,6 +86,7 @@ import {
 import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
+import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
 import { rollupKalshiPrefixRowsByTaxonomyGroup } from "@/lib/kalshi/kalshiCategoryTaxonomy";
 import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
@@ -1118,48 +1119,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [columnComposeItems]);
 
   const buildServerComposePayload = useCallback(() => {
-    const payload = {
-      select: columnComposeItems.map((i) => ({
-        column: i.column,
-        alias: String(i.alias || i.column).trim(),
-        aggregate: i.aggregate || null,
-        dateBucket: i.dateBucket || null,
-        dateFormat: i.dateFormat || null,
-        numberScale: i.numberScale || "none",
-        decimals: i.decimals != null ? Number(i.decimals) : null,
-        treatAsDate: i.treatAsDate === true,
-        ...((i.aggregate === "sum" || i.aggregate == null) && i.sumCase && i.sumCase.enabled ? { sumCase: i.sumCase } : {}),
-        ...(i.aggregate === "sum" && i.equation && i.equation.enabled ? { equation: i.equation } : {}),
-      })),
-      // Server normalizes too: with Sum/Count, GROUP BY is every non-aggregate field (e.g. quarter) so many trades in Q1 2024 become one row.
-      groupByAliases: hasComposeAggregates ? composeDimensionAliases : [],
-      orderBy: columnComposeOrderBy,
-    };
-
-    if (composeHavingFilters.length > 0) {
-      payload.having = {
-        and: composeHavingFilters.map((f) => ({
-          alias: f.havingAlias,
-          op: f.op,
-          value: Number(f.value),
-        })),
-      };
-    }
-
-    if (dataset === "kalshi" && selected?.table === "trades" && KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
-      payload.join = { preset: kalshiTradesJoinPreset };
-    }
-
-    const tableJoins = (composeJoins || [])
-      .filter((j) => j && j.targetKind === "table")
-      .map((j) => ({
-        joinType: j.joinType || "inner",
-        table: String(j.targetTable || "").trim().toLowerCase(),
-        on: { leftColumn: String(j.leftColumn || "").trim(), rightColumn: String(j.rightColumn || "").trim() },
-      }))
-      .filter((j) => j.table && j.on.leftColumn && j.on.rightColumn);
-    if (tableJoins.length) payload.joins = tableJoins;
-    return payload;
+    return buildDataLakeServerComposePayload({
+      columnComposeItems,
+      columnComposeOrderBy,
+      composeHavingFilters,
+      composeJoins,
+      hasComposeAggregates,
+      composeDimensionAliases,
+      dataset,
+      selectedTable: selected?.table,
+      kalshiTradesJoinPreset,
+      kalshiTradesJoinPresets: KALSHI_TRADES_JOIN_PRESETS,
+    });
   }, [
     columnComposeItems,
     columnComposeOrderBy,
@@ -1267,7 +1238,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   // When the table changes, reset meta editor and start with an empty column list (user adds fields explicitly).
   useEffect(() => {
     if (!selected?.table) return;
-    setColumnComposeItems([]);
+    if (!connectHomeKalshiSourcePicker) {
+      setColumnComposeItems([]);
+    }
     setColumnComposeOrderBy([]);
     setComposeLimitRuleOpen(false);
     setComposeLimitRuleValue("");
@@ -1285,7 +1258,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setMetaOperationsMenuOpen(false);
     setKalshiTaxonomyRollup(false);
     setKalshiTradesJoinPreset("");
-  }, [selected?.table]);
+  }, [selected?.table, connectHomeKalshiSourcePicker]);
 
   useEffect(() => {
     if (KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
@@ -2691,8 +2664,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   useEffect(() => {
     if (!connectHomeKalshiSourcePicker || !connectDataLakePullTick) return;
-    handleLoadRef.current();
-  }, [connectHomeKalshiSourcePicker, connectDataLakePullTick]);
+    const runPull = () => handleLoadRef.current();
+    if (selectionTab !== "columns" && selectionTab !== "recipes") {
+      setSelectionTab("columns");
+      requestAnimationFrame(() => requestAnimationFrame(runPull));
+      return;
+    }
+    runPull();
+  }, [connectHomeKalshiSourcePicker, connectDataLakePullTick, selectionTab]);
 
   const activeSheetRequestCards = useMemo(() => {
     if (!activeSheetId) return [];
