@@ -5,12 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
-  ArrowRight,
   ArrowUpFromLine,
   Braces,
   Clock,
   ExternalLink,
   FileImage,
+  FilePlus2,
   LayoutTemplate,
   Loader2,
   Newspaper,
@@ -56,11 +56,30 @@ const PREDICTION_TEMPLATES = [
   { id: "t3", title: "Template 3" },
 ];
 
+/** Solid icon-tile backgrounds on Connect home (match Kalshi / Chainlink pill style). */
+const CONNECT_INTEGRATION_ICON_BG = {
+  kalshiHistorical: "bg-[#28CC95]",
+  polymarket: "bg-[#2E5CFF]",
+  polymarketHistorical: "bg-[#2E5CFF]",
+  binance: "bg-black",
+  chainlink: "bg-[#375BD2]",
+  coinGecko: "bg-black",
+  geckoDex: "bg-black",
+  newsApi: "bg-zinc-800",
+  productHunt: "bg-[#DA552F]",
+};
+
+function connectIntegrationIconClass(key) {
+  const bg = CONNECT_INTEGRATION_ICON_BG[key];
+  if (!bg) return undefined;
+  return cn(bg, "text-white [&_svg]:text-white");
+}
+
 /** Lucide stroke — lighter, wireframe-like. */
 const iconStroke = 1.75;
 
 const iconSlotClass =
-  "flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted/70 text-muted-foreground [&_svg]:shrink-0";
+  "flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/70 text-muted-foreground [&_svg]:shrink-0";
 
 const pillClass = cn(
   "flex w-full min-h-[2.625rem] items-center gap-1 rounded-md border border-border/40 bg-card px-1 py-0.5 text-left",
@@ -74,25 +93,25 @@ const pillLabelClass = "min-w-0 flex-1 truncate";
 
 function IntegrationIconWrap({ children }) {
   return (
-    <span className="flex h-full w-full items-center justify-center overflow-hidden [&_.integration-logo-avatar]:!h-7 [&_.integration-logo-avatar]:!w-7 [&_.integration-logo-avatar]:shadow-none">
+    <span className="flex h-full w-full items-center justify-center overflow-hidden [&_.integration-logo-avatar]:!h-7 [&_.integration-logo-avatar]:!w-7 [&_.integration-logo-avatar]:!rounded-md [&_.integration-logo-avatar]:!bg-transparent [&_.integration-logo-avatar]:shadow-none">
       {children}
     </span>
   );
 }
 
-function PillButton({ icon, label, title, onClick, disabled }) {
+function PillButton({ icon, label, title, onClick, disabled, iconClassName }) {
   return (
     <button type="button" disabled={disabled} onClick={onClick} title={title || label} className={pillClass}>
-      <span className={iconSlotClass}>{icon}</span>
+      <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
       <span className={pillLabelClass}>{label}</span>
     </button>
   );
 }
 
-function PillLink({ href, external, icon, label, title }) {
+function PillLink({ href, external, icon, label, title, iconClassName }) {
   const body = (
     <>
-      <span className={iconSlotClass}>{icon}</span>
+      <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
       <span className={pillLabelClass}>{label}</span>
       {external ? (
         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={iconStroke} aria-hidden />
@@ -398,7 +417,8 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
       : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 xl:gap-x-8",
   );
 
-  const scrollColClass =
+  const integrationsColClass = "flex flex-col gap-3";
+  const guidesScrollColClass =
     "flex max-h-[min(52vh,26rem)] flex-col gap-3 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground)/0.35)_transparent]";
 
   return (
@@ -507,12 +527,18 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
                   });
                 }}
               />
+              <PillButton
+                icon={<FilePlus2 className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
+                label="Start from blank"
+                title="Empty sheet — build from scratch."
+                onClick={() => setViewing?.("newSheet")}
+              />
             </div>
           </section>
 
           <section className="min-w-0">
             <SectionTitle>Integrations</SectionTitle>
-            <div className={scrollColClass}>
+            <div className={integrationsColClass}>
               {connectIntegrationRows.map((row) => (
                 <div key={row.key}>
                   {row.warmConnect?.busy ? (
@@ -531,16 +557,11 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
                     </div>
                   ) : (
                     <PillButton
-                      icon={
-                        row.key === "newsApi" ? (
-                          row.icon
-                        ) : (
-                          <IntegrationIconWrap>{row.icon}</IntegrationIconWrap>
-                        )
-                      }
+                      icon={<IntegrationIconWrap>{row.icon}</IntegrationIconWrap>}
                       label={row.name}
                       title={row.description}
                       onClick={() => onIntegrationRowClick(row)}
+                      iconClassName={connectIntegrationIconClass(row.key)}
                     />
                   )}
                 </div>
@@ -565,8 +586,8 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
 
           <section className="min-w-0">
             <SectionTitle>Guides</SectionTitle>
-            <div className={scrollColClass}>
-              {CONNECT_HOME_GUIDES.map((g) => (
+            <div className={guidesScrollColClass}>
+              {CONNECT_HOME_GUIDES.slice(0, 5).map((g) => (
                 <PillLink
                   key={g.slug}
                   href={`/guides/${g.slug}`}
@@ -613,17 +634,6 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
               </div>
             </section>
           ) : null}
-        </div>
-
-        <div className="mt-12 flex w-full justify-start sm:mt-14 md:mt-16">
-          <button
-            type="button"
-            onClick={() => setViewing?.("newSheet")}
-            className="group inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <span>Start from blank</span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" strokeWidth={iconStroke} aria-hidden />
-          </button>
         </div>
       </div>
     </div>
