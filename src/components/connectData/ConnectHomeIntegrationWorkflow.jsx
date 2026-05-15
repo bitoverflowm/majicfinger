@@ -13,6 +13,7 @@ import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectCo
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { getKalshiColumnDisplayLabel, getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
+import { connectWorkspaceScrollInsetClass } from "@/lib/connectHubLayout";
 import { cn } from "@/lib/utils";
 
 const KALSHI_SAMPLE_BY_ID = Object.fromEntries(ATHENA_KALSHI_SAMPLE_OPTIONS.map((s) => [s.id, s]));
@@ -367,10 +368,11 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     <div
       className={cn(
         "flex flex-col px-4 sm:px-6 md:px-10 lg:px-14",
+        connectWorkspaceScrollInsetClass,
         showKalshiSourceCards
           ? hasColumnPicker
             ? "min-h-0 justify-start py-4 sm:py-5"
-            : "min-h-0 justify-start py-10 sm:py-12"
+            : "min-h-0 justify-start pb-10 pt-16 sm:pb-12 sm:pt-20 md:pt-24"
           : "min-h-[min(28rem,55vh)] justify-center py-10 sm:py-12",
         className,
       )}

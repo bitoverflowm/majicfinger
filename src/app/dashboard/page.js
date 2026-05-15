@@ -46,7 +46,7 @@ const Dashbaord = () => {
                 <StateProviderV2>
                     <LiveStreamManager />
                     <Toaster />
-                    <main>
+                    <main className="flex min-h-svh flex-col">
                         <DashBody user={user}/>
                     </main>
                 </StateProviderV2>

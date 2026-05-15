@@ -33,6 +33,17 @@ export function connectHubLayoutClass({ includeStepRail = true, fixedRail = fals
 export const connectHubMainClass =
   "min-w-0 md:col-start-2 md:mx-auto md:w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl";
 
+/** Extra inset when the Connect workspace scrolls into view (programmatic + anchor scroll). */
+export const connectWorkspaceScrollInsetClass =
+  "scroll-mt-20 sm:scroll-mt-24 md:scroll-mt-32";
+
+/** Applied on the Connect home scroll container for consistent snap padding. */
+export const connectHubScrollPaddingClass =
+  "scroll-pt-20 sm:scroll-pt-24 md:scroll-pt-32";
+
+/** Pixels to leave above #connect-home-workspace when requestConnectWorkspace scrolls. */
+export const CONNECT_WORKSPACE_SCROLL_OFFSET_PX = 96;
+
 /**
  * Top offset for fixed step rail — must match sticky nav (4.5rem) + dashBody py-1 + connectHubPageClass pt-*.
  * @see connectHubPageClass embedded padding (pt-12 / sm:pt-16 / md:pt-20)

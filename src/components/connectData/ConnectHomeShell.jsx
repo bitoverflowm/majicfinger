@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
@@ -9,7 +9,10 @@ import {
   connectHubFlowStepsClass,
   connectHubLayoutClass,
   connectHubPageClass,
+  connectHubScrollPaddingClass,
+  connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
+import { scheduleConnectWorkspaceScroll } from "@/lib/connectHubScroll";
 import { useConnectHomeScrollPanels } from "@/hooks/useConnectHomeScrollPanels";
 import { cn } from "@/lib/utils";
 
@@ -74,12 +77,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   });
 
   const scrollToWorkspace = useCallback(() => {
-    requestAnimationFrame(() => {
-      workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    scheduleConnectWorkspaceScroll(workspaceRef, scrollRef);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!connectWorkspace || !connectWorkspaceScrollTick) return;
     scrollToWorkspace();
   }, [connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
@@ -120,6 +121,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const handleActivateWorkspace = useCallback(
     (id) => {
       context?.requestConnectWorkspace?.(id);
+      scheduleConnectWorkspaceScroll(workspaceRef, scrollRef);
     },
     [context],
   );
@@ -132,7 +134,11 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950">
       <div
         ref={scrollRef}
-        className={cn("min-h-0 flex-1 overflow-y-auto", CONNECT_HOME_SURFACE)}
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto",
+          connectHubScrollPaddingClass,
+          CONNECT_HOME_SURFACE,
+        )}
       >
         <div className={connectHubPageClass(true)}>
           <ConnectHomeFlowSteps currentStep={connectFlowStep} className={connectHubFlowStepsClass} />
@@ -153,7 +159,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   ref={workspaceRef}
                   id="connect-home-workspace"
                   className={cn(
-                    "relative mt-16 min-h-[calc(100dvh-5.5rem)] scroll-mt-4 sm:mt-20 md:mt-28",
+                    "relative mt-16 min-h-[calc(100dvh-5.5rem)] sm:mt-20 md:mt-28",
+                    connectWorkspaceScrollInsetClass,
                     CONNECT_HOME_SURFACE,
                   )}
                 >

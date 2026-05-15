@@ -452,8 +452,10 @@ const DashBody = ({ user }) => {
     return isDemo ? (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
     ) : viewing === "connectDataHome" ? (
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className={cn(isLocked && "pointer-events-none select-none")}>{content}</div>
+      <div className="relative flex min-h-svh min-w-0 flex-col">
+        <div className={cn("flex min-h-0 flex-1 flex-col", isLocked && "pointer-events-none select-none")}>
+          {content}
+        </div>
         {paywallOverlay}
       </div>
     ) : (
