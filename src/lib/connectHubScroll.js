@@ -37,3 +37,18 @@ export function scheduleConnectWorkspaceScroll(workspaceElRef, scrollRootElRef) 
   window.setTimeout(() => run(), 80);
   window.setTimeout(() => run(), 200);
 }
+
+/** Scroll to Step 2 analyze section (#connect-home-analyze). */
+export function scheduleConnectAnalyzeScroll(analyzeElRef, scrollRootElRef) {
+  const run = (attempt = 0) => {
+    const el = analyzeElRef?.current;
+    if (!el) {
+      if (attempt < 24) requestAnimationFrame(() => run(attempt + 1));
+      return;
+    }
+    scrollConnectWorkspaceIntoView(el, scrollRootElRef?.current ?? null);
+  };
+  requestAnimationFrame(() => run());
+  window.setTimeout(() => run(), 80);
+  window.setTimeout(() => run(), 200);
+}

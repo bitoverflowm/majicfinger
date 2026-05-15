@@ -518,11 +518,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const setConnectDataLakeSampleId = ctx?.setConnectDataLakeSampleId;
   const connectKalshiColumnSelections = ctx?.connectKalshiColumnSelections ?? {};
   const connectDataLakePullTick = ctx?.connectDataLakePullTick ?? 0;
+  const setConnectDataLakePullState = ctx?.setConnectDataLakePullState;
+  const requestConnectAnalyzeScroll = ctx?.requestConnectAnalyzeScroll;
+  const connectHomeAnalyzeActive = !!ctx?.connectHomeAnalyzeActive;
   const athenaPingBySampleId = ctx?.athenaPingBySampleId ?? {};
   const pingAthenaLakeSample = ctx?.pingAthenaLakeSample;
   /** Connect home + Kalshi: sync sample/columns from main workspace; panel UI stays full-featured. */
   const connectHomeKalshiSourcePicker =
     viewing === "connectDataHome" && connectWorkspace === "kalshiHistorical" && dataset === "kalshi";
+
+  const syncConnectPullState = useCallback(
+    (patch) => {
+      if (!connectHomeKalshiSourcePicker || !setConnectDataLakePullState) return;
+      setConnectDataLakePullState((prev) => ({ ...prev, ...patch }));
+    },
+    [connectHomeKalshiSourcePicker, setConnectDataLakePullState],
+  );
   const {
     columnComposeItems,
     setColumnComposeItems,
@@ -1235,12 +1246,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     columnComposeOrderBy,
   ]);
 
-  // When the table changes, reset meta editor and start with an empty column list (user adds fields explicitly).
+  // When the table changes, reset meta editor (panel-only). Connect home keeps refine state + checkbox sync.
   useEffect(() => {
     if (!selected?.table) return;
-    if (!connectHomeKalshiSourcePicker) {
-      setColumnComposeItems([]);
-    }
+    if (connectHomeKalshiSourcePicker) return;
+    setColumnComposeItems([]);
     setColumnComposeOrderBy([]);
     setComposeLimitRuleOpen(false);
     setComposeLimitRuleValue("");
@@ -1447,8 +1457,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     ) => {
       return runParquetSheetLoadWithProgress({
         signal,
-        onLabel: setLoadLabel,
-        onProgress: setLoadProgress,
+        onLabel: (label) => {
+          setLoadLabel(label);
+          syncConnectPullState({ label });
+        },
+        onProgress: (progress) => {
+          setLoadProgress(progress);
+          syncConnectPullState({ progress });
+        },
         loadFn: async () => {
           const safeComposeFilters = isDemo ? null : composeFilters;
           if (mode === "meta") {
@@ -1641,7 +1657,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         },
       });
     },
-    [dataset, metaOperationColumn, metaOperationKind, isDemo, athenaRowLimit],
+    [dataset, metaOperationColumn, metaOperationKind, isDemo, athenaRowLimit, syncConnectPullState],
   );
 
   const executeIngestReplace = useCallback(async () => {
@@ -1676,7 +1692,13 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
-    scrollToLoadProgress();
+    syncConnectPullState({
+      loading: true,
+      error: null,
+      label: PARQUET_LOAD_PHASE_MESSAGES[0].text,
+      progress: 5,
+    });
+    if (!connectHomeKalshiSourcePicker) scrollToLoadProgress();
     try {
       const { rows, rowCount } = await runIngestWithProgress(
         lk,
@@ -1693,6 +1715,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         pendingComposeLimit ?? null,
         signal,
       );
+      syncConnectPullState({ error: null });
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         applyRowsToActiveSheet(finalRows, sheetProvenance);
         if (mode === "columns" && requestCard && activeSheetId && setDataSheets) {
@@ -1720,17 +1743,28 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     } catch (e) {
       if (e?.name === "AbortError") {
         setError(null);
+        syncConnectPullState({ loading: false, error: null, progress: 0 });
         toast("Request cancelled");
         return;
       }
       const msg = e?.message || String(e);
       setError(msg);
+      syncConnectPullState({ loading: false, error: msg, progress: 0 });
     } finally {
       ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
+      syncConnectPullState({ loading: false, progress: 0 });
     }
-  }, [applyRowsToActiveSheet, finalizeIngestSheetRows, refreshBeckerViews, runIngestWithProgress, scrollToLoadProgress]);
+  }, [
+    applyRowsToActiveSheet,
+    connectHomeKalshiSourcePicker,
+    finalizeIngestSheetRows,
+    refreshBeckerViews,
+    runIngestWithProgress,
+    scrollToLoadProgress,
+    syncConnectPullState,
+  ]);
 
   const executeIngestAppend = useCallback(async () => {
     const pending = pendingIngestRef.current;
@@ -2568,7 +2602,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       return;
     }
 
-    if (promptReplaceOrNewSheetIfNeeded()) return;
+    if (!connectHomeKalshiSourcePicker && promptReplaceOrNewSheetIfNeeded()) return;
 
     void executeIngestReplace();
   };
@@ -2664,6 +2698,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   useEffect(() => {
     if (!connectHomeKalshiSourcePicker || !connectDataLakePullTick) return;
+    requestConnectAnalyzeScroll?.();
     const runPull = () => handleLoadRef.current();
     if (selectionTab !== "columns" && selectionTab !== "recipes") {
       setSelectionTab("columns");
@@ -2671,7 +2706,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       return;
     }
     runPull();
-  }, [connectHomeKalshiSourcePicker, connectDataLakePullTick, selectionTab]);
+  }, [connectHomeKalshiSourcePicker, connectDataLakePullTick, selectionTab, requestConnectAnalyzeScroll]);
 
   const activeSheetRequestCards = useMemo(() => {
     if (!activeSheetId) return [];

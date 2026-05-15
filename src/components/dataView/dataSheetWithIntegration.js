@@ -47,6 +47,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ConnectHomeIntegrationWorkflow } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
+import { ConnectHomeAnalyzeSection } from "@/components/connectData/ConnectHomeAnalyzeSection";
+import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHomeKalshiSideSummary";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
@@ -148,9 +150,18 @@ export default function DataSheetWithIntegration({
     connectHomeMode &&
     connectWorkspace === "kalshiHistorical" &&
     integrationSidebar === "kalshiHistorical";
+  const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
+  const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
   const connectedData = contextStateV2?.connectedData ?? [];
   const setConnectedDataRaw = contextStateV2?.setConnectedData;
   const dataSheets = contextStateV2?.dataSheets || {};
+  const hasConnectSheetData = useMemo(() => {
+    const sheets = dataSheets && typeof dataSheets === "object" ? Object.values(dataSheets) : [];
+    return sheets.some((s) => Array.isArray(s?.data) && s.data.length > 0);
+  }, [dataSheets]);
+  const showConnectAnalyzeSection =
+    showConnectIntegrationIntro &&
+    (connectHomeAnalyzeActive || connectDataLakePullState.loading || hasConnectSheetData);
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
@@ -535,7 +546,11 @@ export default function DataSheetWithIntegration({
       case "polymarketHistorical":
         return <PolymarketHistorical setConnectedData={setConnectedDataRaw} />;
       case "kalshiHistorical":
-        return <KalshiHistorical setConnectedData={setConnectedDataRaw} />;
+        return connectHomeMode ? (
+          <ConnectHomeKalshiSideSummary />
+        ) : (
+          <KalshiHistorical setConnectedData={setConnectedDataRaw} />
+        );
       case "coinGecko":
         return (
           <CoinGecko
@@ -575,6 +590,13 @@ export default function DataSheetWithIntegration({
 
   const showSidebar = !!rightPanelOpen;
   const isPanelVisible = showSidebar || isPanelClosing;
+
+  useEffect(() => {
+    if (!connectHomeMode || !connectHomeAnalyzeActive) return;
+    setDrawerExpanded(false);
+    setRightPanelOpen?.(true);
+    setRightPanelTab?.("integrations");
+  }, [connectHomeMode, connectHomeAnalyzeActive, setRightPanelOpen, setRightPanelTab]);
 
   useLayoutEffect(() => {
     if (!dashboardMode) {
@@ -853,7 +875,14 @@ export default function DataSheetWithIntegration({
           ) : showConnectIntegrationIntro ? (
             <>
               <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
-              {connectHomeKalshiPullBridge && !isPanelVisible ? (
+              {showConnectAnalyzeSection ? (
+                <ConnectHomeAnalyzeSection
+                  user={user}
+                  startNew={startNew}
+                  setStartNew={setStartNew}
+                />
+              ) : null}
+              {connectHomeKalshiPullBridge ? (
                 <div
                   className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
                   aria-hidden

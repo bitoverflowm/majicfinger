@@ -219,11 +219,12 @@ export function ConnectComposeOperationPanel({ className }) {
     setConnectActiveComposeOps,
   ]);
 
+  const requestConnectAnalyzeScroll = useMyStateV2()?.requestConnectAnalyzeScroll;
+
   const handleRunPull = useCallback(() => {
-    setRightPanelOpen?.(true);
-    setRightPanelTab?.("integrations");
+    requestConnectAnalyzeScroll?.();
     requestConnectDataLakePull?.();
-  }, [setRightPanelOpen, setRightPanelTab, requestConnectDataLakePull]);
+  }, [requestConnectAnalyzeScroll, requestConnectDataLakePull]);
 
   const updateComposeItem = useCallback(
     (id, patch) => {

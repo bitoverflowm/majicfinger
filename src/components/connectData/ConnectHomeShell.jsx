@@ -30,6 +30,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const context = useMyStateV2();
   const connectWorkspace = context?.connectWorkspace;
   const connectWorkspaceScrollTick = context?.connectWorkspaceScrollTick ?? 0;
+  const connectHomeAnalyzeActive = !!context?.connectHomeAnalyzeActive;
+  const connectDataLakePullState = context?.connectDataLakePullState ?? {};
   const dataConnected = context?.dataConnected;
   const viewing = context?.viewing;
   const connectedData = context?.connectedData;
@@ -70,6 +72,14 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     [viewing, dataConnected, connectedData, dataSheets, rightPanelTab],
   );
 
+  const hasSheetData = useMemo(() => {
+    const sheets = dataSheets && typeof dataSheets === "object" ? Object.values(dataSheets) : [];
+    return sheets.some((s) => Array.isArray(s?.data) && s.data.length > 0);
+  }, [dataSheets]);
+
+  const analyzePhase =
+    connectHomeAnalyzeActive || !!connectDataLakePullState.loading || hasSheetData;
+
   const { panelsVisible } = useConnectHomeScrollPanels({
     scrollRef,
     hubRef,
@@ -86,8 +96,17 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
 
   useEffect(() => {
-    // Hub picker (no workspace) or hub still in view — hide integrations drawer.
-    if (!workspaceActive || !panelsVisible) {
+    if (!workspaceActive) {
+      setRightPanelOpen?.(false);
+      return;
+    }
+    // Step 2 analyze: minimized right drawer with request summary; else hub scroll rules.
+    if (analyzePhase) {
+      setRightPanelOpen?.(true);
+      setRightPanelTab?.("integrations");
+      return;
+    }
+    if (!panelsVisible) {
       setRightPanelOpen?.(false);
       return;
     }
@@ -101,6 +120,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       setRightPanelTab?.("integrations");
     }
   }, [
+    analyzePhase,
     panelsVisible,
     workspaceActive,
     showDataWorkspace,
