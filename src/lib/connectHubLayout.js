@@ -34,13 +34,23 @@ export const connectHubMainClass =
   "min-w-0 md:col-start-2 md:mx-auto md:w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl";
 
 /**
+ * Top offset for fixed step rail — must match sticky nav (4.5rem) + dashBody py-1 + connectHubPageClass pt-*.
+ * @see connectHubPageClass embedded padding (pt-12 / sm:pt-16 / md:pt-20)
+ */
+export const connectHubFlowStepsTopClass = cn(
+  "top-[calc(4.5rem+0.25rem+3rem)]",
+  "sm:top-[calc(4.5rem+0.25rem+4rem)]",
+  "md:top-[calc(4.5rem+0.25rem+5rem)]",
+);
+
+/**
  * Fixed step rail — pinned to viewport (sticky failed: grid item was only ~240px tall via self-start).
  * Left edge tracks the centered max-w-7xl column + page padding.
  */
 export const connectHubFlowStepsClass = cn(
   "hidden md:block",
   "fixed z-30 w-[8.5rem] lg:w-[10rem] xl:w-[11rem]",
-  "top-[4.5rem]",
+  connectHubFlowStepsTopClass,
   "bg-white dark:bg-slate-950",
   "left-[max(1rem,calc((100vw-min(100vw,80rem))/2+1rem))]",
   "sm:left-[max(1.25rem,calc((100vw-min(100vw,80rem))/2+1.25rem))]",

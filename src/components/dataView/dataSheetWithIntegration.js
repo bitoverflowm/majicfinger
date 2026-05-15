@@ -714,6 +714,12 @@ export default function DataSheetWithIntegration({
     ? "max-md:w-auto max-md:min-w-0 max-md:max-w-none md:w-1/2 md:min-w-0 md:max-w-[50vw] 2xl:w-1/3 2xl:max-w-[33.333vw]"
     : drawerWidthCollapsed;
 
+  /** Connect home + normal app: fixed to viewport. Demo embed: absolute inside demo viewport. */
+  const drawerAsidePositionClass =
+    isDemo && !connectHomeMode
+      ? "absolute inset-y-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
+      : "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out";
+
   const connectHomeGridSurface =
     "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";
 
@@ -870,11 +876,7 @@ export default function DataSheetWithIntegration({
             />
             <aside
               className={cn(
-                connectHomeMode
-                  ? "absolute inset-y-0 z-20 flex h-full flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
-                  : isDemo
-                  ? "absolute inset-y-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
-                  : "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out",
+                drawerAsidePositionClass,
                 drawerExpanded
                   ? "max-md:left-0 max-md:right-0 md:right-4"
                   : "right-2 sm:right-4",

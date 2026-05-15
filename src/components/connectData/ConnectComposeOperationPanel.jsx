@@ -33,6 +33,7 @@ import { glueTableNamesForDataset } from "@/config/dataLakeParquetSamples";
 import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { cn } from "@/lib/utils";
+import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
 
 const KALSHI_SAMPLE_BY_ID = Object.fromEntries(ATHENA_KALSHI_SAMPLE_OPTIONS.map((s) => [s.id, s]));
 
@@ -80,6 +81,11 @@ export function ConnectComposeOperationPanel({ className }) {
     [columnMeta],
   );
   const kindForColumn = useCallback((col) => kindForLakeColumn(col, typesByName), [typesByName]);
+
+  const numericColumns = useMemo(
+    () => availableColumns.filter((c) => kindForColumn(c) === "number"),
+    [availableColumns, kindForColumn],
+  );
 
   const glueJoinTableOptions = useMemo(() => glueTableNamesForDataset("kalshi"), []);
 
@@ -402,58 +408,66 @@ export function ConnectComposeOperationPanel({ className }) {
 
         {opId === "sort" ? (
           <div className="space-y-2">
-            {columnComposeOrderBy.map((ob, idx) => (
-              <div key={`${ob.alias}-${idx}`} className="flex flex-wrap items-center gap-2">
-                <Select
-                  value={ob.alias}
-                  onValueChange={(v) =>
-                    setColumnComposeOrderBy?.((prev) =>
-                      (prev || []).map((r, j) => (j === idx ? { ...r, alias: v } : r)),
-                    )
-                  }
-                >
-                  <SelectTrigger className="h-8 min-w-[7rem] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {composeSelectAliasChoices.map((c) => (
-                      <SelectItem key={c.alias} value={c.alias} className="text-xs">
-                        {c.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={ob.direction}
-                  onValueChange={(v) =>
-                    setColumnComposeOrderBy?.((prev) =>
-                      (prev || []).map((r, j) => (j === idx ? { ...r, direction: v } : r)),
-                    )
-                  }
-                >
-                  <SelectTrigger className="h-8 w-[10rem] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="asc" className="text-xs">
-                      Ascending
-                    </SelectItem>
-                    <SelectItem value="desc" className="text-xs">
-                      Descending
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <button
-                  type="button"
-                  className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60"
-                  onClick={() =>
-                    setColumnComposeOrderBy?.((prev) => (prev || []).filter((_, j) => j !== idx))
-                  }
-                >
-                  <Minus className="h-2 w-2" />
-                </button>
+            {columnComposeOrderBy.length > 0 ? (
+              <div className="space-y-2">
+                {columnComposeOrderBy.map((ob, obIdx) => (
+                  <div key={`${ob.alias}-${obIdx}`} className="min-w-0 space-y-1">
+                    <Label className="text-xs text-muted-foreground">sort</Label>
+                    <div className="flex w-full flex-nowrap items-center gap-2">
+                      <Select
+                        value={ob.alias}
+                        onValueChange={(v) =>
+                          setColumnComposeOrderBy?.((prev) =>
+                            (prev || []).map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 min-w-[7rem] shrink-0 text-xs">
+                          <SelectValue placeholder="Column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {composeSelectAliasChoices.map((c) => (
+                            <SelectItem key={c.alias} value={c.alias} className="text-xs">
+                              {c.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={ob.direction}
+                        onValueChange={(v) =>
+                          setColumnComposeOrderBy?.((prev) =>
+                            (prev || []).map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 min-w-[10rem] shrink-0 text-xs sm:min-w-[14rem]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="asc" className="text-xs">
+                            Ascending (A→Z, low→high)
+                          </SelectItem>
+                          <SelectItem value="desc" className="text-xs">
+                            Descending (Z→A, high→low)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <button
+                        type="button"
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        onClick={() =>
+                          setColumnComposeOrderBy?.((prev) => (prev || []).filter((_, j) => j !== obIdx))
+                        }
+                        aria-label="Remove sort"
+                      >
+                        <Minus className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -462,8 +476,13 @@ export function ConnectComposeOperationPanel({ className }) {
               disabled={!composeSelectAliasChoices.length}
               onClick={addSortClause}
             >
-              Add sort
+              {columnComposeOrderBy.length > 0 ? "Add another sort" : "Add sort"}
             </Button>
+            {!composeSelectAliasChoices.length ? (
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Select at least one column in your pull before adding sort rules.
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -513,44 +532,16 @@ export function ConnectComposeOperationPanel({ className }) {
         ) : null}
 
         {opId === "summarize" ? (
-          <div className="space-y-2">
-            {columnComposeItems.map((item) => {
-              const k = kindForColumn(item.column);
-              const isNumeric = k === "number";
-              const aggVal = item.aggregate || "none";
-              return (
-                <div
-                  key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 px-2 py-1.5"
-                >
-                  <span className="text-[11px] font-medium">{composeSourceColumnLabel(item.column)}</span>
-                  <Select
-                    value={aggVal}
-                    onValueChange={(v) =>
-                      updateComposeItem(item.id, {
-                        aggregate: v === "none" ? null : v,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-7 w-[11rem] text-[11px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none" className="text-xs">
-                        Show values
-                      </SelectItem>
-                      <SelectItem value="sum" className="text-xs" disabled={!isNumeric}>
-                        Sum
-                      </SelectItem>
-                      <SelectItem value="count" className="text-xs">
-                        Count
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              );
-            })}
-          </div>
+          <ConnectComposeSummarizeSection
+            columnComposeItems={columnComposeItems}
+            updateComposeItem={updateComposeItem}
+            onRemoveItem={(id) =>
+              setColumnComposeItems?.((prev) => (prev || []).filter((row) => row.id !== id))
+            }
+            availableColumns={availableColumns}
+            numericColumns={numericColumns}
+            kindForColumn={kindForColumn}
+          />
         ) : null}
 
         {opId === "having" ? (

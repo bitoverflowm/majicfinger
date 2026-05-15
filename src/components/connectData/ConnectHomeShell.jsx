@@ -85,21 +85,23 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
 
   useEffect(() => {
-    if (panelsVisible && workspaceActive) {
-      setRightPanelOpen?.(true);
-      if (
-        connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER ||
-        isConnectIntegrationWorkspace(connectWorkspace)
-      ) {
-        setRightPanelTab?.("integrations");
-      } else if (showDataWorkspace) {
-        setRightPanelTab?.("integrations");
-      }
-    } else if (!panelsVisible) {
+    // Hub picker (no workspace) or hub still in view — hide integrations drawer.
+    if (!workspaceActive || !panelsVisible) {
       setRightPanelOpen?.(false);
+      return;
+    }
+    setRightPanelOpen?.(true);
+    if (
+      connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER ||
+      isConnectIntegrationWorkspace(connectWorkspace)
+    ) {
+      setRightPanelTab?.("integrations");
+    } else if (showDataWorkspace) {
+      setRightPanelTab?.("integrations");
     }
   }, [
     panelsVisible,
+    workspaceActive,
     showDataWorkspace,
     connectWorkspace,
     setRightPanelOpen,
