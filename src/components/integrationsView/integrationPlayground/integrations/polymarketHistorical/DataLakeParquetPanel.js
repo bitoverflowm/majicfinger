@@ -512,7 +512,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const viewing = ctx?.viewing;
   const connectWorkspace = ctx?.connectWorkspace;
   const connectDataLakeSampleId = ctx?.connectDataLakeSampleId ?? "";
+  const setConnectDataLakeSampleId = ctx?.setConnectDataLakeSampleId;
   const connectKalshiColumnSelections = ctx?.connectKalshiColumnSelections ?? {};
+  /** Connect home + Kalshi: sync sample/columns from main workspace; panel UI stays full-featured. */
   const connectHomeKalshiSourcePicker =
     viewing === "connectDataHome" && connectWorkspace === "kalshiHistorical" && dataset === "kalshi";
   const user = useUser();
@@ -5038,7 +5040,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               </div>
             ) : null}
 
-            {!connectHomeKalshiSourcePicker ? (
             <div className="flex-1 space-y-1">
               <Label className="text-[11px] text-muted-foreground">Data source</Label>
               <div className="flex items-center gap-2 min-w-0">
@@ -5047,6 +5048,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   onValueChange={(v) => {
                     setSampleId(v);
                     void pingAthenaForSource(v);
+                    if (connectHomeKalshiSourcePicker) {
+                      setConnectDataLakeSampleId?.(v);
+                    }
                   }}
                   disabled={!canUseSamples || loading}
                 >
@@ -5106,27 +5110,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               />
               </div>
             </div>
-            ) : selected ? (
-              <div className="flex-1 space-y-1 min-w-0">
-                <Label className="text-[11px] text-muted-foreground">Data source</Label>
-                <div className="flex h-8 items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 text-xs font-medium text-foreground">
-                  <span
-                    className={[
-                      "h-2.5 w-2.5 shrink-0 rounded-full",
-                      pingState === "loading"
-                        ? "bg-amber-500 animate-pulse"
-                        : pingState === "ok"
-                          ? "bg-emerald-500"
-                          : pingState === "error"
-                            ? "bg-red-500"
-                            : "bg-slate-300 dark:bg-slate-700",
-                    ].join(" ")}
-                    aria-hidden
-                  />
-                  <span className="truncate">{selected.label}</span>
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
       )}
