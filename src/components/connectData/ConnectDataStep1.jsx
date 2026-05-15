@@ -63,8 +63,8 @@ const iconSlotClass =
   "flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted/70 text-muted-foreground [&_svg]:shrink-0";
 
 const pillClass = cn(
-  "flex w-full min-h-[2.625rem] items-center gap-2.5 rounded-full border border-border/80 bg-card px-4 py-2.5 text-left",
-  "text-sm font-medium leading-none text-foreground shadow-sm transition-all duration-200",
+  "flex w-full min-h-[2.625rem] items-center gap-1 rounded-md border border-border/40 bg-card px-1 py-0.5 text-left",
+  "text-xs font-light leading-none text-foreground transition-all duration-200",
   "hover:border-border hover:bg-muted/25 hover:shadow-md",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
   "disabled:pointer-events-none disabled:opacity-45",
@@ -392,10 +392,10 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
   };
 
   const columnGridClass = cn(
-    "grid gap-y-3",
+    "grid gap-y-1",
     showLatestWork
-      ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 xl:gap-x-12 2xl:gap-x-16"
-      : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 xl:gap-x-12 2xl:gap-x-16",
+      ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 xl:gap-x-8"
+      : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 xl:gap-x-8",
   );
 
   const scrollColClass =
@@ -404,11 +404,11 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
   return (
     <div
       data-test="onboarding-container"
-      className="min-h-0 flex-1 overflow-auto bg-gradient-to-b from-muted/20 via-background to-background"
+      className="pt-16 min-h-0 flex-1 overflow-auto bg-gradient-to-b from-muted/20 via-background to-background"
     >
-      <div className="mx-auto max-w-6xl px-6 pb-20 pt-12 sm:px-10 sm:pb-24 sm:pt-16 md:px-12 md:pt-20 lg:max-w-7xl">
+      <div className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 sm:px-10 sm:pb-24 sm:pt-16 md:px-16 md:pt-20 lg:px-24 xl:px-32 2xl:px-40">
         {showHandleSetup ? (
-          <Card className="mx-auto mb-14 max-w-2xl rounded-2xl border-border/60 bg-card/95 p-6 shadow-sm sm:mb-16 sm:p-8 md:mb-20">
+          <Card className="mb-14 w-full max-w-2xl rounded-2xl border-border/60 bg-card/95 p-6 shadow-sm sm:mb-16 sm:p-8 md:mb-20">
             <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
               Welcome to Lychee. Pick a unique handle to get started.
             </p>
@@ -469,13 +469,13 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
           </Card>
         ) : null}
 
-        <div className="mx-auto max-w-3xl">
-          <h1 className="pt-12 text-balance text-xl font-semibold tracking-tight text-foreground text-xl">
+        <div className="w-full">
+          <h1 className="text-balance text-left text-xl font-semibold tracking-tight text-foreground">
             Hi, what do you want to discover?
           </h1>
         </div>
 
-        <div className={cn("mx-auto mt-12 max-w-6xl sm:mt-14 md:mt-16 lg:max-w-7xl", columnGridClass)}>
+        <div className={cn("mt-12 w-full sm:mt-14 md:mt-16", columnGridClass)}>
           <section className="min-w-0">
             <SectionTitle>Import</SectionTitle>
             <div className="flex flex-col gap-3">
@@ -506,12 +506,6 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
                     description: "Use CSV/XLSX today where possible; JSON workflows are expanding.",
                   });
                 }}
-              />
-              <PillButton
-                icon={<LayoutTemplate className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
-                label="Integrations"
-                title="Browse the full integrations library."
-                onClick={() => setViewing?.("integrations")}
               />
             </div>
           </section>
@@ -621,7 +615,7 @@ export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
           ) : null}
         </div>
 
-        <div className="mx-auto mt-12 flex max-w-3xl justify-center sm:mt-14 md:mt-16">
+        <div className="mt-12 flex w-full justify-start sm:mt-14 md:mt-16">
           <button
             type="button"
             onClick={() => setViewing?.("newSheet")}
