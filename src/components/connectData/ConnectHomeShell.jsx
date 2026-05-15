@@ -4,12 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
+import { deriveConnectFlowStep } from "@/lib/connectHomeFlow";
+import {
+  connectHubFlowStepsClass,
+  connectHubLayoutClass,
+  connectHubPageClass,
+} from "@/lib/connectHubLayout";
 import { useConnectHomeScrollPanels } from "@/hooks/useConnectHomeScrollPanels";
 import { cn } from "@/lib/utils";
 
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
 import ConnectDataStep1 from "@/components/connectData/ConnectDataStep1";
 import { ConnectHomeFileUpload } from "@/components/connectData/ConnectHomeFileUpload";
+import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSteps";
 
 /** Match Connect hub + nav header white; override AG Grid Balham grey canvas. */
 const CONNECT_HOME_SURFACE = "bg-white dark:bg-slate-950";
@@ -21,9 +28,12 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const connectWorkspace = context?.connectWorkspace;
   const connectWorkspaceScrollTick = context?.connectWorkspaceScrollTick ?? 0;
   const dataConnected = context?.dataConnected;
+  const viewing = context?.viewing;
+  const connectedData = context?.connectedData;
+  const dataSheets = context?.dataSheets;
+  const rightPanelTab = context?.rightPanelTab;
   const setRightPanelOpen = context?.setRightPanelOpen;
   const setRightPanelTab = context?.setRightPanelTab;
-  const setIntegrationSidebar = context?.setIntegrationSidebar;
 
   const scrollRef = useRef(null);
   const hubRef = useRef(null);
@@ -44,6 +54,18 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     if (isConnectIntegrationWorkspace(connectWorkspace)) return true;
     return false;
   }, [connectWorkspace, dataConnected]);
+
+  const connectFlowStep = useMemo(
+    () =>
+      deriveConnectFlowStep({
+        viewing,
+        dataConnected,
+        connectedData,
+        dataSheets,
+        rightPanelTab,
+      }),
+    [viewing, dataConnected, connectedData, dataSheets, rightPanelTab],
+  );
 
   const { panelsVisible } = useConnectHomeScrollPanels({
     scrollRef,
@@ -106,51 +128,59 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
   return (
     <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950">
-          <div
-            ref={scrollRef}
-            className={cn("min-h-0 flex-1 overflow-y-auto", CONNECT_HOME_SURFACE)}
-          >
-            <div ref={hubRef}>
-              <ConnectDataStep1
-                user={user}
-                userProfileFetchOk={userProfileFetchOk}
-                onActivateWorkspace={handleActivateWorkspace}
-                embeddedInShell
-              />
-            </div>
+      <div
+        ref={scrollRef}
+        className={cn("min-h-0 flex-1 overflow-y-auto", CONNECT_HOME_SURFACE)}
+      >
+        <div className={connectHubPageClass(true)}>
+          <div className={connectHubLayoutClass({ includeStepRail: true })}>
+            <ConnectHomeFlowSteps currentStep={connectFlowStep} className={connectHubFlowStepsClass} />
 
-            {workspaceActive ? (
-              <section
-                ref={workspaceRef}
-                id="connect-home-workspace"
-                className={cn(
-                  "relative min-h-[calc(100dvh-5.5rem)] scroll-mt-4",
-                  CONNECT_HOME_SURFACE,
-                )}
-              >
-                {showUploadPanel ? (
-                  <ConnectHomeFileUpload onParsed={handleUploadParsed} />
-                ) : null}
-                {showDataWorkspace ? (
-                  <div
-                    className={cn(
-                      "relative flex min-h-[calc(100dvh-6rem)] flex-col",
-                      CONNECT_HOME_SURFACE,
-                      CONNECT_HOME_GRID_SURFACE,
-                      showUploadPanel && "hidden",
-                    )}
-                  >
-                    <DataSheetWithIntegration
-                      user={user}
-                      startNew={connectWorkspace === CONNECT_WORKSPACE.BLANK ? blankStartNew : startNew}
-                      setStartNew={setStartNew}
-                      connectHomeMode
-                    />
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
+            <div className="flex min-w-0 flex-col md:col-start-2">
+              <div ref={hubRef}>
+                <ConnectDataStep1
+                  user={user}
+                  userProfileFetchOk={userProfileFetchOk}
+                  onActivateWorkspace={handleActivateWorkspace}
+                  embeddedInShell
+                />
+              </div>
+
+              {workspaceActive ? (
+                <section
+                  ref={workspaceRef}
+                  id="connect-home-workspace"
+                  className={cn(
+                    "relative min-h-[calc(100dvh-5.5rem)] scroll-mt-4",
+                    CONNECT_HOME_SURFACE,
+                  )}
+                >
+                  {showUploadPanel ? (
+                    <ConnectHomeFileUpload onParsed={handleUploadParsed} />
+                  ) : null}
+                  {showDataWorkspace ? (
+                    <div
+                      className={cn(
+                        "relative flex min-h-[calc(100dvh-6rem)] flex-col",
+                        CONNECT_HOME_SURFACE,
+                        CONNECT_HOME_GRID_SURFACE,
+                        showUploadPanel && "hidden",
+                      )}
+                    >
+                      <DataSheetWithIntegration
+                        user={user}
+                        startNew={connectWorkspace === CONNECT_WORKSPACE.BLANK ? blankStartNew : startNew}
+                        setStartNew={setStartNew}
+                        connectHomeMode
+                      />
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+            </div>
           </div>
+        </div>
+      </div>
     </main>
   );
 }

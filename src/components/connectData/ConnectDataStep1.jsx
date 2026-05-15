@@ -27,6 +27,11 @@ import {
   isConnectHubIntegrationAvailable,
 } from "@/lib/connectHomeWorkspace";
 import { deriveConnectFlowStep } from "@/lib/connectHomeFlow";
+import {
+  connectHubLayoutClass,
+  connectHubMainClass,
+  connectHubPageClass,
+} from "@/lib/connectHubLayout";
 import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSteps";
 import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
@@ -512,23 +517,8 @@ export default function ConnectDataStep1({
 
   const columnGridClass = "grid grid-cols-1 gap-y-1 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-8";
 
-  const connectHubPageClass = cn(
-    "mx-auto w-full max-w-7xl pb-20 pt-12 sm:pb-24 sm:pt-16 md:pt-20",
-    embeddedInShell
-      ? "pl-4 pr-6 sm:pl-5 sm:pr-8 md:pl-6 md:pr-12 lg:pl-8 lg:pr-16 xl:pl-10 xl:pr-20 2xl:pl-12 2xl:pr-28"
-      : "px-6 sm:px-10 md:px-16 lg:px-24 xl:px-32 2xl:px-40",
-  );
-
-  const connectHubLayoutClass = cn(
-    "grid w-full grid-cols-1",
-    "md:grid-cols-[8.5rem_minmax(0,1fr)] md:gap-x-6",
-    "lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
-    "xl:grid-cols-[11rem_minmax(0,1fr)] xl:gap-x-10",
-  );
-
-  const connectHubMainClass = cn(
-    "min-w-0 md:col-start-2 md:mx-auto md:w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl",
-  );
+  const hubPageClass = connectHubPageClass(embeddedInShell);
+  const hubLayoutClass = connectHubLayoutClass({ includeStepRail: !embeddedInShell });
 
   const integrationsColClass = "flex flex-col gap-3";
 
@@ -556,7 +546,7 @@ export default function ConnectDataStep1({
           : "min-h-0 flex-1 overflow-auto bg-gradient-to-b from-muted/20 via-background to-background pt-16",
       )}
     >
-      <div className={connectHubPageClass}>
+      <div className={embeddedInShell ? "w-full min-w-0" : hubPageClass}>
         {showHandleSetup ? (
           <Card className="mb-14 w-full max-w-2xl rounded-2xl border-border/60 bg-card/95 p-6 shadow-sm sm:mb-16 sm:p-8 md:mb-20">
             <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
@@ -619,9 +609,14 @@ export default function ConnectDataStep1({
           </Card>
         ) : null}
 
-        <div className={connectHubLayoutClass}>
+        <div className={hubLayoutClass}>
           {showLatestWork ? (
-            <section className={cn("mb-8 w-full sm:mb-10", connectHubMainClass)}>
+            <section
+              className={cn(
+                "mb-8 w-full sm:mb-10",
+                embeddedInShell ? "min-w-0" : connectHubMainClass,
+              )}
+            >
               <SectionTitle>Your latest work</SectionTitle>
               <div className="flex flex-wrap gap-3">
                   {latestWorkLoading
@@ -643,18 +638,21 @@ export default function ConnectDataStep1({
               </section>
           ) : null}
 
-          <ConnectHomeFlowSteps
-            currentStep={connectFlowStep}
-            className={cn(
-              "hidden shrink-0 self-start md:-ml-0.5 md:block",
-              showLatestWork ? "md:row-start-2" : "md:row-start-1",
-            )}
-          />
+          {!embeddedInShell ? (
+            <ConnectHomeFlowSteps
+              currentStep={connectFlowStep}
+              sticky
+              className={cn(
+                "hidden shrink-0 self-start md:-ml-0.5 md:block",
+                showLatestWork ? "md:row-start-2" : "md:row-start-1",
+              )}
+            />
+          ) : null}
 
           <div
             className={cn(
-              connectHubMainClass,
-              showLatestWork ? "md:row-start-2" : "md:row-start-1",
+              embeddedInShell ? "min-w-0" : connectHubMainClass,
+              showLatestWork && !embeddedInShell ? "md:row-start-2" : !embeddedInShell ? "md:row-start-1" : null,
             )}
           >
             <h1 className="text-balance text-left text-xl font-semibold tracking-tight text-foreground">
