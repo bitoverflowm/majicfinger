@@ -30,7 +30,7 @@ const OPERATION_ICONS = {
 export function ConnectDataOperationsSection({ selectedCount, className }) {
   const sectionRef = useRef(null);
   const didScrollRef = useRef(false);
-  const { setRightPanelOpen, setRightPanelTab } = useMyStateV2() ?? {};
+  const { connectActiveComposeOp, setConnectActiveComposeOp } = useMyStateV2() ?? {};
 
   const show = selectedCount > 0;
 
@@ -47,9 +47,14 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
     return () => window.clearTimeout(t);
   }, [show]);
 
-  const openIntegrationsPanel = () => {
-    setRightPanelOpen?.(true);
-    setRightPanelTab?.("integrations");
+  const onOperationClick = (opId) => {
+    setConnectActiveComposeOp?.(opId);
+    window.setTimeout(() => {
+      document.getElementById(`connect-compose-${opId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
   };
 
   if (!show) return null;
@@ -76,8 +81,8 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
         >
           <h2 className="text-xs font-semibold tracking-tight text-foreground">Refine your pull</h2>
           <p className="mt-1 max-w-prose text-[11px] leading-snug text-muted-foreground">
-            Optional steps before you run the query. Configure each in the integrations panel on the
-            right — tap an operation to jump there.
+            Optional steps before you run the query. Choose an operation to configure it below — the
+            integrations panel stays in sync.
           </p>
         </motion.div>
 
@@ -97,9 +102,10 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
               >
                 <button
                   type="button"
-                  onClick={openIntegrationsPanel}
+                  onClick={() => onOperationClick(op.id)}
                   className={cn(
                     "flex h-full w-full flex-col rounded-lg border border-border/60 bg-card p-3 text-left transition-colors duration-150",
+                    connectActiveComposeOp === op.id && "border-primary/50 bg-primary/5",
                     "hover:border-border hover:bg-muted/20",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   )}

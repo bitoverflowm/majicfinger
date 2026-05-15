@@ -85,6 +85,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { rollupKalshiPrefixRowsByTaxonomyGroup } from "@/lib/kalshi/kalshiCategoryTaxonomy";
 import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
@@ -520,6 +521,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   /** Connect home + Kalshi: sync sample/columns from main workspace; panel UI stays full-featured. */
   const connectHomeKalshiSourcePicker =
     viewing === "connectDataHome" && connectWorkspace === "kalshiHistorical" && dataset === "kalshi";
+  const {
+    columnComposeItems,
+    setColumnComposeItems,
+    columnComposeOrderBy,
+    setColumnComposeOrderBy,
+    composeLimitRuleOpen,
+    setComposeLimitRuleOpen,
+    composeLimitRuleValue,
+    setComposeLimitRuleValue,
+    composeWhereFilters,
+    setComposeWhereFilters,
+    composeHavingFilters,
+    setComposeHavingFilters,
+    composeJoins,
+    setComposeJoins,
+  } = useDataLakeComposeState(connectHomeKalshiSourcePicker);
   const user = useUser();
   const athenaRowLimit = useMemo(() => {
     if (isDemo) return ATHENA_DEMO_ROW_LIMIT;
@@ -537,19 +554,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   const canUseSamples = true;
   const [sampleId, setSampleId] = useState("");
-  /** @type {Array<{ id: string; column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: null | string; dateFormat: null | string; numberScale: string; decimals: null | number; treatAsDate: boolean; sumCase?: any; equation?: any }>} */
-  const [columnComposeItems, setColumnComposeItems] = useState([]);
-  /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
-  const [columnComposeOrderBy, setColumnComposeOrderBy] = useState([]);
-  /** Optional SQL LIMIT on composed Athena SELECT (clamped server-side to tier cap). */
-  const [composeLimitRuleOpen, setComposeLimitRuleOpen] = useState(false);
-  const [composeLimitRuleValue, setComposeLimitRuleValue] = useState("");
-  /** @type {Array<{ id: string; column: string; kind: "date" | "string" | "number"; op: string; value: any }>} */
-  const [composeWhereFilters, setComposeWhereFilters] = useState([]);
-  /** @type {Array<{ id: string; havingAlias: string; op: string; value: any }>} */
-  const [composeHavingFilters, setComposeHavingFilters] = useState([]);
-  /** @type {Array<{ id: string; targetKind: "table" | "sheet"; targetTable: string; targetSheetId: string; joinType: "inner" | "left"; mergeStrategy?: "browser" | "server"; leftColumn: string; rightColumn: string }>} */
-  const [composeJoins, setComposeJoins] = useState([]);
   const [selectColumnsMenuOpen, setSelectColumnsMenuOpen] = useState(false);
   const [addWhereFilterMenuOpen, setAddWhereFilterMenuOpen] = useState(false);
   const [sheetJoinDialogOpen, setSheetJoinDialogOpen] = useState(false);

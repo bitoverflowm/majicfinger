@@ -9,6 +9,7 @@ import { integrations_list } from "@/components/integrationsView/integrationsCon
 import { Button } from "@/components/ui/button";
 import { ATHENA_KALSHI_SAMPLE_OPTIONS, KALSHI_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { getKalshiColumnDisplayLabel, getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
@@ -183,6 +184,7 @@ function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, 
       </ul>
 
       <ConnectDataOperationsSection selectedCount={selectedColumns.length} />
+      <ConnectComposeOperationPanel />
     </motion.div>
   );
 }
