@@ -153,7 +153,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   ref={workspaceRef}
                   id="connect-home-workspace"
                   className={cn(
-                    "relative min-h-[calc(100dvh-5.5rem)] scroll-mt-4",
+                    "relative mt-16 min-h-[calc(100dvh-5.5rem)] scroll-mt-4 sm:mt-20 md:mt-28",
                     CONNECT_HOME_SURFACE,
                   )}
                 >
