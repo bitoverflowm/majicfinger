@@ -72,6 +72,8 @@ const DashBody = ({ user }) => {
     const [billingCycle, setBillingCycle] = useState(null);
     const [subscriptionStatus, setSubscriptionStatus] = useState(null);
     const [subscribedAt, setSubscribedAt] = useState(null);
+    /** True only after a successful `/api/users/:id` GET — used so Connect hub does not flash handle setup while handle is unknown. */
+    const [userProfileFetchOk, setUserProfileFetchOk] = useState(false);
     const hasDbBackedUserId =
       typeof user?.userId === "string" &&
       user.userId !== "dev-bypass-no-db" &&
@@ -181,15 +183,21 @@ const DashBody = ({ user }) => {
     }, [user, refetchPresentations, isDemo, hasDbBackedUserId])
 
     useEffect(() => {
-        if (user && !isDemo && hasDbBackedUserId) {
-            fetch(`/api/users/${user.userId}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
+        if (!user || isDemo || !hasDbBackedUserId) {
+            setUserProfileFetchOk(false);
+            return;
+        }
+        setUserProfileFetchOk(false);
+        let cancelled = false;
+        fetch(`/api/users/${user.userId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (cancelled) return;
                 if (data.success) {
                     setUserHandle(data.data.user_name);
                     setProfilePic?.(data.data.profile_pic);
@@ -198,14 +206,19 @@ const DashBody = ({ user }) => {
                     setBillingCycle(data.data.billingCycle || null);
                     setSubscriptionStatus(data.data.subscriptionStatus || null);
                     setSubscribedAt(data.data.subscribedAt || null);
+                    setUserProfileFetchOk(true);
                 } else {
                     console.error('Failed to fetch user info:', data.message);
+                    setUserProfileFetchOk(false);
                 }
             })
-            .catch(error => {
+            .catch((error) => {
                 console.error('Error fetching user info:', error);
+                if (!cancelled) setUserProfileFetchOk(false);
             });
-        }
+        return () => {
+            cancelled = true;
+        };
     }, [user, isDemo, hasDbBackedUserId]);
 
     const checkUsernameAvailability = useCallback(
@@ -295,7 +308,7 @@ const DashBody = ({ user }) => {
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
                 {!isDemo && viewing === 'connectDataHome' && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <ConnectDataStep1 user={user} />
+                    <ConnectDataStep1 user={user} userProfileFetchOk={userProfileFetchOk} />
                   </div>
                 )}
                 { (viewing === 'dataStart' || viewing === 'charts' || viewing === 'dashboardComposer') && (

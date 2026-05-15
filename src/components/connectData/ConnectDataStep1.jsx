@@ -109,7 +109,7 @@ function SectionTitle({ children }) {
   return <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{children}</h2>;
 }
 
-export default function ConnectDataStep1({ user }) {
+export default function ConnectDataStep1({ user, userProfileFetchOk = false }) {
   const context = useMyStateV2();
   const setViewing = context?.setViewing;
   const setIntegrationSidebar = context?.setIntegrationSidebar;
@@ -139,6 +139,7 @@ export default function ConnectDataStep1({ user }) {
     /^[a-f0-9]{24}$/i.test(user.userId);
 
   const needsHandle = !String(userHandle || "").trim();
+  const showHandleSetup = hasDbBackedUserId && userProfileFetchOk && needsHandle;
 
   const [onboardingHandle, setOnboardingHandle] = useState("");
   const [onboardingHandleTaken, setOnboardingHandleTaken] = useState(false);
@@ -387,7 +388,7 @@ export default function ConnectDataStep1({ user }) {
   return (
     <div className="min-h-0 flex-1 overflow-auto bg-muted/30 px-4 py-8 md:px-8">
       <div className="mx-auto max-w-[1400px]">
-        {hasDbBackedUserId && needsHandle ? (
+        {showHandleSetup ? (
           <Card className="mb-8 border-border bg-card p-5 shadow-sm">
             <p className="mb-4 text-sm text-muted-foreground">
               Welcome to Lychee. Pick a unique handle to get started.
