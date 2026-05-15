@@ -516,6 +516,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const connectDataLakeSampleId = ctx?.connectDataLakeSampleId ?? "";
   const setConnectDataLakeSampleId = ctx?.setConnectDataLakeSampleId;
   const connectKalshiColumnSelections = ctx?.connectKalshiColumnSelections ?? {};
+  const connectDataLakePullTick = ctx?.connectDataLakePullTick ?? 0;
   const athenaPingBySampleId = ctx?.athenaPingBySampleId ?? {};
   const pingAthenaLakeSample = ctx?.pingAthenaLakeSample;
   /** Connect home + Kalshi: sync sample/columns from main workspace; panel UI stays full-featured. */
@@ -2684,6 +2685,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   ]);
 
   const canRunRequest = runRequestReasons.length === 0;
+
+  const handleLoadRef = useRef(handleLoad);
+  handleLoadRef.current = handleLoad;
+
+  useEffect(() => {
+    if (!connectHomeKalshiSourcePicker || !connectDataLakePullTick) return;
+    handleLoadRef.current();
+  }, [connectHomeKalshiSourcePicker, connectDataLakePullTick]);
 
   const activeSheetRequestCards = useMemo(() => {
     if (!activeSheetId) return [];

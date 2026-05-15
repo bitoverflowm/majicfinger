@@ -41,8 +41,14 @@ const KALSHI_SAMPLE_BY_ID = Object.fromEntries(ATHENA_KALSHI_SAMPLE_OPTIONS.map(
  */
 export function ConnectComposeOperationPanel({ className }) {
   const panelRef = useRef(null);
-  const { connectActiveComposeOp, connectDataLakeSampleId, setRightPanelOpen, setRightPanelTab } =
-    useMyStateV2() ?? {};
+  const {
+    connectActiveComposeOp,
+    setConnectActiveComposeOp,
+    connectDataLakeSampleId,
+    setRightPanelOpen,
+    setRightPanelTab,
+    requestConnectDataLakePull,
+  } = useMyStateV2() ?? {};
 
   const compose = useDataLakeComposeState(true);
   const {
@@ -167,6 +173,41 @@ export function ConnectComposeOperationPanel({ className }) {
     setColumnComposeOrderBy?.((prev) => [...(prev || []), { alias: first.alias, direction: "asc" }]);
   }, [composeSelectAliasChoices, setColumnComposeOrderBy]);
 
+  const handleRestart = useCallback(() => {
+    setComposeWhereFilters?.([]);
+    setComposeHavingFilters?.([]);
+    setComposeJoins?.([]);
+    setColumnComposeOrderBy?.([]);
+    setComposeLimitRuleOpen?.(false);
+    setComposeLimitRuleValue?.("");
+    setColumnComposeItems?.((prev) =>
+      (prev || []).map((row) => ({
+        ...row,
+        aggregate: null,
+        dateBucket: null,
+        dateFormat: null,
+        numberScale: "none",
+        decimals: null,
+      })),
+    );
+    setConnectActiveComposeOp?.(null);
+  }, [
+    setComposeWhereFilters,
+    setComposeHavingFilters,
+    setComposeJoins,
+    setColumnComposeOrderBy,
+    setComposeLimitRuleOpen,
+    setComposeLimitRuleValue,
+    setColumnComposeItems,
+    setConnectActiveComposeOp,
+  ]);
+
+  const handleRunPull = useCallback(() => {
+    setRightPanelOpen?.(true);
+    setRightPanelTab?.("integrations");
+    requestConnectDataLakePull?.();
+  }, [setRightPanelOpen, setRightPanelTab, requestConnectDataLakePull]);
+
   const updateComposeItem = useCallback(
     (id, patch) => {
       setColumnComposeItems?.((prev) => (prev || []).map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -177,20 +218,18 @@ export function ConnectComposeOperationPanel({ className }) {
   if (!connectActiveComposeOp || !activeMeta) return null;
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={connectActiveComposeOp}
-        id={`connect-compose-${connectActiveComposeOp}`}
-        ref={panelRef}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 4 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className={cn(
-          "mt-4 scroll-mt-6 rounded-lg border border-border/60 bg-muted/15 p-4 space-y-4",
-          className,
-        )}
-      >
+    <motion.div className={cn("mt-4 space-y-3", className)}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={connectActiveComposeOp}
+          id={`connect-compose-${connectActiveComposeOp}`}
+          ref={panelRef}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 4 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          className="scroll-mt-6 rounded-lg border border-border/60 bg-muted/15 p-4 space-y-4"
+        >
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
@@ -203,7 +242,7 @@ export function ConnectComposeOperationPanel({ className }) {
         {connectActiveComposeOp === "where" ? (
           <div className="space-y-2">
             {composeWhereFilters.map((f) => (
-              <div key={f.id} className="flex flex-wrap items-center gap-1">
+              <div key={f.id} className="flex w-full flex-nowrap items-center gap-1.5">
                 <Select
                   value={f.column}
                   onValueChange={(val) => {
@@ -211,7 +250,7 @@ export function ConnectComposeOperationPanel({ className }) {
                     updateWhereFilter(f.id, { column: val, kind });
                   }}
                 >
-                  <SelectTrigger className="h-7 min-w-[7rem] text-[11px]">
+                  <SelectTrigger className="h-7 w-auto min-w-[5.5rem] max-w-[10rem] shrink-0 text-[11px]">
                     <SelectValue placeholder="Column" />
                   </SelectTrigger>
                   <SelectContent>
@@ -224,7 +263,11 @@ export function ConnectComposeOperationPanel({ className }) {
                 </Select>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] min-w-8">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 shrink-0 px-2 text-[11px] min-w-8"
+                    >
                       {operatorSymbol(f.op)}
                     </Button>
                   </DropdownMenuTrigger>
@@ -249,17 +292,17 @@ export function ConnectComposeOperationPanel({ className }) {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Input
-                  className="h-7 min-w-0 flex-1 text-[11px]"
+                  className="h-7 min-w-[3rem] flex-1 text-[11px]"
                   value={String(f.value ?? "")}
                   onChange={(e) => updateWhereFilter(f.id, { value: e.target.value })}
                 />
                 <button
                   type="button"
-                  className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60"
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted/60"
                   onClick={() => removeWhereFilter(f.id)}
                   aria-label="Remove filter"
                 >
-                  <Minus className="h-2 w-2" />
+                  <Minus className="h-2.5 w-2.5" />
                 </button>
               </div>
             ))}
@@ -267,7 +310,9 @@ export function ConnectComposeOperationPanel({ className }) {
               <DropdownMenuTrigger asChild>
                 <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] gap-1">
                   <Plus className="h-3 w-3" />
-                  Select column you want to filter
+                  {composeWhereFilters.length > 0
+                    ? "Add another filter"
+                    : "Select column you want to filter"}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 max-h-[280px] overflow-y-auto">
@@ -645,26 +690,22 @@ export function ConnectComposeOperationPanel({ className }) {
           </div>
         ) : null}
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.18 }}
-          className="flex flex-wrap gap-2 border-t border-border/40 pt-3"
-        >
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            className="h-8 text-xs"
-            onClick={() => {
-              setRightPanelOpen?.(true);
-              setRightPanelTab?.("integrations");
-            }}
-          >
-            Run pull in integrations panel
-          </Button>
         </motion.div>
+      </AnimatePresence>
+
+      <motion.div
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.06, duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+        className="flex flex-wrap items-center gap-2"
+      >
+        <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={handleRestart}>
+          Restart
+        </Button>
+        <Button type="button" size="sm" className="h-8 text-xs" onClick={handleRunPull}>
+          Run pull
+        </Button>
       </motion.div>
-    </AnimatePresence>
+    </motion.div>
   );
 }
