@@ -30,9 +30,10 @@ const OPERATION_ICONS = {
 export function ConnectDataOperationsSection({ selectedCount, className }) {
   const sectionRef = useRef(null);
   const didScrollRef = useRef(false);
-  const { connectActiveComposeOp, setConnectActiveComposeOp } = useMyStateV2() ?? {};
+  const { connectActiveComposeOps = [], setConnectActiveComposeOps } = useMyStateV2() ?? {};
 
   const show = selectedCount > 0;
+  const openSet = new Set(connectActiveComposeOps);
 
   useEffect(() => {
     if (!show) {
@@ -48,7 +49,11 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
   }, [show]);
 
   const onOperationClick = (opId) => {
-    setConnectActiveComposeOp?.(opId);
+    setConnectActiveComposeOps?.((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      if (list.includes(opId)) return list;
+      return [...list, opId];
+    });
     window.setTimeout(() => {
       document.getElementById(`connect-compose-${opId}`)?.scrollIntoView({
         behavior: "smooth",
@@ -81,7 +86,7 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
         >
           <h2 className="text-xs font-semibold tracking-tight text-foreground">Refine your pull</h2>
           <p className="mt-1 max-w-prose text-[11px] leading-snug text-muted-foreground">
-            Optional steps before you run the query. Choose an operation to configure it below — the
+            Optional steps before you run the query. Each operation you pick stacks below — the
             integrations panel stays in sync.
           </p>
         </motion.div>
@@ -89,6 +94,7 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {CONNECT_COMPOSE_OPERATIONS.map((op, i) => {
             const Icon = OPERATION_ICONS[op.id] || Filter;
+            const isOpen = openSet.has(op.id);
             return (
               <motion.li
                 key={op.id}
@@ -105,7 +111,7 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
                   onClick={() => onOperationClick(op.id)}
                   className={cn(
                     "flex h-full w-full flex-col rounded-lg border border-border/60 bg-card p-3 text-left transition-colors duration-150",
-                    connectActiveComposeOp === op.id && "border-primary/50 bg-primary/5",
+                    isOpen && "border-primary/50 bg-primary/5",
                     "hover:border-border hover:bg-muted/20",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   )}

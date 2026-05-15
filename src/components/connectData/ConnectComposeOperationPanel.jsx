@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Plus } from "lucide-react";
 
@@ -40,10 +40,9 @@ const KALSHI_SAMPLE_BY_ID = Object.fromEntries(ATHENA_KALSHI_SAMPLE_OPTIONS.map(
  * Inline compose controls (mirrors integrations panel) for Connect home vertical flow.
  */
 export function ConnectComposeOperationPanel({ className }) {
-  const panelRef = useRef(null);
   const {
-    connectActiveComposeOp,
-    setConnectActiveComposeOp,
+    connectActiveComposeOps = [],
+    setConnectActiveComposeOps,
     connectDataLakeSampleId,
     setRightPanelOpen,
     setRightPanelTab,
@@ -105,15 +104,10 @@ export function ConnectComposeOperationPanel({ className }) {
     [columnComposeItems],
   );
 
-  const activeMeta = CONNECT_COMPOSE_OPERATIONS.find((o) => o.id === connectActiveComposeOp);
-
-  useEffect(() => {
-    if (!connectActiveComposeOp) return;
-    const t = window.setTimeout(() => {
-      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
-    return () => window.clearTimeout(t);
-  }, [connectActiveComposeOp]);
+  const openComposeOps = useMemo(() => {
+    const open = new Set(Array.isArray(connectActiveComposeOps) ? connectActiveComposeOps : []);
+    return CONNECT_COMPOSE_OPERATIONS.filter((o) => open.has(o.id));
+  }, [connectActiveComposeOps]);
 
   const addWhereFilter = useCallback(
     (column, op) => {
@@ -190,7 +184,7 @@ export function ConnectComposeOperationPanel({ className }) {
         decimals: null,
       })),
     );
-    setConnectActiveComposeOp?.(null);
+    setConnectActiveComposeOps?.([]);
   }, [
     setComposeWhereFilters,
     setComposeHavingFilters,
@@ -199,7 +193,7 @@ export function ConnectComposeOperationPanel({ className }) {
     setComposeLimitRuleOpen,
     setComposeLimitRuleValue,
     setColumnComposeItems,
-    setConnectActiveComposeOp,
+    setConnectActiveComposeOps,
   ]);
 
   const handleRunPull = useCallback(() => {
@@ -215,31 +209,9 @@ export function ConnectComposeOperationPanel({ className }) {
     [setColumnComposeItems],
   );
 
-  if (!connectActiveComposeOp || !activeMeta) return null;
-
-  return (
-    <motion.div className={cn("mt-4 space-y-3", className)}>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={connectActiveComposeOp}
-          id={`connect-compose-${connectActiveComposeOp}`}
-          ref={panelRef}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 4 }}
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="scroll-mt-6 rounded-lg border border-border/60 bg-muted/15 p-4 space-y-4"
-        >
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <h3 className="text-xs font-semibold tracking-tight text-foreground">{activeMeta.title}</h3>
-          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{activeMeta.description}</p>
-        </motion.div>
-
-        {connectActiveComposeOp === "where" ? (
+  const renderComposeOpBody = (opId) => (
+    <>
+        {opId === "where" ? (
           <div className="space-y-2">
             {composeWhereFilters.map((f) => (
               <div key={f.id} className="flex w-full flex-nowrap items-center gap-1.5">
@@ -326,7 +298,7 @@ export function ConnectComposeOperationPanel({ className }) {
           </div>
         ) : null}
 
-        {connectActiveComposeOp === "join" ? (
+        {opId === "join" ? (
           <div className="space-y-2">
             {composeJoins.map((jr) => {
               const rightCols = getColumnMetaForLakeTable("kalshi", jr.targetTable || "markets").map(
@@ -428,7 +400,7 @@ export function ConnectComposeOperationPanel({ className }) {
           </div>
         ) : null}
 
-        {connectActiveComposeOp === "sort" ? (
+        {opId === "sort" ? (
           <div className="space-y-2">
             {columnComposeOrderBy.map((ob, idx) => (
               <div key={`${ob.alias}-${idx}`} className="flex flex-wrap items-center gap-2">
@@ -495,7 +467,7 @@ export function ConnectComposeOperationPanel({ className }) {
           </div>
         ) : null}
 
-        {connectActiveComposeOp === "row_limit" ? (
+        {opId === "row_limit" ? (
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Maximum rows</Label>
             <motion.div className="flex items-center gap-2">
@@ -540,7 +512,7 @@ export function ConnectComposeOperationPanel({ className }) {
           </div>
         ) : null}
 
-        {connectActiveComposeOp === "summarize" ? (
+        {opId === "summarize" ? (
           <div className="space-y-2">
             {columnComposeItems.map((item) => {
               const k = kindForColumn(item.column);
@@ -581,7 +553,7 @@ export function ConnectComposeOperationPanel({ className }) {
           </div>
         ) : null}
 
-        {connectActiveComposeOp === "having" ? (
+        {opId === "having" ? (
           <div className="space-y-2">
             {composeHavingFilters.map((f) => (
               <motion.div key={f.id} className="flex flex-wrap items-center gap-1">
@@ -690,7 +662,36 @@ export function ConnectComposeOperationPanel({ className }) {
           </div>
         ) : null}
 
-        </motion.div>
+    </>
+  );
+
+  if (!openComposeOps.length) return null;
+
+  return (
+    <motion.div className={cn("mt-4 space-y-3", className)}>
+      <AnimatePresence initial={false}>
+        {openComposeOps.map((op) => (
+          <motion.div
+            key={op.id}
+            id={`connect-compose-${op.id}`}
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="scroll-mt-6 space-y-4 rounded-lg border border-border/60 bg-muted/15 p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <h3 className="text-xs font-semibold tracking-tight text-foreground">{op.title}</h3>
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{op.description}</p>
+            </motion.div>
+            {renderComposeOpBody(op.id)}
+          </motion.div>
+        ))}
       </AnimatePresence>
 
       <motion.div
