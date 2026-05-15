@@ -5,13 +5,17 @@ import { cn } from "@/lib/utils";
 
 /**
  * Vertical step rail for the Connect hub (wireframe / inspiration layout).
- * @param {{ currentStep: number; className?: string }} props
+ * @param {{ currentStep: number; className?: string; sticky?: boolean }} props
  */
 export function ConnectHomeFlowSteps({ currentStep, className, sticky = false }) {
   return (
     <nav
       aria-label="Platform steps"
-      className={cn("flex flex-col", sticky && "sticky top-[4.5rem] z-10 self-start", className)}
+      className={cn(
+        "flex flex-col",
+        sticky && "sticky top-[4.5rem] z-10 self-start",
+        className,
+      )}
     >
       <ol className="flex flex-col gap-6">
         {CONNECT_FLOW_STEPS.map((item) => {

@@ -133,10 +133,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
         className={cn("min-h-0 flex-1 overflow-y-auto", CONNECT_HOME_SURFACE)}
       >
         <div className={connectHubPageClass(true)}>
-          <div className={connectHubLayoutClass({ includeStepRail: true })}>
-            <ConnectHomeFlowSteps currentStep={connectFlowStep} className={connectHubFlowStepsClass} />
+          <ConnectHomeFlowSteps currentStep={connectFlowStep} className={connectHubFlowStepsClass} />
 
-            <div className="flex min-w-0 flex-col md:col-start-2">
+          <div className={connectHubLayoutClass({ fixedRail: true })}>
+            <div className="flex min-w-0 flex-col">
               <div ref={hubRef}>
                 <ConnectDataStep1
                   user={user}

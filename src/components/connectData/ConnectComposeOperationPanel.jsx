@@ -267,7 +267,7 @@ export function ConnectComposeOperationPanel({ className }) {
               <DropdownMenuTrigger asChild>
                 <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] gap-1">
                   <Plus className="h-3 w-3" />
-                  Add filter
+                  Select column you want to filter
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 max-h-[280px] overflow-y-auto">

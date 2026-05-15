@@ -10,8 +10,17 @@ export function connectHubPageClass(embeddedInShell = false) {
   );
 }
 
-/** Two-column hub grid: step rail + main (omit rail column when shell owns the rail). */
-export function connectHubLayoutClass({ includeStepRail = true } = {}) {
+/**
+ * Hub layout: two-column grid (inline rail) or single column with left pad (fixed rail).
+ * @param {{ includeStepRail?: boolean; fixedRail?: boolean }} opts
+ */
+export function connectHubLayoutClass({ includeStepRail = true, fixedRail = false } = {}) {
+  if (fixedRail) {
+    return cn(
+      "w-full min-w-0",
+      "md:pl-[9.5rem] lg:pl-[12rem] xl:pl-[13.5rem]",
+    );
+  }
   if (!includeStepRail) return "w-full min-w-0";
   return cn(
     "grid w-full grid-cols-1",
@@ -24,8 +33,19 @@ export function connectHubLayoutClass({ includeStepRail = true } = {}) {
 export const connectHubMainClass =
   "min-w-0 md:col-start-2 md:mx-auto md:w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl";
 
-/** Sticky step rail — stays visible while hub + workspace scroll. */
+/**
+ * Fixed step rail — pinned to viewport (sticky failed: grid item was only ~240px tall via self-start).
+ * Left edge tracks the centered max-w-7xl column + page padding.
+ */
 export const connectHubFlowStepsClass = cn(
-  "hidden shrink-0 self-start md:-ml-0.5 md:block",
-  "sticky top-[4.5rem] z-10",
+  "hidden md:block",
+  "fixed z-30 w-[8.5rem] lg:w-[10rem] xl:w-[11rem]",
+  "top-[4.5rem]",
+  "bg-white dark:bg-slate-950",
+  "left-[max(1rem,calc((100vw-min(100vw,80rem))/2+1rem))]",
+  "sm:left-[max(1.25rem,calc((100vw-min(100vw,80rem))/2+1.25rem))]",
+  "md:left-[max(1.5rem,calc((100vw-min(100vw,80rem))/2+1.5rem))]",
+  "lg:left-[max(2rem,calc((100vw-min(100vw,80rem))/2+2rem))]",
+  "xl:left-[max(2.5rem,calc((100vw-min(100vw,80rem))/2+2.5rem))]",
+  "2xl:left-[max(3rem,calc((100vw-min(100vw,80rem))/2+3rem))]",
 );
