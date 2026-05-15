@@ -28,6 +28,7 @@ import {
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
 import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
+import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace"
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport"
 import {
   ELITE_WORKSPACE_CAP_BYTES,
@@ -274,6 +275,7 @@ const Nav = () => {
   //what component are we viewing
   const viewing = contextStateV2?.viewing
   const setViewing = contextStateV2?.setViewing
+  const connectWorkspace = contextStateV2?.connectWorkspace
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
   const setDataSetName = contextStateV2?.setDataSetName
@@ -1174,9 +1176,14 @@ const Nav = () => {
   }, [saveIsOpen, loadedDataMeta?.data_set_name]);
 
 
+  const connectBreadcrumbLabel =
+    viewing === "connectDataHome" && isConnectIntegrationWorkspace(connectWorkspace)
+      ? "Integrate"
+      : "Connect";
+
   const breadcrumb = viewing === 'dashboardComposer' ? 'Lychee / Dashboard' :
     viewing === 'charts' ? 'Lychee / Charts' :
-    viewing === 'connectDataHome' ? 'Lychee / Connect' :
+    viewing === 'connectDataHome' ? `Lychee / ${connectBreadcrumbLabel}` :
     (viewing === 'dataStart' || viewing === 'integrations') ? 'Lychee / Data' :
     viewing === 'ai' ? 'Lychee / AI' :
     viewing === 'scrape' ? 'Lychee / Scrape' :
