@@ -117,18 +117,32 @@ function formatLatestWorkWhen(raw) {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+function ConnectPillTooltip({ content, side = "right", fullWidth = true, children }) {
+  const text = typeof content === "string" ? content.trim() : "";
+  if (!text) return children;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn(fullWidth ? "inline-flex w-full min-w-0" : "inline-flex max-w-full")}>
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side={side} className="max-w-xs text-pretty">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function LatestWorkPill({ label, when, title, onClick, disabled }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      title={title || label}
-      className={latestWorkPillClass}
-    >
-      <span className={latestWorkWhenClass}>{when}</span>
-      <span className={pillLabelClass}>{label}</span>
-    </button>
+    <ConnectPillTooltip content={title || label} fullWidth={false}>
+      <button type="button" disabled={disabled} onClick={onClick} className={latestWorkPillClass}>
+        <span className={latestWorkWhenClass}>{when}</span>
+        <span className={pillLabelClass}>{label}</span>
+      </button>
+    </ConnectPillTooltip>
   );
 }
 
@@ -151,37 +165,34 @@ function IntegrationIconWrap({ children }) {
   );
 }
 
-function PillButton({ icon, label, title, onClick, disabled, iconClassName, className }) {
+function PillButton({ icon, label, title, onClick, disabled, iconClassName, className, tooltipSide }) {
   return (
-    <button type="button" disabled={disabled} onClick={onClick} title={title || label} className={cn(pillClass, className)}>
-      <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
-      <span className={pillLabelClass}>{label}</span>
-    </button>
+    <ConnectPillTooltip content={title || label} side={tooltipSide}>
+      <button type="button" disabled={disabled} onClick={onClick} className={cn(pillClass, className)}>
+        <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
+        <span className={pillLabelClass}>{label}</span>
+      </button>
+    </ConnectPillTooltip>
   );
 }
 
-function PillButtonSoon({ icon, label, className, iconClassName }) {
+function PillButtonSoon({ icon, label, className, iconClassName, tooltip = "Coming soon" }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="inline-flex w-full">
-          <button
-            type="button"
-            disabled
-            className={cn(pillClass, className, "cursor-not-allowed opacity-45")}
-            aria-disabled
-          >
-            <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
-            <span className={pillLabelClass}>{label}</span>
-          </button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="right">Coming soon</TooltipContent>
-    </Tooltip>
+    <ConnectPillTooltip content={tooltip}>
+      <button
+        type="button"
+        disabled
+        className={cn(pillClass, className, "cursor-not-allowed opacity-45")}
+        aria-disabled
+      >
+        <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
+        <span className={pillLabelClass}>{label}</span>
+      </button>
+    </ConnectPillTooltip>
   );
 }
 
-function PillLink({ href, external, icon, label, title, iconClassName, wide = false }) {
+function PillLink({ href, external, icon, label, title, iconClassName, wide = false, tooltipSide }) {
   const surfaceClass = wide ? templatesPillClass : pillClass;
   const labelClass = wide ? templatesPillLabelClass : pillLabelClass;
   const body = (
@@ -193,32 +204,31 @@ function PillLink({ href, external, icon, label, title, iconClassName, wide = fa
       ) : null}
     </>
   );
-  if (external) {
-    return (
-      <a href={href} target="_blank" rel="noreferrer" title={title || label} className={surfaceClass}>
-        {body}
-      </a>
-    );
-  }
-  return (
-    <Link href={href} title={title || label} className={surfaceClass}>
+  const link = external ? (
+    <a href={href} target="_blank" rel="noreferrer" className={surfaceClass}>
+      {body}
+    </a>
+  ) : (
+    <Link href={href} className={surfaceClass}>
       {body}
     </Link>
   );
+
+  return (
+    <ConnectPillTooltip content={title || label} side={tooltipSide}>
+      {link}
+    </ConnectPillTooltip>
+  );
 }
 
-function PillButtonWide({ icon, label, title, onClick, disabled, iconClassName }) {
+function PillButtonWide({ icon, label, title, onClick, disabled, iconClassName, tooltipSide }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      title={title || label}
-      className={templatesPillClass}
-    >
-      <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
-      <span className={templatesPillLabelClass}>{label}</span>
-    </button>
+    <ConnectPillTooltip content={title || label} side={tooltipSide}>
+      <button type="button" disabled={disabled} onClick={onClick} className={templatesPillClass}>
+        <span className={cn(iconSlotClass, iconClassName)}>{icon}</span>
+        <span className={templatesPillLabelClass}>{label}</span>
+      </button>
+    </ConnectPillTooltip>
   );
 }
 
@@ -716,16 +726,18 @@ export default function ConnectDataStep1({
                   )}
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={() => activate?.(CONNECT_WORKSPACE.INTEGRATIONS_PICKER)}
-                className={cn(
-                  integrationsPillClass,
-                  "justify-center border-dashed text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground",
-                )}
-              >
-                + more
-              </button>
+              <ConnectPillTooltip content="Browse all integrations">
+                <button
+                  type="button"
+                  onClick={() => activate?.(CONNECT_WORKSPACE.INTEGRATIONS_PICKER)}
+                  className={cn(
+                    integrationsPillClass,
+                    "justify-center border-dashed text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground",
+                  )}
+                >
+                  + more
+                </button>
+              </ConnectPillTooltip>
             </div>
           </section>
 
