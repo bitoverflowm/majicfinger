@@ -509,6 +509,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const activeSheetId = ctx?.activeSheetId;
   const setActiveSheetId = ctx?.setActiveSheetId;
   const isDemo = !!ctx?.isDemo;
+  const viewing = ctx?.viewing;
+  const connectWorkspace = ctx?.connectWorkspace;
+  const connectDataLakeSampleId = ctx?.connectDataLakeSampleId ?? "";
+  const connectKalshiColumnSelections = ctx?.connectKalshiColumnSelections ?? {};
+  const connectHomeKalshiSourcePicker =
+    viewing === "connectDataHome" && connectWorkspace === "kalshiHistorical" && dataset === "kalshi";
   const user = useUser();
   const athenaRowLimit = useMemo(() => {
     if (isDemo) return ATHENA_DEMO_ROW_LIMIT;
@@ -616,6 +622,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setSampleId((prev) => (prev && sampleOptions.some((s) => s.id === prev) ? prev : ""));
   }, [dataset, sampleOptions]);
 
+  useEffect(() => {
+    if (!connectHomeKalshiSourcePicker || !connectDataLakeSampleId) return;
+    if (!sampleOptions.some((s) => s.id === connectDataLakeSampleId)) return;
+    setSampleId((prev) => (prev === connectDataLakeSampleId ? prev : connectDataLakeSampleId));
+  }, [connectHomeKalshiSourcePicker, connectDataLakeSampleId, sampleOptions]);
+
   const selected = sampleOptions.find((s) => s.id === sampleId);
   const pingState = sampleId ? athenaPingBySampleId?.[sampleId] || "idle" : "idle";
 
@@ -650,6 +662,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     },
     [lake, sampleOptions],
   );
+
+  useEffect(() => {
+    if (!connectHomeKalshiSourcePicker || !connectDataLakeSampleId) return;
+    if (sampleId !== connectDataLakeSampleId) return;
+    void pingAthenaForSource(connectDataLakeSampleId);
+  }, [connectHomeKalshiSourcePicker, connectDataLakeSampleId, sampleId, pingAthenaForSource]);
 
   const onSelectionTabChange = useCallback(
     (next) => {
@@ -729,6 +747,46 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     if (typeNorm === "string") return "string";
     return "string";
   }, [availableColumnTypesByName, isDateLikeName]);
+
+  useEffect(() => {
+    if (!connectHomeKalshiSourcePicker || !connectDataLakeSampleId) return;
+    if (sampleId !== connectDataLakeSampleId) return;
+    const cols = connectKalshiColumnSelections[connectDataLakeSampleId];
+    if (!Array.isArray(cols)) return;
+
+    setColumnComposeItems((prev) => {
+      const prevCols = new Set(prev.map((i) => i.column));
+      if (prev.length === cols.length && cols.every((c) => prevCols.has(c))) {
+        return prev;
+      }
+      return cols.map((col) => {
+        const existing = prev.find((i) => i.column === col);
+        if (existing) return existing;
+        const t = String(availableColumnTypesByName[col] || "").toLowerCase();
+        const isDate = (t === "bigint" || t === "int") && isDateLikeName(col);
+        return {
+          id: genComposeRowId(),
+          column: col,
+          alias: col,
+          aggregate: null,
+          dateBucket: null,
+          dateFormat: null,
+          numberScale: "none",
+          decimals: null,
+          treatAsDate: isDate,
+          sumCase: { enabled: false, branches: [], elseColumn: "" },
+          equation: { enabled: false },
+        };
+      });
+    });
+  }, [
+    connectHomeKalshiSourcePicker,
+    connectDataLakeSampleId,
+    sampleId,
+    connectKalshiColumnSelections,
+    availableColumnTypesByName,
+    isDateLikeName,
+  ]);
 
   const hasComposeAggregates = useMemo(
     () => columnComposeItems.some((i) => i.aggregate != null),
@@ -4980,6 +5038,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               </div>
             ) : null}
 
+            {!connectHomeKalshiSourcePicker ? (
             <div className="flex-1 space-y-1">
               <Label className="text-[11px] text-muted-foreground">Data source</Label>
               <div className="flex items-center gap-2 min-w-0">
@@ -5045,10 +5104,31 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                         : "Not checked"
                 }
               />
+              </div>
             </div>
+            ) : selected ? (
+              <div className="flex-1 space-y-1 min-w-0">
+                <Label className="text-[11px] text-muted-foreground">Data source</Label>
+                <div className="flex h-8 items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 text-xs font-medium text-foreground">
+                  <span
+                    className={[
+                      "h-2.5 w-2.5 shrink-0 rounded-full",
+                      pingState === "loading"
+                        ? "bg-amber-500 animate-pulse"
+                        : pingState === "ok"
+                          ? "bg-emerald-500"
+                          : pingState === "error"
+                            ? "bg-red-500"
+                            : "bg-slate-300 dark:bg-slate-700",
+                    ].join(" ")}
+                    aria-hidden
+                  />
+                  <span className="truncate">{selected.label}</span>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
-      </div>
       )}
 
       <div className="min-w-0 max-w-full px-2">

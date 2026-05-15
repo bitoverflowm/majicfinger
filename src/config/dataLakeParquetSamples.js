@@ -24,6 +24,20 @@ export const ATHENA_KALSHI_SAMPLE_OPTIONS = [
   { id: "athena-kal-trades", label: "Trades", table: "trades" },
 ];
 
+/** Connect home — Kalshi Historical source cards (replaces sidebar dropdown). */
+export const KALSHI_CONNECT_DATA_SOURCES = [
+  {
+    sampleId: "athena-kal-markets",
+    title: "Markets",
+    description: "Each row represents a prediction market contract.",
+  },
+  {
+    sampleId: "athena-kal-trades",
+    title: "Trades",
+    description: "Each row represents a single trade execution.",
+  },
+];
+
 /** Fixed server row cap for integration samples (matches product expectation). */
 export const ATHENA_SAMPLE_ROW_LIMIT = 100;
 

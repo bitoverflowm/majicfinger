@@ -46,6 +46,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ConnectHomeIntegrationWorkflow } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
+import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import DashboardComposerPage from "@/components/dashboardComposer/DashboardComposerPage";
@@ -138,6 +140,9 @@ export default function DataSheetWithIntegration({
   const setViewing = contextStateV2?.setViewing;
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
+  const connectWorkspace = contextStateV2?.connectWorkspace;
+  const showConnectIntegrationIntro =
+    connectHomeMode && isConnectIntegrationWorkspace(connectWorkspace);
   const connectedData = contextStateV2?.connectedData ?? [];
   const setConnectedDataRaw = contextStateV2?.setConnectedData;
   const dataSheets = contextStateV2?.dataSheets || {};
@@ -834,6 +839,8 @@ export default function DataSheetWithIntegration({
               ) : null}
               <ChartCanvas />
             </div>
+          ) : showConnectIntegrationIntro ? (
+            <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
           ) : (
             <>
               <DataView user={user} startNew={startNew} setStartNew={setStartNew} />

@@ -1,0 +1,345 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check } from "lucide-react";
+
+import { integrations_list } from "@/components/integrationsView/integrationsConfig";
+import { Button } from "@/components/ui/button";
+import { KALSHI_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
+import { useMyStateV2 } from "@/context/stateContextV2";
+import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
+import { getKalshiColumnDisplayLabel, getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
+import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
+import { cn } from "@/lib/utils";
+
+const columnRowVariants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: (i) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.035, duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
+
+function getIntegrationMeta(integrationId) {
+  const row = integrations_list.find((i) => i.clickHandler === integrationId);
+  if (!row) {
+    return {
+      name: integrationId,
+      description: "Use the integrations panel to pull data into your project.",
+    };
+  }
+  return { name: row.name, description: row.description };
+}
+
+function ColumnHoverPreview({ sampleId }) {
+  const columns = getKalshiConnectColumnsForSample(sampleId);
+  if (!columns.length) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.2 }}
+      className="overflow-hidden"
+    >
+      <div className="mt-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-2">
+        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0 border-b border-border/40 pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span>Column</span>
+          <span>Type</span>
+        </div>
+        <ul className="space-y-0.5">
+          {columns.map((col, i) => (
+            <li key={col.name} className="list-none">
+              <motion.div
+                custom={i}
+                variants={columnRowVariants}
+                initial="hidden"
+                animate="visible"
+                className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 border-b border-border/30 py-1.5 last:border-0"
+              >
+                <span className="text-[11px] text-foreground">{getKalshiColumnDisplayLabel(col)}</span>
+                <span className="text-[10px] text-muted-foreground">{col.type}</span>
+                <span className="col-span-2 text-[11px] leading-snug text-muted-foreground">
+                  {col.description}
+                </span>
+              </motion.div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.div>
+  );
+}
+
+function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, onDeselectAll }) {
+  const columns = getKalshiConnectColumnsForSample(sampleId);
+  const selectedSet = new Set(selectedColumns);
+  const allSelected = columns.length > 0 && selectedColumns.length === columns.length;
+  const noneSelected = selectedColumns.length === 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      className="mt-4 space-y-2"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <h2 className="text-xs font-semibold tracking-tight text-foreground">
+          Select which columns you are interested in pulling
+        </h2>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px] font-normal"
+            onClick={onSelectAll}
+            disabled={allSelected}
+          >
+            Select all
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px] font-normal"
+            onClick={onDeselectAll}
+            disabled={noneSelected}
+          >
+            Deselect all
+          </Button>
+        </div>
+      </div>
+      <ul role="list" className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+        {columns.map((col) => {
+          const isSelected = selectedSet.has(col.name);
+          const displayLabel = getKalshiColumnDisplayLabel(col);
+          return (
+            <li key={col.name}>
+              <button
+                type="button"
+                onClick={() => onToggleColumn(col.name)}
+                aria-pressed={isSelected}
+                title={!isSelected ? col.description : displayLabel}
+                className={cn(
+                  "flex w-full items-start gap-1.5 rounded-md border px-2 py-1 text-left transition-colors duration-150",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+                  isSelected
+                    ? "border-primary/35 bg-primary/5"
+                    : "border-border/50 bg-card hover:border-border hover:bg-muted/15",
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-px flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
+                    isSelected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border/80 bg-background",
+                  )}
+                  aria-hidden
+                >
+                  {isSelected ? <Check className="h-2.5 w-2.5" strokeWidth={2.5} /> : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex min-w-0 items-baseline gap-1.5">
+                    <span className="truncate text-[11px] font-medium leading-tight text-foreground">
+                      {displayLabel}
+                    </span>
+                    <span className="shrink-0 text-[9px] leading-tight text-muted-foreground">{col.type}</span>
+                  </span>
+                  {!isSelected ? (
+                    <span className="mt-0.5 block line-clamp-1 text-[10px] leading-tight text-muted-foreground">
+                      {col.description}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <ConnectDataOperationsSection selectedCount={selectedColumns.length} />
+    </motion.div>
+  );
+}
+
+function KalshiDataSourceCards({
+  selectedSampleId,
+  onSelect,
+  columnSelections,
+  onToggleColumn,
+  onSelectAllColumns,
+  onDeselectAllColumns,
+}) {
+  const [hoveredSampleId, setHoveredSampleId] = useState(null);
+  /** One preview only: below cards. Skip when hovering the already-selected source (picker is shown). */
+  const showHoverPreview =
+    !!hoveredSampleId && (!selectedSampleId || hoveredSampleId !== selectedSampleId);
+
+  return (
+    <motion.div className={cn("space-y-3", selectedSampleId ? "mt-5" : "mt-8")}>
+      <div>
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">Pick one</h2>
+        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          Then pick columns and optional joins, filters, or limits below
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {KALSHI_CONNECT_DATA_SOURCES.map((source) => {
+          const isSelected = selectedSampleId === source.sampleId;
+          const isHovered = hoveredSampleId === source.sampleId;
+
+          return (
+            <motion.div
+              key={source.sampleId}
+              onMouseEnter={() => setHoveredSampleId(source.sampleId)}
+              onMouseLeave={() => setHoveredSampleId((prev) => (prev === source.sampleId ? null : prev))}
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(source.sampleId)}
+                className={cn(
+                  "relative flex w-full min-h-[5.5rem] flex-col rounded-xl border p-4 text-left transition-all duration-200",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  isSelected
+                    ? "border-primary bg-muted/40 shadow-sm ring-2 ring-primary/25"
+                    : isHovered
+                      ? "border-border bg-muted/25 shadow-md"
+                      : "border-border/60 bg-card hover:border-border hover:bg-muted/25 hover:shadow-md",
+                )}
+              >
+                {isSelected ? (
+                  <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden />
+                  </span>
+                ) : null}
+                <span className="text-sm font-semibold tracking-tight text-foreground pr-6">{source.title}</span>
+                <span className="mt-1 text-xs leading-snug text-muted-foreground">{source.description}</span>
+              </button>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      <AnimatePresence>
+        {showHoverPreview ? <ColumnHoverPreview key={hoveredSampleId} sampleId={hoveredSampleId} /> : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedSampleId ? (
+          <ColumnPicker
+            key={selectedSampleId}
+            sampleId={selectedSampleId}
+            selectedColumns={columnSelections[selectedSampleId] || []}
+            onToggleColumn={(col) => onToggleColumn(selectedSampleId, col)}
+            onSelectAll={() => onSelectAllColumns(selectedSampleId)}
+            onDeselectAll={() => onDeselectAllColumns(selectedSampleId)}
+          />
+        ) : null}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+/**
+ * Connect home workspace intro when an integration is selected (replaces empty grid).
+ */
+export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
+  const {
+    connectDataLakeSampleId,
+    setConnectDataLakeSampleId,
+    connectKalshiColumnSelections,
+    setConnectKalshiColumnSelections,
+  } = useMyStateV2() ?? {};
+
+  const toggleColumn = useCallback(
+    (sampleId, columnName) => {
+      setConnectKalshiColumnSelections?.((prev) => {
+        const current = prev?.[sampleId] || [];
+        const has = current.includes(columnName);
+        return {
+          ...(prev || {}),
+          [sampleId]: has ? current.filter((c) => c !== columnName) : [...current, columnName],
+        };
+      });
+    },
+    [setConnectKalshiColumnSelections],
+  );
+
+  const selectAllColumns = useCallback(
+    (sampleId) => {
+      const names = getKalshiConnectColumnsForSample(sampleId).map((c) => c.name);
+      setConnectKalshiColumnSelections?.((prev) => ({
+        ...(prev || {}),
+        [sampleId]: names,
+      }));
+    },
+    [setConnectKalshiColumnSelections],
+  );
+
+  const deselectAllColumns = useCallback(
+    (sampleId) => {
+      setConnectKalshiColumnSelections?.((prev) => ({
+        ...(prev || {}),
+        [sampleId]: [],
+      }));
+    },
+    [setConnectKalshiColumnSelections],
+  );
+
+  if (!isConnectIntegrationWorkspace(integrationId)) return null;
+
+  const { name, description } = getIntegrationMeta(integrationId);
+  const showKalshiSourceCards = integrationId === "kalshiHistorical";
+  const hasColumnPicker = showKalshiSourceCards && !!connectDataLakeSampleId;
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col px-4 sm:px-6 md:px-10 lg:px-14",
+        hasColumnPicker ? "min-h-0 justify-start py-4 sm:py-5" : "min-h-[min(28rem,55vh)] justify-center py-10 sm:py-12",
+        className,
+      )}
+    >
+      <div className={cn("mx-auto w-full", hasColumnPicker ? "max-w-4xl" : "max-w-2xl")}>
+        <h1
+          className={cn(
+            "text-balance text-left font-semibold tracking-tight text-foreground",
+            hasColumnPicker ? "text-lg sm:text-xl" : "text-xl sm:text-2xl",
+          )}
+        >
+          {name}
+        </h1>
+        <p
+          className={cn(
+            "max-w-prose text-muted-foreground",
+            hasColumnPicker ? "mt-1.5 text-xs leading-snug" : "mt-3 text-sm leading-relaxed",
+          )}
+        >
+          {description}
+        </p>
+
+        {showKalshiSourceCards ? (
+          <KalshiDataSourceCards
+            selectedSampleId={connectDataLakeSampleId}
+            onSelect={(sampleId) => setConnectDataLakeSampleId?.(sampleId)}
+            columnSelections={connectKalshiColumnSelections || {}}
+            onToggleColumn={toggleColumn}
+            onSelectAllColumns={selectAllColumns}
+            onDeselectAllColumns={deselectAllColumns}
+          />
+        ) : (
+          <p className="mt-10 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Use the panel on the right to connect and pull data
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
