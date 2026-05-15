@@ -1,17 +1,20 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check } from "lucide-react";
 
+import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Button } from "@/components/ui/button";
-import { KALSHI_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
+import { ATHENA_KALSHI_SAMPLE_OPTIONS, KALSHI_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { getKalshiColumnDisplayLabel, getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { cn } from "@/lib/utils";
+
+const KALSHI_SAMPLE_BY_ID = Object.fromEntries(ATHENA_KALSHI_SAMPLE_OPTIONS.map((s) => [s.id, s]));
 
 const columnRowVariants = {
   hidden: { opacity: 0, y: 6 },
@@ -33,19 +36,19 @@ function getIntegrationMeta(integrationId) {
   return { name: row.name, description: row.description };
 }
 
-function ColumnHoverPreview({ sampleId }) {
+function ColumnHoverPreview({ sampleId, className }) {
   const columns = getKalshiConnectColumnsForSample(sampleId);
   if (!columns.length) return null;
 
   return (
     <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: "auto" }}
-      exit={{ opacity: 0, height: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="overflow-hidden"
+      className={cn("overflow-y-auto", className)}
     >
-      <div className="mt-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-2">
+      <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2">
         <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0 border-b border-border/40 pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Column</span>
           <span>Type</span>
@@ -73,6 +76,9 @@ function ColumnHoverPreview({ sampleId }) {
     </motion.div>
   );
 }
+
+/** Fixed slot height so hover preview does not shift the Pick one block (avoids hover jitter). */
+const KALSHI_HOVER_PREVIEW_SLOT_CLASS = "h-[min(26rem,42vh)] min-h-[11rem] shrink-0";
 
 function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, onDeselectAll }) {
   const columns = getKalshiConnectColumnsForSample(sampleId);
@@ -171,6 +177,7 @@ function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, 
 function KalshiDataSourceCards({
   selectedSampleId,
   onSelect,
+  athenaPingBySampleId,
   columnSelections,
   onToggleColumn,
   onSelectAllColumns,
@@ -190,6 +197,10 @@ function KalshiDataSourceCards({
         </p>
       </div>
 
+      <motion.div
+        className="space-y-3"
+        onMouseLeave={() => setHoveredSampleId(null)}
+      >
       <div className="grid gap-3 sm:grid-cols-2">
         {KALSHI_CONNECT_DATA_SOURCES.map((source) => {
           const isSelected = selectedSampleId === source.sampleId;
@@ -199,7 +210,6 @@ function KalshiDataSourceCards({
             <motion.div
               key={source.sampleId}
               onMouseEnter={() => setHoveredSampleId(source.sampleId)}
-              onMouseLeave={() => setHoveredSampleId((prev) => (prev === source.sampleId ? null : prev))}
             >
               <button
                 type="button"
@@ -215,8 +225,14 @@ function KalshiDataSourceCards({
                 )}
               >
                 {isSelected ? (
-                  <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden />
+                  <span
+                    className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border border-border/50 bg-background shadow-sm"
+                    title="Athena connection test"
+                  >
+                    <AthenaConnectionStatusDot
+                      state={athenaPingBySampleId?.[source.sampleId] || "loading"}
+                      size="sm"
+                    />
                   </span>
                 ) : null}
                 <span className="text-sm font-semibold tracking-tight text-foreground pr-6">{source.title}</span>
@@ -227,9 +243,19 @@ function KalshiDataSourceCards({
         })}
       </div>
 
-      <AnimatePresence>
-        {showHoverPreview ? <ColumnHoverPreview key={hoveredSampleId} sampleId={hoveredSampleId} /> : null}
-      </AnimatePresence>
+      {!selectedSampleId ? (
+        <div className={cn("relative", KALSHI_HOVER_PREVIEW_SLOT_CLASS)} aria-live="polite">
+          <AnimatePresence mode="wait">
+            {showHoverPreview ? (
+              <ColumnHoverPreview
+                key={hoveredSampleId}
+                sampleId={hoveredSampleId}
+                className="absolute inset-0"
+              />
+            ) : null}
+          </AnimatePresence>
+        </div>
+      ) : null}
 
       <AnimatePresence>
         {selectedSampleId ? (
@@ -243,6 +269,7 @@ function KalshiDataSourceCards({
           />
         ) : null}
       </AnimatePresence>
+      </motion.div>
     </motion.div>
   );
 }
@@ -256,7 +283,33 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     setConnectDataLakeSampleId,
     connectKalshiColumnSelections,
     setConnectKalshiColumnSelections,
+    athenaPingBySampleId,
+    pingAthenaLakeSample,
   } = useMyStateV2() ?? {};
+
+  const pingKalshiSample = useCallback(
+    (sampleId) => {
+      const snap = KALSHI_SAMPLE_BY_ID[sampleId];
+      if (!snap) return;
+      void pingAthenaLakeSample?.({ sampleId, lake: "kalshi", table: snap.table });
+    },
+    [pingAthenaLakeSample],
+  );
+
+  const handleSelectKalshiSource = useCallback(
+    (sampleId) => {
+      setConnectDataLakeSampleId?.(sampleId);
+      pingKalshiSample(sampleId);
+    },
+    [setConnectDataLakeSampleId, pingKalshiSample],
+  );
+
+  useEffect(() => {
+    if (!connectDataLakeSampleId) return;
+    const state = athenaPingBySampleId?.[connectDataLakeSampleId];
+    if (state === "loading" || state === "ok" || state === "error") return;
+    pingKalshiSample(connectDataLakeSampleId);
+  }, [connectDataLakeSampleId, athenaPingBySampleId, pingKalshiSample]);
 
   const toggleColumn = useCallback(
     (sampleId, columnName) => {
@@ -303,7 +356,11 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     <div
       className={cn(
         "flex flex-col px-4 sm:px-6 md:px-10 lg:px-14",
-        hasColumnPicker ? "min-h-0 justify-start py-4 sm:py-5" : "min-h-[min(28rem,55vh)] justify-center py-10 sm:py-12",
+        showKalshiSourceCards
+          ? hasColumnPicker
+            ? "min-h-0 justify-start py-4 sm:py-5"
+            : "min-h-0 justify-start py-10 sm:py-12"
+          : "min-h-[min(28rem,55vh)] justify-center py-10 sm:py-12",
         className,
       )}
     >
@@ -328,7 +385,8 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
         {showKalshiSourceCards ? (
           <KalshiDataSourceCards
             selectedSampleId={connectDataLakeSampleId}
-            onSelect={(sampleId) => setConnectDataLakeSampleId?.(sampleId)}
+            onSelect={handleSelectKalshiSource}
+            athenaPingBySampleId={athenaPingBySampleId || {}}
             columnSelections={connectKalshiColumnSelections || {}}
             onToggleColumn={toggleColumn}
             onSelectAllColumns={selectAllColumns}

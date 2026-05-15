@@ -58,6 +58,7 @@ import { userHasExpandedAthenaAccess } from "@/lib/athenaEntitlement";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
+import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
 import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
 import EquationExprBuilder from "./EquationExprBuilder";
@@ -514,6 +515,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const connectDataLakeSampleId = ctx?.connectDataLakeSampleId ?? "";
   const setConnectDataLakeSampleId = ctx?.setConnectDataLakeSampleId;
   const connectKalshiColumnSelections = ctx?.connectKalshiColumnSelections ?? {};
+  const athenaPingBySampleId = ctx?.athenaPingBySampleId ?? {};
+  const pingAthenaLakeSample = ctx?.pingAthenaLakeSample;
   /** Connect home + Kalshi: sync sample/columns from main workspace; panel UI stays full-featured. */
   const connectHomeKalshiSourcePicker =
     viewing === "connectDataHome" && connectWorkspace === "kalshiHistorical" && dataset === "kalshi";
@@ -534,7 +537,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
   const canUseSamples = true;
   const [sampleId, setSampleId] = useState("");
-  const [athenaPingBySampleId, setAthenaPingBySampleId] = useState({}); // { [sampleId]: "idle" | "loading" | "ok" | "error" }
   /** @type {Array<{ id: string; column: string; alias: string; aggregate: null | "sum" | "count"; dateBucket: null | string; dateFormat: null | string; numberScale: string; decimals: null | number; treatAsDate: boolean; sumCase?: any; equation?: any }>} */
   const [columnComposeItems, setColumnComposeItems] = useState([]);
   /** @type {Array<{ alias: string; direction: "asc" | "desc" }>} */
@@ -638,31 +640,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       const id = String(nextSampleId || "").trim();
       const snap = sampleOptions.find((s) => s.id === id);
       const table = snap?.table;
-      if (!id || !table) return;
-      setAthenaPingBySampleId((prev) => ({ ...(prev || {}), [id]: "loading" }));
-      try {
-        const res = await fetch("/api/data-lake/athena-query/start", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({
-            lake,
-            table,
-            queryType: "count",
-            countAlias: "count",
-            limit: 1,
-            caseSensitive: true,
-            filters: null,
-          }),
-        });
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(j.error || res.statusText || `Ping ${res.status}`);
-        setAthenaPingBySampleId((prev) => ({ ...(prev || {}), [id]: "ok" }));
-      } catch (e) {
-        setAthenaPingBySampleId((prev) => ({ ...(prev || {}), [id]: "error" }));
-      }
+      if (!id || !table || !pingAthenaLakeSample) return;
+      await pingAthenaLakeSample({ sampleId: id, lake, table });
     },
-    [lake, sampleOptions],
+    [lake, sampleOptions, pingAthenaLakeSample],
   );
 
   useEffect(() => {
@@ -5086,28 +5067,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   </SelectContent>
                 </Select>
 
-              <span
-                className={[
-                  "h-2.5 w-2.5 rounded-full shrink-0",
-                  pingState === "loading"
-                    ? "bg-amber-500 animate-pulse"
-                    : pingState === "ok"
-                      ? "bg-emerald-500"
-                      : pingState === "error"
-                        ? "bg-red-500"
-                        : "bg-slate-300 dark:bg-slate-700",
-                ].join(" ")}
-                aria-label="Athena connection status"
-                title={
-                  pingState === "loading"
-                    ? "Checking connection…"
-                    : pingState === "ok"
-                      ? "Connected"
-                      : pingState === "error"
-                        ? "Connection issue"
-                        : "Not checked"
-                }
-              />
+              <AthenaConnectionStatusDot state={pingState} />
               </div>
             </div>
           </div>
