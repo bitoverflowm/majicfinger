@@ -84,10 +84,9 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
         >
-          <h2 className="text-xs font-semibold tracking-tight text-foreground">Refine your pull</h2>
+          <h2 className="text-xs font-semibold tracking-tight text-foreground">Refine your query</h2>
           <p className="mt-1 max-w-prose text-[11px] leading-snug text-muted-foreground">
-            Optional steps before you run the query. Each operation you pick stacks below — the
-            integrations panel stays in sync.
+            Optional: you can add filters, sort, limit or join multiple datasets. You can apply multiple operations at once.
           </p>
         </motion.div>
 
