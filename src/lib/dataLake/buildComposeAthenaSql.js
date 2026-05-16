@@ -13,8 +13,8 @@ import {
   KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN,
 } from "@/lib/kalshi/kalshiTaxonomySql";
 
-/** @typedef {"day" | "week" | "month" | "quarter" | "year"} DateBucket */
-/** @typedef {"dmy" | "ym" | "dm"} DateFormat */
+/** @typedef {"hour" | "day" | "week" | "month" | "quarter" | "year"} DateBucket */
+/** @typedef {"raw" | "iso" | "dmy" | "ym" | "dm" | "hm"} DateFormat */
 
 const SAFE_ALIAS = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -273,8 +273,52 @@ function buildKalshiTradesResolvedMarketsJoinSubqueryCent(tradesPhysical, market
 ) `;
 }
 
-const DATE_BUCKETS = new Set(["day", "week", "month", "quarter", "year"]);
-const DATE_FORMATS = new Set(["dmy", "ym", "dm"]);
+const DATE_BUCKETS = new Set(["hour", "day", "week", "month", "quarter", "year"]);
+const DATE_FORMATS = new Set(["raw", "iso", "dmy", "ym", "dm", "hm"]);
+
+/**
+ * @param {string} tsExpr Presto timestamp expression
+ * @param {DateBucket} dateBucket
+ * @param {DateFormat | null} dateFormat
+ */
+function formatDateTimeDimensionSql(tsExpr, dateBucket, dateFormat) {
+  const fmt = dateFormat && DATE_FORMATS.has(dateFormat) ? dateFormat : null;
+
+  if (fmt === "raw") {
+    return `CAST(to_unixtime(${tsExpr}) AS BIGINT)`;
+  }
+
+  const pattern =
+    fmt === "iso"
+      ? "%Y-%m-%d %H:%i"
+      : fmt === "hm"
+        ? "%H:%i"
+        : fmt === "dmy"
+          ? "%d-%m-%Y"
+          : fmt === "ym"
+            ? "%Y-%m"
+            : fmt === "dm"
+              ? "%d-%m"
+              : null;
+
+  if (pattern) {
+    return `date_format(${tsExpr}, '${pattern}')`;
+  }
+
+  if (dateBucket === "quarter") {
+    return `concat('Q', CAST(extract(quarter FROM ${tsExpr}) AS varchar), ' ''', date_format(${tsExpr}, '%y'))`;
+  }
+  if (dateBucket === "month") {
+    return `date_format(${tsExpr}, '%Y-%m')`;
+  }
+  if (dateBucket === "year") {
+    return `date_format(${tsExpr}, '%Y')`;
+  }
+  if (dateBucket === "hour") {
+    return `date_format(${tsExpr}, '%Y-%m-%d %H:00')`;
+  }
+  return `date_format(${tsExpr}, '%Y-%m-%d')`;
+}
 const SCALES = new Set(["none", "ten", "hundred", "thousand", "million", "billion"]);
 
 function divisorForScale(scale) {
@@ -326,6 +370,8 @@ function isNumericHiveType(hiveType) {
  * @param {boolean} opts.treatAsDate
  * @param {DateBucket | null} opts.dateBucket
  * @param {DateFormat | null} opts.dateFormat
+ * @param {string | null} opts.stringBucket
+ * @param {number | null} opts.numberBucket
  * @param {string | null} opts.aggregate
  * @param {string | null} opts.numberScale
  * @param {number | null} opts.decimals
@@ -338,6 +384,8 @@ function buildSelectExpression(opts) {
     treatAsDate,
     dateBucket,
     dateFormat,
+    stringBucket,
+    numberBucket,
     aggregate,
     numberScale,
     decimals,
@@ -543,32 +591,31 @@ function buildSelectExpression(opts) {
     return { innerSql, isAggregate: false };
   }
 
-  // Dimension: date bucket / format (epoch columns only; validated upstream)
-  if (treatAsDate && numeric && dateBucket && DATE_BUCKETS.has(dateBucket)) {
+  // Dimension: date/time bucket + optional display format (epoch columns; validated upstream)
+  if (treatAsDate && numeric) {
     const ts = epochBigintToTimestampExpr(colRef(column));
-    const bucketTs = `date_trunc('${dateBucket}', ${ts})`;
-
-    // Important: return a *string* for date buckets so the sheet shows labels like
-    // "Q1 '24" instead of epoch millis (which happens if we return timestamps).
-    let inner;
-    if (dateBucket === "quarter") {
-      inner = `concat('Q', CAST(extract(quarter FROM ${bucketTs}) AS varchar), ' ''', date_format(${bucketTs}, '%y'))`;
-    } else if (dateBucket === "month") {
-      inner = `date_format(${bucketTs}, '%Y-%m')`;
-    } else if (dateBucket === "year") {
-      inner = `date_format(${bucketTs}, '%Y')`;
-    } else {
-      // day/week: show bucket start date in ISO form
-      inner = `date_format(${bucketTs}, '%Y-%m-%d')`;
+    if (dateBucket && DATE_BUCKETS.has(dateBucket)) {
+      const bucketTs = `date_trunc('${dateBucket}', ${ts})`;
+      const inner = formatDateTimeDimensionSql(bucketTs, dateBucket, dateFormat);
+      return { innerSql: wrapRound(inner), isAggregate: false };
     }
-
-    return { innerSql: wrapRound(inner), isAggregate: false };
+    if (dateFormat && DATE_FORMATS.has(dateFormat) && dateFormat !== "raw") {
+      const inner = formatDateTimeDimensionSql(ts, null, dateFormat);
+      return { innerSql: inner, isAggregate: false };
+    }
   }
-  if (treatAsDate && numeric && dateFormat && DATE_FORMATS.has(dateFormat)) {
-    const ts = epochBigintToTimestampExpr(colRef(column));
-    const fmt = dateFormat === "dmy" ? "%d-%m-%Y" : dateFormat === "ym" ? "%Y-%m" : "%d-%m";
-    const inner = `date_format(${ts}, '${fmt}')`;
-    return { innerSql: inner, isAggregate: false };
+
+  // Dimension: numeric width buckets
+  if (numeric && !treatAsDate && numberBucket != null && Number(numberBucket) > 0) {
+    const w = Number(numberBucket);
+    const base = `CAST(${colRef(column)} AS DOUBLE)`;
+    const inner = `CAST(FLOOR(${base} / ${w}) * ${w} AS DOUBLE)`;
+    return { innerSql: wrapRound(applyScale(inner)), isAggregate: false };
+  }
+
+  // Dimension: string / boolean — unique value grouping key
+  if (!numeric && stringBucket === "distinct") {
+    return { innerSql: `CAST(${colRef(column)} AS VARCHAR)`, isAggregate: false };
   }
 
   // Dimension: pass-through strings / booleans
@@ -779,6 +826,8 @@ export function buildComposeAthenaSelectSql({
       treatAsDate: row.treatAsDate === true,
       dateBucket: row.dateBucket || null,
       dateFormat: row.dateFormat || null,
+      stringBucket: row.stringBucket || null,
+      numberBucket: row.numberBucket != null ? Number(row.numberBucket) : null,
       aggregate: row.aggregate || null,
       numberScale: row.numberScale || null,
       decimals: row.decimals != null ? Number(row.decimals) : null,
@@ -795,6 +844,8 @@ export function buildComposeAthenaSelectSql({
       treatAsDate: row.treatAsDate === true,
       dateBucket: row.dateBucket || null,
       dateFormat: row.dateFormat || null,
+      stringBucket: row.stringBucket || null,
+      numberBucket: row.numberBucket != null ? Number(row.numberBucket) : null,
       aggregate: null,
       numberScale: row.numberScale || null,
       decimals: row.decimals != null ? Number(row.decimals) : null,

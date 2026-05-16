@@ -41,6 +41,8 @@ export function useSyncConnectKalshiComposeItems({
           aggregate: null,
           dateBucket: null,
           dateFormat: null,
+          stringBucket: null,
+          numberBucket: null,
           numberScale: "none",
           decimals: null,
           treatAsDate: isDate,

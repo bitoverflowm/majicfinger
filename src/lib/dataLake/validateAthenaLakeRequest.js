@@ -443,8 +443,9 @@ export function validateAthenaLakeQueryBody(body, access) {
       throw new AthenaLakeRequestError("Compose query is not available for this table", { statusCode: 400, code: "BAD_REQUEST" });
     }
 
-    const dateBuckets = new Set(["day", "week", "month", "quarter", "year"]);
-    const dateFormats = new Set(["dmy", "ym", "dm"]);
+    const dateBuckets = new Set(["hour", "day", "week", "month", "quarter", "year"]);
+    const dateFormats = new Set(["raw", "iso", "dmy", "ym", "dm", "hm"]);
+    const allowedNumberBucketWidths = new Set([0.01, 0.1, 1, 10, 100, 1000, 10000]);
     const scales = new Set(["none", "ten", "hundred", "thousand", "million", "billion"]);
     const safeAlias = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -616,11 +617,19 @@ export function validateAthenaLakeQueryBody(body, access) {
       const dfRaw = row.dateFormat != null && String(row.dateFormat).trim() !== "" ? String(row.dateFormat).trim().toLowerCase() : null;
       const dateFormat = dfRaw && dateFormats.has(dfRaw) ? dfRaw : null;
 
-      if (dateBucket && dateFormat) {
-        throw new AthenaLakeRequestError("Use only one of dateBucket or dateFormat per column", {
-          statusCode: 400,
-          code: "BAD_REQUEST",
-        });
+      const sbRaw =
+        row.stringBucket != null && String(row.stringBucket).trim() !== ""
+          ? String(row.stringBucket).trim().toLowerCase()
+          : null;
+      const stringBucket = sbRaw === "distinct" ? "distinct" : null;
+
+      let numberBucket = null;
+      if (row.numberBucket != null && String(row.numberBucket).trim() !== "") {
+        const nb = Number(row.numberBucket);
+        if (!Number.isFinite(nb) || !allowedNumberBucketWidths.has(nb)) {
+          throw new AthenaLakeRequestError("Invalid numberBucket width", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        numberBucket = nb;
       }
 
       const treatAsDate = row.treatAsDate === true;
@@ -640,8 +649,41 @@ export function validateAthenaLakeQueryBody(body, access) {
         });
       }
 
+      if (stringBucket && isNumericHiveType(colType) && treatAsDate) {
+        throw new AthenaLakeRequestError("stringBucket does not apply to date/time columns", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+      if (stringBucket && isNumericHiveType(colType) && !treatAsDate) {
+        throw new AthenaLakeRequestError("Use numberBucket for numeric grouping, not stringBucket", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+      if (numberBucket != null) {
+        if (!isNumericHiveType(colType) || treatAsDate) {
+          throw new AthenaLakeRequestError("numberBucket applies only to numeric non-date columns", {
+            statusCode: 400,
+            code: "BAD_REQUEST",
+          });
+        }
+      }
+      if (dateBucket && (stringBucket || numberBucket != null)) {
+        throw new AthenaLakeRequestError("Use only one grouping mode per column", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+      if (stringBucket && numberBucket != null) {
+        throw new AthenaLakeRequestError("Use only one grouping mode per column", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+
       const caseOnlyDimension = aggregate == null && normalizedSumCase?.enabled === true;
-      if (normalizedSumCase?.enabled && (dateBucket || dateFormat)) {
+      if (normalizedSumCase?.enabled && (dateBucket || dateFormat || stringBucket || numberBucket != null)) {
         throw new AthenaLakeRequestError("Do not combine if/else CASE with date bucket/format on the same row", {
           statusCode: 400,
           code: "BAD_REQUEST",
@@ -678,8 +720,8 @@ export function validateAthenaLakeQueryBody(body, access) {
         throw new AthenaLakeRequestError("decimals apply only to numeric columns", { statusCode: 400, code: "BAD_REQUEST" });
       }
 
-      if (aggregate && (dateBucket || dateFormat)) {
-        throw new AthenaLakeRequestError("Do not combine aggregates with date truncation on the same select item", {
+      if (aggregate && (dateBucket || dateFormat || stringBucket || numberBucket != null)) {
+        throw new AthenaLakeRequestError("Do not combine aggregates with grouping buckets on the same select item", {
           statusCode: 400,
           code: "BAD_REQUEST",
         });
@@ -691,6 +733,8 @@ export function validateAthenaLakeQueryBody(body, access) {
         aggregate,
         dateBucket,
         dateFormat,
+        stringBucket,
+        numberBucket,
         numberScale,
         decimals,
         treatAsDate,

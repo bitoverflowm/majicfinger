@@ -28,6 +28,11 @@ export const CONNECT_COMPOSE_OPERATIONS = [
     description: "Sum or count values. Requires grouping.",
   },
   {
+    id: "if_else",
+    title: "If / else",
+    description: "Conditional values per row (CASE) or conditional SUM when grouping.",
+  },
+  {
     id: "having",
     title: "Having",
     description: "Filter after grouping (e.g. only group categories where volume > 10000.)",

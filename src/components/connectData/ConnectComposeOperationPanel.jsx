@@ -34,6 +34,7 @@ import { glueTableNamesForDataset } from "@/config/dataLakeParquetSamples";
 import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { cn } from "@/lib/utils";
+import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectComposeIfElseSection";
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
 
 const KALSHI_SAMPLE_BY_ID = Object.fromEntries(ATHENA_KALSHI_SAMPLE_OPTIONS.map((s) => [s.id, s]));
@@ -203,8 +204,13 @@ export function ConnectComposeOperationPanel({ className }) {
         aggregate: null,
         dateBucket: null,
         dateFormat: null,
+        stringBucket: null,
+        numberBucket: null,
         numberScale: "none",
         decimals: null,
+        treatAsDate: row.treatAsDate,
+        sumCase: { enabled: false, branches: [], elseColumn: "" },
+        equation: { enabled: false },
       })),
     );
     setConnectActiveComposeOps?.([]);
@@ -553,9 +559,16 @@ export function ConnectComposeOperationPanel({ className }) {
           <ConnectComposeSummarizeSection
             columnComposeItems={columnComposeItems}
             updateComposeItem={updateComposeItem}
-            onRemoveItem={(id) =>
-              setColumnComposeItems?.((prev) => (prev || []).filter((row) => row.id !== id))
-            }
+            availableColumns={columnsForCompose}
+            numericColumns={numericColumns}
+            kindForColumn={kindForColumn}
+          />
+        ) : null}
+
+        {opId === "if_else" ? (
+          <ConnectComposeIfElseSection
+            columnComposeItems={columnComposeItems}
+            updateComposeItem={updateComposeItem}
             availableColumns={columnsForCompose}
             numericColumns={numericColumns}
             kindForColumn={kindForColumn}

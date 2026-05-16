@@ -78,6 +78,8 @@ export default async function handler(req, res) {
           aggregate: null,
           dateBucket: null,
           dateFormat: null,
+          stringBucket: null,
+          numberBucket: null,
           numberScale: "none",
           decimals: null,
           treatAsDate: false,

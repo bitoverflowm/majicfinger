@@ -9,9 +9,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  composeDateShapeSelectValue,
-  patchesForDateShape,
-} from "@/lib/dataLakeComposeSummarize";
+  bucketShortLabel,
+  composeBucketSelectValue,
+  composeFormatSelectValue,
+  formatShortLabel,
+  getBucketOptionsForKind,
+  getFormatOptionsForKind,
+  patchesForBucket,
+  patchesForFormat,
+} from "@/lib/composeColumnGrouping";
 import { cn } from "@/lib/utils";
 
 const SCALE_SHORT_LABELS = {
@@ -21,18 +27,6 @@ const SCALE_SHORT_LABELS = {
   thousand: "÷1K",
   million: "÷1M",
   billion: "÷1B",
-};
-
-const DATE_SHAPE_SHORT_LABELS = {
-  raw: "Raw",
-  "bucket:day": "Day",
-  "bucket:week": "Week",
-  "bucket:month": "Month",
-  "bucket:quarter": "Qtr",
-  "bucket:year": "Year",
-  "fmt:dmy": "D-M-Y",
-  "fmt:ym": "Y-M",
-  "fmt:dm": "D-M",
 };
 
 function CompactSelectTrigger({ className, children, "aria-label": ariaLabel, ...props }) {
@@ -52,9 +46,100 @@ function CompactSelectTrigger({ className, children, "aria-label": ariaLabel, ..
   );
 }
 
+function BucketFormatSelects({
+  item,
+  kind,
+  updateComposeItem,
+  labelClass,
+  triggerClass,
+  compact,
+}) {
+  const bucketVal = composeBucketSelectValue(item, kind);
+  const formatVal = composeFormatSelectValue(item);
+  const bucketOptions = getBucketOptionsForKind(kind);
+  const formatOptions = getFormatOptionsForKind(kind);
+  const showFormat = kind === "date" || item.treatAsDate;
+
+  const onBucket = (v) => {
+    updateComposeItem(item.id, { aggregate: null, ...patchesForBucket(v, kind) });
+  };
+  const onFormat = (v) => {
+    updateComposeItem(item.id, { aggregate: null, ...patchesForFormat(v) });
+  };
+
+  if (compact) {
+    return (
+      <>
+        <Select value={bucketVal} onValueChange={onBucket}>
+          <CompactSelectTrigger aria-label="Bucket" className="max-w-[2.5rem]">
+            <span className="truncate">{bucketShortLabel(bucketVal, kind)}</span>
+          </CompactSelectTrigger>
+          <SelectContent align="end">
+            {bucketOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {showFormat ? (
+          <Select value={formatVal} onValueChange={onFormat}>
+            <CompactSelectTrigger aria-label="Format" className="max-w-[2.25rem]">
+              <span className="truncate">{formatShortLabel(formatVal)}</span>
+            </CompactSelectTrigger>
+            <SelectContent align="end">
+              {formatOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="min-w-0 space-y-1">
+        <Label className={labelClass}>Bucket</Label>
+        <Select value={bucketVal} onValueChange={onBucket}>
+          <SelectTrigger className={triggerClass}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {bucketOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {showFormat ? (
+        <div className="min-w-0 space-y-1">
+          <Label className={labelClass}>Format</Label>
+          <Select value={formatVal} onValueChange={onFormat}>
+            <SelectTrigger className={triggerClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {formatOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 /**
- * Number scale, decimal places, and date/time shape — shared by Connect column rows
- * and summarize cards (matches integrations DataLakeParquetPanel).
+ * Bucket, format, number scale, and decimal places for compose column rows.
  */
 export function ComposeColumnFormatFields({
   item,
@@ -65,25 +150,22 @@ export function ComposeColumnFormatFields({
   compact = false,
 }) {
   const k = kindForColumn(item.column);
-  const isDateCol = k === "date" || !!item.treatAsDate;
   const isNumericCol = k === "number";
   const canNumberFormat =
     isNumericCol && !["count", "count_distinct"].includes(String(item.aggregate || ""));
-  const showDateShape =
-    isDateCol && !item.aggregate && !item.sumCase?.enabled;
-  const scaleVal = item.numberScale || "none";
-  const decVal = item.decimals == null ? "default" : String(item.decimals);
-  const dateShapeVal = composeDateShapeSelectValue(item);
+  const showGrouping = !item.aggregate && !item.sumCase?.enabled;
 
-  if (!showDateShape && !canNumberFormat) return null;
+  if (!showGrouping && !canNumberFormat) return null;
 
   const labelClass = cn("text-xs", inline && "text-[10px]");
   const triggerClass = cn("h-8 text-xs", inline && "h-7 text-[11px]");
+  const scaleVal = item.numberScale || "none";
+  const decVal = item.decimals == null ? "default" : String(item.decimals);
 
   if (compact) {
     const stop = (e) => e.stopPropagation();
-
-    if (!showDateShape && !canNumberFormat) return null;
+    const hasControls = showGrouping || canNumberFormat;
+    if (!hasControls) return null;
 
     return (
       <div
@@ -91,6 +173,16 @@ export function ComposeColumnFormatFields({
         onClick={stop}
         onPointerDown={stop}
       >
+        {showGrouping ? (
+          <BucketFormatSelects
+            compact
+            item={item}
+            kind={k}
+            updateComposeItem={updateComposeItem}
+            labelClass={labelClass}
+            triggerClass={triggerClass}
+          />
+        ) : null}
         {canNumberFormat ? (
           <>
             <Select
@@ -145,99 +237,26 @@ export function ComposeColumnFormatFields({
             </Select>
           </>
         ) : null}
-        {showDateShape ? (
-          <Select
-            value={dateShapeVal}
-            onValueChange={(shape) => {
-              updateComposeItem(item.id, { aggregate: null, ...patchesForDateShape(shape) });
-            }}
-          >
-            <CompactSelectTrigger
-              aria-label="Date / time shape"
-              className={cn(canNumberFormat ? "max-w-[2.5rem]" : "max-w-[3.25rem]")}
-            >
-              <span className="truncate">
-                {DATE_SHAPE_SHORT_LABELS[dateShapeVal] || "Raw"}
-              </span>
-            </CompactSelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="raw" className="text-xs">
-                Keep as stored (epoch number)
-              </SelectItem>
-              <SelectItem value="bucket:day" className="text-xs">
-                Bucket by day
-              </SelectItem>
-              <SelectItem value="bucket:week" className="text-xs">
-                Bucket by week
-              </SelectItem>
-              <SelectItem value="bucket:month" className="text-xs">
-                Bucket by month
-              </SelectItem>
-              <SelectItem value="bucket:quarter" className="text-xs">
-                Bucket by quarter
-              </SelectItem>
-              <SelectItem value="bucket:year" className="text-xs">
-                Bucket by year
-              </SelectItem>
-              <SelectItem value="fmt:dmy" className="text-xs">
-                Text: day-month-year
-              </SelectItem>
-              <SelectItem value="fmt:ym" className="text-xs">
-                Text: year-month
-              </SelectItem>
-              <SelectItem value="fmt:dm" className="text-xs">
-                Text: day-month
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        ) : null}
       </div>
     );
   }
 
-  if (showDateShape && !canNumberFormat) {
+  if (showGrouping && !canNumberFormat) {
     return (
-      <div className={cn("min-w-0 space-y-1", className)}>
-        <Label className={labelClass}>Date / time shape</Label>
-        <Select
-          value={dateShapeVal}
-          onValueChange={(shape) => {
-            updateComposeItem(item.id, { aggregate: null, ...patchesForDateShape(shape) });
-          }}
-        >
-          <SelectTrigger className={triggerClass}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="raw" className="text-xs">
-              Keep as stored (epoch number)
-            </SelectItem>
-            <SelectItem value="bucket:day" className="text-xs">
-              Bucket by day
-            </SelectItem>
-            <SelectItem value="bucket:week" className="text-xs">
-              Bucket by week
-            </SelectItem>
-            <SelectItem value="bucket:month" className="text-xs">
-              Bucket by month
-            </SelectItem>
-            <SelectItem value="bucket:quarter" className="text-xs">
-              Bucket by quarter
-            </SelectItem>
-            <SelectItem value="bucket:year" className="text-xs">
-              Bucket by year
-            </SelectItem>
-            <SelectItem value="fmt:dmy" className="text-xs">
-              Text: day-month-year
-            </SelectItem>
-            <SelectItem value="fmt:ym" className="text-xs">
-              Text: year-month
-            </SelectItem>
-            <SelectItem value="fmt:dm" className="text-xs">
-              Text: day-month
-            </SelectItem>
-          </SelectContent>
-        </Select>
+      <div
+        className={cn(
+          "grid min-w-0 gap-3",
+          inline ? "grid-cols-1 gap-2 sm:grid-cols-2" : "sm:grid-cols-2",
+          className,
+        )}
+      >
+        <BucketFormatSelects
+          item={item}
+          kind={k}
+          updateComposeItem={updateComposeItem}
+          labelClass={labelClass}
+          triggerClass={triggerClass}
+        />
       </div>
     );
   }
@@ -251,6 +270,15 @@ export function ComposeColumnFormatFields({
           className,
         )}
       >
+        {showGrouping ? (
+          <BucketFormatSelects
+            item={item}
+            kind={k}
+            updateComposeItem={updateComposeItem}
+            labelClass={labelClass}
+            triggerClass={triggerClass}
+          />
+        ) : null}
         <div className="min-w-0 space-y-1">
           <Label className={labelClass}>Number scale</Label>
           <Select
@@ -307,50 +335,6 @@ export function ComposeColumnFormatFields({
             </SelectContent>
           </Select>
         </div>
-        {showDateShape ? (
-          <div className="min-w-0 space-y-1 sm:col-span-2">
-            <Label className={labelClass}>Date / time shape</Label>
-            <Select
-              value={dateShapeVal}
-              onValueChange={(shape) => {
-                updateComposeItem(item.id, { aggregate: null, ...patchesForDateShape(shape) });
-              }}
-            >
-              <SelectTrigger className={triggerClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="raw" className="text-xs">
-                  Keep as stored (epoch number)
-                </SelectItem>
-                <SelectItem value="bucket:day" className="text-xs">
-                  Bucket by day
-                </SelectItem>
-                <SelectItem value="bucket:week" className="text-xs">
-                  Bucket by week
-                </SelectItem>
-                <SelectItem value="bucket:month" className="text-xs">
-                  Bucket by month
-                </SelectItem>
-                <SelectItem value="bucket:quarter" className="text-xs">
-                  Bucket by quarter
-                </SelectItem>
-                <SelectItem value="bucket:year" className="text-xs">
-                  Bucket by year
-                </SelectItem>
-                <SelectItem value="fmt:dmy" className="text-xs">
-                  Text: day-month-year
-                </SelectItem>
-                <SelectItem value="fmt:ym" className="text-xs">
-                  Text: year-month
-                </SelectItem>
-                <SelectItem value="fmt:dm" className="text-xs">
-                  Text: day-month
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
       </div>
     );
   }

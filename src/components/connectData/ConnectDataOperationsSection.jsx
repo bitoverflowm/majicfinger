@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   ArrowUpDown,
   Filter,
+  GitBranch,
   GitMerge,
   ListOrdered,
   Sigma,
@@ -21,6 +22,7 @@ const OPERATION_ICONS = {
   sort: ArrowUpDown,
   row_limit: ListOrdered,
   summarize: Sigma,
+  if_else: GitBranch,
   having: SlidersHorizontal,
 };
 

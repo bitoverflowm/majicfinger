@@ -18,16 +18,68 @@ export function composeDateShapeSelectValue(item) {
   return "raw";
 }
 
-/** @param {string} shape */
+/** @param {string} shape @deprecated use patchesForBucket / patchesForFormat */
 export function patchesForDateShape(shape) {
-  if (shape === "raw") return { dateBucket: null, dateFormat: null };
+  if (shape === "raw") return { dateBucket: null, dateFormat: "raw", stringBucket: null, numberBucket: null };
   if (shape.startsWith("bucket:")) {
-    return { dateBucket: shape.slice(7), dateFormat: null, treatAsDate: true };
+    return {
+      dateBucket: shape.slice(7),
+      dateFormat: null,
+      stringBucket: null,
+      numberBucket: null,
+      treatAsDate: true,
+    };
   }
   if (shape.startsWith("fmt:")) {
-    return { dateBucket: null, dateFormat: shape.slice(4), treatAsDate: true };
+    return {
+      dateBucket: null,
+      dateFormat: shape.slice(4),
+      stringBucket: null,
+      numberBucket: null,
+      treatAsDate: true,
+    };
   }
   return {};
+}
+
+/**
+ * Rollup operations available for a column kind (Connect Where-style summarize rows).
+ * @param {"number" | "string" | "date" | "boolean" | string} kind
+ * @param {{ isDemo?: boolean }} [opts]
+ */
+export function getSummarizeRollupOptions(kind, { isDemo = false } = {}) {
+  const isNumeric = kind === "number";
+  const universal = [
+    { value: "none", label: "Show values (no total)" },
+    { value: "count", label: "Count (non-empty)" },
+    { value: "count_distinct", label: "Count distinct" },
+  ];
+  const numericOnly = [
+    { value: "sum", label: "Sum numbers" },
+    { value: "avg", label: "Average" },
+    { value: "min", label: "Min" },
+    { value: "max", label: "Max" },
+    { value: "median", label: "Median (approx)" },
+    { value: "stddev", label: "Stddev (volatility)" },
+    { value: "variance", label: "Variance" },
+  ];
+  const advanced = [{ value: "equation", label: "Equation (SUM of expression)", demoGated: true }];
+
+  const opts = [...universal];
+  if (isNumeric) opts.push(...numericOnly, ...advanced);
+
+  return opts.map((o) => ({
+    ...o,
+    disabled: !!o.demoGated && isDemo,
+  }));
+}
+
+/** Human-readable label for rollup select value. */
+export function summarizeRollupLabel(value) {
+  const found = getSummarizeRollupOptions("number").find((o) => o.value === value);
+  if (found) return found.label;
+  const universal = getSummarizeRollupOptions("string").find((o) => o.value === value);
+  return universal?.label || value;
 }
 
 /**
@@ -41,6 +93,10 @@ export function buildSummarizeRollupPatch(item, v, { availableColumns, numericCo
       aggregate: null,
       sumCase: { enabled: false, branches: [], elseColumn: "" },
       equation: { enabled: false },
+      dateBucket: null,
+      dateFormat: null,
+      stringBucket: null,
+      numberBucket: null,
     };
   }
   if (v === "equation") {
@@ -77,6 +133,8 @@ export function buildSummarizeRollupPatch(item, v, { availableColumns, numericCo
     aggregate: v,
     dateBucket: null,
     dateFormat: null,
+    stringBucket: null,
+    numberBucket: null,
     ...(v !== "sum" ? { sumCase: { enabled: false, branches: [], elseColumn: "" } } : {}),
     equation: { enabled: false },
   };

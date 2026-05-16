@@ -23,6 +23,8 @@ export function buildDataLakeServerComposePayload({
       aggregate: i.aggregate || null,
       dateBucket: i.dateBucket || null,
       dateFormat: i.dateFormat || null,
+      stringBucket: i.stringBucket || null,
+      numberBucket: i.numberBucket != null ? Number(i.numberBucket) : null,
       numberScale: i.numberScale || "none",
       decimals: i.decimals != null ? Number(i.decimals) : null,
       treatAsDate: i.treatAsDate === true,

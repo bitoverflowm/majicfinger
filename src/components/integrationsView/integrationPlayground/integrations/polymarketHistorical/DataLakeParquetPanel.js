@@ -59,6 +59,7 @@ import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
 import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
+import { ComposeColumnFormatFields } from "@/components/connectData/ComposeColumnFormatFields";
 import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
 import EquationExprBuilder from "./EquationExprBuilder";
@@ -120,6 +121,8 @@ const KALSHI_MARKETS_CATEGORY_VOLUME_COMPOSE_SPEC = {
       aggregate: null,
       dateBucket: null,
       dateFormat: null,
+      stringBucket: null,
+      numberBucket: null,
       numberScale: "none",
       decimals: null,
       treatAsDate: false,
@@ -130,6 +133,8 @@ const KALSHI_MARKETS_CATEGORY_VOLUME_COMPOSE_SPEC = {
       aggregate: "sum",
       dateBucket: null,
       dateFormat: null,
+      stringBucket: null,
+      numberBucket: null,
       numberScale: "none",
       decimals: null,
       treatAsDate: false,
@@ -140,6 +145,8 @@ const KALSHI_MARKETS_CATEGORY_VOLUME_COMPOSE_SPEC = {
       aggregate: "count",
       dateBucket: null,
       dateFormat: null,
+      stringBucket: null,
+      numberBucket: null,
       numberScale: "none",
       decimals: null,
       treatAsDate: false,
@@ -815,7 +822,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         (i) =>
           !i.aggregate &&
           ((i.dateBucket != null && String(i.dateBucket).trim() !== "") ||
-            (i.dateFormat != null && String(i.dateFormat).trim() !== "")),
+            (i.dateFormat != null && String(i.dateFormat).trim() !== "") ||
+            i.stringBucket === "distinct" ||
+            (i.numberBucket != null && i.numberBucket !== "")),
       ),
     [columnComposeItems],
   );
@@ -3935,9 +3944,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       const isNumericCol = k === "number";
                       const canNumberFormat = isNumericCol && !["count", "count_distinct"].includes(String(item.aggregate || ""));
                       const rollVal = composeRollUpSelectValue(item);
-                      const dateShapeVal = composeDateShapeSelectValue(item);
-                      const scaleVal = item.numberScale || "none";
-                      const decVal = item.decimals == null ? "default" : String(item.decimals);
                       return (
                         <div
                           key={item.id}
@@ -4333,114 +4339,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                             </div>
                           ) : null}
 
-                          {isDateCol && !item.aggregate && !item.sumCase?.enabled ? (
-                            <div className="space-y-1 min-w-0">
-                              <Label className="text-xs">Date / time shape</Label>
-                              <Select
-                                value={dateShapeVal}
-                                onValueChange={(shape) => {
-                                  updateComposeItem(item.id, {
-                                    aggregate: null,
-                                    ...patchesForDateShape(shape),
-                                  });
-                                }}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="raw" className="text-xs">
-                                    Keep as stored (epoch number)
-                                  </SelectItem>
-                                  <SelectItem value="bucket:day" className="text-xs">
-                                    Bucket by day
-                                  </SelectItem>
-                                  <SelectItem value="bucket:week" className="text-xs">
-                                    Bucket by week
-                                  </SelectItem>
-                                  <SelectItem value="bucket:month" className="text-xs">
-                                    Bucket by month
-                                  </SelectItem>
-                                  <SelectItem value="bucket:quarter" className="text-xs">
-                                    Bucket by quarter
-                                  </SelectItem>
-                                  <SelectItem value="bucket:year" className="text-xs">
-                                    Bucket by year
-                                  </SelectItem>
-                                  <SelectItem value="fmt:dmy" className="text-xs">
-                                    Text: day-month-year
-                                  </SelectItem>
-                                  <SelectItem value="fmt:ym" className="text-xs">
-                                    Text: year-month
-                                  </SelectItem>
-                                  <SelectItem value="fmt:dm" className="text-xs">
-                                    Text: day-month
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ) : null}
+                          <ComposeColumnFormatFields
+                            item={item}
+                            updateComposeItem={updateComposeItem}
+                            kindForColumn={kindForColumn}
+                          />
 
-                          {canNumberFormat ? (
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div className="space-y-1 min-w-0">
-                                <Label className="text-xs">Number scale</Label>
-                                <Select
-                                  value={scaleVal}
-                                  onValueChange={(v) => updateComposeItem(item.id, { numberScale: v })}
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none" className="text-xs">
-                                      No scaling
-                                    </SelectItem>
-                                    <SelectItem value="ten" className="text-xs">
-                                      Divide by 10
-                                    </SelectItem>
-                                    <SelectItem value="hundred" className="text-xs">
-                                      Divide by 100
-                                    </SelectItem>
-                                    <SelectItem value="thousand" className="text-xs">
-                                      Divide by 1,000
-                                    </SelectItem>
-                                    <SelectItem value="million" className="text-xs">
-                                      Divide by 1,000,000
-                                    </SelectItem>
-                                    <SelectItem value="billion" className="text-xs">
-                                      Divide by 1,000,000,000
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-1 min-w-0">
-                                <Label className="text-xs">Decimal places</Label>
-                                <Select
-                                  value={decVal}
-                                  onValueChange={(v) =>
-                                    updateComposeItem(item.id, {
-                                      decimals: v === "default" ? null : Number(v),
-                                    })
-                                  }
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="default" className="text-xs">
-                                      Default
-                                    </SelectItem>
-                                    {[0, 1, 2, 3, 4].map((d) => (
-                                      <SelectItem key={d} value={String(d)} className="text-xs">
-                                        {d} decimal{d === 1 ? "" : "s"}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          ) : null}
                         </div>
                       );
                     })}
