@@ -870,6 +870,11 @@ export default function DataSheetWithIntegration({
       <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6">
         <main
           ref={mainColumnRef}
+          id={
+            connectHomeMode && showConnectIntegrationIntro && showConnectAnalyzeSection
+              ? "connect-home-analyze-sheet"
+              : undefined
+          }
           className={cn(
             "relative min-w-0 flex-1",
             showConnectIntegrationIntro && showConnectAnalyzeSection

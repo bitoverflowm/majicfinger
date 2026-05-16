@@ -11,11 +11,13 @@ export function useConnectHomeScrollPanels({
   hubRef,
   workspaceRef,
   workspaceActive,
-  /** When true (e.g. sheet has rows), keep panels available even if Step 1 hub still peeks in view. */
-  hasSheetData = false,
+  /** Observe #connect-home-analyze-sheet (grid column) for drawer collapse when Step 2 scrolls away. */
+  trackAnalyzeSection = false,
 }) {
   const [hubDominant, setHubDominant] = useState(true);
   const [workspaceInView, setWorkspaceInView] = useState(false);
+  const [analyzeInView, setAnalyzeInView] = useState(false);
+  const [composeDominant, setComposeDominant] = useState(false);
 
   useEffect(() => {
     const root = scrollRef?.current;
@@ -65,7 +67,90 @@ export function useConnectHomeScrollPanels({
     return () => workspaceObserver.disconnect();
   }, [scrollRef, workspaceRef, workspaceActive]);
 
-  const panelsVisible =
-    workspaceActive && workspaceInView && (!hubDominant || hasSheetData);
-  return { panelsVisible, hubDominant, workspaceInView };
+  useEffect(() => {
+    const root = scrollRef?.current;
+    if (!root || !workspaceActive || !trackAnalyzeSection) {
+      setAnalyzeInView(false);
+      setComposeDominant(false);
+      return;
+    }
+
+    let sheetObserver = null;
+    let composeObserver = null;
+    let cancelled = false;
+
+    const attach = () => {
+      if (cancelled) return;
+      sheetObserver?.disconnect();
+      composeObserver?.disconnect();
+
+      const sheet = document.getElementById("connect-home-analyze-sheet");
+      const compose = document.getElementById("connect-home-compose");
+
+      if (sheet) {
+        sheetObserver = new IntersectionObserver(
+          ([entry]) => {
+            const ratio = entry?.intersectionRatio ?? 0;
+            const rect = entry?.boundingClientRect;
+            const rootRect = entry?.rootBounds;
+            const visiblePx =
+              rect && rootRect
+                ? Math.min(rect.bottom, rootRect.bottom) - Math.max(rect.top, rootRect.top)
+                : 0;
+            setAnalyzeInView(
+              entry.isIntersecting && (ratio >= 0.18 || visiblePx >= 160),
+            );
+          },
+          {
+            root,
+            threshold: [0, 0.08, 0.18, 0.3, 0.5],
+            rootMargin: "-72px 0px -40% 0px",
+          },
+        );
+        sheetObserver.observe(sheet);
+      }
+
+      if (compose) {
+        composeObserver = new IntersectionObserver(
+          ([entry]) => {
+            const ratio = entry?.intersectionRatio ?? 0;
+            setComposeDominant(entry.isIntersecting && ratio >= 0.28);
+          },
+          {
+            root,
+            threshold: [0, 0.12, 0.28, 0.45, 0.65],
+            rootMargin: "-72px 0px -50% 0px",
+          },
+        );
+        composeObserver.observe(compose);
+      }
+    };
+
+    attach();
+    const retryId = window.setTimeout(attach, 120);
+    const retryId2 = window.setTimeout(attach, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(retryId);
+      window.clearTimeout(retryId2);
+      sheetObserver?.disconnect();
+      composeObserver?.disconnect();
+    };
+  }, [scrollRef, workspaceActive, trackAnalyzeSection]);
+
+  const panelsVisible = workspaceActive && workspaceInView && !hubDominant;
+
+  /** Step 2 drawer: data-sheet column in view and compose (Refine query) not dominant. */
+  const analyzePanelsEngaged = trackAnalyzeSection
+    ? workspaceActive && analyzeInView && !composeDominant
+    : panelsVisible;
+
+  return {
+    panelsVisible,
+    analyzeInView,
+    analyzePanelsEngaged,
+    hubDominant,
+    workspaceInView,
+  };
 }

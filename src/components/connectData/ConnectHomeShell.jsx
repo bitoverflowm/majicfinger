@@ -105,27 +105,26 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const [connectPanelUserDismissed, setConnectPanelUserDismissed] = useState(false);
   const prevPanelsVisibleRef = useRef(false);
 
-  const { panelsVisible, workspaceInView } = useConnectHomeScrollPanels({
+  const trackAnalyzeSection =
+    connectHomeAnalyzeActive && (hasSheetData || connectRequestSummaryReady);
+
+  const { panelsVisible, analyzePanelsEngaged } = useConnectHomeScrollPanels({
     scrollRef,
     hubRef,
     workspaceRef,
     workspaceActive,
-    hasSheetData,
+    trackAnalyzeSection,
   });
 
-  /** Right drawer + auto-open: scroll engagement, or analyze workspace with pull results in view. */
-  const connectHomePanelsEngaged =
-    panelsVisible ||
-    (connectHomeAnalyzeActive &&
-      workspaceInView &&
-      (hasSheetData || connectRequestSummaryReady));
+  /** Right drawer: scroll with Step 2 analyze block; Step 1 uses hub/workspace engagement. */
+  const connectHomePanelsEngaged = trackAnalyzeSection ? analyzePanelsEngaged : panelsVisible;
 
   useEffect(() => {
-    if (panelsVisible && !prevPanelsVisibleRef.current) {
+    if (connectHomePanelsEngaged && !prevPanelsVisibleRef.current) {
       setConnectPanelUserDismissed(false);
     }
-    prevPanelsVisibleRef.current = panelsVisible;
-  }, [panelsVisible]);
+    prevPanelsVisibleRef.current = connectHomePanelsEngaged;
+  }, [connectHomePanelsEngaged]);
 
   const scrollToWorkspace = useCallback(() => {
     scheduleConnectWorkspaceScroll(workspaceRef, scrollRef);
