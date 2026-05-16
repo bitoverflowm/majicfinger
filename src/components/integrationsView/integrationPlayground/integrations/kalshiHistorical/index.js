@@ -19,8 +19,21 @@ export default function KalshiHistorical({ setConnectedData }) {
   const { label, progress, ready, error, retry } = useBeckerParquetBoot();
 
   useEffect(() => {
-    if (!connectHomeKalshi || !setConnectDataLakePullState || ingestLoading) return;
-    if (ready || error) return;
+    if (!connectHomeKalshi || !setConnectDataLakePullState) return;
+    if (ready) {
+      setConnectDataLakePullState((prev) => {
+        const p = Number(prev.progress) || 0;
+        if (prev.loading && p < 10) {
+          return { ...prev, loading: false, label: "", progress: 0, error: null };
+        }
+        if (!prev.loading && p > 0 && p < 100) {
+          return { ...prev, label: "", progress: 0 };
+        }
+        return prev;
+      });
+      return;
+    }
+    if (error || ingestLoading) return;
     setConnectDataLakePullState((prev) => ({
       ...prev,
       loading: true,

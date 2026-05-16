@@ -1770,18 +1770,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     } catch (e) {
       if (e?.name === "AbortError") {
         setError(null);
-        syncConnectPullState({ loading: false, error: null, progress: 0 });
+        syncConnectPullState({ loading: false, error: null, label: "", progress: 0 });
         toast("Request cancelled");
         return;
       }
       const msg = e?.message || String(e);
       setError(msg);
-      syncConnectPullState({ loading: false, error: msg, progress: 0 });
+      syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
     } finally {
       ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
-      syncConnectPullState({ loading: false, progress: 0 });
+      syncConnectPullState({ loading: false, label: "", progress: 0 });
     }
   }, [
     applyRowsToActiveSheet,

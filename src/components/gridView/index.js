@@ -504,21 +504,24 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const isConnectPullLoading =
         !!connectDataLakePullState.loading &&
         (viewing === "connectDataHome" || connectHomeAnalyzeActive);
-    const hasDisplayRows = (connectedData?.length ?? 0) > 0;
+    const activeSheetRowCount = Array.isArray(activeSheet?.data) ? activeSheet.data.length : 0;
+    const hasDisplayRows =
+        (connectedData?.length ?? 0) > 0 || activeSheetRowCount > 0;
     const pullProgress = Number(connectDataLakePullState.progress) || 0;
+    const isConnectAnalyzeViewport =
+        fillViewport && connectHomeAnalyzeActive && viewing === "connectDataHome";
+    const connectAwaitingSheetData =
+        isConnectAnalyzeViewport && !hasDisplayRows && !connectDataLakePullState.error;
     const pullInFlight =
         isConnectPullLoading ||
         (!!connectDataLakePullState.label &&
             pullProgress > 0 &&
             pullProgress < 100);
-    const isConnectAnalyzeViewport =
-        fillViewport && connectHomeAnalyzeActive && viewing === "connectDataHome";
-    const connectAwaitingSheetData =
-        isConnectAnalyzeViewport && !hasDisplayRows && !connectDataLakePullState.error;
+    /** Never mask an already-loaded sheet with DuckDB boot / stale pull progress UI. */
     const isSheetLoading =
-        isConnectPullLoading ||
         rehydrateBusy ||
-        (connectAwaitingSheetData && pullInFlight);
+        (!hasDisplayRows &&
+            (isConnectPullLoading || (connectAwaitingSheetData && pullInFlight)));
     const sheetLoadingLabel =
         connectDataLakePullState.label || (rehydrateBusy ? "Reloading sheet…" : "Loading data…");
     const sheetLoadingProgress = rehydrateBusy ? pullProgress || 50 : pullProgress;

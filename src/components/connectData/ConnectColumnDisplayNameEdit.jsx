@@ -41,11 +41,14 @@ export function ConnectColumnDisplayNameEdit({
           type="button"
           variant="ghost"
           size="icon"
-          className={className ?? "h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"}
+          className={
+            className ??
+            "h-3.5 w-3.5 shrink-0 p-0 text-muted-foreground hover:text-foreground [&_svg]:size-2"
+          }
           aria-label={`Rename display label for ${defaultLabel}`}
           onClick={(e) => e.stopPropagation()}
         >
-          <Pencil className="h-2.5 w-2.5" />
+          <Pencil className="h-2 w-2" strokeWidth={2.25} />
         </Button>
       </PopoverTrigger>
       <PopoverContent

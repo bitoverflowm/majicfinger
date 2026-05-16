@@ -784,7 +784,7 @@ export function ConnectComposeOperationPanel({ className }) {
           />
         </div>
         <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={handleRestart}>
-          Restart
+          Start Over
         </Button>
         <Button type="button" size="sm" className="h-8 text-xs" onClick={handleRunPull}>
           Run pull

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
-import { deriveConnectFlowStep, isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
+import { deriveConnectFlowStep, isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import {
   connectHubFlowStepsSidebarOffsetClass,
@@ -14,7 +14,10 @@ import {
   connectHubScrollPaddingClass,
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
-import { scheduleConnectWorkspaceScroll } from "@/lib/connectHubScroll";
+import {
+  scheduleConnectAnalyzeAnchorScroll,
+  scheduleConnectWorkspaceScroll,
+} from "@/lib/connectHubScroll";
 import { useConnectHomeScrollPanels } from "@/hooks/useConnectHomeScrollPanels";
 import { cn } from "@/lib/utils";
 
@@ -104,7 +107,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
   const [connectPanelUserDismissed, setConnectPanelUserDismissed] = useState(false);
   const [connectHomePanelPinned, setConnectHomePanelPinned] = useState(false);
-  const prevPanelsVisibleRef = useRef(false);
 
   const trackAnalyzeSection =
     connectHomeAnalyzeActive && (hasSheetData || connectRequestSummaryReady);
@@ -125,29 +127,13 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     if (!connectHomePanelsEngaged) setConnectHomePanelPinned(false);
   }, [connectHomePanelsEngaged]);
 
-  useEffect(() => {
-    if (!workspaceActive || !connectHomeAnalyzeActive) return;
-    if (rightPanelTab !== "charts" && rightPanelTab !== "dashboard") return;
-    setConnectPanelUserDismissed(false);
-    setConnectHomePanelPinned(true);
-    setRightPanelOpen?.(true);
-  }, [
-    workspaceActive,
-    connectHomeAnalyzeActive,
-    rightPanelTab,
-    setRightPanelOpen,
-  ]);
-
-  useEffect(() => {
-    if (connectHomePanelsVisible && !prevPanelsVisibleRef.current) {
-      setConnectPanelUserDismissed(false);
-    }
-    prevPanelsVisibleRef.current = connectHomePanelsVisible;
-  }, [connectHomePanelsVisible]);
-
   const scrollToWorkspace = useCallback(() => {
+    if (connectHomeAnalyzeActive || hasSheetData) {
+      scheduleConnectAnalyzeAnchorScroll(scrollRef);
+      return;
+    }
     scheduleConnectWorkspaceScroll(workspaceRef, scrollRef);
-  }, []);
+  }, [connectHomeAnalyzeActive, hasSheetData]);
 
   useLayoutEffect(() => {
     if (!connectWorkspace || !connectWorkspaceScrollTick) return;
@@ -164,18 +150,21 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       return;
     }
 
-    const publishTab = isConnectHomePublishPanelTab(rightPanelTab);
-    const analyzePanelsAllowed =
-      connectHomePanelsVisible && connectHomeAnalyzeActive && !connectPanelUserDismissed;
-
-    if (!analyzePanelsAllowed) {
-      if (!publishTab || !connectHomePanelsVisible) {
-        setRightPanelOpen?.(false);
-      }
+    /** User closed the drawer (X or collapse); do not auto-reopen until they use the edge tab or a workspace chip. */
+    if (connectPanelUserDismissed) {
       return;
     }
 
-    if (publishTab) {
+    const designPanelTab = isConnectHomeDesignPanelTab(rightPanelTab);
+    const analyzePanelsAllowed =
+      connectHomePanelsVisible && connectHomeAnalyzeActive;
+
+    if (!analyzePanelsAllowed) {
+      setRightPanelOpen?.(false);
+      return;
+    }
+
+    if (designPanelTab) {
       setRightPanelOpen?.(true);
       return;
     }
@@ -235,8 +224,9 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       <div
         ref={scrollRef}
         className={cn(
-          "min-h-0 flex-1 snap-y snap-proximity overflow-y-auto",
+          "min-h-0 flex-1 overflow-y-auto",
           connectHubScrollPaddingClass,
+          !connectHomeAnalyzeActive && "snap-y snap-proximity",
           CONNECT_HOME_SURFACE,
         )}
       >

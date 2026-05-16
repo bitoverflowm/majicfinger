@@ -9,7 +9,7 @@ import {
   CONNECT_HOME_WORKSPACE_MIN_H,
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
-import { scheduleConnectAnalyzeScroll } from "@/lib/connectHubScroll";
+import { scheduleConnectAnalyzeAnchorScroll } from "@/lib/connectHubScroll";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,7 +28,7 @@ export function ConnectHomeAnalyzeSection({
 
   useLayoutEffect(() => {
     if (!analyzeScrollTick) return;
-    scheduleConnectAnalyzeScroll(analyzeRef, null);
+    scheduleConnectAnalyzeAnchorScroll(null);
   }, [analyzeScrollTick]);
 
   return (

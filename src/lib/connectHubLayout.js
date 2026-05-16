@@ -18,6 +18,9 @@ export const connectHubMainClass =
 export const connectWorkspaceScrollInsetClass =
   "scroll-mt-20 sm:scroll-mt-24 md:scroll-mt-32";
 
+/** Step 2 anchor — same inset as workspace scroll; used by #connect-home-analyze-anchor. */
+export const connectAnalyzeAnchorClass = connectWorkspaceScrollInsetClass;
+
 /** Applied on the Connect home scroll container for consistent snap padding. */
 export const connectHubScrollPaddingClass =
   "scroll-pt-20 sm:scroll-pt-24 md:scroll-pt-32";

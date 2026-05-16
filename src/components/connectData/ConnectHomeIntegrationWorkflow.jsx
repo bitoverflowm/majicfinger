@@ -21,7 +21,11 @@ import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { kindForLakeColumn } from "@/lib/dataLakeComposeHelpers";
 import { getKalshiColumnDisplayLabel, getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
-import { connectWorkspaceScrollInsetClass } from "@/lib/connectHubLayout";
+import {
+  CONNECT_WORKSPACE_SCROLL_OFFSET_PX,
+  connectWorkspaceScrollInsetClass,
+} from "@/lib/connectHubLayout";
+import { findConnectHomeScrollRoot } from "@/lib/connectHubScroll";
 import { cn } from "@/lib/utils";
 
 const KALSHI_SAMPLE_BY_ID = Object.fromEntries(ATHENA_KALSHI_SAMPLE_OPTIONS.map((s) => [s.id, s]));
@@ -104,7 +108,7 @@ function ColumnPicker({
   const selectedSet = new Set(selectedColumns);
   const allSelected = columns.length > 0 && selectedColumns.length === columns.length;
   const noneSelected = selectedColumns.length === 0;
-  const pickerRef = useRef(null);
+  const columnHeaderRef = useRef(null);
 
   const sample = KALSHI_SAMPLE_BY_ID[sampleId];
   const table = sample?.table;
@@ -140,21 +144,51 @@ function ColumnPicker({
   );
 
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 220);
-    return () => window.clearTimeout(t);
+    let cancelled = false;
+    const scrollColumnHeaderIntoView = () => {
+      if (cancelled) return;
+      const el = columnHeaderRef.current;
+      if (!el) return;
+      const scrollRoot = findConnectHomeScrollRoot(el);
+      if (scrollRoot) {
+        const elRect = el.getBoundingClientRect();
+        const scrollerRect = scrollRoot.getBoundingClientRect();
+        const padTop =
+          Number.parseInt(getComputedStyle(scrollRoot).scrollPaddingTop, 10) ||
+          CONNECT_WORKSPACE_SCROLL_OFFSET_PX;
+        const headerOffset = elRect.top - scrollerRect.top;
+        if (headerOffset >= padTop - 8 && headerOffset <= scrollerRect.height * 0.45) {
+          return;
+        }
+        const targetTop = elRect.top - scrollerRect.top + scrollRoot.scrollTop - padTop;
+        scrollRoot.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+        return;
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    };
+    const t = window.setTimeout(scrollColumnHeaderIntoView, 320);
+    requestAnimationFrame(() => requestAnimationFrame(scrollColumnHeaderIntoView));
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, [sampleId]);
 
   return (
     <motion.div
-      ref={pickerRef}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="mt-4 scroll-mt-6 space-y-2"
+      className="mt-4 space-y-2"
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+      <div
+        ref={columnHeaderRef}
+        id="connect-kalshi-column-picker"
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5",
+          connectWorkspaceScrollInsetClass,
+        )}
+      >
         <h2 className="text-xs font-semibold tracking-tight text-foreground">
           Select which columns you are interested in pulling
         </h2>
@@ -238,13 +272,23 @@ function ColumnPicker({
                       !isSelected && "flex-col items-start gap-0",
                     )}
                   >
-                    <span className="flex min-w-0 items-baseline gap-1.5">
+                    <span className="flex min-w-0 items-baseline gap-1">
                       <span className="truncate text-[11px] font-medium leading-tight text-foreground">
                         {displayLabel}
                       </span>
                       <span className="shrink-0 text-[9px] leading-tight text-muted-foreground">
                         {col.type}
                       </span>
+                      {isSelected && composeItem ? (
+                        <ConnectColumnDisplayNameEdit
+                          columnKey={col.name}
+                          defaultLabel={defaultLabel}
+                          displayName={composeItem.displayName}
+                          onSave={(displayName) =>
+                            updateComposeItem(composeItem.id, { displayName })
+                          }
+                        />
+                      ) : null}
                     </span>
                     {!isSelected ? (
                       <span className="mt-0.5 line-clamp-1 text-[10px] leading-3 text-muted-foreground">
@@ -255,14 +299,6 @@ function ColumnPicker({
                 </button>
                 {isSelected && composeItem ? (
                   <>
-                    <ConnectColumnDisplayNameEdit
-                      columnKey={col.name}
-                      defaultLabel={defaultLabel}
-                      displayName={composeItem.displayName}
-                      onSave={(displayName) =>
-                        updateComposeItem(composeItem.id, { displayName })
-                      }
-                    />
                     <ComposeColumnFormatFields
                       compact
                       item={composeItem}

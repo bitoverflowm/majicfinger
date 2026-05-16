@@ -16,7 +16,7 @@ const actionChipBase =
 /**
  * Connect home — sheet/chart tabs on the left; new sheet/chart/dashboard + export on the right.
  */
-export function ConnectHomeWorkspaceNav({ className, compact = false }) {
+export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelManualOpen }) {
   const ctx = useMyStateV2();
   const dataSheets = ctx?.dataSheets || {};
   const chartSheets = ctx?.chartSheets || {};
@@ -76,18 +76,25 @@ export function ConnectHomeWorkspaceNav({ className, compact = false }) {
   const selectSheet = useCallback(
     (id) => {
       setActiveSheetId?.(id);
-      setRightPanelTab?.("integrations");
+      setRightPanelTab?.((prev) =>
+        prev === "charts" || prev === "dashboard" ? "integrations" : prev,
+      );
     },
     [setActiveSheetId, setRightPanelTab],
   );
 
+  const openChartPanel = useCallback(() => {
+    onPanelManualOpen?.();
+    setRightPanelTab?.("charts");
+    setRightPanelOpen?.(true);
+  }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
+
   const selectChart = useCallback(
     (id) => {
       activateChartSheet(id);
-      setRightPanelTab?.("charts");
-      setRightPanelOpen?.(true);
+      openChartPanel();
     },
-    [activateChartSheet, setRightPanelOpen, setRightPanelTab],
+    [activateChartSheet, openChartPanel],
   );
 
   const openIntegrationsPanel = useCallback(() => {
@@ -116,28 +123,21 @@ export function ConnectHomeWorkspaceNav({ className, compact = false }) {
         };
       });
     });
-    setRightPanelTab?.("charts");
-    setRightPanelOpen?.(true);
-    requestAnimationFrame(() => {
-      document.getElementById("connect-home-analyze-sheet")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
+    openChartPanel();
   }, [
     addNewChartAndActivate,
     persistActiveChartSnapshot,
     setChartSheets,
     setLoadedChartBuilderSnapshot,
     setLoadedChartMeta,
-    setRightPanelOpen,
-    setRightPanelTab,
+    openChartPanel,
   ]);
 
   const openDashboard = useCallback(() => {
+    onPanelManualOpen?.();
     setRightPanelTab?.("dashboard");
     setRightPanelOpen?.(true);
-  }, [setRightPanelOpen, setRightPanelTab]);
+  }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
 
   const openExport = useCallback(() => {
     setRightPanelTab?.("export");

@@ -51,9 +51,9 @@ import { ConnectHomeAnalyzeSection } from "@/components/connectData/ConnectHomeA
 import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWorkspaceNav";
 import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHomeKalshiSideSummary";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
-import { isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
-import { scrollConnectWorkspaceIntoView } from "@/lib/connectHubScroll";
+import { isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import {
+  connectAnalyzeAnchorClass,
   connectHomeAnalyzeMainClass,
   connectHomeDrawerAsideFixedClass,
   connectHomeWorkspaceRowClass,
@@ -657,8 +657,8 @@ export default function DataSheetWithIntegration({
   useEffect(() => {
     if (!connectHomeMode || !showConnectIntegrationIntro) return;
     if (!connectHomePanelsVisible || !connectHomeAnalyzeActive) return;
-    const publishTab = isConnectHomePublishPanelTab(rightPanelTab);
-    if (publishTab) {
+    const designPanelTab = isConnectHomeDesignPanelTab(rightPanelTab);
+    if (designPanelTab) {
       setDrawerExpanded(false);
       return;
     }
@@ -675,16 +675,17 @@ export default function DataSheetWithIntegration({
     setRightPanelTab,
   ]);
 
+  const prevConnectWorkspaceTabRef = useRef("");
   useEffect(() => {
     if (!connectHomeMode || !connectHomeWorkspaceLive) return;
-    if (rightPanelTab !== "charts" && rightPanelTab !== "dashboard") return;
+    const tab = rightPanelTab ?? "";
+    const prev = prevConnectWorkspaceTabRef.current;
+    prevConnectWorkspaceTabRef.current = tab;
+    const enteredChart = tab === "charts" && prev !== "charts";
+    const enteredDashboard = tab === "dashboard" && prev !== "dashboard";
+    if (!enteredChart && !enteredDashboard) return;
     onConnectHomePanelManualOpen?.();
     setRightPanelOpen?.(true);
-    const el =
-      document.getElementById("connect-home-analyze-sheet") ||
-      document.getElementById("connect-home-workspace");
-    if (!el) return;
-    scrollConnectWorkspaceIntoView(el, null);
   }, [
     connectHomeMode,
     connectHomeWorkspaceLive,
@@ -851,7 +852,11 @@ export default function DataSheetWithIntegration({
     "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";
 
   const connectWorkspaceNav = showConnectWorkspaceNav ? (
-    <ConnectHomeWorkspaceNav compact className="mb-1 shrink-0 px-0.5 sm:px-1" />
+    <ConnectHomeWorkspaceNav
+      compact
+      className="mb-1 shrink-0 px-0.5 sm:px-1"
+      onPanelManualOpen={onConnectHomePanelManualOpen}
+    />
   ) : null;
 
   const layout = (
@@ -915,6 +920,13 @@ export default function DataSheetWithIntegration({
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
         >
+          {connectHomeWorkspaceLive ? (
+            <div
+              id="connect-home-analyze-anchor"
+              className={cn("h-0 w-full shrink-0 snap-start", connectAnalyzeAnchorClass)}
+              aria-hidden
+            />
+          ) : null}
           {!showSidebar &&
             !isPanelClosing &&
             (!showConnectIntegrationIntro || showConnectAnalyzeSection) && (

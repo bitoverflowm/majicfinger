@@ -1,5 +1,17 @@
 import { CONNECT_WORKSPACE_SCROLL_OFFSET_PX } from "@/lib/connectHubLayout";
 
+/** Step 2 viewport anchor — sheet / chart / dashboard; never scroll to compose. */
+export const CONNECT_HOME_ANALYZE_ANCHOR_ID = "connect-home-analyze-anchor";
+
+export function resolveConnectAnalyzeScrollTarget() {
+  if (typeof document === "undefined") return null;
+  return (
+    document.getElementById(CONNECT_HOME_ANALYZE_ANCHOR_ID) ||
+    document.getElementById("connect-home-analyze-sheet") ||
+    document.getElementById("connect-home-analyze")
+  );
+}
+
 /**
  * Scroll the Connect workspace into view. Uses scrollIntoView (window + ancestors)
  * and aligns an inner overflow pane when it is the scroll container.
@@ -57,23 +69,50 @@ export function findConnectHomeScrollRoot(fromEl) {
 /** Scroll Step 2 analyze so it fills the viewport below the sticky header. */
 export function scrollConnectAnalyzeIntoView(analyzeEl, scrollRootEl) {
   if (!analyzeEl) return;
-  if (!scrollRootEl) {
+  const scrollRoot = scrollRootEl ?? findConnectHomeScrollRoot(analyzeEl);
+  if (!scrollRoot) {
     analyzeEl.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
   const elRect = analyzeEl.getBoundingClientRect();
-  const scrollerRect = scrollRootEl.getBoundingClientRect();
+  const scrollerRect = scrollRoot.getBoundingClientRect();
   const padTop =
-    Number.parseInt(getComputedStyle(scrollRootEl).scrollPaddingTop, 10) ||
+    Number.parseInt(getComputedStyle(scrollRoot).scrollPaddingTop, 10) ||
     CONNECT_WORKSPACE_SCROLL_OFFSET_PX;
-  const targetTop = elRect.top - scrollerRect.top + scrollRootEl.scrollTop - padTop;
-  scrollRootEl.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+  const targetTop = elRect.top - scrollerRect.top + scrollRoot.scrollTop - padTop;
+  scrollRoot.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+}
+
+/** Lock viewport on the Step 2 anchor (sheet / chart / dashboard workspace). */
+export function scrollConnectAnalyzeAnchorIntoView(scrollRootEl) {
+  const target = resolveConnectAnalyzeScrollTarget();
+  if (!target) return;
+  const scrollRoot = scrollRootEl ?? findConnectHomeScrollRoot(target);
+  scrollConnectAnalyzeIntoView(target, scrollRoot);
+}
+
+/** Retry until #connect-home-analyze-anchor is mounted. */
+export function scheduleConnectAnalyzeAnchorScroll(scrollRootElRef) {
+  const run = (attempt = 0) => {
+    const target = resolveConnectAnalyzeScrollTarget();
+    if (!target) {
+      if (attempt < 24) requestAnimationFrame(() => run(attempt + 1));
+      return;
+    }
+    const scrollRoot =
+      scrollRootElRef?.current ?? findConnectHomeScrollRoot(target);
+    scrollConnectAnalyzeIntoView(target, scrollRoot);
+  };
+  requestAnimationFrame(() => run());
+  window.setTimeout(() => run(), 80);
+  window.setTimeout(() => run(), 200);
 }
 
 /** Scroll to Step 2 analyze section (#connect-home-analyze). */
 export function scheduleConnectAnalyzeScroll(analyzeElRef, scrollRootElRef) {
   const run = (attempt = 0) => {
-    const el = analyzeElRef?.current;
+    const el =
+      analyzeElRef?.current ?? resolveConnectAnalyzeScrollTarget();
     if (!el) {
       if (attempt < 24) requestAnimationFrame(() => run(attempt + 1));
       return;
