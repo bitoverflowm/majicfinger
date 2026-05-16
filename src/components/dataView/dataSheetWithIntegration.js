@@ -825,6 +825,10 @@ export default function DataSheetWithIntegration({
   const connectHomeGridSurface =
     "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";
 
+  const connectWorkspaceNav = showConnectWorkspaceNav ? (
+    <ConnectHomeWorkspaceNav compact className="mb-1 shrink-0 px-0.5 sm:px-1" />
+  ) : null;
+
   const layout = (
     <div className={cn(
       "flex min-h-0 w-full max-w-full flex-1 flex-col gap-4 overflow-x-hidden px-2 py-2 sm:gap-6 sm:px-4",
@@ -861,12 +865,6 @@ export default function DataSheetWithIntegration({
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
         >
-          {showConnectWorkspaceNav ? (
-            <ConnectHomeWorkspaceNav
-              compact
-              className="shrink-0 px-0.5 sm:px-1"
-            />
-          ) : null}
           {!showSidebar && !isPanelClosing && (
             <OpenApiPanelTab
               contained={isDemo}
@@ -887,9 +885,13 @@ export default function DataSheetWithIntegration({
             />
           )}
           {effectiveDashboardMode ? (
-            <DashboardComposerPage user={user} />
+            <>
+              {connectWorkspaceNav}
+              <DashboardComposerPage user={user} />
+            </>
           ) : effectiveChartMode ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {connectWorkspaceNav}
               {!showConnectWorkspaceNav ? (
               <div className="mb-2 flex flex-wrap items-center gap-1">
                 {chartSheetIds.map((id) => (
@@ -962,11 +964,14 @@ export default function DataSheetWithIntegration({
             <>
               <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
               {showConnectAnalyzeSection ? (
-                <ConnectHomeAnalyzeSection
-                  user={user}
-                  startNew={startNew}
-                  setStartNew={setStartNew}
-                />
+                <>
+                  {connectWorkspaceNav}
+                  <ConnectHomeAnalyzeSection
+                    user={user}
+                    startNew={startNew}
+                    setStartNew={setStartNew}
+                  />
+                </>
               ) : null}
               {connectHomeKalshiPullBridge ? (
                 <div

@@ -26,6 +26,10 @@ import {
 import { collectKalshiMarketsMaterializedVirtuals } from "./composeWherePredicateSql";
 import { ATHENA_DEMO_ROW_LIMIT, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { validateAndNormalizeEquation } from "./composeEquationAst";
+import {
+  resolveComposeGroupByAliases,
+  selectRowsForAggregatedCompose,
+} from "@/lib/composeColumnGrouping";
 
 export class AthenaLakeRequestError extends Error {
   /**
@@ -745,20 +749,28 @@ export function validateAthenaLakeQueryBody(body, access) {
     }
 
     const hasAggInSelect = normalizedSelect.some((r) => r.aggregate != null);
-    const dimensionAliases = normalizedSelect.filter((r) => !r.aggregate).map((r) => r.alias);
     const allSelectAliases = new Set(normalizedSelect.map((r) => r.alias));
+    let outputSelectAliases = allSelectAliases;
 
-    if (hasAggInSelect && dimensionAliases.length === 0) {
-      throw new AthenaLakeRequestError(
-        "With aggregate functions, add at least one other non-aggregated field so results can GROUP BY that dimension.",
-        { statusCode: 400, code: "BAD_REQUEST" },
-      );
+    const groupByAliasesResolved = hasAggInSelect ? resolveComposeGroupByAliases(normalizedSelect) : [];
+    const normalizedSelectForOutput = selectRowsForAggregatedCompose(normalizedSelect);
+
+    if (hasAggInSelect && groupByAliasesResolved.length === 0) {
+      const grandTotalOnly = normalizedSelectForOutput.every((r) => r.aggregate != null);
+      if (!grandTotalOnly) {
+        throw new AthenaLakeRequestError(
+          "With aggregate functions, add at least one grouping dimension (bucket or unique values on a column).",
+          { statusCode: 400, code: "BAD_REQUEST" },
+        );
+      }
     }
 
-    /** With aggregates, GROUP BY is always every non-aggregated column (e.g. quarter); tens of thousands of trades in Q1 2024 collapse to one row. */
+    outputSelectAliases = new Set(normalizedSelectForOutput.map((r) => r.alias));
+
+    /** With aggregates, GROUP BY uses explicit group keys when any bucket is set; otherwise all dimensions. */
     let groupByAliases;
     if (hasAggInSelect) {
-      groupByAliases = dimensionAliases;
+      groupByAliases = groupByAliasesResolved;
     } else {
       groupByAliases = Array.isArray(raw.groupByAliases)
         ? raw.groupByAliases.map((a) => String(a || "").trim()).filter(Boolean)
@@ -771,14 +783,16 @@ export function validateAthenaLakeQueryBody(body, access) {
     }
 
     const orderBy = Array.isArray(raw.orderBy)
-      ? raw.orderBy.map((o) => {
-          if (!o || typeof o !== "object") {
-            throw new AthenaLakeRequestError("Invalid compose.orderBy entry", { statusCode: 400, code: "BAD_REQUEST" });
-          }
-          const a = String(o.alias || "").trim();
-          const dir = String(o.direction || "asc").toLowerCase().trim() === "desc" ? "desc" : "asc";
-          return { alias: a, direction: dir };
-        })
+      ? raw.orderBy
+          .map((o) => {
+            if (!o || typeof o !== "object") {
+              throw new AthenaLakeRequestError("Invalid compose.orderBy entry", { statusCode: 400, code: "BAD_REQUEST" });
+            }
+            const a = String(o.alias || "").trim();
+            const dir = String(o.direction || "asc").toLowerCase().trim() === "desc" ? "desc" : "asc";
+            return { alias: a, direction: dir };
+          })
+          .filter((o) => o.alias && outputSelectAliases.has(o.alias))
       : [];
 
     /** @type {{ and: Array<{ alias: string; op: "gt" | "lt" | "eq" | "neq"; value: number }> } | null} */
@@ -791,7 +805,9 @@ export function validateAthenaLakeQueryBody(body, access) {
         throw new AthenaLakeRequestError("compose.having.or is not supported yet", { statusCode: 400, code: "BAD_REQUEST" });
       }
 
-      const aggAliasSet = new Set(normalizedSelect.filter((r) => r.aggregate != null).map((r) => r.alias));
+      const aggAliasSet = new Set(
+        normalizedSelectForOutput.filter((r) => r.aggregate != null).map((r) => r.alias),
+      );
 
       const havingAnd = Array.isArray(raw.having.and) ? raw.having.and : [];
       if (havingAnd.length > 0 && !hasAggInSelect) {
@@ -834,7 +850,7 @@ export function validateAthenaLakeQueryBody(body, access) {
     }
 
     validatedCompose = {
-      select: normalizedSelect,
+      select: normalizedSelectForOutput,
       groupByAliases,
       orderBy,
       ...(joinPresetValidated ? { join: { preset: joinPresetValidated } } : {}),

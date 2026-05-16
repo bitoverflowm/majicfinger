@@ -25,7 +25,7 @@ export const CONNECT_COMPOSE_OPERATIONS = [
   {
     id: "summarize",
     title: "Summarize",
-    description: "Sum or count values. Requires grouping.",
+    description: "Sum or count values. Use Bucket → Unique values on a column to group rows, or leave one metric for a grand total.",
   },
   {
     id: "if_else",

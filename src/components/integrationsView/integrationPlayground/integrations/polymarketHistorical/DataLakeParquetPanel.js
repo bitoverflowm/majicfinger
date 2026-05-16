@@ -88,6 +88,11 @@ import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
+import {
+  hasExplicitComposeGrouping,
+  resolveComposeGroupByAliases,
+  selectRowsForAggregatedCompose,
+} from "@/lib/composeColumnGrouping";
 import { rollupKalshiPrefixRowsByTaxonomyGroup } from "@/lib/kalshi/kalshiCategoryTaxonomy";
 import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
@@ -1127,17 +1132,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     });
   }, [availableColumns, selected?.table]);
 
-  /** Non-aggregate SELECT aliases — these are the GROUP BY keys when Sum/Count is used (e.g. one row per quarter). */
+  /** GROUP BY keys when summarizing (bucketed columns only when explicit grouping is set). */
   const composeDimensionAliases = useMemo(
-    () =>
-      columnComposeItems
-        .filter((i) => i.aggregate == null)
-        .map((i) => String(i.alias || i.column).trim()),
+    () => resolveComposeGroupByAliases(columnComposeItems),
     [columnComposeItems],
   );
 
   const composeSelectAliasChoices = useMemo(() => {
-    return columnComposeItems.map((i) => ({
+    const rows = selectRowsForAggregatedCompose(columnComposeItems);
+    return rows.map((i) => ({
       alias: i.alias,
       column: i.column,
       label: i.alias === i.column ? i.alias : `${i.alias} (${i.column})`,
@@ -2427,6 +2430,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
     const effectiveIngestMode = selectionTab === "meta" ? "meta" : "columns";
     const composeSpecForRun = isComposeTab ? buildServerComposePayload() : undefined;
+    const composeSelectForCard = composeSpecForRun?.select ?? [];
     const composeFiltersForRun = isComposeTab
       ? isDemo
         ? null
@@ -2447,11 +2451,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             table: selected.table,
             sheetId: activeSheetId || null,
             sheetLabel: activeSheetId ? String(dataSheets?.[activeSheetId]?.name || activeSheetId) : "",
-            selectAliases: Array.isArray(columnComposeItems)
-              ? columnComposeItems.map((i) => String(i.alias || i.column).trim()).filter(Boolean)
+            selectAliases: Array.isArray(composeSelectForCard)
+              ? composeSelectForCard.map((i) => String(i.alias || i.column).trim()).filter(Boolean)
               : [],
-            selectColumns: Array.isArray(columnComposeItems)
-              ? columnComposeItems.map((i) => String(i.column || "").trim()).filter(Boolean)
+            selectColumns: Array.isArray(composeSelectForCard)
+              ? composeSelectForCard.map((i) => String(i.column || "").trim()).filter(Boolean)
               : [],
             hasWhere: whereSummary.hasWhere,
             whereText: whereSummary.text,
@@ -4480,11 +4484,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     <p className="text-xs text-muted-foreground leading-snug">
                       With <span className="font-medium text-foreground">Sum</span> or{" "}
                       <span className="font-medium text-foreground">Count</span>, Athena uses{" "}
-                      <span className="font-medium text-foreground">GROUP BY</span> on every non-aggregated field (for example
-                      your quarter column). Many trades in the same calendar quarter are not separate rows — they collapse into{" "}
-                      <span className="font-medium text-foreground">one row per quarter</span> with volume summed.{" "}
+                      <span className="font-medium text-foreground">GROUP BY</span>{" "}
+                      {hasExplicitComposeGrouping(columnComposeItems)
+                        ? "only on bucketed or unique-value columns (not every selected column). Pass-through fields are omitted from results."
+                        : "on every non-aggregated field you selected (for example your quarter column). Many rows sharing the same key collapse into one sheet row with totals."}{" "}
                       <span className="font-medium text-foreground">Group keys:</span>{" "}
-                      {composeDimensionAliases.length ? composeDimensionAliases.join(", ") : "— (add a bucket or dimension)"}
+                      {composeDimensionAliases.length ? composeDimensionAliases.join(", ") : "— (totals only, or add a bucket)"}
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground leading-snug">

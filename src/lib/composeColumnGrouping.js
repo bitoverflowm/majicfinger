@@ -183,3 +183,53 @@ export function hasColumnGrouping(item) {
   if (item.numberBucket != null && item.numberBucket !== "") return true;
   return false;
 }
+
+export function composeRowAlias(row) {
+  return String(row?.alias || row?.column || "").trim();
+}
+
+/**
+ * Row is a GROUP BY dimension when summarizing (bucket, unique values, CASE column).
+ * @param {object} row
+ */
+export function isComposeGroupByKeyRow(row) {
+  if (!row || row.aggregate != null) return false;
+  if (hasColumnGrouping(row)) return true;
+  if (row.sumCase?.enabled) return true;
+  return false;
+}
+
+/** Any column uses an explicit bucket / unique-value grouping. */
+export function hasExplicitComposeGrouping(items) {
+  return (items || []).some(isComposeGroupByKeyRow);
+}
+
+/**
+ * GROUP BY aliases for a compose pull.
+ * When explicit grouping exists, only bucketed dimensions group — not every selected column.
+ * @param {object[]} items
+ */
+export function resolveComposeGroupByAliases(items) {
+  const rows = items || [];
+  const hasAgg = rows.some((r) => r.aggregate != null);
+  if (!hasAgg) {
+    return rows.filter((r) => r.aggregate == null).map(composeRowAlias);
+  }
+  if (hasExplicitComposeGrouping(rows)) {
+    return rows.filter(isComposeGroupByKeyRow).map(composeRowAlias);
+  }
+  return rows.filter((r) => r.aggregate == null).map(composeRowAlias);
+}
+
+/**
+ * When summarizing with explicit group keys, omit pass-through columns from SELECT.
+ * @param {object[]} items
+ */
+export function selectRowsForAggregatedCompose(items) {
+  const rows = items || [];
+  const hasAgg = rows.some((r) => r.aggregate != null);
+  if (!hasAgg || !hasExplicitComposeGrouping(rows)) {
+    return rows;
+  }
+  return rows.filter((r) => r.aggregate != null || isComposeGroupByKeyRow(r));
+}

@@ -860,11 +860,12 @@ export function buildComposeAthenaSelectSql({
   }
 
   const hasAgg = [...byAlias.values()].some((v) => v.isAggregate);
-  const dimAliases = [...byAlias.entries()].filter(([, v]) => !v.isAggregate).map(([a]) => a);
 
-  // With SUM/COUNT, GROUP BY must list every dimension (same order as SELECT) so values collapse (e.g. all Q1 2024 trades → one row).
+  // With aggregates, GROUP BY keys come from compose.groupByAliases (explicit buckets / unique values, or all dimensions).
   const gb = hasAgg
-    ? dimAliases
+    ? Array.isArray(compose.groupByAliases)
+      ? compose.groupByAliases.map((a) => String(a).trim()).filter(Boolean)
+      : []
     : Array.isArray(compose.groupByAliases)
       ? compose.groupByAliases.map((a) => String(a).trim()).filter(Boolean)
       : [];

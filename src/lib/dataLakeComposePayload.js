@@ -1,3 +1,8 @@
+import {
+  resolveComposeGroupByAliases,
+  selectRowsForAggregatedCompose,
+} from "@/lib/composeColumnGrouping";
+
 /**
  * Server compose payload for Athena lake pulls (shared by integrations panel + Connect home).
  * Connect home writes the same context state; pulls always go through DataLakeParquetPanel.handleLoad.
@@ -10,14 +15,28 @@ export function buildDataLakeServerComposePayload({
   composeHavingFilters,
   composeJoins,
   hasComposeAggregates,
-  composeDimensionAliases,
+  composeDimensionAliases: _composeDimensionAliases,
   dataset,
   selectedTable,
   kalshiTradesJoinPreset,
   kalshiTradesJoinPresets,
 }) {
+  const selectItems = selectRowsForAggregatedCompose(columnComposeItems);
+  const selectAliasSet = new Set(
+    selectItems.map((i) => String(i.alias || i.column).trim()).filter(Boolean),
+  );
+  const groupByAliases = hasComposeAggregates
+    ? resolveComposeGroupByAliases(columnComposeItems)
+    : [];
+  const orderBy = (columnComposeOrderBy || [])
+    .map((o) => ({
+      alias: String(o?.alias || "").trim(),
+      direction: String(o?.direction || "asc").toLowerCase().trim() === "desc" ? "desc" : "asc",
+    }))
+    .filter((o) => o.alias && selectAliasSet.has(o.alias));
+
   const payload = {
-    select: columnComposeItems.map((i) => ({
+    select: selectItems.map((i) => ({
       column: i.column,
       alias: String(i.alias || i.column).trim(),
       aggregate: i.aggregate || null,
@@ -33,8 +52,8 @@ export function buildDataLakeServerComposePayload({
         : {}),
       ...(i.aggregate === "sum" && i.equation && i.equation.enabled ? { equation: i.equation } : {}),
     })),
-    groupByAliases: hasComposeAggregates ? composeDimensionAliases : [],
-    orderBy: columnComposeOrderBy,
+    groupByAliases,
+    orderBy,
   };
 
   if (composeHavingFilters.length > 0) {

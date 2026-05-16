@@ -33,6 +33,7 @@ import {
 import { glueTableNamesForDataset } from "@/config/dataLakeParquetSamples";
 import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
+import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
 import { cn } from "@/lib/utils";
 import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectComposeIfElseSection";
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
@@ -106,15 +107,14 @@ export function ConnectComposeOperationPanel({ className }) {
 
   const glueJoinTableOptions = useMemo(() => glueTableNamesForDataset("kalshi"), []);
 
-  const composeSelectAliasChoices = useMemo(
-    () =>
-      columnComposeItems.map((i) => ({
-        alias: i.alias,
-        column: i.column,
-        label: i.alias === i.column ? i.alias : `${i.alias} (${i.column})`,
-      })),
-    [columnComposeItems],
-  );
+  const composeSelectAliasChoices = useMemo(() => {
+    const rows = selectRowsForAggregatedCompose(columnComposeItems);
+    return rows.map((i) => ({
+      alias: i.alias,
+      column: i.column,
+      label: i.alias === i.column ? i.alias : `${i.alias} (${i.column})`,
+    }));
+  }, [columnComposeItems]);
 
   const composeAggregateAliasChoices = useMemo(
     () =>
