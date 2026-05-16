@@ -4491,16 +4491,20 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                       <span className="font-medium text-foreground">Group keys:</span>{" "}
                       {composeDimensionAliases.length ? composeDimensionAliases.join(", ") : "— (totals only, or add a bucket)"}
                     </p>
+                  ) : hasExplicitComposeGrouping(columnComposeItems) ? (
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      <span className="font-medium text-foreground">Bucket</span> or{" "}
+                      <span className="font-medium text-foreground">unique values</span> collapse rows: Athena{" "}
+                      <span className="font-medium text-foreground">GROUP BY</span> only the group keys below (not every
+                      selected column). Other columns are omitted unless you add{" "}
+                      <span className="font-medium text-foreground">Summarize</span> (Sum, Count, etc.).{" "}
+                      <span className="font-medium text-foreground">Group keys:</span>{" "}
+                      {composeDimensionAliases.length ? composeDimensionAliases.join(", ") : "—"}
+                    </p>
                   ) : (
                     <p className="text-xs text-muted-foreground leading-snug">
-                      You’re using a <span className="font-medium text-foreground">date bucket</span> or{" "}
-                      <span className="font-medium text-foreground">date text</span> shape. That alone still returns{" "}
-                      <span className="font-medium text-foreground">one sheet row per table row</span> (the bucket is just an
-                      extra column). To get <span className="font-medium text-foreground">one row per quarter</span> (or per
-                      month, etc.), add <span className="font-medium text-foreground">Sum</span> or{" "}
-                      <span className="font-medium text-foreground">Count</span> on a numeric field — then all rows sharing the
-                      same quarter combine into one row, like{" "}
-                      <span className="font-medium text-foreground">GROUP BY quarter</span> in SQL.
+                      Date format shapes only change how a column displays. Without a bucket or summarize, each matching
+                      market row is returned (up to the row limit).
                     </p>
                   )}
                 </div>

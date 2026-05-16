@@ -12,6 +12,7 @@ import {
   buildKalshiTaxonomyGroupSqlExpr,
   KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN,
 } from "@/lib/kalshi/kalshiTaxonomySql";
+import { composeBucketMsColumnAlias } from "@/lib/composeDateDisplay";
 
 /** @typedef {"hour" | "day" | "week" | "month" | "quarter" | "year"} DateBucket */
 /** @typedef {"raw" | "iso" | "dmy" | "ym" | "dm" | "hm"} DateFormat */
@@ -120,6 +121,32 @@ function buildEquationExprSql(expr, colRef) {
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
 
+/**
+ * @param {string | null} baseAlias
+ * @param {Set<string> | null} kalshiMaterializedVirtuals
+ * @returns {(c: string) => string}
+ */
+function makeComposeColRef(baseAlias, kalshiMaterializedVirtuals) {
+  const mat = kalshiMaterializedVirtuals instanceof Set ? kalshiMaterializedVirtuals : null;
+  const eventTickerSql = baseAlias ? `${baseAlias}."event_ticker"` : `"event_ticker"`;
+  return (c) => {
+    const name = String(c || "").trim();
+    if (name === KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN) {
+      if (mat?.has(KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN)) {
+        return baseAlias ? `${baseAlias}."${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"` : `"${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"`;
+      }
+      return buildKalshiTaxonomyGroupSqlExpr(eventTickerSql);
+    }
+    if (name === KALSHI_VIRTUAL_CATEGORY) {
+      if (mat?.has(KALSHI_VIRTUAL_CATEGORY)) {
+        return baseAlias ? `${baseAlias}."${KALSHI_VIRTUAL_CATEGORY}"` : `"${KALSHI_VIRTUAL_CATEGORY}"`;
+      }
+      return kalshiEventTickerCategorySql(eventTickerSql);
+    }
+    return baseAlias ? `${baseAlias}."${name}"` : `"${name}"`;
+  };
+}
+
 /** Max rows for compose queries that are a plain SELECT over a table (no SUM/COUNT, no join preset) — avoids huge result pulls. */
 export const COMPOSE_UNCONSTRAINED_ROW_CAP = 100;
 
@@ -140,6 +167,8 @@ export function composeUnboundedSelectShouldCapRows(compose) {
   if (cteJoins.length) return false;
   const rows = Array.isArray(compose.select) ? compose.select : [];
   const hasAgg = rows.some((r) => r && r.aggregate != null);
+  const groupBy = Array.isArray(compose.groupByAliases) ? compose.groupByAliases : [];
+  if (groupBy.length > 0) return false;
   return !hasAgg;
 }
 
@@ -288,6 +317,7 @@ function formatDateTimeDimensionSql(tsExpr, dateBucket, dateFormat) {
     return `CAST(to_unixtime(${tsExpr}) AS BIGINT)`;
   }
 
+  // Explicit format overrides bucket-native labels (e.g. ISO on a quarter bucket).
   const pattern =
     fmt === "iso"
       ? "%Y-%m-%d %H:%i"
@@ -395,25 +425,7 @@ function buildSelectExpression(opts) {
     kalshiMaterializedVirtuals = null,
   } = opts;
 
-  const mat = kalshiMaterializedVirtuals instanceof Set ? kalshiMaterializedVirtuals : null;
-  const eventTickerSql = baseAlias ? `${baseAlias}."event_ticker"` : `"event_ticker"`;
-  /** Resolves physical + Kalshi virtual columns; virtuals use materialized aliases when present. */
-  const colRef = (c) => {
-    const name = String(c || "").trim();
-    if (name === KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN) {
-      if (mat?.has(KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN)) {
-        return baseAlias ? `${baseAlias}."${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"` : `"${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"`;
-      }
-      return buildKalshiTaxonomyGroupSqlExpr(eventTickerSql);
-    }
-    if (name === KALSHI_VIRTUAL_CATEGORY) {
-      if (mat?.has(KALSHI_VIRTUAL_CATEGORY)) {
-        return baseAlias ? `${baseAlias}."${KALSHI_VIRTUAL_CATEGORY}"` : `"${KALSHI_VIRTUAL_CATEGORY}"`;
-      }
-      return kalshiEventTickerCategorySql(eventTickerSql);
-    }
-    return baseAlias ? `${baseAlias}."${name}"` : `"${name}"`;
-  };
+  const colRef = makeComposeColRef(baseAlias, kalshiMaterializedVirtuals);
 
   if (column === KALSHI_VIRTUAL_CATEGORY) {
     if (aggregate && aggregate !== "count" && aggregate !== "count_distinct") {
@@ -629,8 +641,16 @@ function buildSelectExpression(opts) {
 
 /**
  * Same expression as SELECT but without alias (for GROUP BY).
+ * @param {object} opts
+ * @param {boolean} [opts.forGroupBy] When true, date buckets use date_trunc (not display format).
  */
 function buildGroupExpression(opts) {
+  const { forGroupBy = false, column, treatAsDate, dateBucket, baseAlias, kalshiMaterializedVirtuals } = opts;
+  if (forGroupBy && treatAsDate && dateBucket && DATE_BUCKETS.has(dateBucket)) {
+    const colRef = makeComposeColRef(baseAlias, kalshiMaterializedVirtuals);
+    const ts = epochBigintToTimestampExpr(colRef(column));
+    return `date_trunc('${dateBucket}', ${ts})`;
+  }
   const { innerSql } = buildSelectExpression(opts);
   return innerSql;
 }
@@ -820,7 +840,7 @@ export function buildComposeAthenaSelectSql({
       throw err;
     }
 
-    const innerSql = buildSelectExpression({
+    const rowExprOpts = {
       column: row.column,
       columnType: row.columnType || null,
       treatAsDate: row.treatAsDate === true,
@@ -828,35 +848,42 @@ export function buildComposeAthenaSelectSql({
       dateFormat: row.dateFormat || null,
       stringBucket: row.stringBucket || null,
       numberBucket: row.numberBucket != null ? Number(row.numberBucket) : null,
-      aggregate: row.aggregate || null,
       numberScale: row.numberScale || null,
       decimals: row.decimals != null ? Number(row.decimals) : null,
       sumCase: row.sumCase || null,
       equation: row.equation || null,
       baseAlias,
       kalshiMaterializedVirtuals: kalshiMat,
+    };
+
+    const innerSql = buildSelectExpression({
+      ...rowExprOpts,
+      aggregate: row.aggregate || null,
     }).innerSql;
 
     const isAggregate = row.aggregate != null;
+    const dateBucketTruncExpr =
+      row.treatAsDate === true &&
+      row.dateBucket &&
+      DATE_BUCKETS.has(row.dateBucket) &&
+      !isAggregate
+        ? buildGroupExpression({ ...rowExprOpts, aggregate: null, forGroupBy: true })
+        : null;
     const groupExpr = buildGroupExpression({
-      column: row.column,
-      columnType: row.columnType || null,
-      treatAsDate: row.treatAsDate === true,
-      dateBucket: row.dateBucket || null,
-      dateFormat: row.dateFormat || null,
-      stringBucket: row.stringBucket || null,
-      numberBucket: row.numberBucket != null ? Number(row.numberBucket) : null,
+      ...rowExprOpts,
       aggregate: null,
-      numberScale: row.numberScale || null,
-      decimals: row.decimals != null ? Number(row.decimals) : null,
-      sumCase: row.sumCase || null,
-      equation: row.equation || null,
-      baseAlias,
-      kalshiMaterializedVirtuals: kalshiMat,
+      forGroupBy: !!dateBucketTruncExpr,
     });
 
     byAlias.set(alias, { groupExpr, isAggregate });
     selectParts.push(`${innerSql} AS "${alias}"`);
+
+    if (dateBucketTruncExpr) {
+      const msAlias = composeBucketMsColumnAlias(alias);
+      if (!byAlias.has(msAlias)) {
+        selectParts.push(`CAST(to_unixtime(${dateBucketTruncExpr}) * 1000 AS BIGINT) AS "${msAlias}"`);
+      }
+    }
   }
 
   const hasAgg = [...byAlias.values()].some((v) => v.isAggregate);

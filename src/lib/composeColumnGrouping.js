@@ -1,3 +1,5 @@
+import { defaultDateFormatForBucket } from "@/lib/composeDateDisplay";
+
 /**
  * Column bucket (GROUP BY dimension) and format (display) options for compose pulls.
  */
@@ -71,14 +73,17 @@ export function composeBucketSelectValue(item, kind) {
 export function composeFormatSelectValue(item) {
   if (item.dateFormat) return `fmt:${item.dateFormat}`;
   if (item.treatAsDate && !item.dateBucket) return "fmt:raw";
-  if (item.treatAsDate && item.dateBucket) return "fmt:iso";
+  if (item.treatAsDate && item.dateBucket) {
+    const autoFmt = defaultDateFormatForBucket(item.dateBucket);
+    return autoFmt ? `fmt:${autoFmt}` : "fmt:auto";
+  }
   return "fmt:none";
 }
 
 /** @param {string} value bucket select value */
 export function patchesForBucket(value, kind) {
   if (value === "none" || !value) {
-    return { dateBucket: null, stringBucket: null, numberBucket: null };
+    return { dateBucket: null, dateFormat: null, stringBucket: null, numberBucket: null };
   }
   if (value.startsWith("dt:")) {
     const unit = value.slice(3);
@@ -106,6 +111,9 @@ export function patchesForBucket(value, kind) {
 /** @param {string} value format select value */
 export function patchesForFormat(value) {
   if (!value || value === "fmt:none") {
+    return { dateFormat: null };
+  }
+  if (value === "fmt:auto") {
     return { dateFormat: null };
   }
   if (value === "fmt:raw") {
@@ -165,10 +173,12 @@ export function bucketShortLabel(value, kind) {
 
 export function formatShortLabel(value) {
   if (value === "fmt:none") return "—";
+  if (value === "fmt:auto") return "Auto";
   const opt = getFormatOptionsForKind("date").find((o) => o.value === value);
   if (opt?.label?.includes("epoch")) return "Raw";
   if (opt?.label?.includes("ISO")) return "ISO";
   if (opt?.label?.includes("Hour")) return "H:M";
+  if (opt?.label?.includes("Match bucket")) return "Auto";
   if (value === "fmt:dmy") return "D-M-Y";
   if (value === "fmt:ym") return "Y-M";
   if (value === "fmt:dm") return "D-M";
@@ -212,24 +222,29 @@ export function hasExplicitComposeGrouping(items) {
 export function resolveComposeGroupByAliases(items) {
   const rows = items || [];
   const hasAgg = rows.some((r) => r.aggregate != null);
-  if (!hasAgg) {
-    return rows.filter((r) => r.aggregate == null).map(composeRowAlias);
-  }
   if (hasExplicitComposeGrouping(rows)) {
     return rows.filter(isComposeGroupByKeyRow).map(composeRowAlias);
   }
-  return rows.filter((r) => r.aggregate == null).map(composeRowAlias);
+  if (hasAgg) {
+    return rows.filter((r) => r.aggregate == null).map(composeRowAlias);
+  }
+  return [];
 }
 
 /**
- * When summarizing with explicit group keys, omit pass-through columns from SELECT.
+ * When any column uses an explicit bucket, only group-key + aggregate columns go to SELECT.
  * @param {object[]} items
  */
 export function selectRowsForAggregatedCompose(items) {
   const rows = items || [];
-  const hasAgg = rows.some((r) => r.aggregate != null);
-  if (!hasAgg || !hasExplicitComposeGrouping(rows)) {
+  if (!hasExplicitComposeGrouping(rows)) {
     return rows;
   }
   return rows.filter((r) => r.aggregate != null || isComposeGroupByKeyRow(r));
+}
+
+/** True when the pull will GROUP BY (bucket and/or summarize). */
+export function composePullCollapsesRows(items) {
+  const rows = items || [];
+  return rows.some((r) => r.aggregate != null) || hasExplicitComposeGrouping(rows);
 }

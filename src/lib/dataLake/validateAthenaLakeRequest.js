@@ -752,7 +752,7 @@ export function validateAthenaLakeQueryBody(body, access) {
     const allSelectAliases = new Set(normalizedSelect.map((r) => r.alias));
     let outputSelectAliases = allSelectAliases;
 
-    const groupByAliasesResolved = hasAggInSelect ? resolveComposeGroupByAliases(normalizedSelect) : [];
+    const groupByAliasesResolved = resolveComposeGroupByAliases(normalizedSelect);
     const normalizedSelectForOutput = selectRowsForAggregatedCompose(normalizedSelect);
 
     if (hasAggInSelect && groupByAliasesResolved.length === 0) {
@@ -767,11 +767,11 @@ export function validateAthenaLakeQueryBody(body, access) {
 
     outputSelectAliases = new Set(normalizedSelectForOutput.map((r) => r.alias));
 
-    /** With aggregates, GROUP BY uses explicit group keys when any bucket is set; otherwise all dimensions. */
+    /** GROUP BY when buckets and/or aggregates collapse rows. */
     let groupByAliases;
-    if (hasAggInSelect) {
+    if (groupByAliasesResolved.length > 0) {
       groupByAliases = groupByAliasesResolved;
-    } else {
+    } else if (!hasAggInSelect) {
       groupByAliases = Array.isArray(raw.groupByAliases)
         ? raw.groupByAliases.map((a) => String(a || "").trim()).filter(Boolean)
         : [];
@@ -780,6 +780,8 @@ export function validateAthenaLakeQueryBody(body, access) {
           throw new AthenaLakeRequestError(`Invalid compose.groupByAliases: ${a}`, { statusCode: 400, code: "BAD_REQUEST" });
         }
       }
+    } else {
+      groupByAliases = groupByAliasesResolved;
     }
 
     const orderBy = Array.isArray(raw.orderBy)

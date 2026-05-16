@@ -18,6 +18,11 @@ import {
   patchesForBucket,
   patchesForFormat,
 } from "@/lib/composeColumnGrouping";
+import {
+  composeBucketMsColumnAlias,
+  formatComposeDateFromBucketMs,
+} from "@/lib/composeDateDisplay";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
 
 const SCALE_SHORT_LABELS = {
@@ -54,17 +59,35 @@ function BucketFormatSelects({
   triggerClass,
   compact,
 }) {
+  const setConnectedData = useMyStateV2()?.setConnectedData;
   const bucketVal = composeBucketSelectValue(item, kind);
   const formatVal = composeFormatSelectValue(item);
   const bucketOptions = getBucketOptionsForKind(kind);
   const formatOptions = getFormatOptionsForKind(kind);
   const showFormat = kind === "date" || item.treatAsDate;
 
+  const reformatSheetColumnFromBucketMs = (dateFormat) => {
+    if (!setConnectedData || !item.dateBucket) return;
+    const alias = String(item.alias || item.column).trim();
+    const msKey = composeBucketMsColumnAlias(alias);
+    setConnectedData((prev) =>
+      (Array.isArray(prev) ? prev : []).map((row) => {
+        if (!row || typeof row !== "object" || row[msKey] == null) return row;
+        return {
+          ...row,
+          [alias]: formatComposeDateFromBucketMs(row[msKey], dateFormat, item.dateBucket),
+        };
+      }),
+    );
+  };
+
   const onBucket = (v) => {
     updateComposeItem(item.id, { aggregate: null, ...patchesForBucket(v, kind) });
   };
   const onFormat = (v) => {
-    updateComposeItem(item.id, { aggregate: null, ...patchesForFormat(v) });
+    const patches = patchesForFormat(v);
+    updateComposeItem(item.id, { aggregate: null, ...patches });
+    reformatSheetColumnFromBucketMs(patches.dateFormat);
   };
 
   if (compact) {

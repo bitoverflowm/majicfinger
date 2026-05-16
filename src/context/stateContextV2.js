@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import { coerceDataTypes } from '@/lib/coerceDataTypes';
+import { isComposeBucketMsColumn } from '@/lib/composeDateDisplay';
 import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from '@/lib/connectHomeWorkspace';
 import { pingAthenaLakeConnection } from '@/lib/athenaLakePing';
 
@@ -573,7 +574,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
                 return merged;
             });
 
-            const keys = Object.keys(connectedData[0]);
+            const keys = Object.keys(connectedData[0]).filter((key) => !isComposeBucketMsColumn(key));
             setConnectedCols(
                 keys.map((key) => ({
                     field: key,

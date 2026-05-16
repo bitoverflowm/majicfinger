@@ -11,11 +11,10 @@ const chipIdle = "bg-yellow-200/30 hover:bg-lychee_blue/80 hover:text-lychee_whi
 const chipActive = "bg-lychee_blue/30 text-foreground";
 
 const actionChipBase =
-  "relative cursor-pointer rounded px-[0.35rem] py-[0.2rem] font-mono font-semibold leading-none transition-colors";
+  "relative cursor-pointer rounded px-[0.35rem] py-[0.2rem] font-mono font-semibold leading-none transition-colors whitespace-nowrap";
 
 /**
- * Connect home — sheet/chart tabs + Integration / Chart / Dashboard / Export shortcuts.
- * Mirrors the right drawer tabs; always visible on analyze + publish views.
+ * Connect home — sheet/chart tabs on the left; new sheet/chart/dashboard + export on the right.
  */
 export function ConnectHomeWorkspaceNav({ className, compact = false }) {
   const ctx = useMyStateV2();
@@ -130,91 +129,100 @@ export function ConnectHomeWorkspaceNav({ className, compact = false }) {
   }, [setRightPanelOpen, setRightPanelTab]);
 
   const textSize = compact ? "text-xs" : "text-sm";
+  const gapClass = compact ? "gap-0.5" : "gap-1";
 
   return (
     <nav
       className={cn(
-        "mb-2 flex min-w-0 flex-wrap items-center gap-1",
-        compact && "mb-1 gap-0.5",
+        "mb-2 flex min-w-0 items-center justify-between gap-2",
+        compact && "mb-1 gap-1.5",
         className,
       )}
       aria-label="Workspace navigation"
     >
-      {dataSheetIds.map((id) => (
+      <div
+        className={cn("flex min-w-0 flex-1 flex-wrap items-center", gapClass)}
+        aria-label="Open sheets and charts"
+      >
+        {dataSheetIds.map((id) => (
+          <button
+            key={`sheet-${id}`}
+            type="button"
+            className={cn(
+              chipBase,
+              textSize,
+              tableViewActive && id === activeSheetId ? chipActive : chipIdle,
+            )}
+            onClick={() => selectSheet(id)}
+          >
+            {dataSheets[id]?.name || id}
+          </button>
+        ))}
+
+        {chartSheetIds.map((id) => (
+          <button
+            key={`chart-${id}`}
+            type="button"
+            className={cn(
+              chipBase,
+              textSize,
+              chartViewActive && id === activeChartSheetId ? chipActive : chipIdle,
+            )}
+            onClick={() => selectChart(id)}
+          >
+            {chartSheets[id]?.name || id}
+          </button>
+        ))}
+      </div>
+
+      <div
+        className={cn("flex shrink-0 flex-wrap items-center justify-end", gapClass)}
+        aria-label="Workspace actions"
+      >
         <button
-          key={`sheet-${id}`}
+          type="button"
+          className={cn(actionChipBase, textSize, chipIdle)}
+          onClick={() => addNewSheetAndActivate?.()}
+        >
+          + Sheet
+        </button>
+
+        <button
           type="button"
           className={cn(
-            chipBase,
+            actionChipBase,
             textSize,
-            tableViewActive && id === activeSheetId ? chipActive : chipIdle,
+            integrationsPanelActive && !chartViewActive && !dashboardViewActive ? chipActive : chipIdle,
           )}
-          onClick={() => selectSheet(id)}
+          onClick={openIntegrationsPanel}
         >
-          {dataSheets[id]?.name || id}
+          + Integration
         </button>
-      ))}
 
-      <button
-        type="button"
-        aria-label="Add sheet"
-        title="Add sheet"
-        className={cn(actionChipBase, textSize, chipIdle)}
-        onClick={() => addNewSheetAndActivate?.()}
-      >
-        +
-      </button>
-
-      {chartSheetIds.map((id) => (
         <button
-          key={`chart-${id}`}
           type="button"
-          className={cn(
-            chipBase,
-            textSize,
-            chartViewActive && id === activeChartSheetId ? chipActive : chipIdle,
-          )}
-          onClick={() => selectChart(id)}
+          className={cn(actionChipBase, textSize, chartViewActive ? chipActive : chipIdle)}
+          onClick={addChart}
         >
-          {chartSheets[id]?.name || id}
+          + Chart
         </button>
-      ))}
 
-      <button
-        type="button"
-        className={cn(
-          actionChipBase,
-          textSize,
-          integrationsPanelActive && !chartViewActive && !dashboardViewActive ? chipActive : chipIdle,
-        )}
-        onClick={openIntegrationsPanel}
-      >
-        + Integration
-      </button>
+        <button
+          type="button"
+          className={cn(actionChipBase, textSize, dashboardViewActive ? chipActive : chipIdle)}
+          onClick={openDashboard}
+        >
+          + Dashboard
+        </button>
 
-      <button
-        type="button"
-        className={cn(actionChipBase, textSize, chartViewActive ? chipActive : chipIdle)}
-        onClick={addChart}
-      >
-        + Chart
-      </button>
-
-      <button
-        type="button"
-        className={cn(actionChipBase, textSize, dashboardViewActive ? chipActive : chipIdle)}
-        onClick={openDashboard}
-      >
-        + Dashboard
-      </button>
-
-      <button
-        type="button"
-        className={cn(actionChipBase, textSize, exportActive ? chipActive : chipIdle)}
-        onClick={openExport}
-      >
-        Export
-      </button>
+        <button
+          type="button"
+          className={cn(actionChipBase, textSize, exportActive ? chipActive : chipIdle)}
+          onClick={openExport}
+        >
+          Export
+        </button>
+      </div>
     </nav>
   );
 }

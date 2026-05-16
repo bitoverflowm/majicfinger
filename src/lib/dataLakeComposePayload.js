@@ -25,9 +25,7 @@ export function buildDataLakeServerComposePayload({
   const selectAliasSet = new Set(
     selectItems.map((i) => String(i.alias || i.column).trim()).filter(Boolean),
   );
-  const groupByAliases = hasComposeAggregates
-    ? resolveComposeGroupByAliases(columnComposeItems)
-    : [];
+  const groupByAliases = resolveComposeGroupByAliases(columnComposeItems);
   const orderBy = (columnComposeOrderBy || [])
     .map((o) => ({
       alias: String(o?.alias || "").trim(),

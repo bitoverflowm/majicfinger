@@ -95,6 +95,8 @@ export function normalizeLakeBigintCellValue(value) {
   s = stripTrailingZeroFractionalPart(s);
 
   if (!/^-?\d+$/.test(s)) {
+    // Compose date buckets return labels like "Q1 '24" — keep as string, not null.
+    if (typeof value === "string") return value;
     const n = Number(s);
     return Number.isFinite(n) ? n : null;
   }

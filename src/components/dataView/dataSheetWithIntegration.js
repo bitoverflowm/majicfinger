@@ -964,14 +964,12 @@ export default function DataSheetWithIntegration({
             <>
               <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
               {showConnectAnalyzeSection ? (
-                <>
-                  {connectWorkspaceNav}
-                  <ConnectHomeAnalyzeSection
-                    user={user}
-                    startNew={startNew}
-                    setStartNew={setStartNew}
-                  />
-                </>
+                <ConnectHomeAnalyzeSection
+                  user={user}
+                  startNew={startNew}
+                  setStartNew={setStartNew}
+                  showWorkspaceNav={!!showConnectWorkspaceNav}
+                />
               ) : null}
               {connectHomeKalshiPullBridge ? (
                 <div

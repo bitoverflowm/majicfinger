@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
+import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Plus } from "lucide-react";
 
@@ -33,6 +34,7 @@ import {
 import { glueTableNamesForDataset } from "@/config/dataLakeParquetSamples";
 import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
+import { pruneConnectComposeBeforePull } from "@/lib/connectComposeSanitize";
 import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
 import { cn } from "@/lib/utils";
 import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectComposeIfElseSection";
@@ -228,9 +230,36 @@ export function ConnectComposeOperationPanel({ className }) {
   const requestConnectAnalyzeScroll = useMyStateV2()?.requestConnectAnalyzeScroll;
 
   const handleRunPull = useCallback(() => {
+    const pruned = pruneConnectComposeBeforePull({
+      connectActiveComposeOps,
+      columnComposeItems,
+      composeWhereFilters,
+      columnComposeOrderBy,
+      composeHavingFilters,
+      composeJoins,
+    });
+    if (pruned.changed) {
+      flushSync(() => {
+        setConnectActiveComposeOps?.(pruned.activeOps);
+        if (pruned.removedOps.includes("join")) {
+          setComposeJoins?.(pruned.joins);
+        }
+      });
+    }
     requestConnectAnalyzeScroll?.();
     requestConnectDataLakePull?.();
-  }, [requestConnectAnalyzeScroll, requestConnectDataLakePull]);
+  }, [
+    connectActiveComposeOps,
+    columnComposeItems,
+    composeWhereFilters,
+    columnComposeOrderBy,
+    composeHavingFilters,
+    composeJoins,
+    requestConnectAnalyzeScroll,
+    requestConnectDataLakePull,
+    setConnectActiveComposeOps,
+    setComposeJoins,
+  ]);
 
   const updateComposeItem = useCallback(
     (id, patch) => {
