@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check } from "lucide-react";
 
@@ -9,8 +9,13 @@ import { integrations_list } from "@/components/integrationsView/integrationsCon
 import { Button } from "@/components/ui/button";
 import { ATHENA_KALSHI_SAMPLE_OPTIONS, KALSHI_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { ComposeColumnFormatFields } from "@/components/connectData/ComposeColumnFormatFields";
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
+import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
+import { useSyncConnectKalshiComposeItems } from "@/hooks/useSyncConnectKalshiComposeItems";
+import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
+import { kindForLakeColumn } from "@/lib/dataLakeComposeHelpers";
 import { getKalshiColumnDisplayLabel, getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { connectWorkspaceScrollInsetClass } from "@/lib/connectHubLayout";
@@ -82,12 +87,54 @@ function ColumnHoverPreview({ sampleId, className }) {
 /** Fixed slot height so hover preview does not shift the Pick one block (avoids hover jitter). */
 const KALSHI_HOVER_PREVIEW_SLOT_CLASS = "h-[min(26rem,42vh)] min-h-[11rem] shrink-0";
 
-function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, onDeselectAll }) {
+function ColumnPicker({
+  sampleId,
+  selectedColumns,
+  onSelectColumn,
+  onDeselectColumn,
+  onSelectAll,
+  onDeselectAll,
+}) {
+  const connectKalshiColumnSelections = useMyStateV2()?.connectKalshiColumnSelections ?? {};
+  const { columnComposeItems, setColumnComposeItems } = useDataLakeComposeState(true);
   const columns = getKalshiConnectColumnsForSample(sampleId);
   const selectedSet = new Set(selectedColumns);
   const allSelected = columns.length > 0 && selectedColumns.length === columns.length;
   const noneSelected = selectedColumns.length === 0;
   const pickerRef = useRef(null);
+
+  const sample = KALSHI_SAMPLE_BY_ID[sampleId];
+  const table = sample?.table;
+  const columnMeta = useMemo(
+    () => (table ? getColumnMetaForLakeTable("kalshi", table) : []),
+    [table],
+  );
+  const typesByName = useMemo(
+    () => Object.fromEntries(columnMeta.map((c) => [c.name, c.type])),
+    [columnMeta],
+  );
+  const kindForColumn = useCallback((col) => kindForLakeColumn(col, typesByName), [typesByName]);
+
+  useSyncConnectKalshiComposeItems({
+    connectDataLakeSampleId: sampleId,
+    connectKalshiColumnSelections,
+    setColumnComposeItems,
+    typesByName,
+  });
+
+  const composeItemByColumn = useMemo(
+    () => Object.fromEntries((columnComposeItems || []).map((item) => [item.column, item])),
+    [columnComposeItems],
+  );
+
+  const updateComposeItem = useCallback(
+    (id, patch) => {
+      setColumnComposeItems?.((prev) =>
+        (prev || []).map((row) => (row.id === id ? { ...row, ...patch } : row)),
+      );
+    },
+    [setColumnComposeItems],
+  );
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -135,50 +182,80 @@ function ColumnPicker({ sampleId, selectedColumns, onToggleColumn, onSelectAll, 
         {columns.map((col) => {
           const isSelected = selectedSet.has(col.name);
           const displayLabel = getKalshiColumnDisplayLabel(col);
+          const composeItem = composeItemByColumn[col.name];
           return (
             <li key={col.name}>
-              <button
-                type="button"
-                onClick={() => onToggleColumn(col.name)}
-                aria-pressed={isSelected}
-                title={!isSelected ? col.description : displayLabel}
+              <div
                 className={cn(
-                  "flex h-[2.625rem] w-full items-start gap-1.5 rounded-md border px-2 py-1 text-left transition-colors duration-150",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+                  "flex h-[2.625rem] w-full gap-1 rounded-md border px-2 py-1 transition-colors duration-150",
+                  isSelected ? "items-center" : "items-start py-1",
                   isSelected
                     ? "border-primary/35 bg-primary/5"
                     : "border-border/50 bg-card hover:border-border hover:bg-muted/15",
                 )}
               >
-                <span
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) onDeselectColumn(col.name);
+                    else onSelectColumn(col.name);
+                  }}
+                  aria-label={
+                    isSelected ? `Deselect ${displayLabel}` : `Select ${displayLabel}`
+                  }
+                  aria-pressed={isSelected}
                   className={cn(
-                    "mt-px flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
+                    "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
                     isSelected
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border/80 bg-background",
+                      : "border-border/80 bg-background hover:border-border",
                   )}
-                  aria-hidden
                 >
                   {isSelected ? <Check className="h-2.5 w-2.5" strokeWidth={2.5} /> : null}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 items-baseline gap-1.5">
-                    <span className="truncate text-[11px] font-medium leading-tight text-foreground">
-                      {displayLabel}
-                    </span>
-                    <span className="shrink-0 text-[9px] leading-tight text-muted-foreground">{col.type}</span>
-                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isSelected) onSelectColumn(col.name);
+                  }}
+                  title={!isSelected ? col.description : displayLabel}
+                  className={cn(
+                    "min-w-0 flex-1 text-left",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background rounded-sm",
+                    isSelected ? "cursor-default" : "cursor-pointer",
+                  )}
+                >
                   <span
                     className={cn(
-                      "mt-0.5 block h-3 line-clamp-1 text-[10px] leading-3 text-muted-foreground",
-                      isSelected && "invisible",
+                      "flex min-w-0 items-baseline gap-1.5",
+                      !isSelected && "flex-col items-start gap-0",
                     )}
-                    aria-hidden={isSelected}
                   >
-                    {col.description}
+                    <span className="flex min-w-0 items-baseline gap-1.5">
+                      <span className="truncate text-[11px] font-medium leading-tight text-foreground">
+                        {displayLabel}
+                      </span>
+                      <span className="shrink-0 text-[9px] leading-tight text-muted-foreground">
+                        {col.type}
+                      </span>
+                    </span>
+                    {!isSelected ? (
+                      <span className="mt-0.5 line-clamp-1 text-[10px] leading-3 text-muted-foreground">
+                        {col.description}
+                      </span>
+                    ) : null}
                   </span>
-                </span>
-              </button>
+                </button>
+                {isSelected && composeItem ? (
+                  <ComposeColumnFormatFields
+                    compact
+                    item={composeItem}
+                    updateComposeItem={updateComposeItem}
+                    kindForColumn={kindForColumn}
+                  />
+                ) : null}
+              </div>
             </li>
           );
         })}
@@ -195,7 +272,8 @@ function KalshiDataSourceCards({
   onSelect,
   athenaPingBySampleId,
   columnSelections,
-  onToggleColumn,
+  onSelectColumn,
+  onDeselectColumn,
   onSelectAllColumns,
   onDeselectAllColumns,
 }) {
@@ -275,7 +353,8 @@ function KalshiDataSourceCards({
             key={selectedSampleId}
             sampleId={selectedSampleId}
             selectedColumns={columnSelections[selectedSampleId] || []}
-            onToggleColumn={(col) => onToggleColumn(selectedSampleId, col)}
+            onSelectColumn={(col) => onSelectColumn(selectedSampleId, col)}
+            onDeselectColumn={(col) => onDeselectColumn(selectedSampleId, col)}
             onSelectAll={() => onSelectAllColumns(selectedSampleId)}
             onDeselectAll={() => onDeselectAllColumns(selectedSampleId)}
           />
@@ -323,14 +402,28 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     pingKalshiSample(connectDataLakeSampleId);
   }, [connectDataLakeSampleId, athenaPingBySampleId, pingKalshiSample]);
 
-  const toggleColumn = useCallback(
+  const selectColumn = useCallback(
     (sampleId, columnName) => {
       setConnectKalshiColumnSelections?.((prev) => {
         const current = prev?.[sampleId] || [];
-        const has = current.includes(columnName);
+        if (current.includes(columnName)) return prev ?? {};
         return {
           ...(prev || {}),
-          [sampleId]: has ? current.filter((c) => c !== columnName) : [...current, columnName],
+          [sampleId]: [...current, columnName],
+        };
+      });
+    },
+    [setConnectKalshiColumnSelections],
+  );
+
+  const deselectColumn = useCallback(
+    (sampleId, columnName) => {
+      setConnectKalshiColumnSelections?.((prev) => {
+        const current = prev?.[sampleId] || [];
+        if (!current.includes(columnName)) return prev ?? {};
+        return {
+          ...(prev || {}),
+          [sampleId]: current.filter((c) => c !== columnName),
         };
       });
     },
@@ -401,7 +494,8 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
             onSelect={handleSelectKalshiSource}
             athenaPingBySampleId={athenaPingBySampleId || {}}
             columnSelections={connectKalshiColumnSelections || {}}
-            onToggleColumn={toggleColumn}
+            onSelectColumn={selectColumn}
+            onDeselectColumn={deselectColumn}
             onSelectAllColumns={selectAllColumns}
             onDeselectAllColumns={deselectAllColumns}
           />
