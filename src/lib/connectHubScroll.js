@@ -3,6 +3,41 @@ import { CONNECT_WORKSPACE_SCROLL_OFFSET_PX } from "@/lib/connectHubLayout";
 /** Step 2 viewport anchor — sheet / chart / dashboard; never scroll to compose. */
 export const CONNECT_HOME_ANALYZE_ANCHOR_ID = "connect-home-analyze-anchor";
 
+export const CONNECT_HOME_COMPOSE_ID = "connect-home-compose";
+
+/** Scroll the Connect compose block (Refine query / integration workflow) into view. */
+export function scrollConnectComposeIntoView(composeEl, scrollRootEl) {
+  if (!composeEl) return;
+  const scrollRoot = scrollRootEl ?? findConnectHomeScrollRoot(composeEl);
+  if (!scrollRoot) {
+    composeEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  const elRect = composeEl.getBoundingClientRect();
+  const scrollerRect = scrollRoot.getBoundingClientRect();
+  const padTop =
+    Number.parseInt(getComputedStyle(scrollRoot).scrollPaddingTop, 10) ||
+    CONNECT_WORKSPACE_SCROLL_OFFSET_PX;
+  const targetTop = elRect.top - scrollerRect.top + scrollRoot.scrollTop - padTop;
+  scrollRoot.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+}
+
+/** Retry until #connect-home-compose is mounted. */
+export function scheduleConnectComposeScroll(scrollRootElRef) {
+  const run = (attempt = 0) => {
+    const el = document.getElementById(CONNECT_HOME_COMPOSE_ID);
+    if (!el) {
+      if (attempt < 24) requestAnimationFrame(() => run(attempt + 1));
+      return;
+    }
+    const scrollRoot = scrollRootElRef?.current ?? findConnectHomeScrollRoot(el);
+    scrollConnectComposeIntoView(el, scrollRoot);
+  };
+  requestAnimationFrame(() => run());
+  window.setTimeout(() => run(), 80);
+  window.setTimeout(() => run(), 200);
+}
+
 export function resolveConnectAnalyzeScrollTarget() {
   if (typeof document === "undefined") return null;
   return (
