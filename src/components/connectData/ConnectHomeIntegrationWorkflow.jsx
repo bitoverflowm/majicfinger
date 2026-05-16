@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ATHENA_KALSHI_SAMPLE_OPTIONS, KALSHI_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ComposeColumnFormatFields } from "@/components/connectData/ComposeColumnFormatFields";
+import { ComposeGroupingDroppedColumnsWarning } from "@/components/connectData/ComposeGroupingDroppedColumnsWarning";
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
@@ -260,6 +261,8 @@ function ColumnPicker({
           );
         })}
       </ul>
+
+      <ComposeGroupingDroppedColumnsWarning columnComposeItems={columnComposeItems} />
 
       <ConnectDataOperationsSection selectedCount={selectedColumns.length} />
       <ConnectComposeOperationPanel />

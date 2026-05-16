@@ -248,3 +248,16 @@ export function composePullCollapsesRows(items) {
   const rows = items || [];
   return rows.some((r) => r.aggregate != null) || hasExplicitComposeGrouping(rows);
 }
+
+/**
+ * Selected columns omitted from results when explicit GROUP BY is active (no bucket, no summarize).
+ * @param {object[]} items
+ * @returns {string[]} source column names
+ */
+export function composeColumnsDroppedByExplicitGrouping(items) {
+  if (!hasExplicitComposeGrouping(items)) return [];
+  return (items || [])
+    .filter((r) => r.aggregate == null && !isComposeGroupByKeyRow(r))
+    .map((r) => String(r.column || "").trim())
+    .filter(Boolean);
+}

@@ -26,7 +26,6 @@ import {
   getSummarizeRollupOptions,
 } from "@/lib/dataLakeComposeSummarize";
 import { composeSourceColumnLabel } from "@/lib/dataLakeComposeHelpers";
-import { hasExplicitComposeGrouping } from "@/lib/composeColumnGrouping";
 import { getKalshiColumnDisplayLabel } from "@/lib/kalshiConnectColumns";
 
 function columnLabel(col) {
@@ -129,16 +128,8 @@ export function ConnectComposeSummarizeSection({
     );
   }
 
-  const explicitGrouping = hasExplicitComposeGrouping(columnComposeItems);
-  const hasSummarizeAgg = (columnComposeItems || []).some((i) => i.aggregate != null);
-
   return (
     <div className="space-y-2">
-      {explicitGrouping && hasSummarizeAgg ? (
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Only columns with a bucket (e.g. Unique values) appear in results and define GROUP BY. Other selected columns are dropped from the pull.
-        </p>
-      ) : null}
       {summarizeColumns.map((col) => {
         const item = itemByColumn[col];
         if (!item) return null;
