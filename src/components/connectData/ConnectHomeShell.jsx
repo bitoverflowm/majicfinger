@@ -7,7 +7,6 @@ import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from "@/lib/connectH
 import { deriveConnectFlowStep, isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import {
-  connectHubAnalyzeLayoutClass,
   connectHubFlowStepsSidebarOffsetClass,
   connectHubFlowStepsViewportFixedClass,
   connectHubLayoutClass,
@@ -96,9 +95,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     connectHomeAnalyzeActive &&
     (isConnectIntegration ? hasSheetData : !!dataConnected);
 
-  /** Step 2 workspace layout (sheet/chart area) — active after Run pull, including empty results. */
-  const connectAnalyzeLayoutActive = workspaceActive && connectHomeAnalyzeActive;
-
   /** Kalshi/Polymarket connect home: slide request summary in only after pull finishes. */
   const connectRequestSummaryReady =
     isConnectIntegration &&
@@ -109,12 +105,20 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const [connectPanelUserDismissed, setConnectPanelUserDismissed] = useState(false);
   const prevPanelsVisibleRef = useRef(false);
 
-  const { panelsVisible } = useConnectHomeScrollPanels({
+  const { panelsVisible, workspaceInView } = useConnectHomeScrollPanels({
     scrollRef,
     hubRef,
     workspaceRef,
     workspaceActive,
+    hasSheetData,
   });
+
+  /** Right drawer + auto-open: scroll engagement, or analyze workspace with pull results in view. */
+  const connectHomePanelsEngaged =
+    panelsVisible ||
+    (connectHomeAnalyzeActive &&
+      workspaceInView &&
+      (hasSheetData || connectRequestSummaryReady));
 
   useEffect(() => {
     if (panelsVisible && !prevPanelsVisibleRef.current) {
@@ -144,10 +148,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
     const publishTab = isConnectHomePublishPanelTab(rightPanelTab);
     const analyzePanelsAllowed =
-      panelsVisible && connectHomeAnalyzeActive && !connectPanelUserDismissed;
+      connectHomePanelsEngaged && connectHomeAnalyzeActive && !connectPanelUserDismissed;
 
     if (!analyzePanelsAllowed) {
-      if (!publishTab || !panelsVisible) {
+      if (!publishTab || !connectHomePanelsEngaged) {
         setRightPanelOpen?.(false);
       }
       return;
@@ -178,7 +182,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     connectRequestSummaryReady,
     hasSheetData,
     isConnectIntegration,
-    panelsVisible,
+    connectHomePanelsEngaged,
     rightPanelTab,
     workspaceActive,
     showDataWorkspace,
@@ -252,8 +256,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                     "relative mt-16 min-h-[calc(100dvh-5.5rem)] sm:mt-20 md:mt-28",
                     connectWorkspaceScrollInsetClass,
                     CONNECT_HOME_SURFACE,
-                    connectAnalyzeLayoutActive &&
-                      connectHubAnalyzeLayoutClass(showConnectLeftNav),
+                    "w-full min-w-0 max-w-none",
                   )}
                 >
                   {showUploadPanel ? (
@@ -273,8 +276,9 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                         startNew={connectWorkspace === CONNECT_WORKSPACE.BLANK ? blankStartNew : startNew}
                         setStartNew={setStartNew}
                         connectHomeMode
-                        connectHomePanelsVisible={panelsVisible}
+                        connectHomePanelsVisible={connectHomePanelsEngaged}
                         onConnectHomePanelUserDismiss={() => setConnectPanelUserDismissed(true)}
+                        onConnectHomePanelManualOpen={() => setConnectPanelUserDismissed(false)}
                       />
                     </div>
                   ) : null}

@@ -6,7 +6,14 @@ import { useEffect, useState } from "react";
  * Step 2 analyze panels (right drawer, etc.) show only when the workspace block is in view
  * and Step 1 hub is not dominant. Scrolling up to integrations collapses panels.
  */
-export function useConnectHomeScrollPanels({ scrollRef, hubRef, workspaceRef, workspaceActive }) {
+export function useConnectHomeScrollPanels({
+  scrollRef,
+  hubRef,
+  workspaceRef,
+  workspaceActive,
+  /** When true (e.g. sheet has rows), keep panels available even if Step 1 hub still peeks in view. */
+  hasSheetData = false,
+}) {
   const [hubDominant, setHubDominant] = useState(true);
   const [workspaceInView, setWorkspaceInView] = useState(false);
 
@@ -58,6 +65,7 @@ export function useConnectHomeScrollPanels({ scrollRef, hubRef, workspaceRef, wo
     return () => workspaceObserver.disconnect();
   }, [scrollRef, workspaceRef, workspaceActive]);
 
-  const panelsVisible = workspaceActive && workspaceInView && !hubDominant;
+  const panelsVisible =
+    workspaceActive && workspaceInView && (!hubDominant || hasSheetData);
   return { panelsVisible, hubDominant, workspaceInView };
 }

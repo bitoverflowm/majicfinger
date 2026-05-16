@@ -44,6 +44,7 @@ export default function OpenApiPanelTab({ onOpen, contained = false }) {
     setIsExiting(true);
     exitTimeoutRef.current = setTimeout(() => {
       onOpen?.();
+      setIsExiting(false);
       exitTimeoutRef.current = null;
     }, EXIT_MS);
   };

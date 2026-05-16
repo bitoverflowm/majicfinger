@@ -36,14 +36,8 @@ export function ConnectHomeAnalyzeSection({
       className={cn("w-full max-w-none", connectAnalyzeDashboardSectionClass, className)}
     >
       <div className="mb-4 shrink-0">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Step {CONNECT_FLOW_STEP.ANALYZE}
-        </p>
-        <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-          Analyze your data
-        </h2>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          You can execute operations, bucketing, formulas, or chart and create
+          Execute operations, bucketing, formulas on your data sheet. Download, JSON, CSV, xlsx. Pull more data via integrations or uploading your own data sheet. Chart and create your dashboards to share with your audience/ team.
         </p>
       </div>
 

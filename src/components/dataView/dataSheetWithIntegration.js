@@ -53,10 +53,7 @@ import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHo
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
 import { scrollConnectWorkspaceIntoView } from "@/lib/connectHubScroll";
-import {
-  connectHomeDrawerAsideClass,
-  connectHomeDrawerAsideFixedClass,
-} from "@/lib/connectHubLayout";
+import { connectHomeDrawerAsideFixedClass } from "@/lib/connectHubLayout";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
@@ -143,6 +140,7 @@ export default function DataSheetWithIntegration({
   connectHomeMode = false,
   connectHomePanelsVisible = true,
   onConnectHomePanelUserDismiss,
+  onConnectHomePanelManualOpen,
 }) {
   const hasDbBackedUserId =
     !!user?.userId && user.userId !== "dev-bypass-no-db" && /^[a-f0-9]{24}$/i.test(user.userId);
@@ -185,12 +183,6 @@ export default function DataSheetWithIntegration({
     showConnectIntegrationIntro &&
     connectHomeAnalyzeActive &&
     hasConnectSheetData &&
-    !connectDataLakePullState.loading;
-  const connectHomeDrawerInset =
-    connectHomeMode &&
-    showConnectIntegrationIntro &&
-    connectHomePanelsVisible &&
-    connectHomeAnalyzeActive &&
     !connectDataLakePullState.loading;
   const showConnectWorkspaceNav =
     connectHomeMode &&
@@ -623,8 +615,12 @@ export default function DataSheetWithIntegration({
     }
   };
 
+  /** Connect integrations: drawer only in Step 2 analyze block, not beside compose UI. */
   const connectHomeDrawerAllowed =
-    !connectHomeMode || (connectHomePanelsVisible && connectHomeAnalyzeActive);
+    !connectHomeMode ||
+    (connectHomeAnalyzeActive &&
+      (connectHomePanelsVisible || hasConnectSheetData) &&
+      (!showConnectIntegrationIntro || showConnectAnalyzeSection));
   const showSidebar = !!rightPanelOpen && connectHomeDrawerAllowed;
   const isPanelVisible = showSidebar || isPanelClosing;
 
@@ -815,13 +811,16 @@ export default function DataSheetWithIntegration({
     ? "max-md:w-auto max-md:min-w-0 max-md:max-w-none md:w-1/2 md:min-w-0 md:max-w-[50vw] 2xl:w-1/3 2xl:max-w-[33.333vw]"
     : drawerWidthCollapsed;
 
-  /** Connect home + normal app: fixed to viewport. Demo embed: absolute inside demo viewport. */
+  /** Demo embed: absolute in viewport. Connect home + app: fixed flush to the right screen edge. */
   const drawerAsidePositionClass =
     isDemo && !connectHomeMode
       ? "absolute inset-y-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
-      : connectHomeMode
-        ? cn(connectHomeDrawerAsideClass, "ml-auto shrink-0")
-        : connectHomeDrawerAsideFixedClass;
+      : cn(
+          connectHomeDrawerAsideFixedClass,
+          connectHomeMode
+            ? "right-0 max-md:right-0 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
+            : "right-2 sm:right-4",
+        );
 
   const connectHomeGridSurface =
     "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";
@@ -839,6 +838,7 @@ export default function DataSheetWithIntegration({
       connectHomeMode && "bg-white dark:bg-slate-950",
       connectHomeMode && connectHomeGridSurface,
       connectHomeAnalyzeDashboard && "px-0 sm:px-1 md:px-2",
+      showConnectIntegrationIntro && "min-h-0 gap-0 px-0 py-0 sm:gap-0 sm:px-0 sm:py-0",
     )}>
       <ReplaceOrNewSheetDialog
         open={replaceOrNewSheetOpen}
@@ -853,23 +853,43 @@ export default function DataSheetWithIntegration({
         onReplace={() => resolveSheetDestination("replace")}
         onAddNewSheet={() => resolveSheetDestination("new_sheet")}
       />
+      {showConnectIntegrationIntro ? (
+        <div id="connect-home-compose" className="w-full min-w-0 shrink-0">
+          <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
+          {connectHomeKalshiPullBridge ? (
+            <div
+              className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
+              aria-hidden
+            >
+              <KalshiHistorical setConnectedData={setConnectedDataRaw} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {(!showConnectIntegrationIntro || showConnectAnalyzeSection) && (
       <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6">
-        {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
         <main
           ref={mainColumnRef}
           className={cn(
             "relative min-w-0 flex-1",
-            effectiveChartMode || connectHomeAnalyzeDashboard
-              ? "flex min-h-0 flex-col overflow-hidden"
-              : "overflow-auto",
+            showConnectIntegrationIntro && showConnectAnalyzeSection
+              ? connectHomeAnalyzeDashboard
+                ? "flex min-h-0 flex-col overflow-hidden"
+                : "overflow-auto"
+              : effectiveChartMode || connectHomeAnalyzeDashboard
+                ? "flex min-h-0 flex-col overflow-hidden"
+                : "overflow-auto",
             effectiveDashboardMode && "scroll-pb-40",
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
         >
-          {!showSidebar && !isPanelClosing && (
+          {!showSidebar &&
+            !isPanelClosing &&
+            (!showConnectIntegrationIntro || showConnectAnalyzeSection) && (
             <OpenApiPanelTab
               contained={isDemo}
               onOpen={() => {
+                if (connectHomeMode) onConnectHomePanelManualOpen?.();
                 if (effectiveDashboardMode) {
                   setRightPanelTab?.("dashboard");
                   if (!connectHomeMode) setViewing?.("dashboardComposer");
@@ -961,26 +981,13 @@ export default function DataSheetWithIntegration({
               ) : null}
               <ChartCanvas />
             </div>
-          ) : showConnectIntegrationIntro ? (
-            <>
-              <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
-              {showConnectAnalyzeSection ? (
-                <ConnectHomeAnalyzeSection
-                  user={user}
-                  startNew={startNew}
-                  setStartNew={setStartNew}
-                  showWorkspaceNav={!!showConnectWorkspaceNav}
-                />
-              ) : null}
-              {connectHomeKalshiPullBridge ? (
-                <div
-                  className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
-                  aria-hidden
-                >
-                  <KalshiHistorical setConnectedData={setConnectedDataRaw} />
-                </div>
-              ) : null}
-            </>
+          ) : showConnectIntegrationIntro && showConnectAnalyzeSection ? (
+            <ConnectHomeAnalyzeSection
+              user={user}
+              startNew={startNew}
+              setStartNew={setStartNew}
+              showWorkspaceNav={!!showConnectWorkspaceNav}
+            />
           ) : (
             <>
               <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
@@ -1017,7 +1024,7 @@ export default function DataSheetWithIntegration({
                     : "right-2 sm:right-4"),
                 drawerAsideWidthClass,
                 isPanelClosing || !isPanelOpen ? "translate-x-full" : "translate-x-0",
-                connectHomeDrawerInset && "relative",
+                connectHomeMode && "rounded-r-none border-r-0 shadow-lg",
               )}
             >
               <div className="h-full min-h-0 w-full flex flex-col">
@@ -1885,6 +1892,7 @@ export default function DataSheetWithIntegration({
           </>
         )}
       </div>
+      )}
       {effectiveDashboardMode ? <ChartComposerDock editorInset={mainColumnRect} /> : null}
     </div>
   );
