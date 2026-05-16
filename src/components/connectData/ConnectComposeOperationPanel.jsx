@@ -786,9 +786,14 @@ export function ConnectComposeOperationPanel({ className }) {
         <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={handleRestart}>
           Start Over
         </Button>
-        <Button type="button" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleRunPull}>
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 gap-1 text-xs [&_svg]:!size-2"
+          onClick={handleRunPull}
+        >
           Run pull
-          <Play className="h-3 w-3 shrink-0 fill-current" aria-hidden />
+          <Play className="!size-2 shrink-0 fill-current" aria-hidden />
         </Button>
       </motion.div>
     </motion.div>
