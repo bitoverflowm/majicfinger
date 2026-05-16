@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 
 /**
- * When the Connect hub scrolls out of view, workspace panels (side nav + right drawer) should show.
- * When the user scrolls back to the hub, panels hide again.
+ * Step 2 analyze panels (right drawer, etc.) show only when the workspace block is in view
+ * and Step 1 hub is not dominant. Scrolling up to integrations collapses panels.
  */
-export function useConnectHomeScrollPanels({ scrollRef, hubRef, workspaceActive }) {
+export function useConnectHomeScrollPanels({ scrollRef, hubRef, workspaceRef, workspaceActive }) {
   const [hubDominant, setHubDominant] = useState(true);
+  const [workspaceInView, setWorkspaceInView] = useState(false);
 
   useEffect(() => {
     const root = scrollRef?.current;
@@ -17,22 +18,46 @@ export function useConnectHomeScrollPanels({ scrollRef, hubRef, workspaceActive 
       return;
     }
 
-    const observer = new IntersectionObserver(
+    const hubObserver = new IntersectionObserver(
       ([entry]) => {
         const ratio = entry?.intersectionRatio ?? 0;
-        setHubDominant(entry.isIntersecting && ratio >= 0.28);
+        setHubDominant(entry.isIntersecting && ratio >= 0.22);
       },
       {
         root,
-        threshold: [0, 0.15, 0.28, 0.45, 0.65, 1],
-        rootMargin: "-72px 0px -35% 0px",
+        threshold: [0, 0.12, 0.22, 0.4, 0.65, 1],
+        rootMargin: "-72px 0px -40% 0px",
       },
     );
 
-    observer.observe(hub);
-    return () => observer.disconnect();
+    hubObserver.observe(hub);
+    return () => hubObserver.disconnect();
   }, [scrollRef, hubRef, workspaceActive]);
 
-  const panelsVisible = workspaceActive && !hubDominant;
-  return { panelsVisible, hubDominant };
+  useEffect(() => {
+    const root = scrollRef?.current;
+    const workspace = workspaceRef?.current;
+    if (!root || !workspace || !workspaceActive) {
+      setWorkspaceInView(false);
+      return;
+    }
+
+    const workspaceObserver = new IntersectionObserver(
+      ([entry]) => {
+        const ratio = entry?.intersectionRatio ?? 0;
+        setWorkspaceInView(entry.isIntersecting && ratio >= 0.12);
+      },
+      {
+        root,
+        threshold: [0, 0.08, 0.12, 0.25, 0.5, 1],
+        rootMargin: "-72px 0px 0px",
+      },
+    );
+
+    workspaceObserver.observe(workspace);
+    return () => workspaceObserver.disconnect();
+  }, [scrollRef, workspaceRef, workspaceActive]);
+
+  const panelsVisible = workspaceActive && workspaceInView && !hubDominant;
+  return { panelsVisible, hubDominant, workspaceInView };
 }

@@ -53,7 +53,10 @@ import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHo
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
 import { scrollConnectWorkspaceIntoView } from "@/lib/connectHubScroll";
-import { connectHomeDrawerAsideClass } from "@/lib/connectHubLayout";
+import {
+  connectHomeDrawerAsideClass,
+  connectHomeDrawerAsideFixedClass,
+} from "@/lib/connectHubLayout";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
@@ -138,6 +141,8 @@ export default function DataSheetWithIntegration({
   chartMode,
   dashboardMode = false,
   connectHomeMode = false,
+  connectHomePanelsVisible = true,
+  onConnectHomePanelUserDismiss,
 }) {
   const hasDbBackedUserId =
     !!user?.userId && user.userId !== "dev-bypass-no-db" && /^[a-f0-9]{24}$/i.test(user.userId);
@@ -184,9 +189,9 @@ export default function DataSheetWithIntegration({
   const connectHomeDrawerInset =
     connectHomeMode &&
     showConnectIntegrationIntro &&
-    hasConnectSheetData &&
-    !connectDataLakePullState.loading &&
-    (connectHomeAnalyzeActive || isConnectHomePublishPanelTab(rightPanelTab));
+    connectHomePanelsVisible &&
+    connectHomeAnalyzeActive &&
+    !connectDataLakePullState.loading;
   const showConnectWorkspaceNav =
     connectHomeMode &&
     showConnectIntegrationIntro &&
@@ -486,8 +491,9 @@ export default function DataSheetWithIntegration({
     beginPanelClose(() => {
       setRightPanelOpen?.(false);
       wasOpenRef.current = false;
+      if (connectHomeMode) onConnectHomePanelUserDismiss?.();
     });
-  }, [isPanelClosing, beginPanelClose, setRightPanelOpen]);
+  }, [isPanelClosing, beginPanelClose, connectHomeMode, onConnectHomePanelUserDismiss, setRightPanelOpen]);
 
   const backToDashboardLoadScreen = useCallback(() => {
     if (!dashboardMode) return;
@@ -617,7 +623,9 @@ export default function DataSheetWithIntegration({
     }
   };
 
-  const showSidebar = !!rightPanelOpen;
+  const connectHomeDrawerAllowed =
+    !connectHomeMode || (connectHomePanelsVisible && connectHomeAnalyzeActive);
+  const showSidebar = !!rightPanelOpen && connectHomeDrawerAllowed;
   const isPanelVisible = showSidebar || isPanelClosing;
 
   const connectRequestSummaryReady = useMemo(() => {
@@ -637,29 +645,22 @@ export default function DataSheetWithIntegration({
 
   useEffect(() => {
     if (!connectHomeMode || !showConnectIntegrationIntro) return;
+    if (!connectHomePanelsVisible || !connectHomeAnalyzeActive) return;
     const publishTab = isConnectHomePublishPanelTab(rightPanelTab);
     if (publishTab) {
       setDrawerExpanded(false);
-      setRightPanelOpen?.(true);
       return;
     }
-    if (!connectRequestSummaryReady) {
-      if (connectHomeAnalyzeActive || connectDataLakePullState.loading) {
-        setRightPanelOpen?.(false);
-      }
-      return;
-    }
+    if (!connectRequestSummaryReady) return;
     setDrawerExpanded(false);
-    setRightPanelOpen?.(true);
     setRightPanelTab?.("integrations");
   }, [
     connectHomeMode,
     showConnectIntegrationIntro,
-    connectRequestSummaryReady,
+    connectHomePanelsVisible,
     connectHomeAnalyzeActive,
-    connectDataLakePullState.loading,
+    connectRequestSummaryReady,
     rightPanelTab,
-    setRightPanelOpen,
     setRightPanelTab,
   ]);
 
@@ -818,9 +819,9 @@ export default function DataSheetWithIntegration({
   const drawerAsidePositionClass =
     isDemo && !connectHomeMode
       ? "absolute inset-y-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
-      : connectHomeDrawerInset
-        ? connectHomeDrawerAsideClass
-        : "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out";
+      : connectHomeMode
+        ? cn(connectHomeDrawerAsideClass, "ml-auto shrink-0")
+        : connectHomeDrawerAsideFixedClass;
 
   const connectHomeGridSurface =
     "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";
@@ -852,7 +853,7 @@ export default function DataSheetWithIntegration({
         onReplace={() => resolveSheetDestination("replace")}
         onAddNewSheet={() => resolveSheetDestination("new_sheet")}
       />
-      <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:gap-6">
+      <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6">
         {/* Main: datasheet or chart — shrinks, scrolls, never overflows */}
         <main
           ref={mainColumnRef}
@@ -1010,11 +1011,13 @@ export default function DataSheetWithIntegration({
             <aside
               className={cn(
                 drawerAsidePositionClass,
-                drawerExpanded
-                  ? "max-md:left-0 max-md:right-0 md:right-4"
-                  : "right-2 sm:right-4",
+                !connectHomeMode &&
+                  (drawerExpanded
+                    ? "max-md:left-0 max-md:right-0 md:right-4"
+                    : "right-2 sm:right-4"),
                 drawerAsideWidthClass,
                 isPanelClosing || !isPanelOpen ? "translate-x-full" : "translate-x-0",
+                connectHomeDrawerInset && "relative",
               )}
             >
               <div className="h-full min-h-0 w-full flex flex-col">

@@ -308,12 +308,29 @@ const DashBody = ({ user }) => {
     };
 
 
+    /** Fixed nav clears the icon SideNav when it is in the layout (not Connect Step 1 before analyze). */
+    const navFixedLeftClass =
+      viewing === "connectDataHome" && !connectHomeLeftNavOpen
+        ? "left-0"
+        : "left-[var(--sidebar-width-icon,3rem)]";
+
     const content = (
       <>
         {!isDemo && (
-          <header className="sticky top-0 z-30 w-full shrink-0 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none">
-            <Nav />
-          </header>
+          <>
+            <header
+              className={cn(
+                "fixed top-0 right-0 z-30 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none",
+                navFixedLeftClass,
+              )}
+            >
+              <Nav />
+            </header>
+            <div
+              className="min-h-[5rem] shrink-0 sm:min-h-[4.5rem] md:h-16"
+              aria-hidden
+            />
+          </>
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
