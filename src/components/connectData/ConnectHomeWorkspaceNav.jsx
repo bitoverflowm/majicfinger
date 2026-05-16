@@ -118,6 +118,12 @@ export function ConnectHomeWorkspaceNav({ className, compact = false }) {
     });
     setRightPanelTab?.("charts");
     setRightPanelOpen?.(true);
+    requestAnimationFrame(() => {
+      document.getElementById("connect-home-analyze-sheet")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   }, [
     addNewChartAndActivate,
     persistActiveChartSnapshot,

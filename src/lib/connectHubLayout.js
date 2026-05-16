@@ -28,6 +28,19 @@ export const CONNECT_WORKSPACE_SCROLL_OFFSET_PX = 96;
 /** Step 2 analyze — full-viewport dashboard (below sticky nav ~4.5rem). */
 export const CONNECT_ANALYZE_DASHBOARD_MIN_H = "min-h-[calc(100dvh-4.5rem)]";
 
+/** Stable Step 2 workspace shell (sheet / chart / dashboard); never shrinks below viewport. */
+export const CONNECT_HOME_WORKSPACE_MIN_H = CONNECT_ANALYZE_DASHBOARD_MIN_H;
+
+export const connectHomeWorkspaceRowClass = cn(
+  "flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6",
+  CONNECT_HOME_WORKSPACE_MIN_H,
+);
+
+export const connectHomeAnalyzeMainClass = cn(
+  CONNECT_HOME_WORKSPACE_MIN_H,
+  "relative flex min-w-0 flex-1 flex-col overflow-hidden",
+);
+
 /** Step 2 section: whitespace above + viewport fill + scroll snap. */
 export const connectAnalyzeDashboardSectionClass = cn(
   "mt-24 snap-start sm:mt-28 md:mt-32 lg:mt-40",

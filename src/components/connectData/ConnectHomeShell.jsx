@@ -126,6 +126,19 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [connectHomePanelsEngaged]);
 
   useEffect(() => {
+    if (!workspaceActive || !connectHomeAnalyzeActive) return;
+    if (rightPanelTab !== "charts" && rightPanelTab !== "dashboard") return;
+    setConnectPanelUserDismissed(false);
+    setConnectHomePanelPinned(true);
+    setRightPanelOpen?.(true);
+  }, [
+    workspaceActive,
+    connectHomeAnalyzeActive,
+    rightPanelTab,
+    setRightPanelOpen,
+  ]);
+
+  useEffect(() => {
     if (connectHomePanelsVisible && !prevPanelsVisibleRef.current) {
       setConnectPanelUserDismissed(false);
     }

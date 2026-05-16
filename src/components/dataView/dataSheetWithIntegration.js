@@ -53,7 +53,12 @@ import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHo
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
 import { scrollConnectWorkspaceIntoView } from "@/lib/connectHubScroll";
-import { connectHomeDrawerAsideFixedClass } from "@/lib/connectHubLayout";
+import {
+  connectHomeAnalyzeMainClass,
+  connectHomeDrawerAsideFixedClass,
+  connectHomeWorkspaceRowClass,
+  CONNECT_HOME_WORKSPACE_MIN_H,
+} from "@/lib/connectHubLayout";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
@@ -620,10 +625,16 @@ export default function DataSheetWithIntegration({
   };
 
   /** Connect integrations: drawer only in Step 2 analyze block, not beside compose UI. */
+  const connectHomeWorkspaceLive =
+    connectHomeMode && showConnectIntegrationIntro && showConnectAnalyzeSection;
+
   const connectHomeDrawerAllowed =
     !connectHomeMode ||
     (connectHomeAnalyzeActive &&
-      (connectHomePanelsVisible || hasConnectSheetData) &&
+      (connectHomePanelsVisible ||
+        hasConnectSheetData ||
+        rightPanelTab === "charts" ||
+        rightPanelTab === "dashboard") &&
       (!showConnectIntegrationIntro || showConnectAnalyzeSection));
   const showSidebar = !!rightPanelOpen && connectHomeDrawerAllowed;
   const isPanelVisible = showSidebar || isPanelClosing;
@@ -665,12 +676,22 @@ export default function DataSheetWithIntegration({
   ]);
 
   useEffect(() => {
-    if (!connectHomeMode || !showConnectIntegrationIntro) return;
+    if (!connectHomeMode || !connectHomeWorkspaceLive) return;
     if (rightPanelTab !== "charts" && rightPanelTab !== "dashboard") return;
-    const el = document.getElementById("connect-home-workspace");
+    onConnectHomePanelManualOpen?.();
+    setRightPanelOpen?.(true);
+    const el =
+      document.getElementById("connect-home-analyze-sheet") ||
+      document.getElementById("connect-home-workspace");
     if (!el) return;
     scrollConnectWorkspaceIntoView(el, null);
-  }, [connectHomeMode, showConnectIntegrationIntro, rightPanelTab]);
+  }, [
+    connectHomeMode,
+    connectHomeWorkspaceLive,
+    rightPanelTab,
+    onConnectHomePanelManualOpen,
+    setRightPanelOpen,
+  ]);
 
   useLayoutEffect(() => {
     if (!effectiveDashboardMode) {
@@ -843,6 +864,7 @@ export default function DataSheetWithIntegration({
       connectHomeMode && connectHomeGridSurface,
       connectHomeAnalyzeDashboard && "px-0 sm:px-1 md:px-2",
       showConnectIntegrationIntro && "min-h-0 gap-0 px-0 py-0 sm:gap-0 sm:px-0 sm:py-0",
+      connectHomeWorkspaceLive && "flex min-h-0 flex-1 flex-col",
     )}>
       <ReplaceOrNewSheetDialog
         open={replaceOrNewSheetOpen}
@@ -871,23 +893,24 @@ export default function DataSheetWithIntegration({
         </div>
       ) : null}
       {(!showConnectIntegrationIntro || showConnectAnalyzeSection) && (
-      <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6">
+      <div
+        className={
+          connectHomeWorkspaceLive
+            ? connectHomeWorkspaceRowClass
+            : "flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6"
+        }
+      >
         <main
           ref={mainColumnRef}
-          id={
-            connectHomeMode && showConnectIntegrationIntro && showConnectAnalyzeSection
-              ? "connect-home-analyze-sheet"
-              : undefined
-          }
+          id={connectHomeWorkspaceLive ? "connect-home-analyze-sheet" : undefined}
           className={cn(
-            "relative min-w-0 flex-1",
-            showConnectIntegrationIntro && showConnectAnalyzeSection
-              ? connectHomeAnalyzeDashboard
+            connectHomeWorkspaceLive
+              ? connectHomeAnalyzeMainClass
+              : "relative min-w-0 flex-1",
+            !connectHomeWorkspaceLive &&
+              (effectiveChartMode || connectHomeAnalyzeDashboard
                 ? "flex min-h-0 flex-col overflow-hidden"
-                : "overflow-auto"
-              : effectiveChartMode || connectHomeAnalyzeDashboard
-                ? "flex min-h-0 flex-col overflow-hidden"
-                : "overflow-auto",
+                : "overflow-auto"),
             effectiveDashboardMode && "scroll-pb-40",
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
@@ -916,12 +939,24 @@ export default function DataSheetWithIntegration({
             />
           )}
           {effectiveDashboardMode ? (
-            <>
+            <div
+              className={cn(
+                "flex min-h-0 min-w-0 flex-1 flex-col",
+                connectHomeWorkspaceLive && CONNECT_HOME_WORKSPACE_MIN_H,
+              )}
+            >
               {connectWorkspaceNav}
-              <DashboardComposerPage user={user} />
-            </>
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <DashboardComposerPage user={user} />
+              </div>
+            </div>
           ) : effectiveChartMode ? (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div
+              className={cn(
+                "flex min-h-0 min-w-0 flex-1 flex-col",
+                connectHomeWorkspaceLive && CONNECT_HOME_WORKSPACE_MIN_H,
+              )}
+            >
               {connectWorkspaceNav}
               {!showConnectWorkspaceNav ? (
               <div className="mb-2 flex flex-wrap items-center gap-1">
@@ -989,7 +1024,9 @@ export default function DataSheetWithIntegration({
                   <DemoSignUpBadge />
                 </div>
               ) : null}
-              <ChartCanvas />
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <ChartCanvas />
+              </div>
             </div>
           ) : showConnectIntegrationIntro && showConnectAnalyzeSection ? (
             <ConnectHomeAnalyzeSection
