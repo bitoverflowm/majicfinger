@@ -5,6 +5,12 @@ import Image from "next/image";
 import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { API_INTEGRATIONS } from "@/components/integrationsView/integrationsConfig";
 import {
   buildIntegrationPickerRows,
@@ -15,18 +21,42 @@ import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
 
+/** Brand fills for sidebar integration avatars (matches Connect home hub pills). */
+const INTEGRATION_LOGO_BG = {
+  kalshiHistorical: "bg-[#28CC95] ring-[#28CC95]/50",
+  chainlink: "bg-[#375BD2] ring-[#375BD2]/50",
+};
+
+function integrationLogoShellClass(id) {
+  return INTEGRATION_LOGO_BG[id] ?? "bg-muted/30 ring-border/50";
+}
+
+function integrationTooltipContent(row) {
+  const desc = String(row.description || "").trim();
+  if (row.badge === "Coming soon") {
+    return desc || "Coming soon";
+  }
+  if (row.badge === "Pro") {
+    return desc ? `${desc} (Pro plan required)` : "Available on Pro plan";
+  }
+  return desc || row.name;
+}
+
 function IntegrationRowIcon({ row }) {
   if (row.logoPath) {
+    const branded = row.id === "kalshiHistorical" || row.id === "chainlink";
     return (
-      <span className="relative flex h-5 w-5 shrink-0 overflow-hidden rounded-full ring-1 ring-border/50 bg-muted/30">
+      <span
+        className={cn(
+          "relative flex h-5 w-5 shrink-0 overflow-hidden rounded-full ring-1",
+          integrationLogoShellClass(row.id),
+        )}
+      >
         <Image
           src={row.logoPath}
           alt=""
           fill
-          className={cn(
-            "object-cover",
-            row.id === "kalshiHistorical" && "object-contain p-px",
-          )}
+          className={cn(branded ? "object-contain p-px" : "object-cover")}
           sizes="20px"
         />
       </span>
@@ -114,41 +144,53 @@ export function ConnectIntegrationsPickerList({
             No integrations match your search.
           </p>
         ) : (
-          <ul className="flex flex-col gap-px" role="listbox" aria-label="Integrations">
-            {filtered.map((row) => {
-              const selected = integrationSidebar === row.id;
-              return (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    disabled={!row.available}
-                    title={row.description || row.name}
-                    onClick={() => handleSelect(row)}
-                    className={cn(
-                      "flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
-                      row.available
-                        ? "hover:bg-muted/60 active:bg-muted/80"
-                        : "cursor-not-allowed opacity-50",
-                      selected && row.available && "bg-muted/70 ring-1 ring-border/40",
-                    )}
-                  >
-                    <IntegrationRowIcon row={row} />
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-normal leading-tight text-foreground">
-                      {row.name}
-                    </span>
-                    {row.badge ? (
-                      <span className="shrink-0 rounded border border-border/60 bg-muted/80 px-1 py-px text-[8px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {row.badge}
-                      </span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <TooltipProvider delayDuration={200}>
+            <ul className="flex flex-col gap-px" role="listbox" aria-label="Integrations">
+              {filtered.map((row) => {
+                const selected = integrationSidebar === row.id;
+                const tip = integrationTooltipContent(row);
+                return (
+                  <li key={row.id}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex w-full min-w-0">
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            aria-label={tip}
+                            disabled={!row.available}
+                            onClick={() => handleSelect(row)}
+                            className={cn(
+                              "flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left transition-colors",
+                              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
+                              row.available
+                                ? "hover:bg-muted/60 active:bg-muted/80"
+                                : "cursor-not-allowed opacity-50",
+                              selected && row.available && "bg-muted/70 ring-1 ring-border/40",
+                            )}
+                          >
+                            <IntegrationRowIcon row={row} />
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-normal leading-tight text-foreground">
+                              {row.name}
+                            </span>
+                            {row.badge ? (
+                              <span className="shrink-0 rounded border border-border/60 bg-muted/80 px-1 py-px text-[8px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {row.badge}
+                              </span>
+                            ) : null}
+                          </button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-[14rem] text-pretty text-xs">
+                        {tip}
+                      </TooltipContent>
+                    </Tooltip>
+                  </li>
+                );
+              })}
+            </ul>
+          </TooltipProvider>
         )}
       </div>
     </div>
