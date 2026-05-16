@@ -4,7 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
-import { deriveConnectFlowStep } from "@/lib/connectHomeFlow";
+import { deriveConnectFlowStep, isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
+import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import {
   connectHubFlowStepsClass,
   connectHubLayoutClass,
@@ -39,6 +40,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const rightPanelTab = context?.rightPanelTab;
   const setRightPanelOpen = context?.setRightPanelOpen;
   const setRightPanelTab = context?.setRightPanelTab;
+  const setConnectHomeLeftNavOpen = context?.setConnectHomeLeftNavOpen;
 
   const scrollRef = useRef(null);
   const hubRef = useRef(null);
@@ -72,13 +74,32 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     [viewing, dataConnected, connectedData, dataSheets, rightPanelTab],
   );
 
+  const isConnectIntegration = isConnectIntegrationWorkspace(connectWorkspace);
+
+  const hasRequestCards = useMemo(
+    () => collectRequestCardEntries(dataSheets).length > 0,
+    [dataSheets],
+  );
+
   const hasSheetData = useMemo(() => {
     const sheets = dataSheets && typeof dataSheets === "object" ? Object.values(dataSheets) : [];
     return sheets.some((s) => Array.isArray(s?.data) && s.data.length > 0);
   }, [dataSheets]);
 
-  const analyzePhase =
-    connectHomeAnalyzeActive || !!connectDataLakePullState.loading || hasSheetData;
+  /** Step 2 grid visible: slide in app SideNav only after Run pull reaches analyze (not Step 1 compose). */
+  const showConnectLeftNav =
+    workspaceActive &&
+    !connectDataLakePullState.loading &&
+    hasSheetData &&
+    connectHomeAnalyzeActive &&
+    (isConnectIntegration ? hasSheetData : !!dataConnected);
+
+  /** Kalshi/Polymarket connect home: slide request summary in only after pull finishes. */
+  const connectRequestSummaryReady =
+    isConnectIntegration &&
+    connectHomeAnalyzeActive &&
+    !connectDataLakePullState.loading &&
+    hasRequestCards;
 
   const { panelsVisible } = useConnectHomeScrollPanels({
     scrollRef,
@@ -96,14 +117,24 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
 
   useEffect(() => {
+    setConnectHomeLeftNavOpen?.(!!showConnectLeftNav);
+  }, [showConnectLeftNav, setConnectHomeLeftNavOpen]);
+
+  useEffect(() => {
     if (!workspaceActive) {
       setRightPanelOpen?.(false);
       return;
     }
-    // Step 2 analyze: minimized right drawer with request summary; else hub scroll rules.
-    if (analyzePhase) {
-      setRightPanelOpen?.(true);
-      setRightPanelTab?.("integrations");
+    if (isConnectIntegration) {
+      const publishTab = isConnectHomePublishPanelTab(rightPanelTab);
+      if (publishTab || connectRequestSummaryReady) {
+        setRightPanelOpen?.(true);
+        if (connectRequestSummaryReady && !publishTab) {
+          setRightPanelTab?.("integrations");
+        }
+      } else {
+        setRightPanelOpen?.(false);
+      }
       return;
     }
     if (!panelsVisible) {
@@ -111,17 +142,16 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       return;
     }
     setRightPanelOpen?.(true);
-    if (
-      connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER ||
-      isConnectIntegrationWorkspace(connectWorkspace)
-    ) {
+    if (connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER) {
       setRightPanelTab?.("integrations");
     } else if (showDataWorkspace) {
       setRightPanelTab?.("integrations");
     }
   }, [
-    analyzePhase,
+    connectRequestSummaryReady,
+    isConnectIntegration,
     panelsVisible,
+    rightPanelTab,
     workspaceActive,
     showDataWorkspace,
     connectWorkspace,
@@ -161,7 +191,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
         )}
       >
         <div className={connectHubPageClass(true)}>
-          <ConnectHomeFlowSteps currentStep={connectFlowStep} className={connectHubFlowStepsClass} />
+          <ConnectHomeFlowSteps
+            currentStep={connectFlowStep}
+            className={cn(connectHubFlowStepsClass, showConnectLeftNav && "hidden")}
+          />
 
           <div className={connectHubLayoutClass({ fixedRail: true })}>
             <div className="flex min-w-0 flex-col">

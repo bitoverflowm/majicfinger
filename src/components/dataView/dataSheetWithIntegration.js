@@ -49,6 +49,9 @@ import {
 import { ConnectHomeIntegrationWorkflow } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { ConnectHomeAnalyzeSection } from "@/components/connectData/ConnectHomeAnalyzeSection";
 import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHomeKalshiSideSummary";
+import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
+import { isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
+import { scrollConnectWorkspaceIntoView } from "@/lib/connectHubScroll";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
@@ -152,6 +155,10 @@ export default function DataSheetWithIntegration({
     integrationSidebar === "kalshiHistorical";
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
+  const rightPanelOpen = contextStateV2?.rightPanelOpen;
+  const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
+  const rightPanelTab = contextStateV2?.rightPanelTab;
+  const setRightPanelTab = contextStateV2?.setRightPanelTab;
   const connectedData = contextStateV2?.connectedData ?? [];
   const setConnectedDataRaw = contextStateV2?.setConnectedData;
   const dataSheets = contextStateV2?.dataSheets || {};
@@ -162,6 +169,12 @@ export default function DataSheetWithIntegration({
   const showConnectAnalyzeSection =
     showConnectIntegrationIntro &&
     (connectHomeAnalyzeActive || connectDataLakePullState.loading || hasConnectSheetData);
+  const connectHomeChartsActive =
+    connectHomeMode && showConnectIntegrationIntro && rightPanelTab === "charts";
+  const connectHomeDashboardActive =
+    connectHomeMode && showConnectIntegrationIntro && rightPanelTab === "dashboard";
+  const effectiveChartMode = chartMode || connectHomeChartsActive;
+  const effectiveDashboardMode = dashboardMode || connectHomeDashboardActive;
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
@@ -174,10 +187,6 @@ export default function DataSheetWithIntegration({
   const setLoadedChartMeta = contextStateV2?.setLoadedChartMeta;
   const loadedChartMeta = contextStateV2?.loadedChartMeta;
   const setChartSnapshotFlusher = contextStateV2?.setChartSnapshotFlusher;
-  const rightPanelOpen = contextStateV2?.rightPanelOpen;
-  const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
-  const rightPanelTab = contextStateV2?.rightPanelTab;
-  const setRightPanelTab = contextStateV2?.setRightPanelTab;
   const chartDashboardDraft = contextStateV2?.chartDashboardDraft;
   const setChartDashboardDraft = contextStateV2?.setChartDashboardDraft;
   const setActiveChartDashboardId = contextStateV2?.setActiveChartDashboardId;
@@ -591,15 +600,59 @@ export default function DataSheetWithIntegration({
   const showSidebar = !!rightPanelOpen;
   const isPanelVisible = showSidebar || isPanelClosing;
 
+  const connectRequestSummaryReady = useMemo(() => {
+    if (!connectHomeMode || !showConnectIntegrationIntro) return false;
+    return (
+      connectHomeAnalyzeActive &&
+      !connectDataLakePullState.loading &&
+      collectRequestCardEntries(dataSheets).length > 0
+    );
+  }, [
+    connectHomeMode,
+    showConnectIntegrationIntro,
+    connectHomeAnalyzeActive,
+    connectDataLakePullState.loading,
+    dataSheets,
+  ]);
+
   useEffect(() => {
-    if (!connectHomeMode || !connectHomeAnalyzeActive) return;
+    if (!connectHomeMode || !showConnectIntegrationIntro) return;
+    const publishTab = isConnectHomePublishPanelTab(rightPanelTab);
+    if (publishTab) {
+      setDrawerExpanded(false);
+      setRightPanelOpen?.(true);
+      return;
+    }
+    if (!connectRequestSummaryReady) {
+      if (connectHomeAnalyzeActive || connectDataLakePullState.loading) {
+        setRightPanelOpen?.(false);
+      }
+      return;
+    }
     setDrawerExpanded(false);
     setRightPanelOpen?.(true);
     setRightPanelTab?.("integrations");
-  }, [connectHomeMode, connectHomeAnalyzeActive, setRightPanelOpen, setRightPanelTab]);
+  }, [
+    connectHomeMode,
+    showConnectIntegrationIntro,
+    connectRequestSummaryReady,
+    connectHomeAnalyzeActive,
+    connectDataLakePullState.loading,
+    rightPanelTab,
+    setRightPanelOpen,
+    setRightPanelTab,
+  ]);
+
+  useEffect(() => {
+    if (!connectHomeMode || !showConnectIntegrationIntro) return;
+    if (rightPanelTab !== "charts" && rightPanelTab !== "dashboard") return;
+    const el = document.getElementById("connect-home-workspace");
+    if (!el) return;
+    scrollConnectWorkspaceIntoView(el, null);
+  }, [connectHomeMode, showConnectIntegrationIntro, rightPanelTab]);
 
   useLayoutEffect(() => {
-    if (!dashboardMode) {
+    if (!effectiveDashboardMode) {
       setMainColumnRect(null);
       return;
     }
@@ -619,7 +672,7 @@ export default function DataSheetWithIntegration({
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [dashboardMode, rightPanelOpen, isPanelOpen, drawerExpanded, isPanelClosing]);
+  }, [effectiveDashboardMode, rightPanelOpen, isPanelOpen, drawerExpanded, isPanelClosing]);
   const chartsActive = rightPanelTab === "charts";
   const panelAnimatingOpen = isPanelOpen && !isPanelClosing;
   const chartSheetIds = useMemo(() => Object.keys(chartSheets || {}), [chartSheets]);
@@ -703,11 +756,11 @@ export default function DataSheetWithIntegration({
   ]);
 
   useEffect(() => {
-    if (!chartMode) return;
+    if (!effectiveChartMode) return;
     if (!activeChartSheetId || chartSheets?.[activeChartSheetId]) return;
     const firstId = Object.keys(chartSheets || {})[0];
     if (firstId) setActiveChartSheetId?.(firstId);
-  }, [chartMode, chartSheets, activeChartSheetId, setActiveChartSheetId]);
+  }, [effectiveChartMode, chartSheets, activeChartSheetId, setActiveChartSheetId]);
 
   useEffect(() => {
     if (!setChartSnapshotFlusher) return;
@@ -778,8 +831,8 @@ export default function DataSheetWithIntegration({
           ref={mainColumnRef}
           className={cn(
             "relative min-w-0 flex-1",
-            chartMode ? "flex min-h-0 flex-col overflow-hidden" : "overflow-auto",
-            dashboardMode && "scroll-pb-40",
+            effectiveChartMode ? "flex min-h-0 flex-col overflow-hidden" : "overflow-auto",
+            effectiveDashboardMode && "scroll-pb-40",
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
         >
@@ -787,10 +840,10 @@ export default function DataSheetWithIntegration({
             <OpenApiPanelTab
               contained={isDemo}
               onOpen={() => {
-                if (dashboardMode) {
+                if (effectiveDashboardMode) {
                   setRightPanelTab?.("dashboard");
                   if (!connectHomeMode) setViewing?.("dashboardComposer");
-                } else if (chartMode) {
+                } else if (effectiveChartMode) {
                   setRightPanelTab?.("charts");
                   if (!connectHomeMode) setViewing?.("charts");
                 } else {
@@ -802,9 +855,9 @@ export default function DataSheetWithIntegration({
               }}
             />
           )}
-          {dashboardMode ? (
+          {effectiveDashboardMode ? (
             <DashboardComposerPage user={user} />
-          ) : chartMode ? (
+          ) : effectiveChartMode ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <div className="mb-2 flex flex-wrap items-center gap-1">
                 {chartSheetIds.map((id) => (
@@ -938,6 +991,9 @@ export default function DataSheetWithIntegration({
                       if (connectHomeMode) {
                         if (v === "integrations") {
                           setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+                        }
+                        if (v === "charts" || v === "dashboard" || v === "export") {
+                          setDrawerExpanded(false);
                         }
                         return;
                       }
@@ -1145,7 +1201,7 @@ export default function DataSheetWithIntegration({
                             drawerExpanded ? "w-full p-1 sm:p-2" : "p-1",
                           )}
                         >
-                          {dashboardMode ? (
+                          {effectiveDashboardMode ? (
                             <div className="space-y-3 p-2 text-xs text-muted-foreground">
                               <p>
                                 Build and save charts in the Chart workspace. They appear in each dashboard
@@ -1174,7 +1230,7 @@ export default function DataSheetWithIntegration({
 
                       <TabsContent value="dashboard" className="m-0 h-full min-w-0 w-full max-w-full">
                         <div className="h-full min-w-0 w-full max-w-full overflow-auto p-2 text-xs text-muted-foreground">
-                          {!dashboardMode ? (
+                          {!effectiveDashboardMode ? (
                             <p>
                               Open the dashboard composer to edit rows and cards, or choose this tab again after
                               switching workspace.
@@ -1779,7 +1835,7 @@ export default function DataSheetWithIntegration({
 
                       <TabsContent value="export" className="m-0 h-full min-w-0 w-full max-w-full">
                         <div className="h-full min-w-0 w-full max-w-full overflow-auto">
-                          {dashboardMode ? <DashboardExportPanel /> : <ExportPanel />}
+                          {effectiveDashboardMode ? <DashboardExportPanel /> : <ExportPanel />}
                         </div>
                       </TabsContent>
                     </div>
@@ -1790,7 +1846,7 @@ export default function DataSheetWithIntegration({
           </>
         )}
       </div>
-      {dashboardMode ? <ChartComposerDock editorInset={mainColumnRect} /> : null}
+      {effectiveDashboardMode ? <ChartComposerDock editorInset={mainColumnRect} /> : null}
     </div>
   );
   return (

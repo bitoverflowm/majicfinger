@@ -530,7 +530,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const syncConnectPullState = useCallback(
     (patch) => {
       if (!connectHomeKalshiSourcePicker || !setConnectDataLakePullState) return;
-      setConnectDataLakePullState((prev) => ({ ...prev, ...patch }));
+      setConnectDataLakePullState((prev) => {
+        const next = { ...prev };
+        if (patch.label !== undefined) {
+          next.label =
+            typeof patch.label === "function" ? patch.label(prev.label ?? "") : patch.label;
+        }
+        if (patch.progress !== undefined) {
+          next.progress =
+            typeof patch.progress === "function"
+              ? patch.progress(prev.progress ?? 0)
+              : patch.progress;
+        }
+        if (patch.loading !== undefined) next.loading = patch.loading;
+        if (patch.error !== undefined) next.error = patch.error;
+        return next;
+      });
     },
     [connectHomeKalshiSourcePicker, setConnectDataLakePullState],
   );

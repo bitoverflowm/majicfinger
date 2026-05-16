@@ -38,6 +38,8 @@ const DashBody = ({ user }) => {
     const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace
 
     const viewing = contextStateV2?.viewing
+    const connectHomeLeftNavOpen = !!contextStateV2?.connectHomeLeftNavOpen
+    const setConnectHomeLeftNavOpen = contextStateV2?.setConnectHomeLeftNavOpen
     const rightPanelOpen = contextStateV2?.rightPanelOpen
     //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
@@ -452,12 +454,28 @@ const DashBody = ({ user }) => {
     return isDemo ? (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
     ) : viewing === "connectDataHome" ? (
-      <div className="relative flex min-h-svh min-w-0 flex-col">
-        <div className={cn("flex min-h-0 flex-1 flex-col", isLocked && "pointer-events-none select-none")}>
-          {content}
+      <SidebarProvider
+        open={connectHomeLeftNavOpen}
+        onOpenChange={setConnectHomeLeftNavOpen}
+        defaultOpen={false}
+      >
+        <div className="relative flex min-h-svh min-w-0 flex-col">
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-1",
+              isLocked && "pointer-events-none select-none",
+            )}
+          >
+            {connectHomeLeftNavOpen ? (
+              <SideNav user={user} startNew={startNew} setStartNew={setStartNew} />
+            ) : null}
+            <SidebarInset className="min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden">
+              {content}
+            </SidebarInset>
+          </div>
+          {paywallOverlay}
         </div>
-        {paywallOverlay}
-      </div>
+      </SidebarProvider>
     ) : (
       <SidebarProvider defaultOpen={false}>
         <div className="relative flex min-h-0 min-w-0 flex-1">

@@ -1,6 +1,5 @@
 "use client";
 
-import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { collectRequestCardEntries, fmtRequestElapsed } from "@/lib/connectHomeRequestCards";
 import { cn } from "@/lib/utils";
@@ -26,21 +25,13 @@ export function ConnectHomeKalshiSideSummary({ className }) {
         </p>
       </div>
 
-      {pull.loading ? (
-        <ConnectProgressWithLabel
-          label={pull.label || "Running query…"}
-          progress={pull.progress ?? 0}
-          className="w-full min-w-0"
-        />
-      ) : null}
-
       {pull.error ? (
         <p className="text-[11px] text-destructive" role="alert">
           {pull.error}
         </p>
       ) : null}
 
-      {entries.length === 0 && !pull.loading ? (
+      {entries.length === 0 ? (
         <p className="text-[11px] text-muted-foreground">Run a pull to see the operation summary here.</p>
       ) : null}
 

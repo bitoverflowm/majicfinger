@@ -11,6 +11,13 @@ export const CONNECT_FLOW_STEP = {
   PUBLISH: 3,
 };
 
+/** Right-panel tabs that show chart/dashboard/export tools on Connect home. */
+export const CONNECT_HOME_PUBLISH_PANEL_TABS = ["charts", "dashboard", "export"];
+
+export function isConnectHomePublishPanelTab(tab) {
+  return CONNECT_HOME_PUBLISH_PANEL_TABS.includes(tab ?? "");
+}
+
 export const CONNECT_FLOW_STEPS = [
   {
     step: CONNECT_FLOW_STEP.CONNECT,
@@ -57,7 +64,7 @@ export function deriveConnectFlowStep(state) {
     return CONNECT_FLOW_STEP.PUBLISH;
   }
 
-  if (hasData && (rightPanelTab === "export" || rightPanelTab === "dashboard")) {
+  if (hasData && isConnectHomePublishPanelTab(rightPanelTab)) {
     return CONNECT_FLOW_STEP.PUBLISH;
   }
 
