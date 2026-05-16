@@ -65,7 +65,10 @@ const DataView = ({ user, fillViewport = false }) => {
   // Show sheet chips whenever the grid is in use and there is at least one sheet to label
   // (including a single renamed sheet like "resolved_markets").
   const showSheetTabs =
-    showGrid && (hasMultipleDataSheets || anySheetHasData) && (dataSheetIds?.length ?? 0) > 0;
+    !fillViewport &&
+    showGrid &&
+    (hasMultipleDataSheets || anySheetHasData) &&
+    (dataSheetIds?.length ?? 0) > 0;
 
   const navigatePolymarketHistorical = useCallback(() => {
     if (!API_INTEGRATIONS.includes("polymarketHistorical")) return;

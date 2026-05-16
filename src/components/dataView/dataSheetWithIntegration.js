@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ConnectHomeIntegrationWorkflow } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { ConnectHomeAnalyzeSection } from "@/components/connectData/ConnectHomeAnalyzeSection";
+import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWorkspaceNav";
 import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHomeKalshiSideSummary";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
@@ -186,6 +187,14 @@ export default function DataSheetWithIntegration({
     hasConnectSheetData &&
     !connectDataLakePullState.loading &&
     (connectHomeAnalyzeActive || isConnectHomePublishPanelTab(rightPanelTab));
+  const showConnectWorkspaceNav =
+    connectHomeMode &&
+    showConnectIntegrationIntro &&
+    (showConnectAnalyzeSection ||
+      effectiveChartMode ||
+      effectiveDashboardMode ||
+      rightPanelTab === "export" ||
+      connectDataLakePullState.loading);
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
@@ -852,6 +861,12 @@ export default function DataSheetWithIntegration({
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
         >
+          {showConnectWorkspaceNav ? (
+            <ConnectHomeWorkspaceNav
+              compact
+              className="shrink-0 px-0.5 sm:px-1"
+            />
+          ) : null}
           {!showSidebar && !isPanelClosing && (
             <OpenApiPanelTab
               contained={isDemo}
@@ -875,6 +890,7 @@ export default function DataSheetWithIntegration({
             <DashboardComposerPage user={user} />
           ) : effectiveChartMode ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {!showConnectWorkspaceNav ? (
               <div className="mb-2 flex flex-wrap items-center gap-1">
                 {chartSheetIds.map((id) => (
                   <code
@@ -931,6 +947,7 @@ export default function DataSheetWithIntegration({
                   </TooltipProvider>
                 ) : null}
               </div>
+              ) : null}
               {isDemo ? (
                 <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 pb-2 sm:justify-start">
                   <h2 className="text-sm font-semibold leading-snug tracking-tight text-foreground sm:text-base">
