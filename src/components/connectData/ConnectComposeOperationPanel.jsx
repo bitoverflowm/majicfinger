@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Play, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -786,8 +786,9 @@ export function ConnectComposeOperationPanel({ className }) {
         <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={handleRestart}>
           Start Over
         </Button>
-        <Button type="button" size="sm" className="h-8 text-xs" onClick={handleRunPull}>
+        <Button type="button" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleRunPull}>
           Run pull
+          <Play className="h-3 w-3 shrink-0 fill-current" aria-hidden />
         </Button>
       </motion.div>
     </motion.div>
