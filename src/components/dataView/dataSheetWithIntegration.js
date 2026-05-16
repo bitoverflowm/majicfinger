@@ -880,7 +880,7 @@ export default function DataSheetWithIntegration({
         onAddNewSheet={() => resolveSheetDestination("new_sheet")}
       />
       {showConnectIntegrationIntro ? (
-        <div id="connect-home-compose" className="w-full min-w-0 shrink-0">
+        <div id="connect-home-compose" className="w-full min-w-0 shrink-0 pb-96">
           <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
           {connectHomeKalshiPullBridge ? (
             <div
