@@ -21,6 +21,7 @@ export function ConnectHomeAnalyzeSection({
   setStartNew,
   className,
   showWorkspaceNav = false,
+  onPanelManualOpen,
 }) {
   const analyzeScrollTick = useMyStateV2()?.connectAnalyzeScrollTick ?? 0;
   const pull = useMyStateV2()?.connectDataLakePullState ?? {};
@@ -52,7 +53,11 @@ export function ConnectHomeAnalyzeSection({
       ) : null}
 
       {showWorkspaceNav ? (
-        <ConnectHomeWorkspaceNav compact className="mb-3 shrink-0 px-0.5 sm:px-1" />
+        <ConnectHomeWorkspaceNav
+          compact
+          className="mb-3 shrink-0 px-0.5 sm:px-1"
+          onPanelManualOpen={onPanelManualOpen}
+        />
       ) : null}
 
       {pull.error ? (

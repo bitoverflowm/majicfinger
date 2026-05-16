@@ -83,7 +83,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   );
 
   const openChartPanel = useCallback(() => {
-    onPanelManualOpen?.();
+    onPanelManualOpen?.("charts");
     setRightPanelTab?.("charts");
     setRightPanelOpen?.(true);
   }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
@@ -97,9 +97,10 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   );
 
   const openIntegrationsPanel = useCallback(() => {
+    onPanelManualOpen?.("integrations");
     setRightPanelTab?.("integrations");
     setRightPanelOpen?.(true);
-  }, [setRightPanelOpen, setRightPanelTab]);
+  }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
 
   const addChart = useCallback(() => {
     persistActiveChartSnapshot();
@@ -133,15 +134,16 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   ]);
 
   const openDashboard = useCallback(() => {
-    onPanelManualOpen?.();
+    onPanelManualOpen?.("dashboard");
     setRightPanelTab?.("dashboard");
     setRightPanelOpen?.(true);
   }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
 
   const openExport = useCallback(() => {
+    onPanelManualOpen?.("export");
     setRightPanelTab?.("export");
     setRightPanelOpen?.(true);
-  }, [setRightPanelOpen, setRightPanelTab]);
+  }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
 
   const textSize = compact ? "text-xs" : "text-sm";
   const gapClass = compact ? "gap-0.5" : "gap-1";

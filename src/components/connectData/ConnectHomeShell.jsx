@@ -107,6 +107,14 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
   const [connectPanelUserDismissed, setConnectPanelUserDismissed] = useState(false);
   const [connectHomePanelPinned, setConnectHomePanelPinned] = useState(false);
+  /** User-picked drawer tab (+ Integration, tab bar); do not auto-switch to request history. */
+  const [connectHomePreferredPanelTab, setConnectHomePreferredPanelTab] = useState(null);
+
+  useEffect(() => {
+    if (!connectRequestSummaryReady) {
+      setConnectHomePreferredPanelTab(null);
+    }
+  }, [connectRequestSummaryReady]);
 
   const trackAnalyzeSection =
     connectHomeAnalyzeActive && (hasSheetData || connectRequestSummaryReady);
@@ -172,9 +180,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     if (isConnectIntegration) {
       if (connectRequestSummaryReady || hasSheetData) {
         setRightPanelOpen?.(true);
-        if (connectRequestSummaryReady) {
-          setRightPanelTab?.("requestHistory");
-        }
       }
       return;
     }
@@ -289,9 +294,11 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                           setConnectPanelUserDismissed(true);
                           setConnectHomePanelPinned(false);
                         }}
-                        onConnectHomePanelManualOpen={() => {
+                        connectHomePreferredPanelTab={connectHomePreferredPanelTab}
+                        onConnectHomePanelManualOpen={(tab) => {
                           setConnectPanelUserDismissed(false);
                           setConnectHomePanelPinned(true);
+                          if (tab) setConnectHomePreferredPanelTab(tab);
                         }}
                       />
                     </div>

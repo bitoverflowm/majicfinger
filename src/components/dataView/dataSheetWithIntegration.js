@@ -147,6 +147,7 @@ export default function DataSheetWithIntegration({
   dashboardMode = false,
   connectHomeMode = false,
   connectHomePanelsVisible = true,
+  connectHomePreferredPanelTab = null,
   onConnectHomePanelUserDismiss,
   onConnectHomePanelManualOpen,
 }) {
@@ -236,6 +237,7 @@ export default function DataSheetWithIntegration({
   const snapshotGetterRef = useRef(null);
   const wasOpenRef = useRef(!!rightPanelOpen);
   const autoExpandedEmptySheetRef = useRef(false);
+  const autoOpenedRequestHistoryRef = useRef(false);
   const prevDashboardModeRef = useRef(false);
   const mainColumnRef = useRef(null);
   const [mainColumnRect, setMainColumnRect] = useState(null);
@@ -633,11 +635,17 @@ export default function DataSheetWithIntegration({
   const connectHomeWorkspaceLive =
     connectHomeMode && showConnectIntegrationIntro && showConnectAnalyzeSection;
 
+  const connectHomeManualDrawerTab =
+    !!rightPanelOpen &&
+    (rightPanelTab === "integrations" ||
+      rightPanelTab === "requestHistory" ||
+      rightPanelTab === "export");
   const connectHomeDrawerAllowed =
     !connectHomeMode ||
     (connectHomeAnalyzeActive &&
       (connectHomePanelsVisible ||
         hasConnectSheetData ||
+        connectHomeManualDrawerTab ||
         rightPanelTab === "charts" ||
         rightPanelTab === "dashboard") &&
       (!showConnectIntegrationIntro || showConnectAnalyzeSection));
@@ -662,12 +670,22 @@ export default function DataSheetWithIntegration({
   useEffect(() => {
     if (!connectHomeMode || !showConnectIntegrationIntro) return;
     if (!connectHomePanelsVisible || !connectHomeAnalyzeActive) return;
+
+    if (!connectRequestSummaryReady) {
+      autoOpenedRequestHistoryRef.current = false;
+      return;
+    }
+
     const designPanelTab = isConnectHomeDesignPanelTab(rightPanelTab);
     if (designPanelTab) {
       setDrawerExpanded(false);
       return;
     }
-    if (!connectRequestSummaryReady) return;
+
+    if (connectHomePreferredPanelTab) return;
+    if (autoOpenedRequestHistoryRef.current) return;
+
+    autoOpenedRequestHistoryRef.current = true;
     setDrawerExpanded(false);
     setRightPanelTab?.("requestHistory");
   }, [
@@ -676,6 +694,7 @@ export default function DataSheetWithIntegration({
     connectHomePanelsVisible,
     connectHomeAnalyzeActive,
     connectRequestSummaryReady,
+    connectHomePreferredPanelTab,
     rightPanelTab,
     setRightPanelTab,
   ]);
@@ -939,14 +958,16 @@ export default function DataSheetWithIntegration({
               contained={isDemo}
               instantOpen={connectHomeMode}
               onOpen={() => {
-                if (connectHomeMode) onConnectHomePanelManualOpen?.();
                 if (effectiveDashboardMode) {
+                  if (connectHomeMode) onConnectHomePanelManualOpen?.("dashboard");
                   setRightPanelTab?.("dashboard");
                   if (!connectHomeMode) setViewing?.("dashboardComposer");
                 } else if (effectiveChartMode) {
+                  if (connectHomeMode) onConnectHomePanelManualOpen?.("charts");
                   setRightPanelTab?.("charts");
                   if (!connectHomeMode) setViewing?.("charts");
                 } else {
+                  if (connectHomeMode) onConnectHomePanelManualOpen?.("integrations");
                   setRightPanelTab?.("integrations");
                   if (!connectHomeMode) setViewing?.("dataStart");
                   setIntegrationSidebar?.((prev) => prev ?? "polymarket");
@@ -1051,6 +1072,7 @@ export default function DataSheetWithIntegration({
               startNew={startNew}
               setStartNew={setStartNew}
               showWorkspaceNav={!!showConnectWorkspaceNav}
+              onPanelManualOpen={onConnectHomePanelManualOpen}
             />
           ) : (
             <>
@@ -1099,6 +1121,7 @@ export default function DataSheetWithIntegration({
                       setRightPanelTab?.(v);
                       setRightPanelOpen?.(true);
                       if (connectHomeMode) {
+                        onConnectHomePanelManualOpen?.(v);
                         if (v === "integrations") {
                           setIntegrationSidebar?.((prev) => prev ?? "polymarket");
                         }
