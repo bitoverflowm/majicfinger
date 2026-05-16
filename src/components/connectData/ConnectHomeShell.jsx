@@ -173,7 +173,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       if (connectRequestSummaryReady || hasSheetData) {
         setRightPanelOpen?.(true);
         if (connectRequestSummaryReady) {
-          setRightPanelTab?.("integrations");
+          setRightPanelTab?.("requestHistory");
         }
       }
       return;

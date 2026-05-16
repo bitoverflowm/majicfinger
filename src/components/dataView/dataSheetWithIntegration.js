@@ -29,6 +29,7 @@ import Image from "next/image";
 import {
   BarChart3,
   Cable,
+  History,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -49,7 +50,7 @@ import {
 import { ConnectHomeIntegrationWorkflow } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { ConnectHomeAnalyzeSection } from "@/components/connectData/ConnectHomeAnalyzeSection";
 import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWorkspaceNav";
-import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHomeKalshiSideSummary";
+import { ConnectHomeRequestHistory } from "@/components/connectData/ConnectHomeRequestHistory";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import {
@@ -130,6 +131,7 @@ function pageFormatDockTargetKey(t) {
 }
 
 const RIGHT_PANEL_TAB_ITEMS = [
+  { value: "requestHistory", label: "Request history", Icon: History },
   { value: "integrations", label: "Integrations", Icon: Cable },
   { value: "charts", label: "Charts", Icon: BarChart3 },
   { value: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -412,7 +414,7 @@ export default function DataSheetWithIntegration({
 
   useEffect(() => {
     if (!setRightPanelTab) return;
-    const valid = new Set(["integrations", "charts", "dashboard", "export"]);
+    const valid = new Set(["integrations", "requestHistory", "charts", "dashboard", "export"]);
     if (rightPanelTab != null && rightPanelTab !== "" && !valid.has(rightPanelTab)) {
       setRightPanelTab("integrations");
     }
@@ -583,7 +585,9 @@ export default function DataSheetWithIntegration({
         return <PolymarketHistorical setConnectedData={setConnectedDataRaw} />;
       case "kalshiHistorical":
         return connectHomeMode ? (
-          <ConnectHomeKalshiSideSummary />
+          <p className="text-xs text-muted-foreground">
+            Build and run your query in the compose area above.
+          </p>
         ) : (
           <KalshiHistorical setConnectedData={setConnectedDataRaw} />
         );
@@ -664,7 +668,7 @@ export default function DataSheetWithIntegration({
     }
     if (!connectRequestSummaryReady) return;
     setDrawerExpanded(false);
-    setRightPanelTab?.("integrations");
+    setRightPanelTab?.("requestHistory");
   }, [
     connectHomeMode,
     showConnectIntegrationIntro,
@@ -1297,6 +1301,13 @@ export default function DataSheetWithIntegration({
                             )}
                           </div>
                         </div>
+                      </TabsContent>
+
+                      <TabsContent
+                        value="requestHistory"
+                        className="m-0 h-full w-full min-w-0 max-w-full overflow-auto"
+                      >
+                        <ConnectHomeRequestHistory />
                       </TabsContent>
 
                       <TabsContent value="charts" className="m-0 h-full min-w-0 w-full max-w-full">

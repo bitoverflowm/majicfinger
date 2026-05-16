@@ -14,7 +14,7 @@ const actionChipBase =
   "relative cursor-pointer rounded px-[0.35rem] py-[0.2rem] font-mono font-semibold leading-none transition-colors whitespace-nowrap";
 
 /**
- * Connect home — sheet/chart tabs on the left; new sheet/chart/dashboard + export on the right.
+ * Connect home — sheet/chart tabs on the left; integration/chart/dashboard + export on the right.
  */
 export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelManualOpen }) {
   const ctx = useMyStateV2();
@@ -31,7 +31,6 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const setLoadedChartMeta = ctx?.setLoadedChartMeta;
   const setRightPanelTab = ctx?.setRightPanelTab;
   const setRightPanelOpen = ctx?.setRightPanelOpen;
-  const addNewSheetAndActivate = ctx?.addNewSheetAndActivate;
   const addNewChartAndActivate = ctx?.addNewChartAndActivate;
   const chartSnapshotFlusher = ctx?.chartSnapshotFlusher;
 
@@ -195,14 +194,6 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
         className={cn("flex shrink-0 flex-wrap items-center justify-end", gapClass)}
         aria-label="Workspace actions"
       >
-        <button
-          type="button"
-          className={cn(actionChipBase, textSize, chipIdle)}
-          onClick={() => addNewSheetAndActivate?.()}
-        >
-          + Sheet
-        </button>
-
         <button
           type="button"
           className={cn(
