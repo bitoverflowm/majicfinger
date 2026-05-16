@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
+import { cn } from "@/lib/utils";
 
 import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
@@ -468,7 +469,7 @@ function evaluateIfElseExpression(row, expression) {
   return resolveMathOperand(row, expression?.else);
 }
 
-const GridView = ({startNew}) => {
+const GridView = ({ startNew, fillViewport = false }) => {
 
     const contextStateV2 = useMyStateV2()
     const isDark = useHtmlDarkClass();
@@ -2738,7 +2739,13 @@ const GridView = ({startNew}) => {
     }, [startNew])
 
     return (
-        <div className="h-full w-full min-w-0 text-foreground" style={{ height: '100%', width: '100%' }}>
+        <div
+            className={cn(
+                "h-full w-full min-w-0 text-foreground",
+                fillViewport && "flex min-h-0 flex-1 flex-col",
+            )}
+            style={{ height: "100%", width: "100%" }}
+        >
             <Alert className="mt-4 sm:hidden">
                 <div className="flex gap-2 place-items-center"><TrafficCone className="w-8 h-8"/>
                     <div className="">
@@ -4862,7 +4869,12 @@ const GridView = ({startNew}) => {
               <TabsContent value="table" className="mt-0" />
             </Tabs>
             )}
-            <div className={`${agThemeClass} ${gridExpanded ? 'h-[750px]' : 'h-[550px]'}`}>
+            <div
+                className={cn(
+                    agThemeClass,
+                    fillViewport ? "min-h-[16rem] flex-1" : gridExpanded ? "h-[750px]" : "h-[550px]",
+                )}
+            >
                 <AgGridReact 
                     defaultColDef={defaultColDef} 
                     rowData={displayData} 

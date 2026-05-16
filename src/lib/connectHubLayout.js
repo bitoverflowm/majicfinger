@@ -44,6 +44,21 @@ export const connectHubScrollPaddingClass =
 /** Pixels to leave above #connect-home-workspace when requestConnectWorkspace scrolls. */
 export const CONNECT_WORKSPACE_SCROLL_OFFSET_PX = 96;
 
+/** Step 2 analyze — full-viewport dashboard (below sticky nav ~4.5rem). */
+export const CONNECT_ANALYZE_DASHBOARD_MIN_H = "min-h-[calc(100dvh-4.5rem)]";
+
+/** Step 2 section: whitespace above + viewport fill + scroll snap. */
+export const connectAnalyzeDashboardSectionClass = cn(
+  "mt-24 snap-start sm:mt-28 md:mt-32 lg:mt-40",
+  CONNECT_ANALYZE_DASHBOARD_MIN_H,
+  "flex flex-col",
+  connectWorkspaceScrollInsetClass,
+);
+
+/** Connect home right drawer: ~1rem inset from viewport top/bottom. */
+export const connectHomeDrawerAsideClass =
+  "fixed top-4 bottom-4 z-20 flex h-auto max-h-[calc(100dvh-2rem)] flex-col gap-4 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out sm:gap-6";
+
 /**
  * Top offset for fixed step rail — must match sticky nav (4.5rem) + dashBody py-1 + connectHubPageClass pt-*.
  * @see connectHubPageClass embedded padding (pt-12 / sm:pt-16 / md:pt-20)

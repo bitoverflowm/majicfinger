@@ -185,7 +185,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       <div
         ref={scrollRef}
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto",
+          "min-h-0 flex-1 snap-y snap-proximity overflow-y-auto",
           connectHubScrollPaddingClass,
           CONNECT_HOME_SURFACE,
         )}

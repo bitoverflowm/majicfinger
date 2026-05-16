@@ -39,7 +39,6 @@ const DashBody = ({ user }) => {
 
     const viewing = contextStateV2?.viewing
     const connectHomeLeftNavOpen = !!contextStateV2?.connectHomeLeftNavOpen
-    const setConnectHomeLeftNavOpen = contextStateV2?.setConnectHomeLeftNavOpen
     const rightPanelOpen = contextStateV2?.rightPanelOpen
     //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
@@ -454,11 +453,7 @@ const DashBody = ({ user }) => {
     return isDemo ? (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
     ) : viewing === "connectDataHome" ? (
-      <SidebarProvider
-        open={connectHomeLeftNavOpen}
-        onOpenChange={setConnectHomeLeftNavOpen}
-        defaultOpen={false}
-      >
+      <SidebarProvider open={false} defaultOpen={false}>
         <div className="relative flex min-h-svh min-w-0 flex-col">
           <div
             className={cn(

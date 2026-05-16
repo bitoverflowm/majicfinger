@@ -52,6 +52,7 @@ import { ConnectHomeKalshiSideSummary } from "@/components/connectData/ConnectHo
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
 import { scrollConnectWorkspaceIntoView } from "@/lib/connectHubScroll";
+import { connectHomeDrawerAsideClass } from "@/lib/connectHubLayout";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
@@ -175,6 +176,18 @@ export default function DataSheetWithIntegration({
     connectHomeMode && showConnectIntegrationIntro && rightPanelTab === "dashboard";
   const effectiveChartMode = chartMode || connectHomeChartsActive;
   const effectiveDashboardMode = dashboardMode || connectHomeDashboardActive;
+  const connectHomeAnalyzeDashboard =
+    connectHomeMode &&
+    showConnectIntegrationIntro &&
+    connectHomeAnalyzeActive &&
+    hasConnectSheetData &&
+    !connectDataLakePullState.loading;
+  const connectHomeDrawerInset =
+    connectHomeMode &&
+    showConnectIntegrationIntro &&
+    hasConnectSheetData &&
+    !connectDataLakePullState.loading &&
+    (connectHomeAnalyzeActive || isConnectHomePublishPanelTab(rightPanelTab));
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
@@ -798,7 +811,9 @@ export default function DataSheetWithIntegration({
   const drawerAsidePositionClass =
     isDemo && !connectHomeMode
       ? "absolute inset-y-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
-      : "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out";
+      : connectHomeDrawerInset
+        ? connectHomeDrawerAsideClass
+        : "fixed top-[4.5rem] z-20 flex h-[calc(100dvh-4.5rem)] flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out";
 
   const connectHomeGridSurface =
     "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";
@@ -831,7 +846,9 @@ export default function DataSheetWithIntegration({
           ref={mainColumnRef}
           className={cn(
             "relative min-w-0 flex-1",
-            effectiveChartMode ? "flex min-h-0 flex-col overflow-hidden" : "overflow-auto",
+            effectiveChartMode || connectHomeAnalyzeDashboard
+              ? "flex min-h-0 flex-col overflow-hidden"
+              : "overflow-auto",
             effectiveDashboardMode && "scroll-pb-40",
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
