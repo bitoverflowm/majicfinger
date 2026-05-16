@@ -8,7 +8,7 @@ const ENTRANCE_MS = 280;
 const EXIT_MS = 150;
 const RIPPLE_VISIBLE_MS = 2400;
 
-export default function OpenApiPanelTab({ onOpen, contained = false }) {
+export default function OpenApiPanelTab({ onOpen, contained = false, instantOpen = false }) {
   const [entered, setEntered] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const [showRipple, setShowRipple] = useState(false);
@@ -39,8 +39,11 @@ export default function OpenApiPanelTab({ onOpen, contained = false }) {
     };
   }, [entered, isExiting]);
 
-  // On click: slide out fast, then open panel
   const handleClick = () => {
+    if (instantOpen) {
+      onOpen?.();
+      return;
+    }
     setIsExiting(true);
     exitTimeoutRef.current = setTimeout(() => {
       onOpen?.();

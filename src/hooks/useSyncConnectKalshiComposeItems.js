@@ -48,6 +48,7 @@ export function useSyncConnectKalshiComposeItems({
           treatAsDate: isDate,
           sumCase: { enabled: false, branches: [], elseColumn: "" },
           equation: { enabled: false },
+          displayName: null,
         };
       });
     });

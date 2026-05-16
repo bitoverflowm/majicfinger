@@ -36,7 +36,11 @@ export function ConnectHomeWorkspaceNav({ className, compact = false }) {
   const chartSnapshotFlusher = ctx?.chartSnapshotFlusher;
 
   const dataSheetIds = useMemo(() => Object.keys(dataSheets || {}), [dataSheets]);
-  const chartSheetIds = useMemo(() => Object.keys(chartSheets || {}), [chartSheets]);
+  const chartSheetIds = useMemo(
+    () =>
+      Object.keys(chartSheets || {}).filter((id) => chartSheets[id]?.userCreated === true),
+    [chartSheets],
+  );
 
   const tableViewActive = rightPanelTab !== "charts" && rightPanelTab !== "dashboard";
   const chartViewActive = rightPanelTab === "charts";
@@ -97,12 +101,18 @@ export function ConnectHomeWorkspaceNav({ className, compact = false }) {
       setLoadedChartBuilderSnapshot?.(null);
       setLoadedChartMeta?.(null);
       setChartSheets?.((prev) => {
-        const nextNum = Object.keys(prev || {}).length;
-        const chartName = `Chart ${nextNum}`;
+        const created = Object.values(prev || {}).filter((c) => c?.userCreated).length;
+        const chartName = `Chart ${created + 1}`;
         const cur = prev?.[newId] || {};
         return {
           ...(prev || {}),
-          [newId]: { ...cur, name: chartName, snapshot: null, chartMeta: null },
+          [newId]: {
+            ...cur,
+            name: chartName,
+            snapshot: null,
+            chartMeta: null,
+            userCreated: true,
+          },
         };
       });
     });

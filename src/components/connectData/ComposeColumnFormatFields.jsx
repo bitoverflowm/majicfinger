@@ -94,7 +94,7 @@ function BucketFormatSelects({
     return (
       <>
         <Select value={bucketVal} onValueChange={onBucket}>
-          <CompactSelectTrigger aria-label="Bucket" className="max-w-[2.5rem]">
+          <CompactSelectTrigger aria-label="Bucket" className="min-w-[4.75rem] max-w-[6.5rem]">
             <span className="truncate">{bucketShortLabel(bucketVal, kind)}</span>
           </CompactSelectTrigger>
           <SelectContent align="end">

@@ -439,10 +439,14 @@ export default function DataSheetWithIntegration({
         closeTimeoutRef.current = null;
       }
       setIsPanelClosing(false);
-      setIsPanelOpen(false); // start off-screen so we can animate in
+      wasOpenRef.current = true;
+      if (connectHomeMode) {
+        setIsPanelOpen(true);
+        return;
+      }
+      setIsPanelOpen(false);
       const id = requestAnimationFrame(() => {
-        setIsPanelOpen(true); // trigger slide-open animation; panel ends in "open" state
-        wasOpenRef.current = true;
+        setIsPanelOpen(true);
       });
       return () => cancelAnimationFrame(id);
     }
@@ -450,7 +454,7 @@ export default function DataSheetWithIntegration({
       beginPanelClose();
       wasOpenRef.current = false;
     }
-  }, [rightPanelOpen, isPanelClosing, beginPanelClose]);
+  }, [rightPanelOpen, isPanelClosing, beginPanelClose, connectHomeMode]);
 
   useEffect(() => {
     if (!rightPanelOpen) setDrawerExpanded(false);
@@ -893,6 +897,7 @@ export default function DataSheetWithIntegration({
             (!showConnectIntegrationIntro || showConnectAnalyzeSection) && (
             <OpenApiPanelTab
               contained={isDemo}
+              instantOpen={connectHomeMode}
               onOpen={() => {
                 if (connectHomeMode) onConnectHomePanelManualOpen?.();
                 if (effectiveDashboardMode) {

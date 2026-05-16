@@ -11,7 +11,9 @@ import { ATHENA_KALSHI_SAMPLE_OPTIONS, KALSHI_CONNECT_DATA_SOURCES } from "@/con
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ComposeColumnFormatFields } from "@/components/connectData/ComposeColumnFormatFields";
 import { ComposeGroupingDroppedColumnsWarning } from "@/components/connectData/ComposeGroupingDroppedColumnsWarning";
+import { ConnectColumnDisplayNameEdit } from "@/components/connectData/ConnectColumnDisplayNameEdit";
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
+import { composeColumnDisplayLabel } from "@/lib/connectComposeDisplayLabels";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { useSyncConnectKalshiComposeItems } from "@/hooks/useSyncConnectKalshiComposeItems";
@@ -182,17 +184,20 @@ function ColumnPicker({
       <ul role="list" className="grid grid-cols-1 items-stretch gap-1 sm:grid-cols-2">
         {columns.map((col) => {
           const isSelected = selectedSet.has(col.name);
-          const displayLabel = getKalshiColumnDisplayLabel(col);
+          const defaultLabel = getKalshiColumnDisplayLabel(col);
           const composeItem = composeItemByColumn[col.name];
+          const displayLabel = composeItem
+            ? composeColumnDisplayLabel(composeItem, defaultLabel)
+            : defaultLabel;
           return (
             <li key={col.name}>
               <div
                 className={cn(
                   "flex h-[2.625rem] w-full gap-1 rounded-md border px-2 py-1 transition-colors duration-150",
-                  isSelected ? "items-center" : "items-start py-1",
+                  isSelected ? "min-h-[2.625rem] items-center py-1" : "items-start py-1",
                   isSelected
                     ? "border-primary/35 bg-primary/5"
-                    : "border-border/50 bg-card hover:border-border hover:bg-muted/15",
+                    : "h-[2.625rem] border-border/50 bg-card hover:border-border hover:bg-muted/15",
                 )}
               >
                 <button
@@ -249,12 +254,22 @@ function ColumnPicker({
                   </span>
                 </button>
                 {isSelected && composeItem ? (
-                  <ComposeColumnFormatFields
-                    compact
-                    item={composeItem}
-                    updateComposeItem={updateComposeItem}
-                    kindForColumn={kindForColumn}
-                  />
+                  <>
+                    <ConnectColumnDisplayNameEdit
+                      columnKey={col.name}
+                      defaultLabel={defaultLabel}
+                      displayName={composeItem.displayName}
+                      onSave={(displayName) =>
+                        updateComposeItem(composeItem.id, { displayName })
+                      }
+                    />
+                    <ComposeColumnFormatFields
+                      compact
+                      item={composeItem}
+                      updateComposeItem={updateComposeItem}
+                      kindForColumn={kindForColumn}
+                    />
+                  </>
                 ) : null}
               </div>
             </li>

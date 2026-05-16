@@ -103,6 +103,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     hasRequestCards;
 
   const [connectPanelUserDismissed, setConnectPanelUserDismissed] = useState(false);
+  const [connectHomePanelPinned, setConnectHomePanelPinned] = useState(false);
   const prevPanelsVisibleRef = useRef(false);
 
   const trackAnalyzeSection =
@@ -118,13 +119,18 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
   /** Right drawer: scroll with Step 2 analyze block; Step 1 uses hub/workspace engagement. */
   const connectHomePanelsEngaged = trackAnalyzeSection ? analyzePanelsEngaged : panelsVisible;
+  const connectHomePanelsVisible = connectHomePanelsEngaged || connectHomePanelPinned;
 
   useEffect(() => {
-    if (connectHomePanelsEngaged && !prevPanelsVisibleRef.current) {
+    if (!connectHomePanelsEngaged) setConnectHomePanelPinned(false);
+  }, [connectHomePanelsEngaged]);
+
+  useEffect(() => {
+    if (connectHomePanelsVisible && !prevPanelsVisibleRef.current) {
       setConnectPanelUserDismissed(false);
     }
-    prevPanelsVisibleRef.current = connectHomePanelsEngaged;
-  }, [connectHomePanelsEngaged]);
+    prevPanelsVisibleRef.current = connectHomePanelsVisible;
+  }, [connectHomePanelsVisible]);
 
   const scrollToWorkspace = useCallback(() => {
     scheduleConnectWorkspaceScroll(workspaceRef, scrollRef);
@@ -147,10 +153,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
     const publishTab = isConnectHomePublishPanelTab(rightPanelTab);
     const analyzePanelsAllowed =
-      connectHomePanelsEngaged && connectHomeAnalyzeActive && !connectPanelUserDismissed;
+      connectHomePanelsVisible && connectHomeAnalyzeActive && !connectPanelUserDismissed;
 
     if (!analyzePanelsAllowed) {
-      if (!publishTab || !connectHomePanelsEngaged) {
+      if (!publishTab || !connectHomePanelsVisible) {
         setRightPanelOpen?.(false);
       }
       return;
@@ -181,7 +187,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     connectRequestSummaryReady,
     hasSheetData,
     isConnectIntegration,
-    connectHomePanelsEngaged,
+    connectHomePanelsVisible,
     rightPanelTab,
     workspaceActive,
     showDataWorkspace,
@@ -275,9 +281,15 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                         startNew={connectWorkspace === CONNECT_WORKSPACE.BLANK ? blankStartNew : startNew}
                         setStartNew={setStartNew}
                         connectHomeMode
-                        connectHomePanelsVisible={connectHomePanelsEngaged}
-                        onConnectHomePanelUserDismiss={() => setConnectPanelUserDismissed(true)}
-                        onConnectHomePanelManualOpen={() => setConnectPanelUserDismissed(false)}
+                        connectHomePanelsVisible={connectHomePanelsVisible}
+                        onConnectHomePanelUserDismiss={() => {
+                          setConnectPanelUserDismissed(true);
+                          setConnectHomePanelPinned(false);
+                        }}
+                        onConnectHomePanelManualOpen={() => {
+                          setConnectPanelUserDismissed(false);
+                          setConnectHomePanelPinned(true);
+                        }}
                       />
                     </div>
                   ) : null}
