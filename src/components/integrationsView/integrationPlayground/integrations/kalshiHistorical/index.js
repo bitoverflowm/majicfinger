@@ -1,13 +1,42 @@
 "use client";
 
+import { useEffect } from "react";
+
 import DataLakeParquetPanel from "../polymarketHistorical/DataLakeParquetPanel";
 import { ConnectProgressWithLabel } from "../polymarketHistorical/ConnectProgressWithLabel";
 import { useBeckerParquetBoot } from "../polymarketHistorical/useBeckerParquetBoot";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { Button } from "@/components/ui/button";
 
 /** Kalshi Historical — Becker Parquet under `kalshi/` in the same S3 bucket as Polymarket historical. */
 export default function KalshiHistorical({ setConnectedData }) {
+  const ctx = useMyStateV2();
+  const connectHomeKalshi =
+    ctx?.viewing === "connectDataHome" && ctx?.connectWorkspace === "kalshiHistorical";
+  const setConnectDataLakePullState = ctx?.setConnectDataLakePullState;
+  const ingestLoading = !!ctx?.connectDataLakePullState?.loading;
+
   const { label, progress, ready, error, retry } = useBeckerParquetBoot();
+
+  useEffect(() => {
+    if (!connectHomeKalshi || !setConnectDataLakePullState || ingestLoading) return;
+    if (ready || error) return;
+    setConnectDataLakePullState((prev) => ({
+      ...prev,
+      loading: true,
+      error: null,
+      label: label || prev.label || "Preparing workspace…",
+      progress: Math.max(Number(prev.progress) || 0, Number(progress) || 2),
+    }));
+  }, [
+    connectHomeKalshi,
+    setConnectDataLakePullState,
+    ingestLoading,
+    ready,
+    error,
+    label,
+    progress,
+  ]);
 
   if (error) {
     return (

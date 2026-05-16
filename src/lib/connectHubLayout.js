@@ -10,26 +10,6 @@ export function connectHubPageClass(embeddedInShell = false) {
   );
 }
 
-/**
- * Hub layout: two-column grid (inline rail) or single column with left pad (fixed rail).
- * @param {{ includeStepRail?: boolean; fixedRail?: boolean }} opts
- */
-export function connectHubLayoutClass({ includeStepRail = true, fixedRail = false } = {}) {
-  if (fixedRail) {
-    return cn(
-      "w-full min-w-0",
-      "md:pl-[9.5rem] lg:pl-[12rem] xl:pl-[13.5rem]",
-    );
-  }
-  if (!includeStepRail) return "w-full min-w-0";
-  return cn(
-    "grid w-full grid-cols-1",
-    "md:grid-cols-[8.5rem_minmax(0,1fr)] md:gap-x-6",
-    "lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
-    "xl:grid-cols-[11rem_minmax(0,1fr)] xl:gap-x-10",
-  );
-}
-
 export const connectHubMainClass =
   "min-w-0 md:col-start-2 md:mx-auto md:w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl";
 
@@ -73,15 +53,64 @@ export const connectHubFlowStepsTopClass = cn(
  * Fixed step rail — pinned to viewport (sticky failed: grid item was only ~240px tall via self-start).
  * Left edge tracks the centered max-w-7xl column + page padding.
  */
+const connectHubFlowStepsLeftBase =
+  "left-[max(1rem,calc((100vw-min(100vw,80rem))/2+1rem))] sm:left-[max(1.25rem,calc((100vw-min(100vw,80rem))/2+1.25rem))] md:left-[max(1.5rem,calc((100vw-min(100vw,80rem))/2+1.5rem))] lg:left-[max(2rem,calc((100vw-min(100vw,80rem))/2+2rem))] xl:left-[max(2.5rem,calc((100vw-min(100vw,80rem))/2+2.5rem))] 2xl:left-[max(3rem,calc((100vw-min(100vw,80rem))/2+3rem))]";
+
+/** When app SideNav icon rail is visible — clear gap between sidebar and step menu. */
+export const connectHubFlowStepsSidebarOffsetClass = cn(
+  "left-[max(calc(var(--sidebar-width-icon,3rem)+1.25rem),calc((100vw-min(100vw,80rem))/2+var(--sidebar-width-icon,3rem)+1.25rem))]",
+  "sm:left-[max(calc(var(--sidebar-width-icon,3rem)+1.5rem),calc((100vw-min(100vw,80rem))/2+var(--sidebar-width-icon,3rem)+1.5rem))]",
+  "md:left-[max(calc(var(--sidebar-width-icon,3rem)+1.75rem),calc((100vw-min(100vw,80rem))/2+var(--sidebar-width-icon,3rem)+1.75rem))]",
+  "lg:left-[max(calc(var(--sidebar-width-icon,3rem)+2rem),calc((100vw-min(100vw,80rem))/2+var(--sidebar-width-icon,3rem)+2rem))]",
+  "xl:left-[max(calc(var(--sidebar-width-icon,3rem)+2.25rem),calc((100vw-min(100vw,80rem))/2+var(--sidebar-width-icon,3rem)+2.25rem))]",
+  "2xl:left-[max(calc(var(--sidebar-width-icon,3rem)+2.5rem),calc((100vw-min(100vw,80rem))/2+var(--sidebar-width-icon,3rem)+2.5rem))]",
+);
+
 export const connectHubFlowStepsClass = cn(
   "hidden md:block",
   "fixed z-30 w-[8.5rem] lg:w-[10rem] xl:w-[11rem]",
   connectHubFlowStepsTopClass,
   "bg-white dark:bg-slate-950",
-  "left-[max(1rem,calc((100vw-min(100vw,80rem))/2+1rem))]",
-  "sm:left-[max(1.25rem,calc((100vw-min(100vw,80rem))/2+1.25rem))]",
-  "md:left-[max(1.5rem,calc((100vw-min(100vw,80rem))/2+1.5rem))]",
-  "lg:left-[max(2rem,calc((100vw-min(100vw,80rem))/2+2rem))]",
-  "xl:left-[max(2.5rem,calc((100vw-min(100vw,80rem))/2+2.5rem))]",
-  "2xl:left-[max(3rem,calc((100vw-min(100vw,80rem))/2+3rem))]",
+  connectHubFlowStepsLeftBase,
 );
+
+/** Step 2 dashboard — full width, minimal horizontal gutter (step rail stays fixed). */
+export function connectHubAnalyzePageClass() {
+  return cn(
+    "mx-auto w-full max-w-none pb-16 pt-12 sm:pb-20 sm:pt-16 md:pb-20 md:pt-20",
+    "px-1 pr-1 sm:px-2 sm:pr-2 md:px-3 md:pr-3",
+  );
+}
+
+/** Content inset: sidebar icon rail + fixed step rail only (no duplicate 9.5rem pad). */
+export function connectHubAnalyzeLayoutClass(withAppSidebar = false) {
+  return cn(
+    "w-full min-w-0 max-w-none",
+    withAppSidebar
+      ? "md:pl-[calc(var(--sidebar-width-icon,3rem)+8.75rem+0.25rem)] lg:pl-[calc(var(--sidebar-width-icon,3rem)+10.25rem+0.25rem)] xl:pl-[calc(var(--sidebar-width-icon,3rem)+11.25rem+0.25rem)]"
+      : "md:pl-[calc(8.75rem+0.25rem)] lg:pl-[calc(10.25rem+0.25rem)] xl:pl-[calc(11.25rem+0.25rem)]",
+  );
+}
+
+/** Main column pad when fixed step rail + optional app sidebar. */
+export function connectHubLayoutClass({
+  includeStepRail = true,
+  fixedRail = false,
+  withAppSidebar = false,
+} = {}) {
+  if (fixedRail) {
+    return cn(
+      "w-full min-w-0",
+      "md:pl-[9.5rem] lg:pl-[12rem] xl:pl-[13.5rem]",
+      withAppSidebar &&
+        "md:pl-[calc(9.5rem+var(--sidebar-width-icon,3rem)+1rem)] lg:pl-[calc(12rem+var(--sidebar-width-icon,3rem)+1rem)] xl:pl-[calc(13.5rem+var(--sidebar-width-icon,3rem)+1rem)]",
+    );
+  }
+  if (!includeStepRail) return "w-full min-w-0";
+  return cn(
+    "grid w-full grid-cols-1",
+    "md:grid-cols-[8.5rem_minmax(0,1fr)] md:gap-x-6",
+    "lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
+    "xl:grid-cols-[11rem_minmax(0,1fr)] xl:gap-x-10",
+  );
+}

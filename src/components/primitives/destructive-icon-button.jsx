@@ -4,18 +4,19 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Small solid destructive control — empty red circle, same visual weight as the
- * DataLakeParquetPanel Athena / sample connection status dots (`h-2.5 w-2.5`).
- * No icon; pair with a tooltip (e.g. "delete").
+ * Small solid destructive control — empty red circle (`h-2 w-2`).
+ * No icon; pair with a tooltip (e.g. "clear sheet").
  */
 export function DestructiveIconButton({ className, ariaLabel = "delete", ...props }) {
   return (
-    <Button
+    <button
       type="button"
-      variant="destructive"
+      data-destructive-dot=""
       className={cn(
-        "h-2.5 w-2.5 min-h-2.5 min-w-2.5 shrink-0 rounded-full border-0 p-0 shadow-none",
-        "focus-visible:ring-1 focus-visible:ring-red-500 focus-visible:ring-offset-1",
+        "inline-flex shrink-0 items-center justify-center rounded-full border-0 bg-red-500 p-0 shadow-none",
+        "h-2 w-2 min-h-2 min-w-2 max-h-2 max-w-2",
+        "hover:bg-red-500/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500 focus-visible:ring-offset-1",
+        "dark:bg-red-900 dark:hover:bg-red-900/90",
         className,
       )}
       aria-label={ariaLabel}

@@ -151,9 +151,7 @@ export default function DataSheetWithIntegration({
     connectHomeMode && isConnectIntegrationWorkspace(connectWorkspace);
   /** Mount pull handler when Connect home drawer is closed (same DataLakeParquetPanel + handleLoad). */
   const connectHomeKalshiPullBridge =
-    connectHomeMode &&
-    connectWorkspace === "kalshiHistorical" &&
-    integrationSidebar === "kalshiHistorical";
+    connectHomeMode && connectWorkspace === "kalshiHistorical";
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
   const rightPanelOpen = contextStateV2?.rightPanelOpen;
@@ -826,6 +824,7 @@ export default function DataSheetWithIntegration({
       isDemo && "relative",
       connectHomeMode && "bg-white dark:bg-slate-950",
       connectHomeMode && connectHomeGridSurface,
+      connectHomeAnalyzeDashboard && "px-0 sm:px-1 md:px-2",
     )}>
       <ReplaceOrNewSheetDialog
         open={replaceOrNewSheetOpen}

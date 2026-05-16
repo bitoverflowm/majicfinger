@@ -48,9 +48,17 @@ const DataView = ({ user, fillViewport = false }) => {
     (s) => s?.type === "chainlink"
   );
 
+  const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
+  const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
+  const connectPullLoading = connectHomeAnalyzeActive && !!connectDataLakePullState.loading;
+
   const dataSheetIds = dataSheets ? Object.keys(dataSheets) : [];
   const hasMultipleDataSheets = dataSheetIds.length > 1;
-  const showGrid = (connectedData?.length > 0) || hasMultipleDataSheets || integrationSidebar;
+  const showGrid =
+    connectPullLoading ||
+    (connectedData?.length > 0) ||
+    hasMultipleDataSheets ||
+    integrationSidebar;
   const anySheetHasData = Object.values(dataSheets || {}).some(
     (s) => Array.isArray(s?.data) && s.data.length > 0
   );
@@ -117,16 +125,22 @@ const DataView = ({ user, fillViewport = false }) => {
   return (
     <div
       className={cn(
-        "min-w-0 max-w-full min-h-0 px-2 sm:px-4 md:px-6",
-        fillViewport && "flex min-h-0 flex-1 flex-col",
+        "min-w-0 max-w-full min-h-0",
+        fillViewport ? "flex min-h-0 flex-1 flex-col px-0 sm:px-1" : "px-2 sm:px-4 md:px-6",
       )}
     >
       {showSheetTabs && (
-        <div className="flex flex-wrap items-center gap-1 mb-2">
+        <div className={cn("mb-2 flex flex-wrap items-center gap-1", fillViewport && "mb-1 gap-0.5")}>
           {dataSheetIds.map((id) => (
             <code
               key={id}
-              className={`${id === activeSheetId ? "bg-lychee_blue/30" : "bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
+              className={cn(
+                "relative rounded px-[0.3rem] py-[0.2rem] font-mono font-semibold",
+                fillViewport ? "text-xs" : "text-sm",
+                id === activeSheetId
+                  ? "bg-lychee_blue/30"
+                  : "cursor-pointer bg-yellow-200/30 hover:bg-lychee_blue/80 hover:text-lychee_white",
+              )}
               onClick={() => setActiveSheetId?.(id)}
             >
               {dataSheets[id]?.name || id}

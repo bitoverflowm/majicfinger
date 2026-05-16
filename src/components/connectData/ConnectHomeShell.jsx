@@ -7,7 +7,10 @@ import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from "@/lib/connectH
 import { deriveConnectFlowStep, isConnectHomePublishPanelTab } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import {
+  connectHubAnalyzeLayoutClass,
+  connectHubAnalyzePageClass,
   connectHubFlowStepsClass,
+  connectHubFlowStepsSidebarOffsetClass,
   connectHubLayoutClass,
   connectHubPageClass,
   connectHubScrollPaddingClass,
@@ -93,6 +96,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     hasSheetData &&
     connectHomeAnalyzeActive &&
     (isConnectIntegration ? hasSheetData : !!dataConnected);
+
+  /** Step 2 dashboard: use full width for sheet / chart (less side gutter). */
+  const connectAnalyzeLayoutActive =
+    workspaceActive && connectHomeAnalyzeActive && hasSheetData;
 
   /** Kalshi/Polymarket connect home: slide request summary in only after pull finishes. */
   const connectRequestSummaryReady =
@@ -190,13 +197,26 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
           CONNECT_HOME_SURFACE,
         )}
       >
-        <div className={connectHubPageClass(true)}>
+        <div
+          className={
+            connectAnalyzeLayoutActive ? connectHubAnalyzePageClass() : connectHubPageClass(true)
+          }
+        >
           <ConnectHomeFlowSteps
             currentStep={connectFlowStep}
-            className={cn(connectHubFlowStepsClass, showConnectLeftNav && "hidden")}
+            className={cn(
+              connectHubFlowStepsClass,
+              showConnectLeftNav && connectHubFlowStepsSidebarOffsetClass,
+            )}
           />
 
-          <div className={connectHubLayoutClass({ fixedRail: true })}>
+          <div
+            className={
+              connectAnalyzeLayoutActive
+                ? connectHubAnalyzeLayoutClass(showConnectLeftNav)
+                : connectHubLayoutClass({ fixedRail: true, withAppSidebar: showConnectLeftNav })
+            }
+          >
             <div className="flex min-w-0 flex-col">
               <div ref={hubRef}>
                 <ConnectDataStep1

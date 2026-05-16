@@ -398,6 +398,13 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     }, []);
 
     const requestConnectDataLakePull = useCallback(() => {
+      setConnectDataLakePullState((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: prev.label || "Preparing your data pull…",
+        progress: prev.progress > 0 ? prev.progress : 2,
+      }));
       setConnectDataLakePullTick((t) => t + 1);
     }, []);
 

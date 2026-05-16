@@ -76,7 +76,14 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
+import { GridSheetLoadingState } from "@/components/gridView/GridSheetLoadingState";
+import { GridToolbarSkeleton } from "@/components/gridView/GridViewLoadingSkeleton";
 import { SHEET_GRID_PAGE_SIZE } from "@/config/dataLakeParquetSamples";
+import {
+  connectGridAgCompactClass,
+  connectGridToolbarButtonCompactClass,
+  connectGridToolbarCompactClass,
+} from "@/lib/connectGridCompact";
 import { athenaRowsToObjects } from "@/lib/duckdb/duckdbWasmClient";
 import { appendSheetOperation, createSheetOperation } from "@/lib/projectPersistence";
 import { temporalToMs } from "@/lib/temporalParse";
@@ -491,6 +498,30 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const isProvenancePreviewSheet =
       activeSheet?.storageMode === "provenance" && activeSheet?.rehydrationStatus !== "complete";
     const [rehydrateBusy, setRehydrateBusy] = useState(false);
+    const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
+    const viewing = contextStateV2?.viewing;
+    const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
+    const isConnectPullLoading =
+        !!connectDataLakePullState.loading &&
+        (viewing === "connectDataHome" || connectHomeAnalyzeActive);
+    const hasDisplayRows = (connectedData?.length ?? 0) > 0;
+    const pullProgress = Number(connectDataLakePullState.progress) || 0;
+    const pullInFlight =
+        isConnectPullLoading ||
+        (!!connectDataLakePullState.label &&
+            pullProgress > 0 &&
+            pullProgress < 100);
+    const isConnectAnalyzeViewport =
+        fillViewport && connectHomeAnalyzeActive && viewing === "connectDataHome";
+    const connectAwaitingSheetData =
+        isConnectAnalyzeViewport && !hasDisplayRows && !connectDataLakePullState.error;
+    const isSheetLoading =
+        isConnectPullLoading ||
+        rehydrateBusy ||
+        (connectAwaitingSheetData && pullInFlight);
+    const sheetLoadingLabel =
+        connectDataLakePullState.label || (rehydrateBusy ? "Reloading sheet…" : "Loading data…");
+    const sheetLoadingProgress = rehydrateBusy ? pullProgress || 50 : pullProgress;
     const appendActiveSheetOperation = useCallback(
       (type, payload = {}) => {
         if (!activeSheetId || !setDataSheets) return;
@@ -2631,26 +2662,43 @@ const GridView = ({ startNew, fillViewport = false }) => {
     }, [exportData]);
 
     //Apply settings across all columns
-    const defaultColDef = useMemo(() => ({
-        filter: true, // Enable filtering on all columns
-        //maxWidth: 120,
-        editable: true,
-        background: {visible: false},
-        resizable: true,
-        singleClickEdit: true,
-        stopEditingWhenCellsLoseFocus : true,
-    }))
-
-    const autoSizeStrategy = {
-        type: 'fitGridWidth',
-        defaultMinWidth: 100,
-    };
-
-    const gridOptions = useMemo(()=> ({
-        onCellClicked: (e) => toast(`Hit Enter to accept change`, {
-            duration: 5000
+    const defaultColDef = useMemo(
+        () => ({
+            filter: true,
+            editable: true,
+            background: { visible: false },
+            resizable: true,
+            singleClickEdit: true,
+            stopEditingWhenCellsLoseFocus: true,
+            ...(fillViewport
+                ? {
+                    minWidth: 72,
+                    maxWidth: 200,
+                    flex: 1,
+                  }
+                : {}),
         }),
-    }))
+        [fillViewport],
+    );
+
+    const autoSizeStrategy = useMemo(
+        () => ({
+            type: "fitGridWidth",
+            defaultMinWidth: fillViewport ? 72 : 100,
+        }),
+        [fillViewport],
+    );
+
+    const gridOptions = useMemo(
+        () => ({
+            onCellClicked: () =>
+                toast(`Hit Enter to accept change`, {
+                    duration: 5000,
+                }),
+            ...(fillViewport ? { rowHeight: 22, headerHeight: 24 } : {}),
+        }),
+        [fillViewport],
+    );
 
     const updateCellData = (row, field, newValue) => {
         if (field === '_origIndex') return;
@@ -2754,17 +2802,32 @@ const GridView = ({ startNew, fillViewport = false }) => {
                     </div>
                 </div>
             </Alert>  
-            {activeSheetId && (
+            {(activeSheetId || isSheetLoading) && (
             <Tabs defaultValue="table" className="w-full min-w-0">
-              <div className="flex flex-wrap items-center gap-2 py-2 border-b">
-                <TabsList className="h-9">
-                  <TabsTrigger value="table" className="text-xs">Table</TabsTrigger>
-                  <TabsTrigger value="sort-filter" className="text-xs gap-1">
-                    <Filter className="h-3.5 w-3.5" />
+              {isSheetLoading ? (
+                <GridToolbarSkeleton compact={fillViewport} />
+              ) : (
+              <>
+              <div
+                className={cn(
+                  "flex flex-wrap items-center gap-2 border-b py-2",
+                  fillViewport && connectGridToolbarCompactClass,
+                  fillViewport && connectGridToolbarButtonCompactClass,
+                )}
+              >
+                <TabsList className={cn("h-9", fillViewport && "h-7 p-0.5")}>
+                  <TabsTrigger value="table" className={cn("text-xs", fillViewport && "px-2 py-1 text-[11px]")}>
+                    Table
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="sort-filter"
+                    className={cn("gap-1 text-xs", fillViewport && "px-2 py-1 text-[11px]")}
+                  >
+                    <Filter className={cn("h-3.5 w-3.5", fillViewport && "h-3 w-3")} />
                     Sort & filter
                   </TabsTrigger>
                 </TabsList>
-                <div className="h-4 w-px bg-border shrink-0" />
+                <div className="h-4 w-px shrink-0 bg-border" />
                 {/* Sheet Properties dropdown (keeps existing Add Column dialog code) */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -4725,7 +4788,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="inline-flex shrink-0">
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 items-center justify-center self-center",
+                          fillViewport ? "h-7" : "h-9",
+                        )}
+                      >
                         <DestructiveIconButton ariaLabel="clear sheet" onClick={handleClearSheet} />
                       </span>
                     </TooltipTrigger>
@@ -4736,10 +4804,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 </TooltipProvider>
               </div>
               <TabsContent value="sort-filter" className="mt-3">
-                <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
                         <Filter className="h-3.5 w-3.5" />
                         Sort / Select / Filter
                       </Button>
@@ -4866,12 +4934,23 @@ const GridView = ({ startNew, fillViewport = false }) => {
                   </div>
                 </div>
               </TabsContent>
+              </>
+              )}
               <TabsContent value="table" className="mt-0" />
             </Tabs>
             )}
+            {isSheetLoading ? (
+              <GridSheetLoadingState
+                fillViewport={fillViewport}
+                compact={fillViewport}
+                label={sheetLoadingLabel}
+                progress={sheetLoadingProgress}
+              />
+            ) : (
             <div
                 className={cn(
                     agThemeClass,
+                    fillViewport && connectGridAgCompactClass,
                     fillViewport ? "min-h-[16rem] flex-1" : gridExpanded ? "h-[750px]" : "h-[550px]",
                 )}
             >
@@ -4890,6 +4969,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                     autoSizeStrategy={autoSizeStrategy}
                     />
             </div>
+            )}
         </div>
     )
 
