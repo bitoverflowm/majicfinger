@@ -89,7 +89,7 @@ export const connectDemoAnalyzeMainClass = cn(
 );
 
 export const connectDemoWorkspaceSectionClass = cn(
-  "relative mt-8 min-h-0 flex-1 snap-start snap-always sm:mt-10",
+  "relative mt-12 min-h-0 flex-1 snap-start snap-always sm:mt-16 md:mt-20",
 );
 
 /** Demo + analyze scroll container — mandatory snap between hub and workspace. */

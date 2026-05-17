@@ -74,7 +74,7 @@ export function ConnectHomeFileUpload({ onParsed }) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 pb-10 pt-8 sm:px-10">
+    <div className="mx-auto w-full max-w-2xl px-6 pb-24 pt-24 sm:px-10">
       <h2 className="mb-6 text-lg font-semibold tracking-tight text-foreground">Upload your file</h2>
       <button
         type="button"

@@ -23,8 +23,8 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useUser } from "@/lib/hooks";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
-import { scrollToPricingSection } from "@/lib/scrollToPricing";
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport";
+import { useDemoProGate } from "@/hooks/useDemoProGate";
 
 function getColKeys(connectedCols) {
   return (connectedCols || [])
@@ -49,7 +49,7 @@ function useHasShareableChart() {
   );
 }
 
-function SaveProjectSection() {
+function SaveProjectSection({ runOrRequestPro }) {
   const requestSaveProjectDialog = useMyStateV2()?.requestSaveProjectDialog;
   return (
     <div className="space-y-2 border-b border-border pb-3">
@@ -59,7 +59,9 @@ function SaveProjectSection() {
         variant="default"
         size="sm"
         className="h-8 w-full px-2 text-[11px]"
-        onClick={() => requestSaveProjectDialog?.()}
+        onClick={() =>
+          runOrRequestPro?.(() => requestSaveProjectDialog?.(), "saving projects")
+        }
       >
         Save project
       </Button>
@@ -116,11 +118,9 @@ const SITE = typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL
   : "https://lycheedata.com";
 
-function ShareEmbedSection() {
+function ShareEmbedSection({ runOrRequestPro }) {
   const user = useUser();
   const v2 = useMyStateV2();
-  const isDemo = v2?.isDemo;
-  const setViewing = v2?.setViewing;
   const userHandle = v2?.userHandle;
   const connectedData = v2?.connectedData || [];
   const loadedDataMeta = v2?.loadedDataMeta;
@@ -171,7 +171,6 @@ function ShareEmbedSection() {
   }, [getChartOgImageDataUrl]);
 
   const [slugInput, setSlugInput] = useState("");
-  const [showSignupDialog, setShowSignupDialog] = useState(false);
   const [showSavePublishDialog, setShowSavePublishDialog] = useState(false);
   const [showDeleteEmbedDialog, setShowDeleteEmbedDialog] = useState(false);
   const [pendingChartName, setPendingChartName] = useState("");
@@ -350,10 +349,6 @@ function ShareEmbedSection() {
   ]);
 
   const publishEmbed = useCallback(async () => {
-    if (isDemo) {
-      setShowSignupDialog(true);
-      return;
-    }
     if (!user) {
       toast.error("Sign in to create an embed link");
       return;
@@ -416,7 +411,6 @@ function ShareEmbedSection() {
     setRefetchChart?.(1);
   }, [
     user,
-    isDemo,
     userHandle,
     activeChartMeta,
     pendingChartName,
@@ -519,7 +513,9 @@ function ShareEmbedSection() {
                   size="sm"
                   className="h-8 px-2 text-[10px]"
                   disabled={!hasShareableChart}
-                  onClick={publishEmbed}
+                  onClick={() =>
+                    runOrRequestPro?.(() => publishEmbed(), "publishing embeds")
+                  }
                 >
                   Publish embed
                 </Button>
@@ -540,7 +536,9 @@ function ShareEmbedSection() {
                   size="sm"
                   className="h-8 px-2 text-[10px]"
                   disabled={!hasShareableChart || !publicUrl || !isPublishedForCurrentSlug}
-                  onClick={() => copyText(publicUrl, "Link")}
+                  onClick={() =>
+                    runOrRequestPro?.(() => copyText(publicUrl, "Link"), "sharing charts")
+                  }
                 >
                   Copy link
                 </Button>
@@ -565,7 +563,12 @@ function ShareEmbedSection() {
                   size="sm"
                   className="h-8 px-2 text-[10px]"
                   disabled={!hasShareableChart || !iframeSnippet || !isPublishedForCurrentSlug}
-                  onClick={() => copyText(iframeSnippet, "Iframe")}
+                  onClick={() =>
+                    runOrRequestPro?.(
+                      () => copyText(iframeSnippet, "Iframe"),
+                      "sharing charts",
+                    )
+                  }
                 >
                   Copy iframe
                 </Button>
@@ -598,7 +601,14 @@ function ShareEmbedSection() {
             <TooltipProvider delayDuration={120}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <DestructiveIconButton onClick={() => setShowDeleteEmbedDialog(true)} />
+                  <DestructiveIconButton
+                    onClick={() =>
+                      runOrRequestPro?.(
+                        () => setShowDeleteEmbedDialog(true),
+                        "managing embeds",
+                      )
+                    }
+                  />
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">delete</TooltipContent>
               </Tooltip>
@@ -606,30 +616,6 @@ function ShareEmbedSection() {
           ) : null}
         </div>
       ) : null}
-      <AlertDialog open={showSignupDialog} onOpenChange={setShowSignupDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sign up to share your chart</AlertDialogTitle>
-            <AlertDialogDescription>
-              Create an account to publish interactive embeds and get a shareable public link.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Not now</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (isDemo) {
-                  scrollToPricingSection();
-                  return;
-                }
-                setViewing?.("pricing");
-              }}
-            >
-              Sign up
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <AlertDialog open={showSavePublishDialog} onOpenChange={setShowSavePublishDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -656,7 +642,13 @@ function ShareEmbedSection() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSavePublishing}>Cancel</AlertDialogCancel>
-            <Button type="button" onClick={saveAndPublish} disabled={isSavePublishing}>
+            <Button
+              type="button"
+              onClick={() =>
+                runOrRequestPro?.(() => saveAndPublish(), "publishing embeds")
+              }
+              disabled={isSavePublishing}
+            >
               {isSavePublishing ? "Saving..." : "Save and publish"}
             </Button>
           </AlertDialogFooter>
@@ -689,7 +681,7 @@ function ShareEmbedSection() {
   );
 }
 
-function ExportDataSection() {
+function ExportDataSection({ runOrRequestPro }) {
   const contextStateV2 = useMyStateV2();
   const connectedData = contextStateV2?.connectedData || [];
   const connectedCols = contextStateV2?.connectedCols || [];
@@ -756,7 +748,7 @@ function ExportDataSection() {
           variant="outline"
           size="sm"
           className="h-8 px-2 text-[10px]"
-          onClick={downloadCSV}
+          onClick={() => runOrRequestPro?.(() => downloadCSV(), "exporting data")}
         >
           CSV
         </Button>
@@ -764,7 +756,7 @@ function ExportDataSection() {
           variant="outline"
           size="sm"
           className="h-8 px-2 text-[10px]"
-          onClick={downloadJSON}
+          onClick={() => runOrRequestPro?.(() => downloadJSON(), "exporting data")}
         >
           JSON
         </Button>
@@ -772,7 +764,7 @@ function ExportDataSection() {
           variant="outline"
           size="sm"
           className="h-8 px-2 text-[10px]"
-          onClick={downloadXLSX}
+          onClick={() => runOrRequestPro?.(() => downloadXLSX(), "exporting data")}
         >
           XLSX
         </Button>
@@ -782,12 +774,15 @@ function ExportDataSection() {
 }
 
 export default function ExportPanel() {
+  const { runOrRequestPro, dialog } = useDemoProGate();
+
   return (
     <div className="flex min-w-0 flex-col gap-4 p-3">
-      <SaveProjectSection />
+      <SaveProjectSection runOrRequestPro={runOrRequestPro} />
       <ExportChartSection />
-      <ShareEmbedSection />
-      <ExportDataSection />
+      <ShareEmbedSection runOrRequestPro={runOrRequestPro} />
+      <ExportDataSection runOrRequestPro={runOrRequestPro} />
+      {dialog}
     </div>
   );
 }
