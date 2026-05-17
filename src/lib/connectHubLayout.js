@@ -99,6 +99,15 @@ export const connectHubFlowStepsViewportFixedClass = cn(
   "left-[max(1rem,calc((100vw-min(100vw,80rem))/2+1rem))] sm:left-[max(1.25rem,calc((100vw-min(100vw,80rem))/2+1.25rem))] md:left-[max(1.5rem,calc((100vw-min(100vw,80rem))/2+1.5rem))] lg:left-[max(2rem,calc((100vw-min(100vw,80rem))/2+2rem))] xl:left-[max(2.5rem,calc((100vw-min(100vw,80rem))/2+2.5rem))] 2xl:left-[max(3rem,calc((100vw-min(100vw,80rem))/2+3rem))]",
 );
 
+/** Collapsed viewport-fixed rail — anchor at screen edge (peek tab flush left). */
+export const connectHubFlowStepsViewportCollapsedClass = "left-0";
+
+/** Collapsed peek tab — fixed to viewport left, below app nav. */
+export const connectHubFlowStepsCollapsedPeekClass = cn(
+  "fixed left-0 z-40",
+  connectHubFlowStepsTopClass,
+);
+
 /** @deprecated Use connectHubFlowStepsViewportFixedClass */
 export const connectHubFlowStepsClass = connectHubFlowStepsViewportFixedClass;
 

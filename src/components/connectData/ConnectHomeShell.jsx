@@ -11,6 +11,7 @@ import {
 import { deriveConnectFlowStep, isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import {
+  connectHubFlowStepsViewportCollapsedClass,
   connectHubFlowStepsViewportFixedClass,
   connectHubLayoutClass,
   connectHubPageClass,
@@ -270,11 +271,13 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
           <ConnectHomeFlowSteps
             currentStep={connectFlowStep}
             collapsible
+            fixedRail
             expanded={connectHomeFlowStepsOpen}
             onExpandedChange={setConnectHomeFlowStepsOpen}
             className={cn(
               connectHubFlowStepsViewportFixedClass,
-              !connectHomeFlowStepsOpen && "!w-0 !min-w-0",
+              !connectHomeFlowStepsOpen &&
+                cn(connectHubFlowStepsViewportCollapsedClass, "!w-0 !min-w-0"),
               panelsVisible && connectHomeAnalyzeActive && "hidden",
             )}
           />

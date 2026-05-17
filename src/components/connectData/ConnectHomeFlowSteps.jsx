@@ -3,10 +3,11 @@
 import { ChevronLeft } from "lucide-react";
 
 import { CONNECT_FLOW_STEPS } from "@/lib/connectHomeFlow";
+import { connectHubFlowStepsCollapsedPeekClass } from "@/lib/connectHubLayout";
 import { cn } from "@/lib/utils";
 
-const peekTabClass =
-  "pointer-events-auto absolute left-full top-6 z-40 flex h-11 w-8 flex-col items-center justify-center rounded-r-md border border-l-0 border-border/80 bg-white font-mono text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/50 dark:bg-slate-950 dark:hover:bg-slate-900";
+const peekTabBaseClass =
+  "pointer-events-auto flex h-11 w-8 flex-col items-center justify-center rounded-r-md border border-l-0 border-border/80 bg-white font-mono text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/50 dark:bg-slate-950 dark:hover:bg-slate-900";
 
 /**
  * Vertical step rail for the Connect hub (wireframe / inspiration layout).
@@ -15,6 +16,7 @@ const peekTabClass =
  *   className?: string;
  *   sticky?: boolean;
  *   collapsible?: boolean;
+ *   fixedRail?: boolean;
  *   expanded?: boolean;
  *   onExpandedChange?: (open: boolean) => void;
  * }} props
@@ -24,10 +26,15 @@ export function ConnectHomeFlowSteps({
   className,
   sticky = false,
   collapsible = false,
+  fixedRail = false,
   expanded = true,
   onExpandedChange,
 }) {
   const isExpanded = !collapsible || expanded;
+  const peekTabClass = cn(
+    peekTabBaseClass,
+    fixedRail ? connectHubFlowStepsCollapsedPeekClass : "absolute left-full top-6 z-40",
+  );
 
   return (
     <nav
