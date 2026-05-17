@@ -3,7 +3,11 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 import { cn } from "@/lib/utils";
-import { isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
+import {
+  connectHomeAnySheetHasData,
+  isConnectUserDataPullActive,
+} from "@/lib/connectHomePullDestination";
+import { removeDataSheetFromWorkspace } from "@/lib/removeDataSheetFromWorkspace";
 
 import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
@@ -494,6 +498,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate
     const setSheetData = contextStateV2?.setSheetData
     const setDataSheets = contextStateV2?.setDataSheets
+    const setActiveSheetId = contextStateV2?.setActiveSheetId
+    const setChartSheets = contextStateV2?.setChartSheets
+    const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive
+    const requestConnectComposeScroll = contextStateV2?.requestConnectComposeScroll
+    const liveStreamActions = contextStateV2?.liveStreamActions
     const setDataTypes = contextStateV2?.setDataTypes
     const dataTypes = contextStateV2?.dataTypes || {}
     let dataSheets = contextStateV2?.dataSheets || {}
@@ -2786,10 +2795,45 @@ const GridView = ({ startNew, fillViewport = false }) => {
         toast('Row deleted!', { duration: 5000 });
     };
 
-    const handleClearSheet = () => {
-        setConnectedData([]);
-        toast("Sheet cleared!", { duration: 3000 });
-    };
+    const handleClearSheet = useCallback(() => {
+        if (!activeSheetId) return;
+        const result = removeDataSheetFromWorkspace({
+            sheetId: activeSheetId,
+            dataSheets,
+            activeSheetId,
+            setDataSheets,
+            setActiveSheetId,
+            setConnectedData,
+            setChartSheets,
+            liveStreamActions,
+        });
+        if (!result) return;
+
+        if (
+            fillViewport &&
+            viewing === "connectDataHome" &&
+            !connectHomeAnySheetHasData(result.dataSheets, result.connectedData)
+        ) {
+            setConnectHomeAnalyzeActive?.(false);
+            requestConnectComposeScroll?.();
+        }
+
+        toast(result.resetToEmptySheet ? "Sheet cleared!" : "Sheet removed!", {
+            duration: 3000,
+        });
+    }, [
+        activeSheetId,
+        dataSheets,
+        fillViewport,
+        liveStreamActions,
+        requestConnectComposeScroll,
+        setActiveSheetId,
+        setChartSheets,
+        setConnectHomeAnalyzeActive,
+        setConnectedData,
+        setDataSheets,
+        viewing,
+    ]);
     
 
     useEffect(()=>{
