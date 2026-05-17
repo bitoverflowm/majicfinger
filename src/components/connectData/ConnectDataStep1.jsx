@@ -839,7 +839,8 @@ export default function ConnectDataStep1({
             </div>
           </section>
 
-          <section className={cn("min-w-0 overflow-hidden", !embeddedDemo && "xl:min-w-[15rem] 2xl:min-w-[18rem]")}>
+          {!embeddedDemo ? (
+          <section className="min-w-0 overflow-hidden xl:min-w-[15rem] 2xl:min-w-[18rem]">
             <div className={cn("flex flex-col", hubColGapClass)}>
               <div>
                 <SectionTitle compact={embeddedDemo}>Dashboards</SectionTitle>
@@ -888,6 +889,7 @@ export default function ConnectDataStep1({
               </div>
             </div>
           </section>
+          ) : null}
             </div>
           </div>
         </div>

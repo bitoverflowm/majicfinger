@@ -71,10 +71,10 @@ export const connectHubDemoLayoutClass = cn(
   "grid w-full min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] items-start gap-x-2",
 );
 
-/** Demo hub — three equal columns, single row (stack only below sm). */
+/** Demo hub — Import + Integrations only; two columns, single row (stack only below sm). */
 export const connectHubDemoColumnGridClass = cn(
   "grid w-full min-w-0 items-start gap-x-1.5",
-  "grid-cols-[repeat(3,minmax(0,1fr))]",
+  "grid-cols-[repeat(2,minmax(0,1fr))]",
   "max-sm:grid-cols-1 max-sm:gap-x-0 max-sm:gap-y-3",
 );
 
