@@ -61,6 +61,7 @@ import {
   connectDemoAnalyzeMainClass,
   connectHomeAnalyzeMainClass,
   connectHomeAnalyzeRowClass,
+  connectHomeDrawerAsideDemoClass,
   connectHomeDrawerAsideFixedClass,
   connectHomeWorkspaceRowClass,
   CONNECT_HOME_WORKSPACE_MIN_H,
@@ -932,15 +933,16 @@ export default function DataSheetWithIntegration({
     ? "max-md:w-auto max-md:min-w-0 max-md:max-w-none md:w-1/2 md:min-w-0 md:max-w-[50vw] 2xl:w-1/3 2xl:max-w-[33.333vw]"
     : drawerWidthCollapsed;
 
-  /** Demo embed: absolute in viewport. Connect home + app: fixed flush to the right screen edge. */
-  const drawerAsidePositionClass = isDemo
-    ? "sticky top-2 z-20 flex max-h-full shrink-0 flex-col gap-4 self-start sm:gap-6 transition-[transform,width,min-width,max-width] duration-300 ease-out"
-    : cn(
-        connectHomeDrawerAsideFixedClass,
-        connectHomeMode
-          ? "right-0 max-md:right-0 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
-          : "right-2 sm:right-4",
-      );
+  /** Demo: overlay on spacer (one column). App connect-home: fixed to viewport. */
+  const drawerAsidePositionClass =
+    isDemo && connectHomeMode
+      ? connectHomeDrawerAsideDemoClass
+      : cn(
+          connectHomeDrawerAsideFixedClass,
+          connectHomeMode
+            ? "right-0 max-md:right-0 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
+            : "right-2 sm:right-4",
+        );
 
   const connectHomeGridSurface =
     "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";

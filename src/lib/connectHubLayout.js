@@ -53,7 +53,7 @@ export const connectHomeWorkspaceRowClass = cn(
 
 export const connectHomeAnalyzeMainClass = cn(
   CONNECT_HOME_WORKSPACE_MIN_H,
-  "relative flex min-w-0 flex-1 flex-col overflow-hidden",
+  "relative flex min-h-0 w-0 min-w-0 flex-1 flex-col overflow-hidden",
 );
 
 /** Horizontal inset inside the landing demo card. */
@@ -74,7 +74,7 @@ export const connectDemoAnalyzeFitClass = cn(
 );
 
 export const connectDemoAnalyzeMainClass = cn(
-  "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+  "relative flex min-h-0 w-0 min-w-0 flex-1 flex-col overflow-hidden",
   "min-h-[24rem]",
 );
 
@@ -96,7 +96,14 @@ export const connectHubAnalyzeViewportClass =
 
 /** Analyze row: sheet + drawer inside the fixed viewport (no dvh stack). */
 export const connectHomeAnalyzeRowClass = cn(
-  "flex min-h-0 w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:gap-6",
+  "relative min-h-0 w-full min-w-0 flex-1 overflow-hidden",
+  "flex flex-row gap-4 transition-[gap] duration-300 ease-out sm:gap-6",
+);
+
+/** Demo / connect-home drawer — overlay on the spacer column (not in-flow beside it). */
+export const connectHomeDrawerAsideDemoClass = cn(
+  "absolute inset-y-0 right-0 z-20 flex h-full min-h-0 flex-col gap-4 sm:gap-6",
+  "transition-[transform,width,min-width,max-width] duration-300 ease-out",
 );
 
 /** Landing demo — in-card step rail + hub (same proportions as Connect home shell). */
