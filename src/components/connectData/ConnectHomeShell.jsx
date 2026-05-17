@@ -151,6 +151,11 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [connectHomePanelsEngaged]);
 
   const scrollToWorkspace = useCallback(() => {
+    /** New integration pull — always land on query builder, not the sheet grid. */
+    if (isConnectIntegrationWorkspace(connectWorkspace)) {
+      scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
+      return;
+    }
     if (isConnectSavedProjectWorkspace(connectWorkspace) && hasSheetData) {
       scheduleConnectProjectSheetScroll(workspaceRef, scrollRef);
       return;

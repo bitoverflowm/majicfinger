@@ -85,6 +85,7 @@ export function ConnectIntegrationsPickerList({
   const isDemo = !!ctx.isDemo;
   const integrationSidebar = ctx.integrationSidebar;
   const setIntegrationSidebar = ctx.setIntegrationSidebar;
+  const setRightPanelTab = ctx.setRightPanelTab;
   const requestConnectWorkspace = ctx.requestConnectWorkspace;
 
   const [search, setSearch] = useState("");
@@ -100,14 +101,12 @@ export function ConnectIntegrationsPickerList({
       if (!row.available || !row.id) return;
       if (!API_INTEGRATIONS.includes(row.id)) return;
 
+      setIntegrationSidebar?.(row.id);
       if (connectHomeMode) {
+        setRightPanelTab?.("integrations");
         if (isConnectIntegrationWorkspace(row.id)) {
           requestConnectWorkspace?.(row.id);
-        } else {
-          setIntegrationSidebar?.(row.id);
         }
-      } else {
-        setIntegrationSidebar?.(row.id);
       }
       onAfterSelect?.(row.id);
     },
@@ -116,6 +115,7 @@ export function ConnectIntegrationsPickerList({
       onAfterSelect,
       requestConnectWorkspace,
       setIntegrationSidebar,
+      setRightPanelTab,
     ],
   );
 
