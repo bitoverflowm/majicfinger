@@ -322,7 +322,7 @@ const DashBody = ({ user }) => {
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
-                {!isDemo && viewing === 'connectDataHome' && (
+                {viewing === 'connectDataHome' && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <ConnectHomeShell
                       user={user}
@@ -332,7 +332,7 @@ const DashBody = ({ user }) => {
                     />
                   </div>
                 )}
-                { (viewing === 'dataStart' || viewing === 'charts' || viewing === 'dashboardComposer') && (
+                { !isDemo && (viewing === 'dataStart' || viewing === 'charts' || viewing === 'dashboardComposer') && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <DataSheetWithIntegration
                       user={user}

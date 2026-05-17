@@ -19,6 +19,7 @@ const peekTabBaseClass =
  *   fixedRail?: boolean;
  *   expanded?: boolean;
  *   onExpandedChange?: (open: boolean) => void;
+ *   compact?: boolean;
  * }} props
  */
 export function ConnectHomeFlowSteps({
@@ -29,6 +30,7 @@ export function ConnectHomeFlowSteps({
   fixedRail = false,
   expanded = true,
   onExpandedChange,
+  compact = false,
 }) {
   const isExpanded = !collapsible || expanded;
   const peekTabClass = cn(
@@ -73,12 +75,12 @@ export function ConnectHomeFlowSteps({
 
       <div
         className={cn(
-          "relative w-[8.5rem] lg:w-[10rem] xl:w-[11rem]",
+          compact ? "relative w-[4.25rem]" : "relative w-[8.5rem] lg:w-[10rem] xl:w-[11rem]",
           collapsible && "transition-[transform,opacity] duration-300 ease-in-out",
           collapsible && !isExpanded && "-translate-x-full pointer-events-none opacity-0",
         )}
       >
-        <ol className="flex flex-col gap-6">
+        <ol className={cn("flex flex-col", compact ? "gap-2" : "gap-6")}>
           {CONNECT_FLOW_STEPS.map((item) => {
             const isActive = currentStep === item.step;
 
@@ -86,7 +88,7 @@ export function ConnectHomeFlowSteps({
               <li key={item.step}>
                 <div
                   className={cn(
-                    "px-2.5 py-2 transition-colors",
+                    compact ? "px-1 py-1.5 transition-colors" : "px-2.5 py-2 transition-colors",
                     isActive
                       ? "border-primary/20 bg-muted/35"
                       : "border-transparent opacity-40",
@@ -94,16 +96,26 @@ export function ConnectHomeFlowSteps({
                 >
                   <p
                     className={cn(
-                      "text-[11px] font-medium leading-snug",
+                      compact ? "text-[9px] font-medium leading-snug" : "text-[11px] font-medium leading-snug",
                       isActive ? "text-foreground" : "text-muted-foreground",
                     )}
                   >
-                    <span className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                    <span
+                      className={cn(
+                        "font-normal uppercase tracking-wide text-muted-foreground",
+                        compact ? "text-[8px]" : "text-[10px]",
+                      )}
+                    >
                       Step {item.step}
                     </span>
                     <span className="mt-0.5 block">{item.title}</span>
                   </p>
-                  <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+                  <p
+                    className={cn(
+                      "mt-0.5 leading-snug text-muted-foreground",
+                      compact ? "text-[8px]" : "text-[10px]",
+                    )}
+                  >
                     {item.description}
                   </p>
                 </div>

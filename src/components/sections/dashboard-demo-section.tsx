@@ -15,15 +15,14 @@ export function DashboardDemoSection() {
           <StateProviderV2
             initialSettings={{
               demo: true,
-              // Match first-time dashboard: data workspace + integrations panel, no API pre-selected.
-              viewing: "dataStart",
-              rightPanelOpen: true,
+              viewing: "connectDataHome",
+              rightPanelOpen: false,
               rightPanelTab: "integrations",
               integrationSidebar: null,
             }}
           >
             <LiveStreamManager />
-            <div className="flex h-[80vh] min-h-[680px] w-full flex-col overflow-hidden">
+            <div className="flex h-[min(90vh,920px)] min-h-[720px] w-full flex-col overflow-hidden">
               <DashBody user={null} />
             </div>
           </StateProviderV2>

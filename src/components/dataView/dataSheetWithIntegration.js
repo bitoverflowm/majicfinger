@@ -57,6 +57,8 @@ import { isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import {
   connectAnalyzeAnchorClass,
   connectAnalyzeSectionFitClass,
+  connectDemoAnalyzeFitClass,
+  connectDemoAnalyzeMainClass,
   connectHomeAnalyzeMainClass,
   connectHomeDrawerAsideFixedClass,
   connectHomeWorkspaceRowClass,
@@ -911,15 +913,14 @@ export default function DataSheetWithIntegration({
     : drawerWidthCollapsed;
 
   /** Demo embed: absolute in viewport. Connect home + app: fixed flush to the right screen edge. */
-  const drawerAsidePositionClass =
-    isDemo && !connectHomeMode
-      ? "absolute inset-y-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
-      : cn(
-          connectHomeDrawerAsideFixedClass,
-          connectHomeMode
-            ? "right-0 max-md:right-0 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
-            : "right-2 sm:right-4",
-        );
+  const drawerAsidePositionClass = isDemo
+    ? "absolute inset-y-0 right-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
+    : cn(
+        connectHomeDrawerAsideFixedClass,
+        connectHomeMode
+          ? "right-0 max-md:right-0 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
+          : "right-2 sm:right-4",
+      );
 
   const connectHomeGridSurface =
     "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff]";
@@ -1005,7 +1006,9 @@ export default function DataSheetWithIntegration({
           id={connectHomeSheetLayoutLive ? "connect-home-analyze-sheet" : undefined}
           className={cn(
             connectHomeSheetLayoutLive
-              ? connectHomeAnalyzeMainClass
+              ? isDemo
+                ? connectDemoAnalyzeMainClass
+                : connectHomeAnalyzeMainClass
               : "relative min-w-0 flex-1",
             !connectHomeSheetLayoutLive &&
               (effectiveChartMode || connectHomeAnalyzeDashboard
@@ -1158,7 +1161,10 @@ export default function DataSheetWithIntegration({
           ) : connectHomeProjectGridLive ? (
             <section
               id="connect-home-project-grid"
-              className={cn("flex w-full min-w-0 flex-col", connectAnalyzeSectionFitClass)}
+              className={cn(
+                "flex w-full min-w-0 flex-col",
+                isDemo ? connectDemoAnalyzeFitClass : connectAnalyzeSectionFitClass,
+              )}
             >
               {showConnectWorkspaceNav ? connectWorkspaceNav : null}
               <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

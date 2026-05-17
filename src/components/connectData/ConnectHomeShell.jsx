@@ -11,6 +11,8 @@ import {
 import { deriveConnectFlowStep, isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import {
+  connectDemoWorkspaceSectionClass,
+  connectHubDemoLayoutClass,
   connectHubFlowStepsViewportCollapsedClass,
   connectHubFlowStepsViewportFixedClass,
   connectHubLayoutClass,
@@ -40,6 +42,7 @@ const CONNECT_HOME_GRID_SURFACE =
 
 export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, setStartNew }) {
   const context = useMyStateV2();
+  const isDemo = !!context?.isDemo;
   const connectWorkspace = context?.connectWorkspace;
   const connectWorkspaceScrollTick = context?.connectWorkspaceScrollTick ?? 0;
   const connectAnalyzeScrollTick = context?.connectAnalyzeScrollTick ?? 0;
@@ -267,33 +270,47 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
         id={CONNECT_HOME_SCROLL_ID}
         className={cn(
           "min-h-0 flex-1 overflow-y-auto",
-          connectHubScrollPaddingClass,
-          !connectHomeAnalyzeActive && "snap-y snap-proximity",
+          !isDemo && connectHubScrollPaddingClass,
+          !isDemo && !connectHomeAnalyzeActive && "snap-y snap-proximity",
           CONNECT_HOME_SURFACE,
         )}
       >
-        <div className={connectHubPageClass(true)}>
-          <ConnectHomeFlowSteps
-            currentStep={connectFlowStep}
-            collapsible
-            fixedRail
-            expanded={connectHomeFlowStepsOpen}
-            onExpandedChange={setConnectHomeFlowStepsOpen}
-            className={cn(
-              connectHubFlowStepsViewportFixedClass,
-              !connectHomeFlowStepsOpen &&
-                cn(connectHubFlowStepsViewportCollapsedClass, "!w-0 !min-w-0"),
-              panelsVisible && connectHomeAnalyzeActive && "hidden",
-            )}
-          />
+        <div className={connectHubPageClass(true, { embeddedDemo: isDemo })}>
+          {!isDemo ? (
+            <ConnectHomeFlowSteps
+              currentStep={connectFlowStep}
+              collapsible
+              fixedRail
+              expanded={connectHomeFlowStepsOpen}
+              onExpandedChange={setConnectHomeFlowStepsOpen}
+              className={cn(
+                connectHubFlowStepsViewportFixedClass,
+                !connectHomeFlowStepsOpen &&
+                  cn(connectHubFlowStepsViewportCollapsedClass, "!w-0 !min-w-0"),
+                panelsVisible && connectHomeAnalyzeActive && "hidden",
+              )}
+            />
+          ) : null}
 
           <div
-            className={connectHubLayoutClass({
-              fixedRail: true,
-              withAppSidebar: false,
-              flowStepsExpanded: connectHomeFlowStepsOpen,
-            })}
+            className={
+              isDemo
+                ? connectHubDemoLayoutClass
+                : connectHubLayoutClass({
+                    fixedRail: true,
+                    withAppSidebar: false,
+                    flowStepsExpanded: connectHomeFlowStepsOpen,
+                  })
+            }
           >
+            {isDemo ? (
+              <ConnectHomeFlowSteps
+                currentStep={connectFlowStep}
+                compact
+                sticky
+                className="sticky top-2 z-10 shrink-0 self-start"
+              />
+            ) : null}
             <div className="flex min-w-0 flex-col">
               <div ref={hubRef}>
                 <ConnectDataStep1
@@ -301,6 +318,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   userProfileFetchOk={userProfileFetchOk}
                   onActivateWorkspace={handleActivateWorkspace}
                   embeddedInShell
+                  embeddedDemo={isDemo}
                 />
               </div>
 
@@ -309,8 +327,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   ref={workspaceRef}
                   id="connect-home-workspace"
                   className={cn(
-                    "relative mt-16 min-h-[calc(100dvh-5.5rem)] sm:mt-20 md:mt-28",
-                    connectWorkspaceScrollInsetClass,
+                    isDemo
+                      ? connectDemoWorkspaceSectionClass
+                      : "relative mt-16 min-h-[calc(100dvh-5.5rem)] sm:mt-20 md:mt-28",
+                    !isDemo && connectWorkspaceScrollInsetClass,
                     CONNECT_HOME_SURFACE,
                     "w-full min-w-0 max-w-none",
                   )}

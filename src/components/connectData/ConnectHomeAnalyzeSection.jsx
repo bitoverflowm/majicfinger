@@ -8,6 +8,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   CONNECT_HOME_WORKSPACE_MIN_H,
   connectAnalyzeSectionFitClass,
+  connectDemoAnalyzeFitClass,
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
 import { scheduleConnectAnalyzeAnchorScroll } from "@/lib/connectHubScroll";
@@ -24,8 +25,10 @@ export function ConnectHomeAnalyzeSection({
   showWorkspaceNav = false,
   onPanelManualOpen,
 }) {
-  const analyzeScrollTick = useMyStateV2()?.connectAnalyzeScrollTick ?? 0;
-  const pull = useMyStateV2()?.connectDataLakePullState ?? {};
+  const ctx = useMyStateV2() ?? {};
+  const isDemo = !!ctx.isDemo;
+  const analyzeScrollTick = ctx.connectAnalyzeScrollTick ?? 0;
+  const pull = ctx.connectDataLakePullState ?? {};
   const analyzeRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -40,7 +43,9 @@ export function ConnectHomeAnalyzeSection({
       className={cn(
         "flex w-full max-w-none flex-col",
         showWorkspaceNav
-          ? connectAnalyzeSectionFitClass
+          ? isDemo
+            ? connectDemoAnalyzeFitClass
+            : connectAnalyzeSectionFitClass
           : cn(
               CONNECT_HOME_WORKSPACE_MIN_H,
               connectWorkspaceScrollInsetClass,
