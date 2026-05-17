@@ -88,6 +88,7 @@ import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
+import { buildRequestCardQuerySummary } from "@/lib/connectHomeRequestQuery";
 import {
   hasExplicitComposeGrouping,
   resolveComposeGroupByAliases,
@@ -2441,6 +2442,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
     const requestStartMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
     const whereSummary = summarizeWhereFilters(composeFiltersForRun);
+    const composeSelectAliases = Array.isArray(composeSelectForCard)
+      ? composeSelectForCard.map((i) => String(i.alias || i.column).trim()).filter(Boolean)
+      : [];
     const requestCard =
       effectiveIngestMode === "columns" && isComposeTab
         ? {
@@ -2451,15 +2455,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             table: selected.table,
             sheetId: activeSheetId || null,
             sheetLabel: activeSheetId ? String(dataSheets?.[activeSheetId]?.name || activeSheetId) : "",
-            selectAliases: Array.isArray(composeSelectForCard)
-              ? composeSelectForCard.map((i) => String(i.alias || i.column).trim()).filter(Boolean)
-              : [],
+            selectAliases: composeSelectAliases,
             selectColumns: Array.isArray(composeSelectForCard)
               ? composeSelectForCard.map((i) => String(i.column || "").trim()).filter(Boolean)
               : [],
             hasWhere: whereSummary.hasWhere,
             whereText: whereSummary.text,
             composeRowLimit: composeAthenaRowLimit,
+            querySummary: buildRequestCardQuerySummary({
+              lake,
+              table: selected.table,
+              composeSpec: composeSpecForRun,
+              selectAliases: composeSelectAliases,
+              hasWhere: whereSummary.hasWhere,
+              whereText: whereSummary.text,
+              composeRowLimit: composeAthenaRowLimit,
+            }),
           }
         : null;
     pendingIngestRef.current = {

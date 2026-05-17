@@ -8,6 +8,7 @@ import { ConnectHomeReplaySheetDialog } from "@/components/connectData/ConnectHo
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { collectRequestCardEntries, fmtRequestElapsed } from "@/lib/connectHomeRequestCards";
+import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery";
 import {
   integrationLabelFromLake,
   listConnectHomeSheetHistory,
@@ -152,6 +153,23 @@ export function ConnectHomeRequestHistory({ className }) {
             destination === "new_sheet"
               ? String(newSheetName || "").trim() || cur.name
               : cur.name;
+          const sourceCard = Array.isArray(replaySource?.requestCards)
+            ? replaySource.requestCards[0]
+            : null;
+          const querySummary = formatConnectRequestCardQuery(sourceCard, {
+            provenance: replayProvenance,
+          });
+          const replayCard = sourceCard
+            ? {
+                ...sourceCard,
+                id: `req-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`,
+                createdAt: Date.now(),
+                sheetId: targetSheetId,
+                sheetLabel: name,
+                loadedRowCount: rows.length,
+                querySummary: querySummary || sourceCard.querySummary,
+              }
+            : null;
           return {
             ...p,
             [targetSheetId]: {
@@ -164,6 +182,7 @@ export function ConnectHomeRequestHistory({ className }) {
               rowCount: rows.length,
               fullRowCount: json?.rowCount ?? rows.length,
               columns: Array.isArray(json?.columns) ? json.columns : cur.columns,
+              ...(replayCard ? { requestCards: [replayCard] } : {}),
             },
           };
         });
@@ -202,6 +221,7 @@ export function ConnectHomeRequestHistory({ className }) {
       clearProgressTimer,
       dataSheets,
       replayProvenance,
+      replaySource,
       replaySourceSheetId,
       requestConnectAnalyzeScroll,
       setActiveSheetId,
@@ -270,28 +290,19 @@ export function ConnectHomeRequestHistory({ className }) {
               {cards.length > 0 ? (
                 <ul className="mt-2 space-y-1.5 border-t border-border/40 pt-2">
                   {cards.map((card) => {
-                    const cols =
-                      Array.isArray(card?.selectAliases) && card.selectAliases.length
-                        ? card.selectAliases
-                        : Array.isArray(card?.selectColumns)
-                          ? card.selectColumns
-                          : [];
+                    const queryText = formatConnectRequestCardQuery(card, sheet);
                     return (
                       <li
                         key={card.id}
                         className="rounded-md bg-background/60 px-2 py-1.5 text-[11px] text-muted-foreground"
                       >
-                        <p className="font-medium text-foreground">
-                          {card?.table ? `table: ${card.table}` : "Query"}
-                          {cols.length ? ` · ${cols.slice(0, 4).join(", ")}${cols.length > 4 ? "…" : ""}` : ""}
+                        <p className="font-medium text-foreground break-words leading-snug">
+                          Query
                         </p>
-                        {card?.hasWhere ? (
-                          <p className="truncate">filter: {card.whereText || "WHERE …"}</p>
-                        ) : null}
-                        {card?.composeRowLimit != null ? (
-                          <p>limit: {card.composeRowLimit} rows</p>
-                        ) : null}
-                        <p>created in {fmtRequestElapsed(card?.elapsedMs)}</p>
+                        <p className="mt-0.5 break-words leading-snug text-foreground/90">
+                          {queryText || "—"}
+                        </p>
+                        <p className="mt-1.5">created in {fmtRequestElapsed(card?.elapsedMs)}</p>
                         {card?.loadedRowCount != null ? (
                           <p>
                             loaded <strong>{card.loadedRowCount}</strong> rows

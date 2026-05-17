@@ -23,14 +23,19 @@ export function listConnectHomeSheetHistory(dataSheets) {
   return out;
 }
 
-export function integrationLabelFromLake(lake) {
-  const key = String(lake || "").toLowerCase();
-  if (key === "kalshi") return "Kalshi Historical";
-  if (key === "polymarket") return "Polymarket Historical";
-  return key ? `${key.charAt(0).toUpperCase()}${key.slice(1)}` : "Data Lake";
-}
+import {
+  formatConnectRequestCardQuery,
+  integrationLabelFromLake,
+} from "@/lib/connectHomeRequestQuery";
+
+export { integrationLabelFromLake };
 
 export function requestCardSummaryLabel(card, sheet) {
+  const summary = formatConnectRequestCardQuery(card, sheet);
+  if (summary) {
+    const first = summary.split(" · ")[0];
+    return first || summary;
+  }
   const prov = sheet?.provenance;
   const lake = prov?.lake || card?.lake;
   const table = prov?.table || card?.table;
