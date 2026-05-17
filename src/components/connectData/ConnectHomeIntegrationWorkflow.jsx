@@ -14,6 +14,10 @@ import { ConnectColumnDisplayNameEdit } from "@/components/connectData/ConnectCo
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectQueryComposeRunBar } from "@/components/connectData/ConnectQueryComposeRunBar";
 import { composeColumnDisplayLabel } from "@/lib/connectComposeDisplayLabels";
+import {
+  applyConnectHomeSheetNameToActiveSheet,
+  resolveConnectHomeSheetDestination,
+} from "@/lib/connectHomePullDestination";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { useSyncConnectDataLakeComposeItems } from "@/hooks/useSyncConnectDataLakeComposeItems";
@@ -598,23 +602,12 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const liveDisplayLabel = useCallback((col) => col.name, []);
 
   const handleRunIntegrationPull = useCallback(() => {
-    const sheetName = String(ctx.connectHomePendingSheetName || "").trim();
-    if (sheetName && activeSheetId && setDataSheets) {
-      setDataSheets((prev) => {
-        const cur = prev?.[activeSheetId];
-        if (!cur) return prev;
-        return { ...(prev || {}), [activeSheetId]: { ...cur, name: sheetName.slice(0, 80) } };
-      });
+    if (resolveConnectHomeSheetDestination(ctx).action === "replace") {
+      applyConnectHomeSheetNameToActiveSheet(ctx);
     }
     requestConnectAnalyzeScroll?.();
     requestConnectIntegrationPull?.();
-  }, [
-    ctx.connectHomePendingSheetName,
-    activeSheetId,
-    setDataSheets,
-    requestConnectAnalyzeScroll,
-    requestConnectIntegrationPull,
-  ]);
+  }, [ctx, requestConnectAnalyzeScroll, requestConnectIntegrationPull]);
 
   if (!isConnectIntegrationWorkspace(integrationId)) return null;
   if (!isConnectQueryComposeIntegration(integrationId)) {

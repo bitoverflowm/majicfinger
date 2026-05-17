@@ -132,7 +132,10 @@ const DataView = ({ user, fillViewport = false }) => {
       className={cn(
         "min-w-0 max-w-full min-h-0",
         fillViewport
-          ? "flex min-h-0 flex-1 flex-col overflow-hidden px-0 sm:px-1"
+          ? cn(
+              "flex min-h-0 flex-1 flex-col px-0 sm:px-1",
+              chainlinkConnectSplit ? "overflow-y-auto" : "overflow-hidden",
+            )
           : "px-2 sm:px-4 md:px-6",
       )}
     >
@@ -168,20 +171,21 @@ const DataView = ({ user, fillViewport = false }) => {
       {showGrid ? (
         <div
           className={cn(
-            "relative flex min-h-0 flex-col gap-3",
-            fillViewport && "flex-1 overflow-hidden",
+            chainlinkConnectSplit
+              ? "grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(30rem,48vh)] gap-0"
+              : cn("relative flex min-h-0 flex-col gap-3", fillViewport && "flex-1 overflow-hidden"),
           )}
         >
           <div
             className={cn(
-              "min-h-0 w-full max-w-full",
-              chainlinkConnectSplit
-                ? "flex min-h-[12rem] flex-1 flex-col overflow-hidden"
-                : cn(
-                    "shrink-0",
-                    fillViewport && "flex min-h-0 flex-1 flex-col",
-                    hasChainlinkStream && "overflow-auto",
-                  ),
+              "min-h-0 w-full max-w-full overflow-hidden",
+              !chainlinkConnectSplit &&
+                cn(
+                  "shrink-0",
+                  fillViewport && "flex min-h-0 flex-1 flex-col",
+                  hasChainlinkStream && "overflow-auto",
+                ),
+              chainlinkConnectSplit && "flex min-h-0 flex-col",
             )}
           >
             <GridView fillViewport={fillViewport} />
@@ -198,10 +202,13 @@ const DataView = ({ user, fillViewport = false }) => {
             </p>
           )}
           {hasChainlinkStream && (
-            <div
+            <section
+              aria-label="Live charts"
               className={cn(
-                "shrink-0 min-h-0",
-                chainlinkConnectSplit ? "border-t border-border/50 pt-2" : "pb-10",
+                "flex flex-col gap-3",
+                chainlinkConnectSplit
+                  ? "flex min-h-[30rem] shrink-0 flex-col overflow-visible border-t border-border/50 bg-muted/10 px-1 pb-6 pt-3"
+                  : "shrink-0 pb-10",
               )}
             >
               <ChainlinkLiveChart
@@ -209,7 +216,7 @@ const DataView = ({ user, fillViewport = false }) => {
                 dataSheets={dataSheets || {}}
                 streamsBySheetId={liveStreamState?.streamsBySheetId || {}}
               />
-            </div>
+            </section>
           )}
         </div>
       ) : (

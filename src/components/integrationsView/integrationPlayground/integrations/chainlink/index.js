@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { runConnectHomeLiveStreamPull } from "@/lib/connectHomePullDestination";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Play, Square, RotateCw, Pause, X, Plus } from "lucide-react";
@@ -75,6 +76,10 @@ const Chainlink = ({ connectHomePullBridge = false }) => {
   const connectIntegrationPullTick = ctx?.connectIntegrationPullTick ?? 0;
   const connectLiveSourceId = ctx?.connectLiveSourceId ?? "";
   const connectLiveColumnSelections = ctx?.connectLiveColumnSelections ?? {};
+  const connectHomePullDestination = ctx?.connectHomePullDestination;
+  const connectHomePendingSheetName = ctx?.connectHomePendingSheetName;
+  const connectedData = ctx?.connectedData;
+  const lastConnectPullTickRef = useRef(0);
   const connectHomeActive =
     connectHomePullBridge &&
     ctx?.viewing === "connectDataHome" &&
@@ -113,6 +118,9 @@ const Chainlink = ({ connectHomePullBridge = false }) => {
 
   useEffect(() => {
     if (!connectHomeActive || !connectIntegrationPullTick) return;
+    if (lastConnectPullTickRef.current === connectIntegrationPullTick) return;
+    lastConnectPullTickRef.current = connectIntegrationPullTick;
+
     const symbol = connectLiveSourceId;
     const cols = connectLiveColumnSelections[symbol] || [];
     if (!symbol) {
@@ -138,15 +146,40 @@ const Chainlink = ({ connectHomePullBridge = false }) => {
       progress: 100,
       error: null,
     }));
-    doConnect(activeSheetId, symbol);
+    runConnectHomeLiveStreamPull(
+      {
+        dataSheets,
+        connectedData,
+        activeSheetId,
+        connectHomePullDestination,
+        connectHomePendingSheetName,
+        addNewSheetAndActivate,
+        replaceCurrentSheetData,
+        setSheetData,
+        setDataSheets,
+        liveStreamActions,
+      },
+      {
+        stopActiveStream: true,
+        onStart: (sheetId) => doConnect(sheetId, symbol),
+      },
+    );
   }, [
     connectHomeActive,
     connectIntegrationPullTick,
     connectLiveSourceId,
     connectLiveColumnSelections,
     activeSheetId,
-    setConnectDataLakePullState,
+    connectHomePullDestination,
+    connectHomePendingSheetName,
+    connectedData,
+    dataSheets,
+    addNewSheetAndActivate,
+    replaceCurrentSheetData,
+    setSheetData,
+    setDataSheets,
     liveStreamActions,
+    setConnectDataLakePullState,
   ]);
 
   const handleStart = (symbol) => {

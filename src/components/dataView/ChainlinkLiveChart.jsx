@@ -33,11 +33,15 @@ function toValue(row) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Connect home analyze — Liveline needs extra room for axis, badge, and window pills. */
+const CONNECT_HOME_CHART_HEIGHT = 440;
+const CONNECT_HOME_CHART_MIN_HEIGHT = 420;
+
 export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {}, compact = false }) {
-  const chartHeight = compact ? 260 : 500;
-  const chartMinHeight = compact ? 260 : 500;
+  const chartHeight = compact ? CONNECT_HOME_CHART_HEIGHT : 500;
+  const chartMinHeight = compact ? CONNECT_HOME_CHART_MIN_HEIGHT : 500;
   const outerClass = compact
-    ? "mt-2 rounded-lg border border-border bg-card p-2"
+    ? "mt-2 min-h-[28rem] overflow-visible rounded-lg border border-border bg-card p-2 pb-4"
     : "pb-10 mb-20 mt-4 rounded-lg border border-border bg-card p-3";
   const [split, setSplit] = useState(false);
 
@@ -110,7 +114,10 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {}, com
             </span>
           )}
         </div>
-        <div style={{ height: chartHeight, minHeight: chartMinHeight }} className="w-full">
+        <div
+          style={{ height: chartHeight, minHeight: chartMinHeight }}
+          className="w-full overflow-visible"
+        >
           <Liveline
             data={rows}
             value={rows[rows.length - 1]?.value ?? 0}
@@ -143,7 +150,7 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {}, com
     <div
       className={cn(
         "rounded-lg border border-border bg-card transition-all duration-300 ease-in-out",
-        compact ? "p-2" : "pb-10 mb-20 p-3",
+        compact ? "min-h-[28rem] overflow-visible p-2 pb-4" : "pb-10 mb-20 p-3",
       )}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -175,13 +182,13 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {}, com
                 key={s.id}
                 className={cn(
                   "rounded-lg border border-border/60 bg-card/80 p-2 transition-all duration-300 ease-in-out",
-                  compact ? "h-[220px]" : "h-[460px]",
+                  compact ? "h-[280px]" : "h-[460px]",
                 )}
               >
                 <p className="mb-1 text-[11px] font-medium text-muted-foreground">{s.label}</p>
                 <div
-                  className="w-full"
-                  style={{ height: compact ? 180 : 340, minHeight: compact ? 180 : 340 }}
+                  className="w-full overflow-visible"
+                  style={{ height: compact ? 240 : 340, minHeight: compact ? 240 : 340 }}
                 >
                   <Liveline
                     data={s.data}

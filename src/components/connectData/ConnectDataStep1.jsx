@@ -68,11 +68,9 @@ const EXAMPLE_DASHBOARD = {
   href: "/misterrpink/dashboards/kalshi-volume",
 };
 
-const PREDICTION_TEMPLATES = [
-  { id: "t1", title: "Template 1" },
-  { id: "t2", title: "Template 2" },
-  { id: "t3", title: "Template 3" },
-];
+const PREDICTION_TEMPLATE_LABEL = "Fork Templates Coming Soon";
+
+const PREDICTION_TEMPLATES = [{ id: "fork-templates" }];
 
 /** Solid icon-tile backgrounds on Connect home (match Kalshi / Chainlink pill style). */
 const CONNECT_INTEGRATION_ICON_BG = {
@@ -779,9 +777,9 @@ export default function ConnectDataStep1({
                     <PillButtonWide
                       key={t.id}
                       icon={<LayoutTemplate className="h-3.5 w-3.5" strokeWidth={iconStroke} />}
-                      label={t.title}
-                      title="Placeholder — templates ship later."
-                      onClick={() => toast.info("Templates are not available yet.")}
+                      label={PREDICTION_TEMPLATE_LABEL}
+                      title={PREDICTION_TEMPLATE_LABEL}
+                      disabled
                     />
                   ))}
                 </div>

@@ -53,6 +53,10 @@ import {
 } from "lucide-react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
+import {
+  applyConnectHomeSheetNameToActiveSheet,
+  resolveConnectHomeSheetDestination,
+} from "@/lib/connectHomePullDestination";
 import { cn } from "@/lib/utils";
 import { ENDPOINTS, POLYMARKET_GROUPS, TRADES_RESPONSE_FIELDS } from "./config";
 
@@ -257,8 +261,17 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
 
   const runRequest = useCallback(
     async (query, values) => {
-      const destination = await requestSheetDestination?.();
-      if (!destination) return;
+      let destination;
+      if (connectHomeActive) {
+        destination = resolveConnectHomeSheetDestination(contextStateV2);
+        if (!destination) return;
+        if (destination.action === "replace") {
+          applyConnectHomeSheetNameToActiveSheet(contextStateV2);
+        }
+      } else {
+        destination = await requestSheetDestination?.();
+        if (!destination) return;
+      }
       if (throttleRemaining > 0) return;
       setError(null);
       setLoading(true);
@@ -312,6 +325,9 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         addNewSheetAndActivate,
         setSheetData,
       });
+      if (connectHomeActive && destination.action === "new_sheet") {
+        applyConnectHomeSheetNameToActiveSheet(contextStateV2);
+      }
       if (!qs.includes("fields=") && arr.length > 0 && arr[0] && typeof arr[0] === "object") {
         setLastResultKeys(Object.keys(arr[0]));
       }
@@ -335,6 +351,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       addNewSheetAndActivate,
       buildQueryString,
       connectHomeActive,
+      contextStateV2,
       requestSheetDestination,
       setConnectedData,
       setConnectDataLakePullState,

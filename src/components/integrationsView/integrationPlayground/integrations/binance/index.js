@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { runConnectHomeLiveStreamPull } from "@/lib/connectHomePullDestination";
 
 const RTDS_WS_URL = "wss://ws-live-data.polymarket.com";
 const PING_INTERVAL_MS = 5000;
@@ -29,6 +30,16 @@ const Binance = ({ setConnectedData, connectHomePullBridge = false }) => {
   const connectIntegrationPullTick = ctx?.connectIntegrationPullTick ?? 0;
   const connectLiveSourceId = ctx?.connectLiveSourceId ?? "";
   const connectLiveColumnSelections = ctx?.connectLiveColumnSelections ?? {};
+  const connectHomePullDestination = ctx?.connectHomePullDestination;
+  const connectHomePendingSheetName = ctx?.connectHomePendingSheetName;
+  const connectedData = ctx?.connectedData;
+  const dataSheets = ctx?.dataSheets || {};
+  const activeSheetId = ctx?.activeSheetId;
+  const addNewSheetAndActivate = ctx?.addNewSheetAndActivate;
+  const replaceCurrentSheetData = ctx?.replaceCurrentSheetData;
+  const setSheetData = ctx?.setSheetData;
+  const setDataSheets = ctx?.setDataSheets;
+  const lastConnectPullTickRef = useRef(0);
   const connectHomeActive =
     connectHomePullBridge &&
     ctx?.viewing === "connectDataHome" &&
@@ -134,6 +145,9 @@ const Binance = ({ setConnectedData, connectHomePullBridge = false }) => {
 
   useEffect(() => {
     if (!connectHomeActive || !connectIntegrationPullTick) return;
+    if (lastConnectPullTickRef.current === connectIntegrationPullTick) return;
+    lastConnectPullTickRef.current = connectIntegrationPullTick;
+
     const sym = connectLiveSourceId || symbol;
     const cols = connectLiveColumnSelections[sym] || [];
     if (!sym) {
@@ -152,7 +166,6 @@ const Binance = ({ setConnectedData, connectHomePullBridge = false }) => {
       }));
       return;
     }
-    if (sym !== symbol) setSymbol(sym);
     setConnectDataLakePullState?.((prev) => ({
       ...prev,
       loading: false,
@@ -160,12 +173,39 @@ const Binance = ({ setConnectedData, connectHomePullBridge = false }) => {
       progress: 100,
       error: null,
     }));
-    connect();
+    runConnectHomeLiveStreamPull(
+      {
+        dataSheets,
+        connectedData,
+        activeSheetId,
+        connectHomePullDestination,
+        connectHomePendingSheetName,
+        addNewSheetAndActivate,
+        replaceCurrentSheetData,
+        setSheetData,
+        setDataSheets,
+      },
+      {
+        onStart: () => {
+          if (sym !== symbol) setSymbol(sym);
+          connect();
+        },
+      },
+    );
   }, [
     connectHomeActive,
     connectIntegrationPullTick,
     connectLiveSourceId,
     connectLiveColumnSelections,
+    activeSheetId,
+    connectHomePullDestination,
+    connectHomePendingSheetName,
+    connectedData,
+    dataSheets,
+    addNewSheetAndActivate,
+    replaceCurrentSheetData,
+    setSheetData,
+    setDataSheets,
     symbol,
     connect,
     setConnectDataLakePullState,

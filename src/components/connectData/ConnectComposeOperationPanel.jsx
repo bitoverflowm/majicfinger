@@ -40,26 +40,30 @@ import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
 import { cn } from "@/lib/utils";
 import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectComposeIfElseSection";
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
+import { ConnectHomeSheetPullFields } from "@/components/connectData/ConnectHomeSheetPullFields";
+import {
+  applyConnectHomeSheetNameToActiveSheet,
+  resolveConnectHomeSheetDestination,
+} from "@/lib/connectHomePullDestination";
 
 /**
  * Inline compose controls (mirrors integrations panel) for Connect home vertical flow.
  */
 export function ConnectComposeOperationPanel({ className }) {
+  const ctx = useMyStateV2() ?? {};
   const {
     connectActiveComposeOps = [],
     setConnectActiveComposeOps,
     connectDataLakeSampleId,
     connectDataLakeColumnSelections,
     connectWorkspace,
-    connectHomePendingSheetName,
-    setConnectHomePendingSheetName,
     activeSheetId,
     dataSheets,
-    setDataSheets,
     setRightPanelOpen,
     setRightPanelTab,
     requestConnectDataLakePull,
-  } = useMyStateV2() ?? {};
+    requestConnectAnalyzeScroll,
+  } = ctx;
 
   const compose = useDataLakeComposeState(true);
   const {
@@ -241,8 +245,6 @@ export function ConnectComposeOperationPanel({ className }) {
     setConnectActiveComposeOps,
   ]);
 
-  const requestConnectAnalyzeScroll = useMyStateV2()?.requestConnectAnalyzeScroll;
-
   const handleRunPull = useCallback(() => {
     const pruned = pruneConnectComposeBeforePull({
       connectActiveComposeOps,
@@ -260,29 +262,19 @@ export function ConnectComposeOperationPanel({ className }) {
         }
       });
     }
-    const sheetName = String(connectHomePendingSheetName || "").trim();
-    if (sheetName && activeSheetId && setDataSheets) {
-      setDataSheets((prev) => {
-        const cur = prev?.[activeSheetId];
-        if (!cur) return prev;
-        return {
-          ...(prev || {}),
-          [activeSheetId]: { ...cur, name: sheetName.slice(0, 80) },
-        };
-      });
+    if (resolveConnectHomeSheetDestination(ctx).action === "replace") {
+      applyConnectHomeSheetNameToActiveSheet(ctx);
     }
     requestConnectAnalyzeScroll?.();
     requestConnectDataLakePull?.();
   }, [
+    ctx,
     connectActiveComposeOps,
     columnComposeItems,
     composeWhereFilters,
     columnComposeOrderBy,
     composeHavingFilters,
     composeJoins,
-    connectHomePendingSheetName,
-    activeSheetId,
-    setDataSheets,
     requestConnectAnalyzeScroll,
     requestConnectDataLakePull,
     setConnectActiveComposeOps,
@@ -779,19 +771,7 @@ export function ConnectComposeOperationPanel({ className }) {
         transition={{ delay: 0.06, duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
         className="flex flex-wrap items-end gap-2"
       >
-        <div className="flex min-w-[10rem] flex-col gap-1">
-          <Label htmlFor="connect-home-sheet-name" className="text-[11px] font-medium text-muted-foreground">
-            Name your sheet
-          </Label>
-          <Input
-            id="connect-home-sheet-name"
-            value={connectHomePendingSheetName ?? ""}
-            onChange={(e) => setConnectHomePendingSheetName?.(e.target.value)}
-            placeholder={dataSheets?.[activeSheetId]?.name || "Sheet 1"}
-            className="h-8 text-xs"
-            maxLength={80}
-          />
-        </div>
+        <ConnectHomeSheetPullFields sheetNameInputId="connect-home-sheet-name" className="flex-1 min-w-0" />
         <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={handleRestart}>
           Start Over
         </Button>

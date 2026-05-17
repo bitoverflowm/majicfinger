@@ -86,6 +86,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import {
+  applyConnectHomeSheetNameToActiveSheet,
+  resolveConnectHomeSheetDestination,
+} from "@/lib/connectHomePullDestination";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
 import { buildRequestCardQuerySummary } from "@/lib/connectHomeRequestQuery";
@@ -1939,6 +1943,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         const newCardId = requestCard ? genRequestCardId() : null;
+        const connectHomeSheetName = String(ctx?.connectHomePendingSheetName || "").trim();
         addNewSheetAndActivate?.((newId) => {
           setSheetData?.(newId, finalRows);
           setDataSheets?.((prev) => {
@@ -1948,14 +1953,19 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
             const card =
               requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: newId, elapsedMs, loadedRowCount: n } : null;
+            const autoName = `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
+              0,
+              80,
+            );
+            const sheetName =
+              connectHomeDataLakeCompose && connectHomeSheetName
+                ? connectHomeSheetName.slice(0, 80)
+                : autoName;
             return {
               ...prev,
               [newId]: {
                 ...sheet,
-                name: `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
-                  0,
-                  80,
-                ),
+                name: sheetName,
                 ...(sheetProvenance ? { provenance: sheetProvenance } : {}),
                 ...(card && mode === "columns" ? { requestCards: [card] } : {}),
               },
@@ -1984,6 +1994,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     }
   }, [
     addNewSheetAndActivate,
+    connectHomeDataLakeCompose,
+    ctx,
     dataset,
     finalizeIngestSheetRows,
     refreshBeckerViews,
@@ -2643,7 +2655,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       return;
     }
 
-    if (!connectHomeDataLakeCompose && promptReplaceOrNewSheetIfNeeded()) return;
+    if (connectHomeDataLakeCompose) {
+      const destination = resolveConnectHomeSheetDestination(ctx);
+      if (destination.action === "new_sheet") {
+        void executeIngestNewSheet();
+      } else {
+        applyConnectHomeSheetNameToActiveSheet(ctx);
+        void executeIngestReplace();
+      }
+      return;
+    }
+
+    if (promptReplaceOrNewSheetIfNeeded()) return;
 
     void executeIngestReplace();
   };
