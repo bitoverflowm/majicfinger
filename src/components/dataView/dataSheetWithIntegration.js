@@ -961,7 +961,7 @@ export default function DataSheetWithIntegration({
         <div id="connect-home-compose" className="w-full min-w-0 shrink-0 pb-96">
           <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
           {connectHomeDataLakePullBridge ? (
-            <motion.div
+            <div
               className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
               aria-hidden
             >
@@ -970,7 +970,7 @@ export default function DataSheetWithIntegration({
               ) : (
                 <KalshiHistorical setConnectedData={setConnectedDataRaw} />
               )}
-            </motion.div>
+            </div>
           ) : null}
           {connectHomeIntegrationPullBridge ? (
             <div
