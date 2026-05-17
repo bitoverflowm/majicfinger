@@ -93,7 +93,7 @@ export const connectHubFlowStepsStickyClass = connectHubFlowStepsStickyCore;
 /** Viewport-fixed step rail — out of flow (Step 1 hub; does not push main content down). */
 export const connectHubFlowStepsViewportFixedClass = cn(
   "hidden md:block",
-  "fixed z-30 w-[8.5rem] lg:w-[10rem] xl:w-[11rem]",
+  "fixed z-30",
   connectHubFlowStepsTopClass,
   "bg-white dark:bg-slate-950",
   "left-[max(1rem,calc((100vw-min(100vw,80rem))/2+1rem))] sm:left-[max(1.25rem,calc((100vw-min(100vw,80rem))/2+1.25rem))] md:left-[max(1.5rem,calc((100vw-min(100vw,80rem))/2+1.5rem))] lg:left-[max(2rem,calc((100vw-min(100vw,80rem))/2+2rem))] xl:left-[max(2.5rem,calc((100vw-min(100vw,80rem))/2+2.5rem))] 2xl:left-[max(3rem,calc((100vw-min(100vw,80rem))/2+3rem))]",
@@ -140,12 +140,14 @@ export function connectHubLayoutClass({
   includeStepRail = true,
   fixedRail = false,
   withAppSidebar = false,
+  flowStepsExpanded = true,
 } = {}) {
   if (fixedRail) {
     return cn(
-      "w-full min-w-0",
-      "md:pl-[9.5rem] lg:pl-[12rem] xl:pl-[13.5rem]",
-      withAppSidebar &&
+      "w-full min-w-0 transition-[padding] duration-300 ease-in-out",
+      flowStepsExpanded && "md:pl-[9.5rem] lg:pl-[12rem] xl:pl-[13.5rem]",
+      flowStepsExpanded &&
+        withAppSidebar &&
         "md:pl-[calc(9.5rem+var(--sidebar-width-icon,3rem)+1rem)] lg:pl-[calc(12rem+var(--sidebar-width-icon,3rem)+1rem)] xl:pl-[calc(13.5rem+var(--sidebar-width-icon,3rem)+1rem)]",
     );
   }

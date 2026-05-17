@@ -52,6 +52,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const setRightPanelOpen = context?.setRightPanelOpen;
   const setRightPanelTab = context?.setRightPanelTab;
   const setConnectHomeLeftNavOpen = context?.setConnectHomeLeftNavOpen;
+  const connectHomeFlowStepsOpen = context?.connectHomeFlowStepsOpen !== false;
+  const setConnectHomeFlowStepsOpen = context?.setConnectHomeFlowStepsOpen;
 
   const scrollRef = useRef(null);
   const hubRef = useRef(null);
@@ -267,8 +269,12 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
         <div className={connectHubPageClass(true)}>
           <ConnectHomeFlowSteps
             currentStep={connectFlowStep}
+            collapsible
+            expanded={connectHomeFlowStepsOpen}
+            onExpandedChange={setConnectHomeFlowStepsOpen}
             className={cn(
               connectHubFlowStepsViewportFixedClass,
+              !connectHomeFlowStepsOpen && "!w-0 !min-w-0",
               panelsVisible && connectHomeAnalyzeActive && "hidden",
             )}
           />
@@ -277,6 +283,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
             className={connectHubLayoutClass({
               fixedRail: true,
               withAppSidebar: false,
+              flowStepsExpanded: connectHomeFlowStepsOpen,
             })}
           >
             <div className="flex min-w-0 flex-col">

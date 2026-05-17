@@ -224,10 +224,9 @@ export function finishConnectHomeProjectLoad({
       });
     }
   }
-  if (rightPanelTab) {
-    setRightPanelTab?.(rightPanelTab);
-    setRightPanelOpen?.(true);
-  }
+  const panelTab = rightPanelTab ?? "requestHistory";
+  setRightPanelTab?.(panelTab);
+  setRightPanelOpen?.(true);
 }
 
 /**

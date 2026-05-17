@@ -1,7 +1,15 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -19,12 +27,177 @@ const WORKSPACE_ACTION_TOOLTIPS = {
 };
 
 const chipBase =
-  "relative cursor-pointer rounded px-[0.3rem] py-[0.2rem] font-mono font-semibold transition-colors";
+  "relative max-w-[11rem] shrink-0 cursor-pointer truncate rounded px-[0.3rem] py-[0.2rem] font-mono font-semibold transition-colors";
 const chipIdle = "bg-yellow-200/30 hover:bg-lychee_blue/80 hover:text-lychee_white";
 const chipActive = "bg-lychee_blue/30 text-foreground";
 
 const actionChipBase =
   "relative cursor-pointer rounded px-[0.35rem] py-[0.2rem] font-mono font-semibold leading-none transition-colors whitespace-nowrap";
+
+const CHIP_GAP_PX = 4;
+const OVERFLOW_BTN_WIDTH_PX = 52;
+
+function estimateChipWidth(label, compact) {
+  const charW = compact ? 6.1 : 6.8;
+  return Math.min(176, Math.ceil(String(label || "").length * charW) + 12);
+}
+
+/**
+ * @param {Array<{ label: string; isActive: boolean }>} items
+ * @param {number} availableWidth
+ * @param {boolean} compact
+ */
+function splitVisibleWorkspaceTabs(items, availableWidth, compact) {
+  if (!items.length) return { visible: [], overflow: [] };
+  if (availableWidth <= 0) {
+    const activeIdx = items.findIndex((t) => t.isActive);
+    const activeOnly = activeIdx >= 0 ? [items[activeIdx]] : [items[0]];
+    return { visible: activeOnly, overflow: items.filter((t) => !activeOnly.includes(t)) };
+  }
+
+  const widths = items.map((it) => estimateChipWidth(it.label, compact));
+  let count = 0;
+  let used = 0;
+
+  for (let i = 0; i < items.length; i++) {
+    const w = widths[i] + (count > 0 ? CHIP_GAP_PX : 0);
+    if (count > 0 && used + w > availableWidth) break;
+    used += w;
+    count++;
+  }
+
+  if (count >= items.length) {
+    return { visible: items, overflow: [] };
+  }
+
+  const visibleIndices = new Set();
+  for (let i = 0; i < count; i++) visibleIndices.add(i);
+
+  const activeIdx = items.findIndex((t) => t.isActive);
+  if (activeIdx >= 0 && !visibleIndices.has(activeIdx)) {
+    const dropIdx = Math.max(...visibleIndices);
+    visibleIndices.delete(dropIdx);
+    visibleIndices.add(activeIdx);
+  }
+
+  const ordered = [...visibleIndices].sort((a, b) => a - b);
+  const visible = ordered.map((i) => items[i]);
+  const overflow = items.filter((_, i) => !visibleIndices.has(i));
+  return { visible, overflow };
+}
+
+function WorkspaceTabChip({ item, textSize, onSelect }) {
+  return (
+    <button
+      type="button"
+      title={item.label}
+      className={cn(chipBase, textSize, item.isActive ? chipActive : chipIdle)}
+      onClick={onSelect}
+    >
+      {item.label}
+    </button>
+  );
+}
+
+function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
+  const stripRef = useRef(null);
+  const [{ visible, overflow }, setSplit] = useState({ visible: items, overflow: [] });
+
+  useLayoutEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const width = el.clientWidth;
+      const reserveOverflow = items.length > 1 ? OVERFLOW_BTN_WIDTH_PX : 0;
+      const available = Math.max(0, width - reserveOverflow);
+      setSplit(splitVisibleWorkspaceTabs(items, available, compact));
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [items, compact]);
+
+  const overflowCount = overflow.length;
+  const totalCount = items.length;
+
+  const sheetItems = items.filter((t) => t.kind === "sheet");
+  const chartItems = items.filter((t) => t.kind === "chart");
+
+  return (
+    <div
+      ref={stripRef}
+      className={cn("flex min-w-0 flex-1 items-center overflow-hidden", gapClass)}
+      aria-label="Open sheets and charts"
+    >
+      {visible.map((item) => (
+        <WorkspaceTabChip
+          key={item.key}
+          item={item}
+          textSize={textSize}
+          onSelect={item.onSelect}
+        />
+      ))}
+      {overflowCount > 0 ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={cn(chipBase, textSize, chipIdle, "max-w-none shrink-0")}
+              title={`${totalCount} sheets and charts — open menu`}
+            >
+              + {totalCount}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            className="max-h-[min(20rem,70dvh)] w-[min(20rem,90vw)] overflow-y-auto font-mono text-xs"
+          >
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Sheets & charts ({totalCount})
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {sheetItems.length > 0 ? (
+              <>
+                <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
+                  Sheets
+                </DropdownMenuLabel>
+                {sheetItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.key}
+                    className={cn("truncate", item.isActive && "bg-accent")}
+                    onClick={item.onSelect}
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            ) : null}
+            {chartItems.length > 0 ? (
+              <>
+                {sheetItems.length > 0 ? <DropdownMenuSeparator /> : null}
+                <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
+                  Charts
+                </DropdownMenuLabel>
+                {chartItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.key}
+                    className={cn("truncate", item.isActive && "bg-accent")}
+                    onClick={item.onSelect}
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Connect home — sheet/chart tabs on the left; integration/chart/dashboard + export on the right.
@@ -161,6 +334,40 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     setRightPanelOpen?.(true);
   }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
 
+  const workspaceTabItems = useMemo(() => {
+    const items = [];
+    for (const id of dataSheetIds) {
+      items.push({
+        key: `sheet-${id}`,
+        kind: "sheet",
+        label: dataSheets[id]?.name || id,
+        isActive: tableViewActive && id === activeSheetId,
+        onSelect: () => selectSheet(id),
+      });
+    }
+    for (const id of chartSheetIds) {
+      items.push({
+        key: `chart-${id}`,
+        kind: "chart",
+        label: chartSheets[id]?.name || id,
+        isActive: chartViewActive && id === activeChartSheetId,
+        onSelect: () => selectChart(id),
+      });
+    }
+    return items;
+  }, [
+    activeChartSheetId,
+    activeSheetId,
+    chartSheetIds,
+    chartSheets,
+    chartViewActive,
+    dataSheetIds,
+    dataSheets,
+    selectChart,
+    selectSheet,
+    tableViewActive,
+  ]);
+
   const textSize = compact ? "text-xs" : "text-sm";
   const gapClass = compact ? "gap-0.5" : "gap-1";
 
@@ -173,40 +380,12 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
       )}
       aria-label="Workspace navigation"
     >
-      <div
-        className={cn("flex min-w-0 flex-1 flex-wrap items-center", gapClass)}
-        aria-label="Open sheets and charts"
-      >
-        {dataSheetIds.map((id) => (
-          <button
-            key={`sheet-${id}`}
-            type="button"
-            className={cn(
-              chipBase,
-              textSize,
-              tableViewActive && id === activeSheetId ? chipActive : chipIdle,
-            )}
-            onClick={() => selectSheet(id)}
-          >
-            {dataSheets[id]?.name || id}
-          </button>
-        ))}
-
-        {chartSheetIds.map((id) => (
-          <button
-            key={`chart-${id}`}
-            type="button"
-            className={cn(
-              chipBase,
-              textSize,
-              chartViewActive && id === activeChartSheetId ? chipActive : chipIdle,
-            )}
-            onClick={() => selectChart(id)}
-          >
-            {chartSheets[id]?.name || id}
-          </button>
-        ))}
-      </div>
+      <WorkspaceTabStrip
+        items={workspaceTabItems}
+        compact={compact}
+        textSize={textSize}
+        gapClass={gapClass}
+      />
 
       <div
         className="flex shrink-0 flex-col items-end gap-0.5"
