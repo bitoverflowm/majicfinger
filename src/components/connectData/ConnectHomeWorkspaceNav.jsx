@@ -2,8 +2,21 @@
 
 import { useCallback, useMemo } from "react";
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
+
+const WORKSPACE_ACTION_TOOLTIPS = {
+  integration: "Add more data and connect to another integration",
+  chart: "Visualize your data",
+  dashboard: "Create a dashboard",
+  export: "Share and download your work",
+};
 
 const chipBase =
   "relative cursor-pointer rounded px-[0.3rem] py-[0.2rem] font-mono font-semibold transition-colors";
@@ -205,43 +218,75 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
         >
           Add & export
         </span>
-        <div className={cn("flex flex-wrap items-center justify-end", gapClass)}>
-          <button
-            type="button"
-            className={cn(
-              actionChipBase,
-              textSize,
-              integrationsPanelActive && !chartViewActive && !dashboardViewActive ? chipActive : chipIdle,
-            )}
-            onClick={openIntegrationsPanel}
-          >
-            Integration
-          </button>
+        <TooltipProvider delayDuration={200}>
+          <div className={cn("flex flex-wrap items-center justify-end", gapClass)}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    actionChipBase,
+                    textSize,
+                    integrationsPanelActive && !chartViewActive && !dashboardViewActive
+                      ? chipActive
+                      : chipIdle,
+                  )}
+                  onClick={openIntegrationsPanel}
+                >
+                  Integration
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+                {WORKSPACE_ACTION_TOOLTIPS.integration}
+              </TooltipContent>
+            </Tooltip>
 
-          <button
-            type="button"
-            className={cn(actionChipBase, textSize, chartViewActive ? chipActive : chipIdle)}
-            onClick={addChart}
-          >
-            Chart
-          </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(actionChipBase, textSize, chartViewActive ? chipActive : chipIdle)}
+                  onClick={addChart}
+                >
+                  Chart
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+                {WORKSPACE_ACTION_TOOLTIPS.chart}
+              </TooltipContent>
+            </Tooltip>
 
-          <button
-            type="button"
-            className={cn(actionChipBase, textSize, dashboardViewActive ? chipActive : chipIdle)}
-            onClick={openDashboard}
-          >
-            Dashboard
-          </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(actionChipBase, textSize, dashboardViewActive ? chipActive : chipIdle)}
+                  onClick={openDashboard}
+                >
+                  Dashboard
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+                {WORKSPACE_ACTION_TOOLTIPS.dashboard}
+              </TooltipContent>
+            </Tooltip>
 
-          <button
-            type="button"
-            className={cn(actionChipBase, textSize, exportActive ? chipActive : chipIdle)}
-            onClick={openExport}
-          >
-            Export
-          </button>
-        </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(actionChipBase, textSize, exportActive ? chipActive : chipIdle)}
+                  onClick={openExport}
+                >
+                  Export
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+                {WORKSPACE_ACTION_TOOLTIPS.export}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       </div>
     </nav>
   );
