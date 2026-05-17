@@ -151,7 +151,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   return (
     <nav
       className={cn(
-        "mb-2 flex min-w-0 items-center justify-between gap-2",
+        "mb-2 flex min-w-0 items-end justify-between gap-2",
         compact && "mb-1 gap-1.5",
         className,
       )}
@@ -193,44 +193,55 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
       </div>
 
       <div
-        className={cn("flex shrink-0 flex-wrap items-center justify-end", gapClass)}
-        aria-label="Workspace actions"
+        className="flex shrink-0 flex-col items-end gap-0.5"
+        aria-labelledby="connect-workspace-actions-label"
       >
-        <button
-          type="button"
+        <span
+          id="connect-workspace-actions-label"
           className={cn(
-            actionChipBase,
-            textSize,
-            integrationsPanelActive && !chartViewActive && !dashboardViewActive ? chipActive : chipIdle,
+            "font-mono font-medium leading-none text-muted-foreground",
+            compact ? "text-[9px] tracking-wide" : "text-[10px] tracking-wide",
           )}
-          onClick={openIntegrationsPanel}
         >
-          + Integration
-        </button>
+          Add & export
+        </span>
+        <div className={cn("flex flex-wrap items-center justify-end", gapClass)}>
+          <button
+            type="button"
+            className={cn(
+              actionChipBase,
+              textSize,
+              integrationsPanelActive && !chartViewActive && !dashboardViewActive ? chipActive : chipIdle,
+            )}
+            onClick={openIntegrationsPanel}
+          >
+            Integration
+          </button>
 
-        <button
-          type="button"
-          className={cn(actionChipBase, textSize, chartViewActive ? chipActive : chipIdle)}
-          onClick={addChart}
-        >
-          + Chart
-        </button>
+          <button
+            type="button"
+            className={cn(actionChipBase, textSize, chartViewActive ? chipActive : chipIdle)}
+            onClick={addChart}
+          >
+            Chart
+          </button>
 
-        <button
-          type="button"
-          className={cn(actionChipBase, textSize, dashboardViewActive ? chipActive : chipIdle)}
-          onClick={openDashboard}
-        >
-          + Dashboard
-        </button>
+          <button
+            type="button"
+            className={cn(actionChipBase, textSize, dashboardViewActive ? chipActive : chipIdle)}
+            onClick={openDashboard}
+          >
+            Dashboard
+          </button>
 
-        <button
-          type="button"
-          className={cn(actionChipBase, textSize, exportActive ? chipActive : chipIdle)}
-          onClick={openExport}
-        >
-          Export
-        </button>
+          <button
+            type="button"
+            className={cn(actionChipBase, textSize, exportActive ? chipActive : chipIdle)}
+            onClick={openExport}
+          >
+            Export
+          </button>
+        </div>
       </div>
     </nav>
   );
