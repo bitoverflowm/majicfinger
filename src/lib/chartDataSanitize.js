@@ -5,6 +5,11 @@
 
 import { temporalToMs } from "@/lib/temporalParse";
 
+/** Coerce sheet / API string numerics for Recharts bar/line heights. */
+export function coerceChartPlotNumber(value) {
+  return sanitizePlotNumericOrDate(value, false);
+}
+
 function sanitizePlotNumericOrDate(value, treatAsDate) {
   if (value === undefined) return null;
   if (value === null || value === "") return null;
@@ -54,9 +59,7 @@ export function sanitizeCartesianRowsForPlotting(rows, { xKey, yKeys, xAxisType,
     const out = { ...row };
     for (const yk of yList) {
       const yt = typeof getAxisType === "function" ? getAxisType(yk, dataTypes, rows) : "string";
-      if (yt === "number" || yt === "date") {
-        out[yk] = sanitizePlotNumericOrDate(out[yk], yt === "date");
-      }
+      out[yk] = sanitizePlotNumericOrDate(out[yk], yt === "date");
     }
     if (xKey && (xAxisType === "number" || xAxisType === "date")) {
       out[xKey] = sanitizePlotNumericOrDate(out[xKey], xAxisType === "date");

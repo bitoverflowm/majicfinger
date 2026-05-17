@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { scrollToPricingSection } from "@/lib/scrollToPricing";
 import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
+import { isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
 import { useRouter } from "next/navigation";
 
 const DataView = ({ user, fillViewport = false }) => {
@@ -53,7 +54,9 @@ const DataView = ({ user, fillViewport = false }) => {
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
   const connectPullLoading =
-    !!connectDataLakePullState.loading && (connectHomeAnalyzeActive || fillViewport);
+    isConnectUserDataPullActive(connectDataLakePullState, {
+      analyzeActive: connectHomeAnalyzeActive,
+    }) && (connectHomeAnalyzeActive || fillViewport);
 
   const dataSheetIds = dataSheets ? Object.keys(dataSheets) : [];
   const hasMultipleDataSheets = dataSheetIds.length > 1;

@@ -20,7 +20,7 @@ import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtr
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { sanitizeCartesianRowsForPlotting } from "@/lib/chartDataSanitize";
+import { coerceChartPlotNumber, sanitizeCartesianRowsForPlotting } from "@/lib/chartDataSanitize";
 import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
 import { temporalToMs } from "@/lib/temporalParse";
 
@@ -263,16 +263,18 @@ function formatEpochMsWithPreset(ms, preset) {
  * Local calendar label as dd-mmm (e.g. 08-Apr). Shorter than full datetime so angled ticks fit.
  * @param {number} _rangeMs reserved for future granularity (unused)
  */
-export function formatXAxisValue(value, temporal, humanReadable = true, _intlOptions = null, _rangeMs = null) {
+export function formatXAxisValue(value, temporal, humanReadable = true, _intlOptions = null, rangeMs = null) {
   if (!temporal || !humanReadable) return value;
   if (value == null || value === "") return "";
   const ms = temporalToMs(value);
   if (!Number.isFinite(ms)) return String(value);
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return String(value);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mmm = MONTH_ABBREV_EN[d.getMonth()] ?? "";
-  return `${dd}-${mmm}`;
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mmm = MONTH_ABBREV_EN[d.getUTCMonth()] ?? "";
+  const span = Number(rangeMs);
+  const showYear = Number.isFinite(span) && span > 90 * 24 * 60 * 60 * 1000;
+  return showYear ? `${dd}-${mmm}-${d.getUTCFullYear()}` : `${dd}-${mmm}`;
 }
 
 function toSortableXAxisValue(value, axisType, isTemporal) {
@@ -518,7 +520,9 @@ function materializeChartSeriesRows(rows, ySeries, filters) {
     for (const series of ySeries) {
       const rules = bySeries.get(series.id);
       const keep = !rules?.length || rules.every((rule) => chartFilterRuleMatches(row, rule));
-      next[series.renderKey] = keep ? row?.[series.sourceKey] : null;
+      const rawY = keep ? row?.[series.sourceKey] : null;
+      const coercedY = rawY == null || rawY === "" ? null : coerceChartPlotNumber(rawY);
+      next[series.renderKey] = coercedY == null && rawY !== null && rawY !== "" ? rawY : coercedY;
     }
     return next;
   }).filter((row) => ySeries.some((series) => row?.[series.renderKey] != null && row?.[series.renderKey] !== ""));
@@ -2494,6 +2498,8 @@ export function ChartCanvas() {
                             fill={seriesColorFor(series.sourceKey, idx)}
                             radius={horizontal ? [0, 4, 4, 0] : 4}
                             stackId={stackedBar ? "a" : idx}
+                            isAnimationActive={!demo && finalRenderedData.length < 100}
+                            minPointSize={2}
                           >
                             {(finalRenderedData || []).map((row, i) => {
                               const rainbowFill = rainbowBar

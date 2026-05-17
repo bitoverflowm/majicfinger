@@ -8,6 +8,26 @@
  * @param {Record<string, { data?: unknown[] }> | null | undefined} dataSheets
  * @param {unknown[] | null | undefined} connectedData
  */
+/**
+ * User-initiated Run pull (show cancel / sheet progress) — not lake warm-boot only.
+ *
+ * @param {{ loading?: boolean; label?: string; progress?: number } | null | undefined} pullState
+ * @param {{ analyzeActive?: boolean }} [options]
+ */
+export function isConnectUserDataPullActive(pullState, { analyzeActive = false } = {}) {
+  if (!pullState?.loading) return false;
+  const label = String(pullState.label || "").toLowerCase();
+  if (/preparing workspace/.test(label)) return false;
+  if (
+    !analyzeActive &&
+    /preparing your data pull/.test(label) &&
+    (Number(pullState.progress) || 0) <= 2
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function connectHomeAnySheetHasData(dataSheets, connectedData) {
   const sheets =
     dataSheets && typeof dataSheets === "object" ? Object.values(dataSheets) : [];

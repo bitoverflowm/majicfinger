@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 import { cn } from "@/lib/utils";
+import { isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
 
 import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
@@ -505,7 +506,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const viewing = contextStateV2?.viewing;
     const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
     const isConnectPullLoading =
-        !!connectDataLakePullState.loading &&
+        isConnectUserDataPullActive(connectDataLakePullState, {
+          analyzeActive: connectHomeAnalyzeActive,
+        }) &&
         (viewing === "connectDataHome" || connectHomeAnalyzeActive || fillViewport);
     const activeSheetRowCount = Array.isArray(activeSheet?.data) ? activeSheet.data.length : 0;
     const hasDisplayRows =

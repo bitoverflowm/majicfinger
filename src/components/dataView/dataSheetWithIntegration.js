@@ -53,6 +53,7 @@ import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWor
 import { ConnectHomeRequestHistory } from "@/components/connectData/ConnectHomeRequestHistory";
 import { ConnectIntegrationsPickerList } from "@/components/connectData/ConnectIntegrationsPickerList";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
+import { isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
 import { isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import {
   connectAnalyzeAnchorClass,
@@ -184,6 +185,9 @@ export default function DataSheetWithIntegration({
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
   const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive;
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
+  const connectUserPullActive = isConnectUserDataPullActive(connectDataLakePullState, {
+    analyzeActive: connectHomeAnalyzeActive,
+  });
   const rightPanelOpen = contextStateV2?.rightPanelOpen;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
   const rightPanelTab = contextStateV2?.rightPanelTab;
@@ -197,7 +201,7 @@ export default function DataSheetWithIntegration({
   }, [dataSheets]);
   const showConnectAnalyzeSection =
     showConnectIntegrationIntro &&
-    (connectHomeAnalyzeActive || connectDataLakePullState.loading || hasConnectSheetData);
+    (connectHomeAnalyzeActive || connectUserPullActive || hasConnectSheetData);
   const connectHomeChartsActive =
     connectHomeMode &&
     (showConnectIntegrationIntro || isSavedProjectWorkspace) &&
@@ -213,7 +217,7 @@ export default function DataSheetWithIntegration({
     showConnectIntegrationIntro &&
     connectHomeAnalyzeActive &&
     hasConnectSheetData &&
-    !connectDataLakePullState.loading;
+    !connectUserPullActive;
   const showConnectWorkspaceNav =
     connectHomeMode &&
     ((showConnectIntegrationIntro &&
@@ -221,7 +225,7 @@ export default function DataSheetWithIntegration({
         effectiveChartMode ||
         effectiveDashboardMode ||
         rightPanelTab === "export" ||
-        connectDataLakePullState.loading)) ||
+        connectUserPullActive)) ||
       (isSavedProjectWorkspace && hasConnectSheetData));
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
@@ -715,13 +719,12 @@ export default function DataSheetWithIntegration({
   };
 
   const connectAnalyzePullActive =
-    showConnectIntegrationIntro &&
-    (connectHomeAnalyzeActive || !!connectDataLakePullState.loading);
+    showConnectIntegrationIntro && connectUserPullActive;
 
   const showComposeBlock =
     showConnectIntegrationIntro &&
     !connectHomeAnalyzeActive &&
-    !connectDataLakePullState.loading &&
+    !connectUserPullActive &&
     (connectHomeComposeOnly || !connectHomeAnalyzeLocked);
 
   const showSheetWorkspace =
@@ -772,14 +775,14 @@ export default function DataSheetWithIntegration({
     if (!connectHomeMode || !showConnectIntegrationIntro) return false;
     return (
       connectHomeAnalyzeActive &&
-      !connectDataLakePullState.loading &&
+      !connectUserPullActive &&
       collectRequestCardEntries(dataSheets).length > 0
     );
   }, [
     connectHomeMode,
     showConnectIntegrationIntro,
     connectHomeAnalyzeActive,
-    connectDataLakePullState.loading,
+    connectUserPullActive,
     dataSheets,
   ]);
 

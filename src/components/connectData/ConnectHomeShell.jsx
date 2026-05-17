@@ -10,6 +10,7 @@ import {
 } from "@/lib/connectHomeWorkspace";
 import { deriveConnectFlowStep, isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
+import { isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
 import {
   connectDemoWorkspaceSectionClass,
   connectHubDemoLayoutClass,
@@ -143,7 +144,11 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
   /** Run pull → show sheet + progress (not compose-only) until data lands. */
   const connectAnalyzePullActive =
-    workspaceActive && isConnectIntegration && !!connectDataLakePullState.loading;
+    workspaceActive &&
+    isConnectIntegration &&
+    isConnectUserDataPullActive(connectDataLakePullState, {
+      analyzeActive: connectHomeAnalyzeActive,
+    });
 
   const composeWorkspacePhase =
     workspaceActive &&
@@ -193,8 +198,9 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     : trackAnalyzeSection
       ? analyzePanelsEngaged
       : panelsVisible;
+  const designPanelTabActive = isConnectHomeDesignPanelTab(rightPanelTab);
   const connectHomePanelsVisible = useFixedViewport
-    ? connectHomePanelPinned
+    ? connectHomePanelPinned || (isDemo && designPanelTabActive)
     : connectHomePanelsEngaged || connectHomePanelPinned;
 
   useEffect(() => {
@@ -252,13 +258,23 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       return;
     }
 
-    /** Demo embed: drawer opens only when the user picks Integration / Chart / etc. */
-    if (isDemo && !connectHomePanelPinned) {
-      setRightPanelOpen?.(false);
-      return;
+    const designPanelTab = designPanelTabActive;
+
+    /**
+     * Demo embed: integrations stay closed until pinned; chart / dashboard / export
+     * must keep the right drawer open so ChartControls (X/Y, Data) are usable.
+     */
+    if (isDemo) {
+      if (designPanelTab && hasSheetData) {
+        setRightPanelOpen?.(true);
+        return;
+      }
+      if (!connectHomePanelPinned) {
+        setRightPanelOpen?.(false);
+        return;
+      }
     }
 
-    const designPanelTab = isConnectHomeDesignPanelTab(rightPanelTab);
     const analyzePanelsAllowed =
       connectHomeAnalyzeActive &&
       (connectHomePanelsVisible ||

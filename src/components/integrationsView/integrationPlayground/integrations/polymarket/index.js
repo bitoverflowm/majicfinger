@@ -178,6 +178,9 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
   const hasDataOrStream = (contextStateV2?.connectedData?.length > 0) || Object.values(streamsBySheetId).some((s) => s?.isRunning);
   const hasLiveConnection = Object.values(streamsBySheetId).some((s) => s?.isRunning);
   const pendingWsConfigRef = useRef(null);
+  const lastConnectPullTickRef = useRef(0);
+  const contextRef = useRef(contextStateV2);
+  contextRef.current = contextStateV2;
 
   // Market search (for wsPrice market_token_id)
   const [marketSearch, setMarketSearch] = useState("");
@@ -261,12 +264,13 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
 
   const runRequest = useCallback(
     async (query, values) => {
+      const ctx = contextRef.current;
       let destination;
       if (connectHomeActive) {
-        destination = resolveConnectHomeSheetDestination(contextStateV2);
+        destination = resolveConnectHomeSheetDestination(ctx);
         if (!destination) return;
         if (destination.action === "replace") {
-          applyConnectHomeSheetNameToActiveSheet(contextStateV2);
+          applyConnectHomeSheetNameToActiveSheet(ctx);
         }
       } else {
         destination = await requestSheetDestination?.();
@@ -326,7 +330,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         setSheetData,
       });
       if (connectHomeActive && destination.action === "new_sheet") {
-        applyConnectHomeSheetNameToActiveSheet(contextStateV2);
+        applyConnectHomeSheetNameToActiveSheet(ctx);
       }
       if (!qs.includes("fields=") && arr.length > 0 && arr[0] && typeof arr[0] === "object") {
         setLastResultKeys(Object.keys(arr[0]));
@@ -351,7 +355,6 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       addNewSheetAndActivate,
       buildQueryString,
       connectHomeActive,
-      contextStateV2,
       requestSheetDestination,
       setConnectedData,
       setConnectDataLakePullState,
@@ -362,6 +365,9 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
 
   useEffect(() => {
     if (!connectHomeActive || !connectIntegrationPullTick) return;
+    if (lastConnectPullTickRef.current === connectIntegrationPullTick) return;
+    lastConnectPullTickRef.current = connectIntegrationPullTick;
+
     const endpoint = ENDPOINTS.find((e) => e.query === connectApiEndpointId);
     if (!endpoint) {
       setConnectDataLakePullState?.((prev) => ({

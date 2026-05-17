@@ -16,7 +16,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AmberCancelButton } from "@/components/primitives/destructive-icon-button";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import {
+  connectHomeAnySheetHasData,
+  isConnectUserDataPullActive,
+} from "@/lib/connectHomePullDestination";
+import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { cn } from "@/lib/utils";
 
 const WORKSPACE_ACTION_TOOLTIPS = {
@@ -219,6 +225,23 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const setRightPanelOpen = ctx?.setRightPanelOpen;
   const addNewChartAndActivate = ctx?.addNewChartAndActivate;
   const chartSnapshotFlusher = ctx?.chartSnapshotFlusher;
+  const connectWorkspace = ctx?.connectWorkspace;
+  const connectDataLakePullState = ctx?.connectDataLakePullState ?? {};
+  const cancelConnectDataFeedPull = ctx?.cancelConnectDataFeedPull;
+
+  const connectedData = ctx?.connectedData ?? [];
+  const connectHomeAnalyzeActive = !!ctx?.connectHomeAnalyzeActive;
+  const sheetPullViewActive =
+    rightPanelTab !== "charts" &&
+    rightPanelTab !== "dashboard" &&
+    rightPanelTab !== "export";
+  const showCancelDataPull =
+    sheetPullViewActive &&
+    isConnectIntegrationWorkspace(connectWorkspace) &&
+    isConnectUserDataPullActive(connectDataLakePullState, {
+      analyzeActive: connectHomeAnalyzeActive,
+    });
+  const cancelPullKeepsDashboard = connectHomeAnySheetHasData(dataSheets, connectedData);
 
   const dataSheetIds = useMemo(() => Object.keys(dataSheets || {}), [dataSheets]);
   const chartSheetIds = useMemo(
@@ -334,6 +357,10 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     setRightPanelOpen?.(true);
   }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
 
+  const handleCancelDataPull = useCallback(() => {
+    cancelConnectDataFeedPull?.();
+  }, [cancelConnectDataFeedPull]);
+
   const workspaceTabItems = useMemo(() => {
     const items = [];
     for (const id of dataSheetIds) {
@@ -380,12 +407,34 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
       )}
       aria-label="Workspace navigation"
     >
-      <WorkspaceTabStrip
-        items={workspaceTabItems}
-        compact={compact}
-        textSize={textSize}
-        gapClass={gapClass}
-      />
+      <div className={cn("flex min-w-0 flex-1 items-end", gapClass)}>
+        {showCancelDataPull ? (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="mb-[0.2rem] inline-flex shrink-0 self-center">
+                  <AmberCancelButton
+                    ariaLabel="Cancel data pull"
+                    title="Cancel data pull"
+                    onClick={handleCancelDataPull}
+                  />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+                {cancelPullKeepsDashboard
+                  ? "Cancel data pull and return to your sheet"
+                  : "Cancel data pull and return to query builder"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : null}
+        <WorkspaceTabStrip
+          items={workspaceTabItems}
+          compact={compact}
+          textSize={textSize}
+          gapClass={gapClass}
+        />
+      </div>
 
       <div
         className="flex shrink-0 flex-col items-end gap-0.5"

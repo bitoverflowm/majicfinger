@@ -1,59 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-
 import DataLakeParquetPanel from "../polymarketHistorical/DataLakeParquetPanel";
 import { ConnectProgressWithLabel } from "../polymarketHistorical/ConnectProgressWithLabel";
 import { useBeckerParquetBoot } from "../polymarketHistorical/useBeckerParquetBoot";
-import { useMyStateV2 } from "@/context/stateContextV2";
 import { Button } from "@/components/ui/button";
 
 /** Kalshi Historical — Becker Parquet under `kalshi/` in the same S3 bucket as Polymarket historical. */
 export default function KalshiHistorical({ setConnectedData }) {
-  const ctx = useMyStateV2();
-  const connectHomeDataLake =
-    ctx?.viewing === "connectDataHome" && ctx?.connectWorkspace === "kalshiHistorical";
-  const setConnectDataLakePullState = ctx?.setConnectDataLakePullState;
-  const ingestLoading = !!ctx?.connectDataLakePullState?.loading;
-
   const { label, progress, ready, error, retry } = useBeckerParquetBoot();
-
-  useEffect(() => {
-    if (!connectHomeDataLake || !setConnectDataLakePullState) return;
-    if (ready) {
-      setConnectDataLakePullState((prev) => {
-        const p = Number(prev.progress) || 0;
-        const isRunPull =
-          String(prev.label || "")
-            .toLowerCase()
-            .includes("pull");
-        if (prev.loading && p < 10 && !isRunPull) {
-          return { ...prev, loading: false, label: "", progress: 0, error: null };
-        }
-        if (!prev.loading && p > 0 && p < 100) {
-          return { ...prev, label: "", progress: 0 };
-        }
-        return prev;
-      });
-      return;
-    }
-    if (error || ingestLoading) return;
-    setConnectDataLakePullState((prev) => ({
-      ...prev,
-      loading: true,
-      error: null,
-      label: label || prev.label || "Preparing workspace…",
-      progress: Math.max(Number(prev.progress) || 0, Number(progress) || 2),
-    }));
-  }, [
-    connectHomeDataLake,
-    setConnectDataLakePullState,
-    ingestLoading,
-    ready,
-    error,
-    label,
-    progress,
-  ]);
 
   if (error) {
     return (

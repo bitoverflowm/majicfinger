@@ -25,6 +25,25 @@ export function DestructiveIconButton({ className, ariaLabel = "delete", ...prop
   );
 }
 
+/** Amber cancel dot for in-flight Connect data-feed pulls (`h-3 w-3`, no icon). */
+export function AmberCancelButton({ className, ariaLabel = "Cancel data pull", ...props }) {
+  return (
+    <button
+      type="button"
+      data-cancel-dot=""
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-full border-0 bg-amber-500 p-0 shadow-none",
+        "h-3 w-3 min-h-3 min-w-3 max-h-3 max-w-3",
+        "hover:bg-amber-500/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 focus-visible:ring-offset-1",
+        "dark:bg-amber-500 dark:hover:bg-amber-500/90",
+        className,
+      )}
+      aria-label={ariaLabel}
+      {...props}
+    />
+  );
+}
+
 /** Compact yellow circle control for secondary navigation. */
 export function YellowIconButton({
   className,
