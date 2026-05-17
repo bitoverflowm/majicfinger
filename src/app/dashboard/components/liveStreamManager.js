@@ -432,6 +432,8 @@ export default function LiveStreamManager() {
   );
 
   useEffect(() => {
+    if (typeof setLiveStreamActions !== "function") return undefined;
+
     setLiveStreamActions({
       start,
       stop,
@@ -441,7 +443,9 @@ export default function LiveStreamManager() {
     });
     return () => {
       stop();
-      setLiveStreamActions({ start: noop, stop: noop, pause: noop, resume: noop, restart: noop });
+      if (typeof setLiveStreamActions === "function") {
+        setLiveStreamActions({ start: noop, stop: noop, pause: noop, resume: noop, restart: noop });
+      }
     };
   }, [start, stop, pause, resume, restart, setLiveStreamActions]);
 

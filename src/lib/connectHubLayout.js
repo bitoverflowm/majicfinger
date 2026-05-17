@@ -95,8 +95,8 @@ export const connectDemoWorkspaceSectionClass = cn(
 /** Demo + analyze scroll container — mandatory snap between hub and workspace. */
 export const connectHubScrollSnapClass = "snap-y snap-mandatory";
 
-/** Landing demo — scroll chaining stays inside #connect-home-scroll. */
-export const connectHubDemoScrollContainClass = "overscroll-y-contain touch-pan-y";
+/** Landing demo — allow scroll chaining to the landing page at inner scroll edges. */
+export const connectHubDemoScrollContainClass = "overscroll-y-auto touch-pan-y";
 
 export const connectHubHubSnapClass = "snap-start snap-always";
 

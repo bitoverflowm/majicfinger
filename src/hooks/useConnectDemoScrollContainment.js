@@ -29,7 +29,8 @@ function findScrollableTarget(target, boundary, primaryScrollRoot) {
 }
 
 /**
- * Keep wheel / trackpad scroll inside the landing demo embed (#connect-home-scroll).
+ * Landing demo embed — prefer scrolling #connect-home-scroll when it has room,
+ * but never block the main landing page once inner scroll is exhausted.
  */
 export function useConnectDemoScrollContainment({ enabled, scrollRef, trapRootRef }) {
   useEffect(() => {
@@ -43,21 +44,13 @@ export function useConnectDemoScrollContainment({ enabled, scrollRef, trapRootRe
       if (!trapRoot.contains(e.target)) return;
 
       const primary = findScrollableTarget(e.target, trapRoot, scrollRoot);
-      if (canScrollY(primary, e.deltaY)) {
-        e.stopPropagation();
-        return;
-      }
+      if (canScrollY(primary, e.deltaY)) return;
+      if (primary !== scrollRoot && canScrollY(scrollRoot, e.deltaY)) return;
 
-      if (primary !== scrollRoot && canScrollY(scrollRoot, e.deltaY)) {
-        e.stopPropagation();
-        return;
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
+      // Inner demo scroller is at its edge (or not scrollable) — let the page scroll.
     };
 
-    trapRoot.addEventListener("wheel", onWheel, { passive: false, capture: true });
-    return () => trapRoot.removeEventListener("wheel", onWheel, { capture: true });
+    trapRoot.addEventListener("wheel", onWheel, { passive: true });
+    return () => trapRoot.removeEventListener("wheel", onWheel);
   }, [enabled, scrollRef, trapRootRef]);
 }

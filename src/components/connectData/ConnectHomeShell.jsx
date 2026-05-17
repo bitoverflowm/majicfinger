@@ -23,7 +23,6 @@ import {
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
 import { useConnectHomeAnalyzeScrollLock } from "@/hooks/useConnectHomeAnalyzeScrollLock";
-import { useConnectDemoScrollContainment } from "@/hooks/useConnectDemoScrollContainment";
 import {
   CONNECT_HOME_SCROLL_ID,
   scheduleConnectAnalyzeAnchorScroll,
@@ -178,12 +177,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     scrollRef,
     hubRef,
     enabled: scrollLockEnabled,
-  });
-
-  useConnectDemoScrollContainment({
-    enabled: isDemo && !useFixedViewport,
-    scrollRef,
-    trapRootRef: shellMainRef,
   });
 
   const { panelsVisible, analyzePanelsEngaged } = useConnectHomeScrollPanels({

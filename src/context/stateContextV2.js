@@ -11,8 +11,23 @@ import {
 } from '@/lib/connectHomeWorkspace';
 import { pingAthenaLakeConnection } from '@/lib/athenaLakePing';
 
-// Create the state context
-export const StateContextV2 = createContext();
+const stateV2Noop = () => {};
+const defaultLiveStreamActions = {
+  start: stateV2Noop,
+  stop: stateV2Noop,
+  pause: stateV2Noop,
+  resume: stateV2Noop,
+  restart: stateV2Noop,
+};
+
+/** Defaults so client hooks (e.g. LiveStreamManager) never crash outside a provider. */
+export const StateContextV2 = createContext({
+  setLiveStreamActions: stateV2Noop,
+  setLiveStreamState: stateV2Noop,
+  setSheetData: stateV2Noop,
+  liveStreamActions: defaultLiveStreamActions,
+  liveStreamState: { streamsBySheetId: {} },
+});
 
 // Custom hook for using the created context
 export function useMyStateV2(){
