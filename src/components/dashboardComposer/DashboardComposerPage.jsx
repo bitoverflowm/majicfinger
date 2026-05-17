@@ -39,6 +39,17 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { scrollToPricingSection } from "@/lib/scrollToPricing";
+import {
   getPageTextBlockEditorClasses,
   getPageTextBlockEditorStyle,
   PAGE_SUBHEADING_PLACEHOLDER,
@@ -174,7 +185,10 @@ export default function DashboardComposerPage({ user }) {
     setActiveChartSheetId,
     setLoadedChartMeta,
     setLoadedChartBuilderSnapshot,
-  } = useMyStateV2();
+    isDemo,
+  } = useMyStateV2() ?? {};
+
+  const [demoDashboardDialogOpen, setDemoDashboardDialogOpen] = useState(false);
 
   const hasDbUser =
     user?.userId && user.userId !== "dev-bypass-no-db" && /^[a-f0-9]{24}$/i.test(user.userId);
@@ -402,6 +416,10 @@ export default function DashboardComposerPage({ user }) {
   );
 
   const handleCreateNew = () => {
+    if (isDemo) {
+      setDemoDashboardDialogOpen(true);
+      return;
+    }
     if (!hasDbUser) {
       toast.error("Sign in to create a dashboard.");
       return;
@@ -511,6 +529,24 @@ export default function DashboardComposerPage({ user }) {
     }));
   }, [savedChartDashboards]);
 
+  const demoDashboardDialog = (
+    <AlertDialog open={demoDashboardDialogOpen} onOpenChange={setDemoDashboardDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Dashboards are a Pro feature</AlertDialogTitle>
+          <AlertDialogDescription>
+            Only Pro users have access to dashboards. Sign up to create and share your custom
+            dashboard.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Not now</AlertDialogCancel>
+          <AlertDialogAction onClick={() => scrollToPricingSection()}>Sign up</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (!draft) {
     if (activeChartDashboardId && hasDbUser) {
       return (
@@ -530,6 +566,7 @@ export default function DashboardComposerPage({ user }) {
       );
     }
     return (
+      <>
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6">
         {savedDashboardOptions.length > 0 ? (
           <div className="flex w-full max-w-xl flex-col gap-2">
@@ -577,6 +614,8 @@ export default function DashboardComposerPage({ user }) {
           Load a saved dashboard or start a new dashboard.
         </p>
       </div>
+      {demoDashboardDialog}
+      </>
     );
   }
 
