@@ -52,7 +52,8 @@ const DataView = ({ user, fillViewport = false }) => {
 
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
-  const connectPullLoading = connectHomeAnalyzeActive && !!connectDataLakePullState.loading;
+  const connectPullLoading =
+    !!connectDataLakePullState.loading && (connectHomeAnalyzeActive || fillViewport);
 
   const dataSheetIds = dataSheets ? Object.keys(dataSheets) : [];
   const hasMultipleDataSheets = dataSheetIds.length > 1;

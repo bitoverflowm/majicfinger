@@ -678,12 +678,16 @@ export default function DataSheetWithIntegration({
     }
   };
 
+  const connectAnalyzePullActive =
+    showConnectIntegrationIntro && !!connectDataLakePullState.loading;
+
   const showComposeBlock =
     showConnectIntegrationIntro &&
-    (connectHomeComposeOnly || !connectHomeAnalyzeLocked);
+    (connectHomeComposeOnly || !connectHomeAnalyzeLocked) &&
+    !connectAnalyzePullActive;
 
   const showSheetWorkspace =
-    !connectHomeComposeOnly &&
+    (!connectHomeComposeOnly || connectAnalyzePullActive) &&
     (!showConnectIntegrationIntro || showConnectAnalyzeSection);
 
   /** Connect integrations: drawer only in Step 2 analyze block, not beside compose UI. */
@@ -959,8 +963,10 @@ export default function DataSheetWithIntegration({
       connectHomeMode && connectHomeGridSurface,
       connectHomeAnalyzeDashboard && "px-0 sm:px-1 md:px-2",
       showConnectIntegrationIntro && "min-h-0 gap-0 px-0 py-0 sm:gap-0 sm:px-0 sm:py-0",
+      isDemo && showConnectIntegrationIntro && "overflow-x-visible",
       connectHomeComposeOnly && "flex min-h-0 flex-1 flex-col overflow-hidden",
       connectHomeWorkspaceLive && "flex min-h-0 flex-1 flex-col",
+      connectAnalyzePullActive && connectHomeWorkspaceLive && "min-h-0 flex-1 overflow-hidden",
     )}>
       <ReplaceOrNewSheetDialog
         open={replaceOrNewSheetOpen}
@@ -975,6 +981,33 @@ export default function DataSheetWithIntegration({
         onReplace={() => resolveSheetDestination("replace")}
         onAddNewSheet={() => resolveSheetDestination("new_sheet")}
       />
+      {connectHomeDataLakePullBridge || connectHomeIntegrationPullBridge ? (
+        <div
+          className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
+          aria-hidden
+        >
+          {connectHomeDataLakePullBridge ? (
+            connectWorkspace === "polymarketHistorical" ? (
+              <PolymarketHistorical setConnectedData={setConnectedDataRaw} />
+            ) : (
+              <KalshiHistorical setConnectedData={setConnectedDataRaw} />
+            )
+          ) : null}
+          {connectHomeIntegrationPullBridge ? (
+            connectWorkspace === "polymarket" ? (
+              <Polymarket
+                setConnectedData={setConnectedDataRaw}
+                requestSheetDestination={requestSheetDestination}
+                connectHomePullBridge
+              />
+            ) : connectWorkspace === "chainlink" ? (
+              <Chainlink connectHomePullBridge />
+            ) : (
+              <Binance setConnectedData={setConnectedDataRaw} connectHomePullBridge />
+            )
+          ) : null}
+        </div>
+      ) : null}
       {showComposeBlock ? (
         <div
           id="connect-home-compose"
@@ -988,47 +1021,18 @@ export default function DataSheetWithIntegration({
           )}
         >
           <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
-          {connectHomeDataLakePullBridge ? (
-            <div
-              className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
-              aria-hidden
-            >
-              {connectWorkspace === "polymarketHistorical" ? (
-                <PolymarketHistorical setConnectedData={setConnectedDataRaw} />
-              ) : (
-                <KalshiHistorical setConnectedData={setConnectedDataRaw} />
-              )}
-            </div>
-          ) : null}
-          {connectHomeIntegrationPullBridge ? (
-            <div
-              className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
-              aria-hidden
-            >
-              {connectWorkspace === "polymarket" ? (
-                <Polymarket
-                  setConnectedData={setConnectedDataRaw}
-                  requestSheetDestination={requestSheetDestination}
-                  connectHomePullBridge
-                />
-              ) : connectWorkspace === "chainlink" ? (
-                <Chainlink connectHomePullBridge />
-              ) : (
-                <Binance setConnectedData={setConnectedDataRaw} connectHomePullBridge />
-              )}
-            </div>
-          ) : null}
         </div>
       ) : null}
       {showSheetWorkspace ? (
       <div
-        className={
+        className={cn(
           connectHomeSheetLayoutLive
             ? connectHomeAnalyzeLocked || isDemo
               ? connectHomeAnalyzeRowClass
               : connectHomeWorkspaceRowClass
-            : "flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6"
-        }
+            : "flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6",
+          connectAnalyzePullActive && "min-h-0 flex-1",
+        )}
       >
         <main
           ref={mainColumnRef}

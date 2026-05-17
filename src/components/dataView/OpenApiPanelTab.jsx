@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { PanelRightOpen } from "lucide-react";
 import Ripple from "@/components/magicui/ripple";
+import { connectHubDemoPanelTabFlushRightClass } from "@/lib/connectHubLayout";
+import { cn } from "@/lib/utils";
 
 const ENTRANCE_MS = 280;
 const EXIT_MS = 150;
@@ -61,11 +63,13 @@ export default function OpenApiPanelTab({ onOpen, contained = false, instantOpen
 
   return (
     <div
-      className={`
-        ${contained ? "absolute" : "fixed"} right-0 top-20 z-40 transition ease-out md:top-[4.5rem]
-        ${isExiting ? "duration-150" : "duration-300"}
-        ${entered && !isExiting ? "translate-x-0" : "translate-x-full"}
-      `}
+      className={cn(
+        contained ? "absolute" : "fixed",
+        contained ? connectHubDemoPanelTabFlushRightClass : "right-0",
+        "top-20 z-40 transition ease-out md:top-[4.5rem]",
+        isExiting ? "duration-150" : "duration-300",
+        entered && !isExiting ? "translate-x-0" : "translate-x-full",
+      )}
     >
       <button
         type="button"

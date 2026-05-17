@@ -6,7 +6,6 @@ export function connectHubPageClass(embeddedInShell = false, { embeddedDemo = fa
     return cn(
       "mx-auto w-full max-w-none pb-10 sm:pb-12 md:pb-14",
       "pt-4 sm:pt-5 md:pt-6",
-      "px-4 pr-6 sm:px-5 sm:pr-8 md:px-6 md:pr-10 lg:px-8 lg:pr-12",
     );
   }
   return cn(
@@ -57,10 +56,21 @@ export const connectHomeAnalyzeMainClass = cn(
   "relative flex min-w-0 flex-1 flex-col overflow-hidden",
 );
 
+/** Horizontal inset inside the landing demo card. */
+export const connectHubDemoInsetClass = "px-4 sm:px-5 md:px-6 lg:px-8";
+
+/** OpenApiPanelTab — flush to demo card right edge (cancels grid horizontal inset). */
+export const connectHubDemoPanelTabFlushRightClass =
+  "-right-4 sm:-right-5 md:-right-6 lg:-right-8";
+
+/** Vertical inset inside the landing demo card (shrinks sheet/chart area). */
+export const connectHubDemoVerticalInsetClass = "py-4 sm:py-5 md:py-6 lg:py-8";
+
 /** Landing-page demo embed — heights relative to the demo card, not the viewport. */
 export const connectDemoAnalyzeFitClass = cn(
   "flex min-h-0 flex-1 flex-col overflow-hidden",
   "min-h-[24rem]",
+  connectHubDemoVerticalInsetClass,
 );
 
 export const connectDemoAnalyzeMainClass = cn(
@@ -94,6 +104,7 @@ export const connectHubDemoLayoutClass = cn(
   "grid w-full min-w-0 items-start",
   "grid-cols-[8.5rem_minmax(0,1fr)] gap-x-6",
   "lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
+  connectHubDemoInsetClass,
 );
 
 /** Demo hub — Import + Integrations only (two columns at sm+, stack on mobile). */

@@ -506,7 +506,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
     const isConnectPullLoading =
         !!connectDataLakePullState.loading &&
-        (viewing === "connectDataHome" || connectHomeAnalyzeActive);
+        (viewing === "connectDataHome" || connectHomeAnalyzeActive || fillViewport);
     const activeSheetRowCount = Array.isArray(activeSheet?.data) ? activeSheet.data.length : 0;
     const hasDisplayRows =
         (connectedData?.length ?? 0) > 0 || activeSheetRowCount > 0;

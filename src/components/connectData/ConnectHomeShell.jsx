@@ -142,10 +142,18 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     hasSheetData &&
     !connectDataLakePullState.loading;
 
-  const composeWorkspacePhase =
-    workspaceActive && isConnectIntegration && !analyzeViewportLocked;
+  /** Run pull → show sheet + progress (not compose-only) until data lands. */
+  const connectAnalyzePullActive =
+    workspaceActive && isConnectIntegration && !!connectDataLakePullState.loading;
 
-  const useFixedViewport = analyzeViewportLocked || composeWorkspacePhase;
+  const composeWorkspacePhase =
+    workspaceActive &&
+    isConnectIntegration &&
+    !analyzeViewportLocked &&
+    !connectAnalyzePullActive;
+
+  const useFixedViewport =
+    analyzeViewportLocked || composeWorkspacePhase || connectAnalyzePullActive;
 
   useEffect(() => {
     if (analyzeViewportLocked) {
@@ -260,6 +268,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     const analyzePanelsAllowed =
       connectHomeAnalyzeActive &&
       (connectHomePanelsVisible ||
+        (hasSheetData && isConnectIntegration) ||
         (isConnectSavedProjectWorkspace(connectWorkspace) && hasSheetData) ||
         designPanelTab);
 
@@ -334,7 +343,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       setConnectHomePanelPinned(true);
       if (tab) setConnectHomePreferredPanelTab(tab);
       if (tab === "integrations" && analyzeViewportLocked) {
-        setConnectHomeComposeOpen(true);
+        /** Keep the sheet visible and slide the integrations drawer in (not compose-only). */
+        setConnectHomeComposeOpen(false);
       } else if (tab === "integrations" && !useFixedViewport) {
         scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
       }
@@ -349,7 +359,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       setStartNew={setStartNew}
       connectHomeMode
       connectHomeAnalyzeLocked={analyzeViewportLocked && !connectHomeComposeOpen}
-      connectHomeComposeOnly={composeWorkspacePhase || (analyzeViewportLocked && connectHomeComposeOpen)}
+      connectHomeComposeOnly={
+        (composeWorkspacePhase || (analyzeViewportLocked && connectHomeComposeOpen)) &&
+        !connectAnalyzePullActive
+      }
       connectHomePanelsVisible={connectHomePanelsVisible}
       onConnectHomePanelUserDismiss={() => {
         setConnectPanelUserDismissed(true);
@@ -371,7 +384,11 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
           <section
             ref={workspaceRef}
             id="connect-home-workspace"
-            className={cn(CONNECT_HOME_SURFACE, "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden")}
+            className={cn(
+              CONNECT_HOME_SURFACE,
+              "flex min-h-0 min-w-0 flex-1 flex-col",
+              isDemo ? "overflow-x-visible overflow-y-hidden" : "overflow-hidden",
+            )}
           >
             {showUploadPanel ? <ConnectHomeFileUpload onParsed={handleUploadParsed} /> : null}
             {workspacePanel}

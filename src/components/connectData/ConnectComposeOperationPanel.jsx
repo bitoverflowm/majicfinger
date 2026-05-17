@@ -265,8 +265,10 @@ export function ConnectComposeOperationPanel({ className }) {
     if (resolveConnectHomeSheetDestination(ctx).action === "replace") {
       applyConnectHomeSheetNameToActiveSheet(ctx);
     }
-    requestConnectAnalyzeScroll?.();
-    requestConnectDataLakePull?.();
+    flushSync(() => {
+      requestConnectAnalyzeScroll?.();
+      requestConnectDataLakePull?.();
+    });
   }, [
     ctx,
     connectActiveComposeOps,

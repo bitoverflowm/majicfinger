@@ -23,7 +23,11 @@ export default function KalshiHistorical({ setConnectedData }) {
     if (ready) {
       setConnectDataLakePullState((prev) => {
         const p = Number(prev.progress) || 0;
-        if (prev.loading && p < 10) {
+        const isRunPull =
+          String(prev.label || "")
+            .toLowerCase()
+            .includes("pull");
+        if (prev.loading && p < 10 && !isRunPull) {
           return { ...prev, loading: false, label: "", progress: 0, error: null };
         }
         if (!prev.loading && p > 0 && p < 100) {
