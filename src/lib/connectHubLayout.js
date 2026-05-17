@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 export function connectHubPageClass(embeddedInShell = false, { embeddedDemo = false } = {}) {
   if (embeddedDemo) {
     return cn(
-      "mx-auto w-full max-w-none",
-      "pt-16 pb-10 sm:pt-20 sm:pb-12 md:pt-24 md:pb-14 lg:pt-28 lg:pb-16",
+      "mx-auto w-full max-w-none pb-10 sm:pb-12 md:pb-14",
+      "pt-4 sm:pt-5 md:pt-6",
       "px-4 pr-6 sm:px-5 sm:pr-8 md:px-6 md:pr-10 lg:px-8 lg:pr-12",
     );
   }
