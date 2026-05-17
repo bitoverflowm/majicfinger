@@ -3,7 +3,6 @@
 import { useLayoutEffect, useRef } from "react";
 
 import DataView from "@/components/dataView";
-import { ConnectHomePullProgress } from "@/components/connectData/ConnectHomePullProgress";
 import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWorkspaceNav";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
@@ -77,9 +76,6 @@ export function ConnectHomeAnalyzeSection({
       ) : null}
 
       <div className="flex min-h-0 w-full flex-1 flex-col">
-        {pull.loading ? (
-          <ConnectHomePullProgress className="mb-3 shrink-0 px-0.5 sm:px-1" />
-        ) : null}
         <DataView user={user} startNew={startNew} setStartNew={setStartNew} fillViewport />
       </div>
     </section>
