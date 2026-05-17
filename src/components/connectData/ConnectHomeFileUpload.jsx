@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 
 import { Progress } from "@/components/ui/progress";
 import { ConnectHomeUploadWarnings } from "@/components/connectData/ConnectHomeUploadWarnings";
+import { CONNECT_HOME_UPLOAD_ID } from "@/lib/connectHubScroll";
+import { connectWorkspaceScrollInsetClass } from "@/lib/connectHubLayout";
 
 const iconStroke = 1.75;
 
@@ -74,7 +76,13 @@ export function ConnectHomeFileUpload({ onParsed }) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 pb-24 pt-24 sm:px-10">
+    <div
+      id={CONNECT_HOME_UPLOAD_ID}
+      className={cn(
+        "mx-auto w-full max-w-2xl px-6 pb-24 pt-64 sm:px-10",
+        connectWorkspaceScrollInsetClass,
+      )}
+    >
       <h2 className="mb-6 text-lg font-semibold tracking-tight text-foreground">Upload your file</h2>
       <button
         type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
@@ -28,6 +29,7 @@ import {
   CONNECT_HOME_SCROLL_ID,
   scheduleConnectAnalyzeAnchorScroll,
   scheduleConnectHomeIntegrationActivate,
+  scheduleConnectHomeUploadActivate,
   scheduleConnectProjectSheetScroll,
   scheduleConnectWorkspaceScroll,
 } from "@/lib/connectHubScroll";
@@ -213,6 +215,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
       return;
     }
+    if (connectWorkspace === CONNECT_WORKSPACE.UPLOAD && !dataConnected) {
+      scheduleConnectHomeUploadActivate(workspaceRef, scrollRef);
+      return;
+    }
     if (isConnectSavedProjectWorkspace(connectWorkspace) && hasSheetData) {
       scheduleConnectProjectSheetScroll(workspaceRef, scrollRef);
       return;
@@ -222,7 +228,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       return;
     }
     scheduleConnectWorkspaceScroll(workspaceRef, scrollRef);
-  }, [connectWorkspace, connectHomeAnalyzeActive, hasSheetData]);
+  }, [connectWorkspace, connectHomeAnalyzeActive, hasSheetData, dataConnected]);
 
   useLayoutEffect(() => {
     if (useFixedViewport) return;
@@ -335,17 +341,18 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const handleActivateWorkspace = useCallback(
     (id) => {
       context?.requestConnectWorkspace?.(id);
-      if (!isConnectIntegrationWorkspace(id)) {
-        scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
-      }
     },
     [context],
   );
 
   const handleUploadParsed = useCallback(() => {
+    flushSync(() => {
+      context?.setConnectHomeAnalyzeActive?.(true);
+    });
+    context?.requestConnectAnalyzeScroll?.();
     if (useFixedViewport) return;
     scrollToWorkspace();
-  }, [scrollToWorkspace, useFixedViewport]);
+  }, [context, scrollToWorkspace, useFixedViewport]);
 
   const handleConnectHomePanelManualOpen = useCallback(
     (tab) => {

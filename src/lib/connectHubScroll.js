@@ -7,6 +7,8 @@ export const CONNECT_HOME_COMPOSE_ID = "connect-home-compose";
 
 export const CONNECT_HOME_INTEGRATION_WORKFLOW_ID = "connect-home-integration-workflow";
 
+export const CONNECT_HOME_UPLOAD_ID = "connect-home-upload";
+
 export const CONNECT_HOME_WORKSPACE_ID = "connect-home-workspace";
 
 export const CONNECT_HOME_SCROLL_ID = "connect-home-scroll";
@@ -69,6 +71,22 @@ function runWithRetries(fn, delaysMs = [0, 50, 120, 250, 500, 900, 1400, 2200]) 
   for (const delay of delaysMs) {
     window.setTimeout(tryRun, delay);
   }
+}
+
+/** After Upload is chosen: scroll to the upload panel (same inset as integration query builder). */
+export function scheduleConnectHomeUploadActivate(workspaceElRef, scrollRootElRef) {
+  const tryScroll = () => {
+    const scrollRoot =
+      scrollRootElRef?.current ??
+      document.getElementById(CONNECT_HOME_SCROLL_ID);
+    const target =
+      document.getElementById(CONNECT_HOME_UPLOAD_ID) ||
+      workspaceElRef?.current ||
+      document.getElementById(CONNECT_HOME_WORKSPACE_ID);
+    if (!target) return false;
+    return scrollConnectHomeTargetIntoView(scrollRoot, target, { behavior: "smooth" });
+  };
+  runWithRetries(tryScroll);
 }
 
 /** After integration activates: scroll to workflow (Kalshi / Markets / Trades). */

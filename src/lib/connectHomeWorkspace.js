@@ -14,6 +14,28 @@ export function isConnectSavedProjectWorkspace(id) {
   return id === CONNECT_WORKSPACE.PROJECT;
 }
 
+export function isConnectUploadWorkspace(id) {
+  return id === CONNECT_WORKSPACE.UPLOAD;
+}
+
+/** User uploaded a spreadsheet and sheets are populated in Connect home. */
+export function isConnectUploadWorkspaceReady(id, dataConnected, hasSheetData) {
+  if (!isConnectUploadWorkspace(id) || !hasSheetData) return false;
+  return !!dataConnected;
+}
+
+/** Upload analyze UI — sheet rows landed (dataConnected may commit next tick). */
+export function isConnectUploadAnalyzeWorkspace(
+  id,
+  { dataConnected = false, hasSheetData = false, analyzeActive = false } = {},
+) {
+  return (
+    isConnectUploadWorkspace(id) &&
+    hasSheetData &&
+    (!!dataConnected || !!analyzeActive)
+  );
+}
+
 export function isConnectIntegrationWorkspace(id) {
   return (
     typeof id === "string" &&

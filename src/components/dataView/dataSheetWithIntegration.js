@@ -71,6 +71,8 @@ import {
 import {
   isConnectIntegrationWorkspace,
   isConnectSavedProjectWorkspace,
+  isConnectUploadAnalyzeWorkspace,
+  isConnectUploadWorkspace,
 } from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
@@ -169,6 +171,7 @@ export default function DataSheetWithIntegration({
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const connectWorkspace = contextStateV2?.connectWorkspace;
+  const dataConnected = !!contextStateV2?.dataConnected;
   const showConnectIntegrationIntro =
     connectHomeMode && isConnectIntegrationWorkspace(connectWorkspace);
   const isSavedProjectWorkspace =
@@ -199,22 +202,33 @@ export default function DataSheetWithIntegration({
     const sheets = dataSheets && typeof dataSheets === "object" ? Object.values(dataSheets) : [];
     return sheets.some((s) => Array.isArray(s?.data) && s.data.length > 0);
   }, [dataSheets]);
+  const isConnectUploadWithSheetData =
+    connectHomeMode &&
+    isConnectUploadWorkspace(connectWorkspace) &&
+    hasConnectSheetData;
+  const isConnectUploadAnalyze =
+    isConnectUploadWithSheetData &&
+    isConnectUploadAnalyzeWorkspace(connectWorkspace, {
+      dataConnected,
+      hasSheetData: hasConnectSheetData,
+      analyzeActive: connectHomeAnalyzeActive,
+    });
   const showConnectAnalyzeSection =
     showConnectIntegrationIntro &&
     (connectHomeAnalyzeActive || connectUserPullActive || hasConnectSheetData);
   const connectHomeChartsActive =
     connectHomeMode &&
-    (showConnectIntegrationIntro || isSavedProjectWorkspace) &&
+    (showConnectIntegrationIntro || isSavedProjectWorkspace || isConnectUploadWithSheetData) &&
     rightPanelTab === "charts";
   const connectHomeDashboardActive =
     connectHomeMode &&
-    (showConnectIntegrationIntro || isSavedProjectWorkspace) &&
+    (showConnectIntegrationIntro || isSavedProjectWorkspace || isConnectUploadWithSheetData) &&
     rightPanelTab === "dashboard";
   const effectiveChartMode = chartMode || connectHomeChartsActive;
   const effectiveDashboardMode = dashboardMode || connectHomeDashboardActive;
   const connectHomeAnalyzeDashboard =
     connectHomeMode &&
-    showConnectIntegrationIntro &&
+    (showConnectIntegrationIntro || isConnectUploadWithSheetData) &&
     connectHomeAnalyzeActive &&
     hasConnectSheetData &&
     !connectUserPullActive;
@@ -226,7 +240,12 @@ export default function DataSheetWithIntegration({
         effectiveDashboardMode ||
         rightPanelTab === "export" ||
         connectUserPullActive)) ||
-      (isSavedProjectWorkspace && hasConnectSheetData));
+      (isSavedProjectWorkspace && hasConnectSheetData) ||
+      (isConnectUploadWithSheetData &&
+        (connectHomeAnalyzeActive ||
+          effectiveChartMode ||
+          effectiveDashboardMode ||
+          rightPanelTab === "export")));
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
@@ -738,14 +757,22 @@ export default function DataSheetWithIntegration({
     showConnectAnalyzeSection &&
     (connectHomeAnalyzeLocked || showConnectIntegrationIntro);
 
-  /** Saved project grid — same viewport height contract as Step 2 analyze (flex chain + fillViewport). */
-  const connectHomeProjectGridLive =
-    isSavedProjectWorkspace &&
+  /** Step 2 table view — integration pull, upload, or saved project (shared analyze shell + fillViewport grid). */
+  const showConnectSheetAnalyzeUi =
+    connectHomeMode &&
     hasConnectSheetData &&
     !effectiveChartMode &&
-    !effectiveDashboardMode;
+    !effectiveDashboardMode &&
+    !showComposeBlock &&
+    ((showConnectIntegrationIntro && showConnectAnalyzeSection) ||
+      isConnectUploadWithSheetData ||
+      (isSavedProjectWorkspace && hasConnectSheetData));
 
-  const connectHomeSheetLayoutLive = connectHomeWorkspaceLive || connectHomeProjectGridLive;
+  const connectHomeSheetLayoutLive =
+    connectHomeWorkspaceLive ||
+    showConnectSheetAnalyzeUi ||
+    connectHomeChartsActive ||
+    connectHomeDashboardActive;
 
   const connectHomeSidebarTab =
     rightPanelTab === "integrations" ||
@@ -762,7 +789,8 @@ export default function DataSheetWithIntegration({
         rightPanelTab === "dashboard") &&
       (connectHomeComposeOnly ||
         !showConnectIntegrationIntro ||
-        showConnectAnalyzeSection));
+        showConnectAnalyzeSection ||
+        isConnectUploadWithSheetData));
   const showSidebar = !!rightPanelOpen && connectHomeDrawerAllowed;
   const isPanelVisible = showSidebar || isPanelClosing;
   /** Edge tab to reopen the drawer after X / collapse (demo: also during compose). */
@@ -819,8 +847,14 @@ export default function DataSheetWithIntegration({
   ]);
 
   const prevConnectWorkspaceTabRef = useRef("");
+  const connectHomeCoreWorkspaceEngaged =
+    connectHomeWorkspaceLive ||
+    showConnectSheetAnalyzeUi ||
+    connectHomeChartsActive ||
+    connectHomeDashboardActive;
+
   useEffect(() => {
-    if (!connectHomeMode || !connectHomeWorkspaceLive) return;
+    if (!connectHomeMode || !connectHomeCoreWorkspaceEngaged) return;
     const tab = rightPanelTab ?? "";
     const prev = prevConnectWorkspaceTabRef.current;
     prevConnectWorkspaceTabRef.current = tab;
@@ -830,7 +864,7 @@ export default function DataSheetWithIntegration({
     handleConnectHomePanelManualOpen(rightPanelTab || "charts");
   }, [
     connectHomeMode,
-    connectHomeWorkspaceLive,
+    connectHomeCoreWorkspaceEngaged,
     rightPanelTab,
     handleConnectHomePanelManualOpen,
   ]);
@@ -1209,28 +1243,16 @@ export default function DataSheetWithIntegration({
                 <ChartCanvas />
               </div>
             </div>
-          ) : showConnectIntegrationIntro && showConnectAnalyzeSection ? (
+          ) : showConnectSheetAnalyzeUi ? (
             <ConnectHomeAnalyzeSection
               user={user}
               startNew={startNew}
               setStartNew={setStartNew}
-              showWorkspaceNav={!!showConnectWorkspaceNav}
+              showWorkspaceNav
+              showIntro={!isConnectUploadAnalyze && !isSavedProjectWorkspace}
               embeddedInFixedViewport={connectHomeAnalyzeLocked}
               onPanelManualOpen={handleConnectHomePanelManualOpen}
             />
-          ) : connectHomeProjectGridLive ? (
-            <section
-              id="connect-home-project-grid"
-              className={cn(
-                "flex w-full min-w-0 flex-col",
-                isDemo ? connectDemoAnalyzeFitClass : connectAnalyzeSectionFitClass,
-              )}
-            >
-              {showConnectWorkspaceNav ? connectWorkspaceNav : null}
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                <DataView user={user} startNew={startNew} setStartNew={setStartNew} fillViewport />
-              </div>
-            </section>
           ) : (
             <>
               {showConnectWorkspaceNav ? connectWorkspaceNav : null}
