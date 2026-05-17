@@ -595,15 +595,10 @@ export default function ConnectDataStep1({
     ? "w-full min-w-0"
     : connectHubLayoutClass({ includeStepRail: !embeddedInShell });
 
-  const integrationsColClass = embeddedDemo
-    ? "flex max-h-[17.5rem] flex-col gap-1 overflow-y-auto overscroll-contain"
-    : "flex flex-col gap-3";
-  const integrationsListColClass = embeddedDemo
-    ? "flex max-h-[14.5rem] flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5"
-    : integrationsColClass;
-  const hubIntegrationsPill = embeddedDemo ? demoIntegrationsPillClass : integrationsPillClass;
-  const hubIconSize = embeddedDemo ? demoIconSizeClass : "h-3.5 w-3.5";
-  const hubColGapClass = embeddedDemo ? "gap-2.5" : "gap-8";
+  const integrationsColClass = "flex flex-col gap-3";
+  const hubIntegrationsPill = integrationsPillClass;
+  const hubIconSize = "h-3.5 w-3.5";
+  const hubColGapClass = "gap-8";
 
   const activate = onActivateWorkspace || requestConnectWorkspace;
 
@@ -734,47 +729,33 @@ export default function ConnectDataStep1({
 
           <div
             className={cn(
-              embeddedInShell ? (embeddedDemo ? "min-w-0 w-full max-w-none" : "min-w-0") : connectHubMainClass,
+              embeddedInShell ? "min-w-0 w-full max-w-none" : connectHubMainClass,
               showLatestWork && !embeddedInShell ? "md:row-start-2" : !embeddedInShell ? "md:row-start-1" : null,
             )}
           >
-            <h1
-              className={cn(
-                "text-balance text-left font-semibold tracking-tight text-foreground",
-                embeddedDemo ? "text-base leading-snug" : "text-xl",
-              )}
-            >
+            <h1 className="text-balance text-left text-xl font-semibold tracking-tight text-foreground">
               Hi, what do you want to discover?
             </h1>
 
-            <div
-              className={cn(
-                embeddedDemo ? "mt-3 w-full min-w-0" : "mt-12 w-full sm:mt-14 md:mt-16",
-                columnGridClass,
-              )}
-            >
+            <div className={cn("mt-12 w-full sm:mt-14 md:mt-16", columnGridClass)}>
           <section className="min-w-0 overflow-hidden">
-            <SectionTitle compact={embeddedDemo}>Import</SectionTitle>
+            <SectionTitle>Import</SectionTitle>
             <div className={integrationsColClass}>
               <PillButton
-                compact={embeddedDemo}
                 icon={<ArrowUpFromLine className={hubIconSize} strokeWidth={iconStroke} />}
                 label="CSV / XLSX"
                 title="Upload a spreadsheet to start analyzing."
                 onClick={() => activate?.(CONNECT_WORKSPACE.UPLOAD)}
               />
               <PillButtonSoon
-                compact={embeddedDemo}
                 icon={<FileImage className={hubIconSize} strokeWidth={iconStroke} />}
                 label="PDF & image"
               />
               <PillButtonSoon
-                compact={embeddedDemo}
                 icon={<Braces className={hubIconSize} strokeWidth={iconStroke} />}
                 label="JSON"
               />
               <PillButton
-                compact={embeddedDemo}
                 icon={<FilePlus2 className={hubIconSize} strokeWidth={iconStroke} />}
                 label="Start from blank"
                 title="Empty sheet — build from scratch."
@@ -784,8 +765,8 @@ export default function ConnectDataStep1({
           </section>
 
           <section className="min-w-0 overflow-hidden">
-            <SectionTitle compact={embeddedDemo}>Integrations</SectionTitle>
-            <div className={integrationsListColClass}>
+            <SectionTitle>Integrations</SectionTitle>
+            <div className={integrationsColClass}>
               {connectIntegrationRows.map((row) => (
                 <div key={row.key}>
                   {row.warmConnect?.busy ? (
@@ -804,9 +785,8 @@ export default function ConnectDataStep1({
                     </div>
                   ) : isConnectHubIntegrationAvailable(row) ? (
                     <PillButton
-                      compact={embeddedDemo}
-                      className={embeddedDemo ? hubIntegrationsPill : integrationsPillClass}
-                      icon={<IntegrationIconWrap compact={embeddedDemo}>{row.icon}</IntegrationIconWrap>}
+                      className={hubIntegrationsPill}
+                      icon={<IntegrationIconWrap>{row.icon}</IntegrationIconWrap>}
                       label={row.name}
                       title={row.description}
                       onClick={() => onIntegrationRowClick(row)}
@@ -814,9 +794,8 @@ export default function ConnectDataStep1({
                     />
                   ) : (
                     <PillButtonSoon
-                      compact={embeddedDemo}
-                      className={embeddedDemo ? hubIntegrationsPill : integrationsPillClass}
-                      icon={<IntegrationIconWrap compact={embeddedDemo}>{row.icon}</IntegrationIconWrap>}
+                      className={hubIntegrationsPill}
+                      icon={<IntegrationIconWrap>{row.icon}</IntegrationIconWrap>}
                       label={row.name}
                       iconClassName={connectIntegrationIconClass(row.key)}
                     />
@@ -828,9 +807,8 @@ export default function ConnectDataStep1({
                   type="button"
                   onClick={() => activate?.(CONNECT_WORKSPACE.INTEGRATIONS_PICKER)}
                   className={cn(
-                    embeddedDemo ? hubIntegrationsPill : integrationsPillClass,
+                    hubIntegrationsPill,
                     "justify-center border-dashed text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground",
-                    embeddedDemo && "text-[9px]",
                   )}
                 >
                   + more
@@ -843,13 +821,12 @@ export default function ConnectDataStep1({
           <section className="min-w-0 overflow-hidden xl:min-w-[15rem] 2xl:min-w-[18rem]">
             <div className={cn("flex flex-col", hubColGapClass)}>
               <div>
-                <SectionTitle compact={embeddedDemo}>Dashboards</SectionTitle>
+                <SectionTitle>Dashboards</SectionTitle>
                 <div className={integrationsColClass}>
                   <PillLink
                     href={EXAMPLE_DASHBOARD.href}
                     external
                     wide
-                    compact={embeddedDemo}
                     icon={<LayoutDashboard className={hubIconSize} strokeWidth={iconStroke} />}
                     label={EXAMPLE_DASHBOARD.title}
                     title="Public example dashboard"
@@ -857,14 +834,13 @@ export default function ConnectDataStep1({
                 </div>
               </div>
               <div>
-                <SectionTitle compact={embeddedDemo}>Guides</SectionTitle>
+                <SectionTitle>Guides</SectionTitle>
                 <div className={integrationsColClass}>
-                  {CONNECT_HOME_GUIDES.slice(0, embeddedDemo ? 3 : 5).map((g) => (
+                  {CONNECT_HOME_GUIDES.slice(0, 5).map((g) => (
                     <PillLink
                       key={g.slug}
                       href={`/guides/${g.slug}`}
                       wide
-                      compact={embeddedDemo}
                       icon={<BookOpen className={hubIconSize} strokeWidth={iconStroke} />}
                       label={g.title}
                       title={g.publishedAt ? `${g.title} — published ${g.publishedAt}` : g.title}
@@ -873,12 +849,11 @@ export default function ConnectDataStep1({
                 </div>
               </div>
               <div>
-                <SectionTitle compact={embeddedDemo}>Templates</SectionTitle>
+                <SectionTitle>Templates</SectionTitle>
                 <div className={integrationsColClass}>
                   {PREDICTION_TEMPLATES.map((t) => (
                     <PillButtonWide
                       key={t.id}
-                      compact={embeddedDemo}
                       icon={<LayoutTemplate className={hubIconSize} strokeWidth={iconStroke} />}
                       label={PREDICTION_TEMPLATE_LABEL}
                       title={PREDICTION_TEMPLATE_LABEL}

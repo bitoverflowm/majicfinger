@@ -3,7 +3,11 @@ import { cn } from "@/lib/utils";
 /** Shared Connect hub page padding (shell + standalone step 1). */
 export function connectHubPageClass(embeddedInShell = false, { embeddedDemo = false } = {}) {
   if (embeddedDemo) {
-    return cn("mx-auto w-full max-w-none px-2 pb-6 pt-1.5 sm:px-3 sm:pb-8 sm:pt-2");
+    return cn(
+      "mx-auto w-full max-w-none",
+      "pt-16 pb-10 sm:pt-20 sm:pb-12 md:pt-24 md:pb-14 lg:pt-28 lg:pb-16",
+      "px-4 pr-6 sm:px-5 sm:pr-8 md:px-6 md:pr-10 lg:px-8 lg:pr-12",
+    );
   }
   return cn(
     "mx-auto w-full max-w-7xl pb-20 sm:pb-24",
@@ -66,16 +70,18 @@ export const connectDemoAnalyzeMainClass = cn(
 
 export const connectDemoWorkspaceSectionClass = "relative mt-8 min-h-[28rem] sm:mt-10";
 
-/** Landing demo — in-card step rail + hub (mirrors dashboard grid, narrower rail). */
+/** Landing demo — in-card step rail + hub (same proportions as Connect home shell). */
 export const connectHubDemoLayoutClass = cn(
-  "grid w-full min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] items-start gap-x-2",
+  "grid w-full min-w-0 items-start",
+  "grid-cols-[8.5rem_minmax(0,1fr)] gap-x-6",
+  "lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
 );
 
-/** Demo hub — Import + Integrations only; two columns, single row (stack only below sm). */
+/** Demo hub — Import + Integrations only (two columns at sm+, stack on mobile). */
 export const connectHubDemoColumnGridClass = cn(
-  "grid w-full min-w-0 items-start gap-x-1.5",
-  "grid-cols-[repeat(2,minmax(0,1fr))]",
-  "max-sm:grid-cols-1 max-sm:gap-x-0 max-sm:gap-y-3",
+  "grid w-full min-w-0 grid-cols-1 gap-y-1",
+  "sm:grid-cols-2 sm:gap-x-6 lg:gap-x-8",
+  "max-sm:gap-y-3",
 );
 
 /** Step 2 section: whitespace above + viewport fill + scroll snap. */

@@ -306,7 +306,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
             {isDemo ? (
               <ConnectHomeFlowSteps
                 currentStep={connectFlowStep}
-                compact
                 sticky
                 className="sticky top-2 z-10 shrink-0 self-start"
               />
