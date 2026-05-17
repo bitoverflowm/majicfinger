@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { X } from "lucide-react";
 
 import { CONNECT_FLOW_STEPS } from "@/lib/connectHomeFlow";
 import { connectHubFlowStepsCollapsedPeekClass } from "@/lib/connectHubLayout";
@@ -59,6 +59,18 @@ export function ConnectHomeFlowSteps({
         </button>
       ) : null}
 
+      {collapsible && isExpanded ? (
+        <button
+          type="button"
+          className="mb-1 flex h-4 w-4 shrink-0 items-center justify-center self-start p-0 text-muted-foreground transition-colors hover:text-foreground"
+          onClick={() => onExpandedChange?.(false)}
+          aria-label="Hide platform steps"
+          title="Hide steps"
+        >
+          <X className="h-3 w-3" strokeWidth={2} aria-hidden />
+        </button>
+      ) : null}
+
       <div
         className={cn(
           "relative w-[8.5rem] lg:w-[10rem] xl:w-[11rem]",
@@ -66,18 +78,6 @@ export function ConnectHomeFlowSteps({
           collapsible && !isExpanded && "-translate-x-full pointer-events-none opacity-0",
         )}
       >
-        {collapsible && isExpanded ? (
-          <button
-            type="button"
-            className="absolute -right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-white text-muted-foreground shadow-sm transition-colors hover:bg-muted/60 hover:text-foreground dark:bg-slate-950 dark:hover:bg-slate-900"
-            onClick={() => onExpandedChange?.(false)}
-            aria-label="Hide platform steps"
-            title="Hide steps"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden />
-          </button>
-        ) : null}
-
         <ol className="flex flex-col gap-6">
           {CONNECT_FLOW_STEPS.map((item) => {
             const isActive = currentStep === item.step;
