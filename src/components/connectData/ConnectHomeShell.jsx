@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { CONNECT_WORKSPACE, isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
+import {
+  CONNECT_WORKSPACE,
+  isConnectIntegrationWorkspace,
+  isConnectSavedProjectWorkspace,
+} from "@/lib/connectHomeWorkspace";
 import { deriveConnectFlowStep, isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import {
@@ -18,6 +22,7 @@ import {
   CONNECT_HOME_SCROLL_ID,
   scheduleConnectAnalyzeAnchorScroll,
   scheduleConnectHomeIntegrationActivate,
+  scheduleConnectProjectSheetScroll,
   scheduleConnectWorkspaceScroll,
 } from "@/lib/connectHubScroll";
 import { useConnectHomeScrollPanels } from "@/hooks/useConnectHomeScrollPanels";
@@ -37,6 +42,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const context = useMyStateV2();
   const connectWorkspace = context?.connectWorkspace;
   const connectWorkspaceScrollTick = context?.connectWorkspaceScrollTick ?? 0;
+  const connectAnalyzeScrollTick = context?.connectAnalyzeScrollTick ?? 0;
   const connectHomeAnalyzeActive = !!context?.connectHomeAnalyzeActive;
   const connectDataLakePullState = context?.connectDataLakePullState ?? {};
   const dataConnected = context?.dataConnected;
@@ -143,17 +149,27 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [connectHomePanelsEngaged]);
 
   const scrollToWorkspace = useCallback(() => {
+    if (isConnectSavedProjectWorkspace(connectWorkspace) && hasSheetData) {
+      scheduleConnectProjectSheetScroll(workspaceRef, scrollRef);
+      return;
+    }
     if (connectHomeAnalyzeActive || hasSheetData) {
       scheduleConnectAnalyzeAnchorScroll(scrollRef);
       return;
     }
     scheduleConnectWorkspaceScroll(workspaceRef, scrollRef);
-  }, [connectHomeAnalyzeActive, hasSheetData]);
+  }, [connectWorkspace, connectHomeAnalyzeActive, hasSheetData]);
 
   useLayoutEffect(() => {
     if (!connectWorkspace || !connectWorkspaceScrollTick) return;
     scrollToWorkspace();
   }, [connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
+
+  useLayoutEffect(() => {
+    if (!connectAnalyzeScrollTick) return;
+    if (!isConnectSavedProjectWorkspace(connectWorkspace) && !connectHomeAnalyzeActive) return;
+    scrollToWorkspace();
+  }, [connectAnalyzeScrollTick, connectWorkspace, connectHomeAnalyzeActive, scrollToWorkspace]);
 
   useEffect(() => {
     setConnectHomeLeftNavOpen?.(!!showConnectLeftNav);

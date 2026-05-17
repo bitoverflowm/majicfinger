@@ -106,8 +106,29 @@ export function resolveConnectAnalyzeScrollTarget() {
   return (
     document.getElementById(CONNECT_HOME_ANALYZE_ANCHOR_ID) ||
     document.getElementById("connect-home-analyze-sheet") ||
-    document.getElementById("connect-home-analyze")
+    document.getElementById("connect-home-analyze") ||
+    document.getElementById(CONNECT_HOME_WORKSPACE_ID)
   );
+}
+
+/** After a saved project loads — scroll hub → workspace grid (retries until DOM mounts). */
+export function scheduleConnectProjectSheetScroll(workspaceElRef, scrollRootElRef) {
+  const tryScroll = () => {
+    const scrollRoot =
+      scrollRootElRef?.current ??
+      document.getElementById(CONNECT_HOME_SCROLL_ID);
+    const sheetTarget =
+      document.getElementById(CONNECT_HOME_ANALYZE_ANCHOR_ID) ||
+      document.getElementById("connect-home-analyze-sheet") ||
+      document.getElementById("connect-home-project-grid");
+    const workspaceEl =
+      workspaceElRef?.current ||
+      document.getElementById(CONNECT_HOME_WORKSPACE_ID);
+    const target = sheetTarget || workspaceEl;
+    if (!target) return false;
+    return scrollConnectHomeTargetIntoView(scrollRoot, target, { behavior: "smooth" });
+  };
+  runWithRetries(tryScroll, [0, 80, 200, 400, 700, 1100, 1800, 2600]);
 }
 
 export function scrollConnectWorkspaceIntoView(workspaceEl, scrollRootEl) {

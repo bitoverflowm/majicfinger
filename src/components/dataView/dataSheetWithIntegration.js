@@ -56,6 +56,7 @@ import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import {
   connectAnalyzeAnchorClass,
+  connectAnalyzeSectionFitClass,
   connectHomeAnalyzeMainClass,
   connectHomeDrawerAsideFixedClass,
   connectHomeWorkspaceRowClass,
@@ -669,6 +670,15 @@ export default function DataSheetWithIntegration({
   const connectHomeWorkspaceLive =
     connectHomeMode && showConnectIntegrationIntro && showConnectAnalyzeSection;
 
+  /** Saved project grid — same viewport height contract as Step 2 analyze (flex chain + fillViewport). */
+  const connectHomeProjectGridLive =
+    isSavedProjectWorkspace &&
+    hasConnectSheetData &&
+    !effectiveChartMode &&
+    !effectiveDashboardMode;
+
+  const connectHomeSheetLayoutLive = connectHomeWorkspaceLive || connectHomeProjectGridLive;
+
   const connectHomeSidebarTab =
     rightPanelTab === "integrations" ||
     rightPanelTab === "requestHistory" ||
@@ -956,19 +966,19 @@ export default function DataSheetWithIntegration({
       {(!showConnectIntegrationIntro || showConnectAnalyzeSection) && (
       <div
         className={
-          connectHomeWorkspaceLive
+          connectHomeSheetLayoutLive
             ? connectHomeWorkspaceRowClass
             : "flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6"
         }
       >
         <main
           ref={mainColumnRef}
-          id={connectHomeWorkspaceLive ? "connect-home-analyze-sheet" : undefined}
+          id={connectHomeSheetLayoutLive ? "connect-home-analyze-sheet" : undefined}
           className={cn(
-            connectHomeWorkspaceLive
+            connectHomeSheetLayoutLive
               ? connectHomeAnalyzeMainClass
               : "relative min-w-0 flex-1",
-            !connectHomeWorkspaceLive &&
+            !connectHomeSheetLayoutLive &&
               (effectiveChartMode || connectHomeAnalyzeDashboard
                 ? "flex min-h-0 flex-col overflow-hidden"
                 : "overflow-auto"),
@@ -976,7 +986,7 @@ export default function DataSheetWithIntegration({
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
         >
-          {connectHomeWorkspaceLive ? (
+          {connectHomeSheetLayoutLive ? (
             <div
               id="connect-home-analyze-anchor"
               className={cn("h-0 w-full shrink-0 snap-start", connectAnalyzeAnchorClass)}
@@ -1116,6 +1126,16 @@ export default function DataSheetWithIntegration({
               showWorkspaceNav={!!showConnectWorkspaceNav}
               onPanelManualOpen={handleConnectHomePanelManualOpen}
             />
+          ) : connectHomeProjectGridLive ? (
+            <section
+              id="connect-home-project-grid"
+              className={cn("flex w-full min-w-0 flex-col", connectAnalyzeSectionFitClass)}
+            >
+              {showConnectWorkspaceNav ? connectWorkspaceNav : null}
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <DataView user={user} startNew={startNew} setStartNew={setStartNew} fillViewport />
+              </div>
+            </section>
           ) : (
             <>
               {showConnectWorkspaceNav ? connectWorkspaceNav : null}

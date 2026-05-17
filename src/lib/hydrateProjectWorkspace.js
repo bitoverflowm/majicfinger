@@ -1,4 +1,5 @@
 import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
+import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 
 /**
  * Shared helpers to load a saved DataSet (project) into sheet + chart workspace state.
@@ -217,6 +218,11 @@ export function finishConnectHomeProjectLoad({
   setConnectHomeAnalyzeActive?.(true);
   if (scroll) {
     requestConnectAnalyzeScroll?.();
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        scheduleConnectProjectSheetScroll();
+      });
+    }
   }
   if (rightPanelTab) {
     setRightPanelTab?.(rightPanelTab);
