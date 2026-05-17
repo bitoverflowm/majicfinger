@@ -208,7 +208,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     }
 
     setRightPanelOpen?.(true);
-    if (connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER || showDataWorkspace) {
+    /** Only default integrations for the picker / pre-upload — not loaded projects (user may open Request history). */
+    if (connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER) {
+      setRightPanelTab?.("integrations");
+    } else if (connectWorkspace === CONNECT_WORKSPACE.UPLOAD && !dataConnected) {
       setRightPanelTab?.("integrations");
     }
   }, [
