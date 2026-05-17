@@ -47,6 +47,8 @@ const DataView = ({ user, fillViewport = false }) => {
   const hasChainlinkStream = Object.values(liveStreamState?.streamsBySheetId || {}).some(
     (s) => s?.type === "chainlink"
   );
+  /** Connect home Step 2: share viewport between grid + live chart (avoid 500px chart collapsing the sheet). */
+  const chainlinkConnectSplit = fillViewport && hasChainlinkStream;
 
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
@@ -166,15 +168,20 @@ const DataView = ({ user, fillViewport = false }) => {
       {showGrid ? (
         <div
           className={cn(
-            "relative flex flex-col gap-3",
-            fillViewport ? "min-h-0 flex-1" : "min-h-0",
+            "relative flex min-h-0 flex-col gap-3",
+            fillViewport && "flex-1 overflow-hidden",
           )}
         >
           <div
             className={cn(
-              "min-h-0 w-full max-w-full shrink-0",
-              fillViewport && "flex min-h-0 flex-1 flex-col",
-              hasChainlinkStream && "overflow-auto",
+              "min-h-0 w-full max-w-full",
+              chainlinkConnectSplit
+                ? "flex min-h-[12rem] flex-1 flex-col overflow-hidden"
+                : cn(
+                    "shrink-0",
+                    fillViewport && "flex min-h-0 flex-1 flex-col",
+                    hasChainlinkStream && "overflow-auto",
+                  ),
             )}
           >
             <GridView fillViewport={fillViewport} />
@@ -191,8 +198,14 @@ const DataView = ({ user, fillViewport = false }) => {
             </p>
           )}
           {hasChainlinkStream && (
-            <div className="pb-10">
+            <div
+              className={cn(
+                "shrink-0 min-h-0",
+                chainlinkConnectSplit ? "border-t border-border/50 pt-2" : "pb-10",
+              )}
+            >
               <ChainlinkLiveChart
+                compact={chainlinkConnectSplit}
                 dataSheets={dataSheets || {}}
                 streamsBySheetId={liveStreamState?.streamsBySheetId || {}}
               />

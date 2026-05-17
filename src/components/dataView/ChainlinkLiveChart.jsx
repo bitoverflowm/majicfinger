@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Liveline } from "liveline";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const SHEET_COLORS = [
   "#3b82f6", // shadcn blue
@@ -32,7 +33,12 @@ function toValue(row) {
   return Number.isFinite(n) ? n : null;
 }
 
-export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
+export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {}, compact = false }) {
+  const chartHeight = compact ? 260 : 500;
+  const chartMinHeight = compact ? 260 : 500;
+  const outerClass = compact
+    ? "mt-2 rounded-lg border border-border bg-card p-2"
+    : "pb-10 mb-20 mt-4 rounded-lg border border-border bg-card p-3";
   const [split, setSplit] = useState(false);
 
   const chainlinkSheets = useMemo(() => {
@@ -95,7 +101,7 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
     const paused = !!stream.isPaused;
 
     return (
-      <div className="pb-10 mb-20 mt-4 rounded-lg border border-border bg-card p-3">
+      <div className={outerClass}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-xs font-medium text-muted-foreground">Price vs time (live)</p>
           {paused && (
@@ -104,7 +110,7 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
             </span>
           )}
         </div>
-        <div style={{ height: 500, minHeight: 500 }} className=" w-full">
+        <div style={{ height: chartHeight, minHeight: chartMinHeight }} className="w-full">
           <Liveline
             data={rows}
             value={rows[rows.length - 1]?.value ?? 0}
@@ -134,7 +140,12 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
   const paused = pausedMulti;
 
   return (
-    <div className="pb-10 mb-20 rounded-lg border border-border bg-card p-3 transition-all duration-300 ease-in-out">
+    <div
+      className={cn(
+        "rounded-lg border border-border bg-card transition-all duration-300 ease-in-out",
+        compact ? "p-2" : "pb-10 mb-20 p-3",
+      )}
+    >
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">Price vs time (live)</p>
         <div className="flex items-center gap-2">
@@ -162,10 +173,16 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
             {series.map((s, index) => (
               <div
                 key={s.id}
-                className="h-[460px] rounded-lg border border-border/60 bg-card/80 p-2 transition-all duration-300 ease-in-out"
+                className={cn(
+                  "rounded-lg border border-border/60 bg-card/80 p-2 transition-all duration-300 ease-in-out",
+                  compact ? "h-[220px]" : "h-[460px]",
+                )}
               >
                 <p className="mb-1 text-[11px] font-medium text-muted-foreground">{s.label}</p>
-                <div className="w-full" style={{ height: 340, minHeight: 340 }}>
+                <div
+                  className="w-full"
+                  style={{ height: compact ? 180 : 340, minHeight: compact ? 180 : 340 }}
+                >
                   <Liveline
                     data={s.data}
                     value={s.value}
@@ -190,7 +207,13 @@ export function ChainlinkLiveChart({ dataSheets = {}, streamsBySheetId = {} }) {
             ))}
           </div>
         ) : (
-          <div style={{ height: 360, minHeight: 360 }} className="w-full overflow-visible">
+          <div
+            style={{
+              height: compact ? chartHeight : 360,
+              minHeight: compact ? chartMinHeight : 360,
+            }}
+            className="w-full overflow-visible"
+          >
             <Liveline
               series={series}
               theme="light"
