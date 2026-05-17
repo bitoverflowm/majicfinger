@@ -44,13 +44,11 @@ export function ConnectHomeAnalyzeSection({
         className,
       )}
     >
-      {!showWorkspaceNav ? (
-        <div className="mb-4 shrink-0">
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Execute operations, bucketing, formulas on your data sheet. Download, JSON, CSV, xlsx. Pull more data via integrations or uploading your own data sheet. Chart and create your dashboards to share with your audience/ team.
-          </p>
-        </div>
-      ) : null}
+      <div className="mb-4 shrink-0">
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          Execute operations, bucketing, formulas on your data sheet. Download, JSON, CSV, xlsx. Pull more data via integrations or uploading your own data sheet. Chart and create your dashboards to share with your audience/ team.
+        </p>
+      </div>
 
       {showWorkspaceNav ? (
         <ConnectHomeWorkspaceNav

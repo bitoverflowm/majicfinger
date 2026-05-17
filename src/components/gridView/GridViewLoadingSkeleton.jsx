@@ -1,5 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { connectGridToolbarCompactClass } from "@/lib/connectGridCompact";
+import { connectGridFillViewportClass, connectGridToolbarCompactClass } from "@/lib/connectGridCompact";
 import { cn } from "@/lib/utils";
 
 /** Toolbar placeholders while sheet data is loading (Connect home pull, rehydrate, etc.). */
@@ -36,7 +36,7 @@ export function GridTableSkeleton({ fillViewport = false, className, compact = f
     <div
       className={cn(
         "flex min-h-0 flex-col overflow-hidden rounded-md border border-border/60 bg-white dark:bg-slate-950",
-        fillViewport ? "min-h-[16rem] flex-1" : "h-[550px]",
+        fillViewport ? connectGridFillViewportClass : "h-[550px]",
         className,
       )}
       aria-busy="true"

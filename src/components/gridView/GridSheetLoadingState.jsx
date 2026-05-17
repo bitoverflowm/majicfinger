@@ -1,5 +1,6 @@
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { GridTableSkeleton } from "@/components/gridView/GridViewLoadingSkeleton";
+import { connectGridFillViewportClass } from "@/lib/connectGridCompact";
 import { cn } from "@/lib/utils";
 
 /** Connect Step 2 — progress + animated table skeleton while sheet data loads. */
@@ -14,7 +15,7 @@ export function GridSheetLoadingState({
     <div
       className={cn(
         "flex min-h-0 w-full flex-col gap-3",
-        fillViewport && "min-h-[16rem] flex-1",
+        fillViewport && connectGridFillViewportClass,
         className,
       )}
       aria-busy="true"

@@ -11,6 +11,9 @@ export const connectGridAgCompactClass = cn(
   "[--ag-list-item-height:22px]",
 );
 
+/** Connect analyze grid — slightly shorter than full flex stretch (toolbar + pagination breathing room). */
+export const connectGridFillViewportClass = "min-h-[16rem] flex-1 mb-4";
+
 /** Toolbar above the grid on Connect analyze. */
 export const connectGridToolbarCompactClass = "gap-1.5 py-1.5";
 

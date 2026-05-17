@@ -166,6 +166,7 @@ export default function DataSheetWithIntegration({
   const connectHomeKalshiPullBridge =
     connectHomeMode && connectWorkspace === "kalshiHistorical";
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
+  const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive;
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
   const rightPanelOpen = contextStateV2?.rightPanelOpen;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
@@ -494,12 +495,35 @@ export default function DataSheetWithIntegration({
   const closePanel = useCallback(() => {
     if (isPanelClosing) return;
     setDrawerExpanded(false);
-    beginPanelClose(() => {
-      setRightPanelOpen?.(false);
-      wasOpenRef.current = false;
-      if (connectHomeMode) onConnectHomePanelUserDismiss?.();
-    });
-  }, [isPanelClosing, beginPanelClose, connectHomeMode, onConnectHomePanelUserDismiss, setRightPanelOpen]);
+    if (connectHomeMode) onConnectHomePanelUserDismiss?.();
+    setRightPanelOpen?.(false);
+  }, [isPanelClosing, connectHomeMode, onConnectHomePanelUserDismiss, setRightPanelOpen]);
+
+  /** Workspace nav / tab bar — sync context + local slide state (fixes stuck closed after X). */
+  const handleConnectHomePanelManualOpen = useCallback(
+    (tab) => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
+      setIsPanelClosing(false);
+      wasOpenRef.current = true;
+      setIsPanelOpen(true);
+      if (tab) setRightPanelTab?.(tab);
+      setRightPanelOpen?.(true);
+      if (connectHomeMode) {
+        setConnectHomeAnalyzeActive?.(true);
+        onConnectHomePanelManualOpen?.(tab);
+      }
+    },
+    [
+      connectHomeMode,
+      onConnectHomePanelManualOpen,
+      setConnectHomeAnalyzeActive,
+      setRightPanelOpen,
+      setRightPanelTab,
+    ],
+  );
 
   const backToDashboardLoadScreen = useCallback(() => {
     if (!dashboardMode) return;
@@ -635,17 +659,17 @@ export default function DataSheetWithIntegration({
   const connectHomeWorkspaceLive =
     connectHomeMode && showConnectIntegrationIntro && showConnectAnalyzeSection;
 
-  const connectHomeManualDrawerTab =
-    !!rightPanelOpen &&
-    (rightPanelTab === "integrations" ||
-      rightPanelTab === "requestHistory" ||
-      rightPanelTab === "export");
+  const connectHomeSidebarTab =
+    rightPanelTab === "integrations" ||
+    rightPanelTab === "requestHistory" ||
+    rightPanelTab === "export";
+  const connectHomeInAnalyzeContext = connectHomeAnalyzeActive || hasConnectSheetData;
   const connectHomeDrawerAllowed =
     !connectHomeMode ||
-    (connectHomeAnalyzeActive &&
+    (connectHomeInAnalyzeContext &&
       (connectHomePanelsVisible ||
         hasConnectSheetData ||
-        connectHomeManualDrawerTab ||
+        connectHomeSidebarTab ||
         rightPanelTab === "charts" ||
         rightPanelTab === "dashboard") &&
       (!showConnectIntegrationIntro || showConnectAnalyzeSection));
@@ -708,14 +732,12 @@ export default function DataSheetWithIntegration({
     const enteredChart = tab === "charts" && prev !== "charts";
     const enteredDashboard = tab === "dashboard" && prev !== "dashboard";
     if (!enteredChart && !enteredDashboard) return;
-    onConnectHomePanelManualOpen?.();
-    setRightPanelOpen?.(true);
+    handleConnectHomePanelManualOpen(rightPanelTab || "charts");
   }, [
     connectHomeMode,
     connectHomeWorkspaceLive,
     rightPanelTab,
-    onConnectHomePanelManualOpen,
-    setRightPanelOpen,
+    handleConnectHomePanelManualOpen,
   ]);
 
   useLayoutEffect(() => {
@@ -879,7 +901,7 @@ export default function DataSheetWithIntegration({
     <ConnectHomeWorkspaceNav
       compact
       className="mb-1 shrink-0 px-0.5 sm:px-1"
-      onPanelManualOpen={onConnectHomePanelManualOpen}
+      onPanelManualOpen={handleConnectHomePanelManualOpen}
     />
   ) : null;
 
@@ -959,20 +981,30 @@ export default function DataSheetWithIntegration({
               instantOpen={connectHomeMode}
               onOpen={() => {
                 if (effectiveDashboardMode) {
-                  if (connectHomeMode) onConnectHomePanelManualOpen?.("dashboard");
-                  setRightPanelTab?.("dashboard");
-                  if (!connectHomeMode) setViewing?.("dashboardComposer");
+                  if (connectHomeMode) {
+                    handleConnectHomePanelManualOpen("dashboard");
+                  } else {
+                    setRightPanelTab?.("dashboard");
+                    setViewing?.("dashboardComposer");
+                    setRightPanelOpen?.(true);
+                  }
                 } else if (effectiveChartMode) {
-                  if (connectHomeMode) onConnectHomePanelManualOpen?.("charts");
-                  setRightPanelTab?.("charts");
-                  if (!connectHomeMode) setViewing?.("charts");
-                } else {
-                  if (connectHomeMode) onConnectHomePanelManualOpen?.("integrations");
-                  setRightPanelTab?.("integrations");
-                  if (!connectHomeMode) setViewing?.("dataStart");
+                  if (connectHomeMode) {
+                    handleConnectHomePanelManualOpen("charts");
+                  } else {
+                    setRightPanelTab?.("charts");
+                    setViewing?.("charts");
+                    setRightPanelOpen?.(true);
+                  }
+                } else if (connectHomeMode) {
+                  handleConnectHomePanelManualOpen("integrations");
                   setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+                } else {
+                  setRightPanelTab?.("integrations");
+                  setViewing?.("dataStart");
+                  setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+                  setRightPanelOpen?.(true);
                 }
-                setRightPanelOpen?.(true);
               }}
             />
           )}
@@ -1072,7 +1104,7 @@ export default function DataSheetWithIntegration({
               startNew={startNew}
               setStartNew={setStartNew}
               showWorkspaceNav={!!showConnectWorkspaceNav}
-              onPanelManualOpen={onConnectHomePanelManualOpen}
+              onPanelManualOpen={handleConnectHomePanelManualOpen}
             />
           ) : (
             <>
@@ -1121,7 +1153,7 @@ export default function DataSheetWithIntegration({
                       setRightPanelTab?.(v);
                       setRightPanelOpen?.(true);
                       if (connectHomeMode) {
-                        onConnectHomePanelManualOpen?.(v);
+                        handleConnectHomePanelManualOpen(v);
                         if (v === "integrations") {
                           setIntegrationSidebar?.((prev) => prev ?? "polymarket");
                         }

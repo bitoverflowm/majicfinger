@@ -81,6 +81,7 @@ import { GridToolbarSkeleton } from "@/components/gridView/GridViewLoadingSkelet
 import { SHEET_GRID_PAGE_SIZE } from "@/config/dataLakeParquetSamples";
 import {
   connectGridAgCompactClass,
+  connectGridFillViewportClass,
   connectGridToolbarButtonCompactClass,
   connectGridToolbarCompactClass,
 } from "@/lib/connectGridCompact";
@@ -4954,7 +4955,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 className={cn(
                     agThemeClass,
                     fillViewport && connectGridAgCompactClass,
-                    fillViewport ? "min-h-[16rem] flex-1" : gridExpanded ? "h-[750px]" : "h-[550px]",
+                    fillViewport ? connectGridFillViewportClass : gridExpanded ? "h-[750px]" : "h-[550px]",
                 )}
             >
                 <AgGridReact 
