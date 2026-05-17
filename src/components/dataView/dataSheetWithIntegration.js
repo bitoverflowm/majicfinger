@@ -914,7 +914,7 @@ export default function DataSheetWithIntegration({
 
   /** Demo embed: absolute in viewport. Connect home + app: fixed flush to the right screen edge. */
   const drawerAsidePositionClass = isDemo
-    ? "absolute inset-y-0 right-0 z-20 flex flex-col gap-4 sm:gap-6 transition-[transform,width,min-width,max-width,left,right] duration-300 ease-out"
+    ? "sticky top-2 z-20 flex max-h-full shrink-0 flex-col gap-4 self-start sm:gap-6 transition-[transform,width,min-width,max-width] duration-300 ease-out"
     : cn(
         connectHomeDrawerAsideFixedClass,
         connectHomeMode
@@ -959,7 +959,10 @@ export default function DataSheetWithIntegration({
         onAddNewSheet={() => resolveSheetDestination("new_sheet")}
       />
       {showConnectIntegrationIntro ? (
-        <div id="connect-home-compose" className="w-full min-w-0 shrink-0 pb-96">
+        <div
+          id="connect-home-compose"
+          className={cn("w-full min-w-0 shrink-0", isDemo ? "pb-16" : "pb-96")}
+        >
           <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
           {connectHomeDataLakePullBridge ? (
             <div
@@ -1064,7 +1067,9 @@ export default function DataSheetWithIntegration({
             <div
               className={cn(
                 "flex min-h-0 min-w-0 flex-1 flex-col",
-                connectHomeSheetLayoutLive && CONNECT_HOME_WORKSPACE_MIN_H,
+                connectHomeSheetLayoutLive &&
+                  !isDemo &&
+                  CONNECT_HOME_WORKSPACE_MIN_H,
               )}
             >
               {connectWorkspaceNav}
@@ -1076,7 +1081,9 @@ export default function DataSheetWithIntegration({
             <div
               className={cn(
                 "flex min-h-0 min-w-0 flex-1 flex-col",
-                connectHomeSheetLayoutLive && CONNECT_HOME_WORKSPACE_MIN_H,
+                connectHomeSheetLayoutLive &&
+                  !isDemo &&
+                  CONNECT_HOME_WORKSPACE_MIN_H,
               )}
             >
               {connectWorkspaceNav}

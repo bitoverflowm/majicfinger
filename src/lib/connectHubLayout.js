@@ -68,7 +68,14 @@ export const connectDemoAnalyzeMainClass = cn(
   "min-h-[24rem]",
 );
 
-export const connectDemoWorkspaceSectionClass = "relative mt-8 min-h-[28rem] sm:mt-10";
+export const connectDemoWorkspaceSectionClass = cn(
+  "relative mt-8 min-h-0 flex-1 snap-start snap-always sm:mt-10",
+);
+
+/** Demo + analyze scroll container — mandatory snap between hub and workspace. */
+export const connectHubScrollSnapClass = "snap-y snap-mandatory";
+
+export const connectHubHubSnapClass = "snap-start snap-always";
 
 /** Landing demo — in-card step rail + hub (same proportions as Connect home shell). */
 export const connectHubDemoLayoutClass = cn(

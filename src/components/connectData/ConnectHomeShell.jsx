@@ -15,11 +15,14 @@ import {
   connectHubDemoLayoutClass,
   connectHubFlowStepsViewportCollapsedClass,
   connectHubFlowStepsViewportFixedClass,
+  connectHubHubSnapClass,
   connectHubLayoutClass,
   connectHubPageClass,
   connectHubScrollPaddingClass,
+  connectHubScrollSnapClass,
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
+import { useConnectHomeAnalyzeScrollLock } from "@/hooks/useConnectHomeAnalyzeScrollLock";
 import {
   CONNECT_HOME_SCROLL_ID,
   scheduleConnectAnalyzeAnchorScroll,
@@ -137,6 +140,15 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const trackAnalyzeSection =
     connectHomeAnalyzeActive && (hasSheetData || connectRequestSummaryReady);
 
+  const scrollLockEnabled =
+    workspaceActive && connectHomeAnalyzeActive && hasSheetData;
+
+  const { allowScrollAboveAnalyze } = useConnectHomeAnalyzeScrollLock({
+    scrollRef,
+    hubRef,
+    enabled: scrollLockEnabled,
+  });
+
   const { panelsVisible, analyzePanelsEngaged } = useConnectHomeScrollPanels({
     scrollRef,
     hubRef,
@@ -196,6 +208,12 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       return;
     }
 
+    /** Demo embed: drawer opens only when the user picks Integration / Chart / etc. */
+    if (isDemo && !connectHomePanelPinned) {
+      setRightPanelOpen?.(false);
+      return;
+    }
+
     const designPanelTab = isConnectHomeDesignPanelTab(rightPanelTab);
     const analyzePanelsAllowed =
       connectHomeAnalyzeActive &&
@@ -240,6 +258,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     connectWorkspace,
     setRightPanelOpen,
     setRightPanelTab,
+    isDemo,
+    connectHomePanelPinned,
   ]);
 
   useEffect(() => {
@@ -271,6 +291,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
         className={cn(
           "min-h-0 flex-1 overflow-y-auto",
           !isDemo && connectHubScrollPaddingClass,
+          (isDemo || connectHomeAnalyzeActive) && connectHubScrollSnapClass,
           !isDemo && !connectHomeAnalyzeActive && "snap-y snap-proximity",
           CONNECT_HOME_SURFACE,
         )}
@@ -311,7 +332,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
               />
             ) : null}
             <div className="flex min-w-0 flex-col">
-              <div ref={hubRef}>
+              <div ref={hubRef} className={connectHubHubSnapClass}>
                 <ConnectDataStep1
                   user={user}
                   userProfileFetchOk={userProfileFetchOk}
@@ -328,7 +349,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   className={cn(
                     isDemo
                       ? connectDemoWorkspaceSectionClass
-                      : "relative mt-16 min-h-[calc(100dvh-5.5rem)] sm:mt-20 md:mt-28",
+                      : cn(
+                          "relative mt-16 min-h-[calc(100dvh-5.5rem)] sm:mt-20 md:mt-28",
+                          connectHubHubSnapClass,
+                        ),
                     !isDemo && connectWorkspaceScrollInsetClass,
                     CONNECT_HOME_SURFACE,
                     "w-full min-w-0 max-w-none",
@@ -340,7 +364,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   {showDataWorkspace ? (
                     <div
                       className={cn(
-                        "relative flex min-h-[calc(100dvh-6rem)] flex-col",
+                        "relative flex min-h-0 flex-1 flex-col",
+                        !isDemo && "min-h-[calc(100dvh-6rem)]",
                         CONNECT_HOME_SURFACE,
                         CONNECT_HOME_GRID_SURFACE,
                         showUploadPanel && "hidden",
@@ -361,6 +386,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                           setConnectPanelUserDismissed(false);
                           setConnectHomePanelPinned(true);
                           if (tab) setConnectHomePreferredPanelTab(tab);
+                          if (tab === "integrations" && connectHomeAnalyzeActive) {
+                            allowScrollAboveAnalyze();
+                            scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
+                          }
                         }}
                       />
                     </div>
