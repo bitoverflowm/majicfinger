@@ -133,6 +133,11 @@ function ShareEmbedSection() {
   const hasShareableChart = useHasShareableChart();
   const { getBuilderSnapshot, getChartOgImageDataUrl } = useChartBuilder();
   const activeChartMeta = activeChartSheetId ? (chartSheets?.[activeChartSheetId]?.chartMeta || loadedChartMeta) : loadedChartMeta;
+  const activeChartSheet = activeChartSheetId ? chartSheets?.[activeChartSheetId] : null;
+  const workbookChartName = useMemo(
+    () => (activeChartSheet?.chartMeta?.chart_name || activeChartSheet?.name || "").trim(),
+    [activeChartSheet],
+  );
 
   const syncActiveChartSheet = useCallback((chartMeta, snapshot = null) => {
     if (!activeChartSheetId || !chartMeta) return;
@@ -180,12 +185,16 @@ function ShareEmbedSection() {
   }, []);
 
   useEffect(() => {
+    setPendingChartName(workbookChartName);
+  }, [activeChartSheetId, workbookChartName]);
+
+  useEffect(() => {
     if (activeChartMeta?.public_slug) {
       setSlugInput(activeChartMeta.public_slug);
       return;
     }
-    setSlugInput(normalizeChartEmbedSlug(activeChartMeta?.chart_name || "chart") || "chart");
-  }, [activeChartMeta?._id, activeChartMeta?.chart_name, activeChartMeta?.public_slug]);
+    setSlugInput(normalizeChartEmbedSlug(workbookChartName || activeChartMeta?.chart_name || "chart") || "chart");
+  }, [activeChartMeta?._id, activeChartMeta?.chart_name, activeChartMeta?.public_slug, workbookChartName]);
 
   const publicUrl = useMemo(() => {
     const slug = normalizeChartEmbedSlug(slugInput);
@@ -230,7 +239,7 @@ function ShareEmbedSection() {
       return;
     }
 
-    const chartName = (pendingChartName || "").trim();
+    const chartName = (workbookChartName || pendingChartName || "").trim();
     if (!chartName) {
       toast.error("Name your chart to proceed");
       return;
@@ -333,6 +342,7 @@ function ShareEmbedSection() {
     pendingChartName,
     pendingSlug,
     uploadOgImage,
+    workbookChartName,
     setLoadedChartMeta,
     setRefetchChart,
     user,
@@ -353,10 +363,7 @@ function ShareEmbedSection() {
       return;
     }
       if (!activeChartMeta?._id) {
-      const guessed =
-        (slugInput || "").trim() ||
-        (pendingChartName || "").trim() ||
-        "chart";
+      const guessed = (workbookChartName || slugInput || pendingChartName || "").trim() || "chart";
       setPendingChartName(guessed);
       setShowSavePublishDialog(true);
       return;
@@ -381,7 +388,8 @@ function ShareEmbedSection() {
         ? { ...full.chart_properties[0] }
         : {};
     const snapshot = getBuilderSnapshot();
-    const chart_properties = [{ ...prev0, rechartsBuilder: snapshot }];
+    const publishChartName = (workbookChartName || full.chart_name || "").trim() || "Chart";
+    const chart_properties = [{ ...prev0, title: publishChartName, rechartsBuilder: snapshot }];
     const ogImageUrl = await uploadOgImage(activeChartMeta._id);
 
     const putRes = await fetch(`/api/charts/chart/${activeChartMeta._id}`, {
@@ -389,7 +397,7 @@ function ShareEmbedSection() {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chart_name: full.chart_name,
+        chart_name: publishChartName,
         chart_properties,
         labels: full.labels?.length ? full.labels : ["export"],
         public_slug: slug,
@@ -412,6 +420,7 @@ function ShareEmbedSection() {
     userHandle,
     activeChartMeta,
     pendingChartName,
+    workbookChartName,
     slugInput,
     setLoadedChartMeta,
     getBuilderSnapshot,

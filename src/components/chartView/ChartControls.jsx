@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
+import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Calendar } from "@/components/ui/calendar";
@@ -148,6 +149,9 @@ export default function ChartControls() {
     chartDataOverrideMeta,
     setChartDataOverride,
     setChartDataOverrideMeta,
+
+    chartName,
+    setChartName,
 
     selChartType,
     setSelChartType,
@@ -323,8 +327,12 @@ export default function ChartControls() {
   /** Selected chart type uses the same color users see on hover (works for light/dark). */
   const chartTypeSelectedClass = "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50";
 
-  // Only one section open at a time; default to Chart Type.
-  const [openSection, setOpenSection] = useState("chartType");
+  // Only one section open at a time; default to Chart Meta.
+  const [openSection, setOpenSection] = useState("chartMeta");
+  const chartSlugPreview = useMemo(
+    () => normalizeChartEmbedSlug((chartName || "").trim() || "chart") || "chart",
+    [chartName],
+  );
   const [lineAddValue, setLineAddValue] = useState("");
   const [linesOpen, setLinesOpen] = useState(true);
   const [lineAdvancedOpen, setLineAdvancedOpen] = useState(false);
@@ -896,6 +904,30 @@ export default function ChartControls() {
             onValueChange={(v) => setOpenSection(v || "")}
             className="w-full"
           >
+              <AccordionItem value="chartMeta">
+                <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
+                  Chart Meta
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="chart-meta-name" className="text-xs text-muted-foreground">
+                      Name your chart
+                    </Label>
+                    <Input
+                      id="chart-meta-name"
+                      value={chartName}
+                      onChange={(e) => setChartName(e.target.value)}
+                      placeholder="my-chart"
+                      className="h-8 text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Used for export, publish, and URL slug:{" "}
+                      <span className="font-mono text-foreground/80">{chartSlugPreview}</span>
+                    </p>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
               <AccordionItem value="chartType">
                 <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
                   <span className="flex items-center gap-2">

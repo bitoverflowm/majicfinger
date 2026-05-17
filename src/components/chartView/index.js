@@ -592,6 +592,42 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const effectiveData = (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length) ? chartDataOverride : connectedData;
   const effectiveCols = (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length) ? Object.keys(chartDataOverride[0] || {}).map((field) => ({ field })) : connectedCols;
   const activeSheetId = contextStateV2?.activeSheetId;
+  const activeChartSheetId = contextStateV2?.activeChartSheetId;
+  const chartSheets = contextStateV2?.chartSheets || {};
+  const setChartSheets = contextStateV2?.setChartSheets;
+  const activeChartSheet = activeChartSheetId ? chartSheets[activeChartSheetId] : null;
+  const resolvedChartName = (
+    activeChartSheet?.chartMeta?.chart_name ||
+    activeChartSheet?.name ||
+    ""
+  ).trim();
+
+  const [chartName, setChartNameState] = useState("");
+
+  useEffect(() => {
+    setChartNameState(resolvedChartName);
+  }, [activeChartSheetId, resolvedChartName]);
+
+  const setChartName = useCallback(
+    (next) => {
+      const value = String(next ?? "");
+      setChartNameState(value);
+      if (!activeChartSheetId) return;
+      setChartSheets?.((prev) => {
+        const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+        const displayName = value.trim() || cur.name || "Chart";
+        return {
+          ...(prev || {}),
+          [activeChartSheetId]: {
+            ...cur,
+            name: displayName,
+            chartMeta: cur.chartMeta ? { ...cur.chartMeta, chart_name: displayName } : cur.chartMeta,
+          },
+        };
+      });
+    },
+    [activeChartSheetId, setChartSheets],
+  );
 
   const [selChartType, setSelChartType] = useState('area');
 
@@ -1499,6 +1535,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     getChartPngDataUrl,
     getChartOgImageDataUrl,
     getBuilderSnapshot,
+
+    chartName,
+    setChartName,
 
     selChartType,
     setSelChartType,
