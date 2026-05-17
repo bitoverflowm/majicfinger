@@ -7,7 +7,7 @@ import { connectHubFlowStepsCollapsedPeekClass } from "@/lib/connectHubLayout";
 import { cn } from "@/lib/utils";
 
 const peekTabBaseClass =
-  "pointer-events-auto flex h-11 w-8 flex-col items-center justify-center rounded-r-md border border-l-0 border-border/80 bg-white font-mono text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/50 dark:bg-slate-950 dark:hover:bg-slate-900";
+  "pointer-events-auto flex h-6 w-5 flex-col items-center justify-center rounded-r border border-l-0 border-border/70 bg-white font-mono text-[10px] font-medium leading-none text-muted-foreground shadow-sm transition-colors hover:bg-muted/40 hover:text-foreground dark:bg-slate-950 dark:hover:bg-slate-900";
 
 /**
  * Vertical step rail for the Connect hub (wireframe / inspiration layout).
