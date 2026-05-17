@@ -11,7 +11,6 @@ import {
 import { deriveConnectFlowStep, isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import {
-  connectHubFlowStepsSidebarOffsetClass,
   connectHubFlowStepsViewportFixedClass,
   connectHubLayoutClass,
   connectHubPageClass,
@@ -270,7 +269,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
             currentStep={connectFlowStep}
             className={cn(
               connectHubFlowStepsViewportFixedClass,
-              showConnectLeftNav && connectHubFlowStepsSidebarOffsetClass,
               panelsVisible && connectHomeAnalyzeActive && "hidden",
             )}
           />

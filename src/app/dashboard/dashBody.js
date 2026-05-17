@@ -3,9 +3,7 @@ import Link from "next/link";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 
-import SideNav from './components/sideNav'
 import Nav from './components/nav'
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
 import IntegrationsView from "@/components/integrationsView";
 import ConnectHomeShell from "@/components/connectData/ConnectHomeShell";
@@ -38,7 +36,6 @@ const DashBody = ({ user }) => {
     const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace
 
     const viewing = contextStateV2?.viewing
-    const connectHomeLeftNavOpen = !!contextStateV2?.connectHomeLeftNavOpen
     const rightPanelOpen = contextStateV2?.rightPanelOpen
     //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
@@ -308,21 +305,12 @@ const DashBody = ({ user }) => {
     };
 
 
-    /** Fixed nav clears the icon SideNav when it is in the layout (not Connect Step 1 before analyze). */
-    const navFixedLeftClass =
-      viewing === "connectDataHome" && !connectHomeLeftNavOpen
-        ? "left-0"
-        : "left-[var(--sidebar-width-icon,3rem)]";
-
     const content = (
       <>
         {!isDemo && (
           <>
             <header
-              className={cn(
-                "fixed top-0 right-0 z-30 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none",
-                navFixedLeftClass,
-              )}
+              className="fixed top-0 left-0 right-0 z-30 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none"
             >
               <Nav />
             </header>
@@ -469,35 +457,18 @@ const DashBody = ({ user }) => {
 
     return isDemo ? (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
-    ) : viewing === "connectDataHome" ? (
-      <SidebarProvider open={false} defaultOpen={false}>
-        <div className="relative flex min-h-svh min-w-0 flex-col">
-          <div
-            className={cn(
-              "flex min-h-0 min-w-0 flex-1",
-              isLocked && "pointer-events-none select-none",
-            )}
-          >
-            {connectHomeLeftNavOpen ? (
-              <SideNav user={user} startNew={startNew} setStartNew={setStartNew} />
-            ) : null}
-            <SidebarInset className="min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden">
-              {content}
-            </SidebarInset>
-          </div>
-          {paywallOverlay}
-        </div>
-      </SidebarProvider>
     ) : (
-      <SidebarProvider defaultOpen={false}>
-        <div className="relative flex min-h-0 min-w-0 flex-1">
-          <div className={cn("contents", isLocked && "pointer-events-none select-none")}>
-            <SideNav user={user} startNew={startNew} setStartNew={setStartNew} />
-            <SidebarInset className="min-h-0">{content}</SidebarInset>
-          </div>
-          {paywallOverlay}
+      <div className="relative flex min-h-svh min-w-0 flex-col">
+        <div
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 flex-col",
+            isLocked && "pointer-events-none select-none",
+          )}
+        >
+          {content}
         </div>
-      </SidebarProvider>
+        {paywallOverlay}
+      </div>
     );
 }
 

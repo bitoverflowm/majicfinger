@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react"
+import Image from "next/image"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import moment from "moment"
 import useSWR, { mutate } from "swr"
@@ -1222,13 +1224,30 @@ const Nav = () => {
       ? "Integrate"
       : "Connect";
 
-  const breadcrumb = viewing === 'dashboardComposer' ? 'Lychee / Dashboard' :
-    viewing === 'charts' ? 'Lychee / Charts' :
-    viewing === 'connectDataHome' ? `Lychee / ${connectBreadcrumbLabel}` :
-    (viewing === 'dataStart' || viewing === 'integrations') ? 'Lychee / Data' :
-    viewing === 'ai' ? 'Lychee / AI' :
-    viewing === 'scrape' ? 'Lychee / Scrape' :
-    viewing ? `Lychee / ${viewing}` : 'Lychee';
+  const navSubPage =
+    viewing === "dashboardComposer"
+      ? "Dashboard"
+      : viewing === "charts"
+        ? "Charts"
+        : viewing === "connectDataHome"
+          ? connectBreadcrumbLabel
+          : viewing === "dataStart" || viewing === "integrations"
+            ? "Data"
+            : viewing === "ai"
+              ? "AI"
+              : viewing === "scrape"
+                ? "Scrape"
+                : viewing === "presentation"
+                  ? "Presentation"
+                  : viewing === "pricing"
+                    ? "Pricing"
+                    : viewing === "profilePage"
+                      ? "Profile"
+                      : viewing === "manageAccount"
+                        ? "Billing"
+                        : viewing
+                          ? String(viewing).charAt(0).toUpperCase() + String(viewing).slice(1)
+                          : null;
 
   const showUnsavedFlag = connectedData && connectedData.length > 0 && !loadedDataMeta?.data_set_name && !loadedChartMeta?.chart_name;
   const upgradeSummary = largeProjectUpgradeSummary || currentAdvancedStorageSummary;
@@ -1238,23 +1257,45 @@ const Nav = () => {
   return (
     <>
     <div className="w-full flex flex-col items-start gap-2 px-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2 md:h-16">
-          <div className="flex min-w-0 flex-1 items-center gap-2 pl-2">
-            <div className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
-              <span className="text-sm font-semibold truncate">{breadcrumb}</span>
-              {loadedDataMeta?.data_set_name && (
-                <>
-                  <span className="hidden shrink-0 text-sm text-muted-foreground/50 sm:inline" aria-hidden>
-                    ·
-                  </span>
-                  <span
-                    className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline"
-                    title={loadedDataMeta.data_set_name}
-                  >
-                    {loadedDataMeta.data_set_name}
-                  </span>
-                </>
-              )}
-            </div>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 pl-2">
+            <Link
+              href="/dashboard"
+              className="flex min-w-0 items-center gap-2 rounded-md outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ring-1 ring-border">
+                <Image
+                  src="/logo.png"
+                  width={24}
+                  height={24}
+                  alt="Lychee"
+                  className="object-cover"
+                />
+              </span>
+              <span className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
+                <span className="shrink-0 text-sm font-semibold text-foreground">Lychee</span>
+                {navSubPage ? (
+                  <>
+                    <span className="shrink-0 text-sm font-medium text-muted-foreground" aria-hidden>
+                      /
+                    </span>
+                    <span className="truncate text-sm font-semibold text-foreground">{navSubPage}</span>
+                  </>
+                ) : null}
+              </span>
+            </Link>
+            {loadedDataMeta?.data_set_name ? (
+              <>
+                <span className="hidden shrink-0 text-sm text-muted-foreground/50 sm:inline" aria-hidden>
+                  ·
+                </span>
+                <span
+                  className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline"
+                  title={loadedDataMeta.data_set_name}
+                >
+                  {loadedDataMeta.data_set_name}
+                </span>
+              </>
+            ) : null}
           </div>
           { user ? (
               <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:ml-auto sm:flex-nowrap">
