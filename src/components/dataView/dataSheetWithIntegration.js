@@ -61,7 +61,10 @@ import {
   connectHomeWorkspaceRowClass,
   CONNECT_HOME_WORKSPACE_MIN_H,
 } from "@/lib/connectHubLayout";
-import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
+import {
+  isConnectIntegrationWorkspace,
+  isConnectSavedProjectWorkspace,
+} from "@/lib/connectHomeWorkspace";
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import DashboardComposerPage from "@/components/dashboardComposer/DashboardComposerPage";
@@ -162,6 +165,8 @@ export default function DataSheetWithIntegration({
   const connectWorkspace = contextStateV2?.connectWorkspace;
   const showConnectIntegrationIntro =
     connectHomeMode && isConnectIntegrationWorkspace(connectWorkspace);
+  const isSavedProjectWorkspace =
+    connectHomeMode && isConnectSavedProjectWorkspace(connectWorkspace);
   /** Mount pull handler when Connect home drawer is closed (same DataLakeParquetPanel + handleLoad). */
   const connectHomeKalshiPullBridge =
     connectHomeMode && connectWorkspace === "kalshiHistorical";
@@ -183,9 +188,13 @@ export default function DataSheetWithIntegration({
     showConnectIntegrationIntro &&
     (connectHomeAnalyzeActive || connectDataLakePullState.loading || hasConnectSheetData);
   const connectHomeChartsActive =
-    connectHomeMode && showConnectIntegrationIntro && rightPanelTab === "charts";
+    connectHomeMode &&
+    (showConnectIntegrationIntro || isSavedProjectWorkspace) &&
+    rightPanelTab === "charts";
   const connectHomeDashboardActive =
-    connectHomeMode && showConnectIntegrationIntro && rightPanelTab === "dashboard";
+    connectHomeMode &&
+    (showConnectIntegrationIntro || isSavedProjectWorkspace) &&
+    rightPanelTab === "dashboard";
   const effectiveChartMode = chartMode || connectHomeChartsActive;
   const effectiveDashboardMode = dashboardMode || connectHomeDashboardActive;
   const connectHomeAnalyzeDashboard =
@@ -196,12 +205,13 @@ export default function DataSheetWithIntegration({
     !connectDataLakePullState.loading;
   const showConnectWorkspaceNav =
     connectHomeMode &&
-    showConnectIntegrationIntro &&
-    (showConnectAnalyzeSection ||
-      effectiveChartMode ||
-      effectiveDashboardMode ||
-      rightPanelTab === "export" ||
-      connectDataLakePullState.loading);
+    ((showConnectIntegrationIntro &&
+      (showConnectAnalyzeSection ||
+        effectiveChartMode ||
+        effectiveDashboardMode ||
+        rightPanelTab === "export" ||
+        connectDataLakePullState.loading)) ||
+      (isSavedProjectWorkspace && hasConnectSheetData));
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
@@ -1108,7 +1118,13 @@ export default function DataSheetWithIntegration({
             />
           ) : (
             <>
-              <DataView user={user} startNew={startNew} setStartNew={setStartNew} />
+              {showConnectWorkspaceNav ? connectWorkspaceNav : null}
+              <DataView
+                user={user}
+                startNew={startNew}
+                setStartNew={setStartNew}
+                fillViewport={!!showConnectWorkspaceNav}
+              />
               {isDemo &&
               (integrationSidebar === "polymarketHistorical" || integrationSidebar === "kalshiHistorical") ? (
                 <p

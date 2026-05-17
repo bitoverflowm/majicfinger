@@ -54,6 +54,11 @@ const SideNav = () => {
   const setViewing = contextStateV2?.setViewing;
   const connectWorkspace = contextStateV2?.connectWorkspace;
   const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace;
+  const loadedDataMeta = contextStateV2?.loadedDataMeta;
+  const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive;
+  const setRightPanelTab = contextStateV2?.setRightPanelTab;
+  const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
+  const rightPanelTab = contextStateV2?.rightPanelTab;
   const isDemo = contextStateV2?.isDemo;
   const { state: sidebarState, toggleSidebar } = useSidebar();
 
@@ -66,12 +71,35 @@ const SideNav = () => {
     requestConnectWorkspace?.(workspaceId);
   };
 
+  const openConnectHomeCore = (panelTab) => {
+    setViewing?.("connectDataHome");
+    if (loadedDataMeta?._id) {
+      requestConnectWorkspace?.(CONNECT_WORKSPACE.PROJECT, { scroll: false });
+    }
+    setConnectHomeAnalyzeActive?.(true);
+    if (panelTab) {
+      setRightPanelTab?.(panelTab);
+      setRightPanelOpen?.(true);
+    } else {
+      setRightPanelTab?.((prev) =>
+        prev === "charts" || prev === "dashboard" ? "integrations" : prev,
+      );
+    }
+  };
+
   const isConnectHome = viewing === "connectDataHome";
   const isExpanded = !isConnectHome && sidebarState === "expanded";
 
-  const isDataActive = dataViewKeys.includes(viewing);
-  const isChartActive = chartViewKeys.includes(viewing);
-  const isDashboardActive = dashboardViewKeys.includes(viewing);
+  const isDataActive =
+    dataViewKeys.includes(viewing) ||
+    (isConnectHome &&
+      connectWorkspace === CONNECT_WORKSPACE.PROJECT &&
+      rightPanelTab !== "charts" &&
+      rightPanelTab !== "dashboard");
+  const isChartActive =
+    chartViewKeys.includes(viewing) || (isConnectHome && rightPanelTab === "charts");
+  const isDashboardActive =
+    dashboardViewKeys.includes(viewing) || (isConnectHome && rightPanelTab === "dashboard");
   const isUnderConstructionActive = underConstructionKeys.includes(viewing);
 
   return (
@@ -120,7 +148,7 @@ const SideNav = () => {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={isDataActive}
-                  onClick={() => viewHandler("dataStart")}
+                  onClick={() => openConnectHomeCore()}
                   tooltip="Data"
                 >
                   <Database className="h-5 w-5" />
@@ -171,7 +199,7 @@ const SideNav = () => {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={isChartActive}
-                  onClick={() => viewHandler("charts")}
+                  onClick={() => openConnectHomeCore("charts")}
                   tooltip="Chart"
                 >
                   <BarChart3 className="h-5 w-5" />
@@ -190,7 +218,7 @@ const SideNav = () => {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     isActive={isDashboardActive}
-                    onClick={() => viewHandler("dashboardComposer")}
+                    onClick={() => openConnectHomeCore("dashboard")}
                     tooltip="Dashboard"
                   >
                     <LayoutDashboard className="h-5 w-5" />

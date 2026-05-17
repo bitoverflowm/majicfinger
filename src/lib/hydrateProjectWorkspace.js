@@ -1,3 +1,5 @@
+import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
+
 /**
  * Shared helpers to load a saved DataSet (project) into sheet + chart workspace state.
  * Used by the nav (open project / open chart) and dashboard composer (open dashboard).
@@ -195,4 +197,82 @@ export async function loadFullProjectFromApi({
     setLoadedChartBuilderSnapshot,
   });
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+}
+
+/**
+ * After sheets/charts are hydrated, mount the project in Connect home (core dashboard).
+ */
+export function finishConnectHomeProjectLoad({
+  setViewing,
+  requestConnectWorkspace,
+  setConnectHomeAnalyzeActive,
+  requestConnectAnalyzeScroll,
+  setRightPanelTab,
+  setRightPanelOpen,
+  rightPanelTab = null,
+  scroll = true,
+}) {
+  setViewing?.("connectDataHome");
+  requestConnectWorkspace?.(CONNECT_WORKSPACE.PROJECT, { scroll });
+  setConnectHomeAnalyzeActive?.(true);
+  if (scroll) {
+    requestConnectAnalyzeScroll?.();
+  }
+  if (rightPanelTab) {
+    setRightPanelTab?.(rightPanelTab);
+    setRightPanelOpen?.(true);
+  }
+}
+
+/**
+ * Fetch project + hydrate workspace, then show it in Connect home.
+ */
+export async function openProjectInConnectHome({
+  dataSetId,
+  userId,
+  setDataSheets,
+  setActiveSheetId,
+  setConnectedData,
+  setLoadedDataMeta,
+  setLoadedDataId,
+  setSavedCharts,
+  setChartSheets,
+  setActiveChartSheetId,
+  setLoadedChartMeta,
+  setLoadedChartBuilderSnapshot,
+  setRefetchChartDashboardsTick,
+  setViewing,
+  requestConnectWorkspace,
+  setConnectHomeAnalyzeActive,
+  requestConnectAnalyzeScroll,
+  setRightPanelTab,
+  setRightPanelOpen,
+  rightPanelTab = null,
+  scroll = true,
+}) {
+  await loadFullProjectFromApi({
+    dataSetId,
+    userId,
+    setDataSheets,
+    setActiveSheetId,
+    setConnectedData,
+    setLoadedDataMeta,
+    setLoadedDataId,
+    setSavedCharts,
+    setChartSheets,
+    setActiveChartSheetId,
+    setLoadedChartMeta,
+    setLoadedChartBuilderSnapshot,
+    setRefetchChartDashboardsTick,
+  });
+  finishConnectHomeProjectLoad({
+    setViewing,
+    requestConnectWorkspace,
+    setConnectHomeAnalyzeActive,
+    requestConnectAnalyzeScroll,
+    setRightPanelTab,
+    setRightPanelOpen,
+    rightPanelTab,
+    scroll,
+  });
 }

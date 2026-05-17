@@ -32,6 +32,23 @@ function getColKeys(connectedCols) {
     .filter(Boolean);
 }
 
+/** True when the workbook has at least one chart the user can export or share. */
+function chartSheetIsShareable(sheet) {
+  if (!sheet || typeof sheet !== "object") return false;
+  if (sheet.userCreated === true) return true;
+  if (sheet.chartMeta?._id) return true;
+  if (sheet.snapshot) return true;
+  return false;
+}
+
+function useHasShareableChart() {
+  const chartSheets = useMyStateV2()?.chartSheets || {};
+  return useMemo(
+    () => Object.values(chartSheets).some(chartSheetIsShareable),
+    [chartSheets],
+  );
+}
+
 function SaveProjectSection() {
   const requestSaveProjectDialog = useMyStateV2()?.requestSaveProjectDialog;
   return (
@@ -56,38 +73,41 @@ function SaveProjectSection() {
 
 function ExportChartSection() {
   const { downloadChart } = useChartBuilder();
+  const hasShareableChart = useHasShareableChart();
   return (
     <div className="space-y-2">
       <p className="text-xs font-bold text-muted-foreground">Export Chart</p>
-      <div className="flex min-w-0 flex-wrap gap-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 px-2 text-[10px]"
-          onClick={() => downloadChart("png")}
-        >
-          PNG
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 px-2 text-[10px]"
-          onClick={() => downloadChart("svg")}
-        >
-          SVG
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 px-2 text-[10px]"
-          onClick={() => downloadChart("jpg")}
-        >
-          JPEG
-        </Button>
-      </div>
+      <TooltipProvider delayDuration={120}>
+        <div className="flex min-w-0 flex-wrap gap-1">
+          {[
+            ["png", "PNG"],
+            ["svg", "SVG"],
+            ["jpg", "JPEG"],
+          ].map(([format, label]) => (
+            <Tooltip key={format}>
+              <TooltipTrigger asChild>
+                <span tabIndex={hasShareableChart ? undefined : 0}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-[10px]"
+                    disabled={!hasShareableChart}
+                    onClick={() => downloadChart(format)}
+                  >
+                    {label}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {!hasShareableChart ? (
+                <TooltipContent side="top" className="text-xs">
+                  Create a chart from the Chart tab first
+                </TooltipContent>
+              ) : null}
+            </Tooltip>
+          ))}
+        </div>
+      </TooltipProvider>
     </div>
   );
 }
@@ -110,6 +130,7 @@ function ShareEmbedSection() {
   const setChartSheets = v2?.setChartSheets;
   const activeChartSheetId = v2?.activeChartSheetId;
   const setRefetchChart = v2?.setRefetchChart;
+  const hasShareableChart = useHasShareableChart();
   const { getBuilderSnapshot, getChartOgImageDataUrl } = useChartBuilder();
   const activeChartMeta = activeChartSheetId ? (chartSheets?.[activeChartSheetId]?.chartMeta || loadedChartMeta) : loadedChartMeta;
 
@@ -474,20 +495,33 @@ function ShareEmbedSection() {
             value={slugInput}
             onChange={(e) => setSlugInput(e.target.value)}
             placeholder="my-chart"
+            disabled={!hasShareableChart}
           />
         </div>
       </div>
       <div className="flex flex-wrap gap-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 px-2 text-[10px]"
-          onClick={publishEmbed}
-        >
-          Publish embed
-        </Button>
         <TooltipProvider delayDuration={120}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={hasShareableChart ? undefined : 0}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-[10px]"
+                  disabled={!hasShareableChart}
+                  onClick={publishEmbed}
+                >
+                  Publish embed
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!hasShareableChart ? (
+              <TooltipContent side="top" className="text-xs">
+                Create a chart from the Chart tab first
+              </TooltipContent>
+            ) : null}
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <span tabIndex={0}>
@@ -496,14 +530,18 @@ function ShareEmbedSection() {
                   variant="outline"
                   size="sm"
                   className="h-8 px-2 text-[10px]"
-                  disabled={!publicUrl || !isPublishedForCurrentSlug}
+                  disabled={!hasShareableChart || !publicUrl || !isPublishedForCurrentSlug}
                   onClick={() => copyText(publicUrl, "Link")}
                 >
                   Copy link
                 </Button>
               </span>
             </TooltipTrigger>
-            {!isPublishedForCurrentSlug ? (
+            {!hasShareableChart ? (
+              <TooltipContent side="top" className="text-xs">
+                Create a chart from the Chart tab first
+              </TooltipContent>
+            ) : !isPublishedForCurrentSlug ? (
               <TooltipContent side="top" className="text-xs">
                 only avail after you publish the chart
               </TooltipContent>
@@ -517,14 +555,18 @@ function ShareEmbedSection() {
                   variant="outline"
                   size="sm"
                   className="h-8 px-2 text-[10px]"
-                  disabled={!iframeSnippet || !isPublishedForCurrentSlug}
+                  disabled={!hasShareableChart || !iframeSnippet || !isPublishedForCurrentSlug}
                   onClick={() => copyText(iframeSnippet, "Iframe")}
                 >
                   Copy iframe
                 </Button>
               </span>
             </TooltipTrigger>
-            {!isPublishedForCurrentSlug ? (
+            {!hasShareableChart ? (
+              <TooltipContent side="top" className="text-xs">
+                Create a chart from the Chart tab first
+              </TooltipContent>
+            ) : !isPublishedForCurrentSlug ? (
               <TooltipContent side="top" className="text-xs">
                 only avail after you publish the chart
               </TooltipContent>
@@ -532,7 +574,7 @@ function ShareEmbedSection() {
           </Tooltip>
         </TooltipProvider>
       </div>
-      {publicUrl ? (
+      {hasShareableChart && publicUrl ? (
         <div className="flex items-center gap-2">
           <Link
             href={publicUrl}

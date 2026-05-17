@@ -21,7 +21,9 @@ import { Pause, Play, RotateCw, Square, ExternalLink, Loader2, ChevronDown, Chev
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
 import {
   applyDataSetToWorkspace,
+  finishConnectHomeProjectLoad,
   hydrateChartSheetsForDataSet,
+  openProjectInConnectHome,
 } from "@/lib/hydrateProjectWorkspace"
 import {
   persistChartDashboardDraft,
@@ -275,6 +277,11 @@ const Nav = () => {
   //what component are we viewing
   const viewing = contextStateV2?.viewing
   const setViewing = contextStateV2?.setViewing
+  const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace
+  const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive
+  const requestConnectAnalyzeScroll = contextStateV2?.requestConnectAnalyzeScroll
+  const setRightPanelTab = contextStateV2?.setRightPanelTab
+  const setRightPanelOpen = contextStateV2?.setRightPanelOpen
   const connectWorkspace = contextStateV2?.connectWorkspace
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
@@ -926,43 +933,45 @@ const Nav = () => {
       if (loadedDataMeta && dataSetId === loadedDataMeta._id) {
         bumpLoad(40, "Project already loaded. Refreshing project links…");
         setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
-        bumpLoad(90, "Opening data sheets…");
-        setViewing('dataStart');
+        bumpLoad(90, "Opening project workspace…");
+        finishConnectHomeProjectLoad({
+          setViewing,
+          requestConnectWorkspace,
+          setConnectHomeAnalyzeActive,
+          requestConnectAnalyzeScroll,
+        });
         setIsOpen(false);
         return;
       }
 
       bumpLoad(18, "Loading data sheets…");
       startProjectLoadTicker({ min: 18, max: 64 });
-      const response = await fetch(`/api/dataSets/dataSet/${dataSetId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      await openProjectInConnectHome({
+        dataSetId,
+        userId: user?.userId,
+        setDataSheets,
+        setActiveSheetId,
+        setConnectedData,
+        setLoadedDataMeta,
+        setLoadedDataId,
+        setSavedCharts,
+        setChartSheets,
+        setActiveChartSheetId,
+        setLoadedChartMeta,
+        setLoadedChartBuilderSnapshot,
+        setRefetchChartDashboardsTick,
+        setViewing,
+        requestConnectWorkspace,
+        setConnectHomeAnalyzeActive,
+        requestConnectAnalyzeScroll,
       });
-      const res = await response.json();
       stopProjectLoadTicker();
-      if (!response.ok || !res?.data) {
-        throw new Error(res?.message || "Failed to load project");
-      }
-
-      bumpLoad(66, "Hydrating data sheets into the workspace…");
-      await new Promise((r) => requestAnimationFrame(r));
-      applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData });
-      setLoadedDataMeta(res.data || dataSet);
-
-      bumpLoad(78, "Loading charts…");
-      await hydrateProjectCharts(dataSetId);
-
-      bumpLoad(88, "Loading dashboards and publish settings…");
-      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
 
       bumpLoad(96, "Opening project workspace…");
-      toast.success(`Project: ${res.data.data_set_name || dataSet?.data_set_name || "Untitled"} loaded`, {
+      toast.success(`Project: ${dataSet?.data_set_name || loadedDataMeta?.data_set_name || "Untitled"} loaded`, {
         duration: 99999999
       });
       setIsOpen(false);
-      setViewing('dataStart');
     } catch (error) {
       stopProjectLoadTicker();
       console.error("Error loading project:", error);
@@ -994,7 +1003,15 @@ const Nav = () => {
 
   const loadChart = async (chartId, chartMeta) => {
     if(loadedChartMeta && chartId === loadedChartMeta._id){
-      setViewing('charts')
+      finishConnectHomeProjectLoad({
+        setViewing,
+        requestConnectWorkspace,
+        setConnectHomeAnalyzeActive,
+        requestConnectAnalyzeScroll,
+        setRightPanelTab,
+        setRightPanelOpen,
+        rightPanelTab: "charts",
+      });
       setIsOpen(false)
     }else{
       fetch(`/api/charts/chart/${chartId}`, {
@@ -1028,10 +1045,18 @@ const Nav = () => {
                   ? incomingSnapshot
                   : inferDefaultBuilderSnapshot(rows)
                 setLoadedChartBuilderSnapshot?.(normalizedSnapshot)
+                finishConnectHomeProjectLoad({
+                  setViewing,
+                  requestConnectWorkspace,
+                  setConnectHomeAnalyzeActive,
+                  requestConnectAnalyzeScroll,
+                  setRightPanelTab,
+                  setRightPanelOpen,
+                  rightPanelTab: "charts",
+                });
               })
           })
           setIsOpen(false)
-          setViewing('charts')
         })
     }    
   }
@@ -1039,13 +1064,29 @@ const Nav = () => {
   const loadChartDashboard = (dashboardId) => {
     if (!dashboardId) return;
     if (activeChartDashboardId && String(dashboardId) === String(activeChartDashboardId)) {
-      setViewing("dashboardComposer");
+      finishConnectHomeProjectLoad({
+        setViewing,
+        requestConnectWorkspace,
+        setConnectHomeAnalyzeActive,
+        requestConnectAnalyzeScroll,
+        setRightPanelTab,
+        setRightPanelOpen,
+        rightPanelTab: "dashboard",
+      });
       setIsOpen(false);
       return;
     }
     setActiveChartDashboardId?.(String(dashboardId));
     setChartDashboardDraft?.(null);
-    setViewing("dashboardComposer");
+    finishConnectHomeProjectLoad({
+      setViewing,
+      requestConnectWorkspace,
+      setConnectHomeAnalyzeActive,
+      requestConnectAnalyzeScroll,
+      setRightPanelTab,
+      setRightPanelOpen,
+      rightPanelTab: "dashboard",
+    });
     setIsOpen(false);
     toast.success("Loading dashboard…", { duration: 4000 });
   };

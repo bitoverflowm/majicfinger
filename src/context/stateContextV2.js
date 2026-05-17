@@ -455,6 +455,17 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         resetConnectAnalyzeFlow();
         return;
       }
+      if (id === CONNECT_WORKSPACE.PROJECT) {
+        setConnectWorkspace(id);
+        setDataConnected(true);
+        const shouldScroll =
+          options?.scroll === true ||
+          (options?.scroll !== false && !isConnectWarmIntegration(id));
+        if (shouldScroll) {
+          setConnectWorkspaceScrollTick((t) => t + 1);
+        }
+        return;
+      }
       setConnectDataLakeSampleId("");
       setConnectKalshiColumnSelections({});
       setAthenaPingBySampleId({});

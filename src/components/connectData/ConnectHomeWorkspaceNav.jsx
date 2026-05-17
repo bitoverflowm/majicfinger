@@ -50,7 +50,10 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const dataSheetIds = useMemo(() => Object.keys(dataSheets || {}), [dataSheets]);
   const chartSheetIds = useMemo(
     () =>
-      Object.keys(chartSheets || {}).filter((id) => chartSheets[id]?.userCreated === true),
+      Object.keys(chartSheets || {}).filter((id) => {
+        const sheet = chartSheets[id];
+        return sheet?.userCreated === true || sheet?.chartMeta?._id || sheet?.snapshot;
+      }),
     [chartSheets],
   );
 

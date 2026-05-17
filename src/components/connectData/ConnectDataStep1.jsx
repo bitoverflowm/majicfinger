@@ -20,7 +20,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { API_INTEGRATIONS, integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
-import { loadFullProjectFromApi } from "@/lib/hydrateProjectWorkspace";
+import { openProjectInConnectHome } from "@/lib/hydrateProjectWorkspace";
 import { CONNECT_HOME_GUIDES } from "@/lib/guidesConnectHomeManifest";
 import {
   CONNECT_WORKSPACE,
@@ -250,7 +250,6 @@ export default function ConnectDataStep1({
   embeddedInShell = false,
 }) {
   const context = useMyStateV2();
-  const requestConnectWorkspace = context?.requestConnectWorkspace;
   const viewing = context?.viewing;
   const dataConnected = context?.dataConnected;
   const connectedData = context?.connectedData;
@@ -277,6 +276,9 @@ export default function ConnectDataStep1({
   const setLoadedChartMeta = context?.setLoadedChartMeta;
   const setLoadedChartBuilderSnapshot = context?.setLoadedChartBuilderSnapshot;
   const setRefetchChartDashboardsTick = context?.setRefetchChartDashboardsTick;
+  const requestConnectWorkspace = context?.requestConnectWorkspace;
+  const setConnectHomeAnalyzeActive = context?.setConnectHomeAnalyzeActive;
+  const requestConnectAnalyzeScroll = context?.requestConnectAnalyzeScroll;
 
   const hasDbBackedUserId =
     typeof user?.userId === "string" &&
@@ -477,7 +479,7 @@ export default function ConnectDataStep1({
     if (!dataSetId || loadProjectBusy || !hasDbBackedUserId) return;
     setLoadProjectBusy(true);
     try {
-      await loadFullProjectFromApi({
+      await openProjectInConnectHome({
         dataSetId,
         userId: user.userId,
         setDataSheets,
@@ -491,9 +493,12 @@ export default function ConnectDataStep1({
         setLoadedChartMeta,
         setLoadedChartBuilderSnapshot,
         setRefetchChartDashboardsTick,
+        setViewing,
+        requestConnectWorkspace,
+        setConnectHomeAnalyzeActive,
+        requestConnectAnalyzeScroll,
       });
       toast.success("Project opened");
-      setViewing?.("dataStart");
     } catch (e) {
       toast.error(e?.message || "Failed to load project");
     } finally {

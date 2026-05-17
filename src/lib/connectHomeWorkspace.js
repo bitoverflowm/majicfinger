@@ -4,15 +4,22 @@ import { API_INTEGRATIONS } from "@/components/integrationsView/integrationsConf
 export const CONNECT_WORKSPACE = {
   UPLOAD: "upload",
   BLANK: "blank",
+  /** Saved project opened in the core Connect home workspace (does not reset hydrated sheets). */
+  PROJECT: "project",
   /** Scroll to workspace + open right panel integrations picker (all integrations). */
   INTEGRATIONS_PICKER: "integrationsPicker",
 };
+
+export function isConnectSavedProjectWorkspace(id) {
+  return id === CONNECT_WORKSPACE.PROJECT;
+}
 
 export function isConnectIntegrationWorkspace(id) {
   return (
     typeof id === "string" &&
     id !== CONNECT_WORKSPACE.UPLOAD &&
     id !== CONNECT_WORKSPACE.BLANK &&
+    id !== CONNECT_WORKSPACE.PROJECT &&
     id !== CONNECT_WORKSPACE.INTEGRATIONS_PICKER &&
     id.length > 0
   );
@@ -53,6 +60,7 @@ export function isConnectHubIntegrationAvailable(row) {
 export function connectWorkspaceLabel(id) {
   if (id === CONNECT_WORKSPACE.UPLOAD) return "Upload";
   if (id === CONNECT_WORKSPACE.BLANK) return "Blank sheet";
+  if (id === CONNECT_WORKSPACE.PROJECT) return "Project";
   if (id === CONNECT_WORKSPACE.INTEGRATIONS_PICKER) return "Integrations";
   if (isConnectIntegrationWorkspace(id)) return "Integration";
   return "Workspace";

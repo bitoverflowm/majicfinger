@@ -63,6 +63,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     if (!connectWorkspace) return false;
     if (connectWorkspace === CONNECT_WORKSPACE.UPLOAD) return !!dataConnected;
     if (connectWorkspace === CONNECT_WORKSPACE.BLANK) return true;
+    if (connectWorkspace === CONNECT_WORKSPACE.PROJECT) return true;
     if (connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER) return true;
     if (isConnectIntegrationWorkspace(connectWorkspace)) return true;
     return false;
@@ -98,7 +99,11 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     !connectDataLakePullState.loading &&
     hasSheetData &&
     connectHomeAnalyzeActive &&
-    (isConnectIntegration ? hasSheetData : !!dataConnected);
+    (isConnectIntegration
+      ? hasSheetData
+      : connectWorkspace === CONNECT_WORKSPACE.PROJECT
+        ? hasSheetData
+        : !!dataConnected);
 
   /** Kalshi/Polymarket connect home: slide request summary in only after pull finishes. */
   const connectRequestSummaryReady =
