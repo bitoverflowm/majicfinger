@@ -1919,10 +1919,20 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
-    scrollToLoadProgress();
+    syncConnectPullState({
+      loading: true,
+      error: null,
+      label: PARQUET_LOAD_PHASE_MESSAGES[0].text,
+      progress: 5,
+    });
+    if (!connectHomeDataLakeCompose) scrollToLoadProgress();
 
     const sampleLabel = sampleOptions.find((s) => s.id === sid)?.label || sid;
     const prefix = dataset === "kalshi" ? "Kalshi" : "Polymarket";
+    const preparedSheetId =
+      connectHomeDataLakeCompose && activeSheetId && !(dataSheets?.[activeSheetId]?.data?.length)
+        ? activeSheetId
+        : null;
 
     try {
       const { rows, rowCount } = await runIngestWithProgress(
@@ -1944,15 +1954,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         const newCardId = requestCard ? genRequestCardId() : null;
         const connectHomeSheetName = String(ctx?.connectHomePendingSheetName || "").trim();
-        addNewSheetAndActivate?.((newId) => {
-          setSheetData?.(newId, finalRows);
+        const applyToPreparedSheet = (targetId) => {
+          setSheetData?.(targetId, finalRows);
           setDataSheets?.((prev) => {
-            const sheet = prev[newId];
+            const sheet = prev[targetId];
             if (!sheet) return prev;
             const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
             const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
             const card =
-              requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: newId, elapsedMs, loadedRowCount: n } : null;
+              requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: targetId, elapsedMs, loadedRowCount: n } : null;
             const autoName = `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
               0,
               80,
@@ -1963,7 +1973,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 : autoName;
             return {
               ...prev,
-              [newId]: {
+              [targetId]: {
                 ...sheet,
                 name: sheetName,
                 ...(sheetProvenance ? { provenance: sheetProvenance } : {}),
@@ -1971,7 +1981,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               },
             };
           });
-        });
+        };
+        if (preparedSheetId) {
+          applyToPreparedSheet(preparedSheetId);
+        } else {
+          addNewSheetAndActivate?.((newId) => applyToPreparedSheet(newId));
+        }
         if (mode === "columns" && requestCard) {
           setExpandedRequestKey(null);
           setShowRequestComposer(false);
@@ -1982,26 +1997,31 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     } catch (e) {
       if (e?.name === "AbortError") {
         setError(null);
+        syncConnectPullState({ loading: false, error: null, label: "", progress: 0 });
         toast("Request cancelled");
         return;
       }
       const msg = e?.message || String(e);
       setError(msg);
+      syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
     } finally {
       ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
     }
   }, [
+    activeSheetId,
     addNewSheetAndActivate,
     connectHomeDataLakeCompose,
     ctx,
+    dataSheets,
     dataset,
     finalizeIngestSheetRows,
     refreshBeckerViews,
     runIngestWithProgress,
     sampleOptions,
     scrollToLoadProgress,
+    syncConnectPullState,
     setDataSheets,
     setSheetData,
   ]);
@@ -2660,7 +2680,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       if (destination.action === "new_sheet") {
         void executeIngestNewSheet();
       } else {
-        applyConnectHomeSheetNameToActiveSheet(ctx);
         void executeIngestReplace();
       }
       return;

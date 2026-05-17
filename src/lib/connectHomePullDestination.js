@@ -2,6 +2,10 @@
  * Connect home pull — replace active sheet vs add a new sheet.
  */
 
+import { flushSync } from "react-dom";
+
+import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
+
 /** @typedef {"replace" | "new_sheet"} ConnectHomePullDestination */
 
 /**
@@ -85,6 +89,61 @@ export function resolveConnectHomeSheetDestination(ctx) {
  * @param {object} ctx
  * @param {{ onStart: (sheetId: string) => void, stopActiveStream?: boolean }} options
  */
+/**
+ * Before Run pull: empty target sheet and switch to it so Step 2 shows progress + skeleton.
+ *
+ * @param {object} ctx
+ * @returns {{ action: "replace" } | { action: "new_sheet" }}
+ */
+export function prepareConnectHomePullSheet(ctx) {
+  const destination = resolveConnectHomeSheetDestination(ctx);
+  if (destination.action === "new_sheet" && ctx?.addNewSheetAndActivate) {
+    flushSync(() => {
+      ctx.addNewSheetAndActivate((newId) => {
+        ctx.setSheetData?.(newId, []);
+        applyConnectHomeSheetNameToSheet(ctx, newId);
+      });
+    });
+    return destination;
+  }
+  flushSync(() => {
+    applyConnectHomeSheetNameToActiveSheet(ctx);
+    ctx.replaceCurrentSheetData?.([]);
+  });
+  return destination;
+}
+
+/**
+ * Apply pulled rows without creating a duplicate sheet when Step 2 already prepared an empty tab.
+ *
+ * @param {object} ctx
+ * @param {unknown} incomingRows
+ */
+export function applyConnectHomePullData(ctx, incomingRows) {
+  const destination = resolveConnectHomeSheetDestination(ctx);
+  const rows = Array.isArray(incomingRows) ? incomingRows : incomingRows != null ? [incomingRows] : [];
+  const activeId = ctx?.activeSheetId;
+  const activeSheet = activeId ? ctx?.dataSheets?.[activeId] : null;
+  const preparedEmpty =
+    destination.action === "new_sheet" &&
+    activeId &&
+    Array.isArray(activeSheet?.data) &&
+    activeSheet.data.length === 0;
+
+  if (preparedEmpty && ctx?.setSheetData) {
+    ctx.setSheetData(activeId, rows);
+    applyConnectHomeSheetNameToSheet(ctx, activeId);
+    return true;
+  }
+
+  return applySheetIntegrationDecision(destination, {
+    incomingRows: rows,
+    setConnectedData: ctx?.setConnectedData,
+    addNewSheetAndActivate: ctx?.addNewSheetAndActivate,
+    setSheetData: ctx?.setSheetData,
+  });
+}
+
 export function runConnectHomeLiveStreamPull(ctx, { onStart, stopActiveStream = false }) {
   const destination = resolveConnectHomeSheetDestination(ctx);
   const { activeSheetId, addNewSheetAndActivate, replaceCurrentSheetData, setSheetData, liveStreamActions } =

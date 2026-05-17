@@ -41,10 +41,7 @@ import { cn } from "@/lib/utils";
 import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectComposeIfElseSection";
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
 import { ConnectHomeSheetPullFields } from "@/components/connectData/ConnectHomeSheetPullFields";
-import {
-  applyConnectHomeSheetNameToActiveSheet,
-  resolveConnectHomeSheetDestination,
-} from "@/lib/connectHomePullDestination";
+import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
 
 /**
  * Inline compose controls (mirrors integrations panel) for Connect home vertical flow.
@@ -262,12 +259,7 @@ export function ConnectComposeOperationPanel({ className }) {
         }
       });
     }
-    if (resolveConnectHomeSheetDestination(ctx).action === "replace") {
-      applyConnectHomeSheetNameToActiveSheet(ctx);
-    }
-    if (!activeSheetId && ctx.addNewSheetAndActivate) {
-      ctx.addNewSheetAndActivate();
-    }
+    prepareConnectHomePullSheet(ctx);
     flushSync(() => {
       requestConnectDataLakePull?.();
     });

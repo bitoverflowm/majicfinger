@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check } from "lucide-react";
 
@@ -14,10 +15,7 @@ import { ConnectColumnDisplayNameEdit } from "@/components/connectData/ConnectCo
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectQueryComposeRunBar } from "@/components/connectData/ConnectQueryComposeRunBar";
 import { composeColumnDisplayLabel } from "@/lib/connectComposeDisplayLabels";
-import {
-  applyConnectHomeSheetNameToActiveSheet,
-  resolveConnectHomeSheetDestination,
-} from "@/lib/connectHomePullDestination";
+import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { useSyncConnectDataLakeComposeItems } from "@/hooks/useSyncConnectDataLakeComposeItems";
@@ -504,7 +502,6 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     athenaPingBySampleId,
     pingAthenaLakeSample,
     requestConnectIntegrationPull,
-    requestConnectAnalyzeScroll,
     setConnectHomePendingSheetName,
     activeSheetId,
     setDataSheets,
@@ -602,12 +599,11 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const liveDisplayLabel = useCallback((col) => col.name, []);
 
   const handleRunIntegrationPull = useCallback(() => {
-    if (resolveConnectHomeSheetDestination(ctx).action === "replace") {
-      applyConnectHomeSheetNameToActiveSheet(ctx);
-    }
-    requestConnectAnalyzeScroll?.();
-    requestConnectIntegrationPull?.();
-  }, [ctx, requestConnectAnalyzeScroll, requestConnectIntegrationPull]);
+    prepareConnectHomePullSheet(ctx);
+    flushSync(() => {
+      requestConnectIntegrationPull?.();
+    });
+  }, [ctx, requestConnectIntegrationPull]);
 
   if (!isConnectIntegrationWorkspace(integrationId)) return null;
   if (!isConnectQueryComposeIntegration(integrationId)) {

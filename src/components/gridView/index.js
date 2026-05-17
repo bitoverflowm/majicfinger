@@ -526,6 +526,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
     /** Never mask an already-loaded sheet with DuckDB boot / stale pull progress UI. */
     const isSheetLoading =
         rehydrateBusy ||
+        (isConnectPullLoading && isConnectAnalyzeViewport) ||
         (!hasDisplayRows &&
             (isConnectPullLoading || (connectAwaitingSheetData && pullInFlight)));
     const sheetLoadingLabel =

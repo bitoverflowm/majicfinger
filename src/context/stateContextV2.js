@@ -451,14 +451,15 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     }, []);
 
     const requestConnectIntegrationPull = useCallback(() => {
-      setConnectDataLakePullState((prev) => ({
-        ...prev,
+      setConnectHomeAnalyzeActive(true);
+      setConnectDataLakePullState({
         loading: true,
         error: null,
-        label: prev.label || "Preparing your data pull…",
-        progress: prev.progress > 0 ? prev.progress : 2,
-      }));
+        label: "Preparing your data pull…",
+        progress: 2,
+      });
       setConnectIntegrationPullTick((t) => t + 1);
+      setConnectAnalyzeScrollTick((t) => t + 1);
     }, []);
 
     const requestConnectAnalyzeScroll = useCallback(() => {

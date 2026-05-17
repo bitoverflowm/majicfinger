@@ -54,7 +54,7 @@ import {
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
 import {
-  applyConnectHomeSheetNameToActiveSheet,
+  applyConnectHomePullData,
   resolveConnectHomeSheetDestination,
 } from "@/lib/connectHomePullDestination";
 import { cn } from "@/lib/utils";
@@ -269,9 +269,13 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       if (connectHomeActive) {
         destination = resolveConnectHomeSheetDestination(ctx);
         if (!destination) return;
-        if (destination.action === "replace") {
-          applyConnectHomeSheetNameToActiveSheet(ctx);
-        }
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: true,
+          error: null,
+          label: "Pulling Polymarket data…",
+          progress: Math.max(Number(prev.progress) || 0, 8),
+        }));
       } else {
         destination = await requestSheetDestination?.();
         if (!destination) return;
@@ -323,14 +327,23 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       }
 
       const arr = Array.isArray(data) ? data : [data];
-      applySheetIntegrationDecision(destination, {
-        incomingRows: arr,
-        setConnectedData,
-        addNewSheetAndActivate,
-        setSheetData,
-      });
-      if (connectHomeActive && destination.action === "new_sheet") {
-        applyConnectHomeSheetNameToActiveSheet(ctx);
+      if (connectHomeActive) {
+        applyConnectHomePullData(
+          {
+            ...ctx,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+          },
+          arr,
+        );
+      } else {
+        applySheetIntegrationDecision(destination, {
+          incomingRows: arr,
+          setConnectedData,
+          addNewSheetAndActivate,
+          setSheetData,
+        });
       }
       if (!qs.includes("fields=") && arr.length > 0 && arr[0] && typeof arr[0] === "object") {
         setLastResultKeys(Object.keys(arr[0]));
