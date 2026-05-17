@@ -54,7 +54,11 @@ import { ConnectHomeRequestHistory } from "@/components/connectData/ConnectHomeR
 import { ConnectIntegrationsPickerList } from "@/components/connectData/ConnectIntegrationsPickerList";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
-import { isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
+import {
+  CONNECT_HOME_CENTER_VIEW,
+  isConnectHomeDesignPanelTab,
+  normalizeConnectHomeCenterView,
+} from "@/lib/connectHomeFlow";
 import {
   connectAnalyzeAnchorClass,
   connectAnalyzeSectionFitClass,
@@ -195,6 +199,10 @@ export default function DataSheetWithIntegration({
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
   const rightPanelTab = contextStateV2?.rightPanelTab;
   const setRightPanelTab = contextStateV2?.setRightPanelTab;
+  const connectHomeCenterView = normalizeConnectHomeCenterView(
+    contextStateV2?.connectHomeCenterView,
+  );
+  const setConnectHomeCenterView = contextStateV2?.setConnectHomeCenterView;
   const connectedData = contextStateV2?.connectedData ?? [];
   const setConnectedDataRaw = contextStateV2?.setConnectedData;
   const dataSheets = contextStateV2?.dataSheets || {};
@@ -219,11 +227,11 @@ export default function DataSheetWithIntegration({
   const connectHomeChartsActive =
     connectHomeMode &&
     (showConnectIntegrationIntro || isSavedProjectWorkspace || isConnectUploadWithSheetData) &&
-    rightPanelTab === "charts";
+    connectHomeCenterView === CONNECT_HOME_CENTER_VIEW.CHARTS;
   const connectHomeDashboardActive =
     connectHomeMode &&
     (showConnectIntegrationIntro || isSavedProjectWorkspace || isConnectUploadWithSheetData) &&
-    rightPanelTab === "dashboard";
+    connectHomeCenterView === CONNECT_HOME_CENTER_VIEW.DASHBOARD;
   const effectiveChartMode = chartMode || connectHomeChartsActive;
   const effectiveDashboardMode = dashboardMode || connectHomeDashboardActive;
   const connectHomeAnalyzeDashboard =
@@ -245,7 +253,8 @@ export default function DataSheetWithIntegration({
         (connectHomeAnalyzeActive ||
           effectiveChartMode ||
           effectiveDashboardMode ||
-          rightPanelTab === "export")));
+          rightPanelTab === "export" ||
+          connectHomeCenterView !== CONNECT_HOME_CENTER_VIEW.SHEET)));
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
@@ -557,6 +566,11 @@ export default function DataSheetWithIntegration({
       if (tab) setRightPanelTab?.(tab);
       setRightPanelOpen?.(true);
       if (connectHomeMode) {
+        if (tab === "charts") {
+          setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.CHARTS);
+        } else if (tab === "dashboard") {
+          setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
+        }
         setConnectHomeAnalyzeActive?.(true);
         onConnectHomePanelManualOpen?.(tab);
       }
@@ -565,6 +579,7 @@ export default function DataSheetWithIntegration({
       connectHomeMode,
       onConnectHomePanelManualOpen,
       setConnectHomeAnalyzeActive,
+      setConnectHomeCenterView,
       setRightPanelOpen,
       setRightPanelTab,
     ],
@@ -846,7 +861,7 @@ export default function DataSheetWithIntegration({
     setRightPanelTab,
   ]);
 
-  const prevConnectWorkspaceTabRef = useRef("");
+  const prevConnectCenterViewRef = useRef("");
   const connectHomeCoreWorkspaceEngaged =
     connectHomeWorkspaceLive ||
     showConnectSheetAnalyzeUi ||
@@ -855,17 +870,23 @@ export default function DataSheetWithIntegration({
 
   useEffect(() => {
     if (!connectHomeMode || !connectHomeCoreWorkspaceEngaged) return;
-    const tab = rightPanelTab ?? "";
-    const prev = prevConnectWorkspaceTabRef.current;
-    prevConnectWorkspaceTabRef.current = tab;
-    const enteredChart = tab === "charts" && prev !== "charts";
-    const enteredDashboard = tab === "dashboard" && prev !== "dashboard";
+    const center = connectHomeCenterView;
+    const prev = prevConnectCenterViewRef.current;
+    prevConnectCenterViewRef.current = center;
+    const enteredChart =
+      center === CONNECT_HOME_CENTER_VIEW.CHARTS &&
+      prev !== CONNECT_HOME_CENTER_VIEW.CHARTS;
+    const enteredDashboard =
+      center === CONNECT_HOME_CENTER_VIEW.DASHBOARD &&
+      prev !== CONNECT_HOME_CENTER_VIEW.DASHBOARD;
     if (!enteredChart && !enteredDashboard) return;
-    handleConnectHomePanelManualOpen(rightPanelTab || "charts");
+    handleConnectHomePanelManualOpen(
+      enteredChart ? "charts" : "dashboard",
+    );
   }, [
     connectHomeMode,
     connectHomeCoreWorkspaceEngaged,
-    rightPanelTab,
+    connectHomeCenterView,
     handleConnectHomePanelManualOpen,
   ]);
 
@@ -1311,6 +1332,11 @@ export default function DataSheetWithIntegration({
                       setRightPanelTab?.(v);
                       setRightPanelOpen?.(true);
                       if (connectHomeMode) {
+                        if (v === "charts") {
+                          setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.CHARTS);
+                        } else if (v === "dashboard") {
+                          setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
+                        }
                         handleConnectHomePanelManualOpen(v);
                         if (v === "integrations") {
                           setIntegrationSidebar?.((prev) => prev ?? "polymarket");

@@ -610,8 +610,9 @@ export default function ConnectDataStep1({
         connectedData,
         dataSheets,
         rightPanelTab,
+        connectHomeCenterView: context?.connectHomeCenterView,
       }),
-    [viewing, dataConnected, connectedData, dataSheets, rightPanelTab],
+    [viewing, dataConnected, connectedData, dataSheets, rightPanelTab, context?.connectHomeCenterView],
   );
 
   return (

@@ -11,6 +11,19 @@ export const CONNECT_FLOW_STEP = {
   PUBLISH: 3,
 };
 
+/** Main Connect home canvas (independent of right-drawer tab). */
+export const CONNECT_HOME_CENTER_VIEW = {
+  SHEET: "sheet",
+  CHARTS: "charts",
+  DASHBOARD: "dashboard",
+};
+
+export function normalizeConnectHomeCenterView(value) {
+  if (value === CONNECT_HOME_CENTER_VIEW.CHARTS) return CONNECT_HOME_CENTER_VIEW.CHARTS;
+  if (value === CONNECT_HOME_CENTER_VIEW.DASHBOARD) return CONNECT_HOME_CENTER_VIEW.DASHBOARD;
+  return CONNECT_HOME_CENTER_VIEW.SHEET;
+}
+
 /** Step 2 — chart builder (analyze). */
 export const CONNECT_HOME_ANALYZE_PANEL_TABS = ["charts"];
 
@@ -60,6 +73,7 @@ function sheetHasData(dataSheets) {
  *   connectedData?: unknown[];
  *   dataSheets?: Record<string, { data?: unknown[] }>;
  *   rightPanelTab?: string;
+ *   connectHomeCenterView?: string;
  * }} state
  */
 export function deriveConnectFlowStep(state) {
@@ -67,7 +81,7 @@ export function deriveConnectFlowStep(state) {
   const dataSheets = state?.dataSheets;
   const connectedData = state?.connectedData;
   const dataConnected = !!state?.dataConnected;
-  const rightPanelTab = state?.rightPanelTab ?? "";
+  const centerView = normalizeConnectHomeCenterView(state?.connectHomeCenterView);
   const hasSheetData = sheetHasData(dataSheets);
   const hasRowData = Array.isArray(connectedData) && connectedData.length > 0;
   const hasData = hasSheetData || (dataConnected && hasRowData);
@@ -76,7 +90,7 @@ export function deriveConnectFlowStep(state) {
     return CONNECT_FLOW_STEP.PUBLISH;
   }
 
-  if (hasData && isConnectHomePublishPanelTab(rightPanelTab)) {
+  if (hasData && centerView === CONNECT_HOME_CENTER_VIEW.DASHBOARD) {
     return CONNECT_FLOW_STEP.PUBLISH;
   }
 

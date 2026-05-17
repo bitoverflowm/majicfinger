@@ -60,6 +60,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const connectedData = context?.connectedData;
   const dataSheets = context?.dataSheets;
   const rightPanelTab = context?.rightPanelTab;
+  const connectHomeCenterView = context?.connectHomeCenterView;
   const setRightPanelOpen = context?.setRightPanelOpen;
   const setRightPanelTab = context?.setRightPanelTab;
   const setConnectHomeLeftNavOpen = context?.setConnectHomeLeftNavOpen;
@@ -96,8 +97,9 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
         connectedData,
         dataSheets,
         rightPanelTab,
+        connectHomeCenterView,
       }),
-    [viewing, dataConnected, connectedData, dataSheets, rightPanelTab],
+    [viewing, dataConnected, connectedData, dataSheets, rightPanelTab, connectHomeCenterView],
   );
 
   const isConnectIntegration = isConnectIntegrationWorkspace(connectWorkspace);

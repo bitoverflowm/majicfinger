@@ -22,6 +22,7 @@ import {
   connectHomeAnySheetHasData,
   isConnectUserDataPullActive,
 } from "@/lib/connectHomePullDestination";
+import { CONNECT_HOME_CENTER_VIEW, normalizeConnectHomeCenterView } from "@/lib/connectHomeFlow";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { cn } from "@/lib/utils";
 
@@ -216,6 +217,8 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const activeChartSheetId = ctx?.activeChartSheetId;
   const rightPanelTab = ctx?.rightPanelTab ?? "";
   const rightPanelOpen = !!ctx?.rightPanelOpen;
+  const connectHomeCenterView = normalizeConnectHomeCenterView(ctx?.connectHomeCenterView);
+  const setConnectHomeCenterView = ctx?.setConnectHomeCenterView;
   const setActiveSheetId = ctx?.setActiveSheetId;
   const setActiveChartSheetId = ctx?.setActiveChartSheetId;
   const setChartSheets = ctx?.setChartSheets;
@@ -232,9 +235,8 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const connectedData = ctx?.connectedData ?? [];
   const connectHomeAnalyzeActive = !!ctx?.connectHomeAnalyzeActive;
   const sheetPullViewActive =
-    rightPanelTab !== "charts" &&
-    rightPanelTab !== "dashboard" &&
-    rightPanelTab !== "export";
+    connectHomeCenterView !== CONNECT_HOME_CENTER_VIEW.CHARTS &&
+    connectHomeCenterView !== CONNECT_HOME_CENTER_VIEW.DASHBOARD;
   const showCancelDataPull =
     sheetPullViewActive &&
     isConnectIntegrationWorkspace(connectWorkspace) &&
@@ -253,9 +255,9 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     [chartSheets],
   );
 
-  const tableViewActive = rightPanelTab !== "charts" && rightPanelTab !== "dashboard";
-  const chartViewActive = rightPanelTab === "charts";
-  const dashboardViewActive = rightPanelTab === "dashboard";
+  const tableViewActive = connectHomeCenterView === CONNECT_HOME_CENTER_VIEW.SHEET;
+  const chartViewActive = connectHomeCenterView === CONNECT_HOME_CENTER_VIEW.CHARTS;
+  const dashboardViewActive = connectHomeCenterView === CONNECT_HOME_CENTER_VIEW.DASHBOARD;
   const exportActive = rightPanelTab === "export";
   const integrationsPanelActive = rightPanelTab === "integrations" && rightPanelOpen;
 
@@ -287,18 +289,20 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const selectSheet = useCallback(
     (id) => {
       setActiveSheetId?.(id);
+      setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.SHEET);
       setRightPanelTab?.((prev) =>
         prev === "charts" || prev === "dashboard" ? "integrations" : prev,
       );
     },
-    [setActiveSheetId, setRightPanelTab],
+    [setActiveSheetId, setConnectHomeCenterView, setRightPanelTab],
   );
 
   const openChartPanel = useCallback(() => {
     onPanelManualOpen?.("charts");
+    setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.CHARTS);
     setRightPanelTab?.("charts");
     setRightPanelOpen?.(true);
-  }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
+  }, [onPanelManualOpen, setConnectHomeCenterView, setRightPanelOpen, setRightPanelTab]);
 
   const selectChart = useCallback(
     (id) => {
@@ -347,9 +351,10 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
 
   const openDashboard = useCallback(() => {
     onPanelManualOpen?.("dashboard");
+    setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
     setRightPanelTab?.("dashboard");
     setRightPanelOpen?.(true);
-  }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
+  }, [onPanelManualOpen, setConnectHomeCenterView, setRightPanelOpen, setRightPanelTab]);
 
   const openExport = useCallback(() => {
     onPanelManualOpen?.("export");
