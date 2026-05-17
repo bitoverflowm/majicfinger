@@ -55,7 +55,7 @@ const LIST_MAX_HEIGHT = 400;
 const COLLAPSED_ROW_HEIGHT = 56;
 const COLLAPSED_GAP = 8;
 
-const Chainlink = () => {
+const Chainlink = ({ connectHomePullBridge = false }) => {
   const [error, setError] = useState(null);
   const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
   const [pendingSymbol, setPendingSymbol] = useState(null);
@@ -71,6 +71,14 @@ const Chainlink = () => {
   const dataSheets = ctx?.dataSheets || {};
   const setDataSheets = ctx?.setDataSheets;
   const setActiveSheetId = ctx?.setActiveSheetId;
+  const setConnectDataLakePullState = ctx?.setConnectDataLakePullState;
+  const connectIntegrationPullTick = ctx?.connectIntegrationPullTick ?? 0;
+  const connectLiveSourceId = ctx?.connectLiveSourceId ?? "";
+  const connectLiveColumnSelections = ctx?.connectLiveColumnSelections ?? {};
+  const connectHomeActive =
+    connectHomePullBridge &&
+    ctx?.viewing === "connectDataHome" &&
+    ctx?.connectWorkspace === "chainlink";
 
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
   const replaceTargets = Object.entries(streamsBySheetId)
@@ -102,6 +110,44 @@ const Chainlink = () => {
     setError(null);
     liveStreamActions?.start?.(sheetId, "chainlink", { symbol });
   };
+
+  useEffect(() => {
+    if (!connectHomeActive || !connectIntegrationPullTick) return;
+    const symbol = connectLiveSourceId;
+    const cols = connectLiveColumnSelections[symbol] || [];
+    if (!symbol) {
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Select a trading pair first.",
+      }));
+      return;
+    }
+    if (!cols.length) {
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Select at least one column.",
+      }));
+      return;
+    }
+    setConnectDataLakePullState?.((prev) => ({
+      ...prev,
+      loading: false,
+      label: "Live stream connected",
+      progress: 100,
+      error: null,
+    }));
+    doConnect(activeSheetId, symbol);
+  }, [
+    connectHomeActive,
+    connectIntegrationPullTick,
+    connectLiveSourceId,
+    connectLiveColumnSelections,
+    activeSheetId,
+    setConnectDataLakePullState,
+    liveStreamActions,
+  ]);
 
   const handleStart = (symbol) => {
     if (hasDataOrStream) {

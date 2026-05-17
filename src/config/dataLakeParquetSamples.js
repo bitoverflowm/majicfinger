@@ -24,6 +24,25 @@ export const ATHENA_KALSHI_SAMPLE_OPTIONS = [
   { id: "athena-kal-trades", label: "Trades", table: "trades" },
 ];
 
+/** Connect home — Polymarket Historical source cards. */
+export const POLYMARKET_CONNECT_DATA_SOURCES = [
+  {
+    sampleId: "athena-pm-markets",
+    title: "Markets",
+    description: "Each row is a Polymarket prediction market.",
+  },
+  {
+    sampleId: "athena-pm-trades",
+    title: "Trades",
+    description: "On-chain trade executions from Polymarket contracts.",
+  },
+  {
+    sampleId: "athena-pm-blocks",
+    title: "Blocks",
+    description: "Block timestamps for aligning trades to chain time.",
+  },
+];
+
 /** Connect home — Kalshi Historical source cards (replaces sidebar dropdown). */
 export const KALSHI_CONNECT_DATA_SOURCES = [
   {

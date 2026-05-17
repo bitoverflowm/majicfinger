@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useMyStateV2 } from "@/context/stateContextV2";
 
 const RTDS_WS_URL = "wss://ws-live-data.polymarket.com";
 const PING_INTERVAL_MS = 5000;
@@ -22,7 +23,17 @@ const SYMBOLS = [
   { value: "xrpusdt", label: "xrpusdt — XRP to USDT" },
 ];
 
-const Binance = ({ setConnectedData }) => {
+const Binance = ({ setConnectedData, connectHomePullBridge = false }) => {
+  const ctx = useMyStateV2?.() ?? {};
+  const setConnectDataLakePullState = ctx?.setConnectDataLakePullState;
+  const connectIntegrationPullTick = ctx?.connectIntegrationPullTick ?? 0;
+  const connectLiveSourceId = ctx?.connectLiveSourceId ?? "";
+  const connectLiveColumnSelections = ctx?.connectLiveColumnSelections ?? {};
+  const connectHomeActive =
+    connectHomePullBridge &&
+    ctx?.viewing === "connectDataHome" &&
+    ctx?.connectWorkspace === "binance";
+
   const [symbol, setSymbol] = useState("btcusdt");
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
@@ -116,6 +127,49 @@ const Binance = ({ setConnectedData }) => {
   useEffect(() => {
     return () => disconnect();
   }, [disconnect]);
+
+  useEffect(() => {
+    if (connectLiveSourceId) setSymbol(connectLiveSourceId);
+  }, [connectLiveSourceId]);
+
+  useEffect(() => {
+    if (!connectHomeActive || !connectIntegrationPullTick) return;
+    const sym = connectLiveSourceId || symbol;
+    const cols = connectLiveColumnSelections[sym] || [];
+    if (!sym) {
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Select a symbol first.",
+      }));
+      return;
+    }
+    if (!cols.length) {
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Select at least one column.",
+      }));
+      return;
+    }
+    if (sym !== symbol) setSymbol(sym);
+    setConnectDataLakePullState?.((prev) => ({
+      ...prev,
+      loading: false,
+      label: "Live stream connected",
+      progress: 100,
+      error: null,
+    }));
+    connect();
+  }, [
+    connectHomeActive,
+    connectIntegrationPullTick,
+    connectLiveSourceId,
+    connectLiveColumnSelections,
+    symbol,
+    connect,
+    setConnectDataLakePullState,
+  ]);
 
   return (
     <div className="space-y-4">

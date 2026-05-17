@@ -131,7 +131,7 @@ function calendarWallTimeToUnixSeconds(date, timeString, fallbackHour = 0, fallb
   return String(m.unix());
 }
 
-const Polymarket = ({ setConnectedData, requestSheetDestination }) => {
+const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePullBridge = false }) => {
   const contextStateV2 = useMyStateV2();
   const setViewing = contextStateV2?.setViewing;
   const setPolymarketWsState = contextStateV2?.setPolymarketWsState;
@@ -141,6 +141,14 @@ const Polymarket = ({ setConnectedData, requestSheetDestination }) => {
   const replaceCurrentSheetData = contextStateV2?.replaceCurrentSheetData;
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
+  const setConnectDataLakePullState = contextStateV2?.setConnectDataLakePullState;
+  const connectIntegrationPullTick = contextStateV2?.connectIntegrationPullTick ?? 0;
+  const connectApiEndpointId = contextStateV2?.connectApiEndpointId ?? "";
+  const connectApiColumnSelections = contextStateV2?.connectApiColumnSelections ?? {};
+  const connectHomeActive =
+    connectHomePullBridge &&
+    contextStateV2?.viewing === "connectDataHome" &&
+    contextStateV2?.connectWorkspace === "polymarket";
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -311,18 +319,81 @@ const Polymarket = ({ setConnectedData, requestSheetDestination }) => {
       setThrottleRemaining(COOLDOWN_MS);
       setLoading(false);
       setStageIndex(0);
-      setSelectedAction(null);
-      setParamValues({});
+      if (!connectHomeActive) {
+        setSelectedAction(null);
+        setParamValues({});
+      }
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: false,
+        label: "",
+        progress: 100,
+        error: null,
+      }));
     },
     [
       addNewSheetAndActivate,
       buildQueryString,
+      connectHomeActive,
       requestSheetDestination,
       setConnectedData,
+      setConnectDataLakePullState,
       setSheetData,
       throttleRemaining,
     ]
   );
+
+  useEffect(() => {
+    if (!connectHomeActive || !connectIntegrationPullTick) return;
+    const endpoint = ENDPOINTS.find((e) => e.query === connectApiEndpointId);
+    if (!endpoint) {
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Select an API endpoint first.",
+      }));
+      return;
+    }
+    const cols = connectApiColumnSelections[connectApiEndpointId] || [];
+    if (!cols.length) {
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Select at least one column.",
+      }));
+      return;
+    }
+    for (const p of endpoint.params || []) {
+      if (!p.required) continue;
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: false,
+        error: `"${endpoint.name}" needs ${p.label}. Use the integrations panel for required parameters, or pick a list endpoint.`,
+      }));
+      return;
+    }
+    const selectedFields = Object.fromEntries(cols.map((c) => [c, true]));
+    const values = { selectedFields };
+    endpoint.params?.forEach((p) => {
+      if (p.default !== undefined && p.default !== "") values[p.key] = String(p.default);
+      else if (p.key === "limit") values[p.key] = "20";
+    });
+    setConnectDataLakePullState?.((prev) => ({
+      ...prev,
+      loading: true,
+      error: null,
+      label: "Pulling Polymarket data…",
+      progress: Math.max(Number(prev.progress) || 0, 5),
+    }));
+    runRequest(endpoint.query, values);
+  }, [
+    connectHomeActive,
+    connectIntegrationPullTick,
+    connectApiEndpointId,
+    connectApiColumnSelections,
+    runRequest,
+    setConnectDataLakePullState,
+  ]);
 
   useEffect(() => {
     if (wsConnected) setWsConnecting(false);

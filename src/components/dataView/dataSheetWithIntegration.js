@@ -168,9 +168,15 @@ export default function DataSheetWithIntegration({
     connectHomeMode && isConnectIntegrationWorkspace(connectWorkspace);
   const isSavedProjectWorkspace =
     connectHomeMode && isConnectSavedProjectWorkspace(connectWorkspace);
-  /** Mount pull handler when Connect home drawer is closed (same DataLakeParquetPanel + handleLoad). */
-  const connectHomeKalshiPullBridge =
-    connectHomeMode && connectWorkspace === "kalshiHistorical";
+  /** Mount data-lake pull handler when Connect home drawer is closed (DataLakeParquetPanel + handleLoad). */
+  const connectHomeDataLakePullBridge =
+    connectHomeMode &&
+    (connectWorkspace === "kalshiHistorical" || connectWorkspace === "polymarketHistorical");
+  const connectHomeIntegrationPullBridge =
+    connectHomeMode &&
+    (connectWorkspace === "polymarket" ||
+      connectWorkspace === "chainlink" ||
+      connectWorkspace === "binance");
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
   const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive;
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
@@ -954,12 +960,34 @@ export default function DataSheetWithIntegration({
       {showConnectIntegrationIntro ? (
         <div id="connect-home-compose" className="w-full min-w-0 shrink-0 pb-96">
           <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
-          {connectHomeKalshiPullBridge ? (
+          {connectHomeDataLakePullBridge ? (
+            <motion.div
+              className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
+              aria-hidden
+            >
+              {connectWorkspace === "polymarketHistorical" ? (
+                <PolymarketHistorical setConnectedData={setConnectedDataRaw} />
+              ) : (
+                <KalshiHistorical setConnectedData={setConnectedDataRaw} />
+              )}
+            </motion.div>
+          ) : null}
+          {connectHomeIntegrationPullBridge ? (
             <div
               className="pointer-events-none fixed h-px w-px overflow-hidden opacity-0"
               aria-hidden
             >
-              <KalshiHistorical setConnectedData={setConnectedDataRaw} />
+              {connectWorkspace === "polymarket" ? (
+                <Polymarket
+                  setConnectedData={setConnectedDataRaw}
+                  requestSheetDestination={requestSheetDestination}
+                  connectHomePullBridge
+                />
+              ) : connectWorkspace === "chainlink" ? (
+                <Chainlink connectHomePullBridge />
+              ) : (
+                <Binance setConnectedData={setConnectedDataRaw} connectHomePullBridge />
+              )}
             </div>
           ) : null}
         </div>

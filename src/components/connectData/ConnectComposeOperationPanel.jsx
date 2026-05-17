@@ -21,10 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ATHENA_KALSHI_SAMPLE_OPTIONS, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
-import { useSyncConnectKalshiComposeItems } from "@/hooks/useSyncConnectKalshiComposeItems";
+import { useSyncConnectDataLakeComposeItems } from "@/hooks/useSyncConnectDataLakeComposeItems";
+import { getConnectDataLakeConfig } from "@/lib/connectQueryComposeConfig";
 import {
   composeSourceColumnLabel,
   genComposeJoinId,
@@ -40,8 +41,6 @@ import { cn } from "@/lib/utils";
 import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectComposeIfElseSection";
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
 
-const KALSHI_SAMPLE_BY_ID = Object.fromEntries(ATHENA_KALSHI_SAMPLE_OPTIONS.map((s) => [s.id, s]));
-
 /**
  * Inline compose controls (mirrors integrations panel) for Connect home vertical flow.
  */
@@ -50,7 +49,8 @@ export function ConnectComposeOperationPanel({ className }) {
     connectActiveComposeOps = [],
     setConnectActiveComposeOps,
     connectDataLakeSampleId,
-    connectKalshiColumnSelections,
+    connectDataLakeColumnSelections,
+    connectWorkspace,
     connectHomePendingSheetName,
     setConnectHomePendingSheetName,
     activeSheetId,
@@ -79,12 +79,18 @@ export function ConnectComposeOperationPanel({ className }) {
     setComposeJoins,
   } = compose;
 
-  const sample = KALSHI_SAMPLE_BY_ID[connectDataLakeSampleId];
+  const lakeConfig = getConnectDataLakeConfig(connectWorkspace);
+  const sampleById = useMemo(
+    () => Object.fromEntries((lakeConfig?.sampleOptions || []).map((s) => [s.id, s])),
+    [lakeConfig],
+  );
+  const sample = sampleById[connectDataLakeSampleId];
   const table = sample?.table;
+  const lake = lakeConfig?.lake || "kalshi";
 
   const columnMeta = useMemo(
-    () => (table ? getColumnMetaForLakeTable("kalshi", table) : []),
-    [table],
+    () => (table && lake ? getColumnMetaForLakeTable(lake, table) : []),
+    [lake, table],
   );
   const availableColumns = useMemo(() => columnMeta.map((c) => c.name), [columnMeta]);
   const typesByName = useMemo(
@@ -93,9 +99,9 @@ export function ConnectComposeOperationPanel({ className }) {
   );
   const kindForColumn = useCallback((col) => kindForLakeColumn(col, typesByName), [typesByName]);
 
-  useSyncConnectKalshiComposeItems({
+  useSyncConnectDataLakeComposeItems({
     connectDataLakeSampleId,
-    connectKalshiColumnSelections,
+    connectDataLakeColumnSelections,
     setColumnComposeItems,
     typesByName,
   });
@@ -112,7 +118,10 @@ export function ConnectComposeOperationPanel({ className }) {
     [columnsForCompose, kindForColumn],
   );
 
-  const glueJoinTableOptions = useMemo(() => glueTableNamesForDataset("kalshi"), []);
+  const glueJoinTableOptions = useMemo(
+    () => glueTableNamesForDataset(lakeConfig?.dataset || "kalshi"),
+    [lakeConfig],
+  );
 
   const composeSelectAliasChoices = useMemo(() => {
     const rows = selectRowsForAggregatedCompose(columnComposeItems);

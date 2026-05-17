@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 /** Kalshi Historical — Becker Parquet under `kalshi/` in the same S3 bucket as Polymarket historical. */
 export default function KalshiHistorical({ setConnectedData }) {
   const ctx = useMyStateV2();
-  const connectHomeKalshi =
+  const connectHomeDataLake =
     ctx?.viewing === "connectDataHome" && ctx?.connectWorkspace === "kalshiHistorical";
   const setConnectDataLakePullState = ctx?.setConnectDataLakePullState;
   const ingestLoading = !!ctx?.connectDataLakePullState?.loading;
@@ -19,7 +19,7 @@ export default function KalshiHistorical({ setConnectedData }) {
   const { label, progress, ready, error, retry } = useBeckerParquetBoot();
 
   useEffect(() => {
-    if (!connectHomeKalshi || !setConnectDataLakePullState) return;
+    if (!connectHomeDataLake || !setConnectDataLakePullState) return;
     if (ready) {
       setConnectDataLakePullState((prev) => {
         const p = Number(prev.progress) || 0;
@@ -42,7 +42,7 @@ export default function KalshiHistorical({ setConnectedData }) {
       progress: Math.max(Number(prev.progress) || 0, Number(progress) || 2),
     }));
   }, [
-    connectHomeKalshi,
+    connectHomeDataLake,
     setConnectDataLakePullState,
     ingestLoading,
     ready,

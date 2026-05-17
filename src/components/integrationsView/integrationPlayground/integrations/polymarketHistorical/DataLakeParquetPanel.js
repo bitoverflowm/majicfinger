@@ -529,20 +529,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const connectWorkspace = ctx?.connectWorkspace;
   const connectDataLakeSampleId = ctx?.connectDataLakeSampleId ?? "";
   const setConnectDataLakeSampleId = ctx?.setConnectDataLakeSampleId;
-  const connectKalshiColumnSelections = ctx?.connectKalshiColumnSelections ?? {};
+  const connectDataLakeColumnSelections = ctx?.connectDataLakeColumnSelections ?? {};
   const connectDataLakePullTick = ctx?.connectDataLakePullTick ?? 0;
   const setConnectDataLakePullState = ctx?.setConnectDataLakePullState;
   const requestConnectAnalyzeScroll = ctx?.requestConnectAnalyzeScroll;
   const connectHomeAnalyzeActive = !!ctx?.connectHomeAnalyzeActive;
   const athenaPingBySampleId = ctx?.athenaPingBySampleId ?? {};
   const pingAthenaLakeSample = ctx?.pingAthenaLakeSample;
-  /** Connect home + Kalshi: sync sample/columns from main workspace; panel UI stays full-featured. */
-  const connectHomeKalshiSourcePicker =
-    viewing === "connectDataHome" && connectWorkspace === "kalshiHistorical" && dataset === "kalshi";
+  /** Connect home + data lake: sync sample/columns from main workspace; panel UI stays full-featured. */
+  const connectHomeDataLakeCompose =
+    viewing === "connectDataHome" &&
+    ((connectWorkspace === "kalshiHistorical" && dataset === "kalshi") ||
+      (connectWorkspace === "polymarketHistorical" && dataset === "polymarket"));
 
   const syncConnectPullState = useCallback(
     (patch) => {
-      if (!connectHomeKalshiSourcePicker || !setConnectDataLakePullState) return;
+      if (!connectHomeDataLakeCompose || !setConnectDataLakePullState) return;
       setConnectDataLakePullState((prev) => {
         const next = { ...prev };
         if (patch.label !== undefined) {
@@ -560,7 +562,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         return next;
       });
     },
-    [connectHomeKalshiSourcePicker, setConnectDataLakePullState],
+    [connectHomeDataLakeCompose, setConnectDataLakePullState],
   );
   const {
     columnComposeItems,
@@ -577,7 +579,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setComposeHavingFilters,
     composeJoins,
     setComposeJoins,
-  } = useDataLakeComposeState(connectHomeKalshiSourcePicker);
+  } = useDataLakeComposeState(connectHomeDataLakeCompose);
   const user = useUser();
   const athenaRowLimit = useMemo(() => {
     if (isDemo) return ATHENA_DEMO_ROW_LIMIT;
@@ -672,10 +674,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [dataset, sampleOptions]);
 
   useEffect(() => {
-    if (!connectHomeKalshiSourcePicker || !connectDataLakeSampleId) return;
+    if (!connectHomeDataLakeCompose || !connectDataLakeSampleId) return;
     if (!sampleOptions.some((s) => s.id === connectDataLakeSampleId)) return;
     setSampleId((prev) => (prev === connectDataLakeSampleId ? prev : connectDataLakeSampleId));
-  }, [connectHomeKalshiSourcePicker, connectDataLakeSampleId, sampleOptions]);
+  }, [connectHomeDataLakeCompose, connectDataLakeSampleId, sampleOptions]);
 
   const selected = sampleOptions.find((s) => s.id === sampleId);
   const pingState = sampleId ? athenaPingBySampleId?.[sampleId] || "idle" : "idle";
@@ -692,10 +694,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   );
 
   useEffect(() => {
-    if (!connectHomeKalshiSourcePicker || !connectDataLakeSampleId) return;
+    if (!connectHomeDataLakeCompose || !connectDataLakeSampleId) return;
     if (sampleId !== connectDataLakeSampleId) return;
     void pingAthenaForSource(connectDataLakeSampleId);
-  }, [connectHomeKalshiSourcePicker, connectDataLakeSampleId, sampleId, pingAthenaForSource]);
+  }, [connectHomeDataLakeCompose, connectDataLakeSampleId, sampleId, pingAthenaForSource]);
 
   const onSelectionTabChange = useCallback(
     (next) => {
@@ -777,9 +779,9 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [availableColumnTypesByName, isDateLikeName]);
 
   useEffect(() => {
-    if (!connectHomeKalshiSourcePicker || !connectDataLakeSampleId) return;
+    if (!connectHomeDataLakeCompose || !connectDataLakeSampleId) return;
     if (sampleId !== connectDataLakeSampleId) return;
-    const cols = connectKalshiColumnSelections[connectDataLakeSampleId];
+    const cols = connectDataLakeColumnSelections[connectDataLakeSampleId];
     if (!Array.isArray(cols)) return;
 
     setColumnComposeItems((prev) => {
@@ -808,10 +810,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       });
     });
   }, [
-    connectHomeKalshiSourcePicker,
+    connectHomeDataLakeCompose,
     connectDataLakeSampleId,
     sampleId,
-    connectKalshiColumnSelections,
+    connectDataLakeColumnSelections,
     availableColumnTypesByName,
     isDateLikeName,
   ]);
@@ -1277,7 +1279,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   // When the table changes, reset meta editor (panel-only). Connect home keeps refine state + checkbox sync.
   useEffect(() => {
     if (!selected?.table) return;
-    if (connectHomeKalshiSourcePicker) return;
+    if (connectHomeDataLakeCompose) return;
     setColumnComposeItems([]);
     setColumnComposeOrderBy([]);
     setComposeLimitRuleOpen(false);
@@ -1296,7 +1298,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setMetaOperationsMenuOpen(false);
     setKalshiTaxonomyRollup(false);
     setKalshiTradesJoinPreset("");
-  }, [selected?.table, connectHomeKalshiSourcePicker]);
+  }, [selected?.table, connectHomeDataLakeCompose]);
 
   useEffect(() => {
     if (KALSHI_TRADES_JOIN_PRESETS.has(kalshiTradesJoinPreset)) {
@@ -1726,7 +1728,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       label: PARQUET_LOAD_PHASE_MESSAGES[0].text,
       progress: 5,
     });
-    if (!connectHomeKalshiSourcePicker) scrollToLoadProgress();
+    if (!connectHomeDataLakeCompose) scrollToLoadProgress();
     try {
       const { rows, rowCount } = await runIngestWithProgress(
         lk,
@@ -1786,7 +1788,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     }
   }, [
     applyRowsToActiveSheet,
-    connectHomeKalshiSourcePicker,
+    connectHomeDataLakeCompose,
     finalizeIngestSheetRows,
     refreshBeckerViews,
     runIngestWithProgress,
@@ -2641,7 +2643,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       return;
     }
 
-    if (!connectHomeKalshiSourcePicker && promptReplaceOrNewSheetIfNeeded()) return;
+    if (!connectHomeDataLakeCompose && promptReplaceOrNewSheetIfNeeded()) return;
 
     void executeIngestReplace();
   };
@@ -2736,7 +2738,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   handleLoadRef.current = handleLoad;
 
   useEffect(() => {
-    if (!connectHomeKalshiSourcePicker || !connectDataLakePullTick) return;
+    if (!connectHomeDataLakeCompose || !connectDataLakePullTick) return;
     requestConnectAnalyzeScroll?.();
     const runPull = () => handleLoadRef.current();
     if (selectionTab !== "columns" && selectionTab !== "recipes") {
@@ -2745,7 +2747,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       return;
     }
     runPull();
-  }, [connectHomeKalshiSourcePicker, connectDataLakePullTick, selectionTab, requestConnectAnalyzeScroll]);
+  }, [connectHomeDataLakeCompose, connectDataLakePullTick, selectionTab, requestConnectAnalyzeScroll]);
 
   const activeSheetRequestCards = useMemo(() => {
     if (!activeSheetId) return [];
@@ -4995,7 +4997,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   onValueChange={(v) => {
                     setSampleId(v);
                     void pingAthenaForSource(v);
-                    if (connectHomeKalshiSourcePicker) {
+                    if (connectHomeDataLakeCompose) {
                       setConnectDataLakeSampleId?.(v);
                     }
                   }}
