@@ -60,6 +60,7 @@ import {
   connectDemoAnalyzeFitClass,
   connectDemoAnalyzeMainClass,
   connectHomeAnalyzeMainClass,
+  connectHomeAnalyzeRowClass,
   connectHomeDrawerAsideFixedClass,
   connectHomeWorkspaceRowClass,
   CONNECT_HOME_WORKSPACE_MIN_H,
@@ -154,6 +155,8 @@ export default function DataSheetWithIntegration({
   connectHomeMode = false,
   connectHomePanelsVisible = true,
   connectHomePreferredPanelTab = null,
+  connectHomeAnalyzeLocked = false,
+  connectHomeComposeOnly = false,
   onConnectHomePanelUserDismiss,
   onConnectHomePanelManualOpen,
 }) {
@@ -675,9 +678,20 @@ export default function DataSheetWithIntegration({
     }
   };
 
+  const showComposeBlock =
+    showConnectIntegrationIntro &&
+    (connectHomeComposeOnly || !connectHomeAnalyzeLocked);
+
+  const showSheetWorkspace =
+    !connectHomeComposeOnly &&
+    (!showConnectIntegrationIntro || showConnectAnalyzeSection);
+
   /** Connect integrations: drawer only in Step 2 analyze block, not beside compose UI. */
   const connectHomeWorkspaceLive =
-    connectHomeMode && showConnectIntegrationIntro && showConnectAnalyzeSection;
+    connectHomeMode &&
+    showSheetWorkspace &&
+    showConnectAnalyzeSection &&
+    (connectHomeAnalyzeLocked || showConnectIntegrationIntro);
 
   /** Saved project grid — same viewport height contract as Step 2 analyze (flex chain + fillViewport). */
   const connectHomeProjectGridLive =
@@ -701,7 +715,9 @@ export default function DataSheetWithIntegration({
         connectHomeSidebarTab ||
         rightPanelTab === "charts" ||
         rightPanelTab === "dashboard") &&
-      (!showConnectIntegrationIntro || showConnectAnalyzeSection));
+      (connectHomeComposeOnly ||
+        !showConnectIntegrationIntro ||
+        showConnectAnalyzeSection));
   const showSidebar = !!rightPanelOpen && connectHomeDrawerAllowed;
   const isPanelVisible = showSidebar || isPanelClosing;
 
@@ -943,6 +959,7 @@ export default function DataSheetWithIntegration({
       connectHomeMode && connectHomeGridSurface,
       connectHomeAnalyzeDashboard && "px-0 sm:px-1 md:px-2",
       showConnectIntegrationIntro && "min-h-0 gap-0 px-0 py-0 sm:gap-0 sm:px-0 sm:py-0",
+      connectHomeComposeOnly && "flex min-h-0 flex-1 flex-col overflow-hidden",
       connectHomeWorkspaceLive && "flex min-h-0 flex-1 flex-col",
     )}>
       <ReplaceOrNewSheetDialog
@@ -958,10 +975,17 @@ export default function DataSheetWithIntegration({
         onReplace={() => resolveSheetDestination("replace")}
         onAddNewSheet={() => resolveSheetDestination("new_sheet")}
       />
-      {showConnectIntegrationIntro ? (
+      {showComposeBlock ? (
         <div
           id="connect-home-compose"
-          className={cn("w-full min-w-0 shrink-0", isDemo ? "pb-16" : "pb-96")}
+          className={cn(
+            "w-full min-w-0 shrink-0",
+            connectHomeComposeOnly
+              ? "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-6 sm:pb-8"
+              : isDemo
+                ? "pb-16"
+                : "pb-96",
+          )}
         >
           <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />
           {connectHomeDataLakePullBridge ? (
@@ -996,11 +1020,13 @@ export default function DataSheetWithIntegration({
           ) : null}
         </div>
       ) : null}
-      {(!showConnectIntegrationIntro || showConnectAnalyzeSection) && (
+      {showSheetWorkspace ? (
       <div
         className={
           connectHomeSheetLayoutLive
-            ? connectHomeWorkspaceRowClass
+            ? connectHomeAnalyzeLocked || isDemo
+              ? connectHomeAnalyzeRowClass
+              : connectHomeWorkspaceRowClass
             : "flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6"
         }
       >
@@ -1021,7 +1047,7 @@ export default function DataSheetWithIntegration({
             connectHomeMode && "bg-white dark:bg-slate-950",
           )}
         >
-          {connectHomeSheetLayoutLive ? (
+          {connectHomeSheetLayoutLive && !connectHomeAnalyzeLocked ? (
             <div
               id="connect-home-analyze-anchor"
               className={cn("h-0 w-full shrink-0 snap-start", connectAnalyzeAnchorClass)}
@@ -1030,7 +1056,7 @@ export default function DataSheetWithIntegration({
           ) : null}
           {!showSidebar &&
             !isPanelClosing &&
-            (!showConnectIntegrationIntro || showConnectAnalyzeSection) && (
+            showSheetWorkspace && (
             <OpenApiPanelTab
               contained={isDemo}
               instantOpen={connectHomeMode}
@@ -1163,6 +1189,7 @@ export default function DataSheetWithIntegration({
               startNew={startNew}
               setStartNew={setStartNew}
               showWorkspaceNav={!!showConnectWorkspaceNav}
+              embeddedInFixedViewport={connectHomeAnalyzeLocked}
               onPanelManualOpen={handleConnectHomePanelManualOpen}
             />
           ) : connectHomeProjectGridLive ? (
@@ -2042,7 +2069,7 @@ export default function DataSheetWithIntegration({
           </>
         )}
       </div>
-      )}
+      ) : null}
       {effectiveDashboardMode ? <ChartComposerDock editorInset={mainColumnRect} /> : null}
     </div>
   );

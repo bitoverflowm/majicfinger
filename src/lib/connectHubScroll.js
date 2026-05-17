@@ -148,16 +148,66 @@ export function scheduleConnectWorkspaceScroll(workspaceElRef, scrollRootElRef) 
   runWithRetries(tryScroll);
 }
 
+function isScrollableY(el) {
+  if (!el) return false;
+  const { overflowY } = getComputedStyle(el);
+  if (overflowY !== "auto" && overflowY !== "scroll" && overflowY !== "overlay") {
+    return false;
+  }
+  return el.scrollHeight > el.clientHeight + 1;
+}
+
 export function findConnectHomeScrollRoot(fromEl) {
-  let node = fromEl?.parentElement;
+  let node = fromEl;
   while (node) {
-    const { overflowY } = getComputedStyle(node);
-    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") {
-      return node;
-    }
+    if (isScrollableY(node)) return node;
     node = node.parentElement;
   }
   return null;
+}
+
+/** Scroll a target inside a known root (does not bubble to document). */
+export function scrollWithinScrollRoot(
+  scrollRootEl,
+  targetEl,
+  { behavior = "smooth", insetTop = 0 } = {},
+) {
+  if (!scrollRootEl || !targetEl) return false;
+  const restoreSnap = disableScrollSnap(scrollRootEl);
+  const padTop =
+    insetTop ||
+    Number.parseInt(getComputedStyle(scrollRootEl).scrollPaddingTop, 10) ||
+    0;
+  const elRect = targetEl.getBoundingClientRect();
+  const scrollerRect = scrollRootEl.getBoundingClientRect();
+  const targetTop = elRect.top - scrollerRect.top + scrollRootEl.scrollTop - padTop;
+  scrollRootEl.scrollTo({ top: Math.max(0, targetTop), behavior });
+  window.setTimeout(restoreSnap, 800);
+  return true;
+}
+
+/**
+ * Scroll compose panels (Where, Sort, etc.) inside #connect-home-compose or Connect scroll —
+ * never the landing page / document.
+ */
+export function scrollConnectComposeTargetIntoView(
+  targetEl,
+  { behavior = "smooth", insetTop = 16 } = {},
+) {
+  if (!targetEl || typeof document === "undefined") return false;
+
+  const composeEl = document.getElementById(CONNECT_HOME_COMPOSE_ID);
+  const scrollRoot =
+    (composeEl?.contains(targetEl) && isScrollableY(composeEl) && composeEl) ||
+    findConnectHomeScrollRoot(targetEl) ||
+    document.getElementById(CONNECT_HOME_SCROLL_ID);
+
+  if (!scrollRoot) {
+    targetEl.scrollIntoView({ behavior, block: "nearest" });
+    return false;
+  }
+
+  return scrollWithinScrollRoot(scrollRoot, targetEl, { behavior, insetTop });
 }
 
 export function scrollConnectAnalyzeIntoView(analyzeEl, scrollRootEl) {

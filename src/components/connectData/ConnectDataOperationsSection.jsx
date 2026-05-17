@@ -14,6 +14,7 @@ import {
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
+import { scrollConnectComposeTargetIntoView } from "@/lib/connectHubScroll";
 import { cn } from "@/lib/utils";
 
 const OPERATION_ICONS = {
@@ -45,7 +46,8 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
     if (didScrollRef.current) return;
     didScrollRef.current = true;
     const t = window.setTimeout(() => {
-      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      const el = sectionRef.current;
+      if (el) scrollConnectComposeTargetIntoView(el, { behavior: "smooth", insetTop: 12 });
     }, 280);
     return () => window.clearTimeout(t);
   }, [show]);
@@ -57,10 +59,8 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
       return [...list, opId];
     });
     window.setTimeout(() => {
-      document.getElementById(`connect-compose-${opId}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      const panel = document.getElementById(`connect-compose-${opId}`);
+      if (panel) scrollConnectComposeTargetIntoView(panel, { behavior: "smooth", insetTop: 16 });
     }, 80);
   };
 

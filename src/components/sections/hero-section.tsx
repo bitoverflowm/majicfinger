@@ -21,9 +21,9 @@ export function HeroSection() {
 
   return (
     <section id="hero" className="w-full relative">
-      <div className="relative isolate flex flex-col items-center w-full px-6 pb-16 md:pb-24 lg:pb-32">
+      <div className="relative isolate flex flex-col items-center w-full overflow-hidden px-6 pb-16 md:pb-24 lg:pb-32">
         <div className="absolute inset-0">
-          <div className="hero-aura-gradient absolute inset-0 z-0 h-[600px] md:h-[800px] w-full rounded-b-xl" />
+          <div className="hero-aura-gradient pointer-events-none absolute inset-0 z-0 h-[600px] md:h-[800px] w-full rounded-b-xl" />
         </div>
         <div className="relative z-10 pt-32 mx-auto h-full w-full max-w-[65rem] flex flex-col items-center justify-center gap-10">
           {hero.badgeHref ? (

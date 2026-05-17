@@ -23,6 +23,7 @@ export function ConnectHomeAnalyzeSection({
   setStartNew,
   className,
   showWorkspaceNav = false,
+  embeddedInFixedViewport = false,
   onPanelManualOpen,
 }) {
   const ctx = useMyStateV2() ?? {};
@@ -32,9 +33,9 @@ export function ConnectHomeAnalyzeSection({
   const analyzeRef = useRef(null);
 
   useLayoutEffect(() => {
-    if (!analyzeScrollTick) return;
+    if (embeddedInFixedViewport || !analyzeScrollTick) return;
     scheduleConnectAnalyzeAnchorScroll(null);
-  }, [analyzeScrollTick]);
+  }, [analyzeScrollTick, embeddedInFixedViewport]);
 
   return (
     <section

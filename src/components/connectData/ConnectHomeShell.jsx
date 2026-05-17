@@ -18,11 +18,12 @@ import {
   connectHubHubSnapClass,
   connectHubLayoutClass,
   connectHubPageClass,
+  connectHubDemoScrollContainClass,
   connectHubScrollPaddingClass,
-  connectHubScrollSnapClass,
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
 import { useConnectHomeAnalyzeScrollLock } from "@/hooks/useConnectHomeAnalyzeScrollLock";
+import { useConnectDemoScrollContainment } from "@/hooks/useConnectDemoScrollContainment";
 import {
   CONNECT_HOME_SCROLL_ID,
   scheduleConnectAnalyzeAnchorScroll,
@@ -34,6 +35,7 @@ import { useConnectHomeScrollPanels } from "@/hooks/useConnectHomeScrollPanels";
 import { cn } from "@/lib/utils";
 
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
+import { ConnectHomeAnalyzeViewport } from "@/components/connectData/ConnectHomeAnalyzeViewport";
 import ConnectDataStep1 from "@/components/connectData/ConnectDataStep1";
 import { ConnectHomeFileUpload } from "@/components/connectData/ConnectHomeFileUpload";
 import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSteps";
@@ -63,6 +65,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const setConnectHomeFlowStepsOpen = context?.setConnectHomeFlowStepsOpen;
 
   const scrollRef = useRef(null);
+  const shellMainRef = useRef(null);
   const hubRef = useRef(null);
   const workspaceRef = useRef(null);
 
@@ -128,8 +131,27 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
   const [connectPanelUserDismissed, setConnectPanelUserDismissed] = useState(false);
   const [connectHomePanelPinned, setConnectHomePanelPinned] = useState(false);
+  /** User opened Integration while on the locked sheet view — show compose in the fixed viewport. */
+  const [connectHomeComposeOpen, setConnectHomeComposeOpen] = useState(false);
   /** User-picked drawer tab (+ Integration, tab bar); do not auto-switch to request history. */
   const [connectHomePreferredPanelTab, setConnectHomePreferredPanelTab] = useState(null);
+
+  const analyzeViewportLocked =
+    workspaceActive &&
+    connectHomeAnalyzeActive &&
+    hasSheetData &&
+    !connectDataLakePullState.loading;
+
+  const composeWorkspacePhase =
+    workspaceActive && isConnectIntegration && !analyzeViewportLocked;
+
+  const useFixedViewport = analyzeViewportLocked || composeWorkspacePhase;
+
+  useEffect(() => {
+    if (analyzeViewportLocked) {
+      setConnectHomeComposeOpen(false);
+    }
+  }, [analyzeViewportLocked]);
 
   useEffect(() => {
     if (!connectRequestSummaryReady) {
@@ -141,25 +163,37 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     connectHomeAnalyzeActive && (hasSheetData || connectRequestSummaryReady);
 
   const scrollLockEnabled =
-    workspaceActive && connectHomeAnalyzeActive && hasSheetData;
+    !useFixedViewport && workspaceActive && connectHomeAnalyzeActive && hasSheetData;
 
-  const { allowScrollAboveAnalyze } = useConnectHomeAnalyzeScrollLock({
+  useConnectHomeAnalyzeScrollLock({
     scrollRef,
     hubRef,
     enabled: scrollLockEnabled,
+  });
+
+  useConnectDemoScrollContainment({
+    enabled: isDemo && !useFixedViewport,
+    scrollRef,
+    trapRootRef: shellMainRef,
   });
 
   const { panelsVisible, analyzePanelsEngaged } = useConnectHomeScrollPanels({
     scrollRef,
     hubRef,
     workspaceRef,
-    workspaceActive,
-    trackAnalyzeSection,
+    workspaceActive: workspaceActive && !useFixedViewport,
+    trackAnalyzeSection: trackAnalyzeSection && !useFixedViewport,
   });
 
   /** Right drawer: scroll with Step 2 analyze block; Step 1 uses hub/workspace engagement. */
-  const connectHomePanelsEngaged = trackAnalyzeSection ? analyzePanelsEngaged : panelsVisible;
-  const connectHomePanelsVisible = connectHomePanelsEngaged || connectHomePanelPinned;
+  const connectHomePanelsEngaged = useFixedViewport
+    ? analyzeViewportLocked
+    : trackAnalyzeSection
+      ? analyzePanelsEngaged
+      : panelsVisible;
+  const connectHomePanelsVisible = useFixedViewport
+    ? connectHomePanelPinned
+    : connectHomePanelsEngaged || connectHomePanelPinned;
 
   useEffect(() => {
     if (!connectHomePanelsEngaged) setConnectHomePanelPinned(false);
@@ -183,15 +217,23 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   }, [connectWorkspace, connectHomeAnalyzeActive, hasSheetData]);
 
   useLayoutEffect(() => {
+    if (useFixedViewport) return;
     if (!connectWorkspace || !connectWorkspaceScrollTick) return;
     scrollToWorkspace();
-  }, [connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
+  }, [useFixedViewport, connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
 
   useLayoutEffect(() => {
+    if (useFixedViewport) return;
     if (!connectAnalyzeScrollTick) return;
     if (!isConnectSavedProjectWorkspace(connectWorkspace) && !connectHomeAnalyzeActive) return;
     scrollToWorkspace();
-  }, [connectAnalyzeScrollTick, connectWorkspace, connectHomeAnalyzeActive, scrollToWorkspace]);
+  }, [
+    useFixedViewport,
+    connectAnalyzeScrollTick,
+    connectWorkspace,
+    connectHomeAnalyzeActive,
+    scrollToWorkspace,
+  ]);
 
   useEffect(() => {
     setConnectHomeLeftNavOpen?.(!!showConnectLeftNav);
@@ -274,24 +316,75 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const handleActivateWorkspace = useCallback(
     (id) => {
       context?.requestConnectWorkspace?.(id);
-      scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
+      if (!isConnectIntegrationWorkspace(id)) {
+        scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
+      }
     },
     [context],
   );
 
   const handleUploadParsed = useCallback(() => {
+    if (useFixedViewport) return;
     scrollToWorkspace();
-  }, [scrollToWorkspace]);
+  }, [scrollToWorkspace, useFixedViewport]);
+
+  const handleConnectHomePanelManualOpen = useCallback(
+    (tab) => {
+      setConnectPanelUserDismissed(false);
+      setConnectHomePanelPinned(true);
+      if (tab) setConnectHomePreferredPanelTab(tab);
+      if (tab === "integrations" && analyzeViewportLocked) {
+        setConnectHomeComposeOpen(true);
+      } else if (tab === "integrations" && !useFixedViewport) {
+        scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
+      }
+    },
+    [analyzeViewportLocked, useFixedViewport],
+  );
+
+  const workspacePanel = showDataWorkspace ? (
+    <DataSheetWithIntegration
+      user={user}
+      startNew={connectWorkspace === CONNECT_WORKSPACE.BLANK ? blankStartNew : startNew}
+      setStartNew={setStartNew}
+      connectHomeMode
+      connectHomeAnalyzeLocked={analyzeViewportLocked && !connectHomeComposeOpen}
+      connectHomeComposeOnly={composeWorkspacePhase || (analyzeViewportLocked && connectHomeComposeOpen)}
+      connectHomePanelsVisible={connectHomePanelsVisible}
+      onConnectHomePanelUserDismiss={() => {
+        setConnectPanelUserDismissed(true);
+        setConnectHomePanelPinned(false);
+        setConnectHomeComposeOpen(false);
+      }}
+      connectHomePreferredPanelTab={connectHomePreferredPanelTab}
+      onConnectHomePanelManualOpen={handleConnectHomePanelManualOpen}
+    />
+  ) : null;
 
   return (
-    <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950">
+    <main
+      ref={shellMainRef}
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950"
+    >
+      {useFixedViewport ? (
+        <ConnectHomeAnalyzeViewport isDemo={isDemo} connectFlowStep={connectFlowStep}>
+          <section
+            ref={workspaceRef}
+            id="connect-home-workspace"
+            className={cn(CONNECT_HOME_SURFACE, "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden")}
+          >
+            {showUploadPanel ? <ConnectHomeFileUpload onParsed={handleUploadParsed} /> : null}
+            {workspacePanel}
+          </section>
+        </ConnectHomeAnalyzeViewport>
+      ) : (
       <div
         ref={scrollRef}
         id={CONNECT_HOME_SCROLL_ID}
         className={cn(
           "min-h-0 flex-1 overflow-y-auto",
+          isDemo && connectHubDemoScrollContainClass,
           !isDemo && connectHubScrollPaddingClass,
-          (isDemo || connectHomeAnalyzeActive) && connectHubScrollSnapClass,
           !isDemo && !connectHomeAnalyzeActive && "snap-y snap-proximity",
           CONNECT_HOME_SURFACE,
         )}
@@ -361,7 +454,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   {showUploadPanel ? (
                     <ConnectHomeFileUpload onParsed={handleUploadParsed} />
                   ) : null}
-                  {showDataWorkspace ? (
+                  {workspacePanel ? (
                     <div
                       className={cn(
                         "relative flex min-h-0 flex-1 flex-col",
@@ -371,27 +464,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                         showUploadPanel && "hidden",
                       )}
                     >
-                      <DataSheetWithIntegration
-                        user={user}
-                        startNew={connectWorkspace === CONNECT_WORKSPACE.BLANK ? blankStartNew : startNew}
-                        setStartNew={setStartNew}
-                        connectHomeMode
-                        connectHomePanelsVisible={connectHomePanelsVisible}
-                        onConnectHomePanelUserDismiss={() => {
-                          setConnectPanelUserDismissed(true);
-                          setConnectHomePanelPinned(false);
-                        }}
-                        connectHomePreferredPanelTab={connectHomePreferredPanelTab}
-                        onConnectHomePanelManualOpen={(tab) => {
-                          setConnectPanelUserDismissed(false);
-                          setConnectHomePanelPinned(true);
-                          if (tab) setConnectHomePreferredPanelTab(tab);
-                          if (tab === "integrations" && connectHomeAnalyzeActive) {
-                            allowScrollAboveAnalyze();
-                            scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
-                          }
-                        }}
-                      />
+                      {workspacePanel}
                     </div>
                   ) : null}
                 </section>
@@ -400,6 +473,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
           </div>
         </div>
       </div>
+      )}
     </main>
   );
 }

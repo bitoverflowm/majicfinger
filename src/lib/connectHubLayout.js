@@ -75,7 +75,19 @@ export const connectDemoWorkspaceSectionClass = cn(
 /** Demo + analyze scroll container — mandatory snap between hub and workspace. */
 export const connectHubScrollSnapClass = "snap-y snap-mandatory";
 
+/** Landing demo — scroll chaining stays inside #connect-home-scroll. */
+export const connectHubDemoScrollContainClass = "overscroll-y-contain touch-pan-y";
+
 export const connectHubHubSnapClass = "snap-start snap-always";
+
+/** Fixed Step 2 shell — fills Connect home / demo card without document scroll. */
+export const connectHubAnalyzeViewportClass =
+  "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950";
+
+/** Analyze row: sheet + drawer inside the fixed viewport (no dvh stack). */
+export const connectHomeAnalyzeRowClass = cn(
+  "flex min-h-0 w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:gap-6",
+);
 
 /** Landing demo — in-card step rail + hub (same proportions as Connect home shell). */
 export const connectHubDemoLayoutClass = cn(
