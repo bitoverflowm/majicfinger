@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react";
 import { AnimatePresence, motion, useScroll } from "framer-motion";
 
 import { NavMenu } from "@/components/nav-menu";
+import { DemoScrollLink } from "@/components/sections/demo-scroll-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/lib/config";
 import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
@@ -152,12 +153,12 @@ export function Navbar() {
               <div className="flex items-center space-x-6">
                 {!user ? (
                   <>
-                    <Link
+                    <DemoScrollLink
                       className="bg-secondary h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-fit px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
                       href={siteConfig.hero.cta.primary.href}
                     >
                       {siteConfig.hero.cta.primary.text}
-                    </Link>
+                    </DemoScrollLink>
                     <Link
                       className="h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-fit px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
                       href="/login"
@@ -298,12 +299,12 @@ export function Navbar() {
                 <div className="flex flex-col gap-2">
                   {!user ? (
                     <>
-                      <Link
+                      <DemoScrollLink
                         href={siteConfig.hero.cta.primary.href}
                         className="bg-secondary h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-full px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
                       >
                         {siteConfig.hero.cta.primary.text}
-                      </Link>
+                      </DemoScrollLink>
                       <Link
                         href="/login"
                         className="h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-full px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"

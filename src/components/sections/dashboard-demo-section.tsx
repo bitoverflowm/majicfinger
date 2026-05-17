@@ -13,7 +13,11 @@ export function DashboardDemoSection() {
       id="demo"
       className="relative z-30 mx-auto mb-10 w-full max-w-[min(100%,84rem)] -mt-8 px-6 pb-14 pt-0 sm:-mt-10 sm:px-8 md:-mt-12 lg:-mt-14 lg:px-10"
     >
-      <div className="relative isolate size-full overflow-hidden overscroll-none rounded-2xl border border-border bg-background shadow-xl ring-1 ring-border/60">
+      <div
+        id="demo-mockup"
+        data-demo-mockup
+        className="relative isolate size-full overflow-hidden overscroll-none rounded-2xl border border-border bg-background shadow-xl ring-1 ring-border/60"
+      >
         <StateProvider>
           <StateProviderV2
             initialSettings={{

@@ -2,6 +2,8 @@ import { siteConfig } from "@/lib/config";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { DashboardDemoSection } from "./dashboard-demo-section";
+import { DemoScrollLink } from "./demo-scroll-link";
+import { LandingDemoScrollManager } from "./landing-demo-scroll";
 
 export function HeroSection() {
   const { hero } = siteConfig;
@@ -21,6 +23,7 @@ export function HeroSection() {
 
   return (
     <section id="hero" className="relative w-full overflow-visible">
+      <LandingDemoScrollManager />
       {/* Background only — must stay below copy (z-10) and demo (z-30). */}
       <div
         aria-hidden
@@ -58,12 +61,12 @@ export function HeroSection() {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2.5">
-          <Link
+          <DemoScrollLink
             href={hero.cta.primary.href}
             className="flex h-9 w-32 items-center justify-center rounded-full border border-white/[0.12] bg-secondary px-4 text-sm font-normal tracking-wide text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] transition-all ease-out hover:bg-secondary/80 active:scale-95 dark:text-secondary-foreground"
           >
             {hero.cta.primary.text}
-          </Link>
+          </DemoScrollLink>
           <Link
             href={hero.cta.secondary.href}
             className="flex h-10 w-32 items-center justify-center rounded-full border border-[#E5E7EB] bg-white px-5 text-sm font-normal tracking-wide text-primary transition-all ease-out hover:bg-white/80 active:scale-95 dark:border-[#27272A] dark:bg-background dark:hover:bg-background/80"
