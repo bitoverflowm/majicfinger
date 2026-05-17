@@ -7,6 +7,7 @@ import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWor
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   CONNECT_HOME_WORKSPACE_MIN_H,
+  connectAnalyzeSectionFitClass,
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
 import { scheduleConnectAnalyzeAnchorScroll } from "@/lib/connectHubScroll";
@@ -38,9 +39,13 @@ export function ConnectHomeAnalyzeSection({
       id="connect-home-analyze"
       className={cn(
         "flex w-full max-w-none flex-col",
-        CONNECT_HOME_WORKSPACE_MIN_H,
-        connectWorkspaceScrollInsetClass,
-        showWorkspaceNav ? "mt-0" : "mt-24 snap-start sm:mt-28 md:mt-32 lg:mt-40",
+        showWorkspaceNav
+          ? connectAnalyzeSectionFitClass
+          : cn(
+              CONNECT_HOME_WORKSPACE_MIN_H,
+              connectWorkspaceScrollInsetClass,
+              "mt-24 snap-start sm:mt-28 md:mt-32 lg:mt-40",
+            ),
         className,
       )}
     >
@@ -53,7 +58,7 @@ export function ConnectHomeAnalyzeSection({
       {showWorkspaceNav ? (
         <ConnectHomeWorkspaceNav
           compact
-          className="mb-3 shrink-0 px-0.5 sm:px-1"
+          className="mb-2 shrink-0 px-0.5 sm:px-1"
           onPanelManualOpen={onPanelManualOpen}
         />
       ) : null}

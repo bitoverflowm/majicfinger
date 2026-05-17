@@ -31,6 +31,12 @@ export const CONNECT_WORKSPACE_SCROLL_OFFSET_PX = 96;
 /** Step 2 analyze — full-viewport dashboard (below sticky nav ~4.5rem). */
 export const CONNECT_ANALYZE_DASHBOARD_MIN_H = "min-h-[calc(100dvh-4.5rem)]";
 
+/** Step 2 sheet block — fixed viewport height so toolbar + grid + pagination fit without page scroll. */
+export const connectAnalyzeSectionFitClass = cn(
+  "flex flex-col overflow-hidden",
+  "h-[calc(100dvh-5.25rem)] max-h-[calc(100dvh-5.25rem)]",
+);
+
 /** Stable Step 2 workspace shell (sheet / chart / dashboard); never shrinks below viewport. */
 export const CONNECT_HOME_WORKSPACE_MIN_H = CONNECT_ANALYZE_DASHBOARD_MIN_H;
 

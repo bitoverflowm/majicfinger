@@ -129,7 +129,9 @@ const DataView = ({ user, fillViewport = false }) => {
     <div
       className={cn(
         "min-w-0 max-w-full min-h-0",
-        fillViewport ? "flex min-h-0 flex-1 flex-col px-0 sm:px-1" : "px-2 sm:px-4 md:px-6",
+        fillViewport
+          ? "flex min-h-0 flex-1 flex-col overflow-hidden px-0 sm:px-1"
+          : "px-2 sm:px-4 md:px-6",
       )}
     >
       {showSheetTabs && (

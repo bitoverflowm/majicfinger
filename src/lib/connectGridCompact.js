@@ -11,11 +11,17 @@ export const connectGridAgCompactClass = cn(
   "[--ag-list-item-height:22px]",
 );
 
-/** Connect analyze grid — slightly shorter than full flex stretch (toolbar + pagination breathing room). */
-export const connectGridFillViewportClass = "min-h-[16rem] flex-1 mb-4";
+/** Connect analyze grid — flex child; height comes from section max viewport budget. */
+export const connectGridFillViewportClass = "min-h-0 flex-1 overflow-hidden";
+
+/** GridView shell when fillViewport (toolbar + grid stack). */
+export const connectGridViewportShellClass = "flex min-h-0 flex-1 flex-col overflow-hidden";
+
+/** Tabs row above grid on Connect analyze. */
+export const connectGridViewportTabsClass = "w-full min-w-0 shrink-0";
 
 /** Toolbar above the grid on Connect analyze. */
-export const connectGridToolbarCompactClass = "gap-1.5 py-1.5";
+export const connectGridToolbarCompactClass = "gap-1 py-1 shrink-0";
 
 /** Compact toolbar buttons only — not the clear-sheet dot (`data-destructive-dot`). */
 export const connectGridToolbarButtonCompactClass =

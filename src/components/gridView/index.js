@@ -82,6 +82,8 @@ import { SHEET_GRID_PAGE_SIZE } from "@/config/dataLakeParquetSamples";
 import {
   connectGridAgCompactClass,
   connectGridFillViewportClass,
+  connectGridViewportShellClass,
+  connectGridViewportTabsClass,
   connectGridToolbarButtonCompactClass,
   connectGridToolbarCompactClass,
 } from "@/lib/connectGridCompact";
@@ -2793,10 +2795,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
     return (
         <div
             className={cn(
-                "h-full w-full min-w-0 text-foreground",
-                fillViewport && "flex min-h-0 flex-1 flex-col",
+                "w-full min-w-0 text-foreground",
+                fillViewport ? connectGridViewportShellClass : "h-full",
             )}
-            style={{ height: "100%", width: "100%" }}
+            style={fillViewport ? { width: "100%" } : { height: "100%", width: "100%" }}
         >
             <Alert className="mt-4 sm:hidden">
                 <div className="flex gap-2 place-items-center"><TrafficCone className="w-8 h-8"/>
@@ -2807,7 +2809,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 </div>
             </Alert>  
             {(activeSheetId || isSheetLoading) && (
-            <Tabs defaultValue="table" className="w-full min-w-0">
+            <Tabs defaultValue="table" className={cn(fillViewport ? connectGridViewportTabsClass : "w-full min-w-0")}>
               {isSheetLoading ? (
                 <GridToolbarSkeleton compact={fillViewport} />
               ) : (
