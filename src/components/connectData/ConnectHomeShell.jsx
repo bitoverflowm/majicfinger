@@ -188,7 +188,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
 
     const designPanelTab = isConnectHomeDesignPanelTab(rightPanelTab);
     const analyzePanelsAllowed =
-      connectHomePanelsVisible && connectHomeAnalyzeActive;
+      connectHomeAnalyzeActive &&
+      (connectHomePanelsVisible ||
+        (isConnectSavedProjectWorkspace(connectWorkspace) && hasSheetData) ||
+        designPanelTab);
 
     if (!analyzePanelsAllowed) {
       setRightPanelOpen?.(false);

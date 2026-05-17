@@ -436,10 +436,11 @@ export default function DataSheetWithIntegration({
   }, [rightPanelTab, setRightPanelTab]);
 
   useEffect(() => {
+    if (connectHomeMode) return;
     if (!chartMode && !dashboardMode && setRightPanelTab && rightPanelTab === "dashboard") {
       setRightPanelTab("integrations");
     }
-  }, [chartMode, dashboardMode, rightPanelTab, setRightPanelTab]);
+  }, [chartMode, dashboardMode, connectHomeMode, rightPanelTab, setRightPanelTab]);
 
   const beginPanelClose = useCallback((onAfterClose) => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
@@ -1032,7 +1033,7 @@ export default function DataSheetWithIntegration({
             <div
               className={cn(
                 "flex min-h-0 min-w-0 flex-1 flex-col",
-                connectHomeWorkspaceLive && CONNECT_HOME_WORKSPACE_MIN_H,
+                connectHomeSheetLayoutLive && CONNECT_HOME_WORKSPACE_MIN_H,
               )}
             >
               {connectWorkspaceNav}
@@ -1044,7 +1045,7 @@ export default function DataSheetWithIntegration({
             <div
               className={cn(
                 "flex min-h-0 min-w-0 flex-1 flex-col",
-                connectHomeWorkspaceLive && CONNECT_HOME_WORKSPACE_MIN_H,
+                connectHomeSheetLayoutLive && CONNECT_HOME_WORKSPACE_MIN_H,
               )}
             >
               {connectWorkspaceNav}
