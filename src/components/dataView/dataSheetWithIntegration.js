@@ -61,6 +61,7 @@ import {
   connectDemoAnalyzeMainClass,
   connectHomeAnalyzeMainClass,
   connectHomeAnalyzeRowClass,
+  connectHomeAnalyzeRowDemoClass,
   connectHomeDrawerAsideDemoClass,
   connectHomeDrawerAsideFixedClass,
   connectHomeWorkspaceRowClass,
@@ -106,9 +107,6 @@ import {
   projectNameForDataSetId,
 } from "@/lib/dashboardChartPickerLabels";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
-/** In embedded demo, only these integrations are selectable; others are disabled with a Pro badge. */
-const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
-
 const INTEGRATION_OPTIONS = [
   { value: "binance", label: "Binance", logo: "/binance.jpeg" },
   { value: "chainlink", label: "Chainlink", logo: "/chainlink.png" },
@@ -549,6 +547,43 @@ export default function DataSheetWithIntegration({
     ],
   );
 
+  const handleOpenApiPanelFromTab = useCallback(() => {
+    if (effectiveDashboardMode) {
+      if (connectHomeMode) {
+        handleConnectHomePanelManualOpen("dashboard");
+      } else {
+        setRightPanelTab?.("dashboard");
+        setViewing?.("dashboardComposer");
+        setRightPanelOpen?.(true);
+      }
+    } else if (effectiveChartMode) {
+      if (connectHomeMode) {
+        handleConnectHomePanelManualOpen("charts");
+      } else {
+        setRightPanelTab?.("charts");
+        setViewing?.("charts");
+        setRightPanelOpen?.(true);
+      }
+    } else if (connectHomeMode) {
+      handleConnectHomePanelManualOpen("integrations");
+      setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+    } else {
+      setRightPanelTab?.("integrations");
+      setViewing?.("dataStart");
+      setIntegrationSidebar?.((prev) => prev ?? "polymarket");
+      setRightPanelOpen?.(true);
+    }
+  }, [
+    connectHomeMode,
+    effectiveChartMode,
+    effectiveDashboardMode,
+    handleConnectHomePanelManualOpen,
+    setIntegrationSidebar,
+    setRightPanelOpen,
+    setRightPanelTab,
+    setViewing,
+  ]);
+
   const backToDashboardLoadScreen = useCallback(() => {
     if (!dashboardMode) return;
     setSelectedDashboardCard?.(null);
@@ -680,12 +715,14 @@ export default function DataSheetWithIntegration({
   };
 
   const connectAnalyzePullActive =
-    showConnectIntegrationIntro && !!connectDataLakePullState.loading;
+    showConnectIntegrationIntro &&
+    (connectHomeAnalyzeActive || !!connectDataLakePullState.loading);
 
   const showComposeBlock =
     showConnectIntegrationIntro &&
-    (connectHomeComposeOnly || !connectHomeAnalyzeLocked) &&
-    !connectAnalyzePullActive;
+    !connectHomeAnalyzeActive &&
+    !connectDataLakePullState.loading &&
+    (connectHomeComposeOnly || !connectHomeAnalyzeLocked);
 
   const showSheetWorkspace =
     (!connectHomeComposeOnly || connectAnalyzePullActive) &&
@@ -725,6 +762,11 @@ export default function DataSheetWithIntegration({
         showConnectAnalyzeSection));
   const showSidebar = !!rightPanelOpen && connectHomeDrawerAllowed;
   const isPanelVisible = showSidebar || isPanelClosing;
+  /** Edge tab to reopen the drawer after X / collapse (demo: also during compose). */
+  const showPanelReopenTab =
+    !showSidebar &&
+    !isPanelClosing &&
+    (showSheetWorkspace || (isDemo && connectHomeMode && showComposeBlock));
 
   const connectRequestSummaryReady = useMemo(() => {
     if (!connectHomeMode || !showConnectIntegrationIntro) return false;
@@ -963,9 +1005,12 @@ export default function DataSheetWithIntegration({
       isDemo && "relative",
       connectHomeMode && "bg-white dark:bg-slate-950",
       connectHomeMode && connectHomeGridSurface,
-      connectHomeAnalyzeDashboard && "px-0 sm:px-1 md:px-2",
-      showConnectIntegrationIntro && "min-h-0 gap-0 px-0 py-0 sm:gap-0 sm:px-0 sm:py-0",
-      isDemo && showConnectIntegrationIntro && "overflow-x-visible",
+      connectHomeAnalyzeDashboard &&
+        !showConnectIntegrationIntro &&
+        "px-0 sm:px-1 md:px-2",
+      showConnectIntegrationIntro &&
+        "min-h-0 gap-0 px-0 py-0 sm:gap-0 sm:px-0 sm:py-0 md:px-0 lg:px-0",
+      isDemo && connectHomeMode && "overflow-x-visible",
       connectHomeComposeOnly && "flex min-h-0 flex-1 flex-col overflow-hidden",
       connectHomeWorkspaceLive && "flex min-h-0 flex-1 flex-col",
       connectAnalyzePullActive && connectHomeWorkspaceLive && "min-h-0 flex-1 overflow-hidden",
@@ -1030,7 +1075,7 @@ export default function DataSheetWithIntegration({
         className={cn(
           connectHomeSheetLayoutLive
             ? connectHomeAnalyzeLocked || isDemo
-              ? connectHomeAnalyzeRowClass
+              ? cn(connectHomeAnalyzeRowClass, isDemo && connectHomeAnalyzeRowDemoClass)
               : connectHomeWorkspaceRowClass
             : "flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-row gap-4 transition-[gap] duration-300 ease-out sm:w-full sm:gap-6",
           connectAnalyzePullActive && "min-h-0 flex-1",
@@ -1060,41 +1105,13 @@ export default function DataSheetWithIntegration({
               aria-hidden
             />
           ) : null}
-          {!showSidebar &&
-            !isPanelClosing &&
-            showSheetWorkspace && (
+          {!isDemo && showPanelReopenTab ? (
             <OpenApiPanelTab
-              contained={isDemo}
+              contained={false}
               instantOpen={connectHomeMode}
-              onOpen={() => {
-                if (effectiveDashboardMode) {
-                  if (connectHomeMode) {
-                    handleConnectHomePanelManualOpen("dashboard");
-                  } else {
-                    setRightPanelTab?.("dashboard");
-                    setViewing?.("dashboardComposer");
-                    setRightPanelOpen?.(true);
-                  }
-                } else if (effectiveChartMode) {
-                  if (connectHomeMode) {
-                    handleConnectHomePanelManualOpen("charts");
-                  } else {
-                    setRightPanelTab?.("charts");
-                    setViewing?.("charts");
-                    setRightPanelOpen?.(true);
-                  }
-                } else if (connectHomeMode) {
-                  handleConnectHomePanelManualOpen("integrations");
-                  setIntegrationSidebar?.((prev) => prev ?? "polymarket");
-                } else {
-                  setRightPanelTab?.("integrations");
-                  setViewing?.("dataStart");
-                  setIntegrationSidebar?.((prev) => prev ?? "polymarket");
-                  setRightPanelOpen?.(true);
-                }
-              }}
+              onOpen={handleOpenApiPanelFromTab}
             />
-          )}
+          ) : null}
           {effectiveDashboardMode ? (
             <div
               className={cn(
@@ -1257,7 +1274,12 @@ export default function DataSheetWithIntegration({
               )}
             >
               <div className="h-full min-h-0 w-full flex flex-col">
-                <div className="flex h-full flex-col rounded-lg border bg-background/80 backdrop-blur-sm shadow-sm">
+                <div
+                  className={cn(
+                    "flex h-full flex-col border bg-background/80 backdrop-blur-sm shadow-sm",
+                    isDemo && connectHomeMode ? "rounded-l-lg rounded-r-none" : "rounded-lg",
+                  )}
+                >
                   <Tabs
                     value={rightPanelTab || "integrations"}
                     onValueChange={(v) => {
@@ -2075,6 +2097,13 @@ export default function DataSheetWithIntegration({
           </>
         )}
       </div>
+      ) : null}
+      {isDemo && showPanelReopenTab ? (
+        <OpenApiPanelTab
+          contained
+          instantOpen={connectHomeMode}
+          onOpen={handleOpenApiPanelFromTab}
+        />
       ) : null}
       {effectiveDashboardMode ? <ChartComposerDock editorInset={mainColumnRect} /> : null}
     </div>

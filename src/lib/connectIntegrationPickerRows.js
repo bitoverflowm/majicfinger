@@ -19,28 +19,21 @@ export const INTEGRATION_LOGO_BY_HANDLER = {
   hackerNews: "/hackerNews.png",
 };
 
-const DEMO_ACTIVE_INTEGRATION_VALUES = new Set(["polymarket", "coinGecko"]);
-
 function isComingSoonTags(tags) {
   return (tags || []).some((t) => /coming soon/i.test(String(t)));
 }
 
-/**
- * @param {{ isDemo?: boolean }} [opts]
- */
-export function buildIntegrationPickerRows({ isDemo = false } = {}) {
+export function buildIntegrationPickerRows() {
   return integrations_list
     .filter((item) => item?.clickHandler)
     .map((item) => {
       const id = item.clickHandler;
       const comingSoon = isComingSoonTags(item.tags) || !item.live;
       const isApi = API_INTEGRATIONS.includes(id);
-      const isProOnly = isDemo && !DEMO_ACTIVE_INTEGRATION_VALUES.has(id);
-      const available = isApi && !!item.live && !comingSoon && !isProOnly;
+      const available = isApi && !!item.live && !comingSoon;
 
       let badge = null;
-      if (isProOnly) badge = "Pro";
-      else if (!available) badge = "Coming soon";
+      if (!available) badge = "Coming soon";
 
       return {
         id,

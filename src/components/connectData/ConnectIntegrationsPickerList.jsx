@@ -35,9 +35,6 @@ function integrationTooltipContent(row) {
   if (row.badge === "Coming soon") {
     return desc || "Coming soon";
   }
-  if (row.badge === "Pro") {
-    return desc ? `${desc} (Pro plan required)` : "Available on Pro plan";
-  }
   return desc || row.name;
 }
 
@@ -82,7 +79,6 @@ export function ConnectIntegrationsPickerList({
   onAfterSelect,
 }) {
   const ctx = useMyStateV2() ?? {};
-  const isDemo = !!ctx.isDemo;
   const integrationSidebar = ctx.integrationSidebar;
   const setIntegrationSidebar = ctx.setIntegrationSidebar;
   const setRightPanelTab = ctx.setRightPanelTab;
@@ -90,7 +86,7 @@ export function ConnectIntegrationsPickerList({
 
   const [search, setSearch] = useState("");
 
-  const rows = useMemo(() => buildIntegrationPickerRows({ isDemo }), [isDemo]);
+  const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const filtered = useMemo(
     () => filterIntegrationPickerRows(rows, search),
     [rows, search],

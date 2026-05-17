@@ -59,9 +59,19 @@ export const connectHomeAnalyzeMainClass = cn(
 /** Horizontal inset inside the landing demo card. */
 export const connectHubDemoInsetClass = "px-4 sm:px-5 md:px-6 lg:px-8";
 
-/** OpenApiPanelTab — flush to demo card right edge (cancels grid horizontal inset). */
-export const connectHubDemoPanelTabFlushRightClass =
+/** Cancels demo grid horizontal inset so controls/drawer sit on the card edge. */
+export const connectHubDemoFlushRightInsetClass =
   "-right-4 sm:-right-5 md:-right-6 lg:-right-8";
+
+/** @deprecated Use connectHubDemoFlushRightInsetClass */
+export const connectHubDemoPanelTabFlushRightClass = connectHubDemoFlushRightInsetClass;
+
+/** Demo mockup — edge tab to reopen the integrations drawer (flush to card right). */
+export const connectHubDemoPanelTabClass = cn(
+  "absolute right-0 z-40",
+  connectHubDemoFlushRightInsetClass,
+  "top-20 sm:top-24",
+);
 
 /** Vertical inset inside the landing demo card (shrinks sheet/chart area). */
 export const connectHubDemoVerticalInsetClass = "py-4 sm:py-5 md:py-6 lg:py-8";
@@ -104,7 +114,11 @@ export const connectHomeAnalyzeRowClass = cn(
 export const connectHomeDrawerAsideDemoClass = cn(
   "absolute inset-y-0 right-0 z-20 flex h-full min-h-0 flex-col gap-4 sm:gap-6",
   "transition-[transform,width,min-width,max-width] duration-300 ease-out",
+  connectHubDemoFlushRightInsetClass,
 );
+
+/** Demo analyze row — allow drawer to extend into grid horizontal inset. */
+export const connectHomeAnalyzeRowDemoClass = "overflow-visible";
 
 /** Landing demo — in-card step rail + hub (same proportions as Connect home shell). */
 export const connectHubDemoLayoutClass = cn(

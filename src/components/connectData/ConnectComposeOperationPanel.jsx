@@ -265,19 +265,21 @@ export function ConnectComposeOperationPanel({ className }) {
     if (resolveConnectHomeSheetDestination(ctx).action === "replace") {
       applyConnectHomeSheetNameToActiveSheet(ctx);
     }
+    if (!activeSheetId && ctx.addNewSheetAndActivate) {
+      ctx.addNewSheetAndActivate();
+    }
     flushSync(() => {
-      requestConnectAnalyzeScroll?.();
       requestConnectDataLakePull?.();
     });
   }, [
     ctx,
+    activeSheetId,
     connectActiveComposeOps,
     columnComposeItems,
     composeWhereFilters,
     columnComposeOrderBy,
     composeHavingFilters,
     composeJoins,
-    requestConnectAnalyzeScroll,
     requestConnectDataLakePull,
     setConnectActiveComposeOps,
     setComposeJoins,

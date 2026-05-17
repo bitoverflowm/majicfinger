@@ -9,11 +9,17 @@ import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSt
  */
 export function ConnectHomeAnalyzeViewport({ isDemo, connectFlowStep, children, className }) {
   return (
-    <div className={cn(connectHubAnalyzeViewportClass, className)}>
+    <div
+      className={cn(
+        connectHubAnalyzeViewportClass,
+        isDemo && "overflow-x-visible overflow-y-hidden",
+        className,
+      )}
+    >
       {isDemo ? (
         <div
           className={cn(
-            "grid min-h-0 flex-1 grid-cols-[8.5rem_minmax(0,1fr)] gap-x-6 lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
+            "relative grid min-h-0 flex-1 grid-cols-[8.5rem_minmax(0,1fr)] gap-x-6 lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
             connectHubDemoInsetClass,
           )}
         >
