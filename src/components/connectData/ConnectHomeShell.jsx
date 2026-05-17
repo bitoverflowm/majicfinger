@@ -15,7 +15,9 @@ import {
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
 import {
+  CONNECT_HOME_SCROLL_ID,
   scheduleConnectAnalyzeAnchorScroll,
+  scheduleConnectHomeIntegrationActivate,
   scheduleConnectWorkspaceScroll,
 } from "@/lib/connectHubScroll";
 import { useConnectHomeScrollPanels } from "@/hooks/useConnectHomeScrollPanels";
@@ -215,7 +217,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const handleActivateWorkspace = useCallback(
     (id) => {
       context?.requestConnectWorkspace?.(id);
-      scheduleConnectWorkspaceScroll(workspaceRef, scrollRef);
+      scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
     },
     [context],
   );
@@ -228,6 +230,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950">
       <div
         ref={scrollRef}
+        id={CONNECT_HOME_SCROLL_ID}
         className={cn(
           "min-h-0 flex-1 overflow-y-auto",
           connectHubScrollPaddingClass,

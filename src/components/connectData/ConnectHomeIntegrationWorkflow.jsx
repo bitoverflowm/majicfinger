@@ -512,7 +512,8 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const hasColumnPicker = showKalshiSourceCards && !!connectDataLakeSampleId;
 
   return (
-    <div
+    <motion.div
+      id="connect-home-integration-workflow"
       className={cn(
         "flex flex-col px-4 sm:px-6 md:px-10 lg:px-14",
         connectWorkspaceScrollInsetClass,
@@ -559,6 +560,6 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
           </p>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

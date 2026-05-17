@@ -301,7 +301,7 @@ export default function ConnectDataStep1({
       setIntegrationSidebar?.(integrationId);
       setRightPanelTab?.("integrations");
       if (onActivateWorkspace) {
-        // Connect home shell: scroll to inline workspace; panel opens when hub scrolls out of view.
+        // Connect home shell: mount workspace, then scroll to integration query builder.
         setRightPanelOpen?.(false);
         onActivateWorkspace(integrationId);
       } else {
@@ -503,12 +503,13 @@ export default function ConnectDataStep1({
 
   const onIntegrationRowClick = (row) => {
     if (!isConnectHubIntegrationAvailable(row)) return;
-    if (row.clickHandler) {
-      openIntegrationPlayground(row.clickHandler);
-    }
     if (row.warmConnect) {
       if (row.warmConnect.busy) return;
       row.warmConnect.start();
+      return;
+    }
+    if (row.clickHandler) {
+      openIntegrationPlayground(row.clickHandler);
     }
   };
 

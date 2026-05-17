@@ -18,6 +18,29 @@ export function isConnectIntegrationWorkspace(id) {
   );
 }
 
+/** DuckDB warm-connect before compose (Kalshi / Polymarket historical). */
+export const CONNECT_WARM_INTEGRATION_IDS = new Set([
+  "kalshiHistorical",
+  "polymarketHistorical",
+]);
+
+export function isConnectWarmIntegration(id) {
+  return CONNECT_WARM_INTEGRATION_IDS.has(id);
+}
+
+/** Step 1 integration query builder (Markets / Trades / columns) — not the analyze grid. */
+export function isConnectIntegrationComposeStep(connectWorkspace, connectHomeAnalyzeActive) {
+  return (
+    isConnectIntegrationWorkspace(connectWorkspace) && !connectHomeAnalyzeActive
+  );
+}
+
+export function shouldDeferConnectWarmComposeScroll(connectWorkspace, connectWorkspaceScrollTick) {
+  return (
+    isConnectWarmIntegration(connectWorkspace) && (connectWorkspaceScrollTick ?? 0) === 0
+  );
+}
+
 /** Hub pill is clickable when warm-connect exists or API integration is live. */
 export function isConnectHubIntegrationAvailable(row) {
   if (!row) return false;

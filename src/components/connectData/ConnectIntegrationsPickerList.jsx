@@ -16,7 +16,6 @@ import {
   buildIntegrationPickerRows,
   filterIntegrationPickerRows,
 } from "@/lib/connectIntegrationPickerRows";
-import { scheduleConnectComposeScroll } from "@/lib/connectHubScroll";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
@@ -107,7 +106,6 @@ export function ConnectIntegrationsPickerList({
         } else {
           setIntegrationSidebar?.(row.id);
         }
-        scheduleConnectComposeScroll();
       } else {
         setIntegrationSidebar?.(row.id);
       }

@@ -5,37 +5,100 @@ export const CONNECT_HOME_ANALYZE_ANCHOR_ID = "connect-home-analyze-anchor";
 
 export const CONNECT_HOME_COMPOSE_ID = "connect-home-compose";
 
-/** Scroll the Connect compose block (Refine query / integration workflow) into view. */
-export function scrollConnectComposeIntoView(composeEl, scrollRootEl) {
-  if (!composeEl) return;
-  const scrollRoot = scrollRootEl ?? findConnectHomeScrollRoot(composeEl);
-  if (!scrollRoot) {
-    composeEl.scrollIntoView({ behavior: "smooth", block: "start" });
-    return;
-  }
-  const elRect = composeEl.getBoundingClientRect();
-  const scrollerRect = scrollRoot.getBoundingClientRect();
-  const padTop =
-    Number.parseInt(getComputedStyle(scrollRoot).scrollPaddingTop, 10) ||
-    CONNECT_WORKSPACE_SCROLL_OFFSET_PX;
-  const targetTop = elRect.top - scrollerRect.top + scrollRoot.scrollTop - padTop;
-  scrollRoot.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+export const CONNECT_HOME_INTEGRATION_WORKFLOW_ID = "connect-home-integration-workflow";
+
+export const CONNECT_HOME_WORKSPACE_ID = "connect-home-workspace";
+
+export const CONNECT_HOME_SCROLL_ID = "connect-home-scroll";
+
+export function resolveConnectIntegrationScrollTarget() {
+  if (typeof document === "undefined") return null;
+  return (
+    document.getElementById(CONNECT_HOME_INTEGRATION_WORKFLOW_ID) ||
+    document.getElementById(CONNECT_HOME_COMPOSE_ID) ||
+    document.getElementById(CONNECT_HOME_WORKSPACE_ID)
+  );
 }
 
-/** Retry until #connect-home-compose is mounted. */
-export function scheduleConnectComposeScroll(scrollRootElRef) {
-  const run = (attempt = 0) => {
-    const el = document.getElementById(CONNECT_HOME_COMPOSE_ID);
-    if (!el) {
-      if (attempt < 24) requestAnimationFrame(() => run(attempt + 1));
-      return;
-    }
-    const scrollRoot = scrollRootElRef?.current ?? findConnectHomeScrollRoot(el);
-    scrollConnectComposeIntoView(el, scrollRoot);
+function disableScrollSnap(scrollRootEl) {
+  if (!scrollRootEl) return () => {};
+  const prev = scrollRootEl.style.scrollSnapType;
+  scrollRootEl.style.scrollSnapType = "none";
+  return () => {
+    scrollRootEl.style.scrollSnapType = prev;
   };
-  requestAnimationFrame(() => run());
-  window.setTimeout(() => run(), 80);
-  window.setTimeout(() => run(), 200);
+}
+
+/**
+ * Scroll target into view. Always uses scrollIntoView (works on all scroll ancestors),
+ * then aligns #connect-home-scroll when provided.
+ */
+export function scrollConnectHomeTargetIntoView(
+  scrollRootEl,
+  targetEl,
+  { behavior = "smooth" } = {},
+) {
+  if (!targetEl) return false;
+
+  const restoreSnap = disableScrollSnap(scrollRootEl);
+
+  targetEl.scrollIntoView({ behavior, block: "start" });
+
+  if (scrollRootEl) {
+    const padTop =
+      Number.parseInt(getComputedStyle(scrollRootEl).scrollPaddingTop, 10) ||
+      CONNECT_WORKSPACE_SCROLL_OFFSET_PX;
+    const elRect = targetEl.getBoundingClientRect();
+    const scrollerRect = scrollRootEl.getBoundingClientRect();
+    const targetTop = elRect.top - scrollerRect.top + scrollRootEl.scrollTop - padTop;
+    scrollRootEl.scrollTo({ top: Math.max(0, targetTop), behavior });
+  }
+
+  window.setTimeout(restoreSnap, 1000);
+  return true;
+}
+
+function runWithRetries(fn, delaysMs = [0, 50, 120, 250, 500, 900, 1400, 2200]) {
+  let attempt = 0;
+  const tryRun = () => {
+    if (fn()) return;
+    attempt += 1;
+    if (attempt < 80) requestAnimationFrame(tryRun);
+  };
+  tryRun();
+  for (const delay of delaysMs) {
+    window.setTimeout(tryRun, delay);
+  }
+}
+
+/** After integration activates: scroll to workflow (Kalshi / Markets / Trades). */
+export function scheduleConnectHomeIntegrationActivate(workspaceElRef, scrollRootElRef) {
+  const tryScroll = () => {
+    const scrollRoot =
+      scrollRootElRef?.current ??
+      document.getElementById(CONNECT_HOME_SCROLL_ID);
+    const target =
+      document.getElementById(CONNECT_HOME_INTEGRATION_WORKFLOW_ID) ||
+      document.getElementById(CONNECT_HOME_COMPOSE_ID) ||
+      workspaceElRef?.current ||
+      document.getElementById(CONNECT_HOME_WORKSPACE_ID);
+    if (!target) return false;
+    return scrollConnectHomeTargetIntoView(scrollRoot, target, { behavior: "smooth" });
+  };
+  runWithRetries(tryScroll);
+}
+
+/** @deprecated */
+export function scheduleConnectIntegrationWorkflowScroll(scrollRootElRef) {
+  return scheduleConnectHomeIntegrationActivate(null, scrollRootElRef);
+}
+
+export function scheduleConnectComposeScroll(scrollRootElRef) {
+  return scheduleConnectHomeIntegrationActivate(null, scrollRootElRef);
+}
+
+export function scrollConnectComposeIntoView(composeEl, scrollRootEl) {
+  return scrollConnectHomeTargetIntoView(scrollRootEl, composeEl, { behavior: "smooth" });
 }
 
 export function resolveConnectAnalyzeScrollTarget() {
@@ -47,53 +110,28 @@ export function resolveConnectAnalyzeScrollTarget() {
   );
 }
 
-/**
- * Scroll the Connect workspace into view. Uses scrollIntoView (window + ancestors)
- * and aligns an inner overflow pane when it is the scroll container.
- */
 export function scrollConnectWorkspaceIntoView(workspaceEl, scrollRootEl) {
-  if (!workspaceEl) return;
-
-  workspaceEl.scrollIntoView({ behavior: "smooth", block: "start" });
-
-  if (!scrollRootEl) return;
-  const canInnerScroll = scrollRootEl.scrollHeight > scrollRootEl.clientHeight + 2;
-  if (!canInnerScroll) return;
-
-  const elRect = workspaceEl.getBoundingClientRect();
-  const scrollerRect = scrollRootEl.getBoundingClientRect();
-  const targetTop =
-    elRect.top -
-    scrollerRect.top +
-    scrollRootEl.scrollTop -
-    CONNECT_WORKSPACE_SCROLL_OFFSET_PX;
-  scrollRootEl.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+  if (!workspaceEl) return false;
+  return scrollConnectHomeTargetIntoView(scrollRootEl, workspaceEl, { behavior: "smooth" });
 }
 
-/** Retry scroll until the workspace node is mounted (post-React commit). */
 export function scheduleConnectWorkspaceScroll(workspaceElRef, scrollRootElRef) {
-  const run = (attempt = 0) => {
+  const tryScroll = () => {
     const el = workspaceElRef?.current;
-    if (!el) {
-      if (attempt < 24) requestAnimationFrame(() => run(attempt + 1));
-      return;
-    }
-    scrollConnectWorkspaceIntoView(el, scrollRootElRef?.current ?? null);
+    if (!el) return false;
+    const scrollRoot =
+      scrollRootElRef?.current ??
+      document.getElementById(CONNECT_HOME_SCROLL_ID);
+    return scrollConnectWorkspaceIntoView(el, scrollRoot);
   };
-  requestAnimationFrame(() => run());
-  window.setTimeout(() => run(), 80);
-  window.setTimeout(() => run(), 200);
+  runWithRetries(tryScroll);
 }
 
-/** Nearest vertical scroll container (Connect home shell). */
 export function findConnectHomeScrollRoot(fromEl) {
   let node = fromEl?.parentElement;
   while (node) {
     const { overflowY } = getComputedStyle(node);
-    if (
-      (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
-      node.scrollHeight > node.clientHeight + 2
-    ) {
+    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") {
       return node;
     }
     node = node.parentElement;
@@ -101,24 +139,12 @@ export function findConnectHomeScrollRoot(fromEl) {
   return null;
 }
 
-/** Scroll Step 2 analyze so it fills the viewport below the sticky header. */
 export function scrollConnectAnalyzeIntoView(analyzeEl, scrollRootEl) {
   if (!analyzeEl) return;
   const scrollRoot = scrollRootEl ?? findConnectHomeScrollRoot(analyzeEl);
-  if (!scrollRoot) {
-    analyzeEl.scrollIntoView({ behavior: "smooth", block: "start" });
-    return;
-  }
-  const elRect = analyzeEl.getBoundingClientRect();
-  const scrollerRect = scrollRoot.getBoundingClientRect();
-  const padTop =
-    Number.parseInt(getComputedStyle(scrollRoot).scrollPaddingTop, 10) ||
-    CONNECT_WORKSPACE_SCROLL_OFFSET_PX;
-  const targetTop = elRect.top - scrollerRect.top + scrollRoot.scrollTop - padTop;
-  scrollRoot.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+  scrollConnectHomeTargetIntoView(scrollRoot, analyzeEl, { behavior: "smooth" });
 }
 
-/** Lock viewport on the Step 2 anchor (sheet / chart / dashboard workspace). */
 export function scrollConnectAnalyzeAnchorIntoView(scrollRootEl) {
   const target = resolveConnectAnalyzeScrollTarget();
   if (!target) return;
@@ -126,36 +152,26 @@ export function scrollConnectAnalyzeAnchorIntoView(scrollRootEl) {
   scrollConnectAnalyzeIntoView(target, scrollRoot);
 }
 
-/** Retry until #connect-home-analyze-anchor is mounted. */
 export function scheduleConnectAnalyzeAnchorScroll(scrollRootElRef) {
-  const run = (attempt = 0) => {
+  const tryScroll = () => {
     const target = resolveConnectAnalyzeScrollTarget();
-    if (!target) {
-      if (attempt < 24) requestAnimationFrame(() => run(attempt + 1));
-      return;
-    }
+    if (!target) return false;
     const scrollRoot =
       scrollRootElRef?.current ?? findConnectHomeScrollRoot(target);
     scrollConnectAnalyzeIntoView(target, scrollRoot);
+    return true;
   };
-  requestAnimationFrame(() => run());
-  window.setTimeout(() => run(), 80);
-  window.setTimeout(() => run(), 200);
+  runWithRetries(tryScroll);
 }
 
-/** Scroll to Step 2 analyze section (#connect-home-analyze). */
 export function scheduleConnectAnalyzeScroll(analyzeElRef, scrollRootElRef) {
-  const run = (attempt = 0) => {
+  const tryScroll = () => {
     const el =
       analyzeElRef?.current ?? resolveConnectAnalyzeScrollTarget();
-    if (!el) {
-      if (attempt < 24) requestAnimationFrame(() => run(attempt + 1));
-      return;
-    }
+    if (!el) return false;
     const scrollRoot = scrollRootElRef?.current ?? findConnectHomeScrollRoot(el);
     scrollConnectAnalyzeIntoView(el, scrollRoot);
+    return true;
   };
-  requestAnimationFrame(() => run());
-  window.setTimeout(() => run(), 80);
-  window.setTimeout(() => run(), 200);
+  runWithRetries(tryScroll);
 }
