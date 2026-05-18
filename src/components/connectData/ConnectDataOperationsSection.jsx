@@ -51,6 +51,7 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
         scrollConnectComposeTargetIntoView(el, {
           behavior: "smooth",
           insetTop: 12,
+          onlyIfNeeded: true,
         });
       }
     }, 280);
@@ -65,8 +66,15 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
     });
     window.setTimeout(() => {
       const panel = document.getElementById(`connect-compose-${opId}`);
-      if (panel) scrollConnectComposeTargetIntoView(panel, { behavior: "smooth", insetTop: 16 });
-    }, 80);
+      if (panel) {
+        scrollConnectComposeTargetIntoView(panel, {
+          behavior: "smooth",
+          insetTop: 12,
+          insetBottom: 24,
+          onlyIfNeeded: true,
+        });
+      }
+    }, 240);
   };
 
   if (!show) return null;

@@ -482,46 +482,50 @@ export function ConnectComposeOperationPanel({ className }) {
                 {columnComposeOrderBy.map((ob, obIdx) => (
                   <div key={`${ob.alias}-${obIdx}`} className="min-w-0 space-y-1">
                     <Label className="text-xs text-muted-foreground">sort</Label>
-                    <div className="flex w-full flex-nowrap items-center gap-2">
-                      <Select
-                        value={ob.alias}
-                        onValueChange={(v) =>
-                          setColumnComposeOrderBy?.((prev) =>
-                            (prev || []).map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
-                          )
-                        }
-                      >
-                        <SelectTrigger className="h-8 min-w-[7rem] shrink-0 text-xs">
-                          <SelectValue placeholder="Column" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {composeSelectAliasChoices.map((c) => (
-                            <SelectItem key={c.alias} value={c.alias} className="text-xs">
-                              {c.label}
+                    <div className="flex w-full min-w-0 items-center gap-2">
+                      <div className="min-w-0 flex-1 basis-1/2">
+                        <Select
+                          value={ob.alias}
+                          onValueChange={(v) =>
+                            setColumnComposeOrderBy?.((prev) =>
+                              (prev || []).map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
+                            )
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-full min-w-0 text-xs">
+                            <SelectValue placeholder="Column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {composeSelectAliasChoices.map((c) => (
+                              <SelectItem key={c.alias} value={c.alias} className="text-xs">
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="min-w-0 flex-1 basis-1/2">
+                        <Select
+                          value={ob.direction}
+                          onValueChange={(v) =>
+                            setColumnComposeOrderBy?.((prev) =>
+                              (prev || []).map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
+                            )
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-full min-w-0 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="asc" className="text-xs">
+                              Ascending (A→Z, low→high)
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={ob.direction}
-                        onValueChange={(v) =>
-                          setColumnComposeOrderBy?.((prev) =>
-                            (prev || []).map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
-                          )
-                        }
-                      >
-                        <SelectTrigger className="h-8 min-w-[10rem] shrink-0 text-xs sm:min-w-[14rem]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="asc" className="text-xs">
-                            Ascending (A→Z, low→high)
-                          </SelectItem>
-                          <SelectItem value="desc" className="text-xs">
-                            Descending (Z→A, high→low)
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                            <SelectItem value="desc" className="text-xs">
+                              Descending (Z→A, high→low)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <button
                         type="button"
                         className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -741,12 +745,11 @@ export function ConnectComposeOperationPanel({ className }) {
           <motion.div
             key={op.id}
             id={`connect-compose-${op.id}`}
-            layout
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="scroll-mt-6 space-y-4 rounded-lg border border-border/60 bg-muted/15 p-4"
+            className="space-y-4 rounded-lg border border-border/60 bg-muted/15 p-4"
           >
             <motion.div
               initial={{ opacity: 0, y: 4 }}

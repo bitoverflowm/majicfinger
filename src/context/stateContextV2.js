@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { CONNECT_PROJECT_LOAD_IDLE } from '@/lib/connectProjectLoad';
 import { coerceDataTypes } from '@/lib/coerceDataTypes';
 import { isComposeBucketMsColumn } from '@/lib/composeDateDisplay';
@@ -399,17 +400,23 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       });
     }, [activeSheetId]);
 
-    const addNewSheetAndActivate = useCallback((onNewSheet) => {
+    const addNewSheetAndActivate = useCallback((onNewSheet, options) => {
+      let newId;
       setDataSheets((prev) => {
         const keys = Object.keys(prev);
         const nextNum = keys.length + 1;
-        const newId = `sheet-${nextNum}`;
-        setTimeout(() => {
-          setActiveSheetId(newId);
-          if (typeof onNewSheet === 'function') onNewSheet(newId);
-        }, 0);
+        newId = `sheet-${nextNum}`;
         return { ...prev, [newId]: { name: `Sheet ${nextNum}`, data: [] } };
       });
+      const activate = () => {
+        setActiveSheetId(newId);
+        if (typeof onNewSheet === 'function') onNewSheet(newId);
+      };
+      if (options?.syncActivate) {
+        flushSync(activate);
+      } else {
+        setTimeout(activate, 0);
+      }
     }, []);
 
     const replaceCurrentSheetData = useCallback((data) => {

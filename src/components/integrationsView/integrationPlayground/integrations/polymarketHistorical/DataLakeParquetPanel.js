@@ -1879,14 +1879,19 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
+      if (connectHomeDataLakeCompose) {
+        syncConnectPullState({ loading: false, label: "", progress: 0 });
+      }
     }
   }, [
     applyRowsToActiveSheet,
+    connectHomeDataLakeCompose,
     finalizeIngestSheetRows,
     refreshBeckerViews,
     runIngestWithProgress,
     scrollToLoadProgress,
     setConnectedData,
+    syncConnectPullState,
   ]);
 
   const executeIngestNewSheet = useCallback(async () => {
@@ -1930,10 +1935,22 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
 
     const sampleLabel = sampleOptions.find((s) => s.id === sid)?.label || sid;
     const prefix = dataset === "kalshi" ? "Kalshi" : "Polymarket";
-    const preparedSheetId =
-      connectHomeDataLakeCompose && activeSheetId && !(dataSheets?.[activeSheetId]?.data?.length)
-        ? activeSheetId
-        : null;
+    const resolvePreparedConnectHomeSheetId = () => {
+      if (!connectHomeDataLakeCompose) return null;
+      if (activeSheetId && !(dataSheets?.[activeSheetId]?.data?.length)) {
+        return activeSheetId;
+      }
+      const keys = Object.keys(dataSheets || {}).sort((a, b) => {
+        const na = parseInt(String(a).replace(/\D/g, ""), 10) || 0;
+        const nb = parseInt(String(b).replace(/\D/g, ""), 10) || 0;
+        return nb - na;
+      });
+      for (const id of keys) {
+        if (!(dataSheets?.[id]?.data?.length)) return id;
+      }
+      return null;
+    };
+    const preparedSheetId = resolvePreparedConnectHomeSheetId();
 
     try {
       const { rows, rowCount } = await runIngestWithProgress(
@@ -2009,6 +2026,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
+      syncConnectPullState({ loading: false, label: "", progress: 0 });
     }
   }, [
     activeSheetId,
@@ -2360,15 +2378,19 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const handleLoad = () => {
     setError(null);
     setLastRowCount(null);
+    const rejectConnectHomePull = (msg) => {
+      setError(msg);
+      syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
+    };
     if (!selected?.table) {
-      setError("Choose a table below.");
+      rejectConnectHomePull("Choose a table below.");
       return;
     }
     const isComposeTab = selectionTab === "columns" || selectionTab === "recipes";
     let composeAthenaRowLimit = null;
     if (isComposeTab) {
       if (columnComposeItems.length === 0) {
-        setError("Add at least one column to SELECT.");
+        rejectConnectHomePull("Add at least one column to SELECT.");
         return;
       }
       const hasIncompleteComposeWhereFilters =
@@ -2382,7 +2404,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           return !Number.isFinite(Number(f.value));
         });
       if (hasIncompleteComposeWhereFilters) {
-        setError("Enter a value for each WHERE filter before running.");
+        rejectConnectHomePull("Enter a value for each WHERE filter before running.");
         return;
       }
 
@@ -2396,7 +2418,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         });
 
       if (hasIncompleteComposeHavingFilters) {
-        setError("Enter a value for each HAVING filter before running.");
+        rejectConnectHomePull("Enter a value for each HAVING filter before running.");
         return;
       }
       const safeAlias = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -2404,11 +2426,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       for (const i of columnComposeItems) {
         const a = String(i.alias || "").trim();
         if (!safeAlias.test(a)) {
-          setError(`Invalid alias "${a}" — use letters, numbers, underscore (start with letter or _).`);
+          rejectConnectHomePull(`Invalid alias "${a}" — use letters, numbers, underscore (start with letter or _).`);
           return;
         }
         if (seen.has(a)) {
-          setError(`Duplicate alias "${a}".`);
+          rejectConnectHomePull(`Duplicate alias "${a}".`);
           return;
         }
         seen.add(a);
@@ -2417,12 +2439,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       if (composeLimitRuleOpen) {
         const rawLim = String(composeLimitRuleValue ?? "").trim();
         if (!rawLim) {
-          setError("Enter a maximum row count for the limit, or remove the row limit.");
+          rejectConnectHomePull("Enter a maximum row count for the limit, or remove the row limit.");
           return;
         }
         const n = Math.floor(Number(rawLim));
         if (!Number.isFinite(n) || n < 1) {
-          setError("Row limit must be a positive whole number.");
+          rejectConnectHomePull("Row limit must be a positive whole number.");
           return;
         }
         composeAthenaRowLimit = n;
@@ -2431,12 +2453,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     if (selectionTab === "meta") {
       const allSpecs = buildAllMetaOpSpecsForRun();
       if (allSpecs.length === 0) {
-        setError("Select Count → All or add at least one filter before running.");
+        rejectConnectHomePull("Select Count → All or add at least one filter before running.");
         return;
       }
       for (const spec of allSpecs) {
         if (specHasIncompleteFilters(spec)) {
-          setError("Enter a value for each operation before running request.");
+          rejectConnectHomePull("Enter a value for each operation before running request.");
           return;
         }
       }

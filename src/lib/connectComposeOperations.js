@@ -15,7 +15,7 @@ export const CONNECT_COMPOSE_OPERATIONS = [
   {
     id: "sort",
     title: "Sort",
-    description: "Order results. numeical: ascending or descending; text: alphabetical or reverse alphabetical",
+    description: "Order results. Numerical: ascending or descending; text: alphabetical or reverse alphabetical",
   },
   {
     id: "row_limit",

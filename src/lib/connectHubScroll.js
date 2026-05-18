@@ -205,6 +205,38 @@ export function scrollWithinScrollRoot(
 }
 
 /**
+ * Scroll the minimum amount so `targetEl` fits inside `scrollRootEl`.
+ * Unlike {@link scrollWithinScrollRoot}, does not pin the target to the top edge
+ * (which hid column picks above Sort / Where panels in Chrome).
+ */
+export function scrollRevealInScrollRoot(
+  scrollRootEl,
+  targetEl,
+  { behavior = "smooth", insetTop = 12, insetBottom = 16 } = {},
+) {
+  if (!scrollRootEl || !targetEl) return false;
+
+  const elRect = targetEl.getBoundingClientRect();
+  const scrollerRect = scrollRootEl.getBoundingClientRect();
+  const topBound = scrollerRect.top + insetTop;
+  const bottomBound = scrollerRect.bottom - insetBottom;
+
+  let delta = 0;
+  if (elRect.bottom > bottomBound) {
+    delta = elRect.bottom - bottomBound;
+  } else if (elRect.top < topBound) {
+    delta = elRect.top - topBound;
+  }
+
+  if (Math.abs(delta) < 2) return true;
+
+  const restoreSnap = disableScrollSnap(scrollRootEl);
+  scrollRootEl.scrollBy({ top: delta, behavior });
+  window.setTimeout(restoreSnap, 800);
+  return true;
+}
+
+/**
  * True when `el` is mostly visible inside `scrollRoot` (compose panel), with optional top inset.
  */
 export function isVisibleInScrollRoot(scrollRoot, el, insetTop = 12) {
@@ -230,7 +262,13 @@ export function getConnectComposeScrollEl() {
  */
 export function scrollConnectComposeTargetIntoView(
   targetEl,
-  { behavior = "smooth", insetTop = 16, onlyIfNeeded = false } = {},
+  {
+    behavior = "smooth",
+    insetTop = 12,
+    insetBottom = 16,
+    onlyIfNeeded = false,
+    align = "reveal",
+  } = {},
 ) {
   if (!targetEl || typeof document === "undefined") return false;
 
@@ -239,7 +277,14 @@ export function scrollConnectComposeTargetIntoView(
     if (onlyIfNeeded && isVisibleInScrollRoot(composeEl, targetEl, insetTop)) {
       return true;
     }
-    return scrollWithinScrollRoot(composeEl, targetEl, { behavior, insetTop });
+    if (align === "start") {
+      return scrollWithinScrollRoot(composeEl, targetEl, { behavior, insetTop });
+    }
+    return scrollRevealInScrollRoot(composeEl, targetEl, {
+      behavior,
+      insetTop,
+      insetBottom,
+    });
   }
 
   const scrollRoot =

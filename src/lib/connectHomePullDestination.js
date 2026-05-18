@@ -99,10 +99,13 @@ export function prepareConnectHomePullSheet(ctx) {
   const destination = resolveConnectHomeSheetDestination(ctx);
   if (destination.action === "new_sheet" && ctx?.addNewSheetAndActivate) {
     flushSync(() => {
-      ctx.addNewSheetAndActivate((newId) => {
-        ctx.setSheetData?.(newId, []);
-        applyConnectHomeSheetNameToSheet(ctx, newId);
-      });
+      ctx.addNewSheetAndActivate(
+        (newId) => {
+          ctx.setSheetData?.(newId, []);
+          applyConnectHomeSheetNameToSheet(ctx, newId);
+        },
+        { syncActivate: true },
+      );
     });
     return destination;
   }
