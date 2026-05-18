@@ -13,6 +13,9 @@ const ogImagePath = "/ogImage2.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
+  alternates: {
+    canonical: "/",
+  },
   icons: {
     icon: "/logo.png",
   },

@@ -100,10 +100,10 @@ export async function DashboardsSection({
   return (
     <section id="dashboards" className="relative mx-auto w-full min-w-0 max-w-7xl px-4 py-16 sm:px-6">
       <div className="text-center space-y-4 pb-6 mx-auto">
-        <h2 className="text-sm text-primary font-mono font-medium tracking-wider uppercase">Dashboards</h2>
-        <h3 className="mx-auto mt-4 max-w-xs text-3xl font-semibold sm:max-w-none sm:text-4xl md:text-5xl">
+        <p className="text-sm text-primary font-mono font-medium tracking-wider uppercase">Dashboards</p>
+        <h2 className="mx-auto mt-4 max-w-xs text-3xl font-semibold sm:max-w-none sm:text-4xl md:text-5xl">
           Published dashboards
-        </h3>
+        </h2>
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
           Live, shareable dashboards built with Lychee.
         </p>

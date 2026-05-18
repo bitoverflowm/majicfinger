@@ -475,7 +475,7 @@ export const Feature = ({
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <h2 className="text-lg font-bold">{item.title}</h2>
+                  <h3 className="text-lg font-bold">{item.title}</h3>
                   <p className="mx-0 max-w-sm text-balance text-sm font-medium leading-relaxed">
                     {item.content}
                   </p>

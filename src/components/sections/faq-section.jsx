@@ -1,5 +1,3 @@
-"use client";
-
 import {
   Accordion,
   AccordionContent,
@@ -9,6 +7,11 @@ import {
 import { SectionHeader } from "@/components/section-header";
 import { siteConfig } from "@/lib/config";
 
+/**
+ * Question/answer pairs are rendered as a real `<h3>` + `<p>` per item so the full FAQ body
+ * lives in the static HTML for crawlers (matches the FAQPage JSON-LD on the landing page).
+ * The Radix Accordion below is a progressive-enhancement overlay for the visual experience.
+ */
 export function FAQSection() {
   const { faqSection } = siteConfig;
 
@@ -27,6 +30,16 @@ export function FAQSection() {
       </SectionHeader>
 
       <div className="max-w-3xl w-full mx-auto px-10">
+        {/* SEO-only: static, semantic Q/A list. Hidden visually, fully crawlable. */}
+        <div className="sr-only" aria-hidden>
+          {faqSection.faQitems.map((faq) => (
+            <article key={`seo-${faq.id}`}>
+              <h3>{faq.question}</h3>
+              <p>{faq.answer}</p>
+            </article>
+          ))}
+        </div>
+
         <Accordion
           type="single"
           collapsible

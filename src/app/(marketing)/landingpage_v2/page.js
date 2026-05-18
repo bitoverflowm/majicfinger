@@ -12,6 +12,7 @@ import { PricingSection } from "@/components/sections/pricing-section";
 import { FAQSection } from "@/components/sections/faq-section";
 import { TestimonialSection } from "@/components/sections/testimonial-section";
 import { DashboardsSection } from "@/components/sections/dashboards-section";
+import { LandingJsonLd } from "@/components/seo/landing-json-ld";
 
 export default function LandingPageV2() {
   let articles = [];
@@ -27,21 +28,26 @@ export default function LandingPageV2() {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center divide-y divide-border min-h-screen w-full theme-landing min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
-      <HeroSection />
-      <CompanyShowcase />
-      <BentoSection />
-      <QuoteSection />
-      <FeatureSection />
-      <GrowthSection />
-      <PricingSection />
-      <FAQSection />
-      <TestimonialSection />
-      <DashboardsSection username="misterrpink" />
-      <GuidesSection articles={articles} />
-      <CTASection />
-      <FooterSection />
-    </main>
+    <>
+      {/* JSON-LD lives outside <main> so the hero remains the first child and the
+          `divide-y` border-top selector doesn't draw a line under the navbar. */}
+      <LandingJsonLd />
+      <main className="flex flex-col items-center justify-center divide-y divide-border min-h-screen w-full theme-landing min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
+        <HeroSection />
+        <CompanyShowcase />
+        <BentoSection />
+        <QuoteSection />
+        <FeatureSection />
+        <GrowthSection />
+        <PricingSection />
+        <FAQSection />
+        <TestimonialSection />
+        <DashboardsSection username="misterrpink" />
+        <GuidesSection articles={articles} />
+        <CTASection />
+        <FooterSection />
+      </main>
+    </>
   );
 }
 

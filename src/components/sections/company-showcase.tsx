@@ -34,7 +34,8 @@ export function CompanyShowcase() {
                 height={48}
                 src={logo.src}
                 className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 opacity-70 dark:brightness-0 dark:invert dark:blue-400 dark:hue-rotate-[200deg] dark:saturate-[400%]"
-                alt={logo.alt}
+                alt={`${logo.alt} logo`}
+                loading="lazy"
               />
             </div>
           </Link>
