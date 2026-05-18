@@ -20,7 +20,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { API_INTEGRATIONS, integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
-import { openProjectInConnectHome } from "@/lib/hydrateProjectWorkspace";
+import { runConnectProjectLoad } from "@/lib/connectProjectLoad";
 import { CONNECT_HOME_GUIDES } from "@/lib/guidesConnectHomeManifest";
 import {
   CONNECT_WORKSPACE,
@@ -174,7 +174,35 @@ const templatesPillClass = cn(
 
 const templatesPillLabelClass = "min-w-0 flex-1 text-left text-xs font-light leading-snug line-clamp-2 whitespace-normal";
 
-function IntegrationIconWrap({ children, compact = false }) {
+/** Connect hub (non-demo): scale pills/icons down so three columns stay one row; widen again on 2xl. */
+const connectHubIconSlotResponsive = cn(
+  iconSlotClass,
+  "h-5 w-5 md:h-6 md:w-6 lg:h-6 lg:w-6 xl:h-7 xl:w-7",
+);
+const connectHubPillScaleExtra = cn(
+  "min-h-[2rem] gap-0.5 px-0.5 py-0 text-[10px] leading-tight sm:min-h-[2.125rem] sm:text-[10.5px] md:min-h-[2.25rem] md:text-[11px] lg:min-h-[2.375rem] lg:text-xs xl:min-h-[2.5rem] xl:px-1 2xl:min-h-[2.625rem]",
+);
+const connectHubIntegrationPillScaleExtra = cn(
+  "min-h-[2rem] gap-1.5 px-1 py-0 text-[10px] leading-tight sm:min-h-[2.125rem] sm:gap-2 sm:px-1.5 sm:text-[10.5px] md:min-h-[2.25rem] md:text-[11px] lg:min-h-[2.375rem] lg:text-[11px] xl:min-h-[2.5rem] xl:gap-2.5 xl:px-2 xl:text-xs 2xl:min-h-[2.625rem]",
+);
+const connectHubPillLabelScale = cn(
+  pillLabelClass,
+  "text-[10px] leading-tight sm:text-[10.5px] md:text-[11px] lg:text-xs lg:leading-none",
+);
+const connectHubIntegrationLogoClass =
+  "[&_.integration-logo-avatar]:!h-5 [&_.integration-logo-avatar]:!w-5 md:[&_.integration-logo-avatar]:!h-6 md:[&_.integration-logo-avatar]:!w-6 xl:[&_.integration-logo-avatar]:!h-7 xl:[&_.integration-logo-avatar]:!w-7";
+const connectHubWideTemplatesScaleExtra = cn(
+  "min-h-[2.25rem] gap-2 px-2 py-1.5 sm:min-h-[2.375rem] lg:min-h-[2.5rem] xl:min-h-[2.75rem] xl:px-3 xl:py-2",
+);
+const connectHubWideLabelScaleExtra = cn(
+  "text-[10px] leading-snug sm:text-[10.5px] md:text-[11px] lg:text-xs",
+);
+const connectHubSectionTitleClass =
+  "mb-2 text-[9px] tracking-[0.12em] sm:mb-2.5 sm:text-[9.5px] md:mb-3 md:text-[10px] lg:mb-3 lg:text-[10.5px] xl:mb-4 xl:text-[11px]";
+const connectHubIconGlyphClass = "h-3 w-3 shrink-0 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-3.5 lg:w-3.5";
+const connectHubColGapClass = "gap-5 sm:gap-6 lg:gap-6 xl:gap-8";
+
+function IntegrationIconWrap({ children, compact = false, className }) {
   return (
     <span
       className={cn(
@@ -182,6 +210,7 @@ function IntegrationIconWrap({ children, compact = false }) {
         compact
           ? "[&_.integration-logo-avatar]:!h-4 [&_.integration-logo-avatar]:!w-4 [&_.integration-logo-avatar]:!rounded-[4px] [&_.integration-logo-avatar]:!bg-transparent [&_.integration-logo-avatar]:shadow-none"
           : "[&_.integration-logo-avatar]:!h-7 [&_.integration-logo-avatar]:!w-7 [&_.integration-logo-avatar]:!rounded-md [&_.integration-logo-avatar]:!bg-transparent [&_.integration-logo-avatar]:shadow-none",
+        className,
       )}
     >
       {children}
@@ -196,32 +225,40 @@ function PillButton({
   onClick,
   disabled,
   iconClassName,
+  iconSlotClassName,
+  labelClassName,
   className,
   tooltipSide,
   compact = false,
 }) {
   const surface = compact ? cn(demoPillClass, className) : cn(pillClass, className);
-  const iconBox = compact ? cn(demoIconSlotClass, iconClassName) : cn(iconSlotClass, iconClassName);
+  const iconBox = compact
+    ? cn(demoIconSlotClass, iconClassName)
+    : cn(iconSlotClassName || iconSlotClass, iconClassName);
+  const labelCls = compact ? demoPillLabelClass : cn(pillLabelClass, labelClassName);
   return (
     <ConnectPillTooltip content={title || label} side={tooltipSide}>
       <button type="button" disabled={disabled} onClick={onClick} className={surface}>
         <span className={iconBox}>{icon}</span>
-        <span className={compact ? demoPillLabelClass : pillLabelClass}>{label}</span>
+        <span className={labelCls}>{label}</span>
       </button>
     </ConnectPillTooltip>
   );
 }
 
-function PillButtonSoon({ icon, label, className, iconClassName, tooltip = "Coming soon", compact = false }) {
+function PillButtonSoon({ icon, label, className, iconClassName, iconSlotClassName, labelClassName, tooltip = "Coming soon", compact = false }) {
   const surface = compact
     ? cn(demoPillClass, className, "cursor-not-allowed opacity-45")
     : cn(pillClass, className, "cursor-not-allowed opacity-45");
-  const iconBox = compact ? cn(demoIconSlotClass, iconClassName) : cn(iconSlotClass, iconClassName);
+  const iconBox = compact
+    ? cn(demoIconSlotClass, iconClassName)
+    : cn(iconSlotClassName || iconSlotClass, iconClassName);
+  const labelCls = compact ? demoPillLabelClass : cn(pillLabelClass, labelClassName);
   return (
     <ConnectPillTooltip content={tooltip}>
       <button type="button" disabled className={surface} aria-disabled>
         <span className={iconBox}>{icon}</span>
-        <span className={compact ? demoPillLabelClass : pillLabelClass}>{label}</span>
+        <span className={labelCls}>{label}</span>
       </button>
     </ConnectPillTooltip>
   );
@@ -234,32 +271,39 @@ function PillLink({
   label,
   title,
   iconClassName,
+  iconSlotClassName,
+  labelClassName,
+  externalIconClassName,
   wide = false,
   tooltipSide,
   compact = false,
+  className,
 }) {
   const surfaceClass = wide
     ? compact
       ? demoTemplatesPillClass
-      : templatesPillClass
+      : cn(templatesPillClass, className)
     : compact
-      ? demoPillClass
-      : pillClass;
+      ? cn(demoPillClass, className)
+      : cn(pillClass, className);
   const labelClass = wide
     ? compact
       ? demoTemplatesPillLabelClass
-      : templatesPillLabelClass
+      : cn(templatesPillLabelClass, labelClassName)
     : compact
       ? demoPillLabelClass
-      : pillLabelClass;
-  const iconBox = compact ? cn(demoIconSlotClass, iconClassName) : cn(iconSlotClass, iconClassName);
+      : cn(pillLabelClass, labelClassName);
+  const iconBox = compact ? cn(demoIconSlotClass, iconClassName) : cn(iconSlotClassName || iconSlotClass, iconClassName);
   const body = (
     <>
       <span className={iconBox}>{icon}</span>
       <span className={labelClass}>{label}</span>
       {external ? (
         <ExternalLink
-          className={cn("shrink-0 text-muted-foreground", compact ? "h-3 w-3" : "h-3.5 w-3.5")}
+          className={cn(
+            "shrink-0 text-muted-foreground",
+            externalIconClassName || (compact ? "h-3 w-3" : "h-3.5 w-3.5"),
+          )}
           strokeWidth={iconStroke}
           aria-hidden
         />
@@ -283,10 +327,10 @@ function PillLink({
   );
 }
 
-function PillButtonWide({ icon, label, title, onClick, disabled, iconClassName, tooltipSide, compact = false }) {
-  const surface = compact ? demoTemplatesPillClass : templatesPillClass;
-  const iconBox = compact ? cn(demoIconSlotClass, iconClassName) : cn(iconSlotClass, iconClassName);
-  const labelClass = compact ? demoTemplatesPillLabelClass : templatesPillLabelClass;
+function PillButtonWide({ icon, label, title, onClick, disabled, iconClassName, iconSlotClassName, labelClassName, tooltipSide, compact = false, className }) {
+  const surface = compact ? demoTemplatesPillClass : cn(templatesPillClass, className);
+  const iconBox = compact ? cn(demoIconSlotClass, iconClassName) : cn(iconSlotClassName || iconSlotClass, iconClassName);
+  const labelClass = compact ? demoTemplatesPillLabelClass : cn(templatesPillLabelClass, labelClassName);
   return (
     <ConnectPillTooltip content={title || label} side={tooltipSide}>
       <button type="button" disabled={disabled} onClick={onClick} className={surface}>
@@ -297,12 +341,13 @@ function PillButtonWide({ icon, label, title, onClick, disabled, iconClassName, 
   );
 }
 
-function SectionTitle({ children, compact = false }) {
+function SectionTitle({ children, compact = false, className }) {
   return (
     <h2
       className={cn(
         "font-medium uppercase tracking-[0.14em] text-muted-foreground",
         compact ? "mb-1 text-[8px] tracking-[0.12em]" : "mb-3 text-[11px] md:mb-4",
+        className,
       )}
     >
       {children}
@@ -336,8 +381,11 @@ export default function ConnectDataStep1({
   const setProfilePic = context?.setProfilePic;
   const setDataSheets = context?.setDataSheets;
   const setActiveSheetId = context?.setActiveSheetId;
+  const loadedDataMeta = context?.loadedDataMeta;
   const setLoadedDataMeta = context?.setLoadedDataMeta;
   const setLoadedDataId = context?.setLoadedDataId;
+  const setConnectProjectLoadState = context?.setConnectProjectLoadState;
+  const connectProjectLoadState = context?.connectProjectLoadState ?? {};
   const setSavedCharts = context?.setSavedCharts;
   const setChartSheets = context?.setChartSheets;
   const setActiveChartSheetId = context?.setActiveChartSheetId;
@@ -361,7 +409,7 @@ export default function ConnectDataStep1({
   const [onboardingSubmitBusy, setOnboardingSubmitBusy] = useState(false);
   const [onboardingUploadFn, setOnboardingUploadFn] = useState(null);
   const [isCheckingHandle, setIsCheckingHandle] = useState(false);
-  const [loadProjectBusy, setLoadProjectBusy] = useState(false);
+  const loadProjectBusy = !!connectProjectLoadState.loading;
 
   const openConnectIntegration = useCallback(
     (integrationId) => {
@@ -544,12 +592,17 @@ export default function ConnectDataStep1({
   };
 
   const onOpenProject = async (dataSetId) => {
-    if (!dataSetId || loadProjectBusy || !hasDbBackedUserId) return;
-    setLoadProjectBusy(true);
+    if (!dataSetId || loadProjectBusy || !hasDbBackedUserId || !setConnectProjectLoadState) return;
+    const ds = (Array.isArray(savedDataSets) ? savedDataSets : []).find(
+      (row) => String(row?._id) === String(dataSetId),
+    );
     try {
-      await openProjectInConnectHome({
+      await runConnectProjectLoad({
         dataSetId,
         userId: user.userId,
+        projectName: ds?.data_set_name || "",
+        loadedDataMeta,
+        setConnectProjectLoadState,
         setDataSheets,
         setActiveSheetId,
         setConnectedData,
@@ -565,12 +618,12 @@ export default function ConnectDataStep1({
         requestConnectWorkspace,
         setConnectHomeAnalyzeActive,
         requestConnectAnalyzeScroll,
+        setRightPanelTab,
+        setRightPanelOpen,
       });
       toast.success("Project opened");
     } catch (e) {
       toast.error(e?.message || "Failed to load project");
-    } finally {
-      setLoadProjectBusy(false);
     }
   };
 
@@ -588,17 +641,17 @@ export default function ConnectDataStep1({
 
   const columnGridClass = embeddedDemo
     ? connectHubDemoColumnGridClass
-    : "grid grid-cols-1 gap-y-1 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-8";
+    : cn(
+        "grid w-full min-w-0 grid-cols-1 gap-y-4",
+        "max-sm:gap-y-4 sm:grid-cols-2 sm:gap-x-2 sm:gap-y-2 lg:grid-cols-3 lg:gap-x-2 lg:gap-y-1 xl:gap-x-4 2xl:gap-x-8",
+      );
 
   const hubPageClass = connectHubPageClass(embeddedInShell);
   const hubLayoutClass = embeddedDemo
     ? "w-full min-w-0"
     : connectHubLayoutClass({ includeStepRail: !embeddedInShell });
 
-  const integrationsColClass = "flex flex-col gap-3";
-  const hubIntegrationsPill = integrationsPillClass;
-  const hubIconSize = "h-3.5 w-3.5";
-  const hubColGapClass = "gap-8";
+  const integrationsColClass = embeddedDemo ? "flex flex-col gap-3" : "flex flex-col gap-2 sm:gap-2.5 lg:gap-3";
 
   const activate = onActivateWorkspace || requestConnectWorkspace;
 
@@ -614,6 +667,11 @@ export default function ConnectDataStep1({
       }),
     [viewing, dataConnected, connectedData, dataSheets, rightPanelTab, context?.connectHomeCenterView],
   );
+
+  const hubGlyphClass = embeddedDemo ? "h-3.5 w-3.5" : connectHubIconGlyphClass;
+  const hubIntegrationSurfaceClass = embeddedDemo
+    ? integrationsPillClass
+    : cn(integrationsPillClass, connectHubIntegrationPillScaleExtra);
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -734,39 +792,56 @@ export default function ConnectDataStep1({
               showLatestWork && !embeddedInShell ? "md:row-start-2" : !embeddedInShell ? "md:row-start-1" : null,
             )}
           >
-            <h1 className="text-balance text-left text-xl font-semibold tracking-tight text-foreground">
+            <h1
+              className={cn(
+                "text-balance text-left font-semibold tracking-tight text-foreground",
+                embeddedDemo ? "text-xl" : "text-base sm:text-lg md:text-xl xl:text-2xl",
+              )}
+            >
               Hi, what do you want to discover?
             </h1>
 
             <div className={cn("mt-12 w-full sm:mt-14 md:mt-16", columnGridClass)}>
           <section className="min-w-0 overflow-hidden">
-            <SectionTitle>Import</SectionTitle>
+            <SectionTitle className={embeddedDemo ? undefined : connectHubSectionTitleClass}>Import</SectionTitle>
             <div className={integrationsColClass}>
               <PillButton
-                icon={<ArrowUpFromLine className={hubIconSize} strokeWidth={iconStroke} />}
+                icon={<ArrowUpFromLine className={hubGlyphClass} strokeWidth={iconStroke} />}
                 label="CSV / XLSX"
                 title="Upload a spreadsheet to start analyzing."
                 onClick={() => activate?.(CONNECT_WORKSPACE.UPLOAD)}
+                className={embeddedDemo ? undefined : connectHubPillScaleExtra}
+                iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
+                labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
               />
               <PillButtonSoon
-                icon={<FileImage className={hubIconSize} strokeWidth={iconStroke} />}
+                icon={<FileImage className={hubGlyphClass} strokeWidth={iconStroke} />}
                 label="PDF & image"
+                className={embeddedDemo ? undefined : connectHubPillScaleExtra}
+                iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
+                labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
               />
               <PillButtonSoon
-                icon={<Braces className={hubIconSize} strokeWidth={iconStroke} />}
+                icon={<Braces className={hubGlyphClass} strokeWidth={iconStroke} />}
                 label="JSON"
+                className={embeddedDemo ? undefined : connectHubPillScaleExtra}
+                iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
+                labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
               />
               <PillButton
-                icon={<FilePlus2 className={hubIconSize} strokeWidth={iconStroke} />}
+                icon={<FilePlus2 className={hubGlyphClass} strokeWidth={iconStroke} />}
                 label="Start from blank"
                 title="Empty sheet — build from scratch."
                 onClick={() => activate?.(CONNECT_WORKSPACE.BLANK)}
+                className={embeddedDemo ? undefined : connectHubPillScaleExtra}
+                iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
+                labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
               />
             </div>
           </section>
 
           <section className="min-w-0 overflow-hidden">
-            <SectionTitle>Integrations</SectionTitle>
+            <SectionTitle className={embeddedDemo ? undefined : connectHubSectionTitleClass}>Integrations</SectionTitle>
             <div className={integrationsColClass}>
               {connectIntegrationRows.map((row) => (
                 <div key={row.key}>
@@ -786,19 +861,31 @@ export default function ConnectDataStep1({
                     </div>
                   ) : isConnectHubIntegrationAvailable(row) ? (
                     <PillButton
-                      className={hubIntegrationsPill}
-                      icon={<IntegrationIconWrap>{row.icon}</IntegrationIconWrap>}
+                      className={hubIntegrationSurfaceClass}
+                      icon={
+                        <IntegrationIconWrap className={embeddedDemo ? undefined : connectHubIntegrationLogoClass}>
+                          {row.icon}
+                        </IntegrationIconWrap>
+                      }
                       label={row.name}
                       title={row.description}
                       onClick={() => onIntegrationRowClick(row)}
                       iconClassName={connectIntegrationIconClass(row.key)}
+                      iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
+                      labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
                     />
                   ) : (
                     <PillButtonSoon
-                      className={hubIntegrationsPill}
-                      icon={<IntegrationIconWrap>{row.icon}</IntegrationIconWrap>}
+                      className={hubIntegrationSurfaceClass}
+                      icon={
+                        <IntegrationIconWrap className={embeddedDemo ? undefined : connectHubIntegrationLogoClass}>
+                          {row.icon}
+                        </IntegrationIconWrap>
+                      }
                       label={row.name}
                       iconClassName={connectIntegrationIconClass(row.key)}
+                      iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
+                      labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
                     />
                   )}
                 </div>
@@ -808,7 +895,7 @@ export default function ConnectDataStep1({
                   type="button"
                   onClick={() => activate?.(CONNECT_WORKSPACE.INTEGRATIONS_PICKER)}
                   className={cn(
-                    hubIntegrationsPill,
+                    hubIntegrationSurfaceClass,
                     "justify-center border-dashed text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground",
                   )}
                 >
@@ -819,30 +906,37 @@ export default function ConnectDataStep1({
           </section>
 
           {!embeddedDemo ? (
-          <section className="min-w-0 overflow-hidden xl:min-w-[15rem] 2xl:min-w-[18rem]">
-            <div className={cn("flex flex-col", hubColGapClass)}>
+          <section className="hidden min-w-0 overflow-hidden lg:block lg:min-w-0">
+            <div className={cn("flex flex-col", connectHubColGapClass)}>
               <div>
-                <SectionTitle>Dashboards</SectionTitle>
+                <SectionTitle className={connectHubSectionTitleClass}>Dashboards</SectionTitle>
                 <div className={integrationsColClass}>
                   <PillLink
                     href={EXAMPLE_DASHBOARD.href}
                     external
                     wide
-                    icon={<LayoutDashboard className={hubIconSize} strokeWidth={iconStroke} />}
+                    className={connectHubWideTemplatesScaleExtra}
+                    labelClassName={connectHubWideLabelScaleExtra}
+                    iconSlotClassName={connectHubIconSlotResponsive}
+                    externalIconClassName="h-3 w-3 lg:h-3.5 lg:w-3.5"
+                    icon={<LayoutDashboard className={connectHubIconGlyphClass} strokeWidth={iconStroke} />}
                     label={EXAMPLE_DASHBOARD.title}
                     title="Public example dashboard"
                   />
                 </div>
               </div>
               <div>
-                <SectionTitle>Guides</SectionTitle>
+                <SectionTitle className={connectHubSectionTitleClass}>Guides</SectionTitle>
                 <div className={integrationsColClass}>
                   {CONNECT_HOME_GUIDES.slice(0, 5).map((g) => (
                     <PillLink
                       key={g.slug}
                       href={`/guides/${g.slug}`}
                       wide
-                      icon={<BookOpen className={hubIconSize} strokeWidth={iconStroke} />}
+                      className={connectHubWideTemplatesScaleExtra}
+                      labelClassName={connectHubWideLabelScaleExtra}
+                      iconSlotClassName={connectHubIconSlotResponsive}
+                      icon={<BookOpen className={connectHubIconGlyphClass} strokeWidth={iconStroke} />}
                       label={g.title}
                       title={g.publishedAt ? `${g.title} — published ${g.publishedAt}` : g.title}
                     />
@@ -850,12 +944,15 @@ export default function ConnectDataStep1({
                 </div>
               </div>
               <div>
-                <SectionTitle>Templates</SectionTitle>
+                <SectionTitle className={connectHubSectionTitleClass}>Templates</SectionTitle>
                 <div className={integrationsColClass}>
                   {PREDICTION_TEMPLATES.map((t) => (
                     <PillButtonWide
                       key={t.id}
-                      icon={<LayoutTemplate className={hubIconSize} strokeWidth={iconStroke} />}
+                      className={connectHubWideTemplatesScaleExtra}
+                      iconSlotClassName={connectHubIconSlotResponsive}
+                      labelClassName={connectHubWideLabelScaleExtra}
+                      icon={<LayoutTemplate className={connectHubIconGlyphClass} strokeWidth={iconStroke} />}
                       label={PREDICTION_TEMPLATE_LABEL}
                       title={PREDICTION_TEMPLATE_LABEL}
                       disabled

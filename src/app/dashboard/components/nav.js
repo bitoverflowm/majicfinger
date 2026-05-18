@@ -25,8 +25,9 @@ import {
   applyDataSetToWorkspace,
   finishConnectHomeProjectLoad,
   hydrateChartSheetsForDataSet,
-  openProjectInConnectHome,
 } from "@/lib/hydrateProjectWorkspace"
+import { CONNECT_PROJECT_LOAD_IDLE, runConnectProjectLoad } from "@/lib/connectProjectLoad"
+import { CONNECT_HOME_SCROLL_ID } from "@/lib/connectHubScroll"
 import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
@@ -257,15 +258,6 @@ function EliteWorkspaceUsageIndicator({ quota, isLoading }) {
   );
 }
 
-const PROJECT_LOAD_PROGRESS_MESSAGES = [
-  "Loading data sheets…",
-  "Fetching saved rows from the project store…",
-  "Preparing sheet metadata and previews…",
-  "Reconstructing workbook tabs…",
-  "Hydrating rows into the grid…",
-  "Large projects can take a moment. Still loading…",
-];
-
 const Nav = () => {
   const user = useUser()
   const router = useRouter();
@@ -291,6 +283,8 @@ const Nav = () => {
   
   const savedDataSets = contextStateV2?.savedDataSets
   const setConnectedData = contextStateV2?.setConnectedData
+  const setDataConnected = contextStateV2?.setDataConnected
+  const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar
 
   const loadedDataMeta = contextStateV2?.loadedDataMeta
   const setLoadedDataMeta = contextStateV2?.setLoadedDataMeta
@@ -376,11 +370,12 @@ const Nav = () => {
   const [saveProjectMessage, setSaveProjectMessage] = useState("")
   const [largeProjectUpgradeOpen, setLargeProjectUpgradeOpen] = useState(false)
   const [largeProjectUpgradeSummary, setLargeProjectUpgradeSummary] = useState(null)
-  const [loadProjectBusy, setLoadProjectBusy] = useState(false)
-  const [loadProjectProgress, setLoadProjectProgress] = useState(0)
-  const [loadProjectMessage, setLoadProjectMessage] = useState("")
-  const [loadProjectTargetId, setLoadProjectTargetId] = useState(null)
-  const loadProjectTickerRef = useRef(null)
+  const connectProjectLoadState = contextStateV2?.connectProjectLoadState ?? {}
+  const setConnectProjectLoadState = contextStateV2?.setConnectProjectLoadState
+  const loadProjectBusy = !!connectProjectLoadState.loading
+  const loadProjectProgress = connectProjectLoadState.progress ?? 0
+  const loadProjectMessage = connectProjectLoadState.message ?? ""
+  const loadProjectTargetId = connectProjectLoadState.dataSetId
   const [projectNameInput, setProjectNameInput] = useState("")
   const [runtimeOrigin, setRuntimeOrigin] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -408,14 +403,6 @@ const Nav = () => {
       setSaveIsOpen(true)
     }
   }, [saveProjectDialogNonce])
-
-  useEffect(() => {
-    return () => {
-      if (loadProjectTickerRef.current) {
-        window.clearInterval(loadProjectTickerRef.current)
-      }
-    }
-  }, [])
 
   const handleLogout = async () => {
     try {
@@ -504,8 +491,21 @@ const Nav = () => {
     setChartDataOverrideMeta?.(null);
     setProjectNameInput("");
     setOverwrite(false);
-    setViewing?.("dataStart");
-    toast.success("Started a new blank project.");
+
+    setConnectProjectLoadState?.(CONNECT_PROJECT_LOAD_IDLE);
+    setDataConnected?.(false);
+    setIntegrationSidebar?.(null);
+    setRightPanelOpen?.(false);
+    requestConnectWorkspace?.(null);
+    setViewing?.("connectDataHome");
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        document.getElementById(CONNECT_HOME_SCROLL_ID)?.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+
+    toast.success("Ready to start a new project.");
   };
 
   const saveAllChartsForProject = async (dataSetId, forceCreate = false, chartSheetsForSave = chartSheets) => {
@@ -899,58 +899,15 @@ const Nav = () => {
       setLoadedChartBuilderSnapshot,
     });
 
-  const stopProjectLoadTicker = () => {
-    if (loadProjectTickerRef.current) {
-      window.clearInterval(loadProjectTickerRef.current);
-      loadProjectTickerRef.current = null;
-    }
-  };
-
-  const startProjectLoadTicker = ({ min = 18, max = 64 } = {}) => {
-    stopProjectLoadTicker();
-    let tick = 0;
-    loadProjectTickerRef.current = window.setInterval(() => {
-      tick += 1;
-      setLoadProjectProgress((prev) => {
-        const current = Number.isFinite(Number(prev)) ? Number(prev) : min;
-        if (current >= max) return current;
-        const remaining = max - current;
-        const step = Math.max(0.2, Math.min(1.8, remaining * 0.08));
-        return Math.min(max, current + step);
-      });
-      setLoadProjectMessage(PROJECT_LOAD_PROGRESS_MESSAGES[tick % PROJECT_LOAD_PROGRESS_MESSAGES.length]);
-    }, 900);
-  };
-
   const loadDataSheet = async (dataSetId, dataSet) => {
-    if (!dataSetId || loadProjectBusy) return;
-    const bumpLoad = (pct, message) => {
-      setLoadProjectProgress(pct);
-      setLoadProjectMessage(message);
-    };
-    setLoadProjectBusy(true);
-    setLoadProjectTargetId(String(dataSetId));
-    bumpLoad(6, "Preparing project load…");
+    if (!dataSetId || loadProjectBusy || !setConnectProjectLoadState) return;
     try {
-      if (loadedDataMeta && dataSetId === loadedDataMeta._id) {
-        bumpLoad(40, "Project already loaded. Refreshing project links…");
-        setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
-        bumpLoad(90, "Opening project workspace…");
-        finishConnectHomeProjectLoad({
-          setViewing,
-          requestConnectWorkspace,
-          setConnectHomeAnalyzeActive,
-          requestConnectAnalyzeScroll,
-        });
-        setIsOpen(false);
-        return;
-      }
-
-      bumpLoad(18, "Loading data sheets…");
-      startProjectLoadTicker({ min: 18, max: 64 });
-      await openProjectInConnectHome({
+      await runConnectProjectLoad({
         dataSetId,
         userId: user?.userId,
+        projectName: dataSet?.data_set_name || loadedDataMeta?.data_set_name || "",
+        loadedDataMeta,
+        setConnectProjectLoadState,
         setDataSheets,
         setActiveSheetId,
         setConnectedData,
@@ -966,26 +923,16 @@ const Nav = () => {
         requestConnectWorkspace,
         setConnectHomeAnalyzeActive,
         requestConnectAnalyzeScroll,
+        setRightPanelTab,
+        setRightPanelOpen,
       });
-      stopProjectLoadTicker();
-
-      bumpLoad(96, "Opening project workspace…");
       toast.success(`Project: ${dataSet?.data_set_name || loadedDataMeta?.data_set_name || "Untitled"} loaded`, {
-        duration: 99999999
+        duration: 99999999,
       });
       setIsOpen(false);
     } catch (error) {
-      stopProjectLoadTicker();
       console.error("Error loading project:", error);
       toast.error(error?.message || "Failed to load project.");
-    } finally {
-      stopProjectLoadTicker();
-      setTimeout(() => {
-        setLoadProjectBusy(false);
-        setLoadProjectProgress(0);
-        setLoadProjectMessage("");
-        setLoadProjectTargetId(null);
-      }, 300);
     }
   }
 

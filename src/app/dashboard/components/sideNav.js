@@ -179,8 +179,11 @@ const SideNav = () => {
                   </SidebarMenuSubItem>
                   <SidebarMenuSubItem>
                     <SidebarMenuSubButton
-                      isActive={viewing === "integrations"}
-                      onClick={() => viewHandler("integrations")}
+                      isActive={
+                        viewing === "connectDataHome" &&
+                        connectWorkspace === CONNECT_WORKSPACE.INTEGRATIONS_PICKER
+                      }
+                      onClick={() => openConnectWorkspace(CONNECT_WORKSPACE.INTEGRATIONS_PICKER)}
                     >
                       <Cable className="h-4 w-4" />
                       <span>Integrations</span>

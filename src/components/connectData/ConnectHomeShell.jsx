@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 
 import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
 import { ConnectHomeAnalyzeViewport } from "@/components/connectData/ConnectHomeAnalyzeViewport";
+import { ConnectHomeProjectLoadShell } from "@/components/connectData/ConnectHomeProjectLoadShell";
 import ConnectDataStep1 from "@/components/connectData/ConnectDataStep1";
 import { ConnectHomeFileUpload } from "@/components/connectData/ConnectHomeFileUpload";
 import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSteps";
@@ -55,6 +56,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const connectAnalyzeScrollTick = context?.connectAnalyzeScrollTick ?? 0;
   const connectHomeAnalyzeActive = !!context?.connectHomeAnalyzeActive;
   const connectDataLakePullState = context?.connectDataLakePullState ?? {};
+  const connectProjectLoadState = context?.connectProjectLoadState ?? {};
+  const projectLoadActive = !!connectProjectLoadState.loading;
   const dataConnected = context?.dataConnected;
   const viewing = context?.viewing;
   const connectedData = context?.connectedData;
@@ -139,10 +142,11 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const [connectHomePreferredPanelTab, setConnectHomePreferredPanelTab] = useState(null);
 
   const analyzeViewportLocked =
-    workspaceActive &&
-    connectHomeAnalyzeActive &&
-    hasSheetData &&
-    !connectDataLakePullState.loading;
+    projectLoadActive ||
+    (workspaceActive &&
+      connectHomeAnalyzeActive &&
+      hasSheetData &&
+      !connectDataLakePullState.loading);
 
   /** Run pull → show sheet + progress (not compose-only) until data lands. */
   const connectAnalyzePullActive =
@@ -160,7 +164,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     !connectAnalyzePullActive;
 
   const useFixedViewport =
-    analyzeViewportLocked || composeWorkspacePhase || connectAnalyzePullActive;
+    projectLoadActive ||
+    analyzeViewportLocked ||
+    composeWorkspacePhase ||
+    connectAnalyzePullActive;
 
   useEffect(() => {
     if (analyzeViewportLocked) {
@@ -360,7 +367,9 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     [analyzeViewportLocked, useFixedViewport],
   );
 
-  const workspacePanel = showDataWorkspace ? (
+  const workspacePanel = projectLoadActive ? (
+    <ConnectHomeProjectLoadShell isDemo={isDemo} />
+  ) : showDataWorkspace ? (
     <DataSheetWithIntegration
       user={user}
       startNew={startNew}
