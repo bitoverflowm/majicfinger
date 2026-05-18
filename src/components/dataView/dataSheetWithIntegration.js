@@ -67,6 +67,7 @@ import {
   connectHomeAnalyzeMainClass,
   connectHomeAnalyzeRowClass,
   connectHomeAnalyzeRowDemoClass,
+  connectHomeComposeScrollerClass,
   connectHomeDrawerAsideDemoClass,
   connectHomeDrawerAsideFixedClass,
   connectHomeWorkspaceRowClass,
@@ -1124,12 +1125,9 @@ export default function DataSheetWithIntegration({
         <div
           id="connect-home-compose"
           className={cn(
-            "w-full min-w-0 shrink-0",
             connectHomeComposeOnly
-              ? "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [overflow-anchor:none] pb-6 sm:pb-8"
-              : isDemo
-                ? "pb-16"
-                : "pb-96",
+              ? cn(connectHomeComposeScrollerClass, "pb-6 sm:pb-8")
+              : cn("w-full min-w-0 shrink-0", isDemo ? "pb-16" : "pb-96"),
           )}
         >
           <ConnectHomeIntegrationWorkflow integrationId={connectWorkspace} />

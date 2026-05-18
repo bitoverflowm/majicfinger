@@ -211,10 +211,16 @@ export function isVisibleInScrollRoot(scrollRoot, el, insetTop = 12) {
   if (!scrollRoot || !el) return true;
   const elRect = el.getBoundingClientRect();
   const scrollerRect = scrollRoot.getBoundingClientRect();
-  return (
-    elRect.top >= scrollerRect.top + insetTop - 4 &&
-    elRect.bottom <= scrollerRect.bottom + 4
-  );
+  const topOk = elRect.top >= scrollerRect.top + insetTop - 4;
+  const bottomOk = elRect.bottom <= scrollerRect.bottom + 4;
+  /** Header visible — enough to read; bottom may be below fold (still scroll). */
+  return topOk && (bottomOk || elRect.height <= scrollerRect.height * 0.85);
+}
+
+/** @returns {HTMLElement|null} */
+export function getConnectComposeScrollEl() {
+  if (typeof document === "undefined") return null;
+  return document.getElementById(CONNECT_HOME_COMPOSE_ID);
 }
 
 /**

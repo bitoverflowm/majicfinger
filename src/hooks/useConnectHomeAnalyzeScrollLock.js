@@ -52,6 +52,10 @@ export function useConnectHomeAnalyzeScrollLock({ scrollRef, hubRef, enabled }) 
     const root = scrollRef?.current;
     if (!root) return undefined;
 
+    /** Compose query UI scrolls in #connect-home-compose, not the hub scroller. */
+    const composeEl = document.getElementById("connect-home-compose");
+    if (composeEl) return undefined;
+
     const isBypassed = () => Date.now() < bypassUntilRef.current;
 
     const clamp = () => {
@@ -64,7 +68,6 @@ export function useConnectHomeAnalyzeScrollLock({ scrollRef, hubRef, enabled }) 
 
     const onWheel = (e) => {
       if (isBypassed()) return;
-      const composeEl = document.getElementById("connect-home-compose");
       if (composeEl?.contains(e.target)) return;
       const min = refreshMinScroll();
       if (root.scrollTop <= min + 2 && e.deltaY < 0) {
@@ -78,7 +81,6 @@ export function useConnectHomeAnalyzeScrollLock({ scrollRef, hubRef, enabled }) 
     };
     const onTouchMove = (e) => {
       if (isBypassed()) return;
-      const composeEl = document.getElementById("connect-home-compose");
       if (composeEl?.contains(e.target)) return;
       const min = refreshMinScroll();
       const y = e.touches?.[0]?.clientY ?? 0;

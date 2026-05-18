@@ -51,7 +51,6 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
         scrollConnectComposeTargetIntoView(el, {
           behavior: "smooth",
           insetTop: 12,
-          onlyIfNeeded: true,
         });
       }
     }, 280);

@@ -104,6 +104,14 @@ export const connectHubHubSnapClass = "snap-start snap-always";
 export const connectHubAnalyzeViewportClass =
   "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950";
 
+/**
+ * Kalshi / lake compose scroller (fixed viewport).
+ * `h-0` + `flex-1` + `min-h-0` is required so Chrome constrains height and `overflow-y-auto` scrolls.
+ * Do not use `shrink-0` here — it lets the panel grow to full content height with no scrollbar.
+ */
+export const connectHomeComposeScrollerClass =
+  "flex h-0 min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-auto touch-pan-y [overflow-anchor:none]";
+
 /** Analyze row: sheet + drawer inside the fixed viewport (no dvh stack). */
 export const connectHomeAnalyzeRowClass = cn(
   "relative min-h-0 w-full min-w-0 flex-1 overflow-hidden",
