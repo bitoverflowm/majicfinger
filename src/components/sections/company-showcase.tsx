@@ -1,47 +1,41 @@
 import { siteConfig } from "@/lib/config";
-import Link from "next/link";
 import Image from "next/image";
 
 export function CompanyShowcase() {
-  const { companyShowcase } = siteConfig;
-  const visibleLogos = companyShowcase.companyLogos.filter(
-    (logo) => !!logo.href && logo.href !== "#",
-  );
+  const { companyLogos } = siteConfig.companyShowcase;
 
-  if (visibleLogos.length === 0) {
+  if (companyLogos.length === 0) {
     return null;
   }
 
   return (
-    <section
+    <div
       id="company"
-      className="flex flex-col items-center justify-center gap-10 py-10 pt-20 w-full relative px-6"
+      className="relative z-20 flex w-full flex-col items-center justify-center gap-8 px-6 pb-12 pt-4"
     >
-      <p className="text-muted-foreground font-medium">
+      <p className="text-center text-sm font-medium text-muted-foreground">
         Trusted and actively beta tested by friends at
       </p>
 
-      <div className="grid w-full max-w-7xl grid-cols-2 md:grid-cols-4 overflow-hidden border-y border-border items-center justify-center z-20">
-        {visibleLogos.map((logo) => (
-          <Link
-            href={logo.href}
-            className="group w-full h-28 flex items-center justify-center relative p-4 before:absolute before:-left-1 before:top-0 before:z-10 before:h-screen before:w-px before:bg-border before:content-[''] after:absolute after:-top-1 after:left-0 after:z-10 after:h-px after:w-screen after:bg-border after:content-['']"
+      <div className="grid w-full max-w-7xl grid-cols-2 items-center justify-center overflow-hidden border-y border-border md:grid-cols-4">
+        {companyLogos.map((logo) => (
+          <div
             key={logo.id}
+            className="group relative flex h-28 w-full items-center justify-center p-4 before:absolute before:-left-1 before:top-0 before:z-10 before:h-screen before:w-px before:bg-border before:content-[''] after:absolute after:-top-1 after:left-0 after:z-10 after:h-px after:w-screen after:bg-border after:content-['']"
           >
-            <div className="transition-all duration-300 ease-landing-smooth translate-y-0 group-hover:-translate-y-4 flex items-center justify-center w-full h-full">
+            <div className="flex h-full w-full translate-y-0 items-center justify-center transition-all duration-300 ease-landing-smooth group-hover:-translate-y-4">
               <Image
                 width={120}
                 height={48}
                 src={logo.src}
-                className="h-6 w-16 sm:h-8 sm:w-20 brightness-0 opacity-70 dark:brightness-0 dark:invert dark:blue-400 dark:hue-rotate-[200deg] dark:saturate-[400%]"
+                className="h-6 w-16 brightness-0 opacity-70 sm:h-8 sm:w-20 dark:brightness-0 dark:invert dark:hue-rotate-[200deg] dark:saturate-[400%] dark:blue-400"
                 alt={`${logo.alt} logo`}
                 loading="lazy"
               />
             </div>
-          </Link>
+          </div>
         ))}
       </div>
-    </section>
+    </div>
   );
 }
-

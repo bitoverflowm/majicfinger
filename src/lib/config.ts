@@ -16,14 +16,14 @@ export const siteConfig = {
   },
   companyShowcase: {
     companyLogos: [
-      { id: "jpm", src: "/jpm.svg", alt: "jpm", href: "#" },
-      { id: "goldman", src: "/goldman.svg", alt: "goldman", href: "#" },
-      { id: "meta", src: "/meta.svg", alt: "meta", href: "#" },
-      { id: "google", src: "/google.svg", alt: "google", href: "#" },
-      { id: "apple", src: "/apple.svg", alt: "apple", href: "#" },
-      { id: "mit", src: "/mit.svg", alt: "mit", href: "#" },
-      { id: "jump", src: "/jump.webp", alt: "jump", href: "#" },
-      { id: "coinbase", src: "/coinbase.svg", alt: "coinbase", href: "#" }
+      { id: "jpm", src: "/jpm.svg", alt: "jpm" },
+      { id: "goldman", src: "/goldman.svg", alt: "goldman" },
+      { id: "meta", src: "/meta.svg", alt: "meta" },
+      { id: "google", src: "/google.svg", alt: "google" },
+      { id: "apple", src: "/apple.svg", alt: "apple" },
+      { id: "mit", src: "/mit.svg", alt: "mit" },
+      { id: "jump", src: "/jump.webp", alt: "jump" },
+      { id: "coinbase", src: "/coinbase.svg", alt: "coinbase" },
     ],
   },
   bentoSection,

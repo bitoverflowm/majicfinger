@@ -1,6 +1,7 @@
 import { siteConfig } from "@/lib/config";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
@@ -77,6 +78,7 @@ export function HeroSection() {
       </div>
 
       <DashboardDemoSectionLazy />
+      <CompanyShowcase />
     </section>
   );
 }
