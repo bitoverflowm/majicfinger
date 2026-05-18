@@ -34,12 +34,13 @@ export const POLYMARKET_CONNECT_DATA_SOURCES = [
   {
     sampleId: "athena-pm-trades",
     title: "Trades",
-    description: "On-chain trade executions from Polymarket contracts.",
+    description:
+      "Each row is an OrderFilled event from the Polygon blockchain (CTF Exchange or Neg Risk).",
   },
   {
     sampleId: "athena-pm-blocks",
     title: "Blocks",
-    description: "Block timestamps for aligning trades to chain time.",
+    description: "Polygon block numbers mapped to ISO 8601 timestamps.",
   },
 ];
 

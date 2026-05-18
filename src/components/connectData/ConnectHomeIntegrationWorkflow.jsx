@@ -102,12 +102,40 @@ function ColumnHoverPreview({ columns, getDisplayLabel, className }) {
   );
 }
 
+function PolymarketLegacyTradesReference({ intro, columns, getDisplayLabel }) {
+  if (!columns?.length) return null;
+  return (
+    <div className="rounded-lg border border-border/50 bg-muted/15 px-3 py-2.5 space-y-2">
+      <p className="text-[11px] font-medium text-foreground">Polymarket legacy trades (FPMM)</p>
+      <p className="text-[11px] leading-snug text-muted-foreground">{intro}</p>
+      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0 border-b border-border/40 pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span>Column</span>
+        <span>Type</span>
+      </div>
+      <ul className="space-y-0.5 max-h-[min(14rem,40vh)] overflow-y-auto">
+        {columns.map((col) => (
+          <li
+            key={col.name}
+            className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 border-b border-border/30 py-1.5 last:border-0"
+          >
+            <span className="text-[11px] text-foreground">{getDisplayLabel(col)}</span>
+            <span className="text-[10px] text-muted-foreground">{col.type}</span>
+            <span className="col-span-2 text-[11px] leading-snug text-muted-foreground">{col.description}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ColumnPicker({
   sourceId,
   columns,
   getDisplayLabel,
   lake,
   table,
+  tableIntro,
+  tableNotes,
   enableComposeFormats,
   selectedColumns,
   onSelectColumn,
@@ -211,6 +239,14 @@ function ColumnPicker({
           </Button>
         </motion.div>
       </div>
+      {tableIntro ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">{tableIntro}</p>
+      ) : null}
+      {tableNotes?.footnotes?.map((note) => (
+        <p key={note.slice(0, 48)} className="text-[11px] leading-snug text-muted-foreground">
+          {note}
+        </p>
+      ))}
       <ul role="list" className="grid grid-cols-1 items-stretch gap-1 sm:grid-cols-2">
         {columns.map((col) => {
           const isSelected = selectedSet.has(col.name);
@@ -264,7 +300,7 @@ function ColumnPicker({
                       ) : null}
                     </span>
                     {!isSelected ? (
-                      <span className="mt-0.5 line-clamp-1 text-[10px] leading-3 text-muted-foreground">{col.description}</span>
+                      <span className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">{col.description}</span>
                     ) : null}
                   </span>
                 </button>
@@ -276,6 +312,14 @@ function ColumnPicker({
           );
         })}
       </ul>
+
+      {tableNotes?.legacyIntro && tableNotes?.legacyColumns?.length ? (
+        <PolymarketLegacyTradesReference
+          intro={tableNotes.legacyIntro}
+          columns={tableNotes.legacyColumns}
+          getDisplayLabel={getDisplayLabel}
+        />
+      ) : null}
 
       {enableComposeFormats ? (
         <ComposeGroupingDroppedColumnsWarning columnComposeItems={columnComposeItems} />
@@ -370,6 +414,8 @@ function DataLakeSourceCards({
               getDisplayLabel={lakeConfig.getColumnDisplayLabel}
               lake={lakeConfig.lake}
               table={sampleById[selectedSampleId]?.table}
+              tableIntro={lakeConfig.getTableIntro?.(selectedSampleId)}
+              tableNotes={lakeConfig.getTableNotes?.(selectedSampleId)}
               enableComposeFormats
               selectedColumns={columnSelections[selectedSampleId] || []}
               onSelectColumn={(col) => onSelectColumn(selectedSampleId, col)}

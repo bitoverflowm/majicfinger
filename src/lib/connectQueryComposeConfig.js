@@ -16,6 +16,8 @@ import {
 import {
   getPolymarketColumnDisplayLabel,
   getPolymarketConnectColumnsForSample,
+  getPolymarketTableIntro,
+  getPolymarketTableNotes,
 } from "@/lib/polymarketConnectColumns";
 
 /** @typedef {"dataLake" | "api" | "liveStream"} ConnectComposeKind */
@@ -47,6 +49,8 @@ export const CONNECT_DATA_LAKE_INTEGRATIONS = {
     connectSources: POLYMARKET_CONNECT_DATA_SOURCES,
     getColumnsForSample: getPolymarketConnectColumnsForSample,
     getColumnDisplayLabel: getPolymarketColumnDisplayLabel,
+    getTableIntro: getPolymarketTableIntro,
+    getTableNotes: getPolymarketTableNotes,
   },
 };
 
