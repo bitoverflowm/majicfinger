@@ -4,10 +4,6 @@ import Image from "next/image";
 export function CompanyShowcase() {
   const { companyLogos } = siteConfig.companyShowcase;
 
-  if (companyLogos.length === 0) {
-    return null;
-  }
-
   return (
     <div
       id="company"
