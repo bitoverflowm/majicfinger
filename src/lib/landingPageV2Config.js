@@ -74,7 +74,7 @@ export const landingPageV2Config = {
         "Priority support",
         "Team features (coming soon)",
         "Dashboard analytics",
-        "500 custom alerts (addons available",
+        "500 custom alerts (addons available)",
         "Dedicated data base for large datasets",
         "100 live feeds"
       ],

@@ -183,7 +183,7 @@ export function PricingSection() {
                 <p className="text-sm">
                   {tier.name}
                   {tier.isPopular && (
-                    <span className="bg-gradient-to-b from-secondary/50 from-[1.92%] to-secondary to-[100%] text-white h-6 inline-flex w-fit items-center justify-center px-2 rounded-full text-sm ml-2 shadow-[0px_6px_6px_-3px_rgba(0,0,0,0.08),0px_3px_3px_-1.5px_rgba(0,0,0,0.08),0px_1px_1px_-0.5px_rgba(0,0,0,0.08),0px_0px_0px_1px_rgba(255,255,255,0.12)_inset,0px_1px_0px_0px_rgba(255,255,255,0.12)_inset]">
+                    <span className="bg-secondary text-white h-6 inline-flex w-fit items-center justify-center px-2 rounded-full text-xs font-medium tracking-wide ml-2">
                       {tier.badgeLabel ?? "Popular"}
                     </span>
                   )}
@@ -204,6 +204,8 @@ export function PricingSection() {
               <div className="flex flex-col gap-2 p-4">
                 <a
                   href={tier.display.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={cn(
                     "h-10 w-full flex items-center justify-center text-sm font-normal tracking-wide rounded-full px-4 cursor-pointer transition-all ease-out active:scale-95",
                     tier.isPopular
@@ -311,6 +313,8 @@ export function PricingSection() {
                 </div>
                 <a
                   href={lifetimeAccess.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex h-11 w-full items-center justify-center rounded-full bg-secondary px-4 text-sm font-medium tracking-wide text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.24)] transition-all ease-out hover:opacity-95 active:scale-[0.98]"
                 >
                   {lifetimeAccess.buttonText}

@@ -131,7 +131,7 @@ export function Navbar() {
           )}
         >
           <div className="flex h-[56px] items-center justify-between p-4">
-            <Link href="/" className="flex gap-1.5 items-center pr-3">
+            <Link href="/" className="flex gap-2 items-center pr-6 md:pr-8">
               <span className="flex shrink-0 items-center justify-center">
                 <Image
                   src="/logo.png"
@@ -142,7 +142,7 @@ export function Navbar() {
                   priority
                 />
               </span>
-              <span className="pt-2 font-black text-xl leading-none text-primary">
+              <span className="pr-2 font-black text-xl leading-none text-primary">
                 Lychee
               </span>
             </Link>

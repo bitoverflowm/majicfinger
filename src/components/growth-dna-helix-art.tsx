@@ -54,7 +54,7 @@ export function GrowthDnaHelixArt() {
   );
 
   return (
-    <div className="relative flex h-full min-h-[380px] w-full max-w-full min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/25 p-4 dark:bg-muted/15">
+    <div className="relative flex aspect-square w-full max-w-full min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/25 px-4 py-6 dark:bg-muted/15">
       <pre
         className={cn(
           "relative z-10 mx-auto w-max max-w-full overflow-hidden text-left font-mono text-[7px] leading-[1.1] sm:text-[8px] md:text-[9px]",

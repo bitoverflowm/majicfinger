@@ -85,8 +85,9 @@ export async function GET() {
   addContentType("integrations", "/integrations", { priority: "0.6", changefreq: "monthly" });
   addContentType("concepts", "/concepts", { priority: "0.6", changefreq: "monthly" });
   addContentType("playbooks", "/playbooks", { priority: "0.6", changefreq: "monthly" });
-  // Blog lives under landingpage_v2 routes.
-  addContentType("blog", "/landingpage_v2/blog", { priority: "0.7", changefreq: "monthly" });
+  // Blog posts are served by the /guides/[slug] route (it falls back to blog
+  // content when no guide slug matches), so we list them under /guides.
+  addContentType("blog", "/guides", { priority: "0.7", changefreq: "monthly" });
 
   // Public dashboards and charts (DB-backed; auto-updates as users publish).
   try {

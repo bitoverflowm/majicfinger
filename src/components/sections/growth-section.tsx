@@ -26,9 +26,9 @@ export function GrowthSection() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex min-h-[560px] w-full min-w-0 flex-col items-center justify-end gap-2 p-6"
+              className="flex w-full min-w-0 flex-col items-center justify-end gap-4 p-6"
             >
-              <div className="flex min-h-[380px] w-full flex-1 flex-col items-center justify-center">
+              <div className="flex w-full flex-1 flex-col items-center justify-center">
                 {item.content}
               </div>
               <h3 className="w-full text-lg tracking-tighter font-semibold">

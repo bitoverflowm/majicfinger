@@ -25,8 +25,6 @@ const RESERVED = new Set(
     "dashboards",
     "pricing",
     "playground",
-    "landingpage_v2",
-    "playground",
     "admin",
     "settings",
     "profile",
