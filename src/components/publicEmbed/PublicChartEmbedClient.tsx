@@ -14,7 +14,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 function DataLoader({ rows }: { rows: unknown[] }) {
   const { setConnectedData } = useMyStateV2();
   useEffect(() => {
-    setConnectedData(rows as never[]);
+    setConnectedData?.(rows);
   }, [rows, setConnectedData]);
   return null;
 }
@@ -26,11 +26,11 @@ function DataSheetsLoader({ rows, dataSheets }: { rows: unknown[]; dataSheets?: 
       dataSheets && typeof dataSheets === "object" && Object.keys(dataSheets).length
         ? dataSheets
         : { "sheet-1": { name: "Sheet 1", data: Array.isArray(rows) ? rows : [], provenance: null } };
-    setDataSheets?.(incomingSheets as never);
+    setDataSheets?.(incomingSheets);
     const firstId = Object.keys(incomingSheets)[0] || "sheet-1";
-    setActiveSheetId?.(firstId as never);
+    setActiveSheetId?.(firstId);
     const firstRows = Array.isArray(incomingSheets?.[firstId]?.data) ? incomingSheets[firstId].data : [];
-    setConnectedData?.((firstRows.length ? firstRows : (Array.isArray(rows) ? rows : [])) as never[]);
+    setConnectedData?.(firstRows.length ? firstRows : Array.isArray(rows) ? rows : []);
   }, [rows, dataSheets, setDataSheets, setActiveSheetId, setConnectedData]);
   return null;
 }
