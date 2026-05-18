@@ -12,11 +12,11 @@ export function useMyState() {
 
 // Create the state provider component
 export const StateProvider = ({ children, bento=false }) => {
-  const [dflt, setDflt] = useState(true)
+  const [dflt, setDflt] = useState(false)
   const [working, setWorking] = useState(null);
   const [aiOpen, setAiOpen] = useState(null);
-  const [xKey, setXKey] = useState('mission')
-  const [yKey, setYKey] = useState('price')
+  const [xKey, setXKey] = useState('')
+  const [yKey, setYKey] = useState('')
   const [type, setType] = useState('bar')
   const [colDefs, setColDefs] = useState()
   const [rowData, setRowData] = useState()
@@ -28,7 +28,7 @@ export const StateProvider = ({ children, bento=false }) => {
   const [title, setTitle] = useState('')
   const [subTitle, setSubTitle] = useState('')
 
-  const [data, setData] = useState()
+  const [data, setData] = useState([])
 
   const [fmtCols, setFmtCols] = useState()
 
@@ -69,9 +69,9 @@ export const StateProvider = ({ children, bento=false }) => {
 
   const [chartOptions, setChartOptions] = useState({ // Data: Data to be displayed in the chart
     theme: chartTheme,
-    data: data,
+    data: [],
     // Series: Defines which chart type and data to use
-    series: [{ type: 'bar', xKey: 'mission', yKey: 'price', direction: "horizontal"}],
+    series: [{ type: 'bar', xKey: '', yKey: '', direction: "horizontal"}],
     //animation TODO: fix not working
     animation: [{enabled: true, duration: 0.1}],
     //labeling x, y, and even other axers
@@ -105,39 +105,41 @@ export const StateProvider = ({ children, bento=false }) => {
   const [direction, setDirection] = useState('vertical')
   
   useEffect(()=> {
-    data && setRowData(data)
-    fmtCols && setColDefs(fmtCols)
-    if(data && fmtCols){
-      if(type === 'scatter'){
-          setChartOptions(prevOptions => ({
-              ...prevOptions,
-              series: [{
-                      type: 'scatter',
-                      data: data,
-                      xKey: fmtCols[0].field,
-                      yKey: fmtCols[1].field,
-                  }
-                ],
-              }))
-          }
-      else{
-          setChartOptions(prevOptions => ({
-              ...prevOptions,
-              data: data,
-              series: [{
-                      type: chartOptions.series[0].type,
-                      xKey: fmtCols[0].field,
-                      yKey: fmtCols[1].field,
-                  }
-                ],
-                  background: {
-                    visible: false,
-                  },
-              }))
-      }
-      setXKey(fmtCols[0].field)
-      setYKey(fmtCols[1].field)
-  }
+    if (Array.isArray(data)) setRowData(data)
+    if (Array.isArray(fmtCols)) setColDefs(fmtCols)
+
+    const xField = fmtCols?.[0]?.field
+    const yField = fmtCols?.[1]?.field
+    const hasData = Array.isArray(data) && data.length > 0
+    if (!hasData || !xField) return
+
+    if (type === 'scatter' && yField) {
+      setChartOptions(prevOptions => ({
+        ...prevOptions,
+        series: [{
+          type: 'scatter',
+          data: data,
+          xKey: xField,
+          yKey: yField,
+        }],
+      }))
+    } else if (yField) {
+      setChartOptions(prevOptions => ({
+        ...prevOptions,
+        data: data,
+        series: [{
+          type: chartOptions.series[0].type,
+          xKey: xField,
+          yKey: yField,
+        }],
+        background: {
+          visible: false,
+        },
+      }))
+    }
+
+    setXKey(xField)
+    if (yField) setYKey(yField)
   }, [data, fmtCols])
 
   useEffect(() => {
@@ -216,28 +218,25 @@ export const StateProvider = ({ children, bento=false }) => {
 
   //charts
   const extractData = (cols) => {
-    let arr = cols.map(items => items.field)
+    const arr = (Array.isArray(cols) ? cols : [])
+      .map((item) => item?.field)
+      .filter(Boolean)
     setXOptions(arr)
     setYOptions(arr)
   }
 
   //charts
   useEffect(()=> {
-    fmtCols && extractData(fmtCols)
+    extractData(fmtCols)
   }, [fmtCols])
 
   useEffect(()=> {
-    if(!dflt && data && data.length > 0){
+    if (Array.isArray(data) && data.length > 0) {
         const keys = Object.keys(data[0])
-        const columnsLabels = keys.map(key => {
-            // Handle any price headings
-            /*if (key === 'price') {
-                return { field: key, valueFormatter: params => '$' + params.value.toLocaleString() }
-            }*/
-            return { field: key }
-        })
-        
-        setFmtCols(columnsLabels)           
+        const columnsLabels = keys.map(key => ({ field: key }))
+        setFmtCols(columnsLabels)
+    } else if (!data?.length) {
+        setFmtCols([])
     }
   }, [data])
 
@@ -251,57 +250,6 @@ export const StateProvider = ({ children, bento=false }) => {
     singleClickEdit: true,
     stopEditingWhenCellsLoseFocus : true,
   }))
-
-  useEffect(()=>{
-    if(!data && !bento){
-        setDflt(true)
-        fetch('https://www.ag-grid.com/example-assets/space-mission-data.json') // fetch default data
-        .then(result => result.json()) // Convert to JSON
-        .then(rowData => setData(rowData)); // Update state of `rowData`
-
-        setFmtCols([
-            { field: "mission" },
-            { field: "price" },
-            { field: "company" },
-            { field: "location" },
-            { field: "date" },            
-            { field: "successful" },
-            { field: "rocket" }
-          ])
-
-        setChartOptions(prevOptions => ({
-          ...prevOptions,
-          data: rowData,
-          // Series: Defines which chart type and data to use
-          series: [{ type: 'bar', xKey: 'mission', yKey: 'price', direction: "horizontal"}],
-          //animation TODO: fix not working
-          animation: [{enabled: true, duration: 0.1}],
-          //labeling x, y, and even other axers
-          axes: [
-              {
-                type: "category",
-                position: "bottom",
-                title: {
-                  text: xKey,
-                },
-              },
-              {
-                type: "number",
-                position: "left",
-                title: {
-                  text: yKey,
-                },
-                label: {
-                  formatter: ({ value }) => formatNumber(value),
-                },
-                gridLine: {
-                  enabled: gridLinesEnabled
-                }
-              }
-            ]
-        }))
-    }
-  }, [])
 
   /*
    * Bento Specific states

@@ -1209,7 +1209,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const crossSheetChartData = useMemo(() => {
     const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
-    if (!sheetEntries.length) return chartData || dfltChartData;
+    if (!sheetEntries.length) return chartData?.length ? chartData : (demo ? dfltChartData : []);
     const activeSheetId = contextStateV2?.activeSheetId;
     const dataSheets = contextStateV2?.dataSheets || {};
     const activeRows = Array.isArray(dataSheets?.[activeSheetId]?.data) ? dataSheets[activeSheetId].data : [];
@@ -1227,7 +1227,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       .map((rule) => rule.column)
       .filter(Boolean);
     const neededKeys = new Set([...plotKeyList, ...tooltipKeys, ...filterKeys]);
-    if (!neededKeys.size) return chartData || dfltChartData;
+    if (!neededKeys.size) return chartData?.length ? chartData : (demo ? dfltChartData : []);
     /** Only X/Y (and other plot keys) determine row count. Tooltip-only scoped columns must not truncate the series. */
     const sheetRowCount = (sheetId) => {
       const d = dataSheets?.[sheetId]?.data;
@@ -1260,8 +1260,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       }
       rows.push(row);
     }
-    return rows.length ? rows : chartData || dfltChartData;
+    return rows.length ? rows : (chartData?.length ? chartData : (demo ? dfltChartData : []));
   }, [
+    demo,
     chartData,
     chartFilterColumn,
     chartLineFilters,

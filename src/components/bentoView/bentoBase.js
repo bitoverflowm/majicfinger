@@ -83,7 +83,8 @@ export function BentoBase({data, demo, mobile, basic=false}) {
     }));
     // Update each Bento card with colors from the palette
     setData(prevData => {
-      return prevData.map((item, index) => ({
+      const rows = Array.isArray(prevData) ? prevData : [];
+      return rows.map((item, index) => ({
           ...item,
           background_color: selectedPalette[index % selectedPalette.length], // Cycles through the palette
           icon_style: {
