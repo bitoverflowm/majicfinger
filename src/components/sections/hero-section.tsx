@@ -30,7 +30,7 @@ export function HeroSection() {
         className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-[38rem] w-full max-w-[min(100%,84rem)] rounded-b-2xl md:h-[42rem] lg:h-[44rem]"
       />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[65rem] flex-col items-center gap-10 px-6 pb-20 pt-32 md:pb-24 lg:pb-28">
+      <div className="relative z-10 mx-auto flex w-full max-w-[65rem] flex-col items-center gap-10 px-6 pb-32 pt-32 md:pb-40 lg:pb-48">
         {hero.badgeHref ? (
           <Link
             href={hero.badgeHref}
@@ -49,9 +49,9 @@ export function HeroSection() {
           </p>
         )}
         <div className="flex w-full max-w-[65rem] flex-col items-center justify-center gap-5 px-1 sm:px-0">
-          <h1 className="flex w-full max-w-full flex-col gap-2 sm:gap-2.5 text-3xl font-medium tracking-tighter text-primary md:text-4xl lg:text-5xl xl:text-6xl text-center">
+          <h1 className="flex w-full max-w-full flex-col gap-2 text-center text-[clamp(1.125rem,2.15vw+0.625rem,2.625rem)] font-medium leading-[1.1] tracking-tighter text-primary sm:gap-2.5">
             {heroTitleLines.map((line, i) => (
-              <span key={i} className="block max-w-full leading-[1.1]">
+              <span key={i} className="block max-w-full md:whitespace-nowrap">
                 {line}
               </span>
             ))}
