@@ -95,10 +95,13 @@ export function normalizeLakeBigintCellValue(value) {
   s = stripTrailingZeroFractionalPart(s);
 
   if (!/^-?\d+$/.test(s)) {
+    // AVG/SUM on yes_price, no_price, etc. can return decimals ("98.8") — coerce to number
+    // so AG Grid `cellDataType: number` does not show "Invalid" for string numerics.
+    const n = Number(s);
+    if (Number.isFinite(n)) return n;
     // Compose date buckets return labels like "Q1 '24" — keep as string, not null.
     if (typeof value === "string") return value;
-    const n = Number(s);
-    return Number.isFinite(n) ? n : null;
+    return null;
   }
 
   try {
