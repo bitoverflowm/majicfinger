@@ -205,26 +205,44 @@ export function scrollWithinScrollRoot(
 }
 
 /**
- * Scroll compose panels (Where, Sort, etc.) inside #connect-home-compose or Connect scroll —
- * never the landing page / document.
+ * True when `el` is mostly visible inside `scrollRoot` (compose panel), with optional top inset.
+ */
+export function isVisibleInScrollRoot(scrollRoot, el, insetTop = 12) {
+  if (!scrollRoot || !el) return true;
+  const elRect = el.getBoundingClientRect();
+  const scrollerRect = scrollRoot.getBoundingClientRect();
+  return (
+    elRect.top >= scrollerRect.top + insetTop - 4 &&
+    elRect.bottom <= scrollerRect.bottom + 4
+  );
+}
+
+/**
+ * Scroll compose panels (Where, Sort, etc.) inside #connect-home-compose when possible.
+ * Never falls back to `scrollIntoView` on the document — that caused Chrome to scroll the
+ * wrong ancestor (scroll-snap hub / body) so users could not scroll back to column picks.
  */
 export function scrollConnectComposeTargetIntoView(
   targetEl,
-  { behavior = "smooth", insetTop = 16 } = {},
+  { behavior = "smooth", insetTop = 16, onlyIfNeeded = false } = {},
 ) {
   if (!targetEl || typeof document === "undefined") return false;
 
   const composeEl = document.getElementById(CONNECT_HOME_COMPOSE_ID);
-  const scrollRoot =
-    (composeEl?.contains(targetEl) && isScrollableY(composeEl) && composeEl) ||
-    findConnectHomeScrollRoot(targetEl) ||
-    document.getElementById(CONNECT_HOME_SCROLL_ID);
-
-  if (!scrollRoot) {
-    targetEl.scrollIntoView({ behavior, block: "nearest" });
-    return false;
+  if (composeEl?.contains(targetEl)) {
+    if (onlyIfNeeded && isVisibleInScrollRoot(composeEl, targetEl, insetTop)) {
+      return true;
+    }
+    return scrollWithinScrollRoot(composeEl, targetEl, { behavior, insetTop });
   }
 
+  const scrollRoot =
+    findConnectHomeScrollRoot(targetEl) || document.getElementById(CONNECT_HOME_SCROLL_ID);
+  if (!scrollRoot) return false;
+
+  if (onlyIfNeeded && isVisibleInScrollRoot(scrollRoot, targetEl, insetTop)) {
+    return true;
+  }
   return scrollWithinScrollRoot(scrollRoot, targetEl, { behavior, insetTop });
 }
 

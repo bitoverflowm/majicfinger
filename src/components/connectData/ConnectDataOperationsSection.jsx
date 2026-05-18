@@ -47,7 +47,13 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
     didScrollRef.current = true;
     const t = window.setTimeout(() => {
       const el = sectionRef.current;
-      if (el) scrollConnectComposeTargetIntoView(el, { behavior: "smooth", insetTop: 12 });
+      if (el) {
+        scrollConnectComposeTargetIntoView(el, {
+          behavior: "smooth",
+          insetTop: 12,
+          onlyIfNeeded: true,
+        });
+      }
     }, 280);
     return () => window.clearTimeout(t);
   }, [show]);

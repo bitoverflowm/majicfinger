@@ -185,7 +185,12 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     connectHomeAnalyzeActive && (hasSheetData || connectRequestSummaryReady);
 
   const scrollLockEnabled =
-    !useFixedViewport && workspaceActive && connectHomeAnalyzeActive && hasSheetData;
+    !useFixedViewport &&
+    workspaceActive &&
+    connectHomeAnalyzeActive &&
+    hasSheetData &&
+    !composeWorkspacePhase &&
+    !isConnectIntegrationWorkspace(connectWorkspace);
 
   useConnectHomeAnalyzeScrollLock({
     scrollRef,
@@ -419,7 +424,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
           "min-h-0 flex-1 overflow-y-auto",
           isDemo && connectHubDemoScrollContainClass,
           !isDemo && connectHubScrollPaddingClass,
-          !isDemo && !connectHomeAnalyzeActive && "snap-y snap-proximity",
+          !isDemo &&
+            !connectHomeAnalyzeActive &&
+            !isConnectIntegrationWorkspace(connectWorkspace) &&
+            "snap-y snap-proximity",
           CONNECT_HOME_SURFACE,
         )}
       >

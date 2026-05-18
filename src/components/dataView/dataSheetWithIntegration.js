@@ -1126,7 +1126,7 @@ export default function DataSheetWithIntegration({
           className={cn(
             "w-full min-w-0 shrink-0",
             connectHomeComposeOnly
-              ? "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-6 sm:pb-8"
+              ? "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [overflow-anchor:none] pb-6 sm:pb-8"
               : isDemo
                 ? "pb-16"
                 : "pb-96",

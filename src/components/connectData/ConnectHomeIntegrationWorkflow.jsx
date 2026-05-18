@@ -34,7 +34,7 @@ import {
   CONNECT_WORKSPACE_SCROLL_OFFSET_PX,
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
-import { findConnectHomeScrollRoot } from "@/lib/connectHubScroll";
+import { scrollConnectComposeTargetIntoView } from "@/lib/connectHubScroll";
 import { cn } from "@/lib/utils";
 
 function sampleByIdForConfig(lakeConfig) {
@@ -189,20 +189,11 @@ function ColumnPicker({
       if (cancelled) return;
       const el = columnHeaderRef.current;
       if (!el) return;
-      const scrollRoot = findConnectHomeScrollRoot(el);
-      if (scrollRoot) {
-        const elRect = el.getBoundingClientRect();
-        const scrollerRect = scrollRoot.getBoundingClientRect();
-        const padTop =
-          Number.parseInt(getComputedStyle(scrollRoot).scrollPaddingTop, 10) ||
-          CONNECT_WORKSPACE_SCROLL_OFFSET_PX;
-        const headerOffset = elRect.top - scrollerRect.top;
-        if (headerOffset >= padTop - 8 && headerOffset <= scrollerRect.height * 0.45) return;
-        const targetTop = elRect.top - scrollerRect.top + scrollRoot.scrollTop - padTop;
-        scrollRoot.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
-        return;
-      }
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      scrollConnectComposeTargetIntoView(el, {
+        behavior: "smooth",
+        insetTop: CONNECT_WORKSPACE_SCROLL_OFFSET_PX,
+        onlyIfNeeded: true,
+      });
     };
     const t = window.setTimeout(scrollColumnHeaderIntoView, 320);
     requestAnimationFrame(() => requestAnimationFrame(scrollColumnHeaderIntoView));
