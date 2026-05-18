@@ -18,6 +18,13 @@ export function isConnectUploadWorkspace(id) {
   return id === CONNECT_WORKSPACE.UPLOAD;
 }
 
+export function isConnectBlankWorkspace(id) {
+  return id === CONNECT_WORKSPACE.BLANK;
+}
+
+/** One empty row so the grid opens ready to type (blank-sheet flow). */
+export const CONNECT_BLANK_SHEET_SEED_ROWS = [{}];
+
 /** User uploaded a spreadsheet and sheets are populated in Connect home. */
 export function isConnectUploadWorkspaceReady(id, dataConnected, hasSheetData) {
   if (!isConnectUploadWorkspace(id) || !hasSheetData) return false;

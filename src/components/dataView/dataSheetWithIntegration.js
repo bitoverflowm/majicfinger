@@ -73,6 +73,7 @@ import {
   CONNECT_HOME_WORKSPACE_MIN_H,
 } from "@/lib/connectHubLayout";
 import {
+  isConnectBlankWorkspace,
   isConnectIntegrationWorkspace,
   isConnectSavedProjectWorkspace,
   isConnectUploadAnalyzeWorkspace,
@@ -178,6 +179,8 @@ export default function DataSheetWithIntegration({
   const dataConnected = !!contextStateV2?.dataConnected;
   const showConnectIntegrationIntro =
     connectHomeMode && isConnectIntegrationWorkspace(connectWorkspace);
+  const isConnectBlankSheetWorkspace =
+    connectHomeMode && isConnectBlankWorkspace(connectWorkspace);
   const isSavedProjectWorkspace =
     connectHomeMode && isConnectSavedProjectWorkspace(connectWorkspace);
   /** Mount data-lake pull handler when Connect home drawer is closed (DataLakeParquetPanel + handleLoad). */
@@ -254,7 +257,10 @@ export default function DataSheetWithIntegration({
           effectiveChartMode ||
           effectiveDashboardMode ||
           rightPanelTab === "export" ||
-          connectHomeCenterView !== CONNECT_HOME_CENTER_VIEW.SHEET)));
+          connectHomeCenterView !== CONNECT_HOME_CENTER_VIEW.SHEET)) ||
+      (isConnectBlankSheetWorkspace &&
+        hasConnectSheetData &&
+        connectHomeAnalyzeActive));
   const addNewSheetAndActivate = contextStateV2?.addNewSheetAndActivate;
   const setSheetData = contextStateV2?.setSheetData;
   const loadedChartBuilderSnapshot = contextStateV2?.loadedChartBuilderSnapshot;
@@ -781,7 +787,8 @@ export default function DataSheetWithIntegration({
     !showComposeBlock &&
     ((showConnectIntegrationIntro && showConnectAnalyzeSection) ||
       isConnectUploadWithSheetData ||
-      (isSavedProjectWorkspace && hasConnectSheetData));
+      (isSavedProjectWorkspace && hasConnectSheetData) ||
+      (isConnectBlankSheetWorkspace && connectHomeAnalyzeActive));
 
   const connectHomeSheetLayoutLive =
     connectHomeWorkspaceLive ||
@@ -1270,7 +1277,11 @@ export default function DataSheetWithIntegration({
               startNew={startNew}
               setStartNew={setStartNew}
               showWorkspaceNav
-              showIntro={!isConnectUploadAnalyze && !isSavedProjectWorkspace}
+              showIntro={
+                !isConnectUploadAnalyze &&
+                !isSavedProjectWorkspace &&
+                !isConnectBlankSheetWorkspace
+              }
               embeddedInFixedViewport={connectHomeAnalyzeLocked}
               onPanelManualOpen={handleConnectHomePanelManualOpen}
             />

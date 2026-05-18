@@ -72,8 +72,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const hubRef = useRef(null);
   const workspaceRef = useRef(null);
 
-  const [blankStartNew, setBlankStartNew] = useState(false);
-
   const workspaceActive = !!connectWorkspace;
 
   const showUploadPanel =
@@ -331,15 +329,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     connectHomePanelPinned,
   ]);
 
-  useEffect(() => {
-    if (connectWorkspace === CONNECT_WORKSPACE.BLANK) {
-      setBlankStartNew(true);
-      setStartNew?.(true);
-    } else {
-      setBlankStartNew(false);
-    }
-  }, [connectWorkspace, setStartNew]);
-
   const handleActivateWorkspace = useCallback(
     (id) => {
       context?.requestConnectWorkspace?.(id);
@@ -374,7 +363,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const workspacePanel = showDataWorkspace ? (
     <DataSheetWithIntegration
       user={user}
-      startNew={connectWorkspace === CONNECT_WORKSPACE.BLANK ? blankStartNew : startNew}
+      startNew={startNew}
       setStartNew={setStartNew}
       connectHomeMode
       connectHomeAnalyzeLocked={analyzeViewportLocked && !connectHomeComposeOpen}

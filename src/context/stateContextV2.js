@@ -6,6 +6,7 @@ import { isComposeBucketMsColumn } from '@/lib/composeDateDisplay';
 import { composeFieldDisplayNameMap } from '@/lib/connectComposeDisplayLabels';
 import {
   CONNECT_WORKSPACE,
+  CONNECT_BLANK_SHEET_SEED_ROWS,
   isConnectIntegrationWorkspace,
   isConnectWarmIntegration,
 } from '@/lib/connectHomeWorkspace';
@@ -537,16 +538,29 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       setDataLakeComposeHavingFilters([]);
       setDataLakeComposeJoins([]);
       resetConnectAnalyzeFlow();
-      if (
-        id === CONNECT_WORKSPACE.BLANK ||
-        id === CONNECT_WORKSPACE.UPLOAD ||
-        id === CONNECT_WORKSPACE.INTEGRATIONS_PICKER
-      ) {
+      if (id === CONNECT_WORKSPACE.UPLOAD || id === CONNECT_WORKSPACE.INTEGRATIONS_PICKER) {
         setDataSheets({ 'sheet-1': { name: 'Sheet 1', data: [], provenance: null } });
         setActiveSheetId('sheet-1');
         setDataConnected(false);
         setLoadedDataId(null);
         setLoadedDataMeta(null);
+      }
+      if (id === CONNECT_WORKSPACE.BLANK) {
+        setDataSheets({
+          'sheet-1': {
+            name: 'Sheet 1',
+            data: [...CONNECT_BLANK_SHEET_SEED_ROWS],
+            provenance: null,
+          },
+        });
+        setActiveSheetId('sheet-1');
+        setDataConnected(true);
+        setLoadedDataId(null);
+        setLoadedDataMeta(null);
+        setIntegrationSidebar(null);
+        setConnectHomeAnalyzeActive(true);
+        setConnectHomeCenterView('sheet');
+        setConnectAnalyzeScrollTick((t) => t + 1);
       }
       if (id === CONNECT_WORKSPACE.INTEGRATIONS_PICKER) {
         setIntegrationSidebar((prev) => prev ?? 'polymarket');
@@ -573,6 +587,9 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       setIntegrationSidebar,
       setRightPanelTab,
       setRightPanelOpen,
+      setConnectHomeAnalyzeActive,
+      setConnectHomeCenterView,
+      setConnectAnalyzeScrollTick,
     ]);
     const [connectedCols, setConnectedCols] = useState() //cols of fresh data
     const [tempData, setTempData] = useState() //holder state; whenver new data comes, tempData holds the previous state incase an action was a mistake

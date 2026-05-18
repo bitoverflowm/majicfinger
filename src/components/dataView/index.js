@@ -35,6 +35,8 @@ const DataView = ({ user, fillViewport = false }) => {
   const setConnectedData = contextStateV2?.setConnectedData;
   const setViewing = contextStateV2?.setViewing;
   const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace;
+  const connectWorkspace = contextStateV2?.connectWorkspace;
+  const isBlankSheetWorkspace = connectWorkspace === CONNECT_WORKSPACE.BLANK;
   const setIntegrationSidebar = contextStateV2?.setIntegrationSidebar;
   const integrationSidebar = contextStateV2?.integrationSidebar;
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
@@ -223,7 +225,7 @@ const DataView = ({ user, fillViewport = false }) => {
             </section>
           )}
         </div>
-      ) : (
+      ) : isBlankSheetWorkspace ? null : (
         <div className="relative">
           {!(user) && !isDemo && (
             <div className="w-full max-w-md mx-auto py-4">
