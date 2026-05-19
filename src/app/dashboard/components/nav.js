@@ -20,7 +20,7 @@ import { toast } from "sonner"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { Progress } from "@/components/ui/progress"
 import { Pause, Play, RotateCw, Square, ExternalLink, Loader2, ChevronDown, ChevronUp } from "lucide-react"
-import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot"
+import { inferDefaultBuilderSnapshot, isPlaceholderChartSheet } from "@/lib/inferDefaultBuilderSnapshot"
 import {
   applyDataSetToWorkspace,
   finishConnectHomeProjectLoad,
@@ -515,13 +515,19 @@ const Nav = () => {
       const [chartId, sheet] = entries[idx];
       const chartMeta = sheet?.chartMeta || null;
       const chartName = sheet?.name || chartMeta?.chart_name || `Chart ${idx + 1}`;
+      const hasExistingChart = !!chartMeta?._id;
+      if (!hasExistingChart && isPlaceholderChartSheet(sheet, idx)) continue;
+
+      const chartProps = chartMeta?.chart_properties;
+      const snapshotFromMeta = Array.isArray(chartProps)
+        ? chartProps[0]?.rechartsBuilder
+        : chartProps?.rechartsBuilder;
       const snapshot =
         sheet?.snapshot ||
-        chartMeta?.chart_properties?.[0]?.rechartsBuilder ||
-        inferDefaultBuilderSnapshot(connectedData || []);
+        snapshotFromMeta ||
+        (hasExistingChart ? inferDefaultBuilderSnapshot(connectedData || []) : null);
       const hasChartState = !!snapshot && (snapshot.selX || (Array.isArray(snapshot.selY) && snapshot.selY.length));
       const hasNamedChart = String(chartName || "").trim() !== "" && String(chartName || "").trim() !== `Chart ${idx + 1}`;
-      const hasExistingChart = !!chartMeta?._id;
       if (!hasChartState && !hasNamedChart && !hasExistingChart) continue;
       const previousSnapshot = Array.isArray(chartMeta?.chart_properties)
         ? chartMeta.chart_properties[0]?.rechartsBuilder
@@ -686,15 +692,23 @@ const Nav = () => {
       const flushedSnapshot = typeof chartSnapshotFlusher === "function"
         ? await chartSnapshotFlusher()
         : null;
-      const chartSheetsForSave = flushedSnapshot && activeChartSheetId
-        ? {
-            ...(chartSheets || {}),
-            [activeChartSheetId]: {
-              ...(chartSheets?.[activeChartSheetId] || { name: "Chart", chartMeta: null, snapshot: null }),
-              snapshot: flushedSnapshot,
-            },
-          }
-        : (chartSheets || {});
+      const activeChartIdx = activeChartSheetId
+        ? Object.keys(chartSheets || {}).indexOf(activeChartSheetId)
+        : -1;
+      const activeChartEntry = activeChartSheetId ? chartSheets?.[activeChartSheetId] : null;
+      const flushTargetsPlaceholder =
+        activeChartEntry &&
+        isPlaceholderChartSheet(activeChartEntry, activeChartIdx >= 0 ? activeChartIdx : 0);
+      const chartSheetsForSave =
+        flushedSnapshot && activeChartSheetId && !flushTargetsPlaceholder
+          ? {
+              ...(chartSheets || {}),
+              [activeChartSheetId]: {
+                ...(chartSheets?.[activeChartSheetId] || { name: "Chart", chartMeta: null, snapshot: null }),
+                snapshot: flushedSnapshot,
+              },
+            }
+          : chartSheets || {};
       const hasLoadedProject = !!loadedDataMeta?._id;
       const shouldOverwrite = hasLoadedProject && !!overwrite;
       const projectName = shouldOverwrite
