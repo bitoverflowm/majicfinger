@@ -94,7 +94,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     /** Connect home: optional name applied to active sheet on Run pull. */
     const [connectHomePendingSheetName, setConnectHomePendingSheetName] = useState("");
     /** Connect home: replace active sheet vs add new sheet when data already exists. */
-    const [connectHomePullDestination, setConnectHomePullDestination] = useState("replace");
+    const [connectHomePullDestination, setConnectHomePullDestination] = useState("new_sheet");
     /** Athena test-ping status per lake sample id (idle | loading | ok | error). */
     const [athenaPingBySampleId, setAthenaPingBySampleId] = useState({});
     /** Connect home: refine operation panels open below the hub (stacked: where, join, sort, …). */
@@ -506,7 +506,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         setConnectLiveSourceId("");
         setConnectLiveColumnSelections({});
         setConnectHomePendingSheetName("");
-        setConnectHomePullDestination("replace");
+        setConnectHomePullDestination("new_sheet");
         setAthenaPingBySampleId({});
         setConnectActiveComposeOps([]);
         setDataLakeColumnComposeItems([]);
@@ -537,7 +537,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       setConnectLiveSourceId("");
       setConnectLiveColumnSelections({});
       setConnectHomePendingSheetName("");
-      setConnectHomePullDestination("replace");
+      setConnectHomePullDestination("new_sheet");
       setAthenaPingBySampleId({});
       setConnectActiveComposeOps([]);
       setDataLakeColumnComposeItems([]);

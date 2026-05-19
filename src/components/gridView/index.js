@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
@@ -95,6 +95,7 @@ import {
 import { athenaRowsToObjects } from "@/lib/duckdb/duckdbWasmClient";
 import { appendSheetOperation, createSheetOperation } from "@/lib/projectPersistence";
 import { temporalToMs } from "@/lib/temporalParse";
+import { autoSizeAgGridColumnsToContent } from "@/lib/agGridColumnSizing";
 import * as XLSX from 'xlsx';
 
 
@@ -2680,32 +2681,52 @@ const GridView = ({ startNew, fillViewport = false }) => {
       toast.success('Excel file downloaded');
     }, [exportData]);
 
-    //Apply settings across all columns
+    const gridApiRef = useRef(null);
+    const didInitialColumnAutoSizeRef = useRef(false);
+
+    useEffect(() => {
+        didInitialColumnAutoSizeRef.current = false;
+    }, [activeSheetId]);
+
+    // Apply settings across all columns. Do not use flex + fitGridWidth on Connect sheets — they block drag resize.
     const defaultColDef = useMemo(
         () => ({
             filter: true,
             editable: true,
             background: { visible: false },
             resizable: true,
+            suppressAutoSize: false,
             singleClickEdit: true,
             stopEditingWhenCellsLoseFocus: true,
-            ...(fillViewport
-                ? {
-                    minWidth: 72,
-                    maxWidth: 200,
-                    flex: 1,
-                  }
-                : {}),
+            minWidth: fillViewport ? 72 : 80,
         }),
         [fillViewport],
     );
 
     const autoSizeStrategy = useMemo(
-        () => ({
-            type: "fitGridWidth",
-            defaultMinWidth: fillViewport ? 72 : 100,
-        }),
+        () =>
+            fillViewport
+                ? undefined
+                : {
+                      type: "fitGridWidth",
+                      defaultMinWidth: 100,
+                  },
         [fillViewport],
+    );
+
+    const onGridReady = useCallback((event) => {
+        gridApiRef.current = event.api;
+    }, []);
+
+    const onFirstDataRendered = useCallback(
+        (event) => {
+            const api = event.api;
+            if (!api || !fillViewport || didInitialColumnAutoSizeRef.current) return;
+            if (!(displayData?.length > 0)) return;
+            didInitialColumnAutoSizeRef.current = true;
+            autoSizeAgGridColumnsToContent(api);
+        },
+        [displayData, fillViewport],
     );
 
     const gridOptions = useMemo(
@@ -5008,20 +5029,22 @@ const GridView = ({ startNew, fillViewport = false }) => {
                     fillViewport ? connectGridFillViewportClass : gridExpanded ? "h-[750px]" : "h-[550px]",
                 )}
             >
-                <AgGridReact 
-                    defaultColDef={defaultColDef} 
-                    rowData={displayData} 
-                    columnDefs={columnDefsWithMeta} 
+                <AgGridReact
+                    defaultColDef={defaultColDef}
+                    rowData={displayData}
+                    columnDefs={columnDefsWithMeta}
                     pagination={true}
                     paginationPageSize={SHEET_GRID_PAGE_SIZE}
+                    onGridReady={onGridReady}
+                    onFirstDataRendered={onFirstDataRendered}
                     onCellValueChanged={(event) => {
                         const field = event.colDef?.field;
                         const newValue = event.newValue;
                         if (field && event.data) updateCellData(event.data, field, newValue);
                     }}
                     gridOptions={gridOptions}
-                    autoSizeStrategy={autoSizeStrategy}
-                    />
+                    {...(autoSizeStrategy ? { autoSizeStrategy } : {})}
+                />
             </div>
             )}
         </div>

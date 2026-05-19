@@ -106,6 +106,31 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Keep typed values visible in dark mode (inputs, textareas, native selects). */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  textarea,
+  select {
+    color: var(--foreground);
+    caret-color: var(--foreground);
+  }
+
+  .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  .dark textarea,
+  .dark select {
+    color-scheme: dark;
+  }
+
+  .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):-webkit-autofill,
+  .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):-webkit-autofill:hover,
+  .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):-webkit-autofill:focus,
+  .dark textarea:-webkit-autofill,
+  .dark textarea:-webkit-autofill:hover,
+  .dark textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--foreground);
+    -webkit-box-shadow: 0 0 0 1000px var(--background) inset;
+    caret-color: var(--foreground);
+  }
 }
 
 html,

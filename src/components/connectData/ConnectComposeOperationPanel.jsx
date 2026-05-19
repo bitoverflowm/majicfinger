@@ -771,7 +771,13 @@ export function ConnectComposeOperationPanel({ className }) {
         className="flex flex-wrap items-end gap-2"
       >
         <ConnectHomeSheetPullFields sheetNameInputId="connect-home-sheet-name" className="flex-1 min-w-0" />
-        <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={handleRestart}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 shrink-0 border-border bg-card text-xs text-foreground"
+          onClick={handleRestart}
+        >
           Start Over
         </Button>
         <Button

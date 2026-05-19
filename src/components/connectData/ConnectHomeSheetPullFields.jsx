@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   connectHomeAnySheetHasData,
@@ -62,36 +63,24 @@ export function ConnectHomeSheetPullFields({
       {hasExistingData ? (
         <fieldset className="flex min-w-0 flex-col gap-1.5 pb-0.5">
           <legend className="text-[11px] font-medium text-muted-foreground">Add data to</legend>
-          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Add data to">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={destination === "replace"}
-              onClick={() => setDestination("replace")}
-              className={cn(
-                "rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors",
-                destination === "replace"
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border/60 bg-card text-muted-foreground hover:border-border hover:bg-muted/20",
-              )}
-            >
-              Replace {activeSheetName}
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={destination === "new_sheet"}
-              onClick={() => setDestination("new_sheet")}
-              className={cn(
-                "rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors",
-                destination === "new_sheet"
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border/60 bg-card text-muted-foreground hover:border-border hover:bg-muted/20",
-              )}
-            >
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={destination}
+            onValueChange={(value) => {
+              if (value) setDestination(value);
+            }}
+            className="h-8 flex-wrap justify-start"
+            aria-label="Add data to"
+          >
+            <ToggleGroupItem value="new_sheet" className="h-8 px-2.5 text-[11px]">
               New sheet
-            </button>
-          </div>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="replace" className="h-8 max-w-[14rem] truncate px-2.5 text-[11px]">
+              Replace {activeSheetName}
+            </ToggleGroupItem>
+          </ToggleGroup>
         </fieldset>
       ) : null}
     </div>
