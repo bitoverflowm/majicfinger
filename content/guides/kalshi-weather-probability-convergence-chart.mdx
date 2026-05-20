@@ -1,0 +1,255 @@
+---
+title: "How to Build a Probability Convergence Chart Using Kalshi Historical Weather Data (VWPA Guide)"
+description: "Step-by-step guide to building a probability convergence chart for Kalshi weather markets using historical trades, VWPA, and time bucketing in Lychee."
+publishedAt: "2026-05-20"
+author: "misterrpink"
+topics: ["kalshi", "prediction markets", "weather", "time series", "data visualization"]
+integration: ["Kalshi", "Lychee"]
+coverImage: "/images/guides/kalshi-weather-convergence/main.png"
+ogImage: "https://lycheedata.com/images/guides/kalshi-weather-convergence/main.png"
+featured: true
+slug: "/kalshi-weather-probability-convergence-chart"
+readingTime: "6 min"
+keywords: [
+  "kalshi historical data",
+  "kalshi weather markets",
+  "probability convergence chart",
+  "vwpa kalshi",
+  "prediction market analysis",
+  "weather market visualization",
+  "kalshi trade data analysis",
+  "time series prediction markets"
+]
+canonical: "https://lycheedata.com/guides/kalshi-weather-probability-convergence-chart"
+seoTitle: "How to Build a Kalshi Probability Convergence Chart (VWPA + Historical Data)"
+twitterCard: "summary_large_image"
+---
+
+# How to Build a Probability Convergence Chart Using Kalshi Weather Data
+
+Kalshi weather markets often look noisy in real time.
+
+But when you reconstruct them using historical trade data, a pattern emerges:
+
+> Prices don’t move randomly — they converge toward outcomes.
+
+This guide shows you how to build that exact chart.
+
+You will learn how to:
+
+- pull Kalshi historical trade data
+- filter weather markets
+- compute VWPA (volume-weighted price averages)
+- bucket trades into time intervals
+- visualize probability convergence over time
+
+No code required.
+
+No infrastructure.
+
+Just structured market data.
+
+---
+
+## What you are building
+
+You will recreate a chart that shows:
+
+> YES probability over time
+> NO probability over time
+> smoothed using VWPA
+> aggregated in 15-minute intervals
+
+This reveals:
+
+> how market consensus evolves before settlement
+
+---
+
+## Why this matters
+
+Raw trade data is too noisy to interpret directly.
+
+A single market can have thousands of trades per hour.
+
+So instead of raw ticks, we:
+
+- smooth price using VWPA
+- aggregate into time buckets
+- reconstruct probability over time
+
+This turns chaotic trading into:
+
+> a clean probability convergence curve
+
+---
+
+<YouTube videoId="YOUR_VIDEO_ID_HERE" />
+
+Step 1 — Connect to Kalshi Historical Data
+
+Go to Lychee and open:
+
+👉 Kalshi Historical Integration
+
+Then:
+
+Select Markets
+Choose columns:
+category
+ticker
+title
+volume
+Step 2 — Filter Weather Markets
+
+Apply filter:
+
+WHERE → Category
+value → Weather
+
+This isolates weather-related prediction markets.
+
+Step 3 — Sort by Volume (find meaningful markets)
+
+Now:
+
+SORT → volume
+order → Descending
+
+This ensures you are working with liquid markets (important for signal quality).
+
+Step 4 — Limit dataset
+
+Set:
+
+LIMIT → 30
+
+Now you have:
+
+Top 30 most actively traded Kalshi weather markets
+
+Step 5 — Select a market
+
+Pick a market like:
+
+“Will NYC high temperature be X on date Y?”
+
+Copy its ticker.
+
+Step 6 — Pull historical trades
+
+Now switch to:
+
+👉 Kalshi Historical → TRADES
+
+Apply:
+
+WHERE → ticker = your selected market
+
+Then:
+
+create New Sheet
+run query
+
+You now have full trade history.
+
+Step 7 — Bucket trades into time intervals
+
+Open:
+
+👉 FUNCTIONS → Stats → BUCKET
+
+Set:
+
+column → created_time
+interval → 15 minutes
+
+This converts tick data into time series structure.
+
+Step 8 — Aggregate volume
+
+For each bucket:
+
+SUM → count
+
+Rename:
+
+total_volume
+
+This represents traded activity per interval.
+
+Step 9 — Compute VWPA (key step)
+
+Now add aggregation:
+
+Value Weighted Average
+column → yes_price
+weight → count
+
+This produces:
+
+smoothed YES price per time bucket
+
+Repeat for:
+
+no_price
+Step 10 — Build convergence chart
+
+Go to:
+
+👉 Chart Builder
+
+Set:
+
+X-axis → time_bucket
+Y-axis → yes_price
+
+Then:
+
+add second line → no_price
+
+Chart type:
+
+Line Chart
+
+Step 11 — Interpret convergence
+
+What you now see:
+
+early: noisy disagreement
+mid: information incorporation
+late: sharp convergence
+final: settlement-level consensus
+
+This is:
+
+real-time probability discovery in action
+
+Key Insight
+
+Kalshi weather markets are not static probabilities.
+
+They are:
+
+evolving belief systems shaped by continuous trading
+
+VWPA reveals the true signal behind noisy ticks.
+
+What to build next
+
+Once you understand convergence curves, you can extend this into:
+
+volatility clustering analysis
+forecast vs market divergence
+regime detection (trend vs mean reversion)
+cross-city weather comparison
+Related guides
+Kalshi Weather Market Analysis
+Kalshi Historical Data Guide
+Final takeaway
+
+If you strip away noise, liquidity, and individual trades:
+
+prediction markets become structured probability time series systems
+
+And VWPA is how you extract that structure.
