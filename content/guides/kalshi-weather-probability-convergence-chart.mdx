@@ -5,8 +5,8 @@ publishedAt: "2026-05-20"
 author: "misterrpink"
 topics: ["kalshi", "prediction markets", "weather", "time series", "data visualization"]
 integration: ["Kalshi", "Lychee"]
-coverImage: "/images/guides/kalshi-weather-convergence/main.png"
-ogImage: "https://lycheedata.com/images/guides/kalshi-weather-convergence/main.png"
+coverImage: "/images/guides/kalshi-weather-probability-convergence-chart/main.png"
+ogImage: "https://lycheedata.com/images/guides/kalshi-weather-probability-convergence-chart/main.png"
 featured: true
 slug: "/kalshi-weather-probability-convergence-chart"
 readingTime: "6 min"
@@ -84,49 +84,84 @@ This turns chaotic trading into:
 
 ---
 
-<YouTube videoId="YOUR_VIDEO_ID_HERE" />
+<YouTube videoId="6puApqBkg3A" />
 
-Step 1 — Connect to Kalshi Historical Data
+---
+
+## Step 1 — Connect to Kalshi Historical Data
 
 Go to Lychee and open:
 
-👉 Kalshi Historical Integration
+- Kalshi Historical Integration
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/1.png)
 
 Then:
 
-Select Markets
-Choose columns:
-category
-ticker
-title
-volume
-Step 2 — Filter Weather Markets
+- Select Markets
 
-Apply filter:
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/2.png)
+
+- Choose columns:
+-- category: Kalshi meta categories. 
+--- (Sports, Crypto, Weather, Finance, Politics, Science/Tech, Entertainment, Media, World Events, Esports, Other)
+
+-- ticker: 
+--- Kalshi's unique identifier for each market. This is required to pull trade data for this specific market
+
+-- title: 
+--- Such as “Will NYC high temperature be X on date Y?”
+--- This is a human redable title that is useful for identifying markets of interest
+
+-- volume:
+--- The total number of contracts traded during the lifespan of the given Market
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/3.png)
+
+## Step 2 — Filter Weather Markets
+
+Head to Refine Query section.
+
+Select "Where" to apply filter:
 
 WHERE → Category
-value → Weather
+value → Weather (you would change the value selection to Sports, Crypto, etc depending on the category you are interested in)
 
 This isolates weather-related prediction markets.
 
-Step 3 — Sort by Volume (find meaningful markets)
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/4.png)
+
+## Step 3 — Sort by Volume (find meaningful markets)
 
 Now:
 
 SORT → volume
 order → Descending
 
+This arranges your Weather markets from highest volume to lowest volume.
+
 This ensures you are working with liquid markets (important for signal quality).
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/5.png)
 
 Step 4 — Limit dataset
 
-Set:
+Select "Limit" from Refine query section
+
+Set the limit value to 30:
 
 LIMIT → 30
 
 Now you have:
 
 Top 30 most actively traded Kalshi weather markets
+
+Setting a limit to your dataset is good practice to limit query size, memory usage and load times.
+
+Name your Sheet and hit "Run Pull" to execute your query.
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/6.png)
+
 
 Step 5 — Select a market
 

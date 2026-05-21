@@ -1,6 +1,6 @@
 import type { MDXComponents } from "mdx/types";
 import Image from "next/image";
-import { VideoEmbed } from "@/components/ui";
+import { VideoEmbed, YouTube } from "@/components/ui";
 import { ContentImage } from "./content-image";
 import { PublicChart } from "./PublicChart";
 
@@ -8,7 +8,8 @@ import { PublicChart } from "./PublicChart";
  * MDX components for blog/guide content.
  * - img: Standard markdown images get styled and optimized via Next.js Image
  * - ContentImage: For images with captions and explicit control
- * - VideoEmbed: For embedded videos (YouTube, Vimeo, etc.)
+ * - VideoEmbed: iframe embed with full embed URL (any provider)
+ * - YouTube: `<YouTube videoId="..." />` — id or watch/youtu.be URL
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -42,6 +43,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     },
     ContentImage,
     VideoEmbed,
+    YouTube,
     PublicChart,
     ...components,
   };

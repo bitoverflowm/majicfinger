@@ -2,6 +2,8 @@ export { Container } from "./container";
 export { ContentWrapper } from "./content-wrapper";
 export { Section } from "./section";
 export { VideoEmbed } from "./video-embed";
+export { YouTube, parseYouTubeVideoId } from "./youtube-embed";
+export type { YouTubeProps } from "./youtube-embed";
 export { TemplateActions } from "./template-actions";
 export { Button } from "./button";
 export { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from "./card";
