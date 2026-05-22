@@ -9,7 +9,7 @@ import {
 } from "@/components/sections/featured-resources-carousel";
 
 function resolveFeaturedCards(): FeaturedResourceCard[] {
-  return LANDING_FEATURED_RESOURCE_LINKS.map((entry) => {
+  return LANDING_FEATURED_RESOURCE_LINKS.map((entry): FeaturedResourceCard | null => {
     if (entry.kind === "dashboard") {
       return {
         href: entry.href,
@@ -32,7 +32,7 @@ function resolveFeaturedCards(): FeaturedResourceCard[] {
         (fm?.image as string | undefined) ||
         null,
     };
-  }).filter((card) => card.title && card.href);
+  }).filter((card): card is FeaturedResourceCard => Boolean(card?.title && card?.href));
 }
 
 export function FeaturedResourcesSection() {
