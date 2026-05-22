@@ -8,6 +8,17 @@ import { useMemo, useState } from "react";
 
 type BillingCycle = "weekly" | "monthly" | "annual";
 
+/** Show annual plan as monthly equivalent; "billed annually" carries billing context. */
+function annualPriceAsMonthlyDisplay(annualPrice: string): string {
+  const match = annualPrice.replace(/,/g, "").match(/\$?\s*([\d.]+)/);
+  if (!match) return annualPrice;
+  const monthly = parseFloat(match[1]) / 12;
+  if (!Number.isFinite(monthly)) return annualPrice;
+  const hasCents = Math.round(monthly * 100) % 100 !== 0;
+  const formatted = hasCents ? monthly.toFixed(2) : String(Math.round(monthly));
+  return `$${formatted}`;
+}
+
 interface TabsProps {
   activeTab: BillingCycle;
   setActiveTab: (tab: BillingCycle) => void;
@@ -83,7 +94,7 @@ type LifetimeAccess = {
 };
 
 export function PricingSection() {
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("weekly");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("annual");
   const { title, description, pricingItems } = siteConfig.pricingSection;
   const lifetimeAccess = (siteConfig.pricingSection as { lifetimeAccess?: LifetimeAccess }).lifetimeAccess;
 
@@ -117,8 +128,8 @@ export function PricingSection() {
                 href: tier.hrefMonthly,
               }
             : {
-                price: tier.priceAnnual ?? "",
-                suffix: "year",
+                price: annualPriceAsMonthlyDisplay(tier.priceAnnual ?? ""),
+                suffix: "month",
                 note: tier.yearlyNote ?? "billed annually",
                 href: tier.hrefAnnual,
               };

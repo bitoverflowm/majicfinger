@@ -52,9 +52,6 @@ export function FeaturedResourcesSection() {
         >
           <div className="space-y-8 px-5 py-8 sm:px-8 sm:py-10 md:px-10 md:py-12">
             <div className="space-y-3 text-center">
-              <p className="text-sm font-mono font-medium uppercase tracking-wider text-primary">
-                Before the demo
-              </p>
               <h2 className="mx-auto max-w-2xl text-balance text-2xl font-semibold tracking-tight text-foreground sm:text-3xl md:text-4xl">
                 Featured workflows, showcase and How-tos
               </h2>

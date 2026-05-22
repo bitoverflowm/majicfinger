@@ -34,7 +34,10 @@ type FeaturedResourcesCarouselProps = {
 function KindBadge({ kind }: { kind: FeaturedResourceCard["kind"] }) {
   const isDashboard = kind === "dashboard";
   return (
-    <Badge variant="secondary" className={`gap-1 border ${KIND_TAG_STYLES[kind]}`}>
+    <Badge
+      variant="secondary"
+      className={`w-fit self-start gap-1 border ${KIND_TAG_STYLES[kind]}`}
+    >
       {isDashboard ? (
         <LayoutDashboard className="h-3 w-3 shrink-0" aria-hidden />
       ) : (

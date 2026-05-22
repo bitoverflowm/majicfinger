@@ -1126,7 +1126,10 @@ export default function DataSheetWithIntegration({
           id="connect-home-compose"
           className={cn(
             connectHomeComposeOnly
-              ? cn(connectHomeComposeScrollerClass, "pb-6 sm:pb-8")
+              ? cn(
+                  connectHomeComposeScrollerClass,
+                  isDemo ? "pb-12 sm:pb-14" : "pb-6 sm:pb-8",
+                )
               : cn("w-full min-w-0 shrink-0", isDemo ? "pb-16" : "pb-96"),
           )}
         >
