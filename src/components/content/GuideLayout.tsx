@@ -98,7 +98,8 @@ export function GuideLayout({
               hover:prose-a:underline
               prose-blockquote:border-l-primary
               prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-xl prose-pre:px-4 prose-pre:py-3
-              prose-code:px-1 prose-code:py-0.5 prose-code:rounded"
+              prose-pre:code:bg-transparent prose-pre:code:p-0 prose-pre:code:font-normal
+              prose-code:before:content-none prose-code:after:content-none"
           >
             {children}
           </div>

@@ -59,3 +59,20 @@ export function Muted({ children, className }: TypographyProps) {
     </span>
   );
 }
+
+/** Shadcn-style inline code for MDX backticks and explicit `<TypographyInlineCode>`. */
+export function TypographyInlineCode({
+  children,
+  className,
+}: TypographyProps) {
+  return (
+    <code
+      className={cn(
+        "relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold text-foreground",
+        className
+      )}
+    >
+      {children}
+    </code>
+  );
+}

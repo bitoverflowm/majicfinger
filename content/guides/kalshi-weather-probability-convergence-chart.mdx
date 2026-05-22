@@ -103,18 +103,10 @@ Then:
 ![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/2.png)
 
 - Choose columns:
--- category: Kalshi meta categories. 
---- (Sports, Crypto, Weather, Finance, Politics, Science/Tech, Entertainment, Media, World Events, Esports, Other)
-
--- ticker: 
---- Kalshi's unique identifier for each market. This is required to pull trade data for this specific market
-
--- title: 
---- Such as “Will NYC high temperature be X on date Y?”
---- This is a human redable title that is useful for identifying markets of interest
-
--- volume:
---- The total number of contracts traded during the lifespan of the given Market
+  - `category`: Kalshi meta categories (Sports, Crypto, Weather, Finance, Politics, Science/Tech, Entertainment, Media, World Events, Esports, Other)
+  - `ticker`: Kalshi's unique identifier for each market. Required to pull trade data for that market.
+  - `title`: Human-readable market name (e.g. “Will NYC high temperature be X on date Y?”). Useful for finding markets of interest.
+  - `volume`: Total contracts traded over the market's lifespan.
 
 ![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/3.png)
 
@@ -124,8 +116,8 @@ Head to Refine Query section.
 
 Select "Where" to apply filter:
 
-WHERE → Category
-value → Weather (you would change the value selection to Sports, Crypto, etc depending on the category you are interested in)
+`WHERE` → Category
+`value` → Weather (you would change the value selection to Sports, Crypto, etc depending on the category you are interested in)
 
 This isolates weather-related prediction markets.
 
@@ -135,8 +127,8 @@ This isolates weather-related prediction markets.
 
 Now:
 
-SORT → volume
-order → Descending
+`SORT` → volume
+`order` → Descending
 
 This arranges your Weather markets from highest volume to lowest volume.
 
@@ -144,17 +136,17 @@ This ensures you are working with liquid markets (important for signal quality).
 
 ![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/5.png)
 
-Step 4 — Limit dataset
+## Step 4 — Limit dataset
 
 Select "Limit" from Refine query section
 
 Set the limit value to 30:
 
-LIMIT → 30
+`LIMIT` → 30
 
 Now you have:
 
-Top 30 most actively traded Kalshi weather markets
+> Top 30 most actively traded Kalshi weather markets
 
 Setting a limit to your dataset is good practice to limit query size, memory usage and load times.
 
@@ -162,129 +154,199 @@ Name your Sheet and hit "Run Pull" to execute your query.
 
 ![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/6.png)
 
+## Step 5 — Select a market
 
-Step 5 — Select a market
+Your data is now loaded into Data Sheet. 
+Browse the different markets that match your query criteria.
 
 Pick a market like:
 
 “Will NYC high temperature be X on date Y?”
 
-Copy its ticker.
+Copy its ticker by double clicking on the cell in the `Ticker` column and `ctrl + c`
 
-Step 6 — Pull historical trades
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/7.png)
 
-Now switch to:
+## Step 6 — Pull historical trades
 
-👉 Kalshi Historical → TRADES
+Now that we know which market we want to analyze. 
+Lets pull all trades placed for this market. 
+In this guides case:
 
-Apply:
+- Title: "Will the *high temp in NYC* be 48-49° on Nov 13, 2024?
+- Ticker: KXHIGHNY-24NOV13-B48.5
 
-WHERE → ticker = your selected market
+Now switch to Trades in Kalshi Historical Data:
+
+- Select `Integrations` tab in data sheets. This will open the side panel. 
+    - This side panel allows you to make a new data pull request within your current Project workspace
+- Select `Kalshi Historical` to start another request to Kalshi Historical Data
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/8.png)
+
+
+In Kalshi Historical:
+- Select `TRADES`
+- Select `Select All`: to select all columns in the `TRADES` data base:
+    - `trade_id`: each trade has a unique trade_id to identify the trade
+    - `ticker`: this is the market ticker, in our case `KXHIGHNY-24NOV13-B48.5`
+    - `count`: the number of contracts that exchanged hands in each trade
+    - `yes_price`: the yes_price set for this trade in cents (0-99)
+    - `no_price`: the no_price set for this trade in cents (0-99)
+        - note `yes_price` + `no_price` = 100 for a given trade i.e. $1
+    - `taker_side`: which side of the trade (`yes` or `no`) was playing the role of the taker
+    - `created-time`: the time that the trade was executed
+    - `_fetched_at`: this is a meta meetric when the data was pulled by Lychee. You can mostly ignore it.
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/9.png)
+
+Apply query filter:
+
+`WHERE → ticker = your selected market`
+
+In this guide's case:
+- `WHERE` `ticker` = `KXHIGHNY-24NOV13-B48.5`
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/10.png)
 
 Then:
 
-create New Sheet
-run query
+- create New Sheet, Name your sheet
+- run query
 
-You now have full trade history.
+You now have full trade history for your market.
 
-Step 7 — Bucket trades into time intervals
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/11.png)
 
-Open:
+## Step 7 — Bucket trades into time intervals
 
-👉 FUNCTIONS → Stats → BUCKET
+> Time bucketing is a practical data aggregation method that takes high-frequency, tick-by-tick trading data and organizes it into fixed time intervals — like 1-minute, 5-minute, or 1-hour blocks. 
+>
+> Rather than analyzing every single second, it lets traders step back to see the bigger picture, smooth out random short-term noise, and more effectively run technical analysis or quantitative trading strategies.
 
-Set:
 
-column → created_time
-interval → 15 minutes
+- Open: `FUNCTIONS (Σ)` 
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/12.png)
+
+- Select `Stats` → `BUCKET`
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/13.png)
+
+
+- In the Bucket view, set:
+    - `New Sheet` to bucket trades into a new sheet (i.e. not overwrite the original trades and market pulls)
+    - `Column to Bucket` → created_time
+    - Name the new bucket column anything you want, we are going with "date"
+    - `Bucket Style` → `Time Intervals`
+    - `Time Bucket` → `15 mins` 
+        - This aggregates our trades into 15 minute windows
 
 This converts tick data into time series structure.
 
-Step 8 — Aggregate volume
+- You may also name your new sheet for clarity
 
-For each bucket:
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/14.png)
 
-SUM → count
+## Step 8 — Aggregate volume
 
-Rename:
+Now since we are bucketing multiple rows in 15 minute windows into a single row, we need to aggreagate the columns we are interested in analyzing:
 
-total_volume
-
-This represents traded activity per interval.
+- Select Aggreatagions and set the following:
+    - Aggreagation 1: get the total volume traded during each 15 minute time interval
+        - `Type`: `Sum`
+        - `Value Column`: `count`
+        - `Generated Column`: `volume` (you can name this anything you want) 
 
 Step 9 — Compute VWPA (key step)
 
-Now add aggregation:
+Here for added accuracy we will use a quantitative financial technique called `Volume Weighted Average Price". 
 
-Value Weighted Average
-column → yes_price
-weight → count
+> Unlike a regular simple average (which treats every price equally regardless of how many shares were traded), VWAP is superior because it weights each price by the actual trading volume at that price. This gives much more importance to prices where heavy volume occurred, making it a far more accurate reflection of the true average price buyers and sellers paid during that time bucket.
+>
+> Traders rely on VWAP as a key benchmark because it shows where the real money was exchanged, rather than being skewed by low-volume outlier prices.
 
-This produces:
+    - Aggregation 2: Calculate Volume Weighted Average Yes_Price for each 15 minute window
+        - `Type`: `Value weighted avg`
+        - `Value Column`: `yes_price`
+        - `Weight Column`: `count`
+        - `Generated Column`: `vwpa_yes_price` (you can name this anything you want) 
+    - Aggregation 3: Calculate Volume Weighted Average No_Price for each 15 minute window
+        - `Type`: `Value weighted avg`
+        - `Value Column`: `no_price`
+        - `Weight Column`: `count`
+        - `Generated Column`: `vwpa_no_price` (you can name this anything you want) 
 
-smoothed YES price per time bucket
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/15.png)
 
-Repeat for:
+This represents traded activity per interval.
 
-no_price
-Step 10 — Build convergence chart
+- Click `Create bucket sheet`
 
-Go to:
 
-👉 Chart Builder
+
+## Step 11 — Interpret convergence (Building Chart)
+
+- Select `charts` from the tabs above `Data Sheet` or above the right Side Panel
+
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/16.png)
 
 Set:
-
-X-axis → time_bucket
-Y-axis → yes_price
+- `Chart` → `Line Chart`
+- `X-axis` → `time_bucket` (whatever you named this column. Dropdown is organized by `sheet name + column name`)
+- `Y-axis` → `yes_price`
 
 Then:
 
-add second line → no_price
+- add second line → `no_price`
 
-Chart type:
+![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/17.png)
 
-Line Chart
+- Use the design panel to design the chart as you desire
 
-Step 11 — Interpret convergence
+### What you now see:
 
-What you now see:
-
-early: noisy disagreement
-mid: information incorporation
-late: sharp convergence
-final: settlement-level consensus
+- early: noisy disagreement
+- mid: information incorporation
+- late: sharp convergence
+- final: settlement-level consensus
 
 This is:
 
-real-time probability discovery in action
+> real-time probability discovery in action
 
-Key Insight
+<PublicChart username="misterrpink" slug="high-temp-nov-nyc-probability-convergence" />
+
+
+## Key Insight
 
 Kalshi weather markets are not static probabilities.
 
 They are:
 
-evolving belief systems shaped by continuous trading
+> evolving belief systems shaped by continuous trading
 
 VWPA reveals the true signal behind noisy ticks.
 
-What to build next
+## What to build next
 
 Once you understand convergence curves, you can extend this into:
 
-volatility clustering analysis
-forecast vs market divergence
-regime detection (trend vs mean reversion)
-cross-city weather comparison
-Related guides
-Kalshi Weather Market Analysis
-Kalshi Historical Data Guide
-Final takeaway
+- volatility clustering analysis
+- forecast vs market divergence
+- regime detection (trend vs mean reversion)
+- cross-city weather comparison
+
+
+## Related guides
+- [Kalshi Weather Market Analysis](https://lycheedata.com/guides/kalshi-weather-prediction-markets-analysis)
+- [Kalshi Historical Data Guide](https://lycheedata.com/guides/kalshi-historical-data)
+
+
+## Final takeaway
 
 If you strip away noise, liquidity, and individual trades:
 
-prediction markets become structured probability time series systems
+> prediction markets become structured probability time series systems
 
 And VWPA is how you extract that structure.

@@ -10,5 +10,12 @@ export { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription }
 export { KnowledgeCard } from "./knowledge-card";
 export { Breadcrumb } from "./breadcrumb";
 export { CTASection } from "./cta-section";
-export { H1, H2, H3, P, Muted } from "./typography";
+export {
+  H1,
+  H2,
+  H3,
+  P,
+  Muted,
+  TypographyInlineCode,
+} from "./typography";
 export { Reasoning, ReasoningContent, ReasoningResponse, ReasoningTrigger } from "./reasoning";

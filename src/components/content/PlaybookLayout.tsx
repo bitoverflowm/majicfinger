@@ -77,7 +77,7 @@ export function PlaybookLayout({
         )}
 
         <Section>
-          <div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-24 prose-headings:font-semibold prose-headings:tracking-tight prose-a:no-underline prose-p:tracking-tight">
+          <div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-24 prose-headings:font-semibold prose-headings:tracking-tight prose-a:no-underline prose-p:tracking-tight prose-code:before:content-none prose-code:after:content-none">
             {children}
           </div>
         </Section>
