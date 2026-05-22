@@ -18,7 +18,11 @@ keywords: [
   "prediction market analysis",
   "weather market visualization",
   "kalshi trade data analysis",
-  "time series prediction markets"
+  "time series prediction markets",
+  "vwap analysis",
+  "volume weighted average price",
+  "prediction market vwap",
+  "kalshi vwap"
 ]
 canonical: "https://lycheedata.com/guides/kalshi-weather-probability-convergence-chart"
 seoTitle: "How to Build a Kalshi Probability Convergence Chart (VWPA + Historical Data)"
@@ -36,12 +40,17 @@ But when you reconstruct them using historical trade data, a pattern emerges:
 This guide shows you how to build that exact chart.
 
 You will learn how to:
-
+- connect to the largest Kalshi historical datasets avaiable anywhere
+- pull Kalshi historical market data
 - pull Kalshi historical trade data
 - filter weather markets
-- compute VWPA (volume-weighted price averages)
+- rank markets by volume
+- reconstruct historical trade activity
+- aggregate trades into 15-minute time buckets
+- compute VWPA - style probability curves using volume weighted average prices.
 - bucket trades into time intervals
 - visualize probability convergence over time
+- build an interactive probability convergence chart
 
 No code required.
 
@@ -63,6 +72,8 @@ You will recreate a chart that shows:
 This reveals:
 
 > how market consensus evolves before settlement
+
+<PublicChart username="misterrpink" slug="high-temp-nov-nyc-probability-convergence" />
 
 ---
 
@@ -258,7 +269,7 @@ Now since we are bucketing multiple rows in 15 minute windows into a single row,
         - `Value Column`: `count`
         - `Generated Column`: `volume` (you can name this anything you want) 
 
-Step 9 — Compute VWPA (key step)
+## Step 9 — Compute VWPA (key step)
 
 Here for added accuracy we will use a quantitative financial technique called `Volume Weighted Average Price". 
 
@@ -284,8 +295,7 @@ This represents traded activity per interval.
 - Click `Create bucket sheet`
 
 
-
-## Step 11 — Interpret convergence (Building Chart)
+## Step 10 — Interpret convergence (Building Chart)
 
 - Select `charts` from the tabs above `Data Sheet` or above the right Side Panel
 
@@ -330,12 +340,23 @@ VWPA reveals the true signal behind noisy ticks.
 
 ## What to build next
 
+You now know how to:
+
+- pull historical Kalshi markets
+- reconstruct trade history
+- aggregate market probabilities
+- calculate VWAP-style pricing
+- visualize convergence over time
+
 Once you understand convergence curves, you can extend this into:
 
 - volatility clustering analysis
 - forecast vs market divergence
 - regime detection (trend vs mean reversion)
 - cross-city weather comparison
+- liquidity analysis
+- probability forecasting systems
+- prediction market research
 
 
 ## Related guides
