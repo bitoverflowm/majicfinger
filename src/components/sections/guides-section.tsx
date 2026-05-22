@@ -118,7 +118,7 @@ export default function GuidesSection({ articles = [] }: GuidesSectionProps) {
       <div className="text-center space-y-4 pb-6 mx-auto">
         <p className="text-sm text-primary font-mono font-medium tracking-wider uppercase">Guides</p>
         <h2 className="mx-auto mt-4 max-w-xs text-3xl font-semibold sm:max-w-none sm:text-4xl md:text-5xl">
-          Latest Articles
+          How it works, how-tos, and guides
         </h2>
       </div>
       <div className="mb-8 max-w-md mx-auto">

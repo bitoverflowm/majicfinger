@@ -8,6 +8,7 @@ import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { Progress } from "@/components/ui/progress";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
+import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -63,7 +64,9 @@ export default function PublicChartEmbedClient({
   const [err, setErr] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState(8);
   const [loadStage, setLoadStage] = useState("Preparing data");
-  const [isEmbedded, setIsEmbedded] = useState(false);
+  const [isEmbedded, setIsEmbedded] = useState(
+    () => typeof window !== "undefined" && window.self !== window.top,
+  );
   const rows = payload?.data?.rows ?? [];
   const dataSheets = payload?.data?.dataSheets ?? {};
   const rb =
@@ -119,7 +122,11 @@ export default function PublicChartEmbedClient({
     return (
       <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
         <p>{err}</p>
-        <Link href={SITE} className="text-foreground underline">
+        <Link
+          href={SITE}
+          className="text-foreground underline"
+          {...publicEmbedOutboundLinkProps(isEmbedded)}
+        >
           Lychee Data
         </Link>
       </div>
@@ -187,20 +194,23 @@ export default function PublicChartEmbedClient({
             />
             <span className="min-w-0 text-center">
               <span>{`Made by @${ownerHandle} with `}</span>
-              <Link href={SITE} className="font-medium text-foreground underline">
+              <Link
+                href={SITE}
+                className="font-medium text-foreground underline"
+                {...publicEmbedOutboundLinkProps(isEmbedded)}
+              >
                 Lychee
               </Link>
-              {!isEmbedded ? (
-                <>
-                  <span> · </span>
-                  <Link
-                    href={`${SITE}/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`}
-                    className="underline"
-                  >
-                    Open chart
-                  </Link>
-                </>
-              ) : null}
+              <>
+                <span> · </span>
+                <Link
+                  href={`${SITE}/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`}
+                  className="underline"
+                  {...publicEmbedOutboundLinkProps(isEmbedded)}
+                >
+                  {isEmbedded ? "Open chart in new tab" : "Open chart"}
+                </Link>
+              </>
             </span>
           </div>
           {chart.chart_name ? <span className="block pt-1 opacity-80">{chart.chart_name}</span> : null}

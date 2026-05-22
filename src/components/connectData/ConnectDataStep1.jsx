@@ -50,6 +50,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
+import { useDemoProGate } from "@/hooks/useDemoProGate";
 
 /** Wireframe order + News API (platform integration roadmap). */
 const CONNECT_INTEGRATION_ORDER = [
@@ -246,19 +247,48 @@ function PillButton({
   );
 }
 
-function PillButtonSoon({ icon, label, className, iconClassName, iconSlotClassName, labelClassName, tooltip = "Coming soon", compact = false }) {
+function DemoTierBadges() {
+  return (
+    <span className="ml-auto flex shrink-0 flex-col items-end gap-0.5 leading-none">
+      <span className="rounded border border-primary/35 bg-primary/10 px-1 py-px text-[7px] font-semibold uppercase tracking-wider text-primary">
+        Pro
+      </span>
+      <span className="rounded border border-border/60 bg-muted/70 px-1 py-px text-[7px] font-medium uppercase tracking-wide text-muted-foreground">
+        Lifetime
+      </span>
+      <span className="rounded border border-border/50 px-1 py-px text-[7px] font-medium uppercase tracking-wide text-muted-foreground/90">
+        Coming soon
+      </span>
+    </span>
+  );
+}
+
+function PillButtonSoon({
+  icon,
+  label,
+  className,
+  iconClassName,
+  iconSlotClassName,
+  labelClassName,
+  tooltip = "Pro & Lifetime — coming soon",
+  compact = false,
+  showDemoTierBadges = false,
+}) {
   const surface = compact
-    ? cn(demoPillClass, className, "cursor-not-allowed opacity-45")
-    : cn(pillClass, className, "cursor-not-allowed opacity-45");
+    ? cn(demoPillClass, className, "cursor-not-allowed opacity-45", showDemoTierBadges && "justify-between gap-1 pr-1")
+    : cn(pillClass, className, "cursor-not-allowed opacity-45", showDemoTierBadges && "justify-between gap-2 pr-1.5");
   const iconBox = compact
     ? cn(demoIconSlotClass, iconClassName)
     : cn(iconSlotClassName || iconSlotClass, iconClassName);
-  const labelCls = compact ? demoPillLabelClass : cn(pillLabelClass, labelClassName);
+  const labelCls = compact
+    ? cn(demoPillLabelClass, showDemoTierBadges && "min-w-0 flex-1")
+    : cn(pillLabelClass, labelClassName, showDemoTierBadges && "min-w-0 flex-1");
   return (
     <ConnectPillTooltip content={tooltip}>
       <button type="button" disabled className={surface} aria-disabled>
         <span className={iconBox}>{icon}</span>
         <span className={labelCls}>{label}</span>
+        {showDemoTierBadges ? <DemoTierBadges /> : null}
       </button>
     </ConnectPillTooltip>
   );
@@ -410,6 +440,7 @@ export default function ConnectDataStep1({
   const [onboardingUploadFn, setOnboardingUploadFn] = useState(null);
   const [isCheckingHandle, setIsCheckingHandle] = useState(false);
   const loadProjectBusy = !!connectProjectLoadState.loading;
+  const { dialog: demoProDialog } = useDemoProGate();
 
   const openConnectIntegration = useCallback(
     (integrationId) => {
@@ -817,6 +848,7 @@ export default function ConnectDataStep1({
               <PillButtonSoon
                 icon={<FileImage className={hubGlyphClass} strokeWidth={iconStroke} />}
                 label="PDF & image"
+                showDemoTierBadges={embeddedDemo}
                 className={embeddedDemo ? undefined : connectHubPillScaleExtra}
                 iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
                 labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
@@ -824,6 +856,7 @@ export default function ConnectDataStep1({
               <PillButtonSoon
                 icon={<Braces className={hubGlyphClass} strokeWidth={iconStroke} />}
                 label="JSON"
+                showDemoTierBadges={embeddedDemo}
                 className={embeddedDemo ? undefined : connectHubPillScaleExtra}
                 iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
                 labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
@@ -883,6 +916,7 @@ export default function ConnectDataStep1({
                         </IntegrationIconWrap>
                       }
                       label={row.name}
+                      showDemoTierBadges={embeddedDemo}
                       iconClassName={connectIntegrationIconClass(row.key)}
                       iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
                       labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
@@ -968,6 +1002,7 @@ export default function ConnectDataStep1({
         </div>
       </div>
     </div>
+      {demoProDialog}
     </TooltipProvider>
   );
 }

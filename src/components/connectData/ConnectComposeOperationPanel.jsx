@@ -42,12 +42,24 @@ import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectCom
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
 import { ConnectHomeSheetPullFields } from "@/components/connectData/ConnectHomeSheetPullFields";
 import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
+import {
+  isDemoGatedHistoricalIntegration,
+  useDemoProGate,
+} from "@/hooks/useDemoProGate";
+import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 
 /**
  * Inline compose controls (mirrors integrations panel) for Connect home vertical flow.
  */
+function integrationDisplayName(integrationId) {
+  const row = integrations_list.find((i) => i.clickHandler === integrationId);
+  return row?.name || integrationId || "Historical data";
+}
+
 export function ConnectComposeOperationPanel({ className }) {
   const ctx = useMyStateV2() ?? {};
+  const isDemo = !!ctx.isDemo;
+  const { requestHistoricalProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const {
     connectActiveComposeOps = [],
     setConnectActiveComposeOps,
@@ -275,6 +287,9 @@ export function ConnectComposeOperationPanel({ className }) {
     requestConnectDataLakePull,
     setConnectActiveComposeOps,
     setComposeJoins,
+    isDemo,
+    connectWorkspace,
+    requestHistoricalProUpgrade,
   ]);
 
   const updateComposeItem = useCallback(
@@ -790,6 +805,7 @@ export function ConnectComposeOperationPanel({ className }) {
           <Play className="!size-2 shrink-0 fill-current" aria-hidden />
         </Button>
       </motion.div>
+      {demoProDialog}
     </motion.div>
   );
 }

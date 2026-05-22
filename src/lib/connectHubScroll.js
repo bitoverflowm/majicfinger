@@ -13,6 +13,9 @@ export const CONNECT_HOME_WORKSPACE_ID = "connect-home-workspace";
 
 export const CONNECT_HOME_SCROLL_ID = "connect-home-scroll";
 
+/** Connect hub — Import / Integrations pills (`ConnectDataStep1`). */
+export const CONNECT_HOME_HUB_ID = "connect-home-hub";
+
 export function resolveConnectIntegrationScrollTarget() {
   if (typeof document === "undefined") return null;
   return (
@@ -152,6 +155,21 @@ export function scheduleConnectProjectSheetScroll(workspaceElRef, scrollRootElRe
 export function scrollConnectWorkspaceIntoView(workspaceEl, scrollRootEl) {
   if (!workspaceEl) return false;
   return scrollConnectHomeTargetIntoView(scrollRootEl, workspaceEl, { behavior: "smooth" });
+}
+
+/** Return to integration selection on the Connect hub (not router navigation). */
+export function scheduleConnectHomeHubScroll(hubElRef, scrollRootElRef) {
+  const tryScroll = () => {
+    const scrollRoot =
+      scrollRootElRef?.current ??
+      document.getElementById(CONNECT_HOME_SCROLL_ID);
+    const target =
+      hubElRef?.current ??
+      document.getElementById(CONNECT_HOME_HUB_ID);
+    if (!target) return false;
+    return scrollConnectHomeTargetIntoView(scrollRoot, target, { behavior: "smooth" });
+  };
+  runWithRetries(tryScroll);
 }
 
 export function scheduleConnectWorkspaceScroll(workspaceElRef, scrollRootElRef) {

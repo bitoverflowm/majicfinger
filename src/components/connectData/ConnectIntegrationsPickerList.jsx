@@ -79,6 +79,8 @@ export function ConnectIntegrationsPickerList({
   onAfterSelect,
 }) {
   const ctx = useMyStateV2() ?? {};
+  const isDemo = !!ctx.isDemo;
+  const { requestHistoricalProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const integrationSidebar = ctx.integrationSidebar;
   const setIntegrationSidebar = ctx.setIntegrationSidebar;
   const setRightPanelTab = ctx.setRightPanelTab;
@@ -96,7 +98,6 @@ export function ConnectIntegrationsPickerList({
     (row) => {
       if (!row.available || !row.id) return;
       if (!API_INTEGRATIONS.includes(row.id)) return;
-
       setIntegrationSidebar?.(row.id);
       if (connectHomeMode) {
         setRightPanelTab?.("integrations");

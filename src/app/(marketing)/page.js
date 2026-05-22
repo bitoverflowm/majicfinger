@@ -95,9 +95,9 @@ export default function Home() {
           <QuoteSection />
           <FeatureSection />
           <GrowthSection />
+          <TestimonialSection />
           <PricingSection />
           <FAQSection />
-          <TestimonialSection />
           <DashboardsSection username="misterrpink" />
           <GuidesSection articles={articles} />
           <CTASection />

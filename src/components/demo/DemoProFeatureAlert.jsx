@@ -19,15 +19,20 @@ export function DemoProFeatureAlert({
   open,
   onOpenChange,
   featureLabel = "this feature",
+  title,
+  description,
 }) {
+  const dialogTitle = title ?? `${featureLabel} is a Pro feature`;
+  const dialogDescription =
+    description ??
+    `Only Pro users have access to ${featureLabel}. Would you like to view pricing?`;
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{featureLabel} is a Pro feature</AlertDialogTitle>
-          <AlertDialogDescription>
-            Only Pro users have access to {featureLabel}. Would you like to view pricing?
-          </AlertDialogDescription>
+          <AlertDialogTitle>{dialogTitle}</AlertDialogTitle>
+          <AlertDialogDescription>{dialogDescription}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Not now</AlertDialogCancel>

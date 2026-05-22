@@ -32,6 +32,7 @@ import {
   scheduleConnectHomeUploadActivate,
   scheduleConnectProjectSheetScroll,
   scheduleConnectWorkspaceScroll,
+  CONNECT_HOME_HUB_ID,
 } from "@/lib/connectHubScroll";
 import { useConnectHomeScrollPanels } from "@/hooks/useConnectHomeScrollPanels";
 import { cn } from "@/lib/utils";
@@ -467,7 +468,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
               />
             ) : null}
             <div className="flex min-w-0 flex-col">
-              <div ref={hubRef} className={connectHubHubSnapClass}>
+              <div ref={hubRef} id={CONNECT_HOME_HUB_ID} className={connectHubHubSnapClass}>
                 <ConnectDataStep1
                   user={user}
                   userProfileFetchOk={userProfileFetchOk}

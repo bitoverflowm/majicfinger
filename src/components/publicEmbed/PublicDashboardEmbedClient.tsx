@@ -27,6 +27,7 @@ import {
   getFreeTextRowPublicClassName,
   getFreeTextRowPublicStyle,
 } from "@/lib/dashboardFreeTextTheme";
+import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -110,6 +111,14 @@ export default function PublicDashboardEmbedClient({
 }) {
   const [payload, setPayload] = useState<Payload | null>(() => initialPayload);
   const [err, setErr] = useState<string | null>(() => (initialPayload && !initialPayload.success ? initialPayload.message || "Not found" : null));
+  const [isEmbedded, setIsEmbedded] = useState(
+    () => typeof window !== "undefined" && window.self !== window.top,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsEmbedded(window.self !== window.top);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,7 +147,11 @@ export default function PublicDashboardEmbedClient({
     return (
       <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
         <p>{err}</p>
-        <Link href={SITE} className="text-foreground underline">
+        <Link
+          href={SITE}
+          className="text-foreground underline"
+          {...publicEmbedOutboundLinkProps(isEmbedded)}
+        >
           Lychee Data
         </Link>
       </div>
@@ -212,7 +225,11 @@ export default function PublicDashboardEmbedClient({
                   )}
                   <span>
                     Created by <span className="font-medium text-foreground">@{ownerHandle}</span> using{" "}
-                    <Link href={SITE} className="font-medium text-foreground underline underline-offset-2">
+                    <Link
+                      href={SITE}
+                      className="font-medium text-foreground underline underline-offset-2"
+                      {...publicEmbedOutboundLinkProps(isEmbedded)}
+                    >
                       Lychee
                     </Link>
                   </span>
@@ -335,7 +352,11 @@ export default function PublicDashboardEmbedClient({
       </div>
       <footer className="mt-8 border-t border-border/60 pt-4 text-center text-xs text-muted-foreground">
         <span>Made with </span>
-        <Link href={SITE} className="font-medium text-foreground underline">
+        <Link
+          href={SITE}
+          className="font-medium text-foreground underline"
+          {...publicEmbedOutboundLinkProps(isEmbedded)}
+        >
           Lychee
         </Link>
         {d.dashboard_name ? (

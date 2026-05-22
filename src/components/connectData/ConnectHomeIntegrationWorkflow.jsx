@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 
 import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
@@ -34,8 +34,15 @@ import {
   CONNECT_WORKSPACE_SCROLL_OFFSET_PX,
   connectWorkspaceScrollInsetClass,
 } from "@/lib/connectHubLayout";
-import { scrollConnectComposeTargetIntoView } from "@/lib/connectHubScroll";
+import {
+  scheduleConnectHomeHubScroll,
+  scrollConnectComposeTargetIntoView,
+} from "@/lib/connectHubScroll";
 import { cn } from "@/lib/utils";
+import {
+  isDemoGatedHistoricalIntegration,
+  useDemoProGate,
+} from "@/hooks/useDemoProGate";
 
 function sampleByIdForConfig(lakeConfig) {
   return Object.fromEntries((lakeConfig?.sampleOptions || []).map((s) => [s.id, s]));
@@ -61,6 +68,41 @@ function getIntegrationMeta(integrationId) {
     };
   }
   return { name: row.name, description: row.description };
+}
+
+function IntegrationWorkflowHeader({ name, description, compact = false, onGoBack }) {
+  return (
+    <div className={cn(compact ? "space-y-2" : "space-y-3")}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onGoBack}
+        className="-ml-2 h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+        Go back
+      </Button>
+      <div className={cn(compact ? "space-y-1" : "space-y-2")}>
+        <h1
+          className={cn(
+            "font-semibold tracking-tight text-foreground",
+            compact ? "text-lg" : "text-xl sm:text-2xl",
+          )}
+        >
+          {name}
+        </h1>
+        <p
+          className={cn(
+            "leading-snug text-muted-foreground",
+            compact ? "text-xs" : "text-sm",
+          )}
+        >
+          {description}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function ColumnHoverPreview({ columns, getDisplayLabel, className }) {
@@ -523,6 +565,8 @@ function GenericSourceCards({
  */
 export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const ctx = useMyStateV2() ?? {};
+  const isDemo = !!ctx.isDemo;
+  const { requestHistoricalProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const {
     connectDataLakeSampleId,
     setConnectDataLakeSampleId,
@@ -539,7 +583,10 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     athenaPingBySampleId,
     pingAthenaLakeSample,
     requestConnectIntegrationPull,
+    requestConnectWorkspace,
     setConnectHomePendingSheetName,
+    setIntegrationSidebar,
+    setRightPanelOpen,
     activeSheetId,
     setDataSheets,
   } = ctx;
@@ -635,12 +682,21 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const apiDisplayLabel = useCallback((col) => col.name, []);
   const liveDisplayLabel = useCallback((col) => col.name, []);
 
+  const handleGoBackToIntegrations = useCallback(() => {
+    requestConnectWorkspace?.(null);
+    scheduleConnectHomeHubScroll();
+  }, [requestConnectWorkspace]);
+
   const handleRunIntegrationPull = useCallback(() => {
+    if (isDemo && isDemoGatedHistoricalIntegration(integrationId)) {
+      requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
+      return;
+    }
     prepareConnectHomePullSheet(ctx);
     flushSync(() => {
       requestConnectIntegrationPull?.();
     });
-  }, [ctx, requestConnectIntegrationPull]);
+  }, [ctx, integrationId, isDemo, requestConnectIntegrationPull, requestHistoricalProUpgrade]);
 
   if (!isConnectIntegrationWorkspace(integrationId)) return null;
   if (!isConnectQueryComposeIntegration(integrationId)) {
@@ -648,8 +704,12 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     return (
       <div className={cn("flex min-h-[min(28rem,55vh)] flex-col justify-center px-4 py-10 sm:px-6 md:px-10 lg:px-14", className)}>
         <div className="mx-auto w-full max-w-2xl">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{name}</h1>
-          <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground">{description}</p>
+          <IntegrationWorkflowHeader
+            name={name}
+            description={description}
+            compact={false}
+            onGoBack={handleGoBackToIntegrations}
+          />
           <p className="mt-10 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Use the panel on the right to connect and pull data
           </p>
@@ -677,12 +737,12 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       )}
     >
       <div className="mx-auto w-full max-w-2xl">
-        <h1 className={cn("text-balance text-left font-semibold tracking-tight text-foreground", hasComposeUi ? "text-lg sm:text-xl" : "text-xl sm:text-2xl")}>
-          {name}
-        </h1>
-        <p className={cn("max-w-prose text-muted-foreground", hasComposeUi ? "mt-1.5 text-xs leading-snug" : "mt-3 text-sm leading-relaxed")}>
-          {description}
-        </p>
+        <IntegrationWorkflowHeader
+          name={name}
+          description={description}
+          compact={hasComposeUi}
+          onGoBack={handleGoBackToIntegrations}
+        />
 
         {isDataLake && lakeConfig ? (
           <DataLakeSourceCards
@@ -770,6 +830,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
           />
         ) : null}
       </div>
+      {demoProDialog}
     </motion.div>
   );
 }

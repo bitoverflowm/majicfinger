@@ -19,6 +19,7 @@ import { VscCircleFilled } from "react-icons/vsc";
 import { API_INTEGRATIONS, integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { useBeckerHistoricalWarmIntegrationsConnect } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
+import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import { scrollToPricingSection } from "@/lib/scrollToPricing";
@@ -30,6 +31,7 @@ const DataView = ({ user, fillViewport = false }) => {
   const router = useRouter();
   const contextStateV2 = useMyStateV2();
   const isDemo = contextStateV2?.isDemo;
+  const { dialog: demoProDialog } = useDemoProGate();
 
   const connectedData = contextStateV2?.connectedData;
   const setConnectedData = contextStateV2?.setConnectedData;
@@ -481,6 +483,7 @@ const DataView = ({ user, fillViewport = false }) => {
           </TooltipProvider>
         </div>
       )}
+      {demoProDialog}
     </div>
   );
 };

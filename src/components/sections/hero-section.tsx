@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
+import { FeaturedResourcesSection } from "./featured-resources-section";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
 
 export function HeroSection() {
@@ -77,6 +78,7 @@ export function HeroSection() {
         </div>
       </div>
 
+      <FeaturedResourcesSection />
       <DashboardDemoSectionLazy />
       <CompanyShowcase />
     </section>
