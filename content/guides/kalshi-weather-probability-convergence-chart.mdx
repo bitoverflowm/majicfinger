@@ -111,7 +111,7 @@ Then:
 
 - Select Markets
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/2.png)
+![Select Markets](/images/guides/kalshi-weather-probability-convergence-chart/2.png)
 
 - Choose columns:
   - `category`: Kalshi meta categories (Sports, Crypto, Weather, Finance, Politics, Science/Tech, Entertainment, Media, World Events, Esports, Other)
@@ -119,7 +119,7 @@ Then:
   - `title`: Human-readable market name (e.g. “Will NYC high temperature be X on date Y?”). Useful for finding markets of interest.
   - `volume`: Total contracts traded over the market's lifespan.
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/3.png)
+![Choose Markets Columns](/images/guides/kalshi-weather-probability-convergence-chart/3.png)
 
 ## Step 2 — Filter Weather Markets
 
@@ -132,7 +132,7 @@ Select "Where" to apply filter:
 
 This isolates weather-related prediction markets.
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/4.png)
+![Filter Weather Markets](/images/guides/kalshi-weather-probability-convergence-chart/4.png)
 
 ## Step 3 — Sort by Volume (find meaningful markets)
 
@@ -145,7 +145,7 @@ This arranges your Weather markets from highest volume to lowest volume.
 
 This ensures you are working with liquid markets (important for signal quality).
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/5.png)
+![Sort Your Data](/images/guides/kalshi-weather-probability-convergence-chart/5.png)
 
 ## Step 4 — Limit dataset
 
@@ -163,7 +163,7 @@ Setting a limit to your dataset is good practice to limit query size, memory usa
 
 Name your Sheet and hit "Run Pull" to execute your query.
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/6.png)
+![Top 30 Most Active Markets](/images/guides/kalshi-weather-probability-convergence-chart/6.png)
 
 ## Step 5 — Select a market
 
@@ -176,7 +176,7 @@ Pick a market like:
 
 Copy its ticker by double clicking on the cell in the `Ticker` column and `ctrl + c`
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/7.png)
+![Select your market to analyze](/images/guides/kalshi-weather-probability-convergence-chart/7.png)
 
 ## Step 6 — Pull historical trades
 
@@ -193,7 +193,7 @@ Now switch to Trades in Kalshi Historical Data:
     - This side panel allows you to make a new data pull request within your current Project workspace
 - Select `Kalshi Historical` to start another request to Kalshi Historical Data
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/8.png)
+![Pull Historical Trades](/images/guides/kalshi-weather-probability-convergence-chart/8.png)
 
 
 In Kalshi Historical:
@@ -207,9 +207,9 @@ In Kalshi Historical:
         - note `yes_price` + `no_price` = 100 for a given trade i.e. $1
     - `taker_side`: which side of the trade (`yes` or `no`) was playing the role of the taker
     - `created-time`: the time that the trade was executed
-    - `_fetched_at`: this is a meta meetric when the data was pulled by Lychee. You can mostly ignore it.
+    - `_fetched_at`: this is a meta metric when the data was pulled by Lychee. You can mostly ignore it.
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/9.png)
+![Select Trades columns](/images/guides/kalshi-weather-probability-convergence-chart/9.png)
 
 Apply query filter:
 
@@ -218,7 +218,7 @@ Apply query filter:
 In this guide's case:
 - `WHERE` `ticker` = `KXHIGHNY-24NOV13-B48.5`
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/10.png)
+![Apply query filters](/images/guides/kalshi-weather-probability-convergence-chart/10.png)
 
 Then:
 
@@ -227,7 +227,7 @@ Then:
 
 You now have full trade history for your market.
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/11.png)
+![View fill trade history](/images/guides/kalshi-weather-probability-convergence-chart/11.png)
 
 ## Step 7 — Bucket trades into time intervals
 
@@ -238,11 +238,11 @@ You now have full trade history for your market.
 
 - Open: `FUNCTIONS (Σ)` 
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/12.png)
+![Selecting Functions](/images/guides/kalshi-weather-probability-convergence-chart/12.png)
 
 - Select `Stats` → `BUCKET`
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/13.png)
+![Navigate to Bucketing Operations](/images/guides/kalshi-weather-probability-convergence-chart/13.png)
 
 
 - In the Bucket view, set:
@@ -257,7 +257,7 @@ This converts tick data into time series structure.
 
 - You may also name your new sheet for clarity
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/14.png)
+![Execute on bucketing operations](/images/guides/kalshi-weather-probability-convergence-chart/14.png)
 
 ## Step 8 — Aggregate volume
 
@@ -288,7 +288,7 @@ Here for added accuracy we will use a quantitative financial technique called `V
         - `Weight Column`: `count`
         - `Generated Column`: `vwpa_no_price` (you can name this anything you want) 
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/15.png)
+![Compute VWPA](/images/guides/kalshi-weather-probability-convergence-chart/15.png)
 
 This represents traded activity per interval.
 
@@ -299,7 +299,7 @@ This represents traded activity per interval.
 
 - Select `charts` from the tabs above `Data Sheet` or above the right Side Panel
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/16.png)
+![Charting Convergence](/images/guides/kalshi-weather-probability-convergence-chart/16.png)
 
 Set:
 - `Chart` → `Line Chart`
@@ -310,7 +310,7 @@ Then:
 
 - add second line → `no_price`
 
-![Create API connection screen](/images/guides/kalshi-weather-probability-convergence-chart/17.png)
+![Visualizing yes_price and no_price charts](/images/guides/kalshi-weather-probability-convergence-chart/17.png)
 
 - Use the design panel to design the chart as you desire
 
