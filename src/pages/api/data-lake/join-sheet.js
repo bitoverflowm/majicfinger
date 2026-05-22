@@ -18,7 +18,7 @@
  */
 import { validateAthenaLakeQueryBody, AthenaLakeRequestError } from "../../../lib/dataLake/validateAthenaLakeRequest";
 import { runAthenaBoundedSelect } from "../../../lib/dataLake/runAthenaSelect";
-import { athenaRowsToObjects } from "../../../lib/duckdb/duckdbWasmClient";
+import { athenaRowsToObjects } from "../../../lib/duckdb/athenaRowsToObjects";
 import { getAthenaAccessFromRequest } from "../../../lib/athenaAccess";
 
 function parseBody(req) {

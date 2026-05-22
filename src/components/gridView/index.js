@@ -92,7 +92,7 @@ import {
   connectGridToolbarButtonCompactClass,
   connectGridToolbarCompactClass,
 } from "@/lib/connectGridCompact";
-import { athenaRowsToObjects } from "@/lib/duckdb/duckdbWasmClient";
+import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
 import { appendSheetOperation, createSheetOperation } from "@/lib/projectPersistence";
 import { temporalToMs } from "@/lib/temporalParse";
 import { autoSizeAgGridColumnsToContent } from "@/lib/agGridColumnSizing";

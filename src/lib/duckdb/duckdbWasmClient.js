@@ -1,5 +1,8 @@
 import { arrowTableToRows } from "@/lib/duckdb/arrowTableToRows";
+import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
 import { ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+
+export { athenaRowsToObjects };
 
 /** @type {{ db: import('@duckdb/duckdb-wasm').AsyncDuckDB; conn: import('@duckdb/duckdb-wasm').AsyncDuckDBConnection } | null} */
 let instance = null;
@@ -194,43 +197,6 @@ export async function ingestRemoteParquetAsView(opts) {
   const table = await conn.query(`SELECT * FROM ${viewName} LIMIT ${limit}`);
   const rows = arrowTableToRows(table);
   return { rows, rowCount: rows.length, logicalKey, viewName };
-}
-
-/**
- * Turn Athena poll rows into plain objects for JSON → DuckDB.
- * Poll API returns `string[][]`; Kalshi taxonomy roll-up (and similar) may pass row objects keyed by alias.
- * @param {string[]} columns
- * @param {unknown[]} rows
- * @returns {Record<string, unknown>[]}
- */
-export function athenaRowsToObjects(columns, rows) {
-  if (!Array.isArray(rows) || rows.length === 0) return [];
-  const first = rows[0];
-  const isObjectRow =
-    first != null &&
-    typeof first === "object" &&
-    !Array.isArray(first) &&
-    !(first instanceof Uint8Array);
-  if (isObjectRow) {
-    return rows.map((row) => {
-      const o = {};
-      const r = row && typeof row === "object" ? row : {};
-      for (const col of columns) {
-        const v = r[col];
-        o[col] = v === "" || v == null ? null : v;
-      }
-      return o;
-    });
-  }
-  return rows.map((row) => {
-    const o = {};
-    const arr = Array.isArray(row) ? row : [];
-    columns.forEach((col, i) => {
-      const v = arr[i];
-      o[col] = v === "" || v == null ? null : v;
-    });
-    return o;
-  });
 }
 
 /**

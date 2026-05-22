@@ -1,5 +1,15 @@
 const path = require('path')
+const webpack = require('webpack')
 const { withNextVideo } = require('next-video/process')
+
+const duckdbBrowserEntry = path.join(
+  __dirname,
+  'node_modules',
+  '@duckdb',
+  'duckdb-wasm',
+  'dist',
+  'duckdb-browser.mjs',
+)
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -54,20 +64,13 @@ const nextConfig = {
       yjs: path.join(__dirname, 'node_modules', 'yjs'),
       'y-protocols': path.join(__dirname, 'node_modules', 'y-protocols'),
       lib0: path.join(__dirname, 'node_modules', 'lib0'),
+      '@duckdb/duckdb-wasm': duckdbBrowserEntry,
     }
-    if (!isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@duckdb/duckdb-wasm': path.join(
-          __dirname,
-          'node_modules',
-          '@duckdb',
-          'duckdb-wasm',
-          'dist',
-          'duckdb-browser.mjs',
-        ),
-      }
-    }
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /duckdb-node(-blocking)?\.cjs$/,
+      }),
+    )
     return config
   },
   images: {
