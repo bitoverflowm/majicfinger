@@ -55,6 +55,7 @@ export function FeaturedResourcesCarousel({ items }: FeaturedResourcesCarouselPr
     <div className="relative mx-auto w-full max-w-6xl">
       <Carousel
         opts={{ align: "start", loop: false, dragFree: true }}
+        plugins={[]}
         className="w-full"
       >
         <CarouselContent className="-ml-3 md:-ml-4">

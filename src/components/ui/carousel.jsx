@@ -19,8 +19,8 @@ function useCarousel() {
 function Carousel({
   orientation = "horizontal",
   opts,
-  setApi,
-  plugins,
+  setApi = undefined,
+  plugins = [],
   className,
   children,
   ...props
