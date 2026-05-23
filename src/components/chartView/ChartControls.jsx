@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
+import { cn } from "@/lib/utils";
 import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -326,6 +327,12 @@ export default function ChartControls() {
 
   /** Selected chart type uses the same color users see on hover (works for light/dark). */
   const chartTypeSelectedClass = "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50";
+  /** Applied on each item (Tooltip sets data-state=closed, so parent [data-state=off] selectors miss). */
+  const chartTypeItemClass =
+    "text-slate-700 dark:text-slate-300 [&_svg]:fill-current [&_svg]:text-current";
+  const chartTypeItemClassName = (type) =>
+    cn(chartTypeItemClass, selChartType === type && chartTypeSelectedClass);
+  const chartTypeIconClass = "h-4 w-4 shrink-0 text-current";
 
   // Only one section open at a time; default to Chart Meta.
   const [openSection, setOpenSection] = useState("chartMeta");
@@ -957,9 +964,9 @@ export default function ChartControls() {
                             <ToggleGroupItem
                               value="area"
                               aria-label="Area chart"
-                              className={selChartType === "area" ? chartTypeSelectedClass : undefined}
+                              className={chartTypeItemClassName("area")}
                             >
-                              <MdOutlineAreaChart className="h-4 w-4" />
+                              <MdOutlineAreaChart className={chartTypeIconClass} />
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[260px] text-xs">
@@ -971,9 +978,9 @@ export default function ChartControls() {
                             <ToggleGroupItem
                               value="bar"
                               aria-label="Bar chart"
-                              className={selChartType === "bar" ? chartTypeSelectedClass : undefined}
+                              className={chartTypeItemClassName("bar")}
                             >
-                              <IoStatsChart className="h-4 w-4" />
+                              <IoStatsChart className={chartTypeIconClass} />
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[260px] text-xs">
@@ -985,9 +992,9 @@ export default function ChartControls() {
                             <ToggleGroupItem
                               value="line"
                               aria-label="Line chart"
-                              className={selChartType === "line" ? chartTypeSelectedClass : undefined}
+                              className={chartTypeItemClassName("line")}
                             >
-                              <PiChartLine className="h-4 w-4" />
+                              <PiChartLine className={chartTypeIconClass} />
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[260px] text-xs">
@@ -999,9 +1006,9 @@ export default function ChartControls() {
                             <ToggleGroupItem
                               value="pie"
                               aria-label="Pie chart"
-                              className={selChartType === "pie" ? chartTypeSelectedClass : undefined}
+                              className={chartTypeItemClassName("pie")}
                             >
-                              <IoPieChartOutline className="h-4 w-4" />
+                              <IoPieChartOutline className={chartTypeIconClass} />
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[260px] text-xs">
@@ -1013,9 +1020,9 @@ export default function ChartControls() {
                             <ToggleGroupItem
                               value="radar"
                               aria-label="Radar chart"
-                              className={selChartType === "radar" ? chartTypeSelectedClass : undefined}
+                              className={chartTypeItemClassName("radar")}
                             >
-                              <AiOutlineRadarChart className="h-4 w-4" />
+                              <AiOutlineRadarChart className={chartTypeIconClass} />
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[260px] text-xs">
@@ -1027,9 +1034,9 @@ export default function ChartControls() {
                             <ToggleGroupItem
                               value="treemap"
                               aria-label="Treemap"
-                              className={selChartType === "treemap" ? chartTypeSelectedClass : undefined}
+                              className={chartTypeItemClassName("treemap")}
                             >
-                              <LayoutGrid className="h-4 w-4" />
+                              <LayoutGrid className={chartTypeIconClass} />
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[280px] text-xs">
@@ -1042,9 +1049,9 @@ export default function ChartControls() {
                             <ToggleGroupItem
                               value="scatter"
                               aria-label="Scatter / bubble chart"
-                              className={selChartType === "scatter" ? chartTypeSelectedClass : undefined}
+                              className={chartTypeItemClassName("scatter")}
                             >
-                              <CircleDot className="h-4 w-4" />
+                              <CircleDot className={chartTypeIconClass} />
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[260px] text-xs">
@@ -1056,7 +1063,7 @@ export default function ChartControls() {
                             <ToggleGroupItem
                               value="liveline"
                               aria-label="Liveline chart"
-                              className={selChartType === "liveline" ? chartTypeSelectedClass : undefined}
+                              className={chartTypeItemClassName("liveline")}
                             >
                               <span className="relative inline-flex h-3 w-3">
                                 <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
