@@ -8,6 +8,9 @@ import { useMemo, useState } from "react";
 
 type BillingCycle = "weekly" | "monthly" | "annual";
 
+/** Re-enable when promoting lifetime / pay-once on the marketing page again. */
+const SHOW_LIFETIME_ACCESS = false;
+
 /** Show annual plan as monthly equivalent; "billed annually" carries billing context. */
 function annualPriceAsMonthlyDisplay(annualPrice: string): string {
   const match = annualPrice.replace(/,/g, "").match(/\$?\s*([\d.]+)/);
@@ -285,7 +288,7 @@ export function PricingSection() {
           ))}
         </div>
 
-        {lifetimeAccess && (
+        {SHOW_LIFETIME_ACCESS && lifetimeAccess && (
           <div className="mt-14 w-full border-y border-border bg-gradient-to-br from-accent via-accent/80 to-muted/30 dark:from-accent/30 dark:via-background dark:to-muted/20 py-10 md:py-12 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 lg:flex-row lg:items-stretch lg:justify-between lg:gap-12">
               <div className="flex min-w-0 flex-1 flex-col gap-3 text-left">
