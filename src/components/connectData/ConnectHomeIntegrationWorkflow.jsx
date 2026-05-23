@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check } from "lucide-react";
 
 import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
+import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -16,6 +17,7 @@ import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectCo
 import { ConnectQueryComposeRunBar } from "@/components/connectData/ConnectQueryComposeRunBar";
 import { composeColumnDisplayLabel } from "@/lib/connectComposeDisplayLabels";
 import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
+import { applyKalshiPowerSearchSelection } from "@/lib/kalshiPowerSearchPull";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { useSyncConnectDataLakeComposeItems } from "@/hooks/useSyncConnectDataLakeComposeItems";
@@ -379,6 +381,9 @@ function DataLakeSourceCards({
   onDeselectColumn,
   onSelectAllColumns,
   onDeselectAllColumns,
+  showPowerTools = false,
+  onPowerSearchSelect,
+  powerSearchDisabled = false,
 }) {
   const [hoveredSampleId, setHoveredSampleId] = useState(null);
   const sampleById = useMemo(() => sampleByIdForConfig(lakeConfig), [lakeConfig]);
@@ -489,6 +494,9 @@ function DataLakeSourceCards({
           ) : null}
         </AnimatePresence>
       </div>
+      {showPowerTools && !selectedSampleId ? (
+        <KalshiPowerToolsSearch onSelect={onPowerSearchSelect} disabled={powerSearchDisabled} className="pt-2" />
+      ) : null}
     </div>
   );
 }
@@ -618,6 +626,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     setRightPanelOpen,
     activeSheetId,
     setDataSheets,
+    connectDataLakePullState,
   } = ctx;
 
   const lakeConfig = getConnectDataLakeConfig(integrationId);
@@ -649,6 +658,17 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const handleClearLakeSource = useCallback(() => {
     setConnectDataLakeSampleId?.("");
   }, [setConnectDataLakeSampleId]);
+
+  const handleKalshiPowerSearchSelect = useCallback(
+    (suggestion) => {
+      if (isDemo && isDemoGatedHistoricalIntegration(integrationId)) {
+        requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
+        return;
+      }
+      applyKalshiPowerSearchSelection(ctx, suggestion);
+    },
+    [ctx, integrationId, isDemo, requestHistoricalProUpgrade],
+  );
 
   useEffect(() => {
     if (!isDataLake || !connectDataLakeSampleId) return;
@@ -789,6 +809,9 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
             onDeselectColumn={deselectLakeColumn}
             onSelectAllColumns={selectAllLakeColumns}
             onDeselectAllColumns={deselectAllLakeColumns}
+            showPowerTools={integrationId === "kalshiHistorical"}
+            onPowerSearchSelect={handleKalshiPowerSearchSelect}
+            powerSearchDisabled={!!connectDataLakePullState?.loading}
           />
         ) : null}
 
