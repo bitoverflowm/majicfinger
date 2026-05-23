@@ -1,6 +1,12 @@
 "use client";
 
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   athenaPingStateClassName,
   athenaPingStateLabel,
 } from "@/lib/athenaLakePing";
@@ -14,11 +20,19 @@ export function AthenaConnectionStatusDot({ state = "idle", className, size = "m
   const label = athenaPingStateLabel(state);
 
   return (
-    <span
-      className={cn("shrink-0 rounded-full", sizeClass, athenaPingStateClassName(state), className)}
-      aria-label="Athena connection status"
-      title={label}
-      role="status"
-    />
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn("shrink-0 rounded-full", sizeClass, athenaPingStateClassName(state), className)}
+            aria-label={`Athena connection status: ${label}`}
+            role="status"
+          />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

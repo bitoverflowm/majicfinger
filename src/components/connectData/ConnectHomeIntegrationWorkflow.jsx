@@ -372,6 +372,7 @@ function DataLakeSourceCards({
   lakeConfig,
   selectedSampleId,
   onSelect,
+  onClearSelection,
   athenaPingBySampleId,
   columnSelections,
   onSelectColumn,
@@ -387,43 +388,71 @@ function DataLakeSourceCards({
     <div className={cn("space-y-3", selectedSampleId ? "mt-5" : "mt-8")}>
       <div>
         <h2 className="text-sm font-semibold tracking-tight text-foreground">Pick one</h2>
-        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-          Then pick columns and optional joins, filters, or limits below
-        </p>
+        <div className="mt-0.5 flex items-center justify-between gap-3">
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Then pick columns and optional joins, filters, or limits below
+          </p>
+          {selectedSampleId ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onClearSelection}
+              className="h-auto shrink-0 px-0 py-0 text-[11px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
+            >
+              Cancel
+            </Button>
+          ) : null}
+        </div>
       </div>
       <div className="space-y-3" onMouseLeave={() => setHoveredSampleId(null)}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(lakeConfig?.connectSources || []).map((source) => {
-            const isSelected = selectedSampleId === source.sampleId;
-            const isHovered = hoveredSampleId === source.sampleId;
-            return (
-              <div key={source.sampleId} onMouseEnter={() => setHoveredSampleId(source.sampleId)}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(source.sampleId)}
-                  className={cn(
-                    "relative flex w-full min-h-[5.5rem] flex-col rounded-xl border p-4 text-left transition-all duration-200",
-                    isSelected
-                      ? "border-primary bg-muted/40 shadow-sm ring-2 ring-primary/25"
-                      : isHovered
-                        ? "border-border bg-muted/25 shadow-md"
-                        : "border-border/60 bg-card hover:border-border hover:bg-muted/25 hover:shadow-md",
-                  )}
-                >
-                  {isSelected ? (
-                    <AthenaConnectionStatusDot
-                      state={athenaPingBySampleId?.[source.sampleId] || "loading"}
-                      size="sm"
-                      className="absolute right-3 top-3"
-                    />
-                  ) : null}
-                  <span className="text-sm font-semibold tracking-tight text-foreground pr-6">{source.title}</span>
-                  <span className="mt-1 text-xs leading-snug text-muted-foreground">{source.description}</span>
-                </button>
-              </div>
-            );
-          })}
-        </div>
+        <motion.div
+          layout
+          className={cn("grid gap-3", selectedSampleId ? "grid-cols-1" : "sm:grid-cols-2")}
+        >
+          <AnimatePresence initial={false} mode="popLayout">
+            {(lakeConfig?.connectSources || [])
+              .filter((source) => !selectedSampleId || selectedSampleId === source.sampleId)
+              .map((source) => {
+                const isSelected = selectedSampleId === source.sampleId;
+                const isHovered = hoveredSampleId === source.sampleId;
+                return (
+                  <motion.div
+                    key={source.sampleId}
+                    layout
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    onMouseEnter={() => setHoveredSampleId(source.sampleId)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onSelect(source.sampleId)}
+                      className={cn(
+                        "relative flex w-full min-h-[5.5rem] flex-col rounded-xl border p-4 text-left transition-all duration-200",
+                        isSelected
+                          ? "border-primary bg-muted/40 shadow-sm ring-2 ring-primary/25"
+                          : isHovered
+                            ? "border-border bg-muted/25 shadow-md"
+                            : "border-border/60 bg-card hover:border-border hover:bg-muted/25 hover:shadow-md",
+                      )}
+                    >
+                      {isSelected ? (
+                        <AthenaConnectionStatusDot
+                          state={athenaPingBySampleId?.[source.sampleId] || "loading"}
+                          size="sm"
+                          className="absolute right-3 top-3"
+                        />
+                      ) : null}
+                      <span className="text-sm font-semibold tracking-tight text-foreground pr-6">{source.title}</span>
+                      <span className="mt-1 text-xs leading-snug text-muted-foreground">{source.description}</span>
+                    </button>
+                  </motion.div>
+                );
+              })}
+          </AnimatePresence>
+        </motion.div>
         {!selectedSampleId ? (
           <div className={cn("relative", HOVER_PREVIEW_SLOT_CLASS)} aria-live="polite">
             <AnimatePresence mode="wait">
@@ -617,6 +646,10 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     [setConnectDataLakeSampleId, pingLakeSample],
   );
 
+  const handleClearLakeSource = useCallback(() => {
+    setConnectDataLakeSampleId?.("");
+  }, [setConnectDataLakeSampleId]);
+
   useEffect(() => {
     if (!isDataLake || !connectDataLakeSampleId) return;
     const state = athenaPingBySampleId?.[connectDataLakeSampleId];
@@ -749,6 +782,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
             lakeConfig={lakeConfig}
             selectedSampleId={connectDataLakeSampleId}
             onSelect={handleSelectLakeSource}
+            onClearSelection={handleClearLakeSource}
             athenaPingBySampleId={athenaPingBySampleId || {}}
             columnSelections={connectDataLakeColumnSelections || {}}
             onSelectColumn={selectLakeColumn}
