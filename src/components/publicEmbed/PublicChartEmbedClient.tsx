@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
+import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -168,7 +169,7 @@ export default function PublicChartEmbedClient({
       >
         <DataLoader rows={rows} />
         <DataSheetsLoader rows={rows} dataSheets={dataSheets} />
-        <div className={`mt-0 flex flex-1 items-center justify-center ${isEmbedded ? "" : "md:mt-2"}`}>
+        <div className={`relative mt-0 flex flex-1 items-center justify-center ${isEmbedded ? "" : "md:mt-2"}`}>
           <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
             <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center">
               <div className={`w-full ${isEmbedded ? "max-w-[980px]" : "max-w-[1040px]"}`}>
@@ -182,6 +183,9 @@ export default function PublicChartEmbedClient({
               </div>
             </div>
           </ChartBuilderProvider>
+          <div className="pointer-events-auto absolute bottom-3 right-3 z-20">
+            <RunForYourselfButton ownerHandle={username} chartSlug={slug} kind="chart" />
+          </div>
         </div>
         <footer className={`w-full border-t border-border/60 text-center text-xs text-muted-foreground ${isEmbedded ? "pt-2" : "mt-auto pt-3"}`}>
           <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2">

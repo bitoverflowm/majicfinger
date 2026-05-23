@@ -94,6 +94,7 @@ const DashBody = ({ user }) => {
         (!!tierForAccess && !normalizedSubscriptionStatus)
       ));
     const isLocked = !hasPaidAccess;
+    const runYourselfLocked = !!contextStateV2?.runYourselfLocked;
 
     useEffect(() => {
         if (viewing === "upload") {
@@ -433,14 +434,19 @@ const DashBody = ({ user }) => {
     );
 
     const paywallOverlay =
-      !isDemo && isLocked && user ? (
+      !isDemo && (isLocked || runYourselfLocked) && user ? (
         <div className="pointer-events-auto fixed bottom-5 left-1/2 z-[999] w-[min(94vw,42rem)] -translate-x-1/2 rounded-xl border-2 border-primary/50 bg-card p-5 shadow-2xl ring-4 ring-primary/15">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-base font-semibold text-foreground">Choose a plan to unlock the dashboard</div>
+              <div className="text-base font-semibold text-foreground">
+                {runYourselfLocked && !isLocked
+                  ? "Upgrade to run unlimited analyses"
+                  : "Choose a plan to unlock the dashboard"}
+              </div>
               <div className="mt-1 text-sm leading-snug text-muted-foreground">
-                Editing, saving, uploads, and integrations stay locked until you have an active paid plan (or lifetime
-                access).
+                {runYourselfLocked && !isLocked
+                  ? "You've used your free interactive run. View your chart and data below, then upgrade to Pro to edit, save, and run more analyses."
+                  : "Editing, saving, uploads, and integrations stay locked until you have an active paid plan (or lifetime access)."}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">

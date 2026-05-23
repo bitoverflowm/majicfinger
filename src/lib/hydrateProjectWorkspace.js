@@ -163,6 +163,7 @@ export async function hydrateChartSheetsForDataSet({
 export async function loadFullProjectFromApi({
   dataSetId,
   userId,
+  preferredChartId = null,
   setDataSheets,
   setActiveSheetId,
   setConnectedData,
@@ -191,6 +192,7 @@ export async function loadFullProjectFromApi({
   await hydrateChartSheetsForDataSet({
     dataSetId,
     userId,
+    preferredChartId,
     setSavedCharts,
     setChartSheets,
     setActiveChartSheetId,

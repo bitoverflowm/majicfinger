@@ -1,5 +1,6 @@
 import { isLakeBigintColumnName } from "@/lib/dataLake/lakeTableColumns";
 import { normalizeLakeBigintCellValue } from "@/lib/dataLake/lakeBigintNormalize";
+import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
 
 export const PROJECT_FULL_DATA_SAFE_BYTES = 12 * 1024 * 1024;
 export const PROJECT_PREVIEW_ROW_LIMIT = 50000;
@@ -412,6 +413,18 @@ export function applyOperationToComposeSpec(composeSpec, op) {
 export function applyBrowserOperationToRows(rows, op) {
   const list = Array.isArray(rows) ? rows : [];
   if (!op || typeof op !== "object") return list;
+  if (op.type === "bucket.sheet") {
+    const bucketed = aggregateBucketRows(list, {
+      bucketColumn: op.bucketColumn,
+      bucketOutputColumn: op.bucketOutputColumn,
+      bucketMode: op.bucketMode,
+      timeInterval: op.timeInterval,
+      numericBucketSize: op.numericBucketSize,
+      passthroughColumns: op.passthroughColumns,
+      aggregations: op.aggregations,
+    });
+    return bucketed.length ? bucketed : list;
+  }
   if (op.type === "delete.column") {
     const col = String(op.column || "");
     return list.map((row) => {

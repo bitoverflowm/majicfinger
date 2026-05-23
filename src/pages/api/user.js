@@ -64,6 +64,12 @@ export default async function user(req, res) {
       if (dbUser.subscriptionStatus != null) payload.subscriptionStatus = dbUser.subscriptionStatus;
       if (dbUser.subscribedAt != null) payload.subscribedAt = dbUser.subscribedAt;
       if (dbUser.user_name != null) payload.user_name = dbUser.user_name;
+      if (dbUser.run_yourself_used_at != null) {
+        payload.run_yourself_used_at = dbUser.run_yourself_used_at;
+      }
+      if (dbUser.run_yourself_fork_data_set_id != null) {
+        payload.run_yourself_fork_data_set_id = String(dbUser.run_yourself_fork_data_set_id);
+      }
     }
 
     if (isOwnerFullAccessUser(payload)) {

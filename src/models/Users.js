@@ -70,6 +70,15 @@ const UserSchema = new mongoose.Schema({
     metadata: {
         type: Object,
     },
+    run_yourself_used_at: {
+        type: Date,
+        default: null,
+    },
+    run_yourself_fork_data_set_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "DataSet",
+        default: null,
+    },
 })
 
 

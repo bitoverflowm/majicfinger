@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import DotPattern from "@/components/magicui/dot-pattern";
 import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
@@ -28,6 +28,8 @@ import {
   getFreeTextRowPublicStyle,
 } from "@/lib/dashboardFreeTextTheme";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
+import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
+import { isRunnablePublicChart, isRunnablePublicDashboard } from "@/config/runYourselfAnalyses";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -175,9 +177,32 @@ export default function PublicDashboardEmbedClient({
   const ownerPic = d.owner_profile_pic ? String(d.owner_profile_pic) : "";
   const tags = Array.isArray(d.tags) ? d.tags : [];
 
+  const hasRunnableChart = useMemo(() => {
+    for (const row of rows) {
+      if (row.type !== "cards" || !Array.isArray(row.columns)) continue;
+      for (const col of row.columns) {
+        const s = col.chartLink?.slug;
+        if (s && isRunnablePublicChart(ownerHandle, s)) return true;
+      }
+    }
+    return false;
+  }, [rows, ownerHandle]);
+
+  const dashboardRunnable = isRunnablePublicDashboard(ownerHandle, slug);
+  const showRunDashboardCta = dashboardRunnable || hasRunnableChart;
+
   return (
     <div className="relative w-full px-6 py-10 sm:px-10">
-      <div className="absolute right-4 top-4 z-20">
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+        {showRunDashboardCta ? (
+          <RunForYourselfButton
+            ownerHandle={username}
+            dashboardSlug={slug}
+            kind="dashboard"
+            variant="dashboard"
+            forceRunnable
+          />
+        ) : null}
         <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
       </div>
       <div
@@ -312,7 +337,11 @@ export default function PublicDashboardEmbedClient({
                       ) : null}
                       {col.chartPayload ? (
                         <div className="flex min-h-0 flex-1 flex-col">
-                          <PublicDashboardChartBlock chartPayload={col.chartPayload} />
+                          <PublicDashboardChartBlock
+                            chartPayload={col.chartPayload}
+                            ownerHandle={ownerHandle}
+                            chartSlug={col.chartLink?.slug}
+                          />
                         </div>
                       ) : (
                         <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">

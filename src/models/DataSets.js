@@ -44,7 +44,30 @@ const DataSetSchema = new mongoose.Schema({
         type: Schema.Types.ObjectId, // Defines the type as ObjectId
         ref: 'User', // References the User model
         required: true // Makes this field mandatory
-    }
+    },
+    forked_from_user_id: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+    },
+    forked_from_data_set_id: {
+        type: Schema.Types.ObjectId,
+        ref: "DataSet",
+        default: null,
+    },
+    forked_from_chart_id: {
+        type: Schema.Types.ObjectId,
+        ref: "Chart",
+        default: null,
+    },
+    forked_at: {
+        type: Date,
+        default: null,
+    },
+    run_yourself_analysis_id: {
+        type: String,
+        default: null,
+    },
 })
 
 

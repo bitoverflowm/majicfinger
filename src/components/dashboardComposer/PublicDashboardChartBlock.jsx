@@ -5,6 +5,7 @@ import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
+import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
@@ -22,7 +23,7 @@ function DataSheetsLoader({ rows, dataSheets }) {
   return null;
 }
 
-export function PublicDashboardChartBlock({ chartPayload }) {
+export function PublicDashboardChartBlock({ chartPayload, ownerHandle, chartSlug }) {
   const rows = chartPayload?.rows ?? [];
   const dataSheets = chartPayload?.dataSheets ?? {};
   const chart = chartPayload?.chart;
@@ -57,7 +58,7 @@ export function PublicDashboardChartBlock({ chartPayload }) {
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
-        className="flex min-h-0 w-full flex-1 flex-col rounded-md border bg-card/50 p-2"
+        className="relative flex min-h-0 w-full flex-1 flex-col rounded-md border bg-card/50 p-2"
         style={{
           backgroundColor: cp0.bgColor || undefined,
           color: cp0.textColor || undefined,
@@ -69,6 +70,16 @@ export function PublicDashboardChartBlock({ chartPayload }) {
             <ChartCanvas />
           </div>
         </ChartBuilderProvider>
+        {ownerHandle && chartSlug ? (
+          <div className="pointer-events-auto absolute bottom-2 right-2 z-10">
+            <RunForYourselfButton
+              ownerHandle={ownerHandle}
+              chartSlug={chartSlug}
+              kind="chart"
+              className="shadow-md gap-1 rounded-full px-3 py-2 text-xs font-semibold h-auto"
+            />
+          </div>
+        ) : null}
       </div>
     </StateProviderV2>
   );
