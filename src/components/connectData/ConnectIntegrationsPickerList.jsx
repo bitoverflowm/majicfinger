@@ -18,6 +18,7 @@ import {
 } from "@/lib/connectIntegrationPickerRows";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 
 /** Brand fills for sidebar integration avatars (matches Connect home hub pills). */
