@@ -496,4 +496,92 @@ export async function runAthenaBoundedSelect({
   };
 }
 
+/**
+ * Run a pre-built bounded SELECT (search / ad-hoc). SQL must be a single SELECT with LIMIT.
+ * @param {{ sql: string; database: string; maxWaitMs?: number; rowLimit?: number }} opts
+ */
+export async function runAthenaSqlQuery({ sql, database, maxWaitMs = 15000, rowLimit = 24 }) {
+  const output = assertAthenaConfig();
+  const workGroup = process.env.DATA_LAKE_ATHENA_WORKGROUP || "primary";
+  const catalog = process.env.DATA_LAKE_ATHENA_CATALOG || "AwsDataCatalog";
+  const db = String(database || "").trim();
+  if (!db) {
+    const err = new Error("Server missing DATA_LAKE_ATHENA_DATABASE");
+    err.code = "CONFIG";
+    throw err;
+  }
+
+  const trimmed = String(sql || "").trim();
+  if (!/^SELECT\s/i.test(trimmed)) {
+    const err = new Error("Search SQL must be a SELECT statement");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  if (trimmed.includes(";")) {
+    const err = new Error("Search SQL must be a single statement");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  if (!/\bLIMIT\s+\d+/i.test(trimmed)) {
+    const err = new Error("Search SQL must include LIMIT");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+
+  const athena = new AWS.Athena({ region: getRegion() });
+  const { QueryExecutionId } = await athena
+    .startQueryExecution({
+      QueryString: trimmed,
+      WorkGroup: workGroup,
+      ResultConfiguration: { OutputLocation: output },
+      QueryExecutionContext: { Catalog: catalog, Database: db },
+    })
+    .promise();
+
+  const deadline = Date.now() + maxWaitMs;
+  let status = "RUNNING";
+  let reason = "";
+  let dataScannedBytes = null;
+
+  while (Date.now() < deadline) {
+    const snap = await getAthenaQueryState(QueryExecutionId);
+    status = snap.state;
+    reason = snap.reason;
+    dataScannedBytes = snap.dataScannedBytes;
+
+    if (status === "SUCCEEDED") break;
+    if (status === "FAILED" || status === "CANCELLED") {
+      const err = new Error(reason || `Athena query ${status}`);
+      err.code = "ATHENA_FAILED";
+      err.queryExecutionId = QueryExecutionId;
+      err.engineState = status;
+      throw err;
+    }
+    await sleep(350);
+  }
+
+  if (status !== "SUCCEEDED") {
+    try {
+      await athena.stopQueryExecution({ QueryExecutionId }).promise();
+    } catch {
+      /* ignore */
+    }
+    const err = new Error("Athena search timed out");
+    err.code = "TIMEOUT";
+    err.queryExecutionId = QueryExecutionId;
+    throw err;
+  }
+
+  const lim = Math.max(1, Math.floor(Number(rowLimit) || 24));
+  const result = await fetchAthenaQueryResultRows(QueryExecutionId, lim);
+
+  return {
+    ...result,
+    queryExecutionId: QueryExecutionId,
+    dataScannedBytes,
+    engineState: "SUCCEEDED",
+    sql: trimmed,
+  };
+}
+
 export { sleep };

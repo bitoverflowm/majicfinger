@@ -5,6 +5,10 @@
 import { fetchKalshiSearchSuggestions } from "@/lib/dataLake/kalshiSearchSuggestions";
 import { getAthenaAccessFromRequest } from "@/lib/athenaAccess";
 
+export const config = {
+  maxDuration: 30,
+};
+
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);

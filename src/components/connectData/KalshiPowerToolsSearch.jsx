@@ -84,7 +84,7 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
 
       const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
       setSuggestions(list);
-      setSuggestOpen(list.length > 0);
+      setSuggestOpen(list.length > 0 || trimmed.length >= 2);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
       if (mySeq !== suggestSeqRef.current) return;
@@ -152,7 +152,7 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
         <h2 className="text-sm font-semibold tracking-tight text-foreground">Power Tools</h2>
       </motion.div>
       <p className="text-[11px] leading-snug text-muted-foreground">
-        Search Kalshi markets and trades by ticker, title, or category — select a result to load data.
+        Search Kalshi markets and trades by ticker or title — select a result to load data.
       </p>
 
       <div ref={rootRef} className="relative">
@@ -185,7 +185,7 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
         </span>
         <input
           type="search"
-          placeholder="Search ticker, title, event ticker, or category…"
+          placeholder="Search ticker, title, or event ticker…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => suggestions.length > 0 && setSuggestOpen(true)}
@@ -202,6 +202,21 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
           aria-autocomplete="list"
           aria-expanded={suggestOpen}
         />
+
+        <AnimatePresence>
+          {suggestOpen && !suggestLoading && suggestions.length === 0 && q.trim().length >= 2 ? (
+            <motion.p
+              key="no-matches"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-border bg-popover px-3 py-2 text-left text-xs text-muted-foreground shadow-md"
+            >
+              No matches found for &ldquo;{q.trim()}&rdquo;
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
 
         <AnimatePresence>
           {suggestOpen && suggestions.length > 0 ? (

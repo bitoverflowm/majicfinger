@@ -1,11 +1,13 @@
 /**
- * Kalshi historical search suggestions (Markets + Trades via Athena).
- * Searches ticker, event_ticker, title, and virtual taxonomy/prefix columns on markets;
- * surfaces trades suggestions when trades exist for a matching ticker (joined by ticker).
+ * Kalshi historical typeahead — one bounded Athena query, physical columns only.
+ * Matches loose word tokens across ticker, title, and event_ticker.
+ *
+ * Intentionally excludes virtual columns (kalshi_taxonomy_category,
+ * kalshi_event_ticker_category) — category browse is handled elsewhere.
  */
 import { resolveAthenaTableName } from "@/lib/dataLake/athenaTableMap";
+import { runAthenaSqlQuery } from "@/lib/dataLake/runAthenaSelect";
 import { databaseForLake } from "@/lib/dataLake/validateAthenaLakeRequest";
-import { runAthenaBoundedSelect } from "@/lib/dataLake/runAthenaSelect";
 
 /** @typedef {"markets" | "trades"} KalshiSearchEntity */
 
@@ -19,35 +21,107 @@ import { runAthenaBoundedSelect } from "@/lib/dataLake/runAthenaSelect";
  * @property {string} [matchField]
  */
 
-const MARKET_SEARCH_COLUMNS = ["ticker", "title", "event_ticker"];
-const SEARCH_LIMIT = 12;
-const MAX_WAIT_MS = 35000;
+const SEARCH_LIMIT = 10;
+const MAX_WAIT_MS = 18000;
+const CACHE_TTL_MS = 45_000;
+const CACHE_MAX = 80;
 
-/** @param {string[]} columns */
-function minimalComposeSelect(columns) {
-  return columns.map((column) => ({
-    column,
-    alias: column,
-    aggregate: null,
-    dateBucket: null,
-    dateFormat: null,
-    stringBucket: null,
-    numberBucket: null,
-    numberScale: "none",
-    decimals: null,
-    treatAsDate: false,
-  }));
+/** @type {Map<string, { at: number; suggestions: KalshiSearchSuggestion[] }>} */
+const suggestionCache = new Map();
+
+function escapeSqlString(s) {
+  return String(s).replace(/'/g, "''");
+}
+
+function escapeLike(s) {
+  return String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
 /** @param {string} q */
-function searchOrFilters(q) {
-  return [
-    { column: "ticker", kind: "string", op: "contains", value: q },
-    { column: "title", kind: "string", op: "contains", value: q },
-    { column: "event_ticker", kind: "string", op: "contains", value: q },
-    { column: "kalshi_event_ticker_category", kind: "string", op: "contains", value: q },
-    { column: "kalshi_taxonomy_category", kind: "string", op: "contains", value: q },
-  ];
+function tokenizeQuery(q) {
+  const raw = String(q || "")
+    .trim()
+    .toLowerCase();
+  const words = raw.split(/\s+/).map((w) => w.trim()).filter((w) => w.length >= 2);
+  if (words.length) return words;
+  if (raw.length >= 2) return [raw];
+  return [];
+}
+
+/**
+ * Each token must match at least one searchable column (AND of ORs).
+ * @param {string} alias
+ * @param {string[]} tokens
+ */
+function buildLooseMatchSql(alias, tokens) {
+  const cols = ["ticker", "title", "event_ticker"];
+  return tokens
+    .map((token) => {
+      const pattern = `%${escapeLike(token)}%`;
+      const lit = asLowerLikeLiteral(pattern);
+      const parts = cols.map(
+        (col) => `LOWER(CAST(${alias}."${col}" AS VARCHAR)) LIKE ${lit} ESCAPE '\\'`,
+      );
+      return `(${parts.join(" OR ")})`;
+    })
+    .join(" AND ");
+}
+
+/** @param {string} pattern already escaped for LIKE */
+function asLowerLikeLiteral(pattern) {
+  return `LOWER('${escapeSqlString(pattern)}')`;
+}
+
+/**
+ * @param {string} marketsTable
+ * @param {string} tradesTable
+ * @param {string[]} tokens
+ */
+function buildKalshiMarketsSearchSql(marketsTable, tradesTable, tokens) {
+  const m = "m";
+  const marketMatch = buildLooseMatchSql(m, tokens);
+
+  return `
+SELECT
+  ${m}."ticker" AS ticker,
+  ${m}."title" AS title,
+  ${m}."event_ticker" AS event_ticker,
+  CASE WHEN EXISTS (
+    SELECT 1 FROM "${tradesTable}" t WHERE t."ticker" = ${m}."ticker" LIMIT 1
+  ) THEN '1' ELSE '0' END AS has_trades
+FROM "${marketsTable}" ${m}
+WHERE ${marketMatch}
+LIMIT ${SEARCH_LIMIT}
+`.trim();
+}
+
+/**
+ * Fallback when title search misses — match trade tickers directly.
+ * @param {string} marketsTable
+ * @param {string} tradesTable
+ * @param {string[]} tokens
+ */
+function buildKalshiTickerFallbackSql(marketsTable, tradesTable, tokens) {
+  const t = "t";
+  const m = "m";
+  const pattern = `%${escapeLike(tokens.join("-"))}%`;
+  const tickerPattern = `%${escapeLike(tokens.join(""))}%`;
+  const litA = asLowerLikeLiteral(pattern);
+  const litB = asLowerLikeLiteral(tickerPattern);
+
+  return `
+SELECT
+  ${t}."ticker" AS ticker,
+  COALESCE(${m}."title", ${t}."ticker") AS title,
+  ${m}."event_ticker" AS event_ticker,
+  '1' AS has_trades
+FROM "${tradesTable}" ${t}
+LEFT JOIN "${marketsTable}" ${m} ON ${m}."ticker" = ${t}."ticker"
+WHERE LOWER(CAST(${t}."ticker" AS VARCHAR)) LIKE ${litA} ESCAPE '\\'
+   OR LOWER(CAST(${t}."ticker" AS VARCHAR)) LIKE ${litB} ESCAPE '\\'
+GROUP BY ${t}."ticker", COALESCE(${m}."title", ${t}."ticker"), ${m}."event_ticker"
+LIMIT ${SEARCH_LIMIT}
+`.trim();
 }
 
 /**
@@ -67,189 +141,33 @@ function rowsToRecords(result) {
   });
 }
 
-/**
- * @param {string} q
- * @param {string} database
- * @param {string} physicalMarkets
- */
-async function searchMarkets(q, database, physicalMarkets) {
-  const result = await runAthenaBoundedSelect({
-    physicalTableName: physicalMarkets,
-    database,
-    queryType: "compose",
-    lake: "kalshi",
-    table: "markets",
-    compose: {
-      select: minimalComposeSelect(MARKET_SEARCH_COLUMNS),
-      groupByAliases: [],
-      orderBy: [{ alias: "ticker", direction: "asc" }],
-    },
-    filters: { and: [], or: searchOrFilters(q) },
-    caseSensitive: false,
-    limit: SEARCH_LIMIT,
-    maxWaitMs: MAX_WAIT_MS,
-  });
-  return rowsToRecords(result);
-}
-
-/**
- * @param {string} q
- * @param {string} database
- * @param {string} physicalTrades
- */
-async function searchTradeTickers(q, database, physicalTrades) {
-  const result = await runAthenaBoundedSelect({
-    physicalTableName: physicalTrades,
-    database,
-    queryType: "select",
-    columns: ["ticker"],
-    filters: {
-      and: [],
-      or: [{ column: "ticker", kind: "string", op: "contains", value: q }],
-    },
-    caseSensitive: false,
-    limit: SEARCH_LIMIT,
-    maxWaitMs: MAX_WAIT_MS,
-  });
-  const tickers = rowsToRecords(result).map((r) => String(r.ticker || "").trim()).filter(Boolean);
-  return [...new Set(tickers)];
-}
-
-/**
- * @param {string[]} tickers
- * @param {string} database
- * @param {string} physicalMarkets
- */
-async function fetchMarketMetaForTickers(tickers, database, physicalMarkets) {
-  const unique = [...new Set(tickers.map((t) => String(t || "").trim()).filter(Boolean))];
-  if (!unique.length) return [];
-
-  const result = await runAthenaBoundedSelect({
-    physicalTableName: physicalMarkets,
-    database,
-    queryType: "compose",
-    lake: "kalshi",
-    table: "markets",
-    compose: {
-      select: minimalComposeSelect(MARKET_SEARCH_COLUMNS),
-      groupByAliases: [],
-      orderBy: [{ alias: "ticker", direction: "asc" }],
-    },
-    filters: {
-      and: [{ column: "ticker", kind: "string", op: "in", value: unique }],
-      or: [],
-    },
-    caseSensitive: false,
-    limit: unique.length,
-    maxWaitMs: MAX_WAIT_MS,
-  });
-  return rowsToRecords(result);
-}
-
-/**
- * @param {string[]} tickers
- * @param {string} database
- * @param {string} physicalTrades
- */
-async function tickersWithTrades(tickers, database, physicalTrades) {
-  const unique = [...new Set(tickers.map((t) => String(t || "").trim()).filter(Boolean))];
-  if (!unique.length) return new Set();
-
-  const result = await runAthenaBoundedSelect({
-    physicalTableName: physicalTrades,
-    database,
-    queryType: "select",
-    columns: ["ticker"],
-    filters: {
-      and: [{ column: "ticker", kind: "string", op: "in", value: unique }],
-      or: [],
-    },
-    caseSensitive: false,
-    limit: unique.length,
-    maxWaitMs: MAX_WAIT_MS,
-  });
-  const found = rowsToRecords(result).map((r) => String(r.ticker || "").trim()).filter(Boolean);
-  return new Set(found);
-}
-
-/** @param {string} q @param {string} needle @param {Record<string, string>} row */
-function detectMatchField(q, needle, row) {
-  const n = needle.toLowerCase();
-  for (const field of [
-    "title",
-    "ticker",
-    "event_ticker",
-    "kalshi_event_ticker_category",
-    "kalshi_taxonomy_category",
-  ]) {
+/** @param {string[]} tokens @param {Record<string, string>} row */
+function detectMatchField(tokens, row) {
+  for (const field of ["title", "ticker", "event_ticker"]) {
     const val = String(row[field] || "").toLowerCase();
-    if (val && val.includes(n)) return field;
+    if (!val) continue;
+    if (tokens.some((t) => val.includes(t))) return field;
   }
-  return "ticker";
+  return "title";
 }
 
-/**
- * @param {string} q
- * @returns {Promise<{ suggestions: KalshiSearchSuggestion[] }>}
- */
-export async function fetchKalshiSearchSuggestions(q) {
-  const trimmed = String(q || "").trim();
-  if (trimmed.length < 2) {
-    return { suggestions: [] };
-  }
-
-  const database = databaseForLake("kalshi");
-  const physicalMarkets = resolveAthenaTableName("kalshi", "markets");
-  const physicalTrades = resolveAthenaTableName("kalshi", "trades");
-  if (!database || !physicalMarkets || !physicalTrades) {
-    throw new Error("Kalshi Athena tables are not configured");
-  }
-
-  const needle = trimmed.toLowerCase();
-
-  const [marketRows, tradeTickerHits] = await Promise.all([
-    searchMarkets(trimmed, database, physicalMarkets),
-    searchTradeTickers(trimmed, database, physicalTrades),
-  ]);
-
-  /** @type {Map<string, Record<string, string>>} */
-  const marketByTicker = new Map();
-  for (const row of marketRows) {
-    const ticker = String(row.ticker || "").trim();
-    if (!ticker || marketByTicker.has(ticker)) continue;
-    marketByTicker.set(ticker, row);
-  }
-
-  const orphanTradeTickers = tradeTickerHits.filter((t) => !marketByTicker.has(t));
-  if (orphanTradeTickers.length) {
-    const metaRows = await fetchMarketMetaForTickers(orphanTradeTickers, database, physicalMarkets);
-    for (const row of metaRows) {
-      const ticker = String(row.ticker || "").trim();
-      if (!ticker || marketByTicker.has(ticker)) continue;
-      marketByTicker.set(ticker, row);
-    }
-  }
-
-  const allTickers = [...marketByTicker.keys(), ...tradeTickerHits.filter((t) => !marketByTicker.has(t))];
-  const uniqueTickers = [...new Set(allTickers.map((t) => String(t || "").trim()).filter(Boolean))].slice(
-    0,
-    SEARCH_LIMIT,
-  );
-
-  const tradeTickerSet = await tickersWithTrades(uniqueTickers, database, physicalTrades);
-
+/** @param {Record<string, string>[]} rows @param {string[]} tokens */
+function rowsToSuggestions(rows, tokens) {
   /** @type {KalshiSearchSuggestion[]} */
   const suggestions = [];
   const seen = new Set();
 
-  for (const ticker of uniqueTickers) {
-    const meta = marketByTicker.get(ticker) || { ticker, title: ticker, event_ticker: "" };
-    const title = String(meta.title || ticker).trim() || ticker;
-    const eventTicker = String(meta.event_ticker || "").trim();
-    const matchField = detectMatchField(trimmed, needle, meta);
+  for (const row of rows) {
+    const ticker = String(row.ticker || "").trim();
+    if (!ticker) continue;
+
+    const title = String(row.title || ticker).trim() || ticker;
+    const eventTicker = String(row.event_ticker || "").trim();
+    const hasTrades = row.has_trades === "1" || row.has_trades === "true";
+    const matchField = detectMatchField(tokens, row);
 
     const marketsKey = `markets:${ticker}`;
-    if (!seen.has(marketsKey) && marketByTicker.has(ticker)) {
+    if (!seen.has(marketsKey)) {
       seen.add(marketsKey);
       suggestions.push({
         entity: "markets",
@@ -261,21 +179,81 @@ export async function fetchKalshiSearchSuggestions(q) {
       });
     }
 
-    const tradesKey = `trades:${ticker}`;
-    if (!seen.has(tradesKey) && tradeTickerSet.has(ticker)) {
-      seen.add(tradesKey);
-      suggestions.push({
-        entity: "trades",
-        ticker,
-        title,
-        eventTicker: eventTicker || undefined,
-        subtitle: eventTicker ? `All trades · ${ticker} · ${eventTicker}` : `All trades · ${ticker}`,
-        matchField: marketByTicker.has(ticker) ? matchField : "ticker",
-      });
+    if (hasTrades) {
+      const tradesKey = `trades:${ticker}`;
+      if (!seen.has(tradesKey)) {
+        seen.add(tradesKey);
+        suggestions.push({
+          entity: "trades",
+          ticker,
+          title,
+          eventTicker: eventTicker || undefined,
+          subtitle: eventTicker ? `All trades · ${ticker} · ${eventTicker}` : `All trades · ${ticker}`,
+          matchField,
+        });
+      }
     }
 
     if (suggestions.length >= SEARCH_LIMIT * 2) break;
   }
 
-  return { suggestions: suggestions.slice(0, SEARCH_LIMIT * 2) };
+  return suggestions.slice(0, SEARCH_LIMIT * 2);
+}
+
+/**
+ * @param {string} q
+ * @returns {Promise<{ suggestions: KalshiSearchSuggestion[] }>}
+ */
+export async function fetchKalshiSearchSuggestions(q) {
+  const trimmed = String(q || "").trim();
+  const tokens = tokenizeQuery(trimmed);
+  if (tokens.length === 0) {
+    return { suggestions: [] };
+  }
+
+  const cacheKey = tokens.join(" ");
+  const cached = suggestionCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return { suggestions: cached.suggestions };
+  }
+
+  const database = databaseForLake("kalshi");
+  const physicalMarkets = resolveAthenaTableName("kalshi", "markets");
+  const physicalTrades = resolveAthenaTableName("kalshi", "trades");
+  if (!database || !physicalMarkets || !physicalTrades) {
+    throw new Error("Kalshi Athena tables are not configured");
+  }
+
+  const needle = tokens;
+
+  let rows = rowsToRecords(
+    await runAthenaSqlQuery({
+      sql: buildKalshiMarketsSearchSql(physicalMarkets, physicalTrades, tokens),
+      database,
+      maxWaitMs: MAX_WAIT_MS,
+      rowLimit: SEARCH_LIMIT,
+    }),
+  );
+
+  let suggestions = rowsToSuggestions(rows, needle);
+
+  if (suggestions.length === 0) {
+    rows = rowsToRecords(
+      await runAthenaSqlQuery({
+        sql: buildKalshiTickerFallbackSql(physicalMarkets, physicalTrades, tokens),
+        database,
+        maxWaitMs: MAX_WAIT_MS,
+        rowLimit: SEARCH_LIMIT,
+      }),
+    );
+    suggestions = rowsToSuggestions(rows, needle);
+  }
+
+  suggestionCache.set(cacheKey, { at: Date.now(), suggestions });
+  if (suggestionCache.size > CACHE_MAX) {
+    const oldest = suggestionCache.keys().next().value;
+    if (oldest) suggestionCache.delete(oldest);
+  }
+
+  return { suggestions };
 }
