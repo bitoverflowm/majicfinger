@@ -458,20 +458,53 @@ function DataLakeSourceCards({
               })}
           </AnimatePresence>
         </motion.div>
-        {!selectedSampleId ? (
-          <div className={cn("relative", HOVER_PREVIEW_SLOT_CLASS)} aria-live="polite">
-            <AnimatePresence mode="wait">
-              {showHoverPreview ? (
-                <ColumnHoverPreview
-                  key={hoveredSampleId}
-                  columns={lakeConfig.getColumnsForSample(hoveredSampleId)}
-                  getDisplayLabel={lakeConfig.getColumnDisplayLabel}
-                  className="absolute inset-0"
-                />
-              ) : null}
-            </AnimatePresence>
-          </div>
-        ) : null}
+        <AnimatePresence initial={false}>
+          {!selectedSampleId ? (
+            <motion.div
+              key="source-explore"
+              layout
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="relative"
+              aria-live="polite"
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {showHoverPreview ? (
+                  <motion.div
+                    key="hover-preview"
+                    initial={{ opacity: 0 }}
+
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className={cn("relative", HOVER_PREVIEW_SLOT_CLASS)}
+                  >
+                    <ColumnHoverPreview
+                      columns={lakeConfig.getColumnsForSample(hoveredSampleId)}
+                      getDisplayLabel={lakeConfig.getColumnDisplayLabel}
+                      className="absolute inset-0"
+                    />
+                  </motion.div>
+                ) : showPowerTools ? (
+                  <motion.div
+                    key="power-tools"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <KalshiPowerToolsSearch
+                      onSelect={onPowerSearchSelect}
+                      disabled={powerSearchDisabled}
+                    />
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
         <AnimatePresence>
           {selectedSampleId ? (
             <ColumnPicker
@@ -494,9 +527,6 @@ function DataLakeSourceCards({
           ) : null}
         </AnimatePresence>
       </div>
-      {showPowerTools && !selectedSampleId ? (
-        <KalshiPowerToolsSearch onSelect={onPowerSearchSelect} disabled={powerSearchDisabled} className="pt-2" />
-      ) : null}
     </div>
   );
 }
