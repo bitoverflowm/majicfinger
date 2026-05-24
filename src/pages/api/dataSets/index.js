@@ -2,6 +2,7 @@ import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
 import mongoose from 'mongoose';
+import { assertQueryUserMatchesSession, requireLoginSession } from "@/lib/resourceOwnership";
 import { buildProjectRevision, summarizeDataSetForList } from "@/lib/projectPersistence";
 import {
     summarizeAdvancedDataStorage,
@@ -27,7 +28,10 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET":
             try {
-                const savedDataSets = await DataSet.find({ user_id: uid })
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                if (!assertQueryUserMatchesSession(uid, session, res)) return;
+                const savedDataSets = await DataSet.find({ user_id: session.userId })
                     .select('data_set_name created_date last_saved_date labels source user_id data_sheets')
                     .lean()
                     .exec();
@@ -43,19 +47,19 @@ export default async function handler(req, res) {
             break;
         case "POST":
             try {
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
                 let body;
                 try {
                     body = await parseJsonBodyMaybeGzip(req);
                 } catch (parseErr) {
                     return res.status(400).json({ success: false, message: parseErr?.message || "Invalid request body" });
                 }
-                const { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source, user_id } = body || {};
-                if (!mongoose.Types.ObjectId.isValid(user_id)) {
-                    return res.status(400).json({ success: false, message: "Invalid user_id" });
-                }
+                const { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source } = body || {};
+                const ownerId = new mongoose.Types.ObjectId(String(session.userId));
                 const storageSummary = summarizeAdvancedDataStorage(data_sheets);
                 if (storageSummary.requiresAdvancedStorage) {
-                    const user = await User.findById(user_id).lean();
+                    const user = await User.findById(ownerId).lean();
                     if (!userCanUseAdvancedDataStorage(user)) {
                         return res.status(403).json({
                             success: false,
@@ -79,7 +83,7 @@ export default async function handler(req, res) {
                         saveMode: "full",
                         savedAt: new Date().toISOString(),
                     },
-                    user_id: new mongoose.Types.ObjectId(user_id)
+                    user_id: ownerId,
                 });
 
                 res.status(201).json({ success: true, data: newDataSet });

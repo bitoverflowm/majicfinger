@@ -1,6 +1,6 @@
 import dbConnect from "@/lib/dbConnect";
 import Chart from "@/models/Charts";
-import { getLoginSession } from "@/lib/auth";
+import { assertDocumentOwner, requireLoginSession } from "@/lib/resourceOwnership";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 
 export default async function handler(req, res) {
@@ -14,10 +14,10 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET":
             try {
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
                 const chart = await Chart.findById(id);
-                if (!chart) {
-                    return res.status(400).json({ success: false, message: `No chart found for id: ${id}` });
-                }
+                if (!assertDocumentOwner(chart, session, res)) return;
                 res.status(200).json({ success: true, data: chart });
             } catch (error) {
                 res.status(400).json({ success: false });
@@ -25,26 +25,14 @@ export default async function handler(req, res) {
             break;
         case "PUT":
             try {
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
                 const chart = await Chart.findById(id);
-                if (!chart) {
-                    return res.status(400).json({ success: false, message: `No chart found for id: ${id}` });
-                }
+                if (!assertDocumentOwner(chart, session, res)) return;
 
                 const wantsEmbed =
                     Object.prototype.hasOwnProperty.call(req.body, "public_slug") ||
                     Object.prototype.hasOwnProperty.call(req.body, "is_public");
-
-                if (wantsEmbed) {
-                    let session;
-                    try {
-                        session = await getLoginSession(req);
-                    } catch {
-                        session = null;
-                    }
-                    if (!session?.userId || String(chart.user_id) !== String(session.userId)) {
-                        return res.status(401).json({ success: false, message: "Unauthorized" });
-                    }
-                }
 
                 const $set = {
                     chart_name: req.body.chart_name,
@@ -84,10 +72,11 @@ export default async function handler(req, res) {
                     }
                 }
 
-                const updatedChart = await Chart.findByIdAndUpdate(id, updateOp, {
-                    new: true,
-                    runValidators: true,
-                });
+                const updatedChart = await Chart.findOneAndUpdate(
+                    { _id: id, user_id: session.userId },
+                    updateOp,
+                    { new: true, runValidators: true },
+                );
                 if (!updatedChart) {
                     return res.status(400).json({ success: false , message: "there was an issue in updating the chart"});
                 }
@@ -98,9 +87,11 @@ export default async function handler(req, res) {
             break;
         case "DELETE":
             try {
-                const deletedChart = await Chart.findByIdAndDelete(id);
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                const deletedChart = await Chart.findOneAndDelete({ _id: id, user_id: session.userId });
                 if (!deletedChart) {
-                    return res.status(400).json({ success: false, message: `No Charts found for id: ${id}` });
+                    return res.status(404).json({ success: false, message: "Not found" });
                 }
                 res.status(200).json({ success: true, message: `Chart with id ${id} deleted successfully` });
             } catch (error) {

@@ -1,6 +1,8 @@
 import dbConnect from "@/lib/dbConnect";
 import Chart from "@/models/Charts";
+import DataSet from "@/models/DataSets";
 import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
+import { assertQueryUserMatchesSession, requireLoginSession } from "@/lib/resourceOwnership";
 
 export default async function handler(req, res) {
     const {
@@ -14,7 +16,10 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET":
             try {
-                const savedCharts = await Chart.find({ user_id: uid })
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                if (!assertQueryUserMatchesSession(uid, session, res)) return;
+                const savedCharts = await Chart.find({ user_id: session.userId })
                     .select('chart_name last_saved_date labels user_id data_set_id public_slug is_public')
                     .exec();
 
@@ -29,18 +34,24 @@ export default async function handler(req, res) {
             break;
         case "POST":
             try {
-                // Validate user_id or assume it's already validated and is being sent in correct format
-                if (!mongoose.Types.ObjectId.isValid(user_id)) {
-                    return res.status(400).json({ success: false, message: "Invalid user_id" });
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                if (!mongoose.Types.ObjectId.isValid(data_set_id)) {
+                    return res.status(400).json({ success: false, message: "Invalid data_set_id" });
                 }
+                const project = await DataSet.findById(data_set_id).select("user_id").lean();
+                if (!project || String(project.user_id) !== String(session.userId)) {
+                    return res.status(404).json({ success: false, message: "Project not found" });
+                }
+                const ownerId = new mongoose.Types.ObjectId(String(session.userId));
                 const newChart = await Chart.create({
                     chart_name,
                     chart_properties,
                     created_date: new Date(created_date),
                     last_saved_date: new Date(last_saved_date),
                     labels,
-                    user_id: new mongoose.Types.ObjectId(user_id),  // Convert user_id string to ObjectId
-                    data_set_id: new mongoose.Types.ObjectId(data_set_id)
+                    user_id: ownerId,
+                    data_set_id: new mongoose.Types.ObjectId(data_set_id),
                 });
 
                 res.status(201).json({ success: true, data: newChart });

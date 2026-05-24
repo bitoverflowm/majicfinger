@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
+import { assertDocumentOwner, requireLoginSession } from "@/lib/resourceOwnership";
 import { buildProjectRevision } from "@/lib/projectPersistence";
 import {
     summarizeAdvancedDataStorage,
@@ -29,10 +30,10 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET":
             try {
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
                 const dataSet = await DataSet.findById(id).lean();
-                if (!dataSet) {
-                    return res.status(400).json({ success: false, message: `No dataSet found for id: ${id}` });
-                }
+                if (!assertDocumentOwner(dataSet, session, res)) return;
                 if (dataSet.forked_from_user_id) {
                     const forkUser = await User.findById(dataSet.forked_from_user_id)
                         .select("user_name")
@@ -48,6 +49,10 @@ export default async function handler(req, res) {
             break;
         case "PUT":
             try {
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                const owned = await DataSet.findById(id).select("user_id").lean();
+                if (!assertDocumentOwner(owned, session, res)) return;
                 let body;
                 try {
                     body = await parseJsonBodyMaybeGzip(req);
@@ -62,8 +67,7 @@ export default async function handler(req, res) {
                 });
                 const storageSummary = summarizeAdvancedDataStorage(body.data_sheets);
                 if (storageSummary.requiresAdvancedStorage) {
-                    const existing = await DataSet.findById(id).select("user_id").lean();
-                    const user = existing?.user_id ? await User.findById(existing.user_id).lean() : null;
+                    const user = await User.findById(session.userId).lean();
                     if (!userCanUseAdvancedDataStorage(user)) {
                         return res.status(403).json({
                             success: false,
@@ -89,10 +93,11 @@ export default async function handler(req, res) {
                         },
                     },
                 };
-                const updatedDataSet = await DataSet.findByIdAndUpdate(id, update, {
-                    new: true,
-                    runValidators: true,
-                });
+                const updatedDataSet = await DataSet.findOneAndUpdate(
+                    { _id: id, user_id: session.userId },
+                    update,
+                    { new: true, runValidators: true },
+                );
                 if (!updatedDataSet) {
                     return res.status(400).json({ success: false , message: "there was an issue in updating the data"});
                 }
@@ -103,15 +108,17 @@ export default async function handler(req, res) {
             break;
         case "PATCH":
             try {
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
                 let body;
                 try {
                     body = await parseJsonBodyMaybeGzip(req);
                 } catch (parseErr) {
                     return res.status(400).json({ success: false, message: parseErr?.message || "Invalid request body" });
                 }
-                const existing = await DataSet.findById(id);
+                const existing = await DataSet.findOne({ _id: id, user_id: session.userId });
                 if (!existing) {
-                    return res.status(400).json({ success: false, message: `No dataSet found for id: ${id}` });
+                    return res.status(404).json({ success: false, message: "Not found" });
                 }
                 const currentRevision = existing.save_revision || buildProjectRevision(existing);
                 if (body.baseRevision && currentRevision && body.baseRevision !== currentRevision) {
@@ -181,9 +188,11 @@ export default async function handler(req, res) {
             break;
         case "DELETE":
             try {
-                const deletedDataSet = await DataSet.findByIdAndDelete(id);
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                const deletedDataSet = await DataSet.findOneAndDelete({ _id: id, user_id: session.userId });
                 if (!deletedDataSet) {
-                    return res.status(400).json({ success: false, message: `No DataSets found for id: ${id}` });
+                    return res.status(404).json({ success: false, message: "Not found" });
                 }
                 res.status(200).json({ success: true, message: `DataSet with id ${id} deleted successfully` });
             } catch (error) {

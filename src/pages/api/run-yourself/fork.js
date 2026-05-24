@@ -23,6 +23,7 @@ import { RUN_YOURSELF_ALL_CATEGORIES } from "@/config/runYourselfDashboardCharts
 import { replayForkedProjectSheets } from "@/lib/runYourself/replayForkedProjectSheets";
 import { resolvePublicRunSource } from "@/lib/runYourself/resolvePublicSource";
 import { dbUserHasPaidAccess } from "@/lib/runYourself/serverPaidAccess";
+import { assertForkCreatedDistinctProject } from "@/lib/runYourself/forkIsolation";
 
 function cloneJson(doc) {
   return JSON.parse(JSON.stringify(doc ?? null));
@@ -241,6 +242,7 @@ export default async function handler(req, res) {
       }),
       save_meta: { saveMode: "full", savedAt: new Date().toISOString() },
     });
+    assertForkCreatedDistinctProject(sourceDataSet._id, newDataSet._id);
 
     /** @type {Map<string, string>} */
     const chartIdMap = new Map();
@@ -259,6 +261,7 @@ export default async function handler(req, res) {
         public_slug: privateForkSlug("fork-chart"),
         labels: Array.isArray(srcChart.labels) ? srcChart.labels : [],
       });
+      assertForkCreatedDistinctProject(srcChart._id, created._id);
       chartIdMap.set(String(srcChart._id), String(created._id));
       newChartIds.push(String(created._id));
     }
