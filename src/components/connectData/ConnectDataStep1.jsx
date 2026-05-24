@@ -55,6 +55,7 @@ import { useDemoProGate } from "@/hooks/useDemoProGate";
 /** Wireframe order + News API (platform integration roadmap). */
 const CONNECT_INTEGRATION_ORDER = [
   "kalshiHistorical",
+  "kalshiLive",
   "polymarket",
   "polymarketHistorical",
   "binance",
@@ -77,6 +78,7 @@ const PREDICTION_TEMPLATES = [{ id: "fork-templates" }];
 /** Solid icon-tile backgrounds on Connect home (match Kalshi / Chainlink pill style). */
 const CONNECT_INTEGRATION_ICON_BG = {
   kalshiHistorical: "bg-[#28CC95]",
+  kalshiLive: "bg-[#28CC95]",
   polymarket: "bg-[#2E5CFF]",
   polymarketHistorical: "bg-[#2E5CFF]",
   binance: "bg-black",
@@ -916,7 +918,7 @@ export default function ConnectDataStep1({
                         </IntegrationIconWrap>
                       }
                       label={row.name}
-                      showDemoTierBadges={embeddedDemo}
+                      showDemoTierBadges={embeddedDemo || row.key === "kalshiLive"}
                       iconClassName={connectIntegrationIconClass(row.key)}
                       iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
                       labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}

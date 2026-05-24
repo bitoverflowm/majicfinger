@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 /** Brand fills for sidebar integration avatars (matches Connect home hub pills). */
 const INTEGRATION_LOGO_BG = {
   kalshiHistorical: "bg-[#28CC95] ring-[#28CC95]/50",
+  kalshiLive: "bg-[#28CC95] ring-[#28CC95]/50",
   chainlink: "bg-[#375BD2] ring-[#375BD2]/50",
 };
 
@@ -41,7 +42,7 @@ function integrationTooltipContent(row) {
 
 function IntegrationRowIcon({ row }) {
   if (row.logoPath) {
-    const branded = row.id === "kalshiHistorical" || row.id === "chainlink";
+    const branded = row.id === "kalshiHistorical" || row.id === "kalshiLive" || row.id === "chainlink";
     return (
       <span
         className={cn(

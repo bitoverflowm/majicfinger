@@ -29,6 +29,7 @@ import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourself
  *   label?: string;
  *   className?: string;
  *   variant?: "chart" | "dashboard";
+ *   forceRunnable?: boolean;
  * }} props
  */
 export function RunForYourselfButton({
@@ -41,6 +42,7 @@ export function RunForYourselfButton({
   label,
   className,
   variant = "chart",
+  forceRunnable = false,
 }) {
   const user = useUser();
   const [authOpen, setAuthOpen] = useState(false);
@@ -59,13 +61,15 @@ export function RunForYourselfButton({
     if (chartId) params.set("chartId", chartId);
     if (kind === "dashboard") params.set("replicateDashboard", "1");
 
-    fetch(`/api/run-yourself/resolve?${params}`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (cancelled) return;
-        if (j?.data?.runnable === false) setNotRunnable(true);
-      })
-      .catch(() => {});
+    if (!forceRunnable) {
+      fetch(`/api/run-yourself/resolve?${params}`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (cancelled) return;
+          if (j?.data?.runnable === false) setNotRunnable(true);
+        })
+        .catch(() => {});
+    }
 
     fetch(`/api/run-yourself/eligibility?${params}`)
       .then((r) => r.json())
@@ -77,7 +81,7 @@ export function RunForYourselfButton({
     return () => {
       cancelled = true;
     };
-  }, [handle, chartSlug, dashboardSlug, chartId, kind, runnable]);
+  }, [handle, chartSlug, dashboardSlug, chartId, kind, runnable, forceRunnable]);
 
   const ctx = {
     kind:
@@ -120,7 +124,8 @@ export function RunForYourselfButton({
   const displayLabel =
     label || (variant === "dashboard" ? "Run this dashboard" : "Run for yourself");
 
-  const disabled = notRunnable || (!!user && quotaExceeded && !userHasPaidAccess(user));
+  const disabled =
+    (!forceRunnable && notRunnable) || (!!user && quotaExceeded && !userHasPaidAccess(user));
 
   const button = (
     <Button

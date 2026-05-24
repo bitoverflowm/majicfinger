@@ -42,7 +42,7 @@ export const integrations_list = [
     color: "#2E5CFF",
     icon: <IntegrationLogoImage src="/polymarket.png" />,
     clickHandler: "polymarket",
-    name: "Polymarket data feed",
+    name: "Polymarket Live Data Feed",
     description: "All real-time decentralized polymarket, prediction market API.",
     guide: {
       href: "/guides/polymarket-events-endpoint-no-code",
@@ -85,6 +85,26 @@ export const integrations_list = [
     },
     tags: ["featured", "crypto", "finance", "trading", "prediction", "data lake"],
     live: true,
+  },
+  {
+    color: "#28CC95",
+    icon: (
+      <div className="integration-logo-avatar relative mx-auto flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--integration-card-bg)] shadow-md">
+        <Image
+          src="/kalshi.png"
+          alt=""
+          fill
+          className="object-contain p-1.5"
+          sizes={`${LOGO_PX}px`}
+        />
+      </div>
+    ),
+    clickHandler: "kalshiLive",
+    name: "Kalshi Live Data Feed",
+    description:
+      "Real-time Kalshi market data, prices, and order flow for live dashboards and alerts.",
+    tags: ["featured", "crypto", "finance", "trading", "prediction", "coming soon", "pro", "lifetime"],
+    live: false,
   },
   {
     color: "#E7F0DC",

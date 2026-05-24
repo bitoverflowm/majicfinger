@@ -9,6 +9,7 @@ export const INTEGRATION_LOGO_BY_HANDLER = {
   polymarket: "/polymarket.png",
   polymarketHistorical: "/polymarket.png",
   kalshiHistorical: "/kalshi.png",
+  kalshiLive: "/kalshi.png",
   twitter: "/x.png",
   wallStreetBets: "/wallStreetBets.png",
   productHunt: "/productHunt.png",
