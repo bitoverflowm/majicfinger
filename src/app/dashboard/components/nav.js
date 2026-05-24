@@ -21,6 +21,7 @@ import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { Progress } from "@/components/ui/progress"
 import { Pause, Play, RotateCw, Square, ExternalLink, Loader2, ChevronDown, ChevronUp } from "lucide-react"
 import { inferDefaultBuilderSnapshot, isPlaceholderChartSheet } from "@/lib/inferDefaultBuilderSnapshot"
+import { normalizeBuilderSnapshot } from "@/lib/chartBundle"
 import {
   applyDataSetToWorkspace,
   finishConnectHomeProjectLoad,
@@ -1004,9 +1005,11 @@ const Nav = () => {
               setLoadedDataMeta(savedDataSets.find(ds => ds._id === chartMeta.data_set_id))
               hydrateProjectCharts(chartMeta.data_set_id, chartMeta._id).then(() => {
                 const incomingSnapshot = cp0?.rechartsBuilder
-                const normalizedSnapshot = incomingSnapshot?.v === 1
-                  ? incomingSnapshot
-                  : inferDefaultBuilderSnapshot(rows)
+                const dataSheets = dataSheetRes?.data?.data_sheets || {}
+                const normalizedSnapshot =
+                  incomingSnapshot?.v === 1
+                    ? normalizeBuilderSnapshot(incomingSnapshot, rows, dataSheets)
+                    : inferDefaultBuilderSnapshot(rows)
                 setLoadedChartBuilderSnapshot?.(normalizedSnapshot)
                 finishConnectHomeProjectLoad({
                   setViewing,

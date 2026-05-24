@@ -9,7 +9,7 @@ import {
 } from "@/lib/hydrateProjectWorkspace";
 
 /**
- * Loads forked project from ?project=&chart=&runYourselfLocked=1 query params.
+ * Loads forked project from ?project=&chart=&runYourselfSession=1 query params.
  */
 export function RunYourselfDashboardLoader({ userId }) {
   const searchParams = useSearchParams();
@@ -22,10 +22,15 @@ export function RunYourselfDashboardLoader({ userId }) {
     if (!projectId || !userId || loadedRef.current) return;
 
     const chartId = searchParams.get("chart");
-    const locked = searchParams.get("runYourselfLocked") === "1";
+    const sessionActive = searchParams.get("runYourselfSession") === "1";
 
     loadedRef.current = true;
-    if (locked) ctx.setRunYourselfLocked?.(true);
+    if (sessionActive) {
+      ctx.setRunYourselfSessionActive?.(true);
+      ctx.setRunYourselfLocked?.(false);
+    } else if (searchParams.get("runYourselfLocked") === "1") {
+      ctx.setRunYourselfLocked?.(true);
+    }
 
     (async () => {
       try {

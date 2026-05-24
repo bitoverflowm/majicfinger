@@ -24,3 +24,14 @@ export function userRunYourselfQuotaExceeded(user) {
   if (userHasPaidAccess(user)) return false;
   return !!user.run_yourself_used_at;
 }
+
+/**
+ * Free-tier user still in their one interactive fork session (full dashboard access).
+ * @param {object | null | undefined} user
+ * @returns {boolean}
+ */
+export function userRunYourselfInteractiveUnlocked(user) {
+  if (!user || userHasPaidAccess(user)) return false;
+  if (!user.run_yourself_fork_data_set_id || !user.run_yourself_used_at) return false;
+  return !user.run_yourself_interactive_consumed_at;
+}

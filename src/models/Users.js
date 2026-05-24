@@ -79,6 +79,10 @@ const UserSchema = new mongoose.Schema({
         ref: "DataSet",
         default: null,
     },
+    run_yourself_interactive_consumed_at: {
+        type: Date,
+        default: null,
+    },
 })
 
 

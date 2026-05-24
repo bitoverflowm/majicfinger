@@ -1,4 +1,4 @@
-import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
+import { coerceCategoricalBuilderAxes, inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 
 /** Per-series line colors in the builder UI are keyed as `line:0`, not as sheet columns; keep them when sanitizing snapshots. */
 function isLineSeriesInstanceOverrideKey(rawKey) {
@@ -91,7 +91,7 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     s.selChartType = fallback.selChartType;
   }
 
-  return s;
+  return coerceCategoricalBuilderAxes(s, keys);
 }
 
 /**

@@ -1,5 +1,7 @@
 import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
+import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
+import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 
 /**
  * Shared helpers to load a saved DataSet (project) into sheet + chart workspace state.
@@ -67,6 +69,8 @@ export function firstDashboardLayoutChartId(layout) {
  * @param {Function} [opts.setActiveChartSheetId]
  * @param {Function} [opts.setLoadedChartMeta]
  * @param {Function} [opts.setLoadedChartBuilderSnapshot]
+ * @param {Record<string, object>} [opts.dataSheets]
+ * @param {unknown[]} [opts.legacyRows]
  */
 export async function hydrateChartSheetsForDataSet({
   dataSetId,
@@ -77,6 +81,8 @@ export async function hydrateChartSheetsForDataSet({
   setActiveChartSheetId,
   setLoadedChartMeta,
   setLoadedChartBuilderSnapshot,
+  dataSheets = null,
+  legacyRows = [],
 }) {
   let allCharts = [];
   if (userId) {
@@ -123,13 +129,24 @@ export async function hydrateChartSheetsForDataSet({
     }),
   );
 
+  const rowsForNormalize = Array.isArray(legacyRows) && legacyRows.length
+    ? legacyRows
+    : Object.values(dataSheets || {}).find((s) => Array.isArray(s?.data) && s.data.length)?.data || [];
+
+  const normalizeSnapshot = (snapshot) => {
+    if (snapshot?.v === 1) {
+      return normalizeBuilderSnapshot(snapshot, rowsForNormalize, dataSheets || {});
+    }
+    return inferDefaultBuilderSnapshot(rowsForNormalize);
+  };
+
   const nextSheets = {};
   detailed.forEach((entry, idx) => {
     const id = `chart-${idx + 1}`;
     nextSheets[id] = {
       name: entry?.meta?.chart_name || `Chart ${idx + 1}`,
       chartMeta: entry?.meta || null,
-      snapshot: entry?.snapshot || null,
+      snapshot: entry?.snapshot ? normalizeSnapshot(entry.snapshot) : null,
     };
   });
   setChartSheets?.(nextSheets);
@@ -140,7 +157,9 @@ export async function hydrateChartSheetsForDataSet({
     "chart-1";
   setActiveChartSheetId?.(activeId);
   setLoadedChartMeta?.(preferred?.meta || null);
-  setLoadedChartBuilderSnapshot?.(preferred?.snapshot || null);
+  setLoadedChartBuilderSnapshot?.(
+    preferred?.snapshot ? normalizeSnapshot(preferred.snapshot) : null,
+  );
 }
 
 /**
@@ -198,6 +217,8 @@ export async function loadFullProjectFromApi({
     setActiveChartSheetId,
     setLoadedChartMeta,
     setLoadedChartBuilderSnapshot,
+    dataSheets: res.data?.data_sheets,
+    legacyRows: res.data?.data,
   });
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
 }

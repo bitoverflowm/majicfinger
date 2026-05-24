@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { userSwrFetcher } from "@/lib/hooks";
+import { userSwrFetcher, mutateUser } from "@/lib/hooks";
 import {
   RUN_YOURSELF_ALL_CATEGORIES,
   defaultChartParameterValues,
@@ -265,11 +265,12 @@ export default function RunYourselfWizard() {
       }
 
       setProgress(100);
-      const { dataSetId, primaryChartId, runYourselfLocked } = json.data || {};
+      await mutateUser();
+      const { dataSetId, primaryChartId } = json.data || {};
       const q = new URLSearchParams();
       if (dataSetId) q.set("project", dataSetId);
       if (primaryChartId) q.set("chart", primaryChartId);
-      if (runYourselfLocked) q.set("runYourselfLocked", "1");
+      q.set("runYourselfSession", "1");
       router.push(`/dashboard?${q.toString()}`);
     } catch (e) {
       clearInterval(tick);

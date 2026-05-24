@@ -299,6 +299,7 @@ export default async function handler(req, res) {
     if (!paid) {
       dbUser.run_yourself_used_at = new Date();
       dbUser.run_yourself_fork_data_set_id = newDataSet._id;
+      dbUser.run_yourself_interactive_consumed_at = null;
       await dbUser.save();
     }
 
@@ -309,7 +310,7 @@ export default async function handler(req, res) {
         chartIds: newChartIds,
         primaryChartId,
         dashboardId: newDashboardId,
-        runYourselfLocked: !paid,
+        runYourselfInteractiveUnlocked: !paid,
       },
     });
   } catch (e) {

@@ -70,6 +70,9 @@ export default async function user(req, res) {
       if (dbUser.run_yourself_fork_data_set_id != null) {
         payload.run_yourself_fork_data_set_id = String(dbUser.run_yourself_fork_data_set_id);
       }
+      if (dbUser.run_yourself_interactive_consumed_at != null) {
+        payload.run_yourself_interactive_consumed_at = dbUser.run_yourself_interactive_consumed_at;
+      }
     }
 
     if (isOwnerFullAccessUser(payload)) {

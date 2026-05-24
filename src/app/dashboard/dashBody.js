@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
@@ -28,6 +28,10 @@ import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
 import { isDevLoginBypassUser } from "@/lib/devLoginBypass";
 import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
+import {
+  userRunYourselfInteractiveUnlocked,
+} from "@/lib/runYourself/hasPaidAccess";
+import { consumeRunYourselfInteractiveSession } from "@/lib/runYourself/consumeInteractiveSession";
 
 const DashBody = ({ user }) => {
     const contextStateV2 = useMyStateV2()
@@ -95,6 +99,38 @@ const DashBody = ({ user }) => {
       ));
     const isLocked = !hasPaidAccess;
     const runYourselfLocked = !!contextStateV2?.runYourselfLocked;
+    const runYourselfSessionActive = !!contextStateV2?.runYourselfSessionActive;
+    const loadedDataId = contextStateV2?.loadedDataId;
+    const forkDataSetId = user?.run_yourself_fork_data_set_id
+      ? String(user.run_yourself_fork_data_set_id)
+      : null;
+    const viewingForkProject =
+      !!forkDataSetId &&
+      !!loadedDataId &&
+      String(loadedDataId) === forkDataSetId;
+    const runYourselfInteractiveUnlocked =
+      userRunYourselfInteractiveUnlocked(user) &&
+      (runYourselfSessionActive || viewingForkProject);
+    const dashboardAccessLocked = isLocked && !runYourselfInteractiveUnlocked;
+    const wasOnForkProjectRef = useRef(false);
+
+    useEffect(() => {
+      if (!userRunYourselfInteractiveUnlocked(user)) {
+        wasOnForkProjectRef.current = false;
+        return;
+      }
+
+      if (viewingForkProject) {
+        wasOnForkProjectRef.current = true;
+        return;
+      }
+
+      if (wasOnForkProjectRef.current) {
+        wasOnForkProjectRef.current = false;
+        contextStateV2?.setRunYourselfSessionActive?.(false);
+        void consumeRunYourselfInteractiveSession();
+      }
+    }, [viewingForkProject, user, contextStateV2]);
 
     useEffect(() => {
         if (viewing === "upload") {
@@ -434,7 +470,7 @@ const DashBody = ({ user }) => {
     );
 
     const paywallOverlay =
-      !isDemo && (isLocked || runYourselfLocked) && user ? (
+      !isDemo && (dashboardAccessLocked || runYourselfLocked) && user ? (
         <div className="pointer-events-auto fixed bottom-5 left-1/2 z-[999] w-[min(94vw,42rem)] -translate-x-1/2 rounded-xl border-2 border-primary/50 bg-card p-5 shadow-2xl ring-4 ring-primary/15">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -468,7 +504,7 @@ const DashBody = ({ user }) => {
         <div
           className={cn(
             "flex min-h-0 min-w-0 flex-1 flex-col",
-            isLocked && "pointer-events-none select-none",
+            isLocked && !runYourselfInteractiveUnlocked && "pointer-events-none select-none",
           )}
         >
           {content}
