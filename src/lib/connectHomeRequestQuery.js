@@ -5,6 +5,30 @@ export function integrationLabelFromLake(lake) {
   return key ? `${key.charAt(0).toUpperCase()}${key.slice(1)}` : "Data Lake";
 }
 
+/** Human-readable WHERE clause from compose filter `{ and, or }`. */
+export function summarizeComposeWhereFilters(filters) {
+  const and = Array.isArray(filters?.and) ? filters.and : [];
+  if (!and.length) return { hasWhere: false, text: "" };
+  const parts = and
+    .map((f) => {
+      const c = String(f?.column ?? f?.field ?? "").trim();
+      const op = String(f?.op || "").trim();
+      const v = f?.value;
+      if (!c || !op) return "";
+      if (op === "in" || op === "not_in") {
+        const vals = Array.isArray(v) ? v : [];
+        const cleaned = vals.map((x) => String(x).trim()).filter(Boolean);
+        if (cleaned.length <= 3) return `${c} ${op} (${cleaned.map((x) => `"${x}"`).join(", ")})`;
+        return `${c} ${op} (…)`;
+      }
+      if (typeof v === "string") return `${c} ${op} "${v}"`;
+      if (typeof v === "number" && Number.isFinite(v)) return `${c} ${op} ${v}`;
+      return `${c} ${op}`;
+    })
+    .filter(Boolean);
+  return { hasWhere: parts.length > 0, text: parts.join(" AND ") };
+}
+
 function selectLabelsFromCardOrSpec(card, composeSpec) {
   if (Array.isArray(card?.selectAliases) && card.selectAliases.length) {
     return card.selectAliases.map((s) => String(s).trim()).filter(Boolean);

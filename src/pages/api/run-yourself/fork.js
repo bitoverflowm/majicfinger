@@ -31,6 +31,7 @@ import {
   forkChartSubheadingFromParams,
 } from "@/lib/runYourself/forkPresentation";
 import { renameForkedSheets } from "@/lib/runYourself/forkSheetNaming";
+import { refreshForkSheetRequestMetadata } from "@/lib/runYourself/refreshForkSheetRequestMetadata";
 
 function cloneJson(doc) {
   return JSON.parse(JSON.stringify(doc ?? null));
@@ -218,6 +219,11 @@ export default async function handler(req, res) {
       patchKind,
     });
     patchedSheets = renameForkedSheets({
+      dataSheets: patchedSheets,
+      sheetOrder,
+      presentation,
+    });
+    patchedSheets = refreshForkSheetRequestMetadata({
       dataSheets: patchedSheets,
       sheetOrder,
       presentation,

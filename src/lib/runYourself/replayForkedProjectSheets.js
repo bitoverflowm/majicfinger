@@ -1,5 +1,5 @@
 import { runRehydrateSheetCore, buildSheetProvenanceGraphForRehydrate } from "@/lib/dataLake/rehydrateSheetCore";
-import { replayOperations, normalizeOperationHistory } from "@/lib/projectPersistence";
+import { refreshForkOperationHistory } from "@/lib/runYourself/refreshForkSheetRequestMetadata";
 import { normalizeLakeBigintFieldsInRows } from "@/lib/dataLake/lakeBigintNormalize";
 
 /**
@@ -46,7 +46,7 @@ export async function replayForkedProjectSheets({ dataSheets, sheetOrder, access
           rowCount: rows.length,
           fullRowCount: json?.rowCount ?? rows.length,
           columns: Array.isArray(json?.columns) ? json.columns : sheet.columns,
-          operationHistory: normalizeOperationHistory({ ...sheet, provenance }),
+          operationHistory: refreshForkOperationHistory({ ...sheet, provenance }),
         };
       } catch (err) {
         throw new Error(`Failed to rehydrate sheet "${sheet.name || sheetId}": ${err?.message || err}`);
@@ -66,7 +66,7 @@ export async function replayForkedProjectSheets({ dataSheets, sheetOrder, access
     }
 
     let rows = [...parentRows];
-    const history = normalizeOperationHistory(sheet);
+    const history = refreshForkOperationHistory(sheet);
     for (const op of history) {
       if (op?.type === "source.compose") continue;
       if (op?.type === "bucket.sheet") {
