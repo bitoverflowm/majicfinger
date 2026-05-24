@@ -10,7 +10,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useUser } from "@/lib/hooks";
-import { isRunnablePublicChart, isRunnablePublicDashboard } from "@/config/runYourselfAnalyses";
 import { userHasPaidAccess, userRunYourselfQuotaExceeded } from "@/lib/runYourself/hasPaidAccess";
 import {
   buildTryUrlFromContext,
@@ -30,7 +29,6 @@ import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourself
  *   label?: string;
  *   className?: string;
  *   variant?: "chart" | "dashboard";
- *   forceRunnable?: boolean;
  * }} props
  */
 export function RunForYourselfButton({
@@ -43,25 +41,32 @@ export function RunForYourselfButton({
   label,
   className,
   variant = "chart",
-  forceRunnable = false,
 }) {
   const user = useUser();
   const [authOpen, setAuthOpen] = useState(false);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [notRunnable, setNotRunnable] = useState(false);
 
-  const slug = chartSlug || dashboardSlug || "";
-  const runnable =
-    forceRunnable ||
-    (chartSlug ? isRunnablePublicChart(ownerHandle, chartSlug) : false) ||
-    (dashboardSlug ? isRunnablePublicDashboard(ownerHandle, dashboardSlug) : false);
+  const handle = String(ownerHandle || "").trim();
+  const runnable = !!handle && (!!chartSlug || !!dashboardSlug || !!chartId);
 
   useEffect(() => {
-    if (!runnable || !ownerHandle || !slug) return;
+    if (!runnable || !handle) return;
     let cancelled = false;
-    const params = new URLSearchParams({
-      ownerHandle,
-      ...(chartSlug ? { chartSlug } : { dashboardSlug: dashboardSlug || slug }),
-    });
+    const params = new URLSearchParams({ ownerHandle: handle });
+    if (chartSlug) params.set("chartSlug", chartSlug);
+    if (dashboardSlug) params.set("dashboardSlug", dashboardSlug);
+    if (chartId) params.set("chartId", chartId);
+    if (kind === "dashboard") params.set("replicateDashboard", "1");
+
+    fetch(`/api/run-yourself/resolve?${params}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        if (j?.data?.runnable === false) setNotRunnable(true);
+      })
+      .catch(() => {});
+
     fetch(`/api/run-yourself/eligibility?${params}`)
       .then((r) => r.json())
       .then((j) => {
@@ -72,7 +77,7 @@ export function RunForYourselfButton({
     return () => {
       cancelled = true;
     };
-  }, [ownerHandle, slug, chartSlug, dashboardSlug, runnable]);
+  }, [handle, chartSlug, dashboardSlug, chartId, kind, runnable]);
 
   const ctx = {
     kind:
@@ -81,7 +86,7 @@ export function RunForYourselfButton({
         : kind === "dashboard" || (dashboardSlug && !chartSlug && !chartId)
           ? "dashboard"
           : "chart",
-    ownerHandle,
+    ownerHandle: handle,
     ...(chartSlug ? { chartSlug } : {}),
     ...(dashboardSlug ? { dashboardSlug } : {}),
     ...(chartId ? { chartId } : {}),
@@ -94,7 +99,7 @@ export function RunForYourselfButton({
   }, [ctx]);
 
   const handleClick = useCallback(() => {
-    if (!runnable) return;
+    if (!runnable || notRunnable) return;
 
     if (user && userRunYourselfQuotaExceeded(user) && !userHasPaidAccess(user)) {
       navigateToRunFlow("/#pricing");
@@ -108,14 +113,14 @@ export function RunForYourselfButton({
 
     saveRunSourceContext(ctx);
     setAuthOpen(true);
-  }, [user, runnable, goToTry, ctx]);
+  }, [user, runnable, notRunnable, goToTry, ctx]);
 
   if (!runnable) return null;
 
   const displayLabel =
     label || (variant === "dashboard" ? "Run this dashboard" : "Run for yourself");
 
-  const disabled = !!user && quotaExceeded && !userHasPaidAccess(user);
+  const disabled = notRunnable || (!!user && quotaExceeded && !userHasPaidAccess(user));
 
   const button = (
     <Button
@@ -141,7 +146,11 @@ export function RunForYourselfButton({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
-            <TooltipContent>Upgrade to Pro to run more analyses</TooltipContent>
+            <TooltipContent>
+              {notRunnable
+                ? "This chart uses data that cannot be replayed yet"
+                : "Upgrade to Pro to run more analyses"}
+            </TooltipContent>
           </Tooltip>
         </TooltipProvider>
       ) : (

@@ -12,6 +12,7 @@ import {
   RUN_YOURSELF_ALL_CATEGORIES,
 } from "@/config/runYourselfDashboardCharts";
 import { KALSHI_GROUP_COLORS } from "@/lib/kalshi/kalshiCategoryTaxonomy";
+import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
 
 const KALSHI_CATEGORY_OPTIONS = Object.keys(KALSHI_GROUP_COLORS);
 
@@ -127,6 +128,21 @@ export function RunYourselfDashboardChartParamRow({ chart, values, onChange, dis
             disabled={disabled}
             label="Polymarket category"
           />
+        </div>
+      ) : null}
+
+      {chart.parameterMode === "trade_search" || chart.parameterMode === "market_search" ? (
+        <div className="space-y-2">
+          <KalshiPowerToolsSearch
+            onSelect={(s) => update({ ticker: s.ticker })}
+            disabled={disabled}
+            parameterMode={chart.parameterMode}
+          />
+          {values.ticker ? (
+            <p className="text-xs text-muted-foreground">
+              Selected: <span className="font-medium text-foreground">{values.ticker}</span>
+            </p>
+          ) : null}
         </div>
       ) : null}
 

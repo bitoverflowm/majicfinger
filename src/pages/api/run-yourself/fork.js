@@ -5,19 +5,22 @@ import Chart from "@/models/Charts";
 import ChartDashboard from "@/models/ChartDashboards";
 import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
-import { getRunYourselfAnalysisById, findAnalysisForSourceDashboard, isDashboardRunAnalysis, resolveDashboardForkSource } from "@/config/runYourselfAnalyses";
+import { findAnalysisForSourceDashboard, getRunYourselfAnalysisById } from "@/config/runYourselfAnalyses";
+import {
+  inferDashboardChartManifest,
+  inferRunConfigForChart,
+  inferRunConfigForDashboard,
+  mergeRunConfig,
+} from "@/lib/runYourself/inferRunYourselfConfig";
 import { getAthenaAccessForUserId } from "@/lib/athenaAccess";
 import { buildProjectRevision } from "@/lib/projectPersistence";
 import { collectSheetClosureForCharts, pickSheetsSubset } from "@/lib/runYourself/collectSheetClosure";
 import { patchAllSheetProvenance } from "@/lib/runYourself/patchProvenanceParameter";
-import { patchDashboardSheetsByChart, patchSheetsForDashboardChart } from "@/lib/runYourself/patchDashboardChartSheets";
+import { patchDashboardSheetsByChartDynamic, patchSheetsForDashboardChart } from "@/lib/runYourself/patchDashboardChartSheets";
+import { RUN_YOURSELF_ALL_CATEGORIES } from "@/config/runYourselfDashboardCharts";
 import { replayForkedProjectSheets } from "@/lib/runYourself/replayForkedProjectSheets";
 import { resolvePublicRunSource } from "@/lib/runYourself/resolvePublicSource";
 import { dbUserHasPaidAccess } from "@/lib/runYourself/serverPaidAccess";
-import {
-  getDashboardChartSlots,
-  resolveDashboardChartSlotFromManifest,
-} from "@/config/runYourselfDashboardCharts";
 
 function cloneJson(doc) {
   return JSON.parse(JSON.stringify(doc ?? null));
@@ -51,22 +54,13 @@ export default async function handler(req, res) {
   const chartParameters = body.chartParameters && typeof body.chartParameters === "object" ? body.chartParameters : {};
   const replicateDashboard = !!body.replicateDashboard;
 
-  const analysis = getRunYourselfAnalysisById(analysisId);
-  if (!analysis) {
-    return res.status(400).json({ success: false, message: "Unknown analysis" });
-  }
-
-  const isDashboardFork = replicateDashboard && isDashboardRunAnalysis(analysis);
   const isDashboardChartFork =
-    !isDashboardFork &&
+    !replicateDashboard &&
     !!String(source.dashboardSlug || "").trim() &&
     !!String(source.chartId || "").trim();
-  const paramValue = String(parameter.value || "").trim();
-  if (!isDashboardFork && !isDashboardChartFork && !paramValue) {
-    return res.status(400).json({ success: false, message: "Missing analysis parameter" });
-  }
 
-  const patchKind = parameter.mode === "category" ? "category" : "ticker";
+  const paramValue = String(parameter.value || "").trim();
+  const paramIsDashboardPlaceholder = paramValue === "dashboard";
 
   try {
     await dbConnect();
@@ -92,26 +86,16 @@ export default async function handler(req, res) {
       source.dashboardSlug && source.ownerHandle
         ? findAnalysisForSourceDashboard(source.ownerHandle, source.dashboardSlug)
         : null;
-    const shouldReplicateDashboard =
-      isDashboardFork &&
-      (analysisId === dashboardAnalysis?.id ||
-        (!source.dashboardSlug && isDashboardRunAnalysis(analysis)));
-
-    const forkDashSource = shouldReplicateDashboard
-      ? resolveDashboardForkSource(analysis, source)
-      : null;
+    const curatedAnalysis = analysisId ? getRunYourselfAnalysisById(analysisId) : null;
+    const shouldReplicateDashboard = replicateDashboard && !!source.dashboardSlug;
 
     const chartSlug =
-      (!shouldReplicateDashboard && !isDashboardChartFork && analysis.sourceCharts?.[0]?.slug) ||
-      source.chartSlug ||
-      "";
+      (!shouldReplicateDashboard && !isDashboardChartFork && source.chartSlug) || "";
 
-    const resolved = await resolvePublicRunSource(forkDashSource?.ownerHandle || source.ownerHandle, {
+    const resolved = await resolvePublicRunSource(source.ownerHandle, {
       chartSlug: shouldReplicateDashboard || isDashboardChartFork ? undefined : chartSlug,
       dashboardSlug:
-        shouldReplicateDashboard || isDashboardChartFork
-          ? forkDashSource?.dashboardSlug || source.dashboardSlug
-          : undefined,
+        shouldReplicateDashboard || isDashboardChartFork ? source.dashboardSlug : undefined,
       chartId: isDashboardChartFork ? source.chartId : undefined,
       replicateDashboard: shouldReplicateDashboard,
     });
@@ -120,30 +104,62 @@ export default async function handler(req, res) {
     const sourceCharts = resolved.charts;
     const primarySourceChart = resolved.primaryChart;
 
+    const inferred = shouldReplicateDashboard
+      ? inferRunConfigForDashboard(sourceDataSet.data_sheets || {}, sourceCharts, resolved.dashboard)
+      : inferRunConfigForChart(sourceDataSet.data_sheets || {}, primarySourceChart);
+    const runConfig = mergeRunConfig(curatedAnalysis || dashboardAnalysis, inferred);
+
+    if (!runConfig.runnable) {
+      return res.status(400).json({
+        success: false,
+        message: runConfig.reason || "This chart cannot be run for yourself yet.",
+      });
+    }
+
+    const isCategoryParam =
+      parameter.mode === "category" ||
+      runConfig.parameterMode === "category_optional" ||
+      runConfig.parameterMode === "dual_category_optional";
+    const patchKind = isCategoryParam ? "category" : "ticker";
+
+    const needsParam =
+      !shouldReplicateDashboard &&
+      !isDashboardChartFork &&
+      !paramIsDashboardPlaceholder &&
+      runConfig.parameterMode !== "category_optional" &&
+      runConfig.parameterMode !== "none";
+
+    if (needsParam && !paramValue) {
+      return res.status(400).json({ success: false, message: "Missing analysis parameter" });
+    }
+
     const sheetOrder = collectSheetClosureForCharts(
       sourceDataSet.data_sheets || {},
       sourceCharts,
     );
     const subsetSheets = pickSheetsSubset(sourceDataSet.data_sheets || {}, sheetOrder);
 
+    const dashboardManifest = inferDashboardChartManifest(
+      sourceDataSet.data_sheets || {},
+      sourceCharts,
+      resolved.dashboard?.layout,
+    );
+
     let patchedSheets;
     if (shouldReplicateDashboard && resolved.dashboard) {
-      patchedSheets = patchDashboardSheetsByChart(
+      patchedSheets = patchDashboardSheetsByChartDynamic(
         subsetSheets,
         sourceCharts,
         resolved.dashboard.layout,
-        analysisId,
+        dashboardManifest,
         chartParameters,
       );
     } else if (isDashboardChartFork) {
       const layoutColumnKey = String(source.layoutColumnKey || "").trim();
       const slot =
-        getDashboardChartSlots(analysisId).find((s) => s.key === layoutColumnKey) ||
-        resolveDashboardChartSlotFromManifest(analysisId, {
-          key: layoutColumnKey,
-          layoutColumnId: layoutColumnKey,
-          title: primarySourceChart?.chart_name,
-        });
+        dashboardManifest.find(
+          (c) => c.chartId === String(source.chartId) || c.key === layoutColumnKey,
+        ) || dashboardManifest.find((c) => c.layoutColumnId === layoutColumnKey);
       const slotKey = slot?.key || layoutColumnKey;
       const params = chartParameters[slotKey] || chartParameters[layoutColumnKey] || {};
       const parameterMode = slot?.parameterMode || "category_optional";
@@ -153,11 +169,16 @@ export default async function handler(req, res) {
         params,
         parameterMode,
       );
+    } else if (
+      runConfig.parameterMode === "category_optional" &&
+      (paramValue === RUN_YOURSELF_ALL_CATEGORIES || !paramValue)
+    ) {
+      patchedSheets = subsetSheets;
     } else {
       patchedSheets = patchAllSheetProvenance(subsetSheets, paramValue, {
         patchKind,
-        tickerColumns: analysis.tickerFilterColumns || [],
-        categoryColumns: analysis.categoryFilterColumns || ["kalshi_taxonomy_category", "category"],
+        tickerColumns: runConfig.tickerFilterColumns || [],
+        categoryColumns: runConfig.categoryFilterColumns || ["kalshi_taxonomy_category", "category"],
       });
     }
 
@@ -173,12 +194,16 @@ export default async function handler(req, res) {
       ? patchedSheets[firstSheetId].data
       : [];
 
-    const chartTitle = primarySourceChart?.chart_name || analysis.label;
+    const chartTitle = primarySourceChart?.chart_name || runConfig.label;
+    const paramLabel =
+      paramValue && paramValue !== RUN_YOURSELF_ALL_CATEGORIES ? paramValue : null;
     const projectName = shouldReplicateDashboard
-      ? `${analysis.label}`.slice(0, 100)
+      ? `${runConfig.label}`.slice(0, 100)
       : isDashboardChartFork
         ? `${chartTitle}`.slice(0, 100)
-        : `${analysis.label} — ${paramValue}`.slice(0, 100);
+        : paramLabel
+          ? `${runConfig.label} — ${paramLabel}`.slice(0, 100)
+          : `${runConfig.label}`.slice(0, 100);
 
     const newDataSet = await DataSet.create({
       data_set_name: projectName,
@@ -190,10 +215,11 @@ export default async function handler(req, res) {
       source: "project",
       user_id: newUserId,
       forked_from_user_id: resolved.owner._id,
+      forked_from_user_handle: resolved.owner.user_name || null,
       forked_from_data_set_id: sourceDataSet._id,
       forked_from_chart_id: primarySourceChart?._id || null,
       forked_at: new Date(),
-      run_yourself_analysis_id: analysisId,
+      run_yourself_analysis_id: runConfig.id || analysisId || null,
       save_revision: buildProjectRevision({
         data_set_name: projectName,
         data_sheets: patchedSheets,
@@ -212,7 +238,7 @@ export default async function handler(req, res) {
         Array.isArray(srcChart.chart_properties) ? srcChart.chart_properties : [],
       );
       const created = await Chart.create({
-        chart_name: srcChart.chart_name || analysis.label,
+        chart_name: srcChart.chart_name || runConfig.label,
         chart_properties: cp,
         data_set_id: newDataSet._id,
         user_id: newUserId,

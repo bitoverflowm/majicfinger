@@ -1,8 +1,52 @@
 import { getLoginSession } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
-import { isRunnableRunYourselfSource } from "@/config/runYourselfAnalyses";
 import { dbUserHasPaidAccess } from "@/lib/runYourself/serverPaidAccess";
+import { resolvePublicRunSource } from "@/lib/runYourself/resolvePublicSource";
+import {
+  inferRunConfigForChart,
+  inferRunConfigForDashboard,
+  mergeRunConfig,
+} from "@/lib/runYourself/inferRunYourselfConfig";
+import { findAnalysisForSourceChart, findAnalysisForSourceDashboard } from "@/config/runYourselfAnalyses";
+
+async function checkRunnable(ownerHandle, chartSlug, dashboardSlug, chartId) {
+  try {
+    if (chartId && dashboardSlug) {
+      const resolved = await resolvePublicRunSource(ownerHandle, { dashboardSlug, chartId });
+      const inferred = inferRunConfigForChart(
+        resolved.dataSet.data_sheets || {},
+        resolved.primaryChart,
+      );
+      return inferred.runnable;
+    }
+    if (dashboardSlug) {
+      const resolved = await resolvePublicRunSource(ownerHandle, {
+        dashboardSlug,
+        replicateDashboard: true,
+      });
+      const curated = findAnalysisForSourceDashboard(ownerHandle, dashboardSlug);
+      const inferred = inferRunConfigForDashboard(
+        resolved.dataSet.data_sheets || {},
+        resolved.charts,
+        resolved.dashboard,
+      );
+      return mergeRunConfig(curated, inferred).runnable;
+    }
+    if (chartSlug) {
+      const resolved = await resolvePublicRunSource(ownerHandle, { chartSlug });
+      const curated = findAnalysisForSourceChart(ownerHandle, chartSlug);
+      const inferred = inferRunConfigForChart(
+        resolved.dataSet.data_sheets || {},
+        resolved.primaryChart,
+      );
+      return mergeRunConfig(curated, inferred).runnable;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -10,13 +54,21 @@ export default async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  const { ownerHandle, chartSlug, dashboardSlug } = req.query;
+  const { ownerHandle, chartSlug, dashboardSlug, chartId } = req.query;
   const handle = String(ownerHandle || "").trim();
   const chart = String(chartSlug || "").trim();
   const dash = String(dashboardSlug || "").trim();
-  const runnable = handle
-    ? isRunnableRunYourselfSource(handle, chart, dash || undefined)
-    : false;
+  const cId = String(chartId || "").trim();
+
+  let runnable = false;
+  if (handle && (chart || dash || cId)) {
+    try {
+      await dbConnect();
+      runnable = await checkRunnable(handle, chart, dash, cId);
+    } catch {
+      runnable = false;
+    }
+  }
 
   let session = null;
   try {

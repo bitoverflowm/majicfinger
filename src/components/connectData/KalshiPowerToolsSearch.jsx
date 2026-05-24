@@ -256,10 +256,7 @@ export function KalshiPowerToolsSearch({
               className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-popover py-1 text-left shadow-md"
             >
               {suggestions.map((s) => {
-                const displayEntity =
-                  parameterMode === "trade_search" ? "market" : s.entity;
-                const displayEntityKind =
-                  parameterMode === "trade_search" ? "markets" : s.entity;
+                const showEntityBadge = parameterMode !== "trade_search";
                 return (
                 <motion.li key={suggestionKey(s)} role="option" variants={suggestionRowVariants}>
                   <button
@@ -270,17 +267,21 @@ export function KalshiPowerToolsSearch({
                     onClick={() => handleSelect(s)}
                   >
                     <span className="font-medium text-foreground line-clamp-2">{s.title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      <span
-                        className={cn(
-                          "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium capitalize tracking-wide",
-                          entityTagClass(displayEntityKind),
-                        )}
-                      >
-                        {displayEntity}
+                    {parameterMode === "trade_search" ? (
+                      <span className="text-xs text-muted-foreground font-mono">{s.ticker}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium capitalize tracking-wide",
+                            entityTagClass(s.entity),
+                          )}
+                        >
+                          {s.entity}
+                        </span>
+                        {s.subtitle ? ` · ${s.subtitle}` : ""}
                       </span>
-                      {s.subtitle ? ` · ${s.subtitle}` : ""}
-                    </span>
+                    )}
                   </button>
                 </motion.li>
                 );

@@ -128,6 +128,9 @@ export function resolveDashboardChartSlotFromManifest(analysisId, chart) {
 
 /** @param {DashboardChartParameterMode} mode */
 export function defaultChartParameterValues(mode) {
+  if (mode === "trade_search" || mode === "market_search") {
+    return { ticker: "" };
+  }
   if (mode === "dual_category_optional") {
     return {
       kalshiCategory: RUN_YOURSELF_ALL_CATEGORIES,

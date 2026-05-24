@@ -131,11 +131,24 @@ function patchSheetCategory(sheet, categoryValue, lakeScope = "any") {
   return { ...sheet, provenance };
 }
 
+function patchSheetTicker(sheet, tickerValue, tickerColumns) {
+  if (!sheet?.provenance) return sheet;
+  const value = String(tickerValue || "").trim();
+  if (!value) return sheet;
+  return {
+    ...sheet,
+    provenance: patchProvenanceParameter(sheet.provenance, value, {
+      patchKind: "ticker",
+      extraColumns: tickerColumns,
+    }),
+  };
+}
+
 /**
  * @param {Record<string, object>} dataSheets
  * @param {object} chart
- * @param {{ kalshiCategory?: string; polymarketCategory?: string }} params
- * @param {import("@/config/runYourselfDashboardCharts").DashboardChartParameterMode} parameterMode
+ * @param {{ kalshiCategory?: string; polymarketCategory?: string; ticker?: string }} params
+ * @param {string} parameterMode
  */
 export function patchSheetsForDashboardChart(dataSheets, chart, params, parameterMode) {
   if (parameterMode === "none") return dataSheets;
@@ -148,12 +161,15 @@ export function patchSheetsForDashboardChart(dataSheets, chart, params, paramete
   }
 
   const out = { ...dataSheets };
+  const tickerColumns = ["ticker", "market_ticker", "event_ticker"];
 
   for (const sheetId of patchTargets) {
     let sheet = out[sheetId];
     if (!sheet) continue;
 
-    if (parameterMode === "category_optional") {
+    if (parameterMode === "trade_search" || parameterMode === "market_search") {
+      sheet = patchSheetTicker(sheet, params.ticker, tickerColumns);
+    } else if (parameterMode === "category_optional") {
       sheet = patchSheetCategory(sheet, params.kalshiCategory, "kalshi");
       if (!sheetLake(sheet)) {
         sheet = patchSheetCategory(sheet, params.kalshiCategory, "any");
@@ -164,6 +180,45 @@ export function patchSheetsForDashboardChart(dataSheets, chart, params, paramete
     }
 
     out[sheetId] = sheet;
+  }
+
+  return out;
+}
+
+/**
+ * Apply per-chart parameters across a dashboard fork using dynamic manifest slots.
+ *
+ * @param {Record<string, object>} dataSheets
+ * @param {object[]} sourceCharts
+ * @param {object} dashboardLayout
+ * @param {object[]} manifest
+ * @param {Record<string, { kalshiCategory?: string; polymarketCategory?: string; ticker?: string }>} chartParameters
+ */
+export function patchDashboardSheetsByChartDynamic(
+  dataSheets,
+  sourceCharts,
+  dashboardLayout,
+  manifest,
+  chartParameters,
+) {
+  let out = cloneSheets(dataSheets);
+  const chartsById = new Map(sourceCharts.map((c) => [String(c._id), c]));
+  const slotByChartId = new Map(manifest.map((m) => [String(m.chartId), m]));
+  const rows = Array.isArray(dashboardLayout?.rows) ? dashboardLayout.rows : [];
+
+  for (const row of rows) {
+    if (row?.type !== "cards" || !Array.isArray(row.columns)) continue;
+    for (const col of row.columns) {
+      const chartId = col?.chart_id ? String(col.chart_id) : "";
+      const chart = chartsById.get(chartId);
+      if (!chart) continue;
+
+      const slot = slotByChartId.get(chartId) || manifest.find((m) => m.key === col.id);
+      if (!slot || slot.parameterMode === "none") continue;
+
+      const params = chartParameters[slot.key] || chartParameters[col.id] || {};
+      out = patchSheetsForDashboardChart(out, chart, params, slot.parameterMode);
+    }
   }
 
   return out;

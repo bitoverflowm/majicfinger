@@ -6,7 +6,6 @@ import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
-import { isRunnablePublicChart } from "@/config/runYourselfAnalyses";
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
@@ -64,11 +63,7 @@ export function PublicDashboardChartBlock({
       ? chart.chart_properties[0]
       : {};
 
-  const chartRunnable = !!(chartSlug && ownerHandle && isRunnablePublicChart(ownerHandle, chartSlug));
-  const showRunCta = !!(
-    ownerHandle &&
-    (chartRunnable || (dashboardRunnable && dashboardSlug && chartId))
-  );
+  const showRunCta = !!(ownerHandle && (chartSlug || (dashboardSlug && chartId)));
 
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
@@ -89,12 +84,11 @@ export function PublicDashboardChartBlock({
           <div className="pointer-events-auto absolute bottom-2 right-2 z-10">
             <RunForYourselfButton
               ownerHandle={ownerHandle}
-              chartSlug={chartRunnable ? chartSlug : undefined}
+              chartSlug={chartSlug || undefined}
               dashboardSlug={dashboardSlug}
-              chartId={chartRunnable ? undefined : chartId}
+              chartId={chartId}
               layoutColumnKey={layoutColumnKey}
-              kind={chartRunnable ? "chart" : "dashboard_chart"}
-              forceRunnable={!chartRunnable && dashboardRunnable}
+              kind={chartSlug ? "chart" : "dashboard_chart"}
               className="shadow-md gap-1 rounded-full px-3 py-2 text-xs font-semibold h-auto"
             />
           </div>

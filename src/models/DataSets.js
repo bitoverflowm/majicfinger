@@ -50,6 +50,10 @@ const DataSetSchema = new mongoose.Schema({
         ref: "User",
         default: null,
     },
+    forked_from_user_handle: {
+        type: String,
+        default: null,
+    },
     forked_from_data_set_id: {
         type: Schema.Types.ObjectId,
         ref: "DataSet",

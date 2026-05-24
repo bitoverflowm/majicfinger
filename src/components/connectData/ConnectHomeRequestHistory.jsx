@@ -10,6 +10,8 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { collectRequestCardEntries, fmtRequestElapsed } from "@/lib/connectHomeRequestCards";
 import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery";
 import {
+  describeForkProject,
+  extractSheetVariationLines,
   integrationLabelFromLake,
   listConnectHomeSheetHistory,
   requestCardSummaryLabel,
@@ -48,6 +50,7 @@ function finishReplayPullProgress(setConnectDataLakePullState) {
 export function ConnectHomeRequestHistory({ className }) {
   const ctx = useMyStateV2() ?? {};
   const dataSheets = ctx.dataSheets || {};
+  const loadedDataMeta = ctx.loadedDataMeta || null;
   const activeSheetId = ctx.activeSheetId;
   const setActiveSheetId = ctx.setActiveSheetId;
   const setDataSheets = ctx.setDataSheets;
@@ -59,6 +62,7 @@ export function ConnectHomeRequestHistory({ className }) {
 
   const sheetHistory = useMemo(() => listConnectHomeSheetHistory(dataSheets), [dataSheets]);
   const cardEntries = useMemo(() => collectRequestCardEntries(dataSheets), [dataSheets]);
+  const forkContext = useMemo(() => describeForkProject(loadedDataMeta), [loadedDataMeta]);
 
   const [replayOpen, setReplayOpen] = useState(false);
   const [replaySourceSheetId, setReplaySourceSheetId] = useState(null);
@@ -258,6 +262,7 @@ export function ConnectHomeRequestHistory({ className }) {
           const sheetName = String(sheet?.name || sheetId).trim();
           const integration = integrationLabelFromLake(sheet?.provenance?.lake || cards[0]?.lake);
           const canReplay = !!sheet?.provenance;
+          const variationLines = extractSheetVariationLines(sheet?.provenance);
 
           return (
             <div
@@ -267,6 +272,17 @@ export function ConnectHomeRequestHistory({ className }) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold truncate">{sheetName}</p>
+                  {forkContext ? (
+                    <p className="mt-0.5 text-[11px] leading-snug text-primary/90">{forkContext.line}</p>
+                  ) : null}
+                  {variationLines.map((line) => (
+                    <p
+                      key={`${sheetId}-${line}`}
+                      className="mt-0.5 text-[11px] font-medium leading-snug text-foreground/90"
+                    >
+                      {line}
+                    </p>
+                  ))}
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     {integration}
                     {rowCount > 0 ? ` · ${rowCount.toLocaleString()} rows loaded` : " · no rows"}

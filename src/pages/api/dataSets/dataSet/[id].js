@@ -29,9 +29,17 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET":
             try {
-                const dataSet = await DataSet.findById(id);
+                const dataSet = await DataSet.findById(id).lean();
                 if (!dataSet) {
                     return res.status(400).json({ success: false, message: `No dataSet found for id: ${id}` });
+                }
+                if (dataSet.forked_from_user_id) {
+                    const forkUser = await User.findById(dataSet.forked_from_user_id)
+                        .select("user_name")
+                        .lean();
+                    if (forkUser?.user_name) {
+                        dataSet.forked_from_user_handle = forkUser.user_name;
+                    }
                 }
                 res.status(200).json({ success: true, data: dataSet });
             } catch (error) {

@@ -188,15 +188,15 @@ function rowsToSuggestions(rows, tokens, mode = "all") {
       });
     } else if (mode === "trade_search") {
       if (!hasTrades) continue;
-      const tradesKey = `trades:${ticker}`;
+      const tradesKey = `market:${ticker}`;
       if (seen.has(tradesKey)) continue;
       seen.add(tradesKey);
       suggestions.push({
-        entity: "trades",
+        entity: "markets",
         ticker,
         title,
         eventTicker: eventTicker || undefined,
-        subtitle: eventTicker ? `All trades · ${ticker} · ${eventTicker}` : `All trades · ${ticker}`,
+        subtitle: ticker,
         matchField,
       });
     } else {

@@ -23,16 +23,14 @@ import {
 } from "@/components/ui/select";
 import { userSwrFetcher } from "@/lib/hooks";
 import {
-  RUN_YOURSELF_ANALYSES,
-  findAnalysisForSourceChart,
-  findAnalysisForSourceDashboard,
-  isDashboardRunAnalysis,
-  resolveDashboardForkSource,
-} from "@/config/runYourselfAnalyses";
-import { defaultChartParameterValues } from "@/config/runYourselfDashboardCharts";
+  RUN_YOURSELF_ALL_CATEGORIES,
+  defaultChartParameterValues,
+} from "@/config/runYourselfDashboardCharts";
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
-import { RunYourselfAnalysisPicker } from "@/components/runYourself/RunYourselfAnalysisPicker";
-import { RunYourselfDashboardChartParams, RunYourselfDashboardChartParamRow } from "@/components/runYourself/RunYourselfDashboardChartParams";
+import {
+  RunYourselfDashboardChartParams,
+  RunYourselfDashboardChartParamRow,
+} from "@/components/runYourself/RunYourselfDashboardChartParams";
 import { MagicLinkEmailForm } from "@/components/runYourself/MagicLinkEmailForm";
 import { KALSHI_GROUP_COLORS } from "@/lib/kalshi/kalshiCategoryTaxonomy";
 import { userHasPaidAccess, userRunYourselfQuotaExceeded } from "@/lib/runYourself/hasPaidAccess";
@@ -43,10 +41,15 @@ import {
 
 const KALSHI_CATEGORY_OPTIONS = Object.keys(KALSHI_GROUP_COLORS);
 
-function defaultParameterForAnalysis(analysis) {
-  if (analysis?.parameterMode === "category_dropdown") {
-    const preferred = analysis.defaultCategory || "Weather";
-    return KALSHI_CATEGORY_OPTIONS.includes(preferred) ? preferred : KALSHI_CATEGORY_OPTIONS[0] || "";
+function defaultParameterForConfig(config) {
+  const mode = config?.parameterMode;
+  if (mode === "category_optional" || mode === "category_dropdown") {
+    const preferred = config?.defaultCategory || RUN_YOURSELF_ALL_CATEGORIES;
+    if (preferred === RUN_YOURSELF_ALL_CATEGORIES) return RUN_YOURSELF_ALL_CATEGORIES;
+    return KALSHI_CATEGORY_OPTIONS.includes(preferred) ? preferred : KALSHI_CATEGORY_OPTIONS[0] || RUN_YOURSELF_ALL_CATEGORIES;
+  }
+  if (mode === "trade_search" || mode === "market_search") {
+    return config?.defaultTicker || "";
   }
   return "";
 }
@@ -84,43 +87,48 @@ export default function RunYourselfWizard() {
     return stored;
   }, [searchParams]);
 
-  const preselected = useMemo(() => {
-    if (source?.chartSlug) {
-      const match = findAnalysisForSourceChart(source.ownerHandle, source.chartSlug);
-      if (match) return match.id;
-    }
-    if (source?.dashboardSlug) {
-      const match = findAnalysisForSourceDashboard(source.ownerHandle, source.dashboardSlug);
-      if (match) return match.id;
-    }
-    return RUN_YOURSELF_ANALYSES[0]?.id;
-  }, [source]);
-
-  const [analysisId, setAnalysisId] = useState(preselected);
   const [parameterValue, setParameterValue] = useState("");
   const [chartParameters, setChartParameters] = useState({});
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(5);
   const [error, setError] = useState(null);
 
-  const analysis = RUN_YOURSELF_ANALYSES.find((a) => a.id === analysisId) || RUN_YOURSELF_ANALYSES[0];
   const isDashboardChartFork = source?.kind === "dashboard_chart";
-  const isDashboardFullFork = isDashboardRunAnalysis(analysis) && !isDashboardChartFork;
-  const isDashboardAnalysis = isDashboardFullFork;
+  const isDashboardFullFork = source?.kind === "dashboard";
 
-  const dashboardForkSource = useMemo(
-    () =>
-      isDashboardRunAnalysis(analysis)
-        ? resolveDashboardForkSource(analysis, source || {})
-        : null,
-    [analysis, source],
+  const resolveUrl = useMemo(() => {
+    if (!source?.ownerHandle) return null;
+    const params = new URLSearchParams({ ownerHandle: source.ownerHandle });
+    if (isDashboardChartFork && source.dashboardSlug && source.chartId) {
+      params.set("dashboardSlug", source.dashboardSlug);
+      params.set("chartId", source.chartId);
+    } else if (isDashboardFullFork && source.dashboardSlug) {
+      params.set("dashboardSlug", source.dashboardSlug);
+      params.set("replicateDashboard", "1");
+    } else if (source.chartSlug) {
+      params.set("chartSlug", source.chartSlug);
+    } else {
+      return null;
+    }
+    return `/api/run-yourself/resolve?${params}`;
+  }, [source, isDashboardChartFork, isDashboardFullFork]);
+
+  const { data: resolveRes, isLoading: resolveLoading, error: resolveError } = useSWR(
+    resolveUrl,
+    async (url) => {
+      const res = await fetch(url, { credentials: "same-origin" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || "Failed to load analysis");
+      return json.data;
+    },
   );
 
+  const runConfig = resolveRes?.config || null;
+  const parameterMode = runConfig?.parameterMode || "none";
+
   const manifestUrl =
-    (isDashboardFullFork || isDashboardChartFork) &&
-    dashboardForkSource?.ownerHandle &&
-    dashboardForkSource?.dashboardSlug
-      ? `/api/run-yourself/dashboard-manifest?analysisId=${encodeURIComponent(analysisId)}&ownerHandle=${encodeURIComponent(dashboardForkSource.ownerHandle)}&dashboardSlug=${encodeURIComponent(dashboardForkSource.dashboardSlug)}`
+    (isDashboardFullFork || isDashboardChartFork) && source?.dashboardSlug
+      ? `/api/run-yourself/dashboard-manifest?ownerHandle=${encodeURIComponent(source.ownerHandle)}&dashboardSlug=${encodeURIComponent(source.dashboardSlug)}`
       : null;
 
   const { data: manifestRes, isLoading: manifestLoading } = useSWR(manifestUrl, async (url) => {
@@ -134,17 +142,17 @@ export default function RunYourselfWizard() {
 
   const selectedDashboardChart = useMemo(() => {
     if (!isDashboardChartFork || !source?.chartId) return null;
-    return dashboardCharts.find((c) => c.chartId === source.chartId) || null;
-  }, [isDashboardChartFork, source?.chartId, dashboardCharts]);
+    return (
+      dashboardCharts.find((c) => c.chartId === source.chartId) ||
+      resolveRes?.chartSlot ||
+      null
+    );
+  }, [isDashboardChartFork, source?.chartId, dashboardCharts, resolveRes?.chartSlot]);
 
   useEffect(() => {
-    setAnalysisId(preselected);
-  }, [preselected]);
-
-  useEffect(() => {
-    const a = RUN_YOURSELF_ANALYSES.find((x) => x.id === analysisId) || RUN_YOURSELF_ANALYSES[0];
-    setParameterValue(defaultParameterForAnalysis(a));
-  }, [analysisId]);
+    if (!runConfig) return;
+    setParameterValue(defaultParameterForConfig(runConfig));
+  }, [runConfig?.id, runConfig?.parameterMode, runConfig?.defaultCategory, runConfig?.defaultTicker]);
 
   useEffect(() => {
     if (!manifestRes?.charts?.length) return;
@@ -182,19 +190,28 @@ export default function RunYourselfWizard() {
   }, []);
 
   const handleRun = useCallback(async () => {
-    if (!source || running) return;
-    if (!isDashboardFullFork && !isDashboardChartFork && !parameterValue.trim()) return;
+    if (!source || running || !runConfig?.runnable) return;
+
+    const needsTicker =
+      !isDashboardFullFork &&
+      !isDashboardChartFork &&
+      (parameterMode === "trade_search" || parameterMode === "market_search");
+    const needsCategory =
+      !isDashboardFullFork &&
+      !isDashboardChartFork &&
+      parameterMode !== "category_optional" &&
+      parameterMode !== "none";
+    if (needsTicker && !parameterValue.trim()) return;
+    if (needsCategory && !parameterValue.trim()) return;
 
     setRunning(true);
     setError(null);
     setProgress(12);
 
-    const parameterMode =
-      analysis.parameterMode === "category_dropdown"
+    const parameterModeFork =
+      parameterMode === "category_optional" || parameterMode === "dual_category_optional"
         ? "category"
-        : analysis.parameterMode === "market_search"
-          ? "ticker"
-          : "ticker";
+        : "ticker";
 
     const tick = window.setInterval(() => {
       setProgress((p) => Math.min(p + 4, 88));
@@ -202,7 +219,10 @@ export default function RunYourselfWizard() {
 
     try {
       const forkSource = isDashboardFullFork
-        ? resolveDashboardForkSource(analysis, source)
+        ? {
+            ownerHandle: source.ownerHandle,
+            dashboardSlug: source.dashboardSlug,
+          }
         : isDashboardChartFork
           ? {
               ownerHandle: source.ownerHandle,
@@ -213,7 +233,7 @@ export default function RunYourselfWizard() {
             }
           : {
               ownerHandle: source.ownerHandle,
-              chartSlug: source.chartSlug || analysis.sourceCharts?.[0]?.slug || "",
+              chartSlug: source.chartSlug || "",
               dashboardSlug: source.dashboardSlug,
             };
 
@@ -223,11 +243,11 @@ export default function RunYourselfWizard() {
         credentials: "same-origin",
         body: JSON.stringify({
           source: forkSource,
-          analysisId,
+          analysisId: runConfig?.id || "",
           parameter:
             isDashboardFullFork || isDashboardChartFork
               ? { mode: "category", value: "dashboard" }
-              : { mode: parameterMode, value: parameterValue.trim() },
+              : { mode: parameterModeFork, value: parameterValue.trim() },
           chartParameters:
             isDashboardFullFork || isDashboardChartFork ? chartParameters : undefined,
           replicateDashboard: isDashboardFullFork,
@@ -261,20 +281,22 @@ export default function RunYourselfWizard() {
     chartParameters,
     source,
     running,
-    analysisId,
-    analysis.parameterMode,
+    parameterMode,
+    runConfig,
     isDashboardFullFork,
     isDashboardChartFork,
     selectedDashboardChart,
-    analysis,
     router,
   ]);
 
   const canRun = isDashboardChartFork
-    ? !!selectedDashboardChart && !manifestLoading
+    ? !!selectedDashboardChart && !manifestLoading && runConfig?.runnable
     : isDashboardFullFork
-      ? dashboardCharts.length > 0 && !manifestLoading
-      : !!parameterValue.trim();
+      ? dashboardCharts.length > 0 && !manifestLoading && runConfig?.runnable
+      : runConfig?.runnable &&
+        (parameterMode === "category_optional" ||
+          parameterMode === "none" ||
+          !!parameterValue.trim());
 
   if (userLoading) {
     return (
@@ -325,44 +347,24 @@ export default function RunYourselfWizard() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">1. Choose analysis</CardTitle>
-              <CardDescription>
-                Charts fork one analysis. Dashboards replicate every chart with its own parameters.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RunYourselfAnalysisPicker analysisId={analysisId} onSelect={setAnalysisId} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle className="text-base">
-                2.{" "}
-                {isDashboardChartFork
-                  ? "Configure this chart"
-                  : isDashboardFullFork
-                    ? "Configure dashboard charts"
-                    : analysis.parameterMode === "category_dropdown"
-                      ? "Select category"
-                      : analysis.parameterMode === "market_search"
-                        ? "Select market"
-                        : "Select trade"}
+                {runConfig?.label || "Configure parameters"}
               </CardTitle>
               <CardDescription>
-                {isDashboardChartFork
-                  ? "Set parameters for this chart only — other dashboard cards are not included."
-                  : isDashboardFullFork
-                    ? "Set category filters for each chart. Choose “All categories” to match the original dashboard scope."
-                    : analysis.parameterMode === "category_dropdown"
-                      ? "Choose a Kalshi taxonomy category — the analysis runs across all markets in that category."
-                      : analysis.parameterMode === "market_search"
-                        ? "Search Kalshi markets."
-                        : "Search Kalshi markets — selecting one pulls trades for that market."}
+                {resolveLoading
+                  ? "Loading analysis configuration…"
+                  : runConfig?.description ||
+                    "Set the market or category for your private copy."}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isDashboardChartFork ? (
+              {resolveLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : resolveError || !runConfig?.runnable ? (
+                <p className="text-sm text-destructive">
+                  {resolveError?.message || runConfig?.reason || "This analysis cannot be run yet."}
+                </p>
+              ) : isDashboardChartFork ? (
                 selectedDashboardChart ? (
                   <RunYourselfDashboardChartParamRow
                     chart={selectedDashboardChart}
@@ -387,13 +389,14 @@ export default function RunYourselfWizard() {
                   disabled={running}
                   loading={manifestLoading}
                 />
-              ) : analysis.parameterMode === "category_dropdown" ? (
+              ) : parameterMode === "category_optional" || parameterMode === "category_dropdown" ? (
                 <>
                   <Select value={parameterValue} onValueChange={setParameterValue} disabled={running}>
                     <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Choose a category" />
+                      <SelectValue placeholder="All categories" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={RUN_YOURSELF_ALL_CATEGORIES}>All categories</SelectItem>
                       {KALSHI_CATEGORY_OPTIONS.map((category) => (
                         <SelectItem key={category} value={category}>
                           {category}
@@ -404,7 +407,11 @@ export default function RunYourselfWizard() {
                   {parameterValue ? (
                     <p className="mt-3 text-sm text-muted-foreground">
                       Selected:{" "}
-                      <span className="font-medium text-foreground">{parameterValue}</span>
+                      <span className="font-medium text-foreground">
+                        {parameterValue === RUN_YOURSELF_ALL_CATEGORIES
+                          ? "All categories"
+                          : parameterValue}
+                      </span>
                     </p>
                   ) : null}
                 </>
@@ -414,7 +421,7 @@ export default function RunYourselfWizard() {
                     onSelect={(s) => setParameterValue(s.ticker)}
                     disabled={running}
                     parameterMode={
-                      analysis.parameterMode === "market_search" ? "market_search" : "trade_search"
+                      parameterMode === "market_search" ? "market_search" : "trade_search"
                     }
                   />
                   {parameterValue ? (

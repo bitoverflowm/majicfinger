@@ -1,14 +1,14 @@
 import ChartDashboard from "@/models/ChartDashboards";
 import User from "@/models/Users";
 import dbConnect from "@/lib/dbConnect";
+import { findAnalysisForSourceDashboard } from "@/config/runYourselfAnalyses";
+import { defaultChartParameterValues } from "@/config/runYourselfDashboardCharts";
 import {
-  getRunYourselfAnalysisById,
-  resolveDashboardForkSource,
-} from "@/config/runYourselfAnalyses";
-import {
-  defaultChartParameterValues,
-  resolveDashboardChartSlot,
-} from "@/config/runYourselfDashboardCharts";
+  inferDashboardChartManifest,
+  inferRunConfigForDashboard,
+  mergeRunConfig,
+} from "@/lib/runYourself/inferRunYourselfConfig";
+import { resolvePublicRunSource } from "@/lib/runYourself/resolvePublicSource";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -20,67 +20,53 @@ export default async function handler(req, res) {
   const ownerHandle = String(req.query.ownerHandle || "").trim();
   const dashboardSlug = String(req.query.dashboardSlug || "").trim();
 
-  const analysis = getRunYourselfAnalysisById(analysisId);
-  if (!analysis) {
-    return res.status(400).json({ success: false, message: "Unknown analysis" });
-  }
-
-  const forkSource = resolveDashboardForkSource(analysis, { ownerHandle, dashboardSlug });
-  if (!forkSource.ownerHandle || !forkSource.dashboardSlug) {
+  if (!ownerHandle || !dashboardSlug) {
     return res.status(400).json({ success: false, message: "Missing dashboard source" });
   }
 
   try {
     await dbConnect();
-    const owner = await User.findOne({ user_name: forkSource.ownerHandle }).lean();
+    const owner = await User.findOne({ user_name: ownerHandle }).lean();
     if (!owner) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const dashboard = await ChartDashboard.findOne({
-      user_id: owner._id,
-      public_slug: forkSource.dashboardSlug,
-      is_public: true,
-    }).lean();
+    const resolved = await resolvePublicRunSource(ownerHandle, {
+      dashboardSlug,
+      replicateDashboard: true,
+    });
 
-    if (!dashboard) {
-      return res.status(404).json({ success: false, message: "Dashboard not found" });
-    }
+    const curated = findAnalysisForSourceDashboard(ownerHandle, dashboardSlug);
+    const inferred = inferRunConfigForDashboard(
+      resolved.dataSet.data_sheets || {},
+      resolved.charts,
+      resolved.dashboard,
+    );
+    const config = mergeRunConfig(curated, inferred);
 
-    /** @type {object[]} */
-    const charts = [];
-    const rows = Array.isArray(dashboard.layout?.rows) ? dashboard.layout.rows : [];
-    for (const row of rows) {
-      if (row?.type !== "cards" || !Array.isArray(row.columns)) continue;
-      for (const col of row.columns) {
-        if (!col?.chart_id) continue;
-        const slot = resolveDashboardChartSlot(analysisId, col);
-        const parameterMode = slot?.parameterMode || "none";
-        charts.push({
-          key: slot?.key || col.id,
-          layoutColumnId: col.id,
-          chartId: String(col.chart_id),
-          title: col.h2 || col.caption || "Chart",
-          caption: col.caption || "",
-          parameterMode,
-          hint: slot?.hint || "",
-          defaults: defaultChartParameterValues(parameterMode),
-        });
-      }
-    }
+    const charts = inferDashboardChartManifest(
+      resolved.dataSet.data_sheets || {},
+      resolved.charts,
+      resolved.dashboard?.layout,
+    ).map((c) => ({
+      ...c,
+      defaults: c.defaults || defaultChartParameterValues(c.parameterMode),
+    }));
 
     return res.status(200).json({
       success: true,
       data: {
-        analysisId,
-        dashboardSlug: forkSource.dashboardSlug,
-        ownerHandle: forkSource.ownerHandle,
-        dashboardName: dashboard.dashboard_name || analysis.label,
+        analysisId: config.id || analysisId || inferred.id,
+        dashboardSlug,
+        ownerHandle,
+        dashboardName: resolved.dashboard?.dashboard_name || config.label,
+        runnable: config.runnable,
+        config,
         charts,
       },
     });
   } catch (e) {
-    return res.status(500).json({
+    return res.status(e.statusCode || 500).json({
       success: false,
       message: e?.message || "Failed to load dashboard manifest",
     });

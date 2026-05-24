@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import DotPattern from "@/components/magicui/dot-pattern";
 import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
@@ -177,16 +177,13 @@ export default function PublicDashboardEmbedClient({
   const ownerPic = d.owner_profile_pic ? String(d.owner_profile_pic) : "";
   const tags = Array.isArray(d.tags) ? d.tags : [];
 
-  const hasRunnableChart = useMemo(() => {
-    for (const row of rows) {
-      if (row.type !== "cards" || !Array.isArray(row.columns)) continue;
-      for (const col of row.columns) {
-        const s = col.chartLink?.slug;
-        if (s && isRunnablePublicChart(ownerHandle, s)) return true;
-      }
-    }
-    return false;
-  }, [rows, ownerHandle]);
+  const hasRunnableChart = rows.some((row) => {
+    if (row.type !== "cards" || !Array.isArray(row.columns)) return false;
+    return row.columns.some((col) => {
+      const chartSlug = col.chartLink?.slug;
+      return !!(chartSlug && isRunnablePublicChart(ownerHandle, chartSlug));
+    });
+  });
 
   const dashboardRunnable = isRunnablePublicDashboard(ownerHandle, slug);
   const showRunDashboardCta = dashboardRunnable || hasRunnableChart;
