@@ -32,10 +32,23 @@ function entityTagClass(entity) {
   return "bg-violet-500/15 text-violet-900 ring-1 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35";
 }
 
+/** @typedef {"trade_search" | "market_search"} KalshiPowerToolsParameterMode */
+
 /**
- * @param {{ onSelect: (suggestion: KalshiSearchSuggestion) => void; disabled?: boolean; className?: string }} props
+ * @param {{
+ *   onSelect: (suggestion: KalshiSearchSuggestion) => void;
+ *   disabled?: boolean;
+ *   className?: string;
+ *   /** When set, limits suggestions: markets only, or one row per market (trades pull). *\/
+ *   parameterMode?: KalshiPowerToolsParameterMode;
+ * }} props
  */
-export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }) {
+export function KalshiPowerToolsSearch({
+  onSelect,
+  disabled = false,
+  className,
+  parameterMode,
+}) {
   const rootRef = useRef(null);
   const suggestAbortRef = useRef(null);
   const suggestSeqRef = useRef(0);
@@ -67,6 +80,9 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
 
     try {
       const params = new URLSearchParams({ q: trimmed });
+      if (parameterMode === "trade_search" || parameterMode === "market_search") {
+        params.set("mode", parameterMode);
+      }
       const res = await fetch(`/api/data-lake/kalshi-search/suggestions?${params.toString()}`, {
         headers: { Accept: "application/json" },
         credentials: "same-origin",
@@ -96,7 +112,7 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
         setSuggestLoading(false);
       }
     }
-  }, []);
+  }, [parameterMode]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -107,6 +123,12 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [q, fetchSuggestions]);
+
+  useEffect(() => {
+    setQ("");
+    setSuggestions([]);
+    setSuggestOpen(false);
+  }, [parameterMode]);
 
   useEffect(() => {
     function onDoc(e) {
@@ -144,6 +166,12 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
   };
 
   const busy = disabled || selectLoading;
+  const searchHint =
+    parameterMode === "market_search"
+      ? "Search Kalshi markets by ticker or title — select a market to load data."
+      : parameterMode === "trade_search"
+        ? "Search Kalshi markets by ticker or title — select a market to pull its trades."
+        : "Search Kalshi markets and trades by ticker or title — select a result to load data.";
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -151,9 +179,7 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
         <Zap className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
         <h2 className="text-sm font-semibold tracking-tight text-foreground">Power Tools</h2>
       </motion.div>
-      <p className="text-[11px] leading-snug text-muted-foreground">
-        Search Kalshi markets and trades by ticker or title — select a result to load data.
-      </p>
+      <p className="text-[11px] leading-snug text-muted-foreground">{searchHint}</p>
 
       <div ref={rootRef} className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
@@ -229,7 +255,12 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
               exit="exit"
               className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-popover py-1 text-left shadow-md"
             >
-              {suggestions.map((s) => (
+              {suggestions.map((s) => {
+                const displayEntity =
+                  parameterMode === "trade_search" ? "market" : s.entity;
+                const displayEntityKind =
+                  parameterMode === "trade_search" ? "markets" : s.entity;
+                return (
                 <motion.li key={suggestionKey(s)} role="option" variants={suggestionRowVariants}>
                   <button
                     type="button"
@@ -243,16 +274,17 @@ export function KalshiPowerToolsSearch({ onSelect, disabled = false, className }
                       <span
                         className={cn(
                           "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium capitalize tracking-wide",
-                          entityTagClass(s.entity),
+                          entityTagClass(displayEntityKind),
                         )}
                       >
-                        {s.entity}
+                        {displayEntity}
                       </span>
                       {s.subtitle ? ` · ${s.subtitle}` : ""}
                     </span>
                   </button>
                 </motion.li>
-              ))}
+                );
+              })}
             </motion.ul>
           ) : null}
         </AnimatePresence>

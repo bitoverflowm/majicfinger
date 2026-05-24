@@ -2,10 +2,12 @@ const STORAGE_KEY = "lychee:runSource";
 
 /**
  * @typedef {object} RunSourceContext
- * @property {"chart" | "dashboard"} kind
+ * @property {"chart" | "dashboard" | "dashboard_chart"} kind
  * @property {string} ownerHandle
  * @property {string} [chartSlug]
  * @property {string} [dashboardSlug]
+ * @property {string} [chartId] Source chart _id when forking one dashboard card
+ * @property {string} [layoutColumnKey] Layout column id for parameter slot config
  */
 
 /**
@@ -42,7 +44,13 @@ export function loadRunSourceContext() {
  */
 export function buildTryUrlFromContext(ctx) {
   const params = new URLSearchParams();
-  if (ctx.kind === "dashboard" && ctx.dashboardSlug) {
+  if (ctx.kind === "dashboard_chart" && ctx.dashboardSlug && ctx.chartId) {
+    params.set(
+      "from",
+      `${ctx.ownerHandle}/dashboards/${ctx.dashboardSlug}/chart/${ctx.chartId}`,
+    );
+    if (ctx.layoutColumnKey) params.set("col", ctx.layoutColumnKey);
+  } else if (ctx.kind === "dashboard" && ctx.dashboardSlug) {
     params.set("from", `${ctx.ownerHandle}/dashboards/${ctx.dashboardSlug}`);
   } else if (ctx.chartSlug) {
     params.set("from", `${ctx.ownerHandle}/charts/${ctx.chartSlug}`);
@@ -65,6 +73,14 @@ export function parseFromQueryParam(fromParam) {
     return { kind: "chart", ownerHandle, chartSlug: slug };
   }
   if (kind === "dashboards") {
+    if (parts[3] === "chart" && parts[4]) {
+      return {
+        kind: "dashboard_chart",
+        ownerHandle,
+        dashboardSlug: slug,
+        chartId: parts[4],
+      };
+    }
     return { kind: "dashboard", ownerHandle, dashboardSlug: slug };
   }
   return null;

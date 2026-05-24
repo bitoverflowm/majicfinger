@@ -5,7 +5,7 @@ import User from "@/models/Users";
 
 /**
  * @param {string} ownerHandle
- * @param {{ chartSlug?: string; dashboardSlug?: string; replicateDashboard?: boolean }} source
+ * @param {{ chartSlug?: string; dashboardSlug?: string; chartId?: string; replicateDashboard?: boolean }} source
  */
 export async function resolvePublicRunSource(ownerHandle, source) {
   const handle = String(ownerHandle || "").trim();
@@ -14,6 +14,52 @@ export async function resolvePublicRunSource(ownerHandle, source) {
     const err = new Error("User not found");
     err.statusCode = 404;
     throw err;
+  }
+
+  if (source.dashboardSlug && source.chartId && !source.replicateDashboard) {
+    const dashboard = await ChartDashboard.findOne({
+      user_id: owner._id,
+      public_slug: String(source.dashboardSlug).trim(),
+      is_public: true,
+    }).lean();
+    if (!dashboard) {
+      const err = new Error("Dashboard not found");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const chartId = String(source.chartId).trim();
+    let chartOnDashboard = false;
+    const rows = Array.isArray(dashboard.layout?.rows) ? dashboard.layout.rows : [];
+    for (const row of rows) {
+      if (row?.type !== "cards" || !Array.isArray(row.columns)) continue;
+      for (const col of row.columns) {
+        if (col?.chart_id && String(col.chart_id) === chartId) {
+          chartOnDashboard = true;
+          break;
+        }
+      }
+      if (chartOnDashboard) break;
+    }
+    if (!chartOnDashboard) {
+      const err = new Error("Chart not found on this dashboard");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const chart = await Chart.findOne({ _id: chartId, user_id: owner._id }).lean();
+    if (!chart) {
+      const err = new Error("Chart not found");
+      err.statusCode = 404;
+      throw err;
+    }
+    const dataSet = await DataSet.findById(chart.data_set_id).lean();
+    if (!dataSet) {
+      const err = new Error("Project not found");
+      err.statusCode = 404;
+      throw err;
+    }
+    return { owner, charts: [chart], primaryChart: chart, dataSet, dashboard: null };
   }
 
   if (source.dashboardSlug && source.replicateDashboard) {

@@ -6,6 +6,7 @@ import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
+import { isRunnablePublicChart } from "@/config/runYourselfAnalyses";
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
@@ -23,7 +24,15 @@ function DataSheetsLoader({ rows, dataSheets }) {
   return null;
 }
 
-export function PublicDashboardChartBlock({ chartPayload, ownerHandle, chartSlug }) {
+export function PublicDashboardChartBlock({
+  chartPayload,
+  ownerHandle,
+  chartSlug,
+  chartId,
+  layoutColumnKey,
+  dashboardSlug,
+  dashboardRunnable = false,
+}) {
   const rows = chartPayload?.rows ?? [];
   const dataSheets = chartPayload?.dataSheets ?? {};
   const chart = chartPayload?.chart;
@@ -55,6 +64,12 @@ export function PublicDashboardChartBlock({ chartPayload, ownerHandle, chartSlug
       ? chart.chart_properties[0]
       : {};
 
+  const chartRunnable = !!(chartSlug && ownerHandle && isRunnablePublicChart(ownerHandle, chartSlug));
+  const showRunCta = !!(
+    ownerHandle &&
+    (chartRunnable || (dashboardRunnable && dashboardSlug && chartId))
+  );
+
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
@@ -70,12 +85,16 @@ export function PublicDashboardChartBlock({ chartPayload, ownerHandle, chartSlug
             <ChartCanvas />
           </div>
         </ChartBuilderProvider>
-        {ownerHandle && chartSlug ? (
+        {showRunCta ? (
           <div className="pointer-events-auto absolute bottom-2 right-2 z-10">
             <RunForYourselfButton
               ownerHandle={ownerHandle}
-              chartSlug={chartSlug}
-              kind="chart"
+              chartSlug={chartRunnable ? chartSlug : undefined}
+              dashboardSlug={dashboardSlug}
+              chartId={chartRunnable ? undefined : chartId}
+              layoutColumnKey={layoutColumnKey}
+              kind={chartRunnable ? "chart" : "dashboard_chart"}
+              forceRunnable={!chartRunnable && dashboardRunnable}
               className="shadow-md gap-1 rounded-full px-3 py-2 text-xs font-semibold h-auto"
             />
           </div>

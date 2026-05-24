@@ -17,14 +17,18 @@ export default async function handler(req, res) {
 
   const rawQ = req.query.q;
   const q = String(Array.isArray(rawQ) ? rawQ[0] : rawQ || "").trim();
+  const rawMode = req.query.mode;
+  const mode = String(Array.isArray(rawMode) ? rawMode[0] : rawMode || "").trim();
   if (q.length < 2) {
     return res.status(200).json({ suggestions: [] });
   }
 
   try {
     await getAthenaAccessFromRequest(req);
-    const { suggestions } = await fetchKalshiSearchSuggestions(q);
-    return res.status(200).json({ suggestions, q });
+    const { suggestions } = await fetchKalshiSearchSuggestions(q, {
+      mode: mode === "trade_search" || mode === "market_search" ? mode : "all",
+    });
+    return res.status(200).json({ suggestions, q, mode: mode || "all" });
   } catch (e) {
     const code = e?.code || "INTERNAL";
     if (code === "CONFIG") {

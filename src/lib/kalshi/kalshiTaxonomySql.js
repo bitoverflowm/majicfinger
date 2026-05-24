@@ -54,3 +54,35 @@ export function buildKalshiTaxonomyGroupSqlExpr(eventTickerExpr) {
     FROM (SELECT ${prefixSql} AS ${p}) _kalshi_prefix
   )`;
 }
+
+/**
+ * Two-level markets taxonomy layers (prefix once, then CASE on _kf_p).
+ * Same pattern as buildComposeAthenaSql when materializing kalshi_taxonomy_category on markets.
+ *
+ * @param {string} marketsPhysical
+ * @returns {{ prepped: string; taxCase: string; kfb: string }}
+ */
+export function buildKalshiMarketsTaxonomyLayers(marketsPhysical) {
+  const safe = String(marketsPhysical || "").trim();
+  if (!/^[a-zA-Z0-9_]+$/.test(safe)) {
+    throw new Error("Invalid markets physical table name");
+  }
+  const kb = "kb";
+  const kfb = "_kfb";
+  const pExpr = kalshiEventTickerCategorySql(`${kb}."event_ticker"`);
+  const prepped = `(SELECT ${kb}.*, ${pExpr} AS _kf_p FROM "${safe}" ${kb})`;
+  const taxCase = buildKalshiTaxonomyGroupCaseSqlForPrefixRef(`${kfb}._kf_p`);
+  return { prepped, taxCase, kfb };
+}
+
+/**
+ * Markets subquery with ticker + materialized kalshi_taxonomy_category (for trades semi-joins).
+ * @param {string} marketsPhysical
+ * @param {string} [outAlias]
+ * @returns {string}
+ */
+export function buildKalshiMarketsTaxonomySubquerySql(marketsPhysical, outAlias = "mcat") {
+  const { prepped, taxCase, kfb } = buildKalshiMarketsTaxonomyLayers(marketsPhysical);
+  const a = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(outAlias) ? outAlias : "mcat";
+  return `(SELECT ${kfb}."ticker", ${taxCase} AS "${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}" FROM ${prepped} ${kfb}) ${a}`;
+}

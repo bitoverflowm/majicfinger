@@ -11,6 +11,8 @@ import { databaseForLake } from "@/lib/dataLake/validateAthenaLakeRequest";
 
 /** @typedef {"markets" | "trades"} KalshiSearchEntity */
 
+/** @typedef {"all" | "trade_search" | "market_search"} KalshiSearchMode */
+
 /**
  * @typedef {object} KalshiSearchSuggestion
  * @property {KalshiSearchEntity} entity
@@ -151,8 +153,14 @@ function detectMatchField(tokens, row) {
   return "title";
 }
 
-/** @param {Record<string, string>[]} rows @param {string[]} tokens */
-function rowsToSuggestions(rows, tokens) {
+/** @param {unknown} mode */
+function normalizeSearchMode(mode) {
+  if (mode === "trade_search" || mode === "market_search") return mode;
+  return "all";
+}
+
+/** @param {Record<string, string>[]} rows @param {string[]} tokens @param {KalshiSearchMode} mode */
+function rowsToSuggestions(rows, tokens, mode = "all") {
   /** @type {KalshiSearchSuggestion[]} */
   const suggestions = [];
   const seen = new Set();
@@ -166,8 +174,9 @@ function rowsToSuggestions(rows, tokens) {
     const hasTrades = row.has_trades === "1" || row.has_trades === "true";
     const matchField = detectMatchField(tokens, row);
 
-    const marketsKey = `markets:${ticker}`;
-    if (!seen.has(marketsKey)) {
+    if (mode === "market_search") {
+      const marketsKey = `markets:${ticker}`;
+      if (seen.has(marketsKey)) continue;
       seen.add(marketsKey);
       suggestions.push({
         entity: "markets",
@@ -177,41 +186,69 @@ function rowsToSuggestions(rows, tokens) {
         subtitle: eventTicker ? `${ticker} · ${eventTicker}` : ticker,
         matchField,
       });
-    }
-
-    if (hasTrades) {
+    } else if (mode === "trade_search") {
+      if (!hasTrades) continue;
       const tradesKey = `trades:${ticker}`;
-      if (!seen.has(tradesKey)) {
-        seen.add(tradesKey);
+      if (seen.has(tradesKey)) continue;
+      seen.add(tradesKey);
+      suggestions.push({
+        entity: "trades",
+        ticker,
+        title,
+        eventTicker: eventTicker || undefined,
+        subtitle: eventTicker ? `All trades · ${ticker} · ${eventTicker}` : `All trades · ${ticker}`,
+        matchField,
+      });
+    } else {
+      const marketsKey = `markets:${ticker}`;
+      if (!seen.has(marketsKey)) {
+        seen.add(marketsKey);
         suggestions.push({
-          entity: "trades",
+          entity: "markets",
           ticker,
           title,
           eventTicker: eventTicker || undefined,
-          subtitle: eventTicker ? `All trades · ${ticker} · ${eventTicker}` : `All trades · ${ticker}`,
+          subtitle: eventTicker ? `${ticker} · ${eventTicker}` : ticker,
           matchField,
         });
       }
+
+      if (hasTrades) {
+        const tradesKey = `trades:${ticker}`;
+        if (!seen.has(tradesKey)) {
+          seen.add(tradesKey);
+          suggestions.push({
+            entity: "trades",
+            ticker,
+            title,
+            eventTicker: eventTicker || undefined,
+            subtitle: eventTicker ? `All trades · ${ticker} · ${eventTicker}` : `All trades · ${ticker}`,
+            matchField,
+          });
+        }
+      }
     }
 
-    if (suggestions.length >= SEARCH_LIMIT * 2) break;
+    if (suggestions.length >= SEARCH_LIMIT) break;
   }
 
-  return suggestions.slice(0, SEARCH_LIMIT * 2);
+  return suggestions.slice(0, SEARCH_LIMIT);
 }
 
 /**
  * @param {string} q
+ * @param {{ mode?: KalshiSearchMode | "trade_search" | "market_search" }} [options]
  * @returns {Promise<{ suggestions: KalshiSearchSuggestion[] }>}
  */
-export async function fetchKalshiSearchSuggestions(q) {
+export async function fetchKalshiSearchSuggestions(q, options = {}) {
   const trimmed = String(q || "").trim();
   const tokens = tokenizeQuery(trimmed);
+  const mode = normalizeSearchMode(options.mode);
   if (tokens.length === 0) {
     return { suggestions: [] };
   }
 
-  const cacheKey = tokens.join(" ");
+  const cacheKey = `${mode}:${tokens.join(" ")}`;
   const cached = suggestionCache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return { suggestions: cached.suggestions };
@@ -235,7 +272,7 @@ export async function fetchKalshiSearchSuggestions(q) {
     }),
   );
 
-  let suggestions = rowsToSuggestions(rows, needle);
+  let suggestions = rowsToSuggestions(rows, needle, mode);
 
   if (suggestions.length === 0) {
     rows = rowsToRecords(
@@ -246,7 +283,7 @@ export async function fetchKalshiSearchSuggestions(q) {
         rowLimit: SEARCH_LIMIT,
       }),
     );
-    suggestions = rowsToSuggestions(rows, needle);
+    suggestions = rowsToSuggestions(rows, needle, mode);
   }
 
   suggestionCache.set(cacheKey, { at: Date.now(), suggestions });

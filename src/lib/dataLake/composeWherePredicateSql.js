@@ -4,9 +4,11 @@
  */
 import { kalshiEventTickerCategorySql } from "@/lib/kalshi/kalshiPrefixSql";
 import {
+  buildKalshiMarketsTaxonomySubquerySql,
   buildKalshiTaxonomyGroupSqlExpr,
   KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN,
 } from "@/lib/kalshi/kalshiTaxonomySql";
+import { resolveAthenaTableName } from "@/lib/dataLake/athenaTableMap";
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
 
@@ -83,6 +85,33 @@ export function collectKalshiMarketsMaterializedVirtuals({ compose, filters, lak
   return out;
 }
 
+function escapeSqlStringLiteral(s) {
+  return String(s).replace(/'/g, "''");
+}
+
+/**
+ * Kalshi trades have no taxonomy column — restrict to market tickers in the taxonomy bucket.
+ * @param {string} categoryValue
+ * @param {string} tradesAlias
+ * @param {boolean} caseSensitive
+ */
+function buildKalshiTradesTaxonomyCategoryPredicate(categoryValue, tradesAlias, caseSensitive) {
+  const marketsPhysical = resolveAthenaTableName("kalshi", "markets");
+  if (!marketsPhysical) return "TRUE";
+  const ta = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tradesAlias) ? tradesAlias : "t0";
+  const mcat = "mcat";
+  const marketsWithTaxonomy = buildKalshiMarketsTaxonomySubquerySql(marketsPhysical, mcat);
+  const taxCol = `${mcat}."${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"`;
+  const esc = escapeSqlStringLiteral(String(categoryValue ?? ""));
+  const lit = caseSensitive ? `'${esc}'` : `LOWER('${esc}')`;
+  const taxCmp = caseSensitive ? taxCol : `LOWER(${taxCol})`;
+  return `EXISTS (
+    SELECT 1 FROM ${marketsWithTaxonomy}
+    WHERE CAST(${ta}."ticker" AS VARCHAR) = CAST(${mcat}."ticker" AS VARCHAR)
+      AND ${taxCmp} = ${lit}
+  )`;
+}
+
 /**
  * @param {string} column
  * @param {string} baseAlias
@@ -147,9 +176,22 @@ export function buildComposeFiltersWhereSql(opts) {
   const safeBa = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(ba) ? ba : "t0";
 
   const mat = materializedVirtualColumns instanceof Set ? materializedVirtualColumns : null;
+  const L = String(lake || "").toLowerCase();
+  const T = String(table || "").toLowerCase();
 
   /** @param {{ column: string; kind: string; op: string; value: any }} p */
   const predicateToSql = (p) => {
+    const colName = String(p.column || "").trim();
+    if (
+      L === "kalshi" &&
+      T === "trades" &&
+      colName === KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN &&
+      p.op === "eq" &&
+      p.kind === "string"
+    ) {
+      return buildKalshiTradesTaxonomyCategoryPredicate(p.value, safeBa, caseSensitive);
+    }
+
     const virt = resolveComposeFilterColumnSql(p.column, safeBa, lake, table, mat);
     const colSql = virt ?? `${safeBa}."${String(p.column || "").trim()}"`;
 

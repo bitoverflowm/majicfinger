@@ -24,7 +24,9 @@ import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourself
  *   ownerHandle: string;
  *   chartSlug?: string;
  *   dashboardSlug?: string;
- *   kind?: "chart" | "dashboard";
+ *   chartId?: string;
+ *   layoutColumnKey?: string;
+ *   kind?: "chart" | "dashboard" | "dashboard_chart";
  *   label?: string;
  *   className?: string;
  *   variant?: "chart" | "dashboard";
@@ -35,7 +37,9 @@ export function RunForYourselfButton({
   ownerHandle,
   chartSlug,
   dashboardSlug,
-  kind = chartSlug ? "chart" : "dashboard",
+  chartId,
+  layoutColumnKey,
+  kind = chartSlug ? "chart" : dashboardSlug ? "dashboard" : "chart",
   label,
   className,
   variant = "chart",
@@ -71,10 +75,17 @@ export function RunForYourselfButton({
   }, [ownerHandle, slug, chartSlug, dashboardSlug, runnable]);
 
   const ctx = {
-    kind: kind === "dashboard" || dashboardSlug ? "dashboard" : "chart",
+    kind:
+      kind === "dashboard_chart"
+        ? "dashboard_chart"
+        : kind === "dashboard" || (dashboardSlug && !chartSlug && !chartId)
+          ? "dashboard"
+          : "chart",
     ownerHandle,
     ...(chartSlug ? { chartSlug } : {}),
     ...(dashboardSlug ? { dashboardSlug } : {}),
+    ...(chartId ? { chartId } : {}),
+    ...(layoutColumnKey ? { layoutColumnKey } : {}),
   };
 
   const goToTry = useCallback(() => {

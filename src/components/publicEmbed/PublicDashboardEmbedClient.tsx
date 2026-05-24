@@ -341,6 +341,10 @@ export default function PublicDashboardEmbedClient({
                             chartPayload={col.chartPayload}
                             ownerHandle={ownerHandle}
                             chartSlug={col.chartLink?.slug}
+                            chartId={col.chart_id ? String(col.chart_id) : undefined}
+                            layoutColumnKey={col.id}
+                            dashboardSlug={slug}
+                            dashboardRunnable={dashboardRunnable}
                           />
                         </div>
                       ) : (

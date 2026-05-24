@@ -5,17 +5,27 @@ import Chart from "@/models/Charts";
 import ChartDashboard from "@/models/ChartDashboards";
 import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
-import { getRunYourselfAnalysisById } from "@/config/runYourselfAnalyses";
+import { getRunYourselfAnalysisById, findAnalysisForSourceDashboard, isDashboardRunAnalysis, resolveDashboardForkSource } from "@/config/runYourselfAnalyses";
 import { getAthenaAccessForUserId } from "@/lib/athenaAccess";
 import { buildProjectRevision } from "@/lib/projectPersistence";
 import { collectSheetClosureForCharts, pickSheetsSubset } from "@/lib/runYourself/collectSheetClosure";
 import { patchAllSheetProvenance } from "@/lib/runYourself/patchProvenanceParameter";
+import { patchDashboardSheetsByChart, patchSheetsForDashboardChart } from "@/lib/runYourself/patchDashboardChartSheets";
 import { replayForkedProjectSheets } from "@/lib/runYourself/replayForkedProjectSheets";
 import { resolvePublicRunSource } from "@/lib/runYourself/resolvePublicSource";
 import { dbUserHasPaidAccess } from "@/lib/runYourself/serverPaidAccess";
+import {
+  getDashboardChartSlots,
+  resolveDashboardChartSlotFromManifest,
+} from "@/config/runYourselfDashboardCharts";
 
 function cloneJson(doc) {
   return JSON.parse(JSON.stringify(doc ?? null));
+}
+
+/** Unique private slug so unpublished forks don't collide on user_id + public_slug index. */
+function privateForkSlug(prefix) {
+  return `${prefix}-${new mongoose.Types.ObjectId().toString()}`;
 }
 
 export default async function handler(req, res) {
@@ -38,6 +48,7 @@ export default async function handler(req, res) {
   const source = body.source || {};
   const analysisId = String(body.analysisId || "").trim();
   const parameter = body.parameter || {};
+  const chartParameters = body.chartParameters && typeof body.chartParameters === "object" ? body.chartParameters : {};
   const replicateDashboard = !!body.replicateDashboard;
 
   const analysis = getRunYourselfAnalysisById(analysisId);
@@ -45,10 +56,17 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, message: "Unknown analysis" });
   }
 
+  const isDashboardFork = replicateDashboard && isDashboardRunAnalysis(analysis);
+  const isDashboardChartFork =
+    !isDashboardFork &&
+    !!String(source.dashboardSlug || "").trim() &&
+    !!String(source.chartId || "").trim();
   const paramValue = String(parameter.value || "").trim();
-  if (!paramValue) {
-    return res.status(400).json({ success: false, message: "Missing market or trade parameter" });
+  if (!isDashboardFork && !isDashboardChartFork && !paramValue) {
+    return res.status(400).json({ success: false, message: "Missing analysis parameter" });
   }
+
+  const patchKind = parameter.mode === "category" ? "category" : "ticker";
 
   try {
     await dbConnect();
@@ -70,10 +88,32 @@ export default async function handler(req, res) {
       });
     }
 
-    const resolved = await resolvePublicRunSource(source.ownerHandle, {
-      chartSlug: source.chartSlug,
-      dashboardSlug: source.dashboardSlug,
-      replicateDashboard,
+    const dashboardAnalysis =
+      source.dashboardSlug && source.ownerHandle
+        ? findAnalysisForSourceDashboard(source.ownerHandle, source.dashboardSlug)
+        : null;
+    const shouldReplicateDashboard =
+      isDashboardFork &&
+      (analysisId === dashboardAnalysis?.id ||
+        (!source.dashboardSlug && isDashboardRunAnalysis(analysis)));
+
+    const forkDashSource = shouldReplicateDashboard
+      ? resolveDashboardForkSource(analysis, source)
+      : null;
+
+    const chartSlug =
+      (!shouldReplicateDashboard && !isDashboardChartFork && analysis.sourceCharts?.[0]?.slug) ||
+      source.chartSlug ||
+      "";
+
+    const resolved = await resolvePublicRunSource(forkDashSource?.ownerHandle || source.ownerHandle, {
+      chartSlug: shouldReplicateDashboard || isDashboardChartFork ? undefined : chartSlug,
+      dashboardSlug:
+        shouldReplicateDashboard || isDashboardChartFork
+          ? forkDashSource?.dashboardSlug || source.dashboardSlug
+          : undefined,
+      chartId: isDashboardChartFork ? source.chartId : undefined,
+      replicateDashboard: shouldReplicateDashboard,
     });
 
     const sourceDataSet = resolved.dataSet;
@@ -86,11 +126,40 @@ export default async function handler(req, res) {
     );
     const subsetSheets = pickSheetsSubset(sourceDataSet.data_sheets || {}, sheetOrder);
 
-    let patchedSheets = patchAllSheetProvenance(
-      subsetSheets,
-      paramValue,
-      analysis.tickerFilterColumns || [],
-    );
+    let patchedSheets;
+    if (shouldReplicateDashboard && resolved.dashboard) {
+      patchedSheets = patchDashboardSheetsByChart(
+        subsetSheets,
+        sourceCharts,
+        resolved.dashboard.layout,
+        analysisId,
+        chartParameters,
+      );
+    } else if (isDashboardChartFork) {
+      const layoutColumnKey = String(source.layoutColumnKey || "").trim();
+      const slot =
+        getDashboardChartSlots(analysisId).find((s) => s.key === layoutColumnKey) ||
+        resolveDashboardChartSlotFromManifest(analysisId, {
+          key: layoutColumnKey,
+          layoutColumnId: layoutColumnKey,
+          title: primarySourceChart?.chart_name,
+        });
+      const slotKey = slot?.key || layoutColumnKey;
+      const params = chartParameters[slotKey] || chartParameters[layoutColumnKey] || {};
+      const parameterMode = slot?.parameterMode || "category_optional";
+      patchedSheets = patchSheetsForDashboardChart(
+        subsetSheets,
+        primarySourceChart,
+        params,
+        parameterMode,
+      );
+    } else {
+      patchedSheets = patchAllSheetProvenance(subsetSheets, paramValue, {
+        patchKind,
+        tickerColumns: analysis.tickerFilterColumns || [],
+        categoryColumns: analysis.categoryFilterColumns || ["kalshi_taxonomy_category", "category"],
+      });
+    }
 
     const access = await getAthenaAccessForUserId(newUserId);
     patchedSheets = await replayForkedProjectSheets({
@@ -104,7 +173,12 @@ export default async function handler(req, res) {
       ? patchedSheets[firstSheetId].data
       : [];
 
-    const projectName = `${analysis.label} — ${paramValue}`.slice(0, 100);
+    const chartTitle = primarySourceChart?.chart_name || analysis.label;
+    const projectName = shouldReplicateDashboard
+      ? `${analysis.label}`.slice(0, 100)
+      : isDashboardChartFork
+        ? `${chartTitle}`.slice(0, 100)
+        : `${analysis.label} — ${paramValue}`.slice(0, 100);
 
     const newDataSet = await DataSet.create({
       data_set_name: projectName,
@@ -143,6 +217,7 @@ export default async function handler(req, res) {
         data_set_id: newDataSet._id,
         user_id: newUserId,
         is_public: false,
+        public_slug: privateForkSlug("fork-chart"),
         labels: Array.isArray(srcChart.labels) ? srcChart.labels : [],
       });
       chartIdMap.set(String(srcChart._id), String(created._id));
@@ -150,7 +225,7 @@ export default async function handler(req, res) {
     }
 
     let newDashboardId = null;
-    if (replicateDashboard && resolved.dashboard) {
+    if (shouldReplicateDashboard && resolved.dashboard) {
       const layout = cloneJson(resolved.dashboard.layout);
       const rows = Array.isArray(layout?.rows) ? layout.rows : [];
       for (const row of rows) {
@@ -171,6 +246,7 @@ export default async function handler(req, res) {
         user_id: newUserId,
         data_set_id: newDataSet._id,
         is_public: false,
+        public_slug: privateForkSlug("fork-dash"),
         tags: Array.isArray(resolved.dashboard.tags) ? resolved.dashboard.tags : [],
       });
       newDashboardId = String(dash._id);

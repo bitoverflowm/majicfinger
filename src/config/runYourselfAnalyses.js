@@ -12,7 +12,9 @@
  * @property {RunParameterMode} parameterMode
  * @property {{ ownerHandle: string; slug: string }[]} sourceCharts
  * @property {{ ownerHandle: string; slug: string }[]} [sourceDashboards]
- * @property {string[]} tickerFilterColumns
+ * @property {string[]} [tickerFilterColumns]
+ * @property {string[]} [categoryFilterColumns]
+ * @property {string} [defaultCategory]
  * @property {string} [lake]
  * @property {string} [table]
  */
@@ -37,11 +39,12 @@ export const RUN_YOURSELF_ANALYSES = [
   {
     id: "weather-market-calibration",
     label: "Weather market calibration curve",
-    description: "Compare implied probabilities across weather markets.",
-    parameterMode: "market_search",
+    description: "Compare implied probabilities vs outcomes across all markets in a Kalshi category.",
+    parameterMode: "category_dropdown",
     lake: "kalshi",
     table: "markets",
-    tickerFilterColumns: ["ticker", "event_ticker"],
+    categoryFilterColumns: ["kalshi_taxonomy_category", "category"],
+    defaultCategory: "Weather",
     sourceCharts: [
       {
         ownerHandle: "misterrpink",
@@ -69,10 +72,10 @@ export const RUN_YOURSELF_ANALYSES = [
     label: "Kalshi volume dashboard",
     description:
       "Platform volume trends, monthly growth, category breakdown, and top markets — full dashboard replica.",
-    parameterMode: "trade_search",
+    parameterMode: "category_dropdown",
     lake: "kalshi",
     table: "trades",
-    tickerFilterColumns: ["ticker", "market_ticker", "event_ticker"],
+    categoryFilterColumns: ["kalshi_taxonomy_category", "category"],
     sourceDashboards: [
       { ownerHandle: "misterrpink", slug: "kalshi-volume-dashboard" },
     ],
@@ -106,6 +109,37 @@ export const RUN_YOURSELF_ANALYSES = [
     sourceCharts: [{ ownerHandle: "misterrpink", slug: "kalshi-volume-by-category" }],
   },
 ];
+
+/** Analyses that fork a single chart (no full dashboard replicate). */
+export const RUN_YOURSELF_CHART_ANALYSES = RUN_YOURSELF_ANALYSES.filter(
+  (a) => !(a.sourceDashboards || []).length,
+);
+
+/** Analyses that replicate an entire public dashboard. */
+export const RUN_YOURSELF_DASHBOARD_ANALYSES = RUN_YOURSELF_ANALYSES.filter(
+  (a) => (a.sourceDashboards || []).length > 0,
+);
+
+/**
+ * @param {RunAnalysisConfig} analysis
+ * @returns {boolean}
+ */
+export function isDashboardRunAnalysis(analysis) {
+  return (analysis?.sourceDashboards || []).length > 0;
+}
+
+/**
+ * Resolve dashboard slug/owner for a dashboard analysis fork.
+ * @param {RunAnalysisConfig} analysis
+ * @param {{ ownerHandle?: string; dashboardSlug?: string }} [source]
+ */
+export function resolveDashboardForkSource(analysis, source = {}) {
+  const dash = analysis?.sourceDashboards?.[0];
+  return {
+    ownerHandle: source.ownerHandle || dash?.ownerHandle || "",
+    dashboardSlug: source.dashboardSlug || dash?.slug || "",
+  };
+}
 
 function normalizeHandle(ownerHandle) {
   return String(ownerHandle || "").trim().toLowerCase();

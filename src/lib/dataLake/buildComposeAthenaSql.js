@@ -8,7 +8,7 @@ import {
 } from "./lakeTableColumns";
 import { kalshiEventTickerCategorySql } from "@/lib/kalshi/kalshiPrefixSql";
 import {
-  buildKalshiTaxonomyGroupCaseSqlForPrefixRef,
+  buildKalshiMarketsTaxonomyLayers,
   buildKalshiTaxonomyGroupSqlExpr,
   KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN,
 } from "@/lib/kalshi/kalshiTaxonomySql";
@@ -740,16 +740,13 @@ export function buildComposeAthenaSelectSql({
     let innerFrom = `FROM "${safeTable}" ${baseAlias}`;
     if (kalshiMat.size > 0) {
       const kb = "kb";
-      const kfb = "_kfb";
       const hasTax = kalshiMat.has(KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN);
       const hasPre = kalshiMat.has(KALSHI_VIRTUAL_CATEGORY);
 
       if (hasTax) {
         // Two-level derived table: compute prefix once as _kf_p, then CASE on _kfb._kf_p only.
         // A correlated scalar subquery in `SELECT kb.*, (SELECT …)` triggered Athena INTERNAL_ERROR_QUERY_ENGINE.
-        const pExpr = kalshiEventTickerCategorySql(`${kb}."event_ticker"`);
-        const prepped = `(SELECT ${kb}.*, ${pExpr} AS _kf_p FROM "${safeTable}" ${kb})`;
-        const taxCase = buildKalshiTaxonomyGroupCaseSqlForPrefixRef(`${kfb}._kf_p`);
+        const { prepped, taxCase, kfb } = buildKalshiMarketsTaxonomyLayers(safeTable);
         const outerParts = [];
         if (hasPre) {
           outerParts.push(`${kfb}._kf_p AS "${KALSHI_VIRTUAL_CATEGORY}"`);
