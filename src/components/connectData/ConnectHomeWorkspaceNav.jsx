@@ -35,8 +35,12 @@ const WORKSPACE_ACTION_TOOLTIPS = {
 
 const chipBase =
   "relative max-w-[11rem] shrink-0 cursor-pointer truncate rounded px-[0.3rem] py-[0.2rem] font-mono font-semibold transition-colors";
-const chipIdle = "bg-yellow-200/30 hover:bg-lychee_blue/80 hover:text-lychee_white";
-const chipActive = "bg-lychee_blue/30 text-foreground";
+const chipIdleSheet =
+  "bg-amber-100/70 text-amber-950 hover:bg-amber-200/90 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-900/60";
+const chipActiveSheet = "bg-amber-300/80 text-amber-950 dark:bg-amber-800/70 dark:text-amber-50";
+const chipIdleChart =
+  "bg-violet-100/70 text-violet-950 hover:bg-violet-200/90 dark:bg-violet-950/40 dark:text-violet-100 dark:hover:bg-violet-900/60";
+const chipActiveChart = "bg-violet-300/80 text-violet-950 dark:bg-violet-800/70 dark:text-violet-50";
 
 const actionChipBase =
   "relative cursor-pointer rounded px-[0.35rem] py-[0.2rem] font-mono font-semibold leading-none transition-colors whitespace-nowrap";
@@ -94,11 +98,13 @@ function splitVisibleWorkspaceTabs(items, availableWidth, compact) {
 }
 
 function WorkspaceTabChip({ item, textSize, onSelect }) {
+  const idle = item.kind === "chart" ? chipIdleChart : chipIdleSheet;
+  const active = item.kind === "chart" ? chipActiveChart : chipActiveSheet;
   return (
     <button
       type="button"
       title={item.label}
-      className={cn(chipBase, textSize, item.isActive ? chipActive : chipIdle)}
+      className={cn(chipBase, textSize, item.isActive ? active : idle)}
       onClick={onSelect}
     >
       {item.label}
@@ -152,7 +158,7 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className={cn(chipBase, textSize, chipIdle, "max-w-none shrink-0")}
+              className={cn(chipBase, textSize, chipIdleSheet, "max-w-none shrink-0")}
               title={`${totalCount} sheets and charts — open menu`}
             >
               + {totalCount}

@@ -24,6 +24,13 @@ import { replayForkedProjectSheets } from "@/lib/runYourself/replayForkedProject
 import { resolvePublicRunSource } from "@/lib/runYourself/resolvePublicSource";
 import { dbUserHasPaidAccess } from "@/lib/runYourself/serverPaidAccess";
 import { assertForkCreatedDistinctProject } from "@/lib/runYourself/forkIsolation";
+import {
+  applyPresentationToChartProperties,
+  buildForkPresentationContext,
+  forkChartDisplayName,
+  forkChartSubheadingFromParams,
+} from "@/lib/runYourself/forkPresentation";
+import { renameForkedSheets } from "@/lib/runYourself/forkSheetNaming";
 
 function cloneJson(doc) {
   return JSON.parse(JSON.stringify(doc ?? null));
@@ -196,11 +203,24 @@ export default async function handler(req, res) {
       });
     }
 
-    const access = await getAthenaAccessForUserId(newUserId);
+    const access = await getAthenaAccessForUserId(newUserId, { runYourselfForkPull: !paid });
     patchedSheets = await replayForkedProjectSheets({
       dataSheets: patchedSheets,
       sheetOrder,
       access,
+      forkReplay: true,
+    });
+
+    const presentation = buildForkPresentationContext({
+      runConfig,
+      paramValue,
+      parameterMode: runConfig.parameterMode,
+      patchKind,
+    });
+    patchedSheets = renameForkedSheets({
+      dataSheets: patchedSheets,
+      sheetOrder,
+      presentation,
     });
 
     const firstSheetId = sheetOrder[0] || Object.keys(patchedSheets)[0] || "sheet-1";
@@ -211,12 +231,23 @@ export default async function handler(req, res) {
     const chartTitle = primarySourceChart?.chart_name || runConfig.label;
     const paramLabel =
       paramValue && paramValue !== RUN_YOURSELF_ALL_CATEGORIES ? paramValue : null;
+    const primaryAnalysisHeading = presentation.analysisLabel;
+    const primaryMarketSubheading = presentation.marketLabel || presentation.categoryLabel || "";
     const projectName = shouldReplicateDashboard
       ? `${runConfig.label}`.slice(0, 100)
       : isDashboardChartFork
-        ? `${chartTitle}`.slice(0, 100)
+        ? forkChartDisplayName(
+            dashboardManifest.find((m) => m.chartId === String(source.chartId))?.title || chartTitle,
+            forkChartSubheadingFromParams(
+              chartParameters[
+                dashboardManifest.find((m) => m.chartId === String(source.chartId))?.key || ""
+              ] || {},
+              dashboardManifest.find((m) => m.chartId === String(source.chartId))?.parameterMode,
+              presentation,
+            ),
+          ).slice(0, 100)
         : paramLabel
-          ? `${runConfig.label} — ${paramLabel}`.slice(0, 100)
+          ? forkChartDisplayName(presentation.analysisLabel, paramLabel).slice(0, 100)
           : `${runConfig.label}`.slice(0, 100);
 
     const newDataSet = await DataSet.create({
@@ -249,11 +280,28 @@ export default async function handler(req, res) {
     const newChartIds = [];
 
     for (const srcChart of sourceCharts) {
-      const cp = cloneJson(
-        Array.isArray(srcChart.chart_properties) ? srcChart.chart_properties : [],
+      const srcId = String(srcChart._id);
+      const manifestEntry = dashboardManifest.find((m) => m.chartId === srcId);
+      const slotKey = manifestEntry?.key || "";
+      const slotParams = chartParameters[slotKey] || {};
+      const analysisHeading =
+        manifestEntry?.title || srcChart.chart_name || runConfig.label;
+      const marketSubheading = shouldReplicateDashboard || isDashboardChartFork
+        ? forkChartSubheadingFromParams(
+            slotParams,
+            manifestEntry?.parameterMode || runConfig.parameterMode,
+            presentation,
+          )
+        : primaryMarketSubheading;
+
+      const cp = applyPresentationToChartProperties(
+        cloneJson(Array.isArray(srcChart.chart_properties) ? srcChart.chart_properties : []),
+        { analysisHeading, marketSubheading },
       );
+      const displayName = forkChartDisplayName(analysisHeading, marketSubheading);
+
       const created = await Chart.create({
-        chart_name: srcChart.chart_name || runConfig.label,
+        chart_name: displayName,
         chart_properties: cp,
         data_set_id: newDataSet._id,
         user_id: newUserId,
@@ -280,9 +328,9 @@ export default async function handler(req, res) {
         }
       }
       const dash = await ChartDashboard.create({
-        dashboard_name: resolved.dashboard.dashboard_name || projectName,
-        page_heading: resolved.dashboard.page_heading || "",
-        page_subheading: resolved.dashboard.page_subheading || "",
+        dashboard_name: projectName,
+        page_heading: primaryAnalysisHeading,
+        page_subheading: primaryMarketSubheading,
         layout,
         theme: cloneJson(resolved.dashboard.theme),
         user_id: newUserId,

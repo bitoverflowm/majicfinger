@@ -1207,7 +1207,7 @@ export default function DataSheetWithIntegration({
                 {chartSheetIds.map((id) => (
                   <code
                     key={id}
-                    className={`${id === activeChartSheetId ? "bg-lychee_blue/30" : "bg-yellow-200/30 cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
+                    className={`${id === activeChartSheetId ? "bg-violet-300/80 text-violet-950 dark:bg-violet-800/70 dark:text-violet-50" : "bg-violet-100/70 text-violet-950 cursor-pointer hover:bg-violet-200/90 dark:bg-violet-950/40 dark:text-violet-100 dark:hover:bg-violet-900/60"} relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold`}
                     onClick={() => activateChartSheet(id)}
                   >
                     {chartSheets?.[id]?.name || id}

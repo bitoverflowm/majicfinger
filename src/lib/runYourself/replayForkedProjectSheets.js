@@ -11,7 +11,7 @@ import { normalizeLakeBigintFieldsInRows } from "@/lib/dataLake/lakeBigintNormal
  * @param {object} opts.access Athena access from getAthenaAccessForUserId
  * @returns {Promise<Record<string, object>>}
  */
-export async function replayForkedProjectSheets({ dataSheets, sheetOrder, access }) {
+export async function replayForkedProjectSheets({ dataSheets, sheetOrder, access, forkReplay = false }) {
   const sheets = { ...(dataSheets || {}) };
   /** @type {Map<string, object[]>} */
   const rowsBySheet = new Map();
@@ -30,7 +30,7 @@ export async function replayForkedProjectSheets({ dataSheets, sheetOrder, access
         provenance,
         sheetGraph,
         operationHistory: sheet.operationHistory || [],
-        maxRows: sheet.fullRowCount || sheet.rowCount || undefined,
+        maxRows: forkReplay ? undefined : sheet.fullRowCount || sheet.rowCount || undefined,
         previewRows: [],
         saveMeta: sheet.saveMeta || null,
       };

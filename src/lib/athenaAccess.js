@@ -5,6 +5,7 @@ import User from "@/models/Users";
 import { ATHENA_SAMPLE_ROW_LIMIT, ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { COMPOSE_UNCONSTRAINED_ROW_CAP } from "@/lib/dataLake/buildComposeAthenaSql";
 import { userHasExpandedAthenaAccess } from "@/lib/athenaEntitlement";
+import { dbUserHasPaidAccess } from "@/lib/runYourself/serverPaidAccess";
 
 function subscriberMaxSelectEnv() {
   const n = parseInt(process.env.ATHENA_SUBSCRIBER_MAX_SELECT || String(ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT), 10);
@@ -30,13 +31,22 @@ function freeLimits() {
   };
 }
 
+/** Free user's one interactive fork session — full pulls, not 100-row samples. */
+function dbUserHasRunYourselfFullPullAccess(dbUser) {
+  if (!dbUser) return false;
+  if (dbUserHasPaidAccess(dbUser)) return true;
+  if (!dbUser.run_yourself_fork_data_set_id || !dbUser.run_yourself_used_at) return false;
+  return !dbUser.run_yourself_interactive_consumed_at;
+}
+
 /**
  * Athena row caps for routes that use the **chart/dataset owner's** subscription
  * (e.g. public embed hydration), not the anonymous viewer session.
  *
  * @param {unknown} userId - Mongo ObjectId string or object
+ * @param {{ runYourselfForkPull?: boolean }} [options] One-time full pull during run-yourself fork replay
  */
-export async function getAthenaAccessForUserId(userId) {
+export async function getAthenaAccessForUserId(userId, options = {}) {
   try {
     const uid = userId != null ? String(userId) : "";
     if (!uid || uid === "dev-bypass-no-db") {
@@ -47,6 +57,10 @@ export async function getAthenaAccessForUserId(userId) {
     await dbConnect();
     const dbUser = await User.findById(uid).lean();
     if (!dbUser) return freeLimits();
+
+    if (options.runYourselfForkPull || dbUserHasRunYourselfFullPullAccess(dbUser)) {
+      return subscriberLimits();
+    }
 
     if (userHasExpandedAthenaAccess({ ...dbUser, userId: uid })) {
       return subscriberLimits();
@@ -77,6 +91,9 @@ export async function getAthenaAccessFromRequest(req) {
     if (uid && mongoose.Types.ObjectId.isValid(uid)) {
       await dbConnect();
       const dbUser = await User.findById(uid).lean();
+      if (dbUser && dbUserHasRunYourselfFullPullAccess(dbUser)) {
+        return subscriberLimits();
+      }
       if (dbUser && userHasExpandedAthenaAccess({ ...session, ...dbUser })) {
         return subscriberLimits();
       }

@@ -156,8 +156,8 @@ const DataView = ({ user, fillViewport = false }) => {
                 "relative rounded px-[0.3rem] py-[0.2rem] font-mono font-semibold",
                 fillViewport ? "text-xs" : "text-sm",
                 id === activeSheetId
-                  ? "bg-lychee_blue/30"
-                  : "cursor-pointer bg-yellow-200/30 hover:bg-lychee_blue/80 hover:text-lychee_white",
+                  ? "bg-amber-300/80 text-amber-950 dark:bg-amber-800/70 dark:text-amber-50"
+                  : "cursor-pointer bg-amber-100/70 text-amber-950 hover:bg-amber-200/90 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-900/60",
               )}
               onClick={() => setActiveSheetId?.(id)}
             >
@@ -168,7 +168,7 @@ const DataView = ({ user, fillViewport = false }) => {
             type="button"
             aria-label="Add sheet"
             title="Add sheet"
-            className="relative rounded px-[0.35rem] py-[0.2rem] font-mono text-sm font-semibold leading-none bg-yellow-200/30 text-foreground cursor-pointer hover:bg-lychee_blue/80 hover:text-lychee_white"
+            className="relative rounded px-[0.35rem] py-[0.2rem] font-mono text-sm font-semibold leading-none bg-amber-100/70 text-amber-950 cursor-pointer hover:bg-amber-200/90 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-900/60"
             onClick={() => addNewSheetAndActivate?.()}
           >
             +
