@@ -1,5 +1,6 @@
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
+import { notifySignup } from "@/lib/telegram/trackEvent";
 import { buffer } from "micro";
 
 export const config = {
@@ -548,6 +549,12 @@ async function updateUserPayment(email, name, amount, opts) {
 
   if (!user) {
     await User.create({ email: normalizedEmail, ...update });
+    notifySignup({
+      email: normalizedEmail,
+      name: normalizedEmail.split("@")[0],
+      source: "stripe checkout",
+      method: "stripe",
+    }).catch((err) => console.error("[telegram] signup notify failed", err));
   } else {
     await User.findByIdAndUpdate(user._id, { $set: { ...update, email: normalizeEmail(user.email || normalizedEmail) } });
   }
@@ -582,6 +589,12 @@ async function updateUserSubscriptionStatus(email, opts) {
       stripePriceId: opts?.stripePriceId || undefined,
       token: 100,
     });
+    notifySignup({
+      email: normalizedEmail,
+      name: normalizedEmail.split("@")[0],
+      source: "stripe subscription",
+      method: "stripe",
+    }).catch((err) => console.error("[telegram] signup notify failed", err));
     return;
   }
 
@@ -618,6 +631,12 @@ async function upsertUserByEmail(email, { name, stripeCustomerId }) {
       stripeCustomerId: stripeCustomerId || null,
       token: 100,
     });
+    notifySignup({
+      email: normalizedEmail,
+      name: name || normalizedEmail.split("@")[0] || "Customer",
+      source: "stripe checkout",
+      method: "stripe",
+    }).catch((err) => console.error("[telegram] signup notify failed", err));
     return;
   }
 

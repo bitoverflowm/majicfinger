@@ -10,6 +10,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
+import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -78,6 +79,23 @@ export default function PublicChartEmbedClient({
     () => normalizeBuilderSnapshot(rb, rows, dataSheets),
     [rb, rows, dataSheets],
   );
+  const chartName = payload?.data?.chart?.chart_name || slug;
+  const ownerHandleForTracker = payload?.data?.owner_handle || username;
+  const trackerReady =
+    !!payload?.success &&
+    !!payload?.data &&
+    (rows.length > 0 ||
+      Object.values(dataSheets || {}).some(
+        (sheet: any) => Array.isArray(sheet?.data) && sheet.data.length > 0,
+      ));
+
+  useTelegramContentTracker({
+    contentType: "chart",
+    name: chartName,
+    path: `/${username}/charts/${slug}`,
+    ownerHandle: ownerHandleForTracker,
+    enabled: trackerReady,
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -151,6 +169,7 @@ export default function PublicChartEmbedClient({
   const ownerHandle = payload.data.owner_handle || username;
   const ownerName = payload.data.owner_name ?? null;
   const ownerProfilePic = payload.data.owner_profile_pic ?? null;
+
   const cp0 =
     Array.isArray(chart.chart_properties) && chart.chart_properties[0] && typeof chart.chart_properties[0] === "object"
       ? (chart.chart_properties[0] as Record<string, unknown>)
@@ -184,7 +203,12 @@ export default function PublicChartEmbedClient({
             </div>
           </ChartBuilderProvider>
           <div className="pointer-events-auto absolute bottom-3 right-3 z-20">
-            <RunForYourselfButton ownerHandle={username} chartSlug={slug} kind="chart" />
+            <RunForYourselfButton
+              ownerHandle={username}
+              chartSlug={slug}
+              kind="chart"
+              displayName={chart.chart_name || slug}
+            />
           </div>
         </div>
         <footer className={`w-full border-t border-border/60 text-center text-xs text-muted-foreground ${isEmbedded ? "pt-2" : "mt-auto pt-3"}`}>

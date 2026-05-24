@@ -17,6 +17,7 @@ import {
   saveRunSourceContext,
 } from "@/lib/runYourself/runSourceContext";
 import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
+import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
 
 /**
  * @param {{
@@ -30,6 +31,7 @@ import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourself
  *   className?: string;
  *   variant?: "chart" | "dashboard";
  *   forceRunnable?: boolean;
+ *   displayName?: string;
  * }} props
  */
 export function RunForYourselfButton({
@@ -43,6 +45,7 @@ export function RunForYourselfButton({
   className,
   variant = "chart",
   forceRunnable = false,
+  displayName,
 }) {
   const user = useUser();
   const [authOpen, setAuthOpen] = useState(false);
@@ -105,6 +108,16 @@ export function RunForYourselfButton({
   const handleClick = useCallback(() => {
     if (!runnable || notRunnable) return;
 
+    sendTelegramAnalyticsEvent("fork_click", {
+      kind: ctx.kind,
+      displayName,
+      ownerHandle: handle,
+      chartSlug,
+      dashboardSlug,
+      isLoggedIn: !!user,
+      userEmail: user?.email,
+    });
+
     if (user && userRunYourselfQuotaExceeded(user) && !userHasPaidAccess(user)) {
       navigateToRunFlow("/#pricing");
       return;
@@ -117,7 +130,7 @@ export function RunForYourselfButton({
 
     saveRunSourceContext(ctx);
     setAuthOpen(true);
-  }, [user, runnable, notRunnable, goToTry, ctx]);
+  }, [user, runnable, notRunnable, goToTry, ctx, displayName, handle, chartSlug, dashboardSlug]);
 
   if (!runnable) return null;
 

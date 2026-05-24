@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { GuideLayout } from "@/components/content/GuideLayout";
+import { ArticleViewTracker } from "@/components/analytics/ArticleViewTracker";
 import { MDXContent } from "@/lib/content/mdx";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
 import { extractMdxHeadingsForToc } from "@/lib/content/extract-mdx-headings";
@@ -65,6 +66,7 @@ export default async function GuidePage({
 
   return (
     <>
+      <ArticleViewTracker title={frontmatter.title} slug={slug} contentType={contentType} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

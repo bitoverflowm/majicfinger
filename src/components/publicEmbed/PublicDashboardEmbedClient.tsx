@@ -29,6 +29,7 @@ import {
 } from "@/lib/dashboardFreeTextTheme";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
+import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 import { isRunnablePublicChart, isRunnablePublicDashboard } from "@/config/runYourselfAnalyses";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
@@ -117,6 +118,20 @@ export default function PublicDashboardEmbedClient({
     () => typeof window !== "undefined" && window.self !== window.top,
   );
 
+  const dashboardName =
+    payload?.data?.dashboard_name ||
+    payload?.data?.page_heading ||
+    slug;
+  const trackerReady = !!payload?.success && !!payload?.data;
+
+  useTelegramContentTracker({
+    contentType: "dashboard",
+    name: dashboardName,
+    path: `/${username}/dashboards/${slug}`,
+    ownerHandle: payload?.data?.owner_handle || username,
+    enabled: trackerReady,
+  });
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     setIsEmbedded(window.self !== window.top);
@@ -198,6 +213,7 @@ export default function PublicDashboardEmbedClient({
             kind="dashboard"
             variant="dashboard"
             forceRunnable
+            displayName={dashboardName}
           />
         ) : null}
         <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />

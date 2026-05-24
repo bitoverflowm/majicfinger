@@ -41,7 +41,7 @@ const Login = ({ fromHome }) => {
     setLoading(true);
     setProgress(0);
     const timer = setInterval(() => setProgress((prev) => Math.min(prev + 10, 90)), 3000);
-    const body = { email, name };
+    const body = { email, name, signupSource: fromHome ? 'homepage signup' : 'login page' };
     const isDevBypass = process.env.NODE_ENV !== 'production' && isDevMagicLinkBypassEmail(email);
     if (isDevBypass) body.devBypass = true;
 

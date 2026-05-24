@@ -89,6 +89,7 @@ export function PublicDashboardChartBlock({
               chartId={chartId}
               layoutColumnKey={layoutColumnKey}
               kind={chartSlug ? "chart" : "dashboard_chart"}
+              displayName={chart?.chart_name || chartSlug || chartId}
               className="shadow-md gap-1 rounded-full px-3 py-2 text-xs font-semibold h-auto"
             />
           </div>

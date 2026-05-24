@@ -17,13 +17,14 @@ import {
 const isDev = process.env.NODE_ENV !== "production";
 
 /**
- * @param {{ title?: string; subtitle?: string; onSuccess?: () => void; showUpgradeLink?: boolean }} props
+ * @param {{ title?: string; subtitle?: string; onSuccess?: () => void; showUpgradeLink?: boolean; signupSource?: string }} props
  */
 export function MagicLinkEmailForm({
   title = "Generate your first interactive analysis.",
   subtitle = "Enter your email to receive a magic link — no password needed.",
   onSuccess,
   showUpgradeLink = true,
+  signupSource = "fork flow",
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -42,7 +43,7 @@ export function MagicLinkEmailForm({
     setLoading(true);
     setProgress(0);
     const timer = setInterval(() => setProgress((prev) => Math.min(prev + 10, 90)), 3000);
-    const body = { email, name };
+    const body = { email, name, signupSource };
     const isDevBypass = isDev && isDevMagicLinkBypassEmail(email);
     if (isDevBypass) body.devBypass = true;
 
