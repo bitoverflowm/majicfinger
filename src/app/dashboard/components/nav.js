@@ -685,6 +685,10 @@ const Nav = () => {
   };
 
   const handleSave = async () => {
+    if (contextStateV2?.workspaceWriteLocked) {
+      toast.error("Upgrade to Pro to save projects.");
+      return;
+    }
     const bump = (pct, msg) => {
       setSaveProjectProgress(pct);
       setSaveProjectMessage(msg);

@@ -112,7 +112,13 @@ const DashBody = ({ user }) => {
       userRunYourselfInteractiveUnlocked(user) &&
       (runYourselfSessionActive || viewingForkProject);
     const dashboardAccessLocked = isLocked && !runYourselfInteractiveUnlocked;
+    const workspaceWriteLocked =
+      !isDemo && !!user && (dashboardAccessLocked || runYourselfLocked);
     const wasOnForkProjectRef = useRef(false);
+
+    useEffect(() => {
+      contextStateV2?.setWorkspaceWriteLocked?.(workspaceWriteLocked);
+    }, [workspaceWriteLocked, contextStateV2]);
 
     useEffect(() => {
       if (!userRunYourselfInteractiveUnlocked(user)) {
@@ -482,7 +488,7 @@ const DashBody = ({ user }) => {
               <div className="mt-1 text-sm leading-snug text-muted-foreground">
                 {runYourselfLocked && !isLocked
                   ? "You've used your free interactive run. View your chart and data below, then upgrade to Pro to edit, save, and run more analyses."
-                  : "Editing, saving, uploads, and integrations stay locked until you have an active paid plan (or lifetime access)."}
+                  : "You can browse projects, sheets, and dashboards. Saving, data pulls, uploads, and integrations require an active paid plan (or lifetime access)."}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -501,12 +507,7 @@ const DashBody = ({ user }) => {
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
     ) : (
       <div className="relative flex min-h-svh min-w-0 flex-col">
-        <div
-          className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col",
-            isLocked && !runYourselfInteractiveUnlocked && "pointer-events-none select-none",
-          )}
-        >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {content}
         </div>
         {paywallOverlay}

@@ -9,6 +9,9 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 export const DEMO_HISTORICAL_PRO_DESCRIPTION =
   "Only for Pro users at the moment. Want to upgrade to use feature?";
 
+export const WORKSPACE_WRITE_LOCKED_DESCRIPTION =
+  "You can browse projects, sheets, charts, and dashboards. Saving, data pulls, uploads, and integrations require an active paid plan (or lifetime access).";
+
 export const DEMO_GATED_HISTORICAL_INTEGRATION_IDS = new Set([
   "kalshiHistorical",
   "polymarketHistorical",
@@ -20,16 +23,20 @@ export function isDemoGatedHistoricalIntegration(id) {
 
 /**
  * In demo mode, blocks an action and opens the Pro upgrade dialog instead.
+ * When workspaceWriteLocked (free tier paywall), blocks writes but allows navigation.
  *
  * @returns {{
  *   isDemo: boolean,
+ *   workspaceWriteLocked: boolean,
  *   runOrRequestPro: (action: () => void, featureLabel?: string) => void,
- *   requestProUpgrade: (featureLabel?: string) => void,
+ *   requestProUpgrade: (featureLabel?: string, opts?: object) => void,
+ *   requestHistoricalProUpgrade: (featureLabel?: string) => void,
  *   dialog: import("react").ReactNode,
  * }}
  */
 export function useDemoProGate() {
   const isDemo = !!useMyStateV2()?.isDemo;
+  const workspaceWriteLocked = !!useMyStateV2()?.workspaceWriteLocked;
   const [open, setOpen] = useState(false);
   const [featureLabel, setFeatureLabel] = useState("this feature");
   const [dialogTitle, setDialogTitle] = useState(undefined);
@@ -44,12 +51,19 @@ export function useDemoProGate() {
 
   const requestHistoricalProUpgrade = useCallback(
     (label = "Historical data") => {
+      if (workspaceWriteLocked && !isDemo) {
+        requestProUpgrade(label, {
+          title: "Upgrade to unlock",
+          description: WORKSPACE_WRITE_LOCKED_DESCRIPTION,
+        });
+        return;
+      }
       requestProUpgrade(label, {
         title: "Pro only",
         description: DEMO_HISTORICAL_PRO_DESCRIPTION,
       });
     },
-    [requestProUpgrade],
+    [isDemo, requestProUpgrade, workspaceWriteLocked],
   );
 
   const runOrRequestPro = useCallback(
@@ -58,9 +72,16 @@ export function useDemoProGate() {
         requestProUpgrade(label);
         return;
       }
+      if (workspaceWriteLocked) {
+        requestProUpgrade(label, {
+          title: "Upgrade to unlock",
+          description: WORKSPACE_WRITE_LOCKED_DESCRIPTION,
+        });
+        return;
+      }
       if (typeof action === "function") action();
     },
-    [isDemo, requestProUpgrade],
+    [isDemo, requestProUpgrade, workspaceWriteLocked],
   );
 
   const dialog = (
@@ -75,6 +96,7 @@ export function useDemoProGate() {
 
   return {
     isDemo,
+    workspaceWriteLocked,
     runOrRequestPro,
     requestProUpgrade,
     requestHistoricalProUpgrade,

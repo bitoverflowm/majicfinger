@@ -633,7 +633,7 @@ function GenericSourceCards({
 export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const ctx = useMyStateV2() ?? {};
   const isDemo = !!ctx.isDemo;
-  const { requestHistoricalProUpgrade, dialog: demoProDialog } = useDemoProGate();
+  const { requestHistoricalProUpgrade, workspaceWriteLocked, dialog: demoProDialog } = useDemoProGate();
   const {
     connectDataLakeSampleId,
     setConnectDataLakeSampleId,
@@ -695,9 +695,13 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
         requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
         return;
       }
+      if (workspaceWriteLocked) {
+        requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
+        return;
+      }
       applyKalshiPowerSearchSelection(ctx, suggestion);
     },
-    [ctx, integrationId, isDemo, requestHistoricalProUpgrade],
+    [ctx, integrationId, isDemo, workspaceWriteLocked, requestHistoricalProUpgrade],
   );
 
   useEffect(() => {
@@ -775,11 +779,15 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
       return;
     }
+    if (workspaceWriteLocked) {
+      requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
+      return;
+    }
     prepareConnectHomePullSheet(ctx);
     flushSync(() => {
       requestConnectIntegrationPull?.();
     });
-  }, [ctx, integrationId, isDemo, requestConnectIntegrationPull, requestHistoricalProUpgrade]);
+  }, [ctx, integrationId, isDemo, workspaceWriteLocked, requestConnectIntegrationPull, requestHistoricalProUpgrade]);
 
   if (!isConnectIntegrationWorkspace(integrationId)) return null;
   if (!isConnectQueryComposeIntegration(integrationId)) {
