@@ -7,6 +7,8 @@ import {
   inferDashboardChartManifest,
   inferRunConfigForChart,
   inferRunConfigForDashboard,
+  findDashboardLayoutColumn,
+  mergeCuratedDashboardChartSlot,
   mergeRunConfig,
 } from "@/lib/runYourself/inferRunYourselfConfig";
 import { resolvePublicRunSource } from "@/lib/runYourself/resolvePublicSource";
@@ -43,11 +45,14 @@ export default async function handler(req, res) {
         resolved.dataSet.data_sheets || {},
         resolved.primaryChart,
       );
-      const config = mergeRunConfig(curatedDashboard || curatedChart, inferred);
+      const layoutColumn = findDashboardLayoutColumn(resolved.dashboard?.layout, chartId);
+      const withSlot = mergeCuratedDashboardChartSlot(curatedDashboard, layoutColumn, inferred);
+      const config = mergeRunConfig(curatedDashboard || curatedChart, withSlot);
       const manifest = inferDashboardChartManifest(
         resolved.dataSet.data_sheets || {},
         resolved.charts,
         resolved.dashboard?.layout,
+        curatedDashboard?.id,
       );
       const chartSlot = manifest.find((c) => c.chartId === chartId) || null;
 
@@ -77,12 +82,14 @@ export default async function handler(req, res) {
         resolved.dataSet.data_sheets || {},
         resolved.charts,
         resolved.dashboard,
+        curatedDashboard?.id,
       );
       const config = mergeRunConfig(curatedDashboard, inferred);
       const charts = inferDashboardChartManifest(
         resolved.dataSet.data_sheets || {},
         resolved.charts,
         resolved.dashboard?.layout,
+        curatedDashboard?.id,
       );
 
       return res.status(200).json({

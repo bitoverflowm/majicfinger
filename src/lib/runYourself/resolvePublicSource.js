@@ -59,7 +59,7 @@ export async function resolvePublicRunSource(ownerHandle, source) {
       err.statusCode = 404;
       throw err;
     }
-    return { owner, charts: [chart], primaryChart: chart, dataSet, dashboard: null };
+    return { owner, charts: [chart], primaryChart: chart, dataSet, dashboard };
   }
 
   if (source.dashboardSlug && source.replicateDashboard) {

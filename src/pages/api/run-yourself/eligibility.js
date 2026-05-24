@@ -6,6 +6,8 @@ import { resolvePublicRunSource } from "@/lib/runYourself/resolvePublicSource";
 import {
   inferRunConfigForChart,
   inferRunConfigForDashboard,
+  findDashboardLayoutColumn,
+  mergeCuratedDashboardChartSlot,
   mergeRunConfig,
 } from "@/lib/runYourself/inferRunYourselfConfig";
 import { findAnalysisForSourceChart, findAnalysisForSourceDashboard } from "@/config/runYourselfAnalyses";
@@ -14,11 +16,14 @@ async function checkRunnable(ownerHandle, chartSlug, dashboardSlug, chartId) {
   try {
     if (chartId && dashboardSlug) {
       const resolved = await resolvePublicRunSource(ownerHandle, { dashboardSlug, chartId });
+      const curated = findAnalysisForSourceDashboard(ownerHandle, dashboardSlug);
       const inferred = inferRunConfigForChart(
         resolved.dataSet.data_sheets || {},
         resolved.primaryChart,
       );
-      return inferred.runnable;
+      const layoutColumn = findDashboardLayoutColumn(resolved.dashboard?.layout, chartId);
+      const withSlot = mergeCuratedDashboardChartSlot(curated, layoutColumn, inferred);
+      return mergeRunConfig(curated, withSlot).runnable;
     }
     if (dashboardSlug) {
       const resolved = await resolvePublicRunSource(ownerHandle, {
@@ -30,6 +35,7 @@ async function checkRunnable(ownerHandle, chartSlug, dashboardSlug, chartId) {
         resolved.dataSet.data_sheets || {},
         resolved.charts,
         resolved.dashboard,
+        curated?.id,
       );
       return mergeRunConfig(curated, inferred).runnable;
     }

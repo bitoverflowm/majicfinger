@@ -3,7 +3,7 @@
  */
 import { collectSheetClosureForCharts } from "@/lib/runYourself/collectSheetClosure";
 import { collectLakePullSheetIds } from "@/lib/runYourself/patchDashboardChartSheets";
-import { RUN_YOURSELF_ALL_CATEGORIES } from "@/config/runYourselfDashboardCharts";
+import { RUN_YOURSELF_ALL_CATEGORIES, resolveDashboardChartSlot } from "@/config/runYourselfDashboardCharts";
 
 /** @typedef {"trade_search" | "market_search" | "category_optional" | "dual_category_optional" | "none"} InferredParameterMode */
 
@@ -154,6 +154,12 @@ function inferModeFromContexts(contexts) {
   const allMarkets = contexts.every((c) => c.table === "markets");
   if (allTrades || allMarkets) return "category_optional";
 
+  // Kalshi top-markets style charts often join trades + markets without a fixed ticker filter.
+  const kalshiOnly = hasKalshi && !hasPoly;
+  const hasTradesTable = contexts.some((c) => c.lake === "kalshi" && c.table === "trades");
+  const hasMarketsTable = contexts.some((c) => c.lake === "kalshi" && c.table === "markets");
+  if (kalshiOnly && hasTradesTable && hasMarketsTable) return "category_optional";
+
   return "none";
 }
 
@@ -258,7 +264,7 @@ export function inferRunConfigForChart(dataSheets, chart) {
  * @param {object} layout
  * @returns {object[]}
  */
-export function inferDashboardChartManifest(dataSheets, charts, layout) {
+export function inferDashboardChartManifest(dataSheets, charts, layout, analysisId) {
   const chartsById = new Map((charts || []).map((c) => [String(c._id), c]));
   /** @type {object[]} */
   const out = [];
@@ -272,12 +278,16 @@ export function inferDashboardChartManifest(dataSheets, charts, layout) {
       if (!chart) continue;
 
       const inferred = inferRunConfigForChart(dataSheets, chart);
+      const curatedSlot = analysisId ? resolveDashboardChartSlot(analysisId, col) : null;
+      const merged = curatedSlot
+        ? mergeCuratedDashboardChartSlot({ id: analysisId }, col, inferred)
+        : inferred;
       const parameterMode =
-        inferred.parameterMode === "dual_category_optional"
+        merged.parameterMode === "dual_category_optional"
           ? "dual_category_optional"
-          : inferred.parameterMode === "trade_search" || inferred.parameterMode === "market_search"
-            ? inferred.parameterMode
-            : inferred.parameterMode === "none"
+          : merged.parameterMode === "trade_search" || merged.parameterMode === "market_search"
+            ? merged.parameterMode
+            : merged.parameterMode === "none"
               ? "none"
               : "category_optional";
 
@@ -289,13 +299,14 @@ export function inferDashboardChartManifest(dataSheets, charts, layout) {
         caption: col.caption || "",
         parameterMode,
         hint:
-          parameterMode === "dual_category_optional"
+          curatedSlot?.hint ||
+          (parameterMode === "dual_category_optional"
             ? "Optionally filter each platform by category."
             : parameterMode === "category_optional"
               ? "All categories, or filter to one taxonomy category."
-              : "",
-        defaults: defaultValuesForDashboardMode(parameterMode, inferred),
-        inferred,
+              : ""),
+        defaults: defaultValuesForDashboardMode(parameterMode, merged),
+        inferred: merged,
       });
     }
   }
@@ -328,9 +339,9 @@ function defaultValuesForDashboardMode(mode, inferred) {
  * @param {object} [dashboard]
  * @returns {InferredRunConfig}
  */
-export function inferRunConfigForDashboard(dataSheets, charts, dashboard) {
+export function inferRunConfigForDashboard(dataSheets, charts, dashboard, analysisId) {
   const name = String(dashboard?.dashboard_name || "Dashboard").trim() || "Dashboard";
-  const manifest = inferDashboardChartManifest(dataSheets, charts, dashboard?.layout);
+  const manifest = inferDashboardChartManifest(dataSheets, charts, dashboard?.layout, analysisId);
   const anyRunnable = manifest.some((c) => c.inferred?.runnable);
 
   return {
@@ -342,6 +353,50 @@ export function inferRunConfigForDashboard(dataSheets, charts, dashboard) {
     tickerFilterColumns: ["ticker", "market_ticker"],
     categoryFilterColumns: ["kalshi_taxonomy_category", "category"],
     reason: anyRunnable ? undefined : "No runnable charts found on this dashboard.",
+  };
+}
+
+/**
+ * @param {object} [layout]
+ * @param {string} chartId
+ * @returns {{ id?: string; h2?: string; chart_id?: string } | null}
+ */
+export function findDashboardLayoutColumn(layout, chartId) {
+  const id = String(chartId || "").trim();
+  if (!id) return null;
+  const rows = Array.isArray(layout?.rows) ? layout.rows : [];
+  for (const row of rows) {
+    if (row?.type !== "cards" || !Array.isArray(row.columns)) continue;
+    for (const col of row.columns) {
+      if (col?.chart_id && String(col.chart_id) === id) return col;
+    }
+  }
+  return null;
+}
+
+/**
+ * Apply per-chart curated slot config for dashboard forks (overrides inference when listed).
+ * @param {import("@/config/runYourselfAnalyses").RunAnalysisConfig | null} curatedAnalysis
+ * @param {{ id?: string; h2?: string }} layoutColumn
+ * @param {InferredRunConfig} inferred
+ * @returns {InferredRunConfig}
+ */
+export function mergeCuratedDashboardChartSlot(curatedAnalysis, layoutColumn, inferred) {
+  if (!curatedAnalysis?.id || !layoutColumn) return inferred;
+  const slot = resolveDashboardChartSlot(curatedAnalysis.id, layoutColumn);
+  if (!slot) return inferred;
+
+  if (slot.parameterMode === "none") {
+    return { ...inferred, runnable: true, parameterMode: "none" };
+  }
+
+  const parameterMode =
+    slot.parameterMode === "dual_category_optional" ? "dual_category_optional" : "category_optional";
+
+  return {
+    ...inferred,
+    runnable: true,
+    parameterMode,
   };
 }
 

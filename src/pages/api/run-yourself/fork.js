@@ -10,6 +10,8 @@ import {
   inferDashboardChartManifest,
   inferRunConfigForChart,
   inferRunConfigForDashboard,
+  findDashboardLayoutColumn,
+  mergeCuratedDashboardChartSlot,
   mergeRunConfig,
 } from "@/lib/runYourself/inferRunYourselfConfig";
 import { getAthenaAccessForUserId } from "@/lib/athenaAccess";
@@ -105,8 +107,18 @@ export default async function handler(req, res) {
     const primarySourceChart = resolved.primaryChart;
 
     const inferred = shouldReplicateDashboard
-      ? inferRunConfigForDashboard(sourceDataSet.data_sheets || {}, sourceCharts, resolved.dashboard)
-      : inferRunConfigForChart(sourceDataSet.data_sheets || {}, primarySourceChart);
+      ? inferRunConfigForDashboard(
+          sourceDataSet.data_sheets || {},
+          sourceCharts,
+          resolved.dashboard,
+          dashboardAnalysis?.id,
+        )
+      : (() => {
+          const base = inferRunConfigForChart(sourceDataSet.data_sheets || {}, primarySourceChart);
+          if (!isDashboardChartFork) return base;
+          const layoutColumn = findDashboardLayoutColumn(resolved.dashboard?.layout, source.chartId);
+          return mergeCuratedDashboardChartSlot(dashboardAnalysis, layoutColumn, base);
+        })();
     const runConfig = mergeRunConfig(curatedAnalysis || dashboardAnalysis, inferred);
 
     if (!runConfig.runnable) {
@@ -143,6 +155,7 @@ export default async function handler(req, res) {
       sourceDataSet.data_sheets || {},
       sourceCharts,
       resolved.dashboard?.layout,
+      dashboardAnalysis?.id || curatedAnalysis?.id,
     );
 
     let patchedSheets;

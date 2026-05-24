@@ -41,6 +41,7 @@ export default async function handler(req, res) {
       resolved.dataSet.data_sheets || {},
       resolved.charts,
       resolved.dashboard,
+      curated?.id,
     );
     const config = mergeRunConfig(curated, inferred);
 
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
       resolved.dataSet.data_sheets || {},
       resolved.charts,
       resolved.dashboard?.layout,
+      curated?.id,
     ).map((c) => ({
       ...c,
       defaults: c.defaults || defaultChartParameterValues(c.parameterMode),
