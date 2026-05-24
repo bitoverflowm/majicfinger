@@ -21,6 +21,7 @@ import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { coerceChartPlotNumber, sanitizeCartesianRowsForPlotting } from "@/lib/chartDataSanitize";
+import { isCategoricalLabelColumn, looksLikeProseLabelValue } from "@/lib/chartCategoricalColumns";
 import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
 import { temporalToMs } from "@/lib/temporalParse";
 
@@ -114,6 +115,7 @@ function rowValueForDataKey(row, key) {
 export function getAxisType(key, dataTypes, data) {
   const skey = String(key || "");
   const descoped = skey.includes("::") ? skey.slice(skey.indexOf("::") + 2) : null;
+  if (isCategoricalLabelColumn(descoped || skey)) return "string";
   const dt = dataTypes && (dataTypes[skey] ?? (descoped ? dataTypes[descoped] : undefined));
   if (dt) {
     const t = dt;
@@ -125,7 +127,7 @@ export function getAxisType(key, dataTypes, data) {
       if (v instanceof Date) return "date";
       const n = Number(v);
       if (v != null && v !== "" && !Number.isNaN(n) && Number.isFinite(n)) return "number";
-      if (typeof v === "string" && Number.isFinite(temporalToMs(v))) return "date";
+      if (typeof v === "string" && !looksLikeProseLabelValue(v) && Number.isFinite(temporalToMs(v))) return "date";
     }
     return "string";
   }
@@ -141,14 +143,15 @@ export function getAxisType(key, dataTypes, data) {
 
 function isLikelyTemporalKey(key, dataTypes, data) {
   if (!key) return false;
-  if (getAxisType(key, dataTypes, data) === "date") return true;
   const keyNorm = String(key).toLowerCase();
-  if (keyNorm === "t") return true;
   const keyTail = keyNorm.includes("::") ? keyNorm.slice(keyNorm.indexOf("::") + 2) : keyNorm;
+  if (isCategoricalLabelColumn(keyTail)) return false;
+  if (getAxisType(key, dataTypes, data) === "date") return true;
   if (/(time|timestamp|date|datetime|createdat|updatedat|ts)/.test(keyTail)) return true;
   const rows = Array.isArray(data) ? data : [];
   for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
     const raw = rowValueForDataKey(rows[i], key);
+    if (looksLikeProseLabelValue(raw)) continue;
     if (raw == null || raw === "") continue;
     if (typeof raw === "string" && Number.isFinite(temporalToMs(raw))) return true;
   }
@@ -156,6 +159,7 @@ function isLikelyTemporalKey(key, dataTypes, data) {
   let nonEmptyCount = 0;
   for (let i = 0; i < Math.min(rows.length, 50); i += 1) {
     const raw = rowValueForDataKey(rows[i], key);
+    if (looksLikeProseLabelValue(raw)) continue;
     if (raw == null || raw === "") continue;
     nonEmptyCount += 1;
     const n = Number(raw);
@@ -1154,9 +1158,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (!selX) return false;
     const rawKey = String(selX || "");
     const splitIdx = rawKey.indexOf("::");
+    const col = splitIdx > 0 ? rawKey.slice(splitIdx + 2) : rawKey;
+    if (isCategoricalLabelColumn(col)) return false;
     if (splitIdx > 0) {
       const sheetId = rawKey.slice(0, splitIdx);
-      const col = rawKey.slice(splitIdx + 2);
       const rows = Array.isArray(contextStateV2?.dataSheets?.[sheetId]?.data)
         ? contextStateV2.dataSheets[sheetId].data
         : [];
@@ -1165,13 +1170,14 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
         // Fast path: unix-like epochs, including raw trade timestamps in micro/nanoseconds.
         for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
           const v = rows[i]?.[col];
+          if (looksLikeProseLabelValue(v)) continue;
           const n = typeof v === "number" ? v : Number(v);
           if (Number.isFinite(n) && Number.isFinite(temporalToMs(n))) return true;
         }
         // General path: anything parseable by our temporal parser.
         for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
           const v = rows[i]?.[col];
-          if (v == null || v === "") continue;
+          if (v == null || v === "" || looksLikeProseLabelValue(v)) continue;
           if (Number.isFinite(temporalToMs(v))) return true;
         }
       }
@@ -1885,15 +1891,17 @@ export function ChartCanvas() {
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
   const axesConfigured = usingSampleFallback || (!!selX && yKeys.length > 0);
   const xKey = selX || "month";
+  const xIsCategoricalLabel = selX ? isCategoricalLabelColumn(stripSheetScopedColumnKey(xKey)) : false;
   const xAxisType = selX ? getAxisType(xKey, dataTypes, rawData) : "string";
 
   const useTimeSeriesX =
+    !xIsCategoricalLabel &&
     xTimeScale &&
     !!selX &&
     (xAxisType === "date" ||
       (xAxisType === "number" && lineIsTemporalX) ||
       (xAxisType === "string" && lineIsTemporalX));
-  const effectiveTemporalSort = lineIsTemporalX || useTimeSeriesX;
+  const effectiveTemporalSort = !xIsCategoricalLabel && (lineIsTemporalX || useTimeSeriesX);
 
   const cartesianChart =
     selChartType === "line" || selChartType === "area" || selChartType === "bar" || selChartType === "scatter";
@@ -1901,8 +1909,14 @@ export function ChartCanvas() {
 
   const plotRows = useMemo(() => {
     if (!cartesianChart) return rawData;
-    return normalizeCartesianPivotToEpochMs(rawData, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX || chartUsesTimeframes);
-  }, [rawData, cartesianChart, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX, chartUsesTimeframes]);
+    return normalizeCartesianPivotToEpochMs(
+      rawData,
+      xKey,
+      xAxisType,
+      lineIsTemporalX && !xIsCategoricalLabel,
+      !xIsCategoricalLabel && (useTimeSeriesX || chartUsesTimeframes),
+    );
+  }, [rawData, cartesianChart, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX, chartUsesTimeframes, xIsCategoricalLabel]);
 
   const sortedPlotRows = useMemo(() => {
     if (!selX || !Array.isArray(plotRows) || plotRows.length <= 1) return plotRows;
@@ -2064,7 +2078,9 @@ export function ChartCanvas() {
 
   const xTickIntlOptions = useMemo(() => temporalIntlFormatOptionsForRange(xPivotSpanMs), [xPivotSpanMs]);
 
-  const xHumanReadable = selChartType === "line" || selChartType === "area" ? lineHumanReadableTime : true;
+  const xHumanReadable =
+    !xIsCategoricalLabel &&
+    (selChartType === "line" || selChartType === "area" ? lineHumanReadableTime : false);
   const xOriginalTemporalLabelByMs = useMemo(() => {
     if (!useTimeSeriesX || !selX || !Array.isArray(rawData)) return new Map();
     const map = new Map();

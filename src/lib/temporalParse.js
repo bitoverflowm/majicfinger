@@ -3,6 +3,8 @@
  * Covers Athena compose buckets (month, quarter, year, day), named months, and epoch sec/ms/us/ns.
  */
 
+import { looksLikeProseLabelValue } from "@/lib/chartCategoricalColumns";
+
 function epochNumberToMs(value) {
   if (!Number.isFinite(value)) return NaN;
   const abs = Math.abs(value);
@@ -90,6 +92,7 @@ export function temporalToMs(value) {
   if (/^[+-]?\d+(?:\.\d+)?\s*-\s*[+-]?\d+(?:\.\d+)?$/.test(s)) {
     return NaN;
   }
+  if (looksLikeProseLabelValue(s)) return NaN;
   // `Date.parse` is overly permissive on long prose (e.g. Kalshi/Polymarket `title` cells): it can
   // match substrings like "May" inside "Mayor" plus a year and yield bogus instants. Only use it
   // for compact strings that might be browser-specific date literals — not full-sentence labels.
