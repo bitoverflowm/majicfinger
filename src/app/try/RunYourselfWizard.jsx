@@ -26,11 +26,18 @@ import {
   RUN_YOURSELF_ALL_CATEGORIES,
   defaultChartParameterValues,
 } from "@/config/runYourselfDashboardCharts";
+import {
+  getRunYourselfAnalysisById,
+  isDashboardRunAnalysis,
+  resolveChartForkSource,
+  resolveDashboardForkSource,
+} from "@/config/runYourselfAnalyses";
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
 import {
   RunYourselfDashboardChartParams,
   RunYourselfDashboardChartParamRow,
 } from "@/components/runYourself/RunYourselfDashboardChartParams";
+import { RunYourselfAnalysisPicker } from "@/components/runYourself/RunYourselfAnalysisPicker";
 import { MagicLinkEmailForm } from "@/components/runYourself/MagicLinkEmailForm";
 import { KALSHI_GROUP_COLORS } from "@/lib/kalshi/kalshiCategoryTaxonomy";
 import { userHasPaidAccess, userRunYourselfQuotaExceeded } from "@/lib/runYourself/hasPaidAccess";
@@ -69,6 +76,7 @@ export default function RunYourselfWizard() {
   const { data: user, isLoading: userLoading } = useSWR("/api/user", userSwrFetcher);
 
   const source = useMemo(() => {
+    if (searchParams.get("generic") === "1") return null;
     const from = searchParams.get("from");
     const col = searchParams.get("col");
     const stored = loadRunSourceContext();
@@ -86,32 +94,56 @@ export default function RunYourselfWizard() {
     }
     return stored;
   }, [searchParams]);
+  const requestedAnalysisId = searchParams.get("analysisId") || "";
 
   const [parameterValue, setParameterValue] = useState("");
   const [chartParameters, setChartParameters] = useState({});
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(5);
   const [error, setError] = useState(null);
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState(requestedAnalysisId);
 
-  const isDashboardChartFork = source?.kind === "dashboard_chart";
-  const isDashboardFullFork = source?.kind === "dashboard";
+  useEffect(() => {
+    if (requestedAnalysisId) setSelectedAnalysisId(requestedAnalysisId);
+  }, [requestedAnalysisId]);
+
+  const selectedAnalysis = useMemo(
+    () => getRunYourselfAnalysisById(selectedAnalysisId),
+    [selectedAnalysisId],
+  );
+  const derivedSource = useMemo(() => {
+    if (!selectedAnalysis) return null;
+    if (isDashboardRunAnalysis(selectedAnalysis)) {
+      const dash = resolveDashboardForkSource(selectedAnalysis);
+      if (!dash.ownerHandle || !dash.dashboardSlug) return null;
+      return { kind: "dashboard", ownerHandle: dash.ownerHandle, dashboardSlug: dash.dashboardSlug };
+    }
+    const chart = resolveChartForkSource(selectedAnalysis);
+    if (!chart.ownerHandle || !chart.chartSlug) return null;
+    return { kind: "chart", ownerHandle: chart.ownerHandle, chartSlug: chart.chartSlug };
+  }, [selectedAnalysis]);
+  const effectiveSource = source || derivedSource;
+  const genericAnalysisMode = !source;
+
+  const isDashboardChartFork = effectiveSource?.kind === "dashboard_chart";
+  const isDashboardFullFork = effectiveSource?.kind === "dashboard";
 
   const resolveUrl = useMemo(() => {
-    if (!source?.ownerHandle) return null;
-    const params = new URLSearchParams({ ownerHandle: source.ownerHandle });
-    if (isDashboardChartFork && source.dashboardSlug && source.chartId) {
-      params.set("dashboardSlug", source.dashboardSlug);
-      params.set("chartId", source.chartId);
-    } else if (isDashboardFullFork && source.dashboardSlug) {
-      params.set("dashboardSlug", source.dashboardSlug);
+    if (!effectiveSource?.ownerHandle) return null;
+    const params = new URLSearchParams({ ownerHandle: effectiveSource.ownerHandle });
+    if (isDashboardChartFork && effectiveSource.dashboardSlug && effectiveSource.chartId) {
+      params.set("dashboardSlug", effectiveSource.dashboardSlug);
+      params.set("chartId", effectiveSource.chartId);
+    } else if (isDashboardFullFork && effectiveSource.dashboardSlug) {
+      params.set("dashboardSlug", effectiveSource.dashboardSlug);
       params.set("replicateDashboard", "1");
-    } else if (source.chartSlug) {
-      params.set("chartSlug", source.chartSlug);
+    } else if (effectiveSource.chartSlug) {
+      params.set("chartSlug", effectiveSource.chartSlug);
     } else {
       return null;
     }
     return `/api/run-yourself/resolve?${params}`;
-  }, [source, isDashboardChartFork, isDashboardFullFork]);
+  }, [effectiveSource, isDashboardChartFork, isDashboardFullFork]);
 
   const { data: resolveRes, isLoading: resolveLoading, error: resolveError } = useSWR(
     resolveUrl,
@@ -127,8 +159,8 @@ export default function RunYourselfWizard() {
   const parameterMode = runConfig?.parameterMode || "none";
 
   const manifestUrl =
-    (isDashboardFullFork || isDashboardChartFork) && source?.dashboardSlug
-      ? `/api/run-yourself/dashboard-manifest?ownerHandle=${encodeURIComponent(source.ownerHandle)}&dashboardSlug=${encodeURIComponent(source.dashboardSlug)}`
+    (isDashboardFullFork || isDashboardChartFork) && effectiveSource?.dashboardSlug
+      ? `/api/run-yourself/dashboard-manifest?ownerHandle=${encodeURIComponent(effectiveSource.ownerHandle)}&dashboardSlug=${encodeURIComponent(effectiveSource.dashboardSlug)}`
       : null;
 
   const { data: manifestRes, isLoading: manifestLoading } = useSWR(manifestUrl, async (url) => {
@@ -190,7 +222,7 @@ export default function RunYourselfWizard() {
   }, []);
 
   const handleRun = useCallback(async () => {
-    if (!source || running || !runConfig?.runnable) return;
+    if (!effectiveSource || running || !runConfig?.runnable) return;
 
     const needsTicker =
       !isDashboardFullFork &&
@@ -220,21 +252,21 @@ export default function RunYourselfWizard() {
     try {
       const forkSource = isDashboardFullFork
         ? {
-            ownerHandle: source.ownerHandle,
-            dashboardSlug: source.dashboardSlug,
+            ownerHandle: effectiveSource.ownerHandle,
+            dashboardSlug: effectiveSource.dashboardSlug,
           }
         : isDashboardChartFork
           ? {
-              ownerHandle: source.ownerHandle,
-              dashboardSlug: source.dashboardSlug,
-              chartId: source.chartId,
+              ownerHandle: effectiveSource.ownerHandle,
+              dashboardSlug: effectiveSource.dashboardSlug,
+              chartId: effectiveSource.chartId,
               layoutColumnKey:
-                source.layoutColumnKey || selectedDashboardChart?.key || undefined,
+                effectiveSource.layoutColumnKey || selectedDashboardChart?.key || undefined,
             }
           : {
-              ownerHandle: source.ownerHandle,
-              chartSlug: source.chartSlug || "",
-              dashboardSlug: source.dashboardSlug,
+              ownerHandle: effectiveSource.ownerHandle,
+              chartSlug: effectiveSource.chartSlug || "",
+              dashboardSlug: effectiveSource.dashboardSlug,
             };
 
       const res = await fetch("/api/run-yourself/fork", {
@@ -243,7 +275,7 @@ export default function RunYourselfWizard() {
         credentials: "same-origin",
         body: JSON.stringify({
           source: forkSource,
-          analysisId: runConfig?.id || "",
+          analysisId: selectedAnalysis?.id || runConfig?.id || "",
           parameter:
             isDashboardFullFork || isDashboardChartFork
               ? { mode: "category", value: "dashboard" }
@@ -280,13 +312,14 @@ export default function RunYourselfWizard() {
   }, [
     parameterValue,
     chartParameters,
-    source,
+    effectiveSource,
     running,
     parameterMode,
     runConfig,
     isDashboardFullFork,
     isDashboardChartFork,
     selectedDashboardChart,
+    selectedAnalysis,
     router,
   ]);
 
@@ -315,7 +348,7 @@ export default function RunYourselfWizard() {
     );
   }
 
-  if (!source) {
+  if (!effectiveSource && !genericAnalysisMode) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
         <h1 className="text-xl font-semibold">No chart selected</h1>
@@ -346,20 +379,44 @@ export default function RunYourselfWizard() {
         </div>
       ) : (
         <div className="space-y-6">
+          {genericAnalysisMode ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Choose an analysis</CardTitle>
+                <CardDescription>
+                  Legacy public charts can&apos;t be forked directly, so start from one of the curated replayable analyses instead.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RunYourselfAnalysisPicker
+                  analysisId={selectedAnalysisId}
+                  onSelect={(id) => {
+                    setSelectedAnalysisId(id);
+                    setError(null);
+                  }}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                {runConfig?.label || "Configure parameters"}
+                {runConfig?.label || (genericAnalysisMode ? "Select an analysis first" : "Configure parameters")}
               </CardTitle>
               <CardDescription>
                 {resolveLoading
                   ? "Loading analysis configuration…"
+                  : !effectiveSource
+                    ? "Pick one of the supported analyses above to continue."
                   : runConfig?.description ||
                     "Set the market or category for your private copy."}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {resolveLoading ? (
+              {!effectiveSource ? (
+                <p className="text-sm text-muted-foreground">Select an analysis to configure its parameters.</p>
+              ) : resolveLoading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : resolveError || !runConfig?.runnable ? (
                 <p className="text-sm text-destructive">

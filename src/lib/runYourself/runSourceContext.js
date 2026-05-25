@@ -38,6 +38,15 @@ export function loadRunSourceContext() {
   }
 }
 
+export function clearRunSourceContext() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * @param {RunSourceContext} ctx
  * @returns {string}

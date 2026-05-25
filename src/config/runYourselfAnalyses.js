@@ -34,6 +34,10 @@ export const RUN_YOURSELF_ANALYSES = [
         ownerHandle: "misterrpink",
         slug: "kalshi-weather-probability-convergence-jan-2025-2",
       },
+      {
+        ownerHandle: "misterrpink",
+        slug: "kalshi-weather-probability-convergence-jan-2025",
+      },
     ],
   },
   {
@@ -64,6 +68,21 @@ export const RUN_YOURSELF_ANALYSES = [
       {
         ownerHandle: "misterrpink",
         slug: "nyc-weather-market-intraday-volatility-clustering",
+      },
+    ],
+  },
+  {
+    id: "high-temp-nyc-probability-convergence",
+    label: "High temp NYC probability convergence",
+    description: "Historical trade prices converging toward resolution for a single NYC high-temperature weather market.",
+    parameterMode: "trade_search",
+    lake: "kalshi",
+    table: "trades",
+    tickerFilterColumns: ["ticker", "market_ticker"],
+    sourceCharts: [
+      {
+        ownerHandle: "misterrpink",
+        slug: "high-temp-nov-nyc-probability-convergence",
       },
     ],
   },
@@ -138,6 +157,19 @@ export function resolveDashboardForkSource(analysis, source = {}) {
   return {
     ownerHandle: source.ownerHandle || dash?.ownerHandle || "",
     dashboardSlug: source.dashboardSlug || dash?.slug || "",
+  };
+}
+
+/**
+ * Resolve chart slug/owner for a single-chart analysis fork.
+ * @param {RunAnalysisConfig} analysis
+ * @param {{ ownerHandle?: string; chartSlug?: string }} [source]
+ */
+export function resolveChartForkSource(analysis, source = {}) {
+  const chart = analysis?.sourceCharts?.[0];
+  return {
+    ownerHandle: source.ownerHandle || chart?.ownerHandle || "",
+    chartSlug: source.chartSlug || chart?.slug || "",
   };
 }
 

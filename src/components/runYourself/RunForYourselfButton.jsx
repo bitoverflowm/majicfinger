@@ -13,6 +13,7 @@ import { useUser } from "@/lib/hooks";
 import { userHasPaidAccess, userRunYourselfQuotaExceeded } from "@/lib/runYourself/hasPaidAccess";
 import {
   buildTryUrlFromContext,
+  clearRunSourceContext,
   navigateToRunFlow,
   saveRunSourceContext,
 } from "@/lib/runYourself/runSourceContext";
@@ -54,6 +55,7 @@ export function RunForYourselfButton({
 
   const handle = String(ownerHandle || "").trim();
   const runnable = !!handle && (!!chartSlug || !!dashboardSlug || !!chartId);
+  const useGenericAnalysisFallback = !forceRunnable && notRunnable;
 
   useEffect(() => {
     if (!runnable || !handle) return;
@@ -101,12 +103,17 @@ export function RunForYourselfButton({
   };
 
   const goToTry = useCallback(() => {
+    if (useGenericAnalysisFallback) {
+      clearRunSourceContext();
+      navigateToRunFlow("/try?generic=1");
+      return;
+    }
     saveRunSourceContext(ctx);
     navigateToRunFlow(buildTryUrlFromContext(ctx));
-  }, [ctx]);
+  }, [ctx, useGenericAnalysisFallback]);
 
   const handleClick = useCallback(() => {
-    if (!runnable || notRunnable) return;
+    if (!runnable) return;
 
     sendTelegramAnalyticsEvent("fork_click", {
       kind: ctx.kind,
@@ -114,6 +121,7 @@ export function RunForYourselfButton({
       ownerHandle: handle,
       chartSlug,
       dashboardSlug,
+      genericAnalysisFallback: useGenericAnalysisFallback,
       isLoggedIn: !!user,
       userEmail: user?.email,
     });
@@ -128,17 +136,36 @@ export function RunForYourselfButton({
       return;
     }
 
-    saveRunSourceContext(ctx);
+    if (!useGenericAnalysisFallback) {
+      saveRunSourceContext(ctx);
+    } else {
+      clearRunSourceContext();
+    }
     setAuthOpen(true);
-  }, [user, runnable, notRunnable, goToTry, ctx, displayName, handle, chartSlug, dashboardSlug]);
+  }, [
+    user,
+    runnable,
+    goToTry,
+    ctx,
+    displayName,
+    handle,
+    chartSlug,
+    dashboardSlug,
+    useGenericAnalysisFallback,
+  ]);
 
   if (!runnable) return null;
 
   const displayLabel =
-    label || (variant === "dashboard" ? "Run this dashboard" : "Run for yourself");
+    label ||
+    (useGenericAnalysisFallback
+      ? "Run your own analysis"
+      : variant === "dashboard"
+        ? "Run this dashboard"
+        : "Run for yourself");
 
   const disabled =
-    (!forceRunnable && notRunnable) || (!!user && quotaExceeded && !userHasPaidAccess(user));
+    !!user && quotaExceeded && !userHasPaidAccess(user);
 
   const button = (
     <Button
@@ -165,7 +192,9 @@ export function RunForYourselfButton({
           <Tooltip>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
             <TooltipContent>
-              {notRunnable
+              {useGenericAnalysisFallback
+                ? "This legacy chart can't be forked directly yet, but you can run one of the supported analyses."
+                : notRunnable
                 ? "This chart uses data that cannot be replayed yet"
                 : "Upgrade to Pro to run more analyses"}
             </TooltipContent>
