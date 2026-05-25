@@ -511,6 +511,28 @@ async function handleCustomerDeleted(customer) {
   await updateUserSubscriptionStatus(email, { status: "cancelled" });
 }
 
+function userHasRecordedPaidAccess(user) {
+  if (!user) return false;
+  const status = String(user.subscriptionStatus || "").toLowerCase();
+  return !!(
+    user.lifetimeMember ||
+    user.subscriptionTier ||
+    user.subscribedAt ||
+    status === "active" ||
+    status === "trialing"
+  );
+}
+
+function shouldNotifyStripeActivation(user, { status, lifetimeMember }) {
+  const nextStatus = String(status || "").toLowerCase();
+  const activating = !!lifetimeMember || nextStatus === "active" || nextStatus === "trialing";
+  return activating && !userHasRecordedPaidAccess(user);
+}
+
+function notifyStripeSignup(payload) {
+  notifySignup(payload).catch((err) => console.error("[telegram] signup notify failed", err));
+}
+
 async function updateUserPayment(email, name, amount, opts) {
   await dbConnect();
   const {
@@ -531,6 +553,7 @@ async function updateUserPayment(email, name, amount, opts) {
     stripeCustomerId,
     stripeSubscriptionId,
   });
+  const shouldNotify = shouldNotifyStripeActivation(user, { status, lifetimeMember });
   const update = {
     name: name || user?.name,
     ...(tier ? { subscriptionTier: tier } : {}),
@@ -549,14 +572,20 @@ async function updateUserPayment(email, name, amount, opts) {
 
   if (!user) {
     await User.create({ email: normalizedEmail, ...update });
-    notifySignup({
-      email: normalizedEmail,
-      name: normalizedEmail.split("@")[0],
-      source: "stripe checkout",
-      method: "stripe",
-    }).catch((err) => console.error("[telegram] signup notify failed", err));
   } else {
     await User.findByIdAndUpdate(user._id, { $set: { ...update, email: normalizeEmail(user.email || normalizedEmail) } });
+  }
+
+  if (shouldNotify) {
+    notifyStripeSignup({
+      email: normalizedEmail,
+      name: name || user?.name || normalizedEmail.split("@")[0],
+      source: "stripe checkout completed",
+      method: "stripe",
+      tier: tier || user?.subscriptionTier,
+      cycle: cycle || user?.billingCycle,
+      status,
+    });
   }
 }
 
@@ -570,6 +599,10 @@ async function updateUserSubscriptionStatus(email, opts) {
   });
   const tier = opts?.tier;
   const cycle = opts?.cycle;
+  const shouldNotify = shouldNotifyStripeActivation(user, {
+    status: opts?.status,
+    lifetimeMember: false,
+  });
 
   // If we subscribed to customer.* events, we may already have a user document.
   // Otherwise, create one so subscription/invoice events can still update access reliably.
@@ -589,12 +622,17 @@ async function updateUserSubscriptionStatus(email, opts) {
       stripePriceId: opts?.stripePriceId || undefined,
       token: 100,
     });
-    notifySignup({
-      email: normalizedEmail,
-      name: normalizedEmail.split("@")[0],
-      source: "stripe subscription",
-      method: "stripe",
-    }).catch((err) => console.error("[telegram] signup notify failed", err));
+    if (shouldNotify) {
+      notifyStripeSignup({
+        email: normalizedEmail,
+        name: normalizedEmail.split("@")[0],
+        source: "stripe subscription activated",
+        method: "stripe",
+        tier,
+        cycle,
+        status: opts?.status,
+      });
+    }
     return;
   }
 
@@ -618,6 +656,18 @@ async function updateUserSubscriptionStatus(email, opts) {
     update.subscribedAt = new Date();
   }
   await User.findByIdAndUpdate(user._id, { $set: update });
+
+  if (shouldNotify) {
+    notifyStripeSignup({
+      email: normalizedEmail,
+      name: user.name || normalizedEmail.split("@")[0],
+      source: "stripe subscription activated",
+      method: "stripe",
+      tier: tier || user.subscriptionTier,
+      cycle: cycle || user.billingCycle,
+      status: opts?.status || user.subscriptionStatus,
+    });
+  }
 }
 
 async function upsertUserByEmail(email, { name, stripeCustomerId }) {
@@ -631,12 +681,6 @@ async function upsertUserByEmail(email, { name, stripeCustomerId }) {
       stripeCustomerId: stripeCustomerId || null,
       token: 100,
     });
-    notifySignup({
-      email: normalizedEmail,
-      name: name || normalizedEmail.split("@")[0] || "Customer",
-      source: "stripe checkout",
-      method: "stripe",
-    }).catch((err) => console.error("[telegram] signup notify failed", err));
     return;
   }
 

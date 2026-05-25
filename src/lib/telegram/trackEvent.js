@@ -128,7 +128,15 @@ export async function notifyForkClick(payload) {
 }
 
 /**
- * @param {{ email?: string; name?: string; source?: string; method?: string }} payload
+ * @param {{
+ *   email?: string;
+ *   name?: string;
+ *   source?: string;
+ *   method?: string;
+ *   tier?: string;
+ *   cycle?: string;
+ *   status?: string;
+ * }} payload
  */
 export async function notifySignup(payload) {
   const method = payload.method || "magic link";
@@ -140,6 +148,9 @@ export async function notifySignup(payload) {
       Name: payload.name,
       Source: payload.source,
       Method: method,
+      Tier: payload.tier,
+      Cycle: payload.cycle,
+      Status: payload.status,
     },
   });
 }
