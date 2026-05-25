@@ -1,4 +1,5 @@
 import { runRehydrateSheetCore, buildSheetProvenanceGraphForRehydrate } from "@/lib/dataLake/rehydrateSheetCore";
+import { replayOperations } from "@/lib/projectPersistence";
 import { refreshForkOperationHistory } from "@/lib/runYourself/refreshForkSheetRequestMetadata";
 import { normalizeLakeBigintFieldsInRows } from "@/lib/dataLake/lakeBigintNormalize";
 
