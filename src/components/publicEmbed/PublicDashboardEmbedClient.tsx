@@ -30,7 +30,6 @@ import {
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
-import { isRunnablePublicChart, isRunnablePublicDashboard } from "@/config/runYourselfAnalyses";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -192,30 +191,16 @@ export default function PublicDashboardEmbedClient({
   const ownerPic = d.owner_profile_pic ? String(d.owner_profile_pic) : "";
   const tags = Array.isArray(d.tags) ? d.tags : [];
 
-  const hasRunnableChart = rows.some((row) => {
-    if (row.type !== "cards" || !Array.isArray(row.columns)) return false;
-    return row.columns.some((col) => {
-      const chartSlug = col.chartLink?.slug;
-      return !!(chartSlug && isRunnablePublicChart(ownerHandle, chartSlug));
-    });
-  });
-
-  const dashboardRunnable = isRunnablePublicDashboard(ownerHandle, slug);
-  const showRunDashboardCta = dashboardRunnable || hasRunnableChart;
-
   return (
     <div className="relative w-full px-6 py-10 sm:px-10">
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-        {showRunDashboardCta ? (
-          <RunForYourselfButton
-            ownerHandle={username}
-            dashboardSlug={slug}
-            kind="dashboard"
-            variant="dashboard"
-            forceRunnable
-            displayName={dashboardName}
-          />
-        ) : null}
+        <RunForYourselfButton
+          ownerHandle={username}
+          dashboardSlug={slug}
+          kind="dashboard"
+          variant="dashboard"
+          displayName={dashboardName}
+        />
         <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
       </div>
       <div
@@ -357,7 +342,6 @@ export default function PublicDashboardEmbedClient({
                             chartId={col.chart_id ? String(col.chart_id) : undefined}
                             layoutColumnKey={col.id}
                             dashboardSlug={slug}
-                            dashboardRunnable={dashboardRunnable}
                           />
                         </div>
                       ) : (
