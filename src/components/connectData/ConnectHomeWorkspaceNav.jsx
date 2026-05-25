@@ -44,6 +44,9 @@ const chipActiveChart = "bg-violet-300/80 text-violet-950 dark:bg-violet-800/70 
 
 const actionChipBase =
   "relative cursor-pointer rounded px-[0.35rem] py-[0.2rem] font-mono font-semibold leading-none transition-colors whitespace-nowrap";
+const actionChipIdle =
+  "bg-slate-200/70 text-slate-900 hover:bg-lychee_blue/80 hover:text-lychee_white dark:bg-slate-800/70 dark:text-slate-100";
+const actionChipActive = "bg-lychee_blue/30 text-foreground";
 
 const CHIP_GAP_PX = 4;
 const OVERFLOW_BTN_WIDTH_PX = 52;
@@ -470,8 +473,8 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
                     actionChipBase,
                     textSize,
                     integrationsPanelActive && !chartViewActive && !dashboardViewActive
-                      ? chipActive
-                      : chipIdle,
+                      ? actionChipActive
+                      : actionChipIdle,
                   )}
                   onClick={openIntegrationsPanel}
                 >
@@ -487,7 +490,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className={cn(actionChipBase, textSize, chartViewActive ? chipActive : chipIdle)}
+                  className={cn(actionChipBase, textSize, chartViewActive ? actionChipActive : actionChipIdle)}
                   onClick={addChart}
                 >
                   Chart
@@ -502,7 +505,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className={cn(actionChipBase, textSize, dashboardViewActive ? chipActive : chipIdle)}
+                  className={cn(actionChipBase, textSize, dashboardViewActive ? actionChipActive : actionChipIdle)}
                   onClick={openDashboard}
                 >
                   Dashboard
@@ -517,7 +520,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className={cn(actionChipBase, textSize, exportActive ? chipActive : chipIdle)}
+                  className={cn(actionChipBase, textSize, exportActive ? actionChipActive : actionChipIdle)}
                   onClick={openExport}
                 >
                   Export
