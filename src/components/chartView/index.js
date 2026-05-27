@@ -649,6 +649,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [availableYOptions, setAvailableYOptons] = useState([]);
   const [lineStyle, setLineStyle] = useState("natural");
   const [lineAliasing, setLineAliasing] = useState(false);
+  /** Line chart series stroke width (1–8 px). */
+  const [lineStrokeWidth, setLineStrokeWidth] = useState(2);
   const [lineHumanReadableTime, setLineHumanReadableTime] = useState(false);
   /** When on, pivot X is coerced to epoch ms and drawn on a numeric time scale (line/area/bar). */
   const [xTimeScale, setXTimeScale] = useState(false);
@@ -772,6 +774,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (Array.isArray(s.selY)) setSelY(s.selY);
     if (s.lineStyle != null) setLineStyle(s.lineStyle);
     if (s.lineAliasing !== undefined) setLineAliasing(!!s.lineAliasing);
+    if (s.lineStrokeWidth !== undefined && Number.isFinite(Number(s.lineStrokeWidth))) {
+      setLineStrokeWidth(Math.max(1, Math.min(8, Math.round(Number(s.lineStrokeWidth)))));
+    }
     if (s.lineHumanReadableTime !== undefined) setLineHumanReadableTime(!!s.lineHumanReadableTime);
     if (s.xTimeScale !== undefined) setXTimeScale(!!s.xTimeScale);
     if (s.xDateFormatPreset != null) setXDateFormatPreset(String(s.xDateFormatPreset || "auto"));
@@ -1341,6 +1346,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     selY,
     lineStyle,
     lineAliasing,
+    lineStrokeWidth,
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
@@ -1674,6 +1680,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setLineStyle,
     lineAliasing,
     setLineAliasing,
+    lineStrokeWidth,
+    setLineStrokeWidth,
     lineHumanReadableTime,
     setLineHumanReadableTime,
     xTimeScale,
@@ -1805,6 +1813,7 @@ export function ChartCanvas() {
     selY,
     lineStyle,
     lineAliasing,
+    lineStrokeWidth,
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
@@ -2705,7 +2714,7 @@ export function ChartCanvas() {
                             type={lineStyle}
                             connectNulls={lineAliasing || !hasChartLineFilters}
                             stroke={seriesColorFor(series.sourceKey, idx)}
-                            strokeWidth={2}
+                            strokeWidth={lineStrokeWidth}
                             dot={dots && finalRenderedData.length <= 40}
                           >
                             {labelLine && (

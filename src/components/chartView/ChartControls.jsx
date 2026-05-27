@@ -233,6 +233,8 @@ export default function ChartControls() {
     setLineStyle,
     lineAliasing,
     setLineAliasing,
+    lineStrokeWidth,
+    setLineStrokeWidth,
     lineHumanReadableTime,
     setLineHumanReadableTime,
     xTimeScale,
@@ -1595,6 +1597,25 @@ export default function ChartControls() {
                       <p className="text-[10px] leading-snug text-muted-foreground">
                         Connect line segments across null or filtered-out values so the chart appears continuous.
                       </p>
+                      {selChartType === "line" && (
+                        <div className="space-y-1.5">
+                          <Label htmlFor="chart-design-line-thickness" className="text-xs text-muted-foreground">
+                            Line thickness
+                          </Label>
+                          <Input
+                            id="chart-design-line-thickness"
+                            type="number"
+                            min="1"
+                            max="8"
+                            value={String(lineStrokeWidth ?? 2)}
+                            onChange={(e) =>
+                              setLineStrokeWidth(Math.max(1, Math.min(8, Number(e.target.value) || 2)))
+                            }
+                            className="h-8 text-xs"
+                          />
+                          <p className="text-[10px] leading-snug text-muted-foreground">Stroke width in pixels (1–8).</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
