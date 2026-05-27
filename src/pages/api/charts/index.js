@@ -23,11 +23,7 @@ export default async function handler(req, res) {
                     .select('chart_name last_saved_date labels user_id data_set_id public_slug is_public')
                     .exec();
 
-                if (!savedCharts || savedCharts.length === 0) {
-                    return res.status(404).json({ success: false, message: "No Charts Found" });
-                }
-
-                res.status(200).json({ success: true, data: savedCharts });
+                res.status(200).json({ success: true, data: savedCharts || [] });
             } catch (error) {
                 res.status(400).json({ success: false });
             }

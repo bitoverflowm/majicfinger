@@ -36,11 +36,10 @@ export default async function handler(req, res) {
                     .lean()
                     .exec();
 
-                if (!savedDataSets || savedDataSets.length === 0) {
-                    return res.status(404).json({ success: false, message: "No Saved Projects" });
-                }
-
-                res.status(200).json({ success: true, data: savedDataSets.map(summarizeDataSetForList) });
+                res.status(200).json({
+                    success: true,
+                    data: (savedDataSets || []).map(summarizeDataSetForList),
+                });
             } catch (error) {
                 res.status(400).json({ success: false, message: error.message });
             }

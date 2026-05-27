@@ -156,14 +156,14 @@ const DashBody = ({ user }) => {
                     'Content-Type': 'application/json',
                 },
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
+            .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (ok && data?.success && Array.isArray(data.data)) {
                     setSavedDataSets(data.data);
                 } else {
                     setSavedDataSets([]);
                 }
-                setRefetchData(0)
+                setRefetchData(0);
             })
             .catch(() => {
                 setSavedDataSets([]);
@@ -180,15 +180,23 @@ const DashBody = ({ user }) => {
                     'Content-Type': 'application/json',
                 },
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
+            .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (ok && data?.success && Array.isArray(data.data)) {
                     setSavedCharts(data.data);
                 } else {
-                    console.error('Failed to fetch saved Charts:', data.message);
+                    if (!ok || !data?.success) {
+                        console.error("Failed to fetch saved charts:", data?.message || "request failed");
+                    }
+                    setSavedCharts([]);
                 }
-                setRefetchChart(0)
+                setRefetchChart(0);
             })
+            .catch((err) => {
+                console.error("Failed to fetch saved charts:", err);
+                setSavedCharts([]);
+                setRefetchChart(0);
+            });
         }
     }, [user, refetchChart, isDemo, hasDbBackedUserId])
 

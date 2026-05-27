@@ -1,5 +1,3 @@
-import { ATHENA_STATUS_PAGE_FETCH_THRESHOLD, ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
-
 /**
  * Browser → POST start → poll GET status until SUCCEEDED (serverless-friendly).
  * For `queryType: "compose"`, omit `limit` to use the server tier cap; pass a positive integer to add SQL LIMIT.
@@ -15,7 +13,7 @@ import { ATHENA_STATUS_PAGE_FETCH_THRESHOLD, ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT }
  *   sumColumn?: string | null;
  *   sumAlias?: string | null;
  * }} opts
- * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number; onProgress?: (info: { phase: string; fraction?: number; rowsDownloaded?: number }) => void }} [pollOpts]
+ * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number }} [pollOpts]
  * @returns {Promise<{ columns: string[]; rows: string[][]; rowCount: number; dataScannedBytes: number | null; queryExecutionId: string; sql?: string }>}
  */
 function sleep(ms, signal) {
@@ -51,7 +49,7 @@ export async function fetchAthenaLakeSample(
   },
   pollOpts = {},
 ) {
-  const { signal, pollIntervalMs = 900, maxWaitMs = 180000, onProgress } = pollOpts;
+  const { signal, pollIntervalMs = 900, maxWaitMs = 180000 } = pollOpts;
 
   const isCompose = queryType === "compose";
   let lim;
@@ -104,116 +102,17 @@ export async function fetchAthenaLakeSample(
   }
 
   const deadline = Date.now() + maxWaitMs;
-  const usePaginatedDownload =
-    rowLimit == null || Number(rowLimit) > ATHENA_STATUS_PAGE_FETCH_THRESHOLD;
-
-  const pollParams = () => {
-    const q = new URLSearchParams({ queryExecutionId });
-    if (rowLimit == null) {
-      q.set("limit", "all");
-    } else {
-      q.set("limit", String(rowLimit));
-    }
-    return q;
-  };
-
-  while (Date.now() < deadline) {
-    if (signal?.aborted) {
-      throw new DOMException("Aborted", "AbortError");
-    }
-
-    const stRes = await fetch(`/api/data-lake/athena-query/status?${pollParams().toString()}`, {
-      method: "GET",
-      credentials: "same-origin",
-      signal,
-    });
-
-    let j = {};
-    try {
-      j = await stRes.json();
-    } catch {
-      /* ignore */
-    }
-
-    if (stRes.status === 502 && j.code === "ATHENA_FAILED") {
-      throw new Error(j.error || "Athena query failed");
-    }
-
-    if (!stRes.ok && stRes.status !== 502) {
-      throw new Error(j.error || stRes.statusText || `Athena status ${stRes.status}`);
-    }
-
-    if (j.state === "SUCCEEDED") {
-      if (usePaginatedDownload || j.paginate === true) {
-        return await fetchAthenaResultPaginated({
-          queryExecutionId,
-          rowLimit,
-          signal,
-          deadline,
-          onProgress,
-          sql: startJson.sql || undefined,
-          initialDataScannedBytes: j.dataScannedBytes ?? null,
-        });
-      }
-      if (Array.isArray(j.columns)) {
-        onProgress?.({ phase: "download", fraction: 1, rowsDownloaded: j.rows?.length ?? 0 });
-        return {
-          columns: j.columns || [],
-          rows: j.rows || [],
-          rowCount: j.rowCount ?? (j.rows?.length ?? 0),
-          dataScannedBytes: j.dataScannedBytes ?? null,
-          queryExecutionId,
-          sql: startJson.sql || undefined,
-        };
-      }
-    }
-
-    if (j.state === "FAILED" || j.state === "CANCELLED") {
-      throw new Error(j.error || `Athena ${j.state}`);
-    }
-
-    onProgress?.({ phase: "athena", fraction: 0.05 });
-    await sleep(pollIntervalMs, signal);
+  const q = new URLSearchParams({ queryExecutionId });
+  if (rowLimit == null) {
+    q.set("limit", "all");
+  } else {
+    q.set("limit", String(rowLimit));
   }
 
-  throw new Error("Timed out waiting for Athena (increase maxWaitMs or check query in console)");
-}
-
-/**
- * Download Athena results in 1k-row pages (smaller JSON payloads, real progress).
- */
-async function fetchAthenaResultPaginated({
-  queryExecutionId,
-  rowLimit,
-  signal,
-  deadline,
-  onProgress,
-  sql,
-  initialDataScannedBytes,
-}) {
-  const cap =
-    rowLimit == null
-      ? ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT
-      : Math.min(ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT, Math.max(1, Number(rowLimit)));
-
-  /** @type {string[]} */
-  let columns = [];
-  /** @type {string[][]} */
-  const allRows = [];
-  let nextToken = null;
-  let dataScannedBytes = initialDataScannedBytes ?? null;
-
   while (Date.now() < deadline) {
     if (signal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
     }
-
-    const q = new URLSearchParams({
-      queryExecutionId,
-      rowsMode: "page",
-      limit: "all",
-    });
-    if (nextToken) q.set("nextToken", nextToken);
 
     const stRes = await fetch(`/api/data-lake/athena-query/status?${q.toString()}`, {
       method: "GET",
@@ -224,50 +123,48 @@ async function fetchAthenaResultPaginated({
     let j = {};
     try {
       j = await stRes.json();
-    } catch {
-      /* ignore */
+    } catch (parseErr) {
+      const hint =
+        stRes.status === 200
+          ? " Response may be too large for the browser to parse."
+          : "";
+      throw new Error(
+        `Failed to read Athena status JSON (${stRes.status}): ${parseErr?.message || parseErr}${hint}`,
+      );
     }
 
-    if (!stRes.ok) {
-      throw new Error(j.error || stRes.statusText || `Athena page ${stRes.status}`);
+    if (stRes.status === 502 && j.code === "ATHENA_FAILED") {
+      throw new Error(j.error || "Athena query failed");
     }
 
-    if (j.state !== "SUCCEEDED") {
-      throw new Error(j.error || `Athena page unexpected state: ${j.state}`);
+    if (!stRes.ok && stRes.status !== 502) {
+      throw new Error(j.error || stRes.statusText || `Athena status ${stRes.status}`);
     }
 
-    if (j.isFirstPage && Array.isArray(j.columns) && j.columns.length) {
-      columns = j.columns;
+    if (j.state === "SUCCEEDED" && Array.isArray(j.columns)) {
+      const rows = j.rows || [];
+      const rowCount = j.rowCount ?? rows.length;
+      if (rowCount > 0 && rows.length === 0) {
+        throw new Error(
+          "Athena reported rows but the download was empty (response may be truncated). Try a smaller filter or SQL LIMIT.",
+        );
+      }
+      return {
+        columns: j.columns || [],
+        rows,
+        rowCount,
+        dataScannedBytes: j.dataScannedBytes ?? null,
+        queryExecutionId,
+        sql: startJson.sql || undefined,
+      };
     }
-    const pageRows = Array.isArray(j.rows) ? j.rows : [];
-    for (const row of pageRows) {
-      if (allRows.length >= cap) break;
-      allRows.push(row);
+
+    if (j.state === "FAILED" || j.state === "CANCELLED") {
+      throw new Error(j.error || `Athena ${j.state}`);
     }
 
-    dataScannedBytes = j.dataScannedBytes ?? dataScannedBytes;
-    nextToken = j.nextToken || null;
-
-    onProgress?.({
-      phase: "download",
-      rowsDownloaded: allRows.length,
-      fraction: nextToken ? Math.min(0.85, 0.15 + (allRows.length / cap) * 0.7) : 0.9,
-    });
-
-    if (allRows.length >= cap || !nextToken) break;
+    await sleep(pollIntervalMs, signal);
   }
 
-  if (!columns.length && allRows.length === 0) {
-    throw new Error("Athena returned no rows.");
-  }
-
-  return {
-    columns,
-    rows: allRows,
-    rowCount: allRows.length,
-    dataScannedBytes,
-    queryExecutionId,
-    sql,
-    truncated: allRows.length >= cap,
-  };
+  throw new Error("Timed out waiting for Athena (increase maxWaitMs or check query in console)");
 }

@@ -59,6 +59,7 @@ import {
   userHasExpandedAthenaAccess,
 } from "@/lib/athenaEntitlement";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
+import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { removeDataSheetFromWorkspace } from "@/lib/removeDataSheetFromWorkspace";
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
@@ -662,6 +663,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; composeFilters?: any; composeAthenaRowLimit?: number | null; sheetJoinSpec?: any; sheetProvenance?: any; requestCard?: any; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
   const ingestAbortControllerRef = useRef(null);
+  const pullInFlightRef = useRef(false);
   const loadProgressRef = useRef(null);
 
   const scrollToLoadProgress = useCallback(() => {
@@ -1339,31 +1341,34 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, []);
 
   const applyRowsToActiveSheet = useCallback(
-    (rows, provenance) => {
-      replaceCurrentSheetData?.(rows);
-      setConnectedData?.(rows);
-      if (provenance && setDataSheets && activeSheetId) {
-        setDataSheets((prev) => {
-          const cur = prev?.[activeSheetId];
-          return {
-            ...(prev || {}),
-            [activeSheetId]: {
-              ...(cur || { name: `Sheet`, data: [] }),
-              provenance,
-            },
-          };
-        });
+    (rows, extras = {}) => {
+      const provenance = extras?.provenance ?? null;
+      const requestCards = extras?.requestCards;
+      const name = extras?.name;
+      if (!activeSheetId || !setDataSheets) {
+        replaceCurrentSheetData?.(rows);
+        setConnectedData?.(rows);
+        return;
       }
+      flushSync(() => {
+        setDataSheets((prev) =>
+          applyAthenaPullToSheetPatch(prev, activeSheetId, rows, {
+            provenance,
+            requestCards,
+            name,
+          }),
+        );
+      });
     },
-    [replaceCurrentSheetData, setConnectedData, setDataSheets, activeSheetId],
+    [activeSheetId, setDataSheets, replaceCurrentSheetData, setConnectedData],
   );
 
+  /** Always write rows to the sheet first (Mongo-style). Nullish cleanup is optional afterward. */
   const finalizeIngestSheetRows = useCallback((rows, rowCountHint, applyWithCount) => {
+    const n = rowCountHint ?? (Array.isArray(rows) ? rows.length : 0);
+    applyWithCount(rows, n);
     const { columns: badCols } = scanNullishColumnsInSheetRows(rows);
-    if (!badCols.length) {
-      applyWithCount(rows, rowCountHint ?? rows.length);
-      return;
-    }
+    if (!badCols.length) return;
     postNullishContinueRef.current = (finalRows) => {
       applyWithCount(finalRows, finalRows.length);
       postNullishContinueRef.current = null;
@@ -1504,12 +1509,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           syncConnectPullState({ progress });
         },
         loadFn: async () => {
-          const reportPullProgress = (pct, label) => {
-            const p = Math.max(5, Math.min(98, Math.round(pct)));
-            setLoadProgress(p);
-            syncConnectPullState({ progress: p, ...(label ? { label } : {}) });
-          };
-
           const safeComposeFilters = isDemo ? null : composeFilters;
           if (mode === "meta") {
             if (Array.isArray(metaOpSpecs) && metaOpSpecs.length > 0) {
@@ -1660,24 +1659,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   demo: isDemo,
                   ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                 },
-                {
-                  signal,
-                  maxWaitMs: 900000,
-                  onProgress: ({ phase, fraction, rowsDownloaded }) => {
-                    if (phase === "athena") {
-                      reportPullProgress(12, "Waiting for Athena…");
-                      return;
-                    }
-                    if (phase === "download") {
-                      const frac = typeof fraction === "number" ? fraction : 0;
-                      const n = rowsDownloaded ?? 0;
-                      reportPullProgress(
-                        15 + frac * 45,
-                        n > 0 ? `Downloading ${n.toLocaleString()} rows…` : "Receiving rows…",
-                      );
-                    }
-                  },
-                },
+                { signal, maxWaitMs: 900000 },
               );
 
           let outRows = rows;
@@ -1711,7 +1693,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             ingestFull || !Array.isArray(outRows)
               ? outRows
               : outRows.slice(0, athenaRowLimit);
-          reportPullProgress(58, "Preparing sheet data…");
           return ingestAthenaResultAsView({
             dataset,
             sampleId: `${sid}-compose`,
@@ -1719,15 +1700,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             rows: cappedRows,
             limit: ingestFull ? null : athenaRowLimit,
             ingestFullResult: ingestFull,
-            onProgress: (fraction, phase) => {
-              const labels = {
-                convert: "Converting rows for the sheet…",
-                register: "Registering data with DuckDB…",
-                view: "Building SQL view…",
-                done: "Finalizing…",
-              };
-              reportPullProgress(58 + fraction * 38, labels[phase] || "Processing…");
-            },
           });
         },
       });
@@ -1760,10 +1732,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setSheetDialogOpen(false);
     setError(null);
     setLastRowCount(null);
-    ingestAbortControllerRef.current?.abort();
     const ingestAbort = new AbortController();
     ingestAbortControllerRef.current = ingestAbort;
     const signal = ingestAbort.signal;
+    pullInFlightRef.current = true;
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
@@ -1790,28 +1762,20 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         pendingComposeLimit ?? null,
         signal,
       );
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new Error("Query finished but no rows were loaded into the sheet.");
+      }
       syncConnectPullState({ error: null });
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
-        applyRowsToActiveSheet(finalRows, sheetProvenance);
-        if (mode === "columns" && requestCard && activeSheetId && setDataSheets) {
+        let requestCards;
+        if (mode === "columns" && requestCard && activeSheetId) {
           const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
           const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
-          const card = { ...requestCard, sheetId: activeSheetId, elapsedMs, loadedRowCount: n };
-          setDataSheets((prev) => {
-            const p = prev || {};
-            const sheet = p[activeSheetId];
-            if (!sheet) return prev;
-            return {
-              ...p,
-              [activeSheetId]: {
-                ...sheet,
-                requestCards: [card],
-              },
-            };
-          });
+          requestCards = [{ ...requestCard, sheetId: activeSheetId, elapsedMs, loadedRowCount: n }];
           setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
+        applyRowsToActiveSheet(finalRows, { provenance: sheetProvenance, requestCards });
         setLastRowCount(n);
         refreshBeckerViews();
       });
@@ -1826,6 +1790,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       setError(msg);
       syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
     } finally {
+      pullInFlightRef.current = false;
       ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
@@ -1958,10 +1923,10 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setSheetDialogOpen(false);
     setError(null);
     setLastRowCount(null);
-    ingestAbortControllerRef.current?.abort();
     const ingestAbort = new AbortController();
     ingestAbortControllerRef.current = ingestAbort;
     const signal = ingestAbort.signal;
+    pullInFlightRef.current = true;
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
@@ -2009,41 +1974,44 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         signal,
       );
 
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new Error("Query finished but no rows were loaded into the sheet.");
+      }
+
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         const newCardId = requestCard ? genRequestCardId() : null;
         const connectHomeSheetName = String(ctx?.connectHomePendingSheetName || "").trim();
         const applyToPreparedSheet = (targetId) => {
-          setSheetData?.(targetId, finalRows);
-          setDataSheets?.((prev) => {
-            const sheet = prev[targetId];
-            if (!sheet) return prev;
-            const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
-            const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
-            const card =
-              requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: targetId, elapsedMs, loadedRowCount: n } : null;
-            const autoName = `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
-              0,
-              80,
-            );
-            const sheetName =
-              connectHomeDataLakeCompose && connectHomeSheetName
-                ? connectHomeSheetName.slice(0, 80)
-                : autoName;
-            return {
-              ...prev,
-              [targetId]: {
-                ...sheet,
+          const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+          const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
+          const card =
+            requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: targetId, elapsedMs, loadedRowCount: n } : null;
+          const autoName = `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
+            0,
+            80,
+          );
+          const sheetName =
+            connectHomeDataLakeCompose && connectHomeSheetName
+              ? connectHomeSheetName.slice(0, 80)
+              : autoName;
+          flushSync(() => {
+            setDataSheets?.((prev) =>
+              applyAthenaPullToSheetPatch(prev, targetId, finalRows, {
+                provenance: sheetProvenance,
                 name: sheetName,
-                ...(sheetProvenance ? { provenance: sheetProvenance } : {}),
-                ...(card && mode === "columns" ? { requestCards: [card] } : {}),
-              },
-            };
+                requestCards: card && mode === "columns" ? [card] : undefined,
+              }),
+            );
           });
         };
         if (preparedSheetId) {
+          flushSync(() => setActiveSheetId?.(preparedSheetId));
           applyToPreparedSheet(preparedSheetId);
         } else {
-          addNewSheetAndActivate?.((newId) => applyToPreparedSheet(newId));
+          addNewSheetAndActivate?.((newId) => {
+            flushSync(() => setActiveSheetId?.(newId));
+            applyToPreparedSheet(newId);
+          });
         }
         if (mode === "columns" && requestCard) {
           setExpandedRequestKey(null);
@@ -2063,6 +2031,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       setError(msg);
       syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
     } finally {
+      pullInFlightRef.current = false;
       ingestAbortControllerRef.current = null;
       setLoading(false);
       setLoadProgress(0);
@@ -2416,6 +2385,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [selectionTab, metaPreviewRows, connectedData, applyRowsToActiveSheet]);
 
   const handleLoad = () => {
+    if (pullInFlightRef.current) return;
     setError(null);
     setLastRowCount(null);
     const rejectConnectHomePull = (msg) => {

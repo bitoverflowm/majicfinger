@@ -70,15 +70,6 @@ export const ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT = 500000;
 /** Max points rendered per cartesian series (full data stays in the sheet). */
 export const CHART_RENDER_ROW_CAP = 20000;
 
-/** Browser ingest: use CSV + chunked conversion above this row count (faster than JSON round-trip). */
-export const ATHENA_INGEST_CSV_THRESHOLD = 2500;
-
-/** Rows converted per idle slice during large Athena → sheet ingest. */
-export const ATHENA_INGEST_CHUNK_SIZE = 4000;
-
-/** Paginate Athena status downloads when pulling more than this many rows. */
-export const ATHENA_STATUS_PAGE_FETCH_THRESHOLD = 8000;
-
 /** AG Grid shows this many rows per page; full dataset stays in sheet state for charts and transforms. */
 export const SHEET_GRID_PAGE_SIZE = 100;
 

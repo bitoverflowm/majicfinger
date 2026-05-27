@@ -416,57 +416,6 @@ export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
 }
 
 /**
- * One Athena GetQueryResults page (up to 1000 rows). Used for browser paginated downloads.
- * @param {string} queryExecutionId
- * @param {string | null | undefined} nextToken
- * @param {{ maxRows?: number }} [opts]
- */
-export async function fetchAthenaQueryResultPage(queryExecutionId, nextToken, opts = {}) {
-  const maxRows = Math.max(1, Number(opts.maxRows) || 1000);
-  const athena = new AWS.Athena({ region: getRegion() });
-
-  const page = await athena
-    .getQueryResults({
-      QueryExecutionId: queryExecutionId,
-      ...(nextToken ? { NextToken: nextToken } : {}),
-      MaxResults: Math.min(1000, maxRows),
-    })
-    .promise();
-
-  const rs = page.ResultSet;
-  const meta = rs?.ResultSetMetadata?.ColumnInfo;
-  const rawRows = rs?.Rows || [];
-  const columnNames = [];
-  const dataRows = [];
-  const isFirstPage = !nextToken;
-
-  if (isFirstPage && meta?.length) {
-    for (const c of meta) {
-      columnNames.push(c.Name || "");
-    }
-  }
-
-  let startIdx = 0;
-  if (isFirstPage && rawRows.length > 0) {
-    if (!columnNames.length) {
-      columnNames.push(...(rawRows[0].Data?.map((d) => d.VarCharValue ?? "") || []));
-    }
-    startIdx = 1;
-  }
-
-  for (let i = startIdx; i < rawRows.length && dataRows.length < maxRows; i++) {
-    dataRows.push(rawRows[i].Data?.map((d) => d.VarCharValue ?? "") || []);
-  }
-
-  return {
-    columns: columnNames,
-    rows: dataRows,
-    nextToken: page.NextToken || null,
-    isFirstPage,
-  };
-}
-
-/**
  * Sync path: start → poll until done or timeout → fetch rows.
  * @param {object} opts
  * @param {string} opts.physicalTableName
