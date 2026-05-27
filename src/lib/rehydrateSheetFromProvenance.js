@@ -54,7 +54,6 @@ export async function rehydrateSheetFromProvenance({
       provenance,
       sheetGraph,
       operationHistory: sourceSheet?.operationHistory || [],
-      maxRows: sourceSheet?.fullRowCount || sourceSheet?.rowCount || undefined,
       previewRows: sourceSheet?.data || [],
       saveMeta: sourceSheet?.saveMeta || null,
     }),

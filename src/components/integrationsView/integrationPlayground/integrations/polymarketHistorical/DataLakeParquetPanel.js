@@ -54,7 +54,10 @@ import {
   ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT,
 } from "@/config/dataLakeParquetSamples";
 import { useUser } from "@/lib/hooks";
-import { userHasExpandedAthenaAccess } from "@/lib/athenaEntitlement";
+import {
+  getHistoricalPullRowLimit,
+  userHasExpandedAthenaAccess,
+} from "@/lib/athenaEntitlement";
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { removeDataSheetFromWorkspace } from "@/lib/removeDataSheetFromWorkspace";
@@ -586,11 +589,11 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setComposeJoins,
   } = useDataLakeComposeState(connectHomeDataLakeCompose);
   const user = useUser();
-  const athenaRowLimit = useMemo(() => {
-    if (isDemo) return ATHENA_DEMO_ROW_LIMIT;
-    if (userHasExpandedAthenaAccess(user)) return ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
-    return ATHENA_SAMPLE_ROW_LIMIT;
-  }, [isDemo, user]);
+  const subscriberAthenaAccess = useMemo(() => userHasExpandedAthenaAccess(user), [user]);
+  const athenaRowLimit = useMemo(
+    () => getHistoricalPullRowLimit(user, { isDemo }),
+    [user, isDemo],
+  );
 
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
   const hasLiveConnection =
@@ -1680,19 +1683,23 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           }
 
           const cappedColumns = Array.isArray(resultColumns) ? resultColumns : [];
-          const cappedRows = Array.isArray(outRows) ? outRows.slice(0, athenaRowLimit) : [];
+          const ingestFull = subscriberAthenaAccess;
+          const cappedRows =
+            ingestFull || !Array.isArray(outRows)
+              ? outRows
+              : outRows.slice(0, athenaRowLimit);
           return ingestAthenaResultAsView({
             dataset,
             sampleId: `${sid}-compose`,
             columns: cappedColumns,
             rows: cappedRows,
-            limit: athenaRowLimit,
-            ingestFullResult: false,
+            limit: ingestFull ? null : athenaRowLimit,
+            ingestFullResult: ingestFull,
           });
         },
       });
     },
-    [dataset, metaOperationColumn, metaOperationKind, isDemo, athenaRowLimit, syncConnectPullState],
+    [dataset, metaOperationColumn, metaOperationKind, isDemo, athenaRowLimit, subscriberAthenaAccess, syncConnectPullState],
   );
 
   const executeIngestReplace = useCallback(async () => {

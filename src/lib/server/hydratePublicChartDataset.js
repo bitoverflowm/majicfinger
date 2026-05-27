@@ -84,7 +84,6 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
         provenance: sheet.provenance,
         sheetGraph,
         operationHistory: sheet.operationHistory || [],
-        maxRows: sheet.fullRowCount || sheet.rowCount || undefined,
         previewRows: sheet.data || [],
         saveMeta: sheet.saveMeta || null,
       };

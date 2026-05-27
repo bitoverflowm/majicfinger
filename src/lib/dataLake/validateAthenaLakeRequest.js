@@ -76,6 +76,7 @@ export function validateAthenaLakeQueryBody(body, access) {
   }
 
   const accessOpts = access && typeof access === "object" ? access : {};
+  const unlimitedComposeRows = accessOpts.unlimitedComposeRows === true;
   const maxSelectRows =
     typeof accessOpts.maxSelectRows === "number" && Number.isFinite(accessOpts.maxSelectRows)
       ? Math.min(COMPOSE_SQL_LIMIT_ABSOLUTE_MAX, Math.max(1, Math.floor(accessOpts.maxSelectRows)))
@@ -291,7 +292,7 @@ export function validateAthenaLakeQueryBody(body, access) {
   if (queryType === "compose") {
     const limitProvided = body.limit != null && body.limit !== "";
     if (!limitProvided) {
-      limClamped = maxComposeRowsCap;
+      limClamped = unlimitedComposeRows ? null : maxComposeRowsCap;
     } else {
       const n = Number(body.limit);
       if (!Number.isFinite(n)) {
@@ -887,6 +888,7 @@ export function validateAthenaLakeQueryBody(body, access) {
     table,
     limit: limClamped,
     maxComposeRows: maxComposeRowsCap,
+    unlimitedComposeRows,
     demo,
     columns: queryType === "compose" ? null : columns && columns.length ? columns : null,
     queryType,

@@ -52,6 +52,8 @@ export const siteConfig = {
       trial: plan.trial ?? null,
     })),
     lifetimeAccess: landingPageV2Config.lifetimeAccess,
+    demoTier: landingPageV2Config.demoTier,
+    pricingFinePrint: landingPageV2Config.pricingFinePrint,
   },
   featureSection: {
     title: "Everything You Need to Move Fast",

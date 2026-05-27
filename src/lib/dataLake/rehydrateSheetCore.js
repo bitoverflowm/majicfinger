@@ -52,10 +52,19 @@ function rowsToObjects(columns, rows) {
 }
 
 function normalizeLimit(body, provenance, access) {
-  const requested = Number(body?.maxRows ?? provenance?.composeAthenaRowLimit ?? access.maxComposeRows ?? access.maxSelectRows);
-  const fallback = Math.max(1, Math.floor(Number(access.maxComposeRows || access.maxSelectRows || 100)));
-  if (!Number.isFinite(requested)) return fallback;
-  return Math.max(1, Math.min(Math.floor(requested), fallback));
+  const tierMax = Math.max(1, Math.floor(Number(access.maxComposeRows || access.maxSelectRows || 100)));
+  const explicitProv = provenance?.composeAthenaRowLimit;
+  if (explicitProv != null && explicitProv !== "" && Number.isFinite(Number(explicitProv))) {
+    return Math.max(1, Math.min(Math.floor(Number(explicitProv)), tierMax));
+  }
+  if (access.unlimitedComposeRows) {
+    return tierMax;
+  }
+  const requested = Number(body?.maxRows);
+  if (Number.isFinite(requested) && requested > 0) {
+    return Math.max(1, Math.min(Math.floor(requested), tierMax));
+  }
+  return tierMax;
 }
 
 function getRegion() {
@@ -293,6 +302,7 @@ export async function runRehydrateSheetCore(body, access, opts = {}) {
           maxWaitMs,
           demo: validated.demo,
           composeSqlCap: validated.maxComposeRows,
+          unlimitedComposeRows: access.unlimitedComposeRows,
         });
       })();
 

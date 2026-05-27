@@ -2,6 +2,7 @@ import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
+import { rehydrateProjectProvenanceSheets } from "@/lib/rehydrateProjectProvenanceSheets";
 
 /**
  * Shared helpers to load a saved DataSet (project) into sheet + chart workspace state.
@@ -206,6 +207,25 @@ export async function loadFullProjectFromApi({
   }
   applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData });
   setLoadedDataMeta?.(res.data);
+
+  let sheetsForCharts = res.data?.data_sheets;
+  const incomingSheets =
+    res.data?.data_sheets && typeof res.data.data_sheets === "object" ? res.data.data_sheets : null;
+  if (incomingSheets && Object.keys(incomingSheets).length > 0 && setDataSheets) {
+    try {
+      const rehydrated = await rehydrateProjectProvenanceSheets(incomingSheets);
+      sheetsForCharts = rehydrated;
+      setDataSheets(rehydrated);
+      const firstKey = Object.keys(rehydrated)[0];
+      if (firstKey) {
+        setActiveSheetId?.(firstKey);
+        setConnectedData?.(Array.isArray(rehydrated[firstKey]?.data) ? rehydrated[firstKey].data : []);
+      }
+    } catch (e) {
+      console.warn("[loadFullProjectFromApi] Provenance rehydrate failed:", e?.message || e);
+    }
+  }
+
   const rid = res.data?._id ?? dataSetId;
   if (rid != null) setLoadedDataId?.(rid);
   await hydrateChartSheetsForDataSet({
@@ -217,7 +237,7 @@ export async function loadFullProjectFromApi({
     setActiveChartSheetId,
     setLoadedChartMeta,
     setLoadedChartBuilderSnapshot,
-    dataSheets: res.data?.data_sheets,
+    dataSheets: sheetsForCharts,
     legacyRows: res.data?.data,
   });
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);

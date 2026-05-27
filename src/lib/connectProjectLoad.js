@@ -9,6 +9,7 @@ export const PROJECT_LOAD_PROGRESS_MESSAGES = [
   "Fetching saved rows from the project store…",
   "Preparing sheet metadata and previews…",
   "Reconstructing workbook tabs…",
+  "Re-running saved Data Lake queries…",
   "Hydrating rows into the grid…",
   "Large projects can take a moment. Still loading…",
 ];

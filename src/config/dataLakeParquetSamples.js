@@ -61,8 +61,14 @@ export const KALSHI_CONNECT_DATA_SOURCES = [
 /** Fixed server row cap for integration samples (matches product expectation). */
 export const ATHENA_SAMPLE_ROW_LIMIT = 100;
 
-/** Default max rows for subscriber Athena pulls (select + compose) and for DuckDB materialization of Athena JSON; server/env may raise further up to 500k. */
-export const ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT = 50000;
+/** Basic tier: max rows per historical pull request. */
+export const ATHENA_BASIC_QUERY_ROW_LIMIT = 12500;
+
+/** Pro / Elite: max rows per pull (server/env may lower; hard ceiling 500k). */
+export const ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT = 500000;
+
+/** Max points rendered per cartesian series (full data stays in the sheet). */
+export const CHART_RENDER_ROW_CAP = 20000;
 
 /** AG Grid shows this many rows per page; full dataset stays in sheet state for charts and transforms. */
 export const SHEET_GRID_PAGE_SIZE = 100;

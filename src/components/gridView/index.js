@@ -411,7 +411,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
             provenance: activeSheet.provenance,
             sheetGraph,
             operationHistory: activeSheet.operationHistory || [],
-            maxRows: activeSheet.fullRowCount || activeSheet.rowCount || undefined,
             previewRows: activeSheet.data || [],
             saveMeta: activeSheet.saveMeta || null,
           }),
@@ -444,6 +443,14 @@ const GridView = ({ startNew, fillViewport = false }) => {
         setRehydrateBusy(false);
       }
     }, [activeSheet, activeSheetId, dataSheets, setConnectedData, setDataSheets]);
+
+    const autoRehydrateAttemptedRef = useRef(new Set());
+    useEffect(() => {
+      if (!activeSheetId || !isProvenancePreviewSheet || rehydrateBusy) return;
+      if (autoRehydrateAttemptedRef.current.has(activeSheetId)) return;
+      autoRehydrateAttemptedRef.current.add(activeSheetId);
+      void rehydrateActiveSheet();
+    }, [activeSheetId, isProvenancePreviewSheet, rehydrateActiveSheet, rehydrateBusy]);
     
     const [columnName, setColumnName] = useState('');
     const [colAddOpen, setColAddOpen] = useState()

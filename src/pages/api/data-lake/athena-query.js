@@ -68,6 +68,7 @@ export default async function handler(req, res) {
       maxWaitMs,
       demo: validated.demo,
       composeSqlCap: validated.maxComposeRows,
+      unlimitedComposeRows: validated.unlimitedComposeRows,
     });
 
     return res.status(200).json({

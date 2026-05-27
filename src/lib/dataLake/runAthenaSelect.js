@@ -60,7 +60,8 @@ function assertAthenaConfig() {
  * @param {boolean} [opts.caseSensitive]
  * @param {boolean} [opts.demo] — when true, compose queries use ATHENA_DEMO_ROW_LIMIT as SQL row cap
  * @param {number} [opts.composeSqlCap] — max rows for compose when the query is an unbounded SELECT (subscriber tier)
- * @param {number} opts.limit
+ * @param {boolean} [opts.unlimitedComposeRows] — Pro/Elite: omit SQL LIMIT unless client passes `limit`
+ * @param {number | null} opts.limit
  * @returns {Promise<{ queryExecutionId: string; sql: string; rowLimit: number | null }>}
  */
 export async function startAthenaBoundedQuery({
@@ -80,6 +81,7 @@ export async function startAthenaBoundedQuery({
   limit,
   demo = false,
   composeSqlCap,
+  unlimitedComposeRows = false,
 }) {
   const output = assertAthenaConfig();
 
@@ -267,8 +269,20 @@ export async function startAthenaBoundedQuery({
       : typeof composeSqlCap === "number" && Number.isFinite(composeSqlCap)
         ? Math.floor(composeSqlCap)
         : COMPOSE_UNCONSTRAINED_ROW_CAP;
-    const requestLim = Math.max(1, Math.floor(Number(limit) || capRows));
-    const sqlLimit = Math.min(capRows, requestLim);
+    const explicitLimit =
+      limit != null && limit !== "" && Number.isFinite(Number(limit))
+        ? Math.max(1, Math.floor(Number(limit)))
+        : null;
+    let sqlLimit = null;
+    if (demo) {
+      sqlLimit = ATHENA_DEMO_ROW_LIMIT;
+    } else if (explicitLimit != null) {
+      sqlLimit = Math.min(capRows, explicitLimit);
+    } else if (unlimitedComposeRows) {
+      sqlLimit = null;
+    } else {
+      sqlLimit = capRows;
+    }
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
       limit: sqlLimit,
@@ -287,13 +301,15 @@ export async function startAthenaBoundedQuery({
         QueryExecutionContext: { Catalog: catalog, Database: db },
       })
       .promise();
-    return { queryExecutionId: QueryExecutionId, sql, rowLimit: sqlLimit };
+    return { queryExecutionId: QueryExecutionId, sql, rowLimit: sqlLimit ?? null };
   }
 
+  const selectLimit =
+    lim != null && Number.isFinite(Number(lim)) ? Math.max(1, Math.floor(Number(lim))) : 100;
   const sql =
     queryType === "count" || queryType === "sum"
       ? `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql}`
-      : `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql} LIMIT ${lim}`;
+      : `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql} LIMIT ${selectLimit}`;
 
   const athena = new AWS.Athena({ region: getRegion() });
   const { QueryExecutionId } = await athena
@@ -305,7 +321,7 @@ export async function startAthenaBoundedQuery({
     })
     .promise();
 
-  return { queryExecutionId: QueryExecutionId, sql, rowLimit: lim };
+  return { queryExecutionId: QueryExecutionId, sql, rowLimit: selectLimit };
 }
 
 /**
@@ -430,6 +446,7 @@ export async function runAthenaBoundedSelect({
   maxWaitMs,
   demo = false,
   composeSqlCap,
+  unlimitedComposeRows = false,
 }) {
   const { queryExecutionId, sql, rowLimit } = await startAthenaBoundedQuery({
     physicalTableName,
@@ -448,6 +465,7 @@ export async function runAthenaBoundedSelect({
     limit,
     demo,
     composeSqlCap,
+    unlimitedComposeRows,
   });
 
   const deadline = Date.now() + maxWaitMs;

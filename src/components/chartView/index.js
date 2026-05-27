@@ -24,6 +24,7 @@ import { coerceChartPlotNumber, sanitizeCartesianRowsForPlotting } from "@/lib/c
 import { isCategoricalLabelColumn, looksLikeProseLabelValue } from "@/lib/chartCategoricalColumns";
 import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
 import { temporalToMs } from "@/lib/temporalParse";
+import { downsampleRowsForChart } from "@/lib/chartRenderCap";
 
 const ChartBuilderContext = createContext(null);
 
@@ -1285,8 +1286,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   ]);
 
   const lineChartData = useMemo(() => {
-    if (selChartType === "line" || scopedKeysInUse) return crossSheetChartData;
-    return chartData;
+    const base =
+      selChartType === "line" || scopedKeysInUse ? crossSheetChartData : chartData;
+    return downsampleRowsForChart(base);
   }, [selChartType, scopedKeysInUse, crossSheetChartData, chartData]);
 
   const chartTimeframesAvailable = useMemo(() => {

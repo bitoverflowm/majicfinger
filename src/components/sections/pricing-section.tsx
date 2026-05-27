@@ -96,10 +96,22 @@ type LifetimeAccess = {
   features: string[];
 };
 
+type DemoTier = {
+  name: string;
+  priceLabel: string;
+  suffix: string;
+  description: string;
+  buttonText: string;
+  href: string;
+  features: string[];
+};
+
 export function PricingSection() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("annual");
   const { title, description, pricingItems } = siteConfig.pricingSection;
   const lifetimeAccess = (siteConfig.pricingSection as { lifetimeAccess?: LifetimeAccess }).lifetimeAccess;
+  const demoTier = (siteConfig.pricingSection as { demoTier?: DemoTier }).demoTier;
+  const pricingFinePrint = (siteConfig.pricingSection as { pricingFinePrint?: string }).pricingFinePrint;
 
   const computedTiers = useMemo(() => {
     return pricingItems.map((tier) => {
@@ -182,7 +194,43 @@ export function PricingSection() {
           />
         </div>
 
-        <div className="grid min-[650px]:grid-cols-2 min-[900px]:grid-cols-3 gap-4 w-full max-w-6xl mx-auto px-6">
+        <div className="grid min-[650px]:grid-cols-2 min-[1100px]:grid-cols-4 gap-4 w-full max-w-7xl mx-auto px-6">
+          {demoTier ? (
+            <div
+              key={demoTier.name}
+              className="rounded-xl grid grid-rows-[180px_auto_1fr] relative h-fit min-[650px]:h-full border border-dashed border-border bg-background/60"
+            >
+              <div className="flex flex-col gap-4 p-4">
+                <p className="text-sm">{demoTier.name}</p>
+                <div className="flex items-baseline mt-2">
+                  <span className="text-4xl font-semibold">{demoTier.priceLabel}</span>
+                  <span className="ml-2 text-sm text-muted-foreground">/{demoTier.suffix}</span>
+                </div>
+                <p className="text-sm mt-2 text-muted-foreground">{demoTier.description}</p>
+              </div>
+              <div className="flex flex-col gap-2 p-4">
+                <a
+                  href={demoTier.href}
+                  className="h-10 w-full flex items-center justify-center text-sm font-normal tracking-wide rounded-full px-4 border border-border bg-background hover:bg-muted transition-all"
+                >
+                  {demoTier.buttonText}
+                </a>
+              </div>
+              <hr className="border-border dark:border-white/20" />
+              <div className="p-4">
+                <ul className="space-y-3">
+                  {demoTier.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2">
+                      <div className="size-5 rounded-full border border-primary/20 flex items-center justify-center shrink-0">
+                        <div className="size-1.5 rounded-full bg-muted-foreground" />
+                      </div>
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
           {computedTiers.map((tier) => (
             <div
               key={tier.name}
@@ -287,6 +335,12 @@ export function PricingSection() {
             </div>
           ))}
         </div>
+
+        {pricingFinePrint ? (
+          <p className="mt-6 max-w-3xl mx-auto px-6 text-center text-xs text-muted-foreground leading-relaxed">
+            {pricingFinePrint}
+          </p>
+        ) : null}
 
         {SHOW_LIFETIME_ACCESS && lifetimeAccess && (
           <div className="mt-14 w-full border-y border-border bg-gradient-to-br from-accent via-accent/80 to-muted/30 dark:from-accent/30 dark:via-background dark:to-muted/20 py-10 md:py-12 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">

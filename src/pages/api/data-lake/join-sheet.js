@@ -136,6 +136,7 @@ export default async function handler(req, res) {
       maxWaitMs,
       demo: validated.demo,
       composeSqlCap: validated.maxComposeRows,
+      unlimitedComposeRows: validated.unlimitedComposeRows,
     });
 
     const pullObjects = athenaRowsToObjects(result.columns, result.rows);
