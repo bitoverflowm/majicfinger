@@ -1504,6 +1504,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           syncConnectPullState({ progress });
         },
         loadFn: async () => {
+          const reportPullProgress = (pct, label) => {
+            const p = Math.max(5, Math.min(98, Math.round(pct)));
+            setLoadProgress(p);
+            syncConnectPullState({ progress: p, ...(label ? { label } : {}) });
+          };
+
           const safeComposeFilters = isDemo ? null : composeFilters;
           if (mode === "meta") {
             if (Array.isArray(metaOpSpecs) && metaOpSpecs.length > 0) {
@@ -1654,7 +1660,24 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   demo: isDemo,
                   ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                 },
-                { signal, maxWaitMs: 900000 },
+                {
+                  signal,
+                  maxWaitMs: 900000,
+                  onProgress: ({ phase, fraction, rowsDownloaded }) => {
+                    if (phase === "athena") {
+                      reportPullProgress(12, "Waiting for Athena…");
+                      return;
+                    }
+                    if (phase === "download") {
+                      const frac = typeof fraction === "number" ? fraction : 0;
+                      const n = rowsDownloaded ?? 0;
+                      reportPullProgress(
+                        15 + frac * 45,
+                        n > 0 ? `Downloading ${n.toLocaleString()} rows…` : "Receiving rows…",
+                      );
+                    }
+                  },
+                },
               );
 
           let outRows = rows;
@@ -1688,6 +1711,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             ingestFull || !Array.isArray(outRows)
               ? outRows
               : outRows.slice(0, athenaRowLimit);
+          reportPullProgress(58, "Preparing sheet data…");
           return ingestAthenaResultAsView({
             dataset,
             sampleId: `${sid}-compose`,
@@ -1695,6 +1719,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             rows: cappedRows,
             limit: ingestFull ? null : athenaRowLimit,
             ingestFullResult: ingestFull,
+            onProgress: (fraction, phase) => {
+              const labels = {
+                convert: "Converting rows for the sheet…",
+                register: "Registering data with DuckDB…",
+                view: "Building SQL view…",
+                done: "Finalizing…",
+              };
+              reportPullProgress(58 + fraction * 38, labels[phase] || "Processing…");
+            },
           });
         },
       });

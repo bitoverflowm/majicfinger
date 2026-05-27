@@ -198,7 +198,7 @@ export function PricingSection() {
           {demoTier ? (
             <div
               key={demoTier.name}
-              className="rounded-xl grid grid-rows-[180px_auto_1fr] relative h-fit min-[650px]:h-full border border-dashed border-border bg-background/60"
+              className="rounded-xl grid grid-rows-[180px_auto_1fr] relative h-fit min-[650px]:h-full min-[900px]:h-fit border border-dashed border-border bg-background/60"
             >
               <div className="flex flex-col gap-4 p-4">
                 <p className="text-sm">{demoTier.name}</p>
@@ -216,8 +216,9 @@ export function PricingSection() {
                   {demoTier.buttonText}
                 </a>
               </div>
-              <hr className="border-border dark:border-white/20" />
-              <div className="p-4">
+              <div className="flex min-h-0 flex-col justify-start">
+                <hr className="border-border dark:border-white/20" />
+                <div className="p-4">
                 <ul className="space-y-3">
                   {demoTier.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
@@ -228,6 +229,7 @@ export function PricingSection() {
                     </li>
                   ))}
                 </ul>
+                </div>
               </div>
             </div>
           ) : null}
@@ -279,9 +281,10 @@ export function PricingSection() {
                 </a>
               </div>
 
-              <hr className="border-border dark:border-white/20" />
+              <div className="flex min-h-0 flex-col justify-start">
+                <hr className="border-border dark:border-white/20" />
 
-              <div className="p-4">
+                <div className="p-4">
                 <ul className="space-y-3">
                   {tier.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
@@ -331,6 +334,7 @@ export function PricingSection() {
                     </li>
                   ))}
                 </ul>
+                </div>
               </div>
             </div>
           ))}

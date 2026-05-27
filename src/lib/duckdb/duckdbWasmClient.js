@@ -1,6 +1,11 @@
 import { arrowTableToRows } from "@/lib/duckdb/arrowTableToRows";
-import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
-import { ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { athenaRowsToObjects, athenaRowsToObjectsChunked } from "@/lib/duckdb/athenaRowsToObjects";
+import { athenaObjectsToCsvBytes } from "@/lib/duckdb/athenaObjectsToCsv";
+import {
+  ATHENA_INGEST_CHUNK_SIZE,
+  ATHENA_INGEST_CSV_THRESHOLD,
+  ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT,
+} from "@/config/dataLakeParquetSamples";
 
 export { athenaRowsToObjects };
 
@@ -203,11 +208,12 @@ export async function ingestRemoteParquetAsView(opts) {
  * Register Athena result (column names + string cells) as JSON and expose a DuckDB view
  * (same registry pattern as Parquet — enables runBeckerSelectSql / joins).
  *
- * @param {{ dataset: "polymarket" | "kalshi"; sampleId: string; columns: string[]; rows: string[][] | Record<string, unknown>[]; limit?: number; ingestFullResult?: boolean }} opts
+ * @param {{ dataset: "polymarket" | "kalshi"; sampleId: string; columns: string[]; rows: string[][] | Record<string, unknown>[]; limit?: number; ingestFullResult?: boolean; onProgress?: (fraction: number, phase: string) => void }} opts
  */
 export async function ingestAthenaResultAsView(opts) {
   const { dataset, sampleId, columns, rows } = opts;
   const full = opts.ingestFullResult === true;
+  const onProgress = typeof opts.onProgress === "function" ? opts.onProgress : null;
   /** Align with Athena subscriber pull cap — previously 5000 hid most of large compose results in DuckDB/sheet. */
   const limit = full
     ? null
@@ -254,22 +260,47 @@ export async function ingestAthenaResultAsView(opts) {
     return { rows: [], rowCount: 0, logicalKey, viewName };
   }
 
-  const objects = athenaRowsToObjects(columns, rows);
+  const rowCount = rows.length;
+  const useChunked = rowCount > ATHENA_INGEST_CHUNK_SIZE;
+  const objects = useChunked
+    ? await athenaRowsToObjectsChunked(columns, rows, {
+        chunkSize: ATHENA_INGEST_CHUNK_SIZE,
+        onProgress: (f) => onProgress?.(f * 0.35, "convert"),
+      })
+    : athenaRowsToObjects(columns, rows);
 
-  const jsonBytes = new TextEncoder().encode(JSON.stringify(objects));
-  await db.registerFileBuffer(jsonFileName, jsonBytes);
+  onProgress?.(0.4, "register");
 
-  const escapedFile = jsonFileName.replace(/'/g, "''");
+  const virtualFileName =
+    rowCount >= ATHENA_INGEST_CSV_THRESHOLD
+      ? `becker_${logicalKey}_athena.csv`
+      : jsonFileName;
+  const fileBytes =
+    rowCount >= ATHENA_INGEST_CSV_THRESHOLD
+      ? athenaObjectsToCsvBytes(columns, objects)
+      : new TextEncoder().encode(JSON.stringify(objects));
+
+  await db.registerFileBuffer(virtualFileName, fileBytes);
+
+  const escapedFile = virtualFileName.replace(/'/g, "''");
+  const readFn =
+    rowCount >= ATHENA_INGEST_CSV_THRESHOLD ? "read_csv_auto" : "read_json_auto";
   await conn.query(
-    `CREATE OR REPLACE VIEW ${viewName} AS SELECT * FROM read_json_auto('${escapedFile}')`,
+    `CREATE OR REPLACE VIEW ${viewName} AS SELECT * FROM ${readFn}('${escapedFile}')`,
   );
 
-  beckerParquetRegistry.set(logicalKey, { virtualFileName: jsonFileName, viewName });
+  beckerParquetRegistry.set(logicalKey, { virtualFileName, viewName });
 
-  const table = await conn.query(
-    limit == null ? `SELECT * FROM ${viewName}` : `SELECT * FROM ${viewName} LIMIT ${limit}`,
-  );
+  onProgress?.(0.85, "view");
+
+  if (full) {
+    onProgress?.(1, "done");
+    return { rows: objects, rowCount: objects.length, logicalKey, viewName };
+  }
+
+  const table = await conn.query(`SELECT * FROM ${viewName} LIMIT ${limit}`);
   const outRows = arrowTableToRows(table);
+  onProgress?.(1, "done");
   return { rows: outRows, rowCount: outRows.length, logicalKey, viewName };
 }
 

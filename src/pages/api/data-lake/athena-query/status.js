@@ -4,9 +4,11 @@
  * GET ?queryExecutionId=…&limit=…
  *   limit — row cap for GetQueryResults pagination (default 100), or "all" to paginate entire result
  */
+import { ATHENA_STATUS_PAGE_FETCH_THRESHOLD } from "@/config/dataLakeParquetSamples";
 import {
   getAthenaQueryState,
   fetchAthenaQueryResultRows,
+  fetchAthenaQueryResultPage,
 } from "../../../../lib/dataLake/runAthenaSelect";
 
 /** Athena returns UUID-style ids (36 chars with hyphens). */
@@ -37,6 +39,14 @@ export default async function handler(req, res) {
       ? null
       : Math.min(500000, Math.max(1, parseInt(String(limStr || "100"), 10) || 100));
 
+  const rawRowsMode = req.query.rowsMode;
+  const rowsMode = String(Array.isArray(rawRowsMode) ? rawRowsMode[0] : rawRowsMode || "")
+    .trim()
+    .toLowerCase();
+  const paginated = rowsMode === "page";
+  const rawPageToken = req.query.nextToken;
+  const pageToken = String(Array.isArray(rawPageToken) ? rawPageToken[0] : rawPageToken || "").trim() || null;
+
   try {
     const { state, reason, dataScannedBytes } = await getAthenaQueryState(qeid);
 
@@ -63,6 +73,32 @@ export default async function handler(req, res) {
         queryExecutionId: qeid,
         reason: reason || undefined,
         dataScannedBytes,
+      });
+    }
+
+    if (paginated) {
+      const page = await fetchAthenaQueryResultPage(qeid, pageToken);
+      return res.status(200).json({
+        state: "SUCCEEDED",
+        queryExecutionId: qeid,
+        dataScannedBytes,
+        columns: page.columns,
+        rows: page.rows,
+        rowCount: page.rows.length,
+        nextToken: page.nextToken,
+        isFirstPage: page.isFirstPage,
+        rowsMode: "page",
+      });
+    }
+
+    /** Large pulls: avoid materializing the full result in one response (client uses rowsMode=page). */
+    const deferFullFetch = rowLimit == null || rowLimit > ATHENA_STATUS_PAGE_FETCH_THRESHOLD;
+    if (deferFullFetch) {
+      return res.status(200).json({
+        state: "SUCCEEDED",
+        queryExecutionId: qeid,
+        dataScannedBytes,
+        paginate: true,
       });
     }
 
