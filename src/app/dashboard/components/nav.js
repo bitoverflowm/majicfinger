@@ -1120,14 +1120,27 @@ const Nav = () => {
         if (loadedDataMeta?._id === deleteTarget.id) setLoadedDataMeta(null)
         setRefetchData?.(1)
         if (deleteDownstream) {
-          if (loadedChartMeta?._id && (json?.uses || []).some((u) => u.kind === "chart" && u.id === loadedChartMeta._id)) {
+          const uses = Array.isArray(json?.uses) ? json.uses : []
+          if (loadedChartMeta?._id && uses.some((u) => u.kind === "chart" && u.id === loadedChartMeta._id)) {
             setLoadedChartMeta(null)
           }
-          if (loadedPresentationMeta?._id && (json?.uses || []).some((u) => u.kind === "presentation" && u.id === loadedPresentationMeta._id)) {
+          if (loadedPresentationMeta?._id && uses.some((u) => u.kind === "presentation" && u.id === loadedPresentationMeta._id)) {
             setLoadedPresentationMeta(null)
+          }
+          if (
+            activeChartDashboardId &&
+            uses.some(
+              (u) =>
+                (u.kind === "dashboard" || u.kind === "publicDashboard") &&
+                u.id === String(activeChartDashboardId),
+            )
+          ) {
+            setActiveChartDashboardId?.(null)
+            setChartDashboardDraft?.(null)
           }
           setRefetchChart?.(1)
           setRefetchPresentations?.(1)
+          setRefetchChartDashboardsTick?.((t) => (t || 0) + 1)
         }
       } else if (t === "chart") {
         if (loadedChartMeta?._id === deleteTarget.id) {

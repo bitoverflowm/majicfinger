@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import DataSet from "@/models/DataSets";
 import Chart from "@/models/Charts";
+import ChartDashboard from "@/models/ChartDashboards";
 import Presentation from "@/models/Presentations";
 
 function asObjectId(id) {
@@ -10,6 +11,21 @@ function asObjectId(id) {
 
 function normalizePresentationName(p) {
   return p?.presentation_name || p?.project_name || "Untitled presentation";
+}
+
+function normalizeDashboardName(d) {
+  return d?.dashboard_name || d?.page_heading || "Untitled dashboard";
+}
+
+/** Dashboards owned by this user and linked to this dataset only (never fork lineage ids). */
+function userDatasetDashboardFilter(userOid, datasetOid) {
+  return { user_id: userOid, data_set_id: datasetOid };
+}
+
+async function findUserDatasetDashboards(userOid, datasetOid, select) {
+  return ChartDashboard.find(userDatasetDashboardFilter(userOid, datasetOid))
+    .select(select)
+    .lean();
 }
 
 export async function analyzeAssetDependencies({ type, id, userId }) {
@@ -65,6 +81,27 @@ export async function analyzeAssetDependencies({ type, id, userId }) {
         id: String(p._id),
         name: normalizePresentationName(p),
       });
+    });
+
+    const dashboards = await findUserDatasetDashboards(
+      userOid,
+      oid,
+      "_id dashboard_name page_heading is_public public_slug",
+    );
+    dashboards.forEach((d) => {
+      uses.push({
+        kind: "dashboard",
+        id: String(d._id),
+        name: normalizeDashboardName(d),
+      });
+      if (d?.is_public && d?.public_slug) {
+        uses.push({
+          kind: "publicDashboard",
+          id: String(d._id),
+          name: normalizeDashboardName(d),
+          slug: d.public_slug,
+        });
+      }
     });
   } else if (type === "chart") {
     asset = await Chart.findOne({ _id: oid, user_id: userOid })
@@ -127,7 +164,7 @@ export async function deleteAssetWithDependencies({ type, id, userId, deleteDown
 
   const oid = asObjectId(id);
   const userOid = asObjectId(userId);
-  const deleted = { datasets: 0, charts: 0, presentations: 0, publicPages: 0 };
+  const deleted = { datasets: 0, charts: 0, dashboards: 0, presentations: 0, publicPages: 0 };
 
   if (type === "publicPage") {
     const updated = await Chart.findOneAndUpdate(
@@ -156,6 +193,12 @@ export async function deleteAssetWithDependencies({ type, id, userId, deleteDown
     };
     const presentationDocs = await Presentation.find(presentationQuery).select("_id").lean();
     const presentationIds = presentationDocs.map((p) => p._id);
+    const dashboardDocs = await findUserDatasetDashboards(
+      userOid,
+      oid,
+      "_id is_public public_slug",
+    );
+    const dashboardIds = dashboardDocs.map((d) => d._id);
 
     await DataSet.deleteOne({ _id: oid, user_id: userOid });
     deleted.datasets = 1;
@@ -165,11 +208,21 @@ export async function deleteAssetWithDependencies({ type, id, userId, deleteDown
         const result = await Chart.deleteMany({ _id: { $in: chartIds }, user_id: userOid });
         deleted.charts = result.deletedCount || 0;
       }
+      if (dashboardIds.length) {
+        const result = await ChartDashboard.deleteMany({
+          _id: { $in: dashboardIds },
+          user_id: userOid,
+          data_set_id: oid,
+        });
+        deleted.dashboards = result.deletedCount || 0;
+      }
       if (presentationIds.length) {
         const result = await Presentation.deleteMany({ _id: { $in: presentationIds }, user_id: userOid });
         deleted.presentations = result.deletedCount || 0;
       }
-      deleted.publicPages = chartDocs.filter((c) => c?.is_public && c?.public_slug).length;
+      const publicChartPages = chartDocs.filter((c) => c?.is_public && c?.public_slug).length;
+      const publicDashboardPages = dashboardDocs.filter((d) => d?.is_public && d?.public_slug).length;
+      deleted.publicPages = publicChartPages + publicDashboardPages;
     }
     return { ok: true, status: 200, data: { deleted, uses: deps.data.uses } };
   }
