@@ -1,0 +1,564 @@
+---
+title: "How to Build a Probability Calibration Chart Using Kalshi Weather Markets (Accuracy Analysis Guide)"
+description: "Step-by-step guide to building a probability calibration chart using Kalshi historical weather market data and bucketed prediction analysis in Lychee."
+publishedAt: "2026-05-28"
+author: "misterrpink"
+topics: ["kalshi", "prediction markets", "probability calibration", "weather markets", "data visualization", "market accuracy"]
+integration: ["Kalshi", "Lychee"]
+coverImage: "/images/guides/kalshi-weather-probability-calibration-chart/main.png"
+ogImage: "https://lycheedata.com/images/guides/kalshi-weather-probability-calibration-chart/main.png"
+featured: true
+slug: "/kalshi-weather-probability-calibration-chart"
+readingTime: "7 min"
+keywords: [
+  "kalshi accuracy",
+  "prediction market accuracy",
+  "kalshi weather markets",
+  "probability calibration chart",
+  "forecast calibration",
+  "prediction market analysis",
+  "how accurate are prediction markets",
+  "kalshi historical data analysis",
+  "prediction market calibration",
+  "market calibration curve",
+  "forecast accuracy markets",
+  "kalshi trading data"
+]
+canonical: "https://lycheedata.com/guides/kalshi-weather-probability-calibration-chart"
+seoTitle: "How to Build a Kalshi Probability Calibration Chart (Accuracy of Prediction Markets)"
+twitterCard: "summary_large_image"
+---
+
+# How to Build a Probability Calibration Chart Using Kalshi Weather Markets
+
+Prediction markets often look like speculation machines.
+
+But when you reconstruct them using historical data, something more structured appears:
+
+> They behave like probabilistic forecasting systems.
+
+This guide shows you how to turn raw Kalshi weather market data into a **probability calibration chart** that helps you understand how accurate market pricing actually is.
+
+You will build a system that reveals:
+
+- how closely market probabilities match real outcomes
+- where markets systematically overestimate probability
+- where markets underestimate probability
+- whether prediction market pricing is actually calibrated
+
+<PublicChart username="misterrpink" slug="probability-calibration" />
+
+## About the dataset
+
+This analysis is built on the full historical dataset of Kalshi weather markets since inception.
+
+That means we are not sampling a subset, cherry-picking examples, or working with simulated data.
+
+We are analyzing:
+
+> every weather prediction market ever listed, traded, and resolved on Kalshi
+
+This includes:
+
+- all historical weather contracts
+- complete market resolution outcomes
+- final market-implied probabilities
+- historical liquidity and volume metrics
+- resolved YES / NO outcomes across the full dataset
+
+We also exclude extremely small and illiquid markets in order to improve signal quality and reduce statistical noise.
+
+You can read more about the underlying dataset here:
+
+- [Kalshi Historical Data Guide](https://lycheedata.com/guides/kalshi-historical-data)
+
+And interact with the data directly here:
+
+- https://lycheedata.com
+
+This is effectively one of the largest structured prediction market datasets available publicly.
+
+> you are looking at the complete historical record of a real-world probabilistic forecasting system
+
+This is what makes calibration analysis possible in the first place:
+
+> without large-scale historical resolution data, probability accuracy cannot be meaningfully measured
+
+---
+
+## What you are building
+
+You will construct a **probability calibration chart** that evaluates how well Kalshi weather market prices align with real-world outcomes.
+
+This is done by grouping all historical Kalshi weather markets into probability buckets based on their final traded price.
+
+Specifically, you will compute:
+
+- All Kalshi weather markets (filtered by category and volume)
+- Final market-implied probability (`last_price`)
+- Bucketed probability ranges (0–10, 11–20, 21–30, etc.)
+- Number of markets in each probability bucket
+- Number of YES outcomes within each bucket
+
+From this, you construct a calibration curve by plotting:
+
+- X-axis → predicted probability bucket
+- Y-axis → empirical YES outcome frequency
+
+This produces a direct comparison between:
+
+> what the market predicted vs what actually happened
+
+If the market is well calibrated, the resulting line will closely follow:
+
+> y = x (the identity line)
+
+This allows you to visually answer:
+
+> Do Kalshi weather markets actually predict outcomes well?
+
+---
+
+## Core idea: What is probability calibration?
+
+A calibrated market means:
+
+- If a market says **70% chance of rain**
+- Then it should rain ~70% of the time across similar situations
+
+So calibration is not about whether an individual market prediction was correct.
+
+It is about:
+
+> whether probabilities match long-run reality
+
+This is one of the most important concepts in forecasting systems, prediction markets, and probabilistic modeling.
+
+<YouTube videoId="75-Ox-ciLbY" />
+
+---
+
+## Why Kalshi weather markets?
+
+Weather markets are ideal because:
+
+- outcomes are binary and objective
+- resolution is deterministic
+- high liquidity exists in major cities
+- strong historical dataset coverage exists
+- weather outcomes avoid many subjective interpretation problems
+
+This makes them perfect for:
+
+- probability calibration testing
+- forecasting validation
+- market efficiency analysis
+- prediction market research
+
+This guide is part of a structured deep dive series into Kalshi weather markets using historical data from Lychee.
+
+Together, these guides break down different layers of market behavior:
+
+- [**Overview:** Understanding Kalshi weather market structure and data composition](https://lycheedata.com/guides/kalshi-weather-prediction-markets-analysis)
+- [**Guide 1:** Building probability convergence charts using VWAP-style aggregation](https://lycheedata.com/guides/kalshi-weather-probability-convergence-chart)
+- [**Guide 2 (this page):** Probability calibration analysis using bucketed market outcomes](https://lycheedata.com/guides/kalshi-weather-probability-calibration-chart)
+
+---
+
+## Step 1 — Connect to Kalshi Historical Data
+
+You first connect to the historical dataset inside Lychee.
+
+This dataset contains:
+
+- historical Kalshi markets
+- market metadata
+- volume statistics
+- final market pricing
+- market resolution outcomes
+
+Open:
+
+- Kalshi Historical Integration
+
+![Select Kalshi Historical](/images/guides/kalshi-weather-probability-calibration-chart/1.png)
+
+Then select:
+
+- Markets dataset
+
+![Select Markets Data](/images/guides/kalshi-weather-probability-calibration-chart/2.png)
+
+---
+
+## Step 2 — Filter Weather Markets With Sufficient Volume
+
+From column selection select:
+
+- `category`
+  - allows us to isolate Weather markets specifically
+
+- `volume`
+  - used to filter out low-liquidity markets with weak informational quality
+
+- `last_price`
+  - the final market-implied probability before settlement
+  - in simple terms:
+    - `0` = market believed outcome would almost certainly resolve NO
+    - `100` = market believed outcome would almost certainly resolve YES
+
+- `result`
+  - the actual resolved market outcome
+
+![Select Columns](/images/guides/kalshi-weather-probability-calibration-chart/3.png)
+
+Now refine your query:
+
+- `WHERE category = Weather`
+  - isolates weather prediction markets only
+
+- `WHERE volume > 100`
+  - filters out insignificant markets with weak participation
+
+This improves:
+
+- signal quality
+- calibration reliability
+- statistical consistency
+
+Run request to begin your data pull.
+
+![Select Filters](/images/guides/kalshi-weather-probability-calibration-chart/4.png)
+
+---
+
+## Step 3 — Handling NaN Values
+
+Once the data pull completes, you may see:
+
+> Null or NaN values detected
+
+For this workflow, select:
+
+> Keep all rows
+
+This preserves the full historical dataset and avoids unintentionally removing valid market records.
+
+![Select Kalshi Historical](/images/guides/kalshi-weather-probability-calibration-chart/5.png)
+
+---
+
+## Step 4 — Review Your Dataset
+
+Your dataset will now load into the Data Sheet.
+
+You have now successfully pulled:
+
+> every Kalshi weather market with meaningful trading activity
+
+Each row represents:
+
+- one prediction market
+- one implied probability
+- one real-world outcome
+
+This is now a structured probabilistic forecasting dataset.
+
+![Select Kalshi Historical](/images/guides/kalshi-weather-probability-calibration-chart/6.png)
+
+---
+
+## Step 5 — Open Mathematics Operations
+
+Now begin transforming the raw market data into structured probability buckets.
+
+Open:
+
+- Mathematics Operations
+
+This is where we begin constructing the calibration system.
+
+![Select Kalshi Historical](/images/guides/kalshi-weather-probability-calibration-chart/7.png)
+
+---
+
+## Step 6 — Bucket Markets Into Probability Ranges
+
+Select:
+
+- `Bucket`
+
+![Select Kalshi Historical](/images/guides/kalshi-weather-probability-calibration-chart/8.png)
+
+Now configure the following:
+
+- Bucket style → `Numeric ranges`
+- Range size → `10`
+- Bucket column → `last_price`
+- New sheet name → `<your choice>`
+
+This groups all markets into probability buckets:
+
+- 0–10
+- 11–20
+- 21–30
+- etc.
+
+Next add aggregations.
+
+### Aggregation 1 — Total Markets Per Bucket
+
+Set:
+
+- `Count`
+- `Rows in bucket`
+
+This calculates:
+
+> how many markets existed inside each probability bucket
+
+For example:
+
+- how many markets ended with implied probabilities between 70–80%
+
+### Aggregation 2 — YES Outcomes Per Bucket
+
+Set:
+
+- `Count`
+- `result`
+- `WHERE result = Yes`
+
+This calculates:
+
+> how many markets inside each probability bucket actually resolved YES
+
+For example:
+
+- if 72 out of 100 markets in the 70–80 bucket resolved YES
+- then empirical outcome frequency ≈ 72%
+
+![Execute Bucket Aggregations](/images/guides/kalshi-weather-probability-calibration-chart/9.png)
+
+After execution:
+
+> each row now represents a probability bucket with both predicted probability and realized outcome frequency
+
+---
+
+## Step 7 — Preview Your Bucketed Dataset
+
+Review the transformed dataset before continuing.
+
+You should now see:
+
+- probability buckets
+- total market count per bucket
+- YES outcomes per bucket
+
+This is now the foundation of your calibration curve.
+
+![Select Kalshi Historical](/images/guides/kalshi-weather-probability-calibration-chart/10.png)
+
+---
+
+## Step 8 — Compute Prediction Accuracy
+
+Now calculate the actual realized accuracy inside each bucket.
+
+Open:
+
+- Mathematics Operations
+
+![Select Kalshi Historical](/images/guides/kalshi-weather-probability-calibration-chart/11.png)
+
+Inside the Basics tab select:
+
+- Operation → `Divide (A/B)`
+- Column A → `yes_correctly_predicted`
+- Column B → `markets`
+
+This constructs:
+
+```text
+yes_correctly_predicted / markets
+````
+
+In practical terms:
+
+```text
+YES outcomes / total markets in bucket
+```
+
+For example:
+
+* 73 YES outcomes
+* 100 total markets
+
+Produces:
+
+```text
+0.73 = 73% empirical probability
+```
+
+Select:
+
+* `Current Sheet`
+
+Then:
+
+* Click `Apply to sheet`
+
+This creates your final probability calibration metric.
+
+---
+
+## Step 9 — Visualize Probability Calibration
+
+Now visualize the calibration system.
+
+Open:
+
+* Charts
+
+Configure:
+
+* Chart → `Line Chart`
+* X-axis → `probability_calibration_bucket`
+* Y-axis → `prediction_accuracy`
+
+This chart now compares:
+
+> predicted probability vs realized outcome frequency
+
+---
+
+## Step 10 — Design Your Chart
+
+Use the chart customization panel to style your visualization.
+
+You may customize:
+
+* labels
+* smoothing
+* axis titles
+* colors
+* interpolation
+* line thickness
+* chart dimensions
+
+---
+
+## What the chart shows
+
+The calibration chart reveals whether market pricing aligns with reality.
+
+### If the curve follows y = x
+
+The market is well calibrated.
+
+Meaning:
+
+* 70% markets resolve YES roughly 70% of the time
+* 30% markets resolve YES roughly 30% of the time
+
+This suggests:
+
+> market probabilities are statistically meaningful
+
+### If the curve falls below the identity line
+
+Markets are overconfident.
+
+Example:
+
+* markets predict 80%
+* outcomes occur only 65% of the time
+
+### If the curve rises above the identity line
+
+Markets are underconfident.
+
+Example:
+
+* markets predict 40%
+* outcomes occur 55% of the time
+
+This transforms prediction market analysis from:
+
+> subjective opinions
+
+into:
+
+> measurable probabilistic forecasting evaluation
+
+---
+
+## Key Insight: What “accuracy” actually means here
+
+Prediction market accuracy does not mean:
+
+> “Did a single prediction come true?”
+
+Instead, accuracy means:
+
+> “Do probabilities match reality across large numbers of events?”
+
+This distinction is critical.
+
+Because probabilistic systems are evaluated through:
+
+* calibration
+* consistency
+* long-run statistical alignment
+
+Not individual guesses.
+
+A perfectly calibrated market can still be wrong frequently.
+
+What matters is:
+
+> whether its probabilities are honest representations of uncertainty
+
+---
+
+## What this enables next
+
+Once you can construct calibration curves, you can extend this analysis into:
+
+* Brier score analysis
+* calibration scoring systems
+* cross-category market comparison
+* liquidity vs calibration studies
+* volatility vs accuracy analysis
+* trader behavior analysis
+* market efficiency research
+* probabilistic forecasting systems
+* prediction market ranking systems
+
+You are no longer analyzing isolated markets.
+
+You are analyzing:
+
+> the statistical behavior of an entire forecasting ecosystem
+
+---
+
+## Related guides
+
+* [Kalshi Historical Data Guide](https://lycheedata.com/guides/kalshi-historical-data)
+* [Kalshi Weather Market Analysis](https://lycheedata.com/guides/kalshi-weather-prediction-markets-analysis)
+
+---
+
+## Final takeaway
+
+Prediction markets are not just betting platforms.
+
+At scale, they become:
+
+> large probabilistic forecasting systems powered by financial incentives
+
+Probability calibration is one of the clearest ways to measure whether those systems actually work.
+
+And Kalshi weather markets provide one of the cleanest real-world environments available to study that behavior empirically.
