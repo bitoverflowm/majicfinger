@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import type {
   HubCta,
@@ -13,6 +13,20 @@ import type {
   HubStatsSection,
   HubTextBlockSection,
 } from "@/types/hub";
+
+const HubKalshiQueryBuilder = dynamic(
+  () =>
+    import("@/components/hubs/kalshiQuery/HubKalshiQueryBuilder").then(
+      (m) => m.HubKalshiQueryBuilder,
+    ),
+  { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
+);
+
+const HubPublishedChartCard = dynamic(
+  () =>
+    import("@/components/hubs/HubPublishedChartCard").then((m) => m.HubPublishedChartCard),
+  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-xl bg-muted/40" /> },
+);
 
 function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "primary" | "secondary" }) {
   const className =
@@ -83,8 +97,7 @@ function HubQuery({ section }: { section: HubQuerySection }) {
       id={section.anchorId}
       className={cn("w-full px-6 py-20 md:py-28", section.anchorId && "scroll-mt-28")}
     >
-      <div className="mx-auto w-full max-w-3xl space-y-10">
-        <div className="space-y-4 text-center">
+      <div className="mx-auto w-full max-w-3xl space-y-4 text-center">
           <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             {section.title}
           </h2>
@@ -92,25 +105,26 @@ function HubQuery({ section }: { section: HubQuerySection }) {
             {section.description}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-muted/30 p-8 md:p-10">
-          <p className="mb-5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Example queries
+
+        <div className="relative z-20 -mx-6 mt-12 w-[calc(100%+3rem)]">
+          <HubKalshiQueryBuilder />
+        </div>
+
+        <div className="mx-auto w-full max-w-3xl space-y-4 pt-12">
+          <p className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {section.examplesTitle || "Example queries you can build"}
           </p>
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="mx-auto grid max-w-2xl gap-2 sm:grid-cols-2">
             {section.examples.map((example) => (
               <li
                 key={example}
-                className="rounded-lg border border-border/60 bg-background px-4 py-3 text-sm text-foreground/90"
+                className="rounded-lg border border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
               >
                 {example}
               </li>
             ))}
           </ul>
-          <div className="mt-10 flex justify-center">
-            <HubCtaButton cta={section.cta} variant="primary" />
-          </div>
         </div>
-      </div>
     </section>
   );
 }
@@ -134,33 +148,32 @@ function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
   return (
     <section
       id={section.anchorId}
-      className={cn("w-full px-6 py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+      className={cn("w-full px-6 py-20 md:py-28", section.anchorId && "scroll-mt-28")}
     >
       <div className="mx-auto w-full max-w-4xl space-y-12">
         <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
           {section.title}
         </h2>
-        <div className="space-y-14">
+        <div className="mx-auto w-full max-w-xl space-y-10">
           {section.groups.map((group) => (
-            <div key={group.label} className="space-y-6">
+            <div key={group.label} className="space-y-3">
               <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
                 {group.label}
               </h3>
-              <ul className="grid gap-4 sm:grid-cols-2">
+              <ul className="space-y-2">
                 {group.links.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="group block h-full rounded-xl border border-border bg-card/40 p-6 transition-all hover:border-primary/30 hover:bg-accent/30 hover:shadow-sm"
+                      className="group flex flex-wrap gap-x-2 text-base leading-relaxed hover:underline underline-offset-2"
                       prefetch={false}
                     >
-                      <span className="text-base font-medium text-foreground group-hover:text-primary">
+                      <span className="font-medium text-foreground group-hover:text-primary">
                         {link.title}
+                        {link.description ? ":" : ""}
                       </span>
                       {link.description ? (
-                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground line-clamp-3">
-                          {link.description}
-                        </p>
+                        <span className="text-muted-foreground">{link.description}</span>
                       ) : null}
                     </Link>
                   </li>
@@ -198,45 +211,16 @@ function HubPublishedCharts({
           ) : null}
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {charts.map((chart, idx) => {
-            const href = `/${encodeURIComponent(chart.username)}/charts/${encodeURIComponent(chart.slug)}`;
-            const ogImage = chart.hasOgImage
-              ? `/api/public/charts/${encodeURIComponent(chart.username)}/${encodeURIComponent(chart.slug)}/og-image`
-              : null;
-            return (
-              <Link
-                key={`${chart.username}-${chart.slug}`}
-                href={href}
-                className="group block min-w-0"
-                prefetch={false}
-              >
-                <div className="h-full overflow-hidden rounded-xl border border-border bg-card/40 transition-all hover:border-primary/30 hover:shadow-md">
-                  {ogImage ? (
-                    <div className="relative aspect-[40/21] w-full overflow-hidden border-b border-border/60">
-                      <Image
-                        className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                        src={ogImage}
-                        alt={chart.title}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        priority={idx <= 2}
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex aspect-[40/21] items-center justify-center border-b border-border/60 bg-muted text-sm text-muted-foreground">
-                      Chart
-                    </div>
-                  )}
-                  <div className="p-5">
-                    <h3 className="text-base font-medium text-foreground group-hover:text-primary line-clamp-2">
-                      {chart.title}
-                    </h3>
-                    <p className="mt-2 text-xs text-muted-foreground">@{chart.username}</p>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+          {charts.map((chart, idx) => (
+            <HubPublishedChartCard
+              key={`${chart.username}-${chart.slug}`}
+              username={chart.username}
+              slug={chart.slug}
+              title={chart.title}
+              hasOgImage={chart.hasOgImage}
+              priority={idx <= 2}
+            />
+          ))}
         </div>
       </div>
     </section>

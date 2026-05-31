@@ -1,13 +1,22 @@
-import dbConnect from "@/lib/dbConnect";
+import dbConnectPublicRead, { getPublicReadModel } from "@/lib/dbConnectPublicRead";
 import User from "@/models/Users";
 import Chart from "@/models/Charts";
 import ChartDashboard from "@/models/ChartDashboards";
+import DataSet from "@/models/DataSets";
+import { RUN_YOURSELF_ANALYSES } from "@/config/runYourselfAnalyses";
 import type {
   HubAssetFilter,
   HubPublishedAssets,
   HubPublishedChart,
   HubPublishedDashboard,
 } from "@/types/hub";
+
+type PublicModels = {
+  User: typeof User;
+  Chart: typeof Chart;
+  ChartDashboard: typeof ChartDashboard;
+  DataSet: typeof DataSet;
+};
 
 function normalize(s: string) {
   return String(s || "").trim().toLowerCase();
@@ -22,6 +31,123 @@ function assetKey(username: string, slug: string) {
   return `${normalize(username)}::${normalize(slug)}`;
 }
 
+function dataSheetsUseLake(dataSheets: unknown, lake: string): boolean {
+  if (!dataSheets || typeof dataSheets !== "object") return false;
+  const target = normalize(lake);
+  for (const sheet of Object.values(dataSheets as Record<string, unknown>)) {
+    if (!sheet || typeof sheet !== "object") continue;
+    const prov = (sheet as { provenance?: { lake?: string } }).provenance;
+    if (normalize(prov?.lake || "") === target) return true;
+  }
+  return false;
+}
+
+function slugToTitle(slug: string) {
+  return String(slug || "")
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function applyStaticChartFallback(
+  charts: HubPublishedChart[],
+  seenCharts: Set<string>,
+  filter: HubAssetFilter,
+) {
+  for (const ref of filter.chartSlugs || []) {
+    const username = ref.username.trim();
+    const slug = ref.slug.trim();
+    if (!username || !slug) continue;
+    const key = assetKey(username, slug);
+    if (seenCharts.has(key)) continue;
+    seenCharts.add(key);
+    charts.push({
+      username,
+      slug,
+      title: slugToTitle(slug),
+      hasOgImage: true,
+    });
+  }
+}
+
+function collectRunYourselfChartRefs(lake?: string): Array<{ username: string; slug: string }> {
+  const target = lake ? normalize(lake) : "";
+  const refs: Array<{ username: string; slug: string }> = [];
+  const seen = new Set<string>();
+
+  for (const analysis of RUN_YOURSELF_ANALYSES) {
+    if (target && normalize(analysis.lake || "") !== target) continue;
+    for (const chart of analysis.sourceCharts || []) {
+      const username = String(chart.ownerHandle || "").trim();
+      const slug = String(chart.slug || "").trim();
+      if (!username || !slug) continue;
+      const key = assetKey(username, slug);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      refs.push({ username, slug });
+    }
+  }
+
+  return refs;
+}
+
+async function fetchPublishedChart(
+  username: string,
+  slug: string,
+  models: Pick<PublicModels, "User" | "Chart">,
+): Promise<HubPublishedChart | null> {
+  const u = username.trim();
+  const s = slug.trim();
+  if (!u || !s) return null;
+
+  const owner = (await models.User.findOne({ user_name: u }).select("_id").lean()) as
+    | { _id?: unknown }
+    | null;
+  if (!owner?._id) return null;
+
+  const chart = (await models.Chart.findOne({
+    user_id: owner._id,
+    public_slug: s,
+    is_public: true,
+  })
+    .select("public_slug chart_name og_image_data")
+    .lean()) as { public_slug?: string; chart_name?: string; og_image_data?: string } | null;
+
+  if (!chart?.public_slug) return null;
+
+  return {
+    username: u,
+    slug: String(chart.public_slug),
+    title: String(chart.chart_name || chart.public_slug).trim(),
+    hasOgImage: !!chart.og_image_data,
+  };
+}
+
+async function addChartRef(
+  charts: HubPublishedChart[],
+  seenCharts: Set<string>,
+  username: string,
+  slug: string,
+  models: Pick<PublicModels, "User" | "Chart">,
+) {
+  const key = assetKey(username, slug);
+  if (seenCharts.has(key)) return;
+  const chart = await fetchPublishedChart(username, slug, models);
+  if (!chart) return;
+  seenCharts.add(key);
+  charts.push(chart);
+}
+
+async function getPublicModels(): Promise<PublicModels> {
+  const conn = await dbConnectPublicRead();
+  return {
+    User: getPublicReadModel(conn, "User", User) as typeof User,
+    Chart: getPublicReadModel(conn, "Chart", Chart) as typeof Chart,
+    ChartDashboard: getPublicReadModel(conn, "ChartDashboard", ChartDashboard) as typeof ChartDashboard,
+    DataSet: getPublicReadModel(conn, "DataSet", DataSet) as typeof DataSet,
+  };
+}
+
 export async function queryHubPublishedAssets(
   filter?: HubAssetFilter,
 ): Promise<HubPublishedAssets> {
@@ -33,60 +159,40 @@ export async function queryHubPublishedAssets(
   const seenDashboards = new Set<string>();
 
   try {
-    await dbConnect();
+    const { User: UserModel, Chart: ChartModel, ChartDashboard: DashboardModel, DataSet: DataSetModel } =
+      await getPublicModels();
 
     const username = filter.username?.trim() || "";
+    const chartOwnerScoped = username && !filter.chartSearchAllUsers;
     let userId: string | null = null;
 
     if (username) {
-      const user = (await User.findOne({ user_name: username }).select("_id user_name").lean()) as
+      const user = (await UserModel.findOne({ user_name: username }).select("_id user_name").lean()) as
         | { _id?: unknown; user_name?: string }
         | null;
       if (user?._id) userId = String(user._id);
     }
 
-    // Explicit chart slugs first
-    if (filter.chartSlugs?.length) {
-      for (const ref of filter.chartSlugs) {
-        const u = ref.username.trim();
-        const s = ref.slug.trim();
-        if (!u || !s) continue;
+    const explicitRefs = [
+      ...(filter.chartSlugs || []),
+      ...collectRunYourselfChartRefs(filter.chartLake),
+    ];
 
-        const owner = (await User.findOne({ user_name: u }).select("_id").lean()) as
-          | { _id?: unknown }
-          | null;
-        if (!owner?._id) continue;
-
-        const chart = (await Chart.findOne({
-          user_id: owner._id,
-          public_slug: s,
-          is_public: true,
-        })
-          .select("public_slug chart_name og_image_data")
-          .lean()) as { public_slug?: string; chart_name?: string; og_image_data?: string } | null;
-
-        if (!chart?.public_slug) continue;
-        const key = assetKey(u, chart.public_slug);
-        if (seenCharts.has(key)) continue;
-        seenCharts.add(key);
-        charts.push({
-          username: u,
-          slug: String(chart.public_slug),
-          title: String(chart.chart_name || chart.public_slug).trim(),
-          hasOgImage: !!chart.og_image_data,
-        });
-      }
+    for (const ref of explicitRefs) {
+      await addChartRef(charts, seenCharts, ref.username, ref.slug, {
+        User: UserModel,
+        Chart: ChartModel,
+      });
     }
 
-    // Keyword-matched charts
     if (filter.chartKeywords?.length) {
       const query: Record<string, unknown> = {
         is_public: true,
         public_slug: { $type: "string", $gt: "" },
       };
-      if (userId) query.user_id = userId;
+      if (chartOwnerScoped && userId) query.user_id = userId;
 
-      const allCharts = (await Chart.find(query)
+      const allCharts = (await ChartModel.find(query)
         .select("user_id public_slug chart_name og_image_data labels")
         .lean()) as Array<{
         user_id?: unknown;
@@ -98,7 +204,7 @@ export async function queryHubPublishedAssets(
 
       const ownerIds = [...new Set(allCharts.map((c) => String(c.user_id)).filter(Boolean))];
       const owners = ownerIds.length
-        ? ((await User.find({ _id: { $in: ownerIds } })
+        ? ((await UserModel.find({ _id: { $in: ownerIds } })
             .select("_id user_name")
             .lean()) as Array<{ _id?: unknown; user_name?: string }>)
         : [];
@@ -127,7 +233,66 @@ export async function queryHubPublishedAssets(
       }
     }
 
-    // Tag-matched dashboards
+    if (filter.chartLake) {
+      const query: Record<string, unknown> = {
+        is_public: true,
+        public_slug: { $type: "string", $gt: "" },
+        data_set_id: { $exists: true, $ne: null },
+      };
+      if (chartOwnerScoped && userId) query.user_id = userId;
+
+      const allCharts = (await ChartModel.find(query)
+        .select("user_id public_slug chart_name og_image_data data_set_id")
+        .lean()) as Array<{
+        user_id?: unknown;
+        public_slug?: string;
+        chart_name?: string;
+        og_image_data?: string;
+        data_set_id?: unknown;
+      }>;
+
+      const dataSetIds = [
+        ...new Set(allCharts.map((c) => String(c.data_set_id)).filter(Boolean)),
+      ];
+      const dataSets = dataSetIds.length
+        ? ((await DataSetModel.find({ _id: { $in: dataSetIds } })
+            .select("_id data_sheets")
+            .lean()) as Array<{ _id?: unknown; data_sheets?: unknown }>)
+        : [];
+      const lakeByDataSetId = new Map(
+        dataSets.map((ds) => [
+          String(ds._id),
+          dataSheetsUseLake(ds.data_sheets, filter.chartLake!),
+        ]),
+      );
+
+      const ownerIds = [...new Set(allCharts.map((c) => String(c.user_id)).filter(Boolean))];
+      const owners = ownerIds.length
+        ? ((await UserModel.find({ _id: { $in: ownerIds } })
+            .select("_id user_name")
+            .lean()) as Array<{ _id?: unknown; user_name?: string }>)
+        : [];
+      const usernameById = new Map(owners.map((o) => [String(o._id), String(o.user_name || "")]));
+
+      for (const chart of allCharts) {
+        const slug = String(chart.public_slug || "").trim();
+        const u = usernameById.get(String(chart.user_id)) || "";
+        const dsId = String(chart.data_set_id || "");
+        if (!slug || !u || !dsId) continue;
+        if (!lakeByDataSetId.get(dsId)) continue;
+
+        const key = assetKey(u, slug);
+        if (seenCharts.has(key)) continue;
+        seenCharts.add(key);
+        charts.push({
+          username: u,
+          slug,
+          title: String(chart.chart_name || slug).trim(),
+          hasOgImage: !!chart.og_image_data,
+        });
+      }
+    }
+
     if (filter.dashboardTags?.length) {
       const query: Record<string, unknown> = {
         is_public: true,
@@ -135,7 +300,7 @@ export async function queryHubPublishedAssets(
       };
       if (userId) query.user_id = userId;
 
-      const allDashboards = (await ChartDashboard.find(query)
+      const allDashboards = (await DashboardModel.find(query)
         .select("user_id public_slug page_heading page_subheading og_image_data tags")
         .sort({ published_at: -1, last_edited_date: -1 })
         .lean()) as Array<{
@@ -149,7 +314,7 @@ export async function queryHubPublishedAssets(
 
       const ownerIds = [...new Set(allDashboards.map((d) => String(d.user_id)).filter(Boolean))];
       const owners = ownerIds.length
-        ? ((await User.find({ _id: { $in: ownerIds } })
+        ? ((await UserModel.find({ _id: { $in: ownerIds } })
             .select("_id user_name")
             .lean()) as Array<{ _id?: unknown; user_name?: string }>)
         : [];
@@ -185,9 +350,15 @@ export async function queryHubPublishedAssets(
         });
       }
     }
-  } catch {
-    return { charts: [], dashboards: [] };
+  } catch (err) {
+    console.error("[queryHubPublishedAssets]", err);
   }
+
+  if (!charts.length) {
+    applyStaticChartFallback(charts, seenCharts, filter);
+  }
+
+  charts.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
 
   return { charts, dashboards };
 }

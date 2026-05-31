@@ -12,6 +12,7 @@ import { StateProviderV2 } from '@/context/stateContextV2';
 import DashBody from './dashBody';
 import LiveStreamManager from './components/liveStreamManager';
 import { RunYourselfLoaderGate } from './RunYourselfLoaderGate';
+import { HubQueryLoaderGate } from './HubQueryLoaderGate';
 
 import { Toaster } from "@/components/ui/sonner"
 import { Progress } from "@/components/ui/progress"
@@ -49,6 +50,7 @@ const Dashbaord = () => {
                     <Toaster />
                     <main className="flex min-h-svh flex-col">
                         <RunYourselfLoaderGate userId={user.userId} />
+                        <HubQueryLoaderGate />
                         <DashBody user={user}/>
                     </main>
                 </StateProviderV2>

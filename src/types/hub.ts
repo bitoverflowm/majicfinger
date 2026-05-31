@@ -40,8 +40,9 @@ export type HubQuerySection = {
   anchorId?: string;
   title: string;
   description: string;
+  examplesTitle?: string;
   examples: string[];
-  cta: HubCta;
+  cta?: HubCta;
 };
 
 export type HubTextBlockSection = {
@@ -88,6 +89,10 @@ export type HubAssetFilter = {
   chartSlugs?: Array<{ username: string; slug: string }>;
   /** Limit chart/dashboard queries to this owner when set. */
   username?: string;
+  /** When true, keyword and lake chart queries are not scoped to `username`. */
+  chartSearchAllUsers?: boolean;
+  /** Include public charts whose dataset sheets pull from this data lake (e.g. "kalshi"). */
+  chartLake?: string;
 };
 
 export type HubPageConfig = {

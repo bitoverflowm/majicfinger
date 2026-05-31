@@ -46,6 +46,8 @@ export const kalshiHistoricalHub: HubPageConfig = {
 
   assetFilter: {
     username: "misterrpink",
+    chartSearchAllUsers: true,
+    chartLake: "kalshi",
     dashboardTags: ["kalshi", "historical data", "volume"],
     chartKeywords: ["kalshi"],
     chartSlugs: [
@@ -97,6 +99,20 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
+      type: "text_block",
+      title: "What is Included in Kalshi Historical Data",
+      content:
+        "Kalshi historical data includes full market data, trade history, orderbook data, and historical price movements across all Kalshi prediction markets. This dataset supports Kalshi backtesting, trade analysis, and prediction market research. Users can access Kalshi historical market data via API or download formats for offline analysis.",
+    },
+
+    {
+      type: "text_block",
+      title: "Download & Export Formats",
+      content:
+        "Kalshi historical data can be exported for analysis and backtesting. Common formats include CSV, JSON, and structured dataset exports. Users often use this data for offline analysis, research, and machine learning workflows. GitHub-style dataset usage and reproducible research workflows are supported through structured exports.",
+    },
+
+    {
       type: "query",
       anchorId: "explore-data",
       title: "Kalshi Historical Data API & Search",
@@ -112,25 +128,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
         "Show Kalshi historical data by category",
         "Analyze Kalshi trading volume trends",
       ],
-      cta: {
-        label: "Run Query (Free)",
-        href: "/guides/kalshi-historical-data#download-kalshi-historical-data-csv-excel-json",
-        requiresAuth: false,
-      },
-    },
-
-    {
-      type: "text_block",
-      title: "What is Included in Kalshi Historical Data",
-      content:
-        "Kalshi historical data includes full market data, trade history, orderbook data, and historical price movements across all Kalshi prediction markets. This dataset supports Kalshi backtesting, trade analysis, and prediction market research. Users can access Kalshi historical market data via API or download formats for offline analysis.",
-    },
-
-    {
-      type: "text_block",
-      title: "Download & Export Formats",
-      content:
-        "Kalshi historical data can be exported for analysis and backtesting. Common formats include CSV, JSON, and structured dataset exports. Users often use this data for offline analysis, research, and machine learning workflows. GitHub-style dataset usage and reproducible research workflows are supported through structured exports.",
+      examplesTitle: "Example queries you can build",
     },
 
     {
@@ -187,6 +185,13 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
+      type: "published_charts",
+      title: "Kalshi Historical Data Charts",
+      description:
+        "Every published chart built on Kalshi historical data — volume trends, probability convergence, calibration curves, and more. Run any chart for yourself with your own parameters.",
+    },
+
+    {
       type: "text_block",
       title: "Kalshi Backtesting with Historical Data",
       content:
@@ -222,13 +227,6 @@ export const kalshiHistoricalHub: HubPageConfig = {
           ],
         },
       ],
-    },
-
-    {
-      type: "published_charts",
-      title: "Kalshi Historical Data Charts",
-      description:
-        "Interactive charts built on Kalshi historical data — volume trends, probability convergence, calibration curves, and more.",
     },
 
     {
