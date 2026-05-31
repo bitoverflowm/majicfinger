@@ -16,7 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { KALSHI_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
-import { useUser } from "@/lib/hooks";
+import useSWR from "swr";
+import { userSwrFetcher } from "@/lib/hooks";
 import { getConnectDataLakeConfig } from "@/lib/connectQueryComposeConfig";
 import { getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
 import {
@@ -25,7 +26,6 @@ import {
   normalizeHubQueryDraft,
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
-import { userHasPaidAccess, userRunYourselfQuotaExceeded } from "@/lib/runYourself/hasPaidAccess";
 import { cn } from "@/lib/utils";
 
 const LAKE_CONFIG = getConnectDataLakeConfig("kalshiHistorical");
@@ -65,7 +65,8 @@ function ColumnDefinitionsPanel({ columns, getDisplayLabel, showAll = false }) {
 }
 
 export function HubKalshiQueryBuilder() {
-  const user = useUser();
+  const { data: user, isLoading: userLoading } = useSWR("/api/user", userSwrFetcher);
+  const isLoggedIn = !!user;
   const [authOpen, setAuthOpen] = useState(false);
   const [submitBusy, setSubmitBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -179,35 +180,17 @@ export function HubKalshiQueryBuilder() {
     setError(null);
 
     try {
-      if (user && userRunYourselfQuotaExceeded(user) && !userHasPaidAccess(user)) {
-        navigateToHubQueryDashboard("/#pricing");
-        return;
-      }
-
-      if (user && !userHasPaidAccess(user)) {
-        const res = await fetch("/api/hub-query/reserve-free-query", {
-          method: "POST",
-          credentials: "same-origin",
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          if (data?.quotaExceeded) {
-            navigateToHubQueryDashboard("/#pricing");
-            return;
-          }
-          throw new Error(data?.error || "Could not reserve free query");
-        }
-      }
-
       navigateToHubQueryDashboard(buildHubQueryDashboardUrl());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
       setSubmitBusy(false);
     }
-  }, [buildDraft, user]);
+  }, [buildDraft]);
 
   const handleSubmit = useCallback(() => {
+    if (userLoading) return;
+
     const draft = buildDraft();
     if (!draft) {
       setError("Select Markets or Trades and at least one column.");
@@ -215,13 +198,13 @@ export function HubKalshiQueryBuilder() {
     }
     saveHubQueryDraft(draft);
 
-    if (user) {
+    if (isLoggedIn) {
       void continueToDashboard();
       return;
     }
 
     setAuthOpen(true);
-  }, [buildDraft, user, continueToDashboard]);
+  }, [buildDraft, userLoading, isLoggedIn, continueToDashboard]);
 
   return (
     <>
@@ -455,12 +438,14 @@ export function HubKalshiQueryBuilder() {
             type="button"
             size="lg"
             className="rounded-full px-8"
-            disabled={submitBusy || !sampleId || selectedColumns.length === 0}
+            disabled={submitBusy || userLoading || !sampleId || selectedColumns.length === 0}
             onClick={handleSubmit}
           >
-            {submitBusy ? "Starting…" : "Run for Free"}
+            {submitBusy ? "Starting…" : userLoading ? "Loading…" : isLoggedIn ? "Run query" : "Run for Free"}
           </Button>
-          <p className="text-xs text-muted-foreground">No credit card required</p>
+          {!isLoggedIn ? (
+            <p className="text-xs text-muted-foreground">No credit card required</p>
+          ) : null}
         </div>
       </div>
 
