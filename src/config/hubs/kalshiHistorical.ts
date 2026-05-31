@@ -70,18 +70,14 @@ export const kalshiHistoricalHub: HubPageConfig = {
         "Search Kalshi historical data, analyze market behavior, and download historical trade and orderbook data for backtesting strategies.",
       primaryCTAs: [
         {
-          label: "Search Kalshi Historical Data",
-          href: "/guides/kalshi-historical-data#download-kalshi-historical-data-csv-excel-json",
-        },
-        {
-          label: "Browse Markets",
-          href: "/try",
+          label: "Take me to the data",
+          href: "#explore-data",
         },
       ],
       secondaryCTAs: [
         {
-          label: "Browse Trade History",
-          href: "/guides/kalshi-historical-data",
+          label: "Get Inspired",
+          href: "#get-inspired",
         },
       ],
     },
@@ -93,14 +89,16 @@ export const kalshiHistoricalHub: HubPageConfig = {
         { label: "Dataset Size", value: "36GB+" },
         { label: "Kalshi Historical Markets", value: "All markets" },
         { label: "Historical Trade Data", value: "Full trade history" },
-        { label: "Orderbook Data", value: "Full depth snapshots" },
         { label: "API Access", value: "Kalshi historical data API supported" },
+        { label: "Download Formats", value: "JSON, CSV, XLSX" },
+        { label: "In-Browser Access", value: "Query, explore, and export without code" },
         { label: "Backtesting Support", value: "Yes" },
       ],
     },
 
     {
       type: "query",
+      anchorId: "explore-data",
       title: "Kalshi Historical Data API & Search",
       description:
         "Run queries on Kalshi historical data, including trade history, orderbook data, and market-level datasets. Supports backtesting and analysis workflows.",
@@ -137,6 +135,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
 
     {
       type: "link_group",
+      anchorId: "get-inspired",
       title: "Kalshi Historical Data Guides",
       groups: [
         {

@@ -64,18 +64,11 @@ function HubStats({ section }: { section: HubStatsSection }) {
         <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
           {section.title}
         </h2>
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <dl className="mx-auto w-full max-w-xl space-y-2 text-left">
           {section.stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-xl border border-border bg-card/50 px-6 py-8 text-center transition-colors hover:bg-accent/30"
-            >
-              <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {stat.label}
-              </dt>
-              <dd className="mt-3 text-lg font-semibold tracking-tight text-foreground md:text-xl">
-                {stat.value}
-              </dd>
+            <div key={stat.label} className="flex flex-wrap gap-x-2 text-base leading-relaxed">
+              <dt className="font-medium text-foreground">{stat.label}:</dt>
+              <dd className="text-muted-foreground">{stat.value}</dd>
             </div>
           ))}
         </dl>
@@ -86,7 +79,10 @@ function HubStats({ section }: { section: HubStatsSection }) {
 
 function HubQuery({ section }: { section: HubQuerySection }) {
   return (
-    <section className="w-full px-6 py-20 md:py-28">
+    <section
+      id={section.anchorId}
+      className={cn("w-full px-6 py-20 md:py-28", section.anchorId && "scroll-mt-28")}
+    >
       <div className="mx-auto w-full max-w-3xl space-y-10">
         <div className="space-y-4 text-center">
           <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
@@ -136,7 +132,10 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
 
 function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
   return (
-    <section className="w-full px-6 py-16 md:py-24">
+    <section
+      id={section.anchorId}
+      className={cn("w-full px-6 py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+    >
       <div className="mx-auto w-full max-w-4xl space-y-12">
         <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
           {section.title}

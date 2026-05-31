@@ -37,6 +37,7 @@ export type HubStatsSection = {
 
 export type HubQuerySection = {
   type: "query";
+  anchorId?: string;
   title: string;
   description: string;
   examples: string[];
@@ -51,6 +52,7 @@ export type HubTextBlockSection = {
 
 export type HubLinkGroupSection = {
   type: "link_group";
+  anchorId?: string;
   title: string;
   groups: HubLinkGroup[];
 };
