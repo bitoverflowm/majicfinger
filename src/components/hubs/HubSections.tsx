@@ -25,7 +25,7 @@ const HubKalshiQueryBuilder = dynamic(
 const HubPublishedChartEmbed = dynamic(
   () =>
     import("@/components/hubs/HubPublishedChartEmbed").then((m) => m.HubPublishedChartEmbed),
-  { ssr: false, loading: () => <div className="h-[380px] animate-pulse rounded-xl bg-muted/40 md:h-[420px]" /> },
+  { ssr: false, loading: () => <div className="h-[570px] animate-pulse rounded-xl bg-muted/40 md:h-[630px]" /> },
 );
 
 function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "primary" | "secondary" }) {

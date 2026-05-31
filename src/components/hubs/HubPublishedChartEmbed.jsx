@@ -7,6 +7,9 @@ import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfBut
 import { Skeleton } from "@/components/ui/skeleton";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
+import { cn } from "@/lib/utils";
+
+const HUB_CHART_EMBED_HEIGHT = "h-[570px] md:h-[630px]";
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
@@ -26,7 +29,7 @@ function DataSheetsLoader({ rows, dataSheets }) {
 
 function HubChartEmbedSkeleton() {
   return (
-    <div className="flex h-[380px] flex-col gap-4 p-4 md:h-[420px]">
+    <div className={cn("flex flex-col gap-4 p-4", HUB_CHART_EMBED_HEIGHT)}>
       <Skeleton className="h-3 w-24" />
       <Skeleton className="min-h-0 flex-1 w-full rounded-lg" />
     </div>
@@ -53,7 +56,7 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
 
   if (!rows.length && !hasRowsInAnySheet) {
     return (
-      <div className="flex h-[380px] items-center justify-center text-sm text-muted-foreground md:h-[420px]">
+      <div className={cn("flex items-center justify-center text-sm text-muted-foreground", HUB_CHART_EMBED_HEIGHT)}>
         Chart unavailable
       </div>
     );
@@ -69,7 +72,7 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
-        className="relative h-[380px] md:h-[420px]"
+        className={cn("relative", HUB_CHART_EMBED_HEIGHT)}
         style={{
           backgroundColor: cp0.bgColor || undefined,
           color: cp0.textColor || undefined,
@@ -135,7 +138,7 @@ export function HubPublishedChartEmbed({ username, slug }) {
     <article className="overflow-hidden rounded-xl border border-border bg-card/40">
       {loading ? <HubChartEmbedSkeleton /> : null}
       {!loading && err ? (
-        <div className="flex h-[380px] items-center justify-center px-6 text-center text-sm text-muted-foreground md:h-[420px]">
+        <div className={cn("flex items-center justify-center px-6 text-center text-sm text-muted-foreground", HUB_CHART_EMBED_HEIGHT)}>
           {err}
         </div>
       ) : null}
