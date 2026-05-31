@@ -16,6 +16,9 @@ function isAuthSession(sessionKind) {
   return sessionKind === "auth";
 }
 
+/** Auth sessions with no real activity for this long are treated as abandoned. */
+const AUTH_SESSION_STALE_MS = 30 * 60 * 1000;
+
 async function recordSessionStart(sessionId, meta = {}, sessionKind = "visitor") {
   await dbConnect();
   const now = new Date();
@@ -203,12 +206,22 @@ async function recordSessionChain(sessionId, meta = {}) {
     return { ok: true, skipped: true };
   }
 
+  if (meta.tabVisible === false) {
+    return { ok: true, skipped: true };
+  }
+
+  const lastActivityAt = existing.last_seen_at || existing.started_at;
+  const idleMs = now.getTime() - new Date(lastActivityAt).getTime();
+  if (idleMs > AUTH_SESSION_STALE_MS) {
+    return recordSessionEnd(sessionId, meta, "auth");
+  }
+
   const since = existing.last_chain_at || existing.started_at;
 
   const session = await VisitorSession.findOneAndUpdate(
     { session_id: sessionId },
     {
-      $set: { last_seen_at: now, last_chain_at: now },
+      $set: { last_chain_at: now },
       $inc: { chain_count: 1 },
     },
     { new: true },

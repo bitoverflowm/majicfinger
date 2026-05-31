@@ -155,6 +155,7 @@ export function flushAuthJourneyQueue(endSession = false) {
 export function sendAuthSessionChainUpdate() {
   if (typeof window === "undefined") return;
   if (!hasAuthSessionStarted() || hasAuthSessionEnded()) return;
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
 
   const sessionId = getAuthSessionId();
   if (!sessionId) return;
@@ -167,6 +168,7 @@ export function sendAuthSessionChainUpdate() {
       path: window.location.pathname,
       email: identityRef.email,
       userId: identityRef.userId,
+      tabVisible: document.visibilityState === "visible",
     },
   });
 }
@@ -185,6 +187,21 @@ export function stopAuthSessionChainTimer() {
   if (chainTimer) {
     clearInterval(chainTimer);
     chainTimer = null;
+  }
+}
+
+/** Pause chain updates when tab is hidden or dashboard unmounts. */
+export function pauseAuthSessionTracking() {
+  stopAuthSessionChainTimer();
+}
+
+/** Resume chain updates when tab is visible again. */
+export function resumeAuthSessionTracking() {
+  if (typeof window === "undefined") return;
+  if (!hasAuthSessionStarted() || hasAuthSessionEnded()) return;
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+  if (!chainTimer) {
+    startAuthSessionChainTimer();
   }
 }
 

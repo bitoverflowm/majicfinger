@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import {
   endAuthenticatedSession,
   ensureAuthenticatedSession,
-  flushAuthJourneyQueue,
+  pauseAuthSessionTracking,
+  resumeAuthSessionTracking,
   trackAuthError,
   updateAuthSessionIdentity,
 } from "@/lib/analytics/authJourneyClient";
@@ -37,6 +38,7 @@ export function AuthenticatedJourneyInit({ user }) {
 
   useEffect(() => {
     let lastErrorAt = 0;
+    let hiddenEndTimer = null;
 
     const shouldReportError = (message) => {
       if (!message || message === "Script error.") return false;
@@ -67,19 +69,44 @@ export function AuthenticatedJourneyInit({ user }) {
       });
     };
 
-    const onPageHide = () => {
+    const endSession = () => {
       endAuthenticatedSession(identityRef.current);
+    };
+
+    const onPageHide = () => {
+      endSession();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        pauseAuthSessionTracking();
+        hiddenEndTimer = window.setTimeout(() => {
+          endSession();
+        }, 3 * 60 * 1000);
+        return;
+      }
+
+      if (hiddenEndTimer) {
+        clearTimeout(hiddenEndTimer);
+        hiddenEndTimer = null;
+      }
+      resumeAuthSessionTracking();
     };
 
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
     window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
       window.removeEventListener("pagehide", onPageHide);
-      flushAuthJourneyQueue(false);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (hiddenEndTimer) {
+        clearTimeout(hiddenEndTimer);
+      }
+      endSession();
     };
   }, []);
 
