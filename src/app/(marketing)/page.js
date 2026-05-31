@@ -12,7 +12,7 @@ import { GrowthSection } from "@/components/sections/growth-section";
 import { PricingSection } from "@/components/sections/pricing-section";
 import { FAQSection } from "@/components/sections/faq-section";
 import { TestimonialSection } from "@/components/sections/testimonial-section";
-import { DashboardsSection } from "@/components/sections/dashboards-section";
+import { getPublishedDashboardsForLanding } from "@/lib/landing/publishedDashboards";
 import { LandingJsonLd } from "@/components/seo/landing-json-ld";
 import { getAllContent } from "@/lib/content";
 
@@ -67,7 +67,7 @@ const stripeReferralSnippet = `(function(){
   }
 })();`;
 
-export default function Home() {
+export default async function Home() {
   let articles = [];
   try {
     const guides = getAllContent("guides") || [];
@@ -79,6 +79,8 @@ export default function Home() {
   } catch (e) {
     console.warn("Content could not be loaded:", e);
   }
+
+  const { dashboards, profilePic } = await getPublishedDashboardsForLanding("misterrpink", 12);
 
   return (
     <>
@@ -98,8 +100,12 @@ export default function Home() {
           <TestimonialSection />
           <PricingSection />
           <FAQSection />
-          <DashboardsSection username="misterrpink" />
-          <GuidesSection articles={articles} />
+          <GuidesSection
+            articles={articles}
+            dashboards={dashboards}
+            profilePic={profilePic}
+            combinedWithDashboards
+          />
           <CTASection />
           <FooterSection />
         </main>

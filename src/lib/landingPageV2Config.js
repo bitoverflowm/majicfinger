@@ -109,8 +109,6 @@ export const landingPageV2Config = {
       isPopular: false,
     },
   ],
-  pricingFinePrint:
-    "Historical pulls on Pro and Elite are capped at 500,000 rows per request for platform stability. Basic is capped at 12,500 rows per pull. Demo and unsigned users see smaller samples.",
   /** One-time Stripe Payment Link; amount must match webhook PLAN_MAP (19999 cents = $199.99). */
   lifetimeAccess: {
     href: "https://buy.stripe.com/cNieVe3fX1PgcVSdvq2ZO0B",

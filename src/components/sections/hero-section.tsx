@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
-import { FeaturedResourcesSection } from "./featured-resources-section";
+import { HomepageFeatureCallout } from "./homepage-feature-callout";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
 
 export function HeroSection() {
@@ -32,7 +32,7 @@ export function HeroSection() {
         className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-[38rem] w-full max-w-[min(100%,84rem)] rounded-b-2xl md:h-[42rem] lg:h-[44rem]"
       />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[65rem] flex-col items-center gap-10 px-6 pb-32 pt-32 md:pb-40 lg:pb-48">
+      <div className="relative z-10 mx-auto flex w-full max-w-[65rem] flex-col items-center gap-10 px-6 pb-12 pt-32 md:pb-16 md:pt-32 lg:pb-20">
         {hero.badgeHref ? (
           <Link
             href={hero.badgeHref}
@@ -78,8 +78,8 @@ export function HeroSection() {
         </div>
       </div>
 
-      <FeaturedResourcesSection />
       <DashboardDemoSectionLazy />
+      <HomepageFeatureCallout />
       <CompanyShowcase />
     </section>
   );

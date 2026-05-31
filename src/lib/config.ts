@@ -11,7 +11,7 @@ export const siteConfig = {
       { id: "hero", name: "Home", href: "/#hero" },
       { id: "pricing", name: "Pricing", href: "/#pricing" },
       { id: "guides", name: "Guides", href: "/#guides" },
-      { id: "dashboards", name: "Dashboards", href: "/#dashboards" },
+      { id: "dashboards", name: "Dashboards", href: "/#guides" },
     ],
   },
   companyShowcase: {
@@ -53,7 +53,6 @@ export const siteConfig = {
     })),
     lifetimeAccess: landingPageV2Config.lifetimeAccess,
     demoTier: landingPageV2Config.demoTier,
-    pricingFinePrint: landingPageV2Config.pricingFinePrint,
   },
   featureSection: {
     title: "Everything You Need to Move Fast",

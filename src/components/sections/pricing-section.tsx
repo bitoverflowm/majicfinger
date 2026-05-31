@@ -111,7 +111,6 @@ export function PricingSection() {
   const { title, description, pricingItems } = siteConfig.pricingSection;
   const lifetimeAccess = (siteConfig.pricingSection as { lifetimeAccess?: LifetimeAccess }).lifetimeAccess;
   const demoTier = (siteConfig.pricingSection as { demoTier?: DemoTier }).demoTier;
-  const pricingFinePrint = (siteConfig.pricingSection as { pricingFinePrint?: string }).pricingFinePrint;
 
   const computedTiers = useMemo(() => {
     return pricingItems.map((tier) => {
@@ -339,12 +338,6 @@ export function PricingSection() {
             </div>
           ))}
         </div>
-
-        {pricingFinePrint ? (
-          <p className="mt-6 max-w-3xl mx-auto px-6 text-center text-xs text-muted-foreground leading-relaxed">
-            {pricingFinePrint}
-          </p>
-        ) : null}
 
         {SHOW_LIFETIME_ACCESS && lifetimeAccess && (
           <div className="mt-14 w-full border-y border-border bg-gradient-to-br from-accent via-accent/80 to-muted/30 dark:from-accent/30 dark:via-background dark:to-muted/20 py-10 md:py-12 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
