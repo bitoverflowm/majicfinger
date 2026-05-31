@@ -1,0 +1,122 @@
+export type HubLink = {
+  title: string;
+  href: string;
+  description?: string;
+};
+
+export type HubCta = {
+  label: string;
+  href: string;
+  requiresAuth?: boolean;
+};
+
+export type HubLinkGroup = {
+  label: string;
+  links: HubLink[];
+};
+
+export type HubStat = {
+  label: string;
+  value: string;
+};
+
+export type HubHeroSection = {
+  type: "hero";
+  title: string;
+  subtitle: string;
+  microtext?: string;
+  primaryCTAs: HubCta[];
+  secondaryCTAs?: HubCta[];
+};
+
+export type HubStatsSection = {
+  type: "stats";
+  title: string;
+  stats: HubStat[];
+};
+
+export type HubQuerySection = {
+  type: "query";
+  title: string;
+  description: string;
+  examples: string[];
+  cta: HubCta;
+};
+
+export type HubTextBlockSection = {
+  type: "text_block";
+  title: string;
+  content: string;
+};
+
+export type HubLinkGroupSection = {
+  type: "link_group";
+  title: string;
+  groups: HubLinkGroup[];
+};
+
+export type HubCtaSection = {
+  type: "cta";
+  title: string;
+  description: string;
+  cta: HubCta;
+};
+
+export type HubPublishedChartsSection = {
+  type: "published_charts";
+  title: string;
+  description?: string;
+};
+
+export type HubSection =
+  | HubHeroSection
+  | HubStatsSection
+  | HubQuerySection
+  | HubTextBlockSection
+  | HubLinkGroupSection
+  | HubCtaSection
+  | HubPublishedChartsSection;
+
+export type HubAssetFilter = {
+  /** Match dashboards whose tags include any of these (case-insensitive). */
+  dashboardTags?: string[];
+  /** Match charts whose name or slug contains any keyword (case-insensitive). */
+  chartKeywords?: string[];
+  /** Always include these published charts. */
+  chartSlugs?: Array<{ username: string; slug: string }>;
+  /** Limit chart/dashboard queries to this owner when set. */
+  username?: string;
+};
+
+export type HubPageConfig = {
+  id: string;
+  /** URL segment, e.g. "kalshi-historical-data" → /kalshi-historical-data */
+  slug: string;
+  title: string;
+  description: string;
+  keywords?: string[];
+  ogImage?: string;
+  sections: HubSection[];
+  assetFilter?: HubAssetFilter;
+};
+
+export type HubPublishedChart = {
+  username: string;
+  slug: string;
+  title: string;
+  hasOgImage: boolean;
+};
+
+export type HubPublishedDashboard = {
+  username: string;
+  slug: string;
+  title: string;
+  description: string;
+  hasOgImage: boolean;
+  tags: string[];
+};
+
+export type HubPublishedAssets = {
+  charts: HubPublishedChart[];
+  dashboards: HubPublishedDashboard[];
+};

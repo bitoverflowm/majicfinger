@@ -4,6 +4,7 @@ import ChartDashboard from "@/models/ChartDashboards";
 import Chart from "@/models/Charts";
 import User from "@/models/Users";
 import { getAllSlugs } from "@/lib/content";
+import { getAllHubSlugs } from "@/config/hubs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,11 @@ export async function GET() {
     { path: "/charts", priority: "0.7", changefreq: "weekly" },
     { path: "/search", priority: "0.6", changefreq: "weekly" },
     { path: "/polymarket-metadata", priority: "0.7", changefreq: "monthly" },
+    ...getAllHubSlugs().map((slug) => ({
+      path: `/${slug}`,
+      priority: "0.85",
+      changefreq: "weekly" as const,
+    })),
     { path: "/terms", priority: "0.2", changefreq: "yearly" },
     { path: "/privacy", priority: "0.2", changefreq: "yearly" },
   ];

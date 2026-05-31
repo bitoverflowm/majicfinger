@@ -120,7 +120,7 @@ export const siteConfig = {
     badgeIcon: "dot",
     badge: "36GB of every Kalshi & Polymarket trade ever",
     /** Guides / blog post (MDX slug) */
-    badgeHref: "/guides/kalshi-historical-data",
+    badgeHref: "/kalshi-historical-data",
     title: `Analyze real-time prediction market data.
 In <0.69 seconds. No coding. No setup.`,
     description:
