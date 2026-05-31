@@ -40,13 +40,15 @@ function entityTagClass(entity: MetadataSuggestion["entity"]) {
 const LYCHEE_PRICING_HREF = "/#pricing";
 
 function ExploreEntityButton({ entity }: { entity: "event" | "market" }) {
+  const label = entity === "event" ? "Explore this Event" : "Explore this Market";
+
   return (
     <Link
       href={LYCHEE_PRICING_HREF}
-      className="inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+      className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-md transition-opacity hover:opacity-95"
       prefetch={false}
     >
-      Explore this {entity}
+      {label}
     </Link>
   );
 }
