@@ -175,7 +175,10 @@ In <0.69 seconds. No coding. No setup.`,
     },
     {
       title: "Our tools",
-      links: [{ id: 14, title: "Polymarket metadata", url: "/polymarket-metadata" }],
+      links: [
+        { id: 14, title: "Polymarket metadata", url: "/polymarket-metadata" },
+        { id: 15, title: "Kalshi Historical Data", url: "/kalshi-historical-data" },
+      ],
     },
   ],
 } as const;
