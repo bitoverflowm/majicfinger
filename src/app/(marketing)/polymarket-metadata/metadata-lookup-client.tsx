@@ -37,7 +37,19 @@ function entityTagClass(entity: MetadataSuggestion["entity"]) {
   return "bg-violet-500/15 text-violet-900 ring-1 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35";
 }
 
-const LYCHEE_HOME_HREF = "/";
+const LYCHEE_PRICING_HREF = "/#pricing";
+
+function ExploreEntityButton({ entity }: { entity: "event" | "market" }) {
+  return (
+    <Link
+      href={LYCHEE_PRICING_HREF}
+      className="inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+      prefetch={false}
+    >
+      Explore this {entity}
+    </Link>
+  );
+}
 
 type ResultEntityKind = "event" | "market";
 
@@ -142,6 +154,7 @@ function MarketSummaryCard({
             {model.title}
           </h4>
         </div>
+        <ExploreEntityButton entity="market" />
       </div>
       <dl className="space-y-2.5">
         {model.entityId ? (
@@ -226,6 +239,7 @@ function MostNeededMetadataSection({ view }: { view: MostNeededView }) {
             </span>
             <h4 className="text-base font-semibold leading-snug text-foreground">{view.primary.title}</h4>
           </div>
+          <ExploreEntityButton entity="event" />
         </div>
         <dl className="space-y-2.5">
           {view.primary.entityId ? (
@@ -733,7 +747,7 @@ export function MetadataLookupClient() {
               {lycheeAnalyzeLabel}
             </p>
             <Link
-              href={LYCHEE_HOME_HREF}
+              href={LYCHEE_PRICING_HREF}
               className="inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
             >
               Open Lychee
