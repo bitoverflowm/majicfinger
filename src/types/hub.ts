@@ -92,10 +92,23 @@ export type HubPageConfig = {
   id: string;
   /** URL segment, e.g. "kalshi-historical-data" → /kalshi-historical-data */
   slug: string;
+  /** Display / schema name */
   title: string;
+  /** Overrides `<title>` and OG/Twitter titles when set */
+  seoTitle?: string;
   description: string;
   keywords?: string[];
+  canonical?: string;
+  publishedAt?: string;
+  updatedAt?: string;
+  author?: string;
+  topics?: string[];
+  integration?: string[];
+  coverImage?: string;
   ogImage?: string;
+  featured?: boolean;
+  readingTime?: string;
+  twitterCard?: "summary" | "summary_large_image" | "app" | "player";
   sections: HubSection[];
   assetFilter?: HubAssetFilter;
 };
