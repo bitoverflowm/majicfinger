@@ -64,7 +64,7 @@ function ColumnDefinitionsPanel({ columns, getDisplayLabel, showAll = false }) {
   );
 }
 
-export function HubKalshiQueryBuilder() {
+export function HubKalshiQueryBuilder({ embedded = false }) {
   const { data: user, isLoading: userLoading } = useSWR("/api/user", userSwrFetcher);
   const isLoggedIn = !!user;
   const [authOpen, setAuthOpen] = useState(false);
@@ -208,7 +208,14 @@ export function HubKalshiQueryBuilder() {
 
   return (
     <>
-      <div className="relative z-20 w-full space-y-8 border-y border-border bg-background px-6 py-8 md:px-8 md:py-10">
+      <div
+        className={cn(
+          "relative z-20 w-full space-y-8 bg-background",
+          embedded
+            ? "px-4 py-6 md:px-6 md:py-8"
+            : "border-y border-border px-6 py-8 md:px-8 md:py-10",
+        )}
+      >
         <div className="space-y-3">
           <h3 className="text-base font-semibold text-foreground">Build your query</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">

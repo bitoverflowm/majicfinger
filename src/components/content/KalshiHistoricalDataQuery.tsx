@@ -39,9 +39,9 @@ export function KalshiHistoricalDataQuery({
   id = "kalshi-historical-data-query",
 }: KalshiHistoricalDataQueryProps) {
   return (
-    <section id={id} className="not-prose my-12 scroll-mt-28">
-      <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 bg-background">
-        <div className="mx-auto max-w-3xl space-y-3 px-6 pb-2 pt-8 text-center md:pt-10">
+    <section id={id} className="not-prose my-10 w-full scroll-mt-28">
+      <div className="w-full overflow-hidden rounded-xl border border-border bg-background">
+        <div className="space-y-2 border-b border-border/60 px-4 py-5 text-center sm:px-6">
           <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
             {title}
           </h2>
@@ -49,9 +49,7 @@ export function KalshiHistoricalDataQuery({
             {description}
           </p>
         </div>
-        <div className="relative z-20 w-full">
-          <HubKalshiQueryBuilder />
-        </div>
+        <HubKalshiQueryBuilder embedded />
       </div>
     </section>
   );
