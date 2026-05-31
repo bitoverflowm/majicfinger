@@ -30,11 +30,8 @@ function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "pr
 function HubHero({ section }: { section: HubHeroSection }) {
   return (
     <section className="relative w-full">
-      <div className="relative isolate flex w-full flex-col items-center px-6 pb-20 pt-28 md:pb-28 md:pt-32">
-        <div className="absolute inset-0">
-          <div className="hero-aura-gradient absolute inset-0 z-0 h-[520px] w-full rounded-b-xl md:h-[600px]" />
-        </div>
-        <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
+      <div className="flex w-full flex-col items-center px-6 pb-20 pt-36 md:pb-28 md:pt-44">
+        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
           <h1 className="text-3xl font-medium tracking-tighter text-primary md:text-4xl lg:text-5xl text-balance">
             {section.title}
           </h1>
