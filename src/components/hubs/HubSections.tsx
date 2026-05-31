@@ -209,7 +209,7 @@ function HubPublishedCharts({
           </p>
         ) : null}
       </div>
-      <div className="relative z-20 -mx-6 mt-12 w-[calc(100%+3rem)] px-6">
+      <div className="relative left-1/2 z-20 mt-12 w-screen max-w-[100vw] -translate-x-1/2 px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {charts.map((chart) => (
             <HubPublishedChartEmbed
@@ -259,7 +259,7 @@ export function HubSectionRenderer({
   const isAlternate = index % 2 === 1;
 
   const wrapper = (children: React.ReactNode) => (
-    <div className={cn(isAlternate && "bg-muted/20")}>{children}</div>
+    <div className={cn("w-full", isAlternate && "bg-muted/20")}>{children}</div>
   );
 
   switch (section.type) {

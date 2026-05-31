@@ -22,7 +22,7 @@ export function HubPage({ config, assets }: HubPageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
       />
 
-      <main className="flex min-h-screen w-full flex-col items-center bg-background font-sans antialiased theme-landing scroll-smooth">
+      <main className="flex min-h-screen w-full flex-col items-stretch bg-background font-sans antialiased theme-landing scroll-smooth">
         {config.sections.map((section, index) => (
           <HubSectionRenderer
             key={`${section.type}-${index}`}
