@@ -103,6 +103,13 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
+      type: "text_block",
+      title: "Download & Export Formats",
+      content:
+        "Kalshi historical data can be exported for analysis and backtesting. Common formats include CSV, JSON, and structured dataset exports. Users often use this data for offline analysis, research, and machine learning workflows. GitHub-style dataset usage and reproducible research workflows are supported through structured exports.",
+    },
+
+    {
       type: "link_group",
       title: "Kalshi Historical Data Guides",
       groups: [
