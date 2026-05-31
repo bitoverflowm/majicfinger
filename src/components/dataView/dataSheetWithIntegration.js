@@ -8,6 +8,7 @@ import ChartControls from "@/components/chartView/ChartControls";
 import Polymarket from "@/components/integrationsView/integrationPlayground/integrations/polymarket";
 import PolymarketHistorical from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical";
 import KalshiHistorical from "@/components/integrationsView/integrationPlayground/integrations/kalshiHistorical";
+import KalshiLive from "@/components/integrationsView/integrationPlayground/integrations/kalshiLive";
 import CoinGecko from "@/components/integrationsView/integrationPlayground/integrations/coinGecko";
 import Twitter from "@/components/integrationsView/integrationPlayground/integrations/twitter";
 import WallStreetBets from "@/components/integrationsView/integrationPlayground/integrations/wallStreetBets";
@@ -130,6 +131,13 @@ const INTEGRATION_OPTIONS = [
     avatarBgClass: "bg-black",
     avatarImageClass: "object-contain p-0.5",
   },
+  {
+    value: "kalshiLive",
+    label: "Kalshi Live",
+    logo: "/kalshi.png",
+    avatarBgClass: "bg-black",
+    avatarImageClass: "object-contain p-0.5",
+  },
   { value: "twitter", label: "Twitter", logo: "/x.png" },
   { value: "wallStreetBets", label: "Wall Street Bets", logo: "/wallStreetBets.png" },
 ].sort((a, b) => a.label.localeCompare(b.label));
@@ -191,6 +199,7 @@ export default function DataSheetWithIntegration({
   const connectHomeIntegrationPullBridge =
     connectHomeMode &&
     (connectWorkspace === "polymarket" ||
+      connectWorkspace === "kalshiLive" ||
       connectWorkspace === "chainlink" ||
       connectWorkspace === "binance");
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
@@ -722,6 +731,14 @@ export default function DataSheetWithIntegration({
         ) : (
           <KalshiHistorical setConnectedData={setConnectedDataRaw} />
         );
+      case "kalshiLive":
+        return connectHomeMode ? (
+          <p className="text-xs text-muted-foreground">
+            Build and run your query in the compose area above.
+          </p>
+        ) : (
+          <KalshiLive setConnectedData={setConnectedDataRaw} />
+        );
       case "coinGecko":
         return (
           <CoinGecko
@@ -1113,6 +1130,8 @@ export default function DataSheetWithIntegration({
                 requestSheetDestination={requestSheetDestination}
                 connectHomePullBridge
               />
+            ) : connectWorkspace === "kalshiLive" ? (
+              <KalshiLive setConnectedData={setConnectedDataRaw} connectHomePullBridge />
             ) : connectWorkspace === "chainlink" ? (
               <Chainlink connectHomePullBridge />
             ) : (

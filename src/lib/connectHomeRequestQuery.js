@@ -1,6 +1,7 @@
 export function integrationLabelFromLake(lake) {
   const key = String(lake || "").toLowerCase();
   if (key === "kalshi") return "Kalshi Historical";
+  if (key === "kalshi-live") return "Kalshi Live";
   if (key === "polymarket") return "Polymarket Historical";
   return key ? `${key.charAt(0).toUpperCase()}${key.slice(1)}` : "Data Lake";
 }

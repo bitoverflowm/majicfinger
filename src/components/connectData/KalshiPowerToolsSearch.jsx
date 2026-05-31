@@ -41,6 +41,10 @@ function entityTagClass(entity) {
  *   className?: string;
  *   /** When set, limits suggestions: markets only, or one row per market (trades pull). *\/
  *   parameterMode?: KalshiPowerToolsParameterMode;
+ *   /** Override suggestions API (default: Athena historical search). *\/
+ *   suggestionsApiPath?: string;
+ *   /** Badge label for market rows (e.g. "Market" for Kalshi Live). *\/
+ *   entityTagLabel?: string;
  * }} props
  */
 export function KalshiPowerToolsSearch({
@@ -48,6 +52,8 @@ export function KalshiPowerToolsSearch({
   disabled = false,
   className,
   parameterMode,
+  suggestionsApiPath = "/api/data-lake/kalshi-search/suggestions",
+  entityTagLabel,
 }) {
   const rootRef = useRef(null);
   const suggestAbortRef = useRef(null);
@@ -83,7 +89,7 @@ export function KalshiPowerToolsSearch({
       if (parameterMode === "trade_search" || parameterMode === "market_search") {
         params.set("mode", parameterMode);
       }
-      const res = await fetch(`/api/data-lake/kalshi-search/suggestions?${params.toString()}`, {
+      const res = await fetch(`${suggestionsApiPath}?${params.toString()}`, {
         headers: { Accept: "application/json" },
         credentials: "same-origin",
         signal: ac.signal,
@@ -112,7 +118,7 @@ export function KalshiPowerToolsSearch({
         setSuggestLoading(false);
       }
     }
-  }, [parameterMode]);
+  }, [parameterMode, suggestionsApiPath]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -167,11 +173,13 @@ export function KalshiPowerToolsSearch({
 
   const busy = disabled || selectLoading;
   const searchHint =
-    parameterMode === "market_search"
-      ? "Search Kalshi markets by ticker or title — select a market to load data."
-      : parameterMode === "trade_search"
-        ? "Search Kalshi markets by ticker or title — select a market to pull its trades."
-        : "Search Kalshi markets and trades by ticker or title — select a result to load data.";
+    suggestionsApiPath.includes("kalshi-live")
+      ? "Search live Kalshi markets by ticker or title — select a market to load data."
+      : parameterMode === "market_search"
+        ? "Search Kalshi markets by ticker or title — select a market to load data."
+        : parameterMode === "trade_search"
+          ? "Search Kalshi markets by ticker or title — select a market to pull its trades."
+          : "Search Kalshi markets and trades by ticker or title — select a result to load data.";
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -277,7 +285,7 @@ export function KalshiPowerToolsSearch({
                             entityTagClass(s.entity),
                           )}
                         >
-                          {s.entity}
+                          {entityTagLabel || s.entity}
                         </span>
                         {s.subtitle ? ` · ${s.subtitle}` : ""}
                       </span>

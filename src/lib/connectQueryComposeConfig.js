@@ -128,6 +128,7 @@ export function isConnectQueryComposeIntegration(integrationId) {
   return (
     isConnectDataLakeIntegration(integrationId) ||
     integrationId === "polymarket" ||
+    integrationId === "kalshiLive" ||
     integrationId === "chainlink" ||
     integrationId === "binance"
   );

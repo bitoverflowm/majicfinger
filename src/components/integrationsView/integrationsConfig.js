@@ -7,6 +7,7 @@ export const API_INTEGRATIONS = [
   "polymarket",
   "polymarketHistorical",
   "kalshiHistorical",
+  "kalshiLive",
   "coinGecko",
   "twitter",
   "wallStreetBets",
@@ -103,8 +104,8 @@ export const integrations_list = [
     name: "Kalshi Live Data Feed",
     description:
       "Real-time Kalshi market data, prices, and order flow for live dashboards and alerts.",
-    tags: ["featured", "crypto", "finance", "trading", "prediction", "coming soon", "pro", "lifetime"],
-    live: false,
+    tags: ["featured", "crypto", "finance", "trading", "prediction"],
+    live: true,
   },
   {
     color: "#E7F0DC",

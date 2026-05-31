@@ -7,6 +7,7 @@ import { ArrowLeft, Check } from "lucide-react";
 
 import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
+import { KalshiLiveIntegrationsCore } from "@/components/connectData/kalshiLive/KalshiLiveIntegrationsCore";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -663,6 +664,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const liveConfig = getConnectLiveStreamConfig(integrationId);
   const isDataLake = isConnectDataLakeIntegration(integrationId);
   const isApi = integrationId === "polymarket";
+  const isKalshiLive = integrationId === "kalshiLive";
   const isLive = !!liveConfig;
 
   const sampleById = useMemo(() => sampleByIdForConfig(lakeConfig), [lakeConfig]);
@@ -810,9 +812,12 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   }
 
   const { name, description } = getIntegrationMeta(integrationId);
+  const connectKalshiLiveEndpointId = ctx.connectKalshiLiveEndpointId;
+
   const hasComposeUi =
     (isDataLake && !!connectDataLakeSampleId) ||
     (isApi && !!connectApiEndpointId) ||
+    (isKalshiLive && !!connectKalshiLiveEndpointId) ||
     (isLive && !!connectLiveSourceId);
 
   return (
@@ -834,6 +839,10 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
           compact={hasComposeUi}
           onGoBack={handleGoBackToIntegrations}
         />
+
+        {isKalshiLive ? (
+          <KalshiLiveIntegrationsCore onRunPull={handleRunIntegrationPull} />
+        ) : null}
 
         {isDataLake && lakeConfig ? (
           <DataLakeSourceCards

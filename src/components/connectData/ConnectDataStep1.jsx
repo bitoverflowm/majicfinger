@@ -926,7 +926,7 @@ export default function ConnectDataStep1({
                         </IntegrationIconWrap>
                       }
                       label={row.name}
-                      showDemoTierBadges={embeddedDemo || row.key === "kalshiLive"}
+                      showDemoTierBadges={embeddedDemo}
                       iconClassName={connectIntegrationIconClass(row.key)}
                       iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
                       labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
