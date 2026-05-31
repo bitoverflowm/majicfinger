@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
+import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
 
 /**
  * Track when someone opens and leaves a chart, dashboard, or article.
+ * Events are batched into the visitor session journey (summary sent at session end).
  * @param {{
  *   contentType: 'chart' | 'dashboard' | 'article';
  *   name?: string | null;
@@ -20,7 +21,6 @@ export function useTelegramContentTracker({
   ownerHandle,
   enabled = true,
 }) {
-  const sessionIdRef = useRef(null);
   const openedAtRef = useRef(null);
   const viewSentRef = useRef(false);
   const leaveSentRef = useRef(false);
@@ -28,21 +28,17 @@ export function useTelegramContentTracker({
   useEffect(() => {
     if (!enabled || !name) return;
 
-    if (!sessionIdRef.current) {
-      sessionIdRef.current =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `sess-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
     openedAtRef.current = Date.now();
 
     if (!viewSentRef.current) {
       viewSentRef.current = true;
-      sendTelegramAnalyticsEvent("content_view", {
-        contentType,
-        name,
+      trackJourneyEvent("content_view", {
         path: path || (typeof window !== "undefined" ? window.location.pathname : undefined),
-        ownerHandle,
+        meta: {
+          contentType,
+          name,
+          ownerHandle,
+        },
       });
     }
 
@@ -52,17 +48,15 @@ export function useTelegramContentTracker({
       const durationSeconds = openedAtRef.current
         ? Math.max(1, Math.round((Date.now() - openedAtRef.current) / 1000))
         : undefined;
-      sendTelegramAnalyticsEvent(
-        "content_leave",
-        {
+      trackJourneyEvent("content_leave", {
+        path: path || (typeof window !== "undefined" ? window.location.pathname : undefined),
+        meta: {
           contentType,
           name,
-          path: path || (typeof window !== "undefined" ? window.location.pathname : undefined),
           ownerHandle,
           durationSeconds,
         },
-        { sessionId: sessionIdRef.current, keepalive: true },
-      );
+      });
     };
 
     const onVisibilityChange = () => {
@@ -70,12 +64,10 @@ export function useTelegramContentTracker({
     };
 
     window.addEventListener("pagehide", sendLeave);
-    window.addEventListener("beforeunload", sendLeave);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.removeEventListener("pagehide", sendLeave);
-      window.removeEventListener("beforeunload", sendLeave);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       sendLeave();
     };

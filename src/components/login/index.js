@@ -15,6 +15,7 @@ import {
   DEV_LOGIN_BYPASS_NAME,
   isDevMagicLinkBypassEmail,
 } from '@/lib/devLoginBypass';
+import { handleLoginJourney } from '@/lib/analytics/journeyClient';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -58,6 +59,13 @@ const Login = ({ fromHome }) => {
       });
     }
     if (res.status === 200) {
+      const data = await res.json().catch(() => ({}));
+      handleLoginJourney(data, {
+        email,
+        name,
+        signupSource: fromHome ? 'homepage signup' : 'login page',
+        method: isDevBypass ? 'dev bypass' : 'magic link',
+      });
       mutateUser();
       setLoading(false);
       clearInterval(timer);

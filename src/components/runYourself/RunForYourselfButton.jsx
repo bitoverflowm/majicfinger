@@ -18,6 +18,7 @@ import {
   saveRunSourceContext,
 } from "@/lib/runYourself/runSourceContext";
 import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
+import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
 import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
 
 /**
@@ -114,6 +115,20 @@ export function RunForYourselfButton({
 
   const handleClick = useCallback(() => {
     if (!runnable) return;
+
+    trackJourneyEvent("fork_click", {
+      path: typeof window !== "undefined" ? window.location.pathname : undefined,
+      meta: {
+        kind: ctx.kind,
+        displayName,
+        ownerHandle: handle,
+        chartSlug,
+        dashboardSlug,
+        genericAnalysisFallback: useGenericAnalysisFallback,
+        isLoggedIn: !!user,
+        userEmail: user?.email,
+      },
+    });
 
     sendTelegramAnalyticsEvent("fork_click", {
       kind: ctx.kind,

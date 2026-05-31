@@ -13,6 +13,7 @@ import {
   DEV_LOGIN_BYPASS_NAME,
   isDevMagicLinkBypassEmail,
 } from "@/lib/devLoginBypass";
+import { handleLoginJourney } from "@/lib/analytics/journeyClient";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -68,6 +69,13 @@ export function MagicLinkEmailForm({
         });
       }
       if (res.status === 200) {
+        const data = await res.json().catch(() => ({}));
+        handleLoginJourney(data, {
+          email,
+          name,
+          signupSource,
+          method: isDevBypass ? "dev bypass" : "magic link",
+        });
         await mutateUser();
         clearInterval(timer);
         setProgress(100);

@@ -6,6 +6,7 @@ import { GeistMono } from 'geist/font/mono'
 import { GeistSans } from 'geist/font/sans'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
+import { VisitorJourneyInit } from '@/components/analytics/VisitorJourneyInit'
 
 export { metadata } from './metadata'
 
@@ -35,6 +36,7 @@ export default function RootLayout({ children }) {
           enableSystem
           disableTransitionOnChange
         >
+          <VisitorJourneyInit />
           {children}
           <Toaster />
         </ThemeProvider>

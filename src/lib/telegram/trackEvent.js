@@ -3,7 +3,7 @@ import TelegramEventCounter from "@/models/TelegramEventCounter";
 import { sendTelegramMessage } from "@/lib/telegram/notify";
 import { escapeHtml, formatFieldLines, ordinal } from "@/lib/telegram/format";
 
-/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'test_ping'} TelegramEventKey */
+/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'visitor_session' | 'visitor_session_end' | 'test_ping'} TelegramEventKey */
 
 const COUNTER_TIMEOUT_MS = 5000;
 

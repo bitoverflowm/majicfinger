@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
+import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
 import { extractClickTargetFromEvent } from "@/lib/telegram/extractClickTarget";
 
 const CLICK_THROTTLE_MS = 2000;
@@ -33,10 +33,9 @@ export function useTelegramPageAnalytics({
 
     if (!viewSentRef.current) {
       viewSentRef.current = true;
-      sendTelegramAnalyticsEvent("page_view", {
-        pageType,
-        pageName,
+      trackJourneyEvent("page_view", {
         path,
+        meta: { pageType, pageName },
       });
     }
   }, [enabled, pageName, pageType, path]);
@@ -61,17 +60,19 @@ export function useTelegramPageAnalytics({
         recentClickKeysRef.current.clear();
       }
 
-      const payload = {
-        pageType,
-        pageName,
-        path,
-        label: meta.label,
-        targetType: meta.targetType,
-        href: meta.href,
-        section: meta.section,
-      };
-
-      const send = () => sendTelegramAnalyticsEvent("page_click", payload);
+      const send = () =>
+        trackJourneyEvent("page_click", {
+          path,
+          label: meta.label,
+          meta: {
+            pageType,
+            pageName,
+            label: meta.label,
+            targetType: meta.targetType,
+            href: meta.href,
+            section: meta.section,
+          },
+        });
 
       if (typeof window.requestIdleCallback === "function") {
         window.requestIdleCallback(send, { timeout: 1500 });
