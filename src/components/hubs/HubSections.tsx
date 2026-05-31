@@ -198,7 +198,10 @@ function HubPublishedCharts({
   if (!charts.length) return null;
 
   return (
-    <section className="w-full py-16 md:py-24">
+    <section
+      id={section.anchorId}
+      className={cn("w-full py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+    >
       <div className="mx-auto max-w-2xl space-y-4 px-6 text-center">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
           {section.title}
@@ -209,16 +212,14 @@ function HubPublishedCharts({
           </p>
         ) : null}
       </div>
-      <div className="relative left-1/2 z-20 mt-12 w-screen max-w-[100vw] -translate-x-1/2 px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {charts.map((chart) => (
-            <HubPublishedChartEmbed
-              key={`${chart.username}-${chart.slug}`}
-              username={chart.username}
-              slug={chart.slug}
-            />
-          ))}
-        </div>
+      <div className="mt-12 grid grid-cols-1 gap-6 px-4 sm:px-6 md:grid-cols-2 lg:px-8">
+        {charts.map((chart) => (
+          <HubPublishedChartEmbed
+            key={`${chart.username}-${chart.slug}`}
+            username={chart.username}
+            slug={chart.slug}
+          />
+        ))}
       </div>
     </section>
   );
@@ -274,7 +275,11 @@ export function HubSectionRenderer({
     case "link_group":
       return wrapper(<HubLinkGroup section={section} />);
     case "published_charts":
-      return wrapper(<HubPublishedCharts section={section} assets={assets} />);
+      return (
+        <div className="relative z-30 w-full bg-white [clip-path:inset(0_-100vmax)] shadow-[0_0_0_100vmax_#ffffff] dark:bg-background dark:shadow-[0_0_0_100vmax_var(--background)]">
+          <HubPublishedCharts section={section} assets={assets} />
+        </div>
+      );
     case "cta":
       return wrapper(<HubCta section={section} />);
     default:

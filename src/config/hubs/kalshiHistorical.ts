@@ -132,8 +132,15 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
-      type: "link_group",
+      type: "published_charts",
       anchorId: "get-inspired",
+      title: "Kalshi Historical Data Charts",
+      description:
+        "Every published chart built on Kalshi historical data — volume trends, probability convergence, calibration curves, and more. Run any chart for yourself with your own parameters.",
+    },
+
+    {
+      type: "link_group",
       title: "Kalshi Historical Data Guides",
       groups: [
         {
@@ -182,13 +189,6 @@ export const kalshiHistoricalHub: HubPageConfig = {
           ],
         },
       ],
-    },
-
-    {
-      type: "published_charts",
-      title: "Kalshi Historical Data Charts",
-      description:
-        "Every published chart built on Kalshi historical data — volume trends, probability convergence, calibration curves, and more. Run any chart for yourself with your own parameters.",
     },
 
     {

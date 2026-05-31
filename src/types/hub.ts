@@ -68,6 +68,7 @@ export type HubCtaSection = {
 
 export type HubPublishedChartsSection = {
   type: "published_charts";
+  anchorId?: string;
   title: string;
   description?: string;
 };
