@@ -3,7 +3,7 @@ import TelegramEventCounter from "@/models/TelegramEventCounter";
 import { sendTelegramMessage } from "@/lib/telegram/notify";
 import { escapeHtml, formatFieldLines, ordinal } from "@/lib/telegram/format";
 
-/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'test_ping'} TelegramEventKey */
+/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'test_ping'} TelegramEventKey */
 
 const COUNTER_TIMEOUT_MS = 5000;
 
@@ -192,6 +192,55 @@ export async function notifyContentView(payload) {
  *   durationSeconds?: number;
  * }} payload
  */
+/**
+ * @param {{
+ *   pageType: 'homepage' | 'hub';
+ *   pageName: string;
+ *   path?: string;
+ * }} payload
+ */
+export async function notifyPageView(payload) {
+  const typeLabel = payload.pageType === "hub" ? "hub page" : "homepage";
+  return trackAndNotifyTelegramEvent({
+    eventKey: "page_view",
+    headline: `{rank} person to visit a ${typeLabel}`,
+    fields: {
+      Action: `Opened ${typeLabel}`,
+      Page: payload.pageName,
+      Path: payload.path,
+      Type: payload.pageType,
+    },
+  });
+}
+
+/**
+ * @param {{
+ *   pageType: 'homepage' | 'hub';
+ *   pageName: string;
+ *   path?: string;
+ *   label?: string;
+ *   targetType?: string;
+ *   href?: string;
+ *   section?: string;
+ * }} payload
+ */
+export async function notifyPageClick(payload) {
+  const typeLabel = payload.pageType === "hub" ? "hub page" : "homepage";
+  return trackAndNotifyTelegramEvent({
+    eventKey: "page_click",
+    headline: `{rank} click on ${typeLabel}`,
+    fields: {
+      Page: payload.pageName,
+      Path: payload.path,
+      Type: payload.pageType,
+      Label: payload.label,
+      Target: payload.targetType,
+      Link: payload.href,
+      Section: payload.section,
+    },
+  });
+}
+
 export async function notifyContentLeave(payload) {
   const typeLabel =
     payload.contentType === "article"

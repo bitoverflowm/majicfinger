@@ -2,9 +2,17 @@ import {
   notifyContentLeave,
   notifyContentView,
   notifyForkClick,
+  notifyPageClick,
+  notifyPageView,
 } from "@/lib/telegram/trackEvent";
 
-const ALLOWED_EVENTS = new Set(["fork_click", "content_view", "content_leave"]);
+const ALLOWED_EVENTS = new Set([
+  "fork_click",
+  "content_view",
+  "content_leave",
+  "page_view",
+  "page_click",
+]);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, message: "Method not allowed" });
@@ -37,6 +45,34 @@ export default async function handler(req, res) {
         name: payload.name,
         path: payload.path,
         ownerHandle: payload.ownerHandle,
+      });
+      return res.status(200).json(result);
+    }
+
+    if (event === "page_view") {
+      if (!payload?.pageName || !payload?.pageType) {
+        return res.status(400).json({ ok: false, message: "Missing pageName or pageType" });
+      }
+      const result = await notifyPageView({
+        pageType: payload.pageType,
+        pageName: payload.pageName,
+        path: payload.path,
+      });
+      return res.status(200).json(result);
+    }
+
+    if (event === "page_click") {
+      if (!payload?.pageName || !payload?.pageType || !payload?.label) {
+        return res.status(400).json({ ok: false, message: "Missing pageName, pageType, or label" });
+      }
+      const result = await notifyPageClick({
+        pageType: payload.pageType,
+        pageName: payload.pageName,
+        path: payload.path,
+        label: payload.label,
+        targetType: payload.targetType,
+        href: payload.href,
+        section: payload.section,
       });
       return res.status(200).json(result);
     }
