@@ -1,17 +1,23 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import {
   Container,
   ContentWrapper,
   Section,
   Breadcrumb,
-  CTASection,
   H1,
   P,
   Muted,
   KnowledgeCard,
 } from "@/components/ui";
+import { GuideTakeawayCta } from "./GuideTakeawayCta";
 import { getRelatedContent } from "@/lib/content/related";
+import {
+  isKalshiHistoricalHubGuide,
+  KALSHI_HISTORICAL_DATA_HUB_PATH,
+  KALSHI_HUB_GUIDE_BACK_LINK,
+} from "@/lib/hubs/kalshiHubGuides";
 import type { TocItem } from "@/lib/content/extract-mdx-headings";
 import type { BaseContent, ContentType } from "@/lib/content/types";
 import { ContentTocNav } from "./ContentTocNav";
@@ -40,6 +46,7 @@ export function GuideLayout({
   children,
 }: GuideLayoutProps) {
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
+  const showKalshiHubBackLink = isKalshiHistoricalHubGuide(slug);
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -48,10 +55,20 @@ export function GuideLayout({
   ];
 
   return (
+    <>
     <Container>
       <ContentTocNav items={tocItems} />
       <ContentWrapper>
         <Breadcrumb items={breadcrumbItems} />
+        {showKalshiHubBackLink && (
+          <Link
+            href={KALSHI_HISTORICAL_DATA_HUB_PATH}
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+            {KALSHI_HUB_GUIDE_BACK_LINK}
+          </Link>
+        )}
 
         <Section>
           <H1>{frontmatter.title}</H1>
@@ -105,6 +122,10 @@ export function GuideLayout({
           </div>
         </Section>
 
+        <Section>
+          <GuideTakeawayCta />
+        </Section>
+
         {related.length > 0 && (
           <Section>
             <h2 className="text-2xl font-medium mb-6">Related content</h2>
@@ -131,16 +152,8 @@ export function GuideLayout({
             </div>
           </Section>
         )}
-
-        <CTASection
-          title="Need help?"
-          description="Explore our docs or reach out to our team."
-          primaryHref="/"
-          primaryLabel="Get started"
-          secondaryHref="/search"
-          secondaryLabel="Search docs"
-        />
       </ContentWrapper>
     </Container>
+    </>
   );
 }

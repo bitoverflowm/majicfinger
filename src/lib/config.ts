@@ -138,10 +138,12 @@ In <0.69 seconds. No coding. No setup.`,
   },
   ctaSection: {
     title: "Go from raw markets to charts in seconds—no code, no CSVs.",
+    guideTitle:
+      "Go from raw markets to charts and dashboards in seconds—no code, no CSVs.",
     subtext: "Free to explore here · Polymarket, Kalshi, Chainlink & more",
     button: {
       href: "/#pricing",
-      text: "Get Lychee",
+      text: "Gain Your Edge Now",
     },
   },
   footerLinks: [
