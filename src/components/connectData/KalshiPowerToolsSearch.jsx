@@ -277,6 +277,23 @@ export function KalshiPowerToolsSearch({
                     <span className="font-medium text-foreground line-clamp-2">{s.title}</span>
                     {parameterMode === "trade_search" ? (
                       <span className="text-xs text-muted-foreground font-mono">{s.ticker}</span>
+                    ) : parameterMode === "market_search" ? (
+                      <>
+                        {s.subtitle && s.subtitle !== s.title ? (
+                          <span className="text-xs text-muted-foreground line-clamp-1">{s.subtitle}</span>
+                        ) : null}
+                        <span className="text-xs text-muted-foreground">
+                          <span
+                            className={cn(
+                              "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium capitalize tracking-wide",
+                              entityTagClass(s.entity),
+                            )}
+                          >
+                            {entityTagLabel || s.entity}
+                          </span>
+                          {s.ticker ? ` · ${s.ticker}` : ""}
+                        </span>
+                      </>
                     ) : (
                       <span className="text-xs text-muted-foreground">
                         <span
