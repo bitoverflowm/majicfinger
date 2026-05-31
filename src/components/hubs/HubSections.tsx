@@ -22,10 +22,10 @@ const HubKalshiQueryBuilder = dynamic(
   { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
 );
 
-const HubPublishedChartCard = dynamic(
+const HubPublishedChartEmbed = dynamic(
   () =>
-    import("@/components/hubs/HubPublishedChartCard").then((m) => m.HubPublishedChartCard),
-  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-xl bg-muted/40" /> },
+    import("@/components/hubs/HubPublishedChartEmbed").then((m) => m.HubPublishedChartEmbed),
+  { ssr: false, loading: () => <div className="h-[380px] animate-pulse rounded-xl bg-muted/40 md:h-[420px]" /> },
 );
 
 function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "primary" | "secondary" }) {
@@ -198,27 +198,24 @@ function HubPublishedCharts({
   if (!charts.length) return null;
 
   return (
-    <section className="w-full px-6 py-16 md:py-24">
-      <div className="mx-auto w-full max-w-6xl space-y-12">
-        <div className="mx-auto max-w-2xl space-y-4 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-            {section.title}
-          </h2>
-          {section.description ? (
-            <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
-              {section.description}
-            </p>
-          ) : null}
-        </div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {charts.map((chart, idx) => (
-            <HubPublishedChartCard
+    <section className="w-full py-16 md:py-24">
+      <div className="mx-auto max-w-2xl space-y-4 px-6 text-center">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+          {section.title}
+        </h2>
+        {section.description ? (
+          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+            {section.description}
+          </p>
+        ) : null}
+      </div>
+      <div className="relative z-20 -mx-6 mt-12 w-[calc(100%+3rem)] px-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {charts.map((chart) => (
+            <HubPublishedChartEmbed
               key={`${chart.username}-${chart.slug}`}
               username={chart.username}
               slug={chart.slug}
-              title={chart.title}
-              hasOgImage={chart.hasOgImage}
-              priority={idx <= 2}
             />
           ))}
         </div>
@@ -238,8 +235,11 @@ function HubCta({ section }: { section: HubCtaSection }) {
           <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-muted-foreground text-pretty">
             {section.description}
           </p>
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <HubCtaButton cta={section.cta} variant="primary" />
+            {section.secondaryCta ? (
+              <HubCtaButton cta={section.secondaryCta} variant="secondary" />
+            ) : null}
           </div>
         </div>
       </div>

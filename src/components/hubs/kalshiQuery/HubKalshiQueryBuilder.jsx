@@ -433,19 +433,21 @@ export function HubKalshiQueryBuilder() {
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        <div className="flex flex-col items-end gap-2 border-t border-border/60 pt-6">
-          <Button
-            type="button"
-            size="lg"
-            className="rounded-full px-8"
-            disabled={submitBusy || userLoading || !sampleId || selectedColumns.length === 0}
-            onClick={handleSubmit}
-          >
-            {submitBusy ? "Starting…" : userLoading ? "Loading…" : isLoggedIn ? "Run query" : "Run for Free"}
-          </Button>
-          {!isLoggedIn ? (
-            <p className="text-xs text-muted-foreground">No credit card required</p>
-          ) : null}
+        <div className="flex justify-end border-t border-border/60 pt-6">
+          <div className="flex flex-col items-center gap-2">
+            <Button
+              type="button"
+              size="lg"
+              className="rounded-full px-8"
+              disabled={submitBusy || userLoading || !sampleId || selectedColumns.length === 0}
+              onClick={handleSubmit}
+            >
+              {submitBusy ? "Starting…" : userLoading ? "Loading…" : isLoggedIn ? "Run query" : "Run for Free"}
+            </Button>
+            {!isLoggedIn ? (
+              <p className="text-xs text-muted-foreground">No credit card required</p>
+            ) : null}
+          </div>
         </div>
       </div>
 

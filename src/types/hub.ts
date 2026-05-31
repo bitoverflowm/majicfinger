@@ -63,6 +63,7 @@ export type HubCtaSection = {
   title: string;
   description: string;
   cta: HubCta;
+  secondaryCta?: HubCta;
 };
 
 export type HubPublishedChartsSection = {

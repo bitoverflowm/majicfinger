@@ -102,7 +102,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       type: "text_block",
       title: "What is Included in Kalshi Historical Data",
       content:
-        "Kalshi historical data includes full market data, trade history, orderbook data, and historical price movements across all Kalshi prediction markets. This dataset supports Kalshi backtesting, trade analysis, and prediction market research. Users can access Kalshi historical market data via API or download formats for offline analysis.",
+        "Kalshi historical data includes full market data, trade history and historical price movements across all Kalshi prediction markets. This dataset supports Kalshi backtesting, trade analysis, and prediction market research. Users can access Kalshi historical market data via Lychee's browser based tools or download formats for offline analysis.",
     },
 
     {
@@ -119,7 +119,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       description:
         "Run queries on Kalshi historical data, including trade history, orderbook data, and market-level datasets. Supports backtesting and analysis workflows.",
       examples: [
-        "Kalshi historical data API download",
+        "Kalshi historical data download",
         "Kalshi historical orderbook data",
         "Kalshi trade history CSV export",
         "Kalshi backtesting historical data",
@@ -243,7 +243,12 @@ export const kalshiHistoricalHub: HubPageConfig = {
         "Search Kalshi historical data, analyze trade history, and run backtests on real prediction market data.",
       cta: {
         label: "Start Free Query",
-        href: "/guides/kalshi-historical-data#download-kalshi-historical-data-csv-excel-json",
+        href: "#explore-data",
+        requiresAuth: false,
+      },
+      secondaryCta: {
+        label: "Get Full Access",
+        href: "/#pricing",
         requiresAuth: false,
       },
     },

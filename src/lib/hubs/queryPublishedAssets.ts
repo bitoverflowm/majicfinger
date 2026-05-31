@@ -358,7 +358,7 @@ export async function queryHubPublishedAssets(
     applyStaticChartFallback(charts, seenCharts, filter);
   }
 
-  charts.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+  charts.sort((a, b) => b.title.localeCompare(a.title, undefined, { sensitivity: "base" }));
 
   return { charts, dashboards };
 }
