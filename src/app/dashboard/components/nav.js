@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient"
 
 function attachPublicAssetsToProjectRow(row) {
   row.publicCharts = (row.charts || []).filter((c) => c?.is_public && c?.public_slug)
@@ -408,6 +409,10 @@ const Nav = () => {
   const handleLogout = async () => {
     try {
       liveStreamActions?.stop?.();
+      endAuthenticatedSession({
+        email: user?.email,
+        userId: user?._id || user?.userId,
+      });
       const response = await fetch('/api/logout', {
         method: 'POST',
       });

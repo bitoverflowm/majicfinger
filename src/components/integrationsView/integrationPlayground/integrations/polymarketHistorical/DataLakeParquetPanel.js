@@ -110,6 +110,7 @@ import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META,
 } from "@/lib/dataLake/lakeTableColumns";
 import { toast } from "sonner";
+import { trackAuthEvent, trackAuthError } from "@/lib/analytics/authJourneyClient";
 
 /** Shown in the column picker / compose cards for server-computed Kalshi fields. */
 const KALSHI_VIRTUAL_COMPOSE_LABELS = {
@@ -2019,6 +2020,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         }
         setLastRowCount(n);
         refreshBeckerViews();
+        trackAuthEvent("query_submit", {
+          meta: {
+            integration: dataset,
+            lake: lk,
+            table,
+            sampleId: sid,
+            sampleLabel,
+            mode,
+            rowCount: n,
+            status: "success",
+          },
+        });
       });
     } catch (e) {
       if (e?.name === "AbortError") {
@@ -2030,6 +2043,23 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       const msg = e?.message || String(e);
       setError(msg);
       syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
+      trackAuthEvent("query_error", {
+        label: msg,
+        meta: {
+          integration: dataset,
+          lake: lk,
+          table,
+          sampleId: sid,
+          sampleLabel,
+          mode,
+          message: msg,
+        },
+      });
+      trackAuthError({
+        message: msg,
+        source: "DataLakeParquetPanel.executeIngestNewSheet",
+        integration: dataset,
+      });
     } finally {
       pullInFlightRef.current = false;
       ingestAbortControllerRef.current = null;
@@ -2698,6 +2728,20 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       metaAppendTargetIndex:
         selectionTab === "meta" && shouldRunSingleMetaAppend ? Math.max(0, metaPreviewRows.length - 1) : undefined,
     };
+
+    const sampleLabel = sampleOptions.find((s) => s.id === selected.id)?.label || selected.id;
+    trackAuthEvent("query_submit", {
+      meta: {
+        integration: dataset,
+        lake,
+        table: selected.table,
+        sampleId: selected.id,
+        sampleLabel,
+        mode: effectiveIngestMode,
+        selectionTab,
+        status: "started",
+      },
+    });
 
     if (disposition === "new_sheet") {
       void executeIngestNewSheet();
@@ -4982,6 +5026,17 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     if (connectHomeDataLakeCompose) {
                       setConnectDataLakeSampleId?.(v);
                     }
+                    const sourceLabel = sampleOptions.find((s) => s.id === v)?.label || v;
+                    trackAuthEvent("data_source_select", {
+                      label: sourceLabel,
+                      meta: {
+                        integration: dataset,
+                        sampleId: v,
+                        label: sourceLabel,
+                        table: selected?.table,
+                        lake,
+                      },
+                    });
                   }}
                   disabled={!canUseSamples || loading}
                 >

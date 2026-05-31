@@ -14,6 +14,7 @@ import { siteConfig } from "@/lib/config";
 import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
+import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient";
 
 const INITIAL_WIDTH = "70rem";
 const MAX_WIDTH = "800px";
@@ -95,6 +96,10 @@ export function Navbar() {
   const handleOverlayClick = () => setIsDrawerOpen(false);
   const handleLogout = async () => {
     try {
+      endAuthenticatedSession({
+        email: user?.email,
+        userId: user?._id || user?.userId,
+      });
       const response = await fetch("/api/logout", {
         method: "POST",
       });

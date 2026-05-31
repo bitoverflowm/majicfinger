@@ -39,6 +39,24 @@ export function formatJourneyStep(event, index) {
       return `${index}. Signed up (${meta.method || "unknown"}) — ${meta.email || "email unknown"}`;
     case "identity_linked":
       return `${index}. Identified as ${meta.email || meta.userId || "user"}`;
+    case "integration_select":
+      return `${index}. Opened integration: ${meta.integrationName || meta.integrationId || event.label || "unknown"}`;
+    case "data_source_select":
+      return `${index}. Selected data source: ${meta.label || meta.sampleId || event.label || "unknown"}${
+        meta.integration ? ` (${meta.integration})` : ""
+      }`;
+    case "query_submit":
+      return `${index}. Ran query on ${meta.table || "table"}${meta.mode ? ` (${meta.mode})` : ""}${
+        meta.rowCount != null ? ` → ${meta.rowCount} rows` : ""
+      }`;
+    case "query_error":
+      return `${index}. Query failed: ${meta.message || event.label || "unknown error"}`;
+    case "workspace_dwell":
+      return `${index}. Spent ${meta.durationSeconds || "?"}s in ${meta.workspace || meta.integrationId || "workspace"}`;
+    case "error":
+      return `${index}. Error: ${meta.message || event.label || "unknown"}${
+        meta.source ? ` (${meta.source})` : ""
+      }`;
     default:
       return `${index}. ${event.type}${path ? ` (${path})` : ""}`;
   }
@@ -54,6 +72,18 @@ export function inferSessionOutcome(events) {
   if (types.includes("content_view")) return "Browsed content";
   if (types.includes("page_click")) return "Explored marketing pages";
   return "Left without converting";
+}
+
+/**
+ * @param {Array<{ type: string; meta?: Record<string, unknown> }>} events
+ */
+export function inferAuthSessionOutcome(events) {
+  const types = events.map((e) => e.type);
+  if (types.includes("query_error") || types.includes("error")) return "Hit an error";
+  if (types.includes("query_submit")) return "Ran data queries";
+  if (types.includes("data_source_select")) return "Explored data sources";
+  if (types.includes("integration_select")) return "Browsed integrations";
+  return "Active session";
 }
 
 /**
@@ -122,6 +152,154 @@ export function buildSessionStartTelegramMessage({ session, sessionCount }) {
   }
   if (session.email) {
     lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * @param {{
+ *   session: { session_id: string; entry_path?: string; email?: string };
+ *   sessionCount?: number;
+ * }} opts
+ */
+export function buildAuthSessionStartTelegramMessage({ session, sessionCount }) {
+  const shortId = String(session.session_id || "").slice(0, 8);
+  const rank = sessionCount ? ordinal(sessionCount) : null;
+
+  const lines = [
+    rank ? `<b>🔐 ${rank} authenticated session</b>` : "<b>🔐 Authenticated session started</b>",
+    "",
+    `<b>Session:</b> ${escapeHtml(shortId)}`,
+    `<b>Entry:</b> ${escapeHtml(session.entry_path || "/dashboard")}`,
+  ];
+
+  if (session.email) {
+    lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * @param {{
+ *   session: { session_id: string; started_at: Date; ended_at?: Date; entry_path?: string; email?: string; chain_count?: number };
+ *   events: Array<{ type: string; path?: string; label?: string; meta?: Record<string, unknown>; ts?: Date }>;
+ *   sessionCount?: number;
+ * }} opts
+ */
+export function buildAuthSessionEndTelegramMessage({ session, events, sessionCount }) {
+  const startedAt = session.started_at ? new Date(session.started_at).getTime() : Date.now();
+  const endedAt = session.ended_at ? new Date(session.ended_at).getTime() : Date.now();
+  const duration = formatDuration(Math.max(0, endedAt - startedAt));
+  const shortId = String(session.session_id || "").slice(0, 8);
+  const rank = sessionCount ? ordinal(sessionCount) : null;
+
+  const steps = events.slice(0, 30).map((event, i) => formatJourneyStep(event, i + 1));
+  const more = events.length > 30 ? `\n… and ${events.length - 30} more steps` : "";
+
+  const lines = [
+    rank ? `<b>📋 ${rank} auth session summary</b>` : "<b>📋 Auth session summary</b>",
+    "",
+    `<b>Session:</b> ${escapeHtml(shortId)}`,
+    `<b>Duration:</b> ${escapeHtml(duration)}`,
+    `<b>Entry:</b> ${escapeHtml(session.entry_path || "/dashboard")}`,
+  ];
+
+  if (session.email) {
+    lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
+  }
+
+  if (session.chain_count) {
+    lines.push(`<b>Chain updates:</b> ${session.chain_count}`);
+  }
+
+  lines.push("", "<b>Activity:</b>");
+  if (steps.length) {
+    lines.push(...steps.map((s) => escapeHtml(s)));
+    if (more) lines.push(escapeHtml(more.trim()));
+  } else {
+    lines.push("No tracked activity recorded.");
+  }
+
+  lines.push("", `<b>Outcome:</b> ${escapeHtml(inferAuthSessionOutcome(events))}`);
+
+  return lines.join("\n");
+}
+
+/**
+ * @param {{
+ *   session: { session_id: string; started_at: Date; email?: string; chain_count?: number };
+ *   events: Array<{ type: string; meta?: Record<string, unknown>; ts?: Date }>;
+ *   chainIndex: number;
+ * }} opts
+ */
+export function buildAuthSessionChainTelegramMessage({ session, events, chainIndex }) {
+  const startedAt = session.started_at ? new Date(session.started_at).getTime() : Date.now();
+  const elapsed = formatDuration(Math.max(0, Date.now() - startedAt));
+  const shortId = String(session.session_id || "").slice(0, 8);
+
+  const recent = events.slice(-15);
+  const steps = recent.map((event, i) => formatJourneyStep(event, i + 1));
+
+  const lines = [
+    `<b>⏱ Auth session update #${chainIndex}</b>`,
+    "",
+    `<b>Session:</b> ${escapeHtml(shortId)}`,
+    `<b>Elapsed:</b> ${escapeHtml(elapsed)}`,
+  ];
+
+  if (session.email) {
+    lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
+  }
+
+  lines.push("", "<b>Recent activity:</b>");
+  if (steps.length) {
+    lines.push(...steps.map((s) => escapeHtml(s)));
+  } else {
+    lines.push("No new activity since last update.");
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * @param {{
+ *   session: { session_id: string; email?: string };
+ *   meta: { message?: string; source?: string; integration?: string; stack?: string; path?: string };
+ * }} opts
+ */
+export function buildAuthSessionErrorTelegramMessage({ session, meta = {} }) {
+  const shortId = String(session.session_id || "").slice(0, 8);
+
+  const lines = [
+    "<b>🚨 Auth session error</b>",
+    "",
+    `<b>Session:</b> ${escapeHtml(shortId)}`,
+  ];
+
+  if (session.email) {
+    lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
+  }
+
+  if (meta.path) {
+    lines.push(`<b>Path:</b> ${escapeHtml(meta.path)}`);
+  }
+
+  if (meta.integration) {
+    lines.push(`<b>Integration:</b> ${escapeHtml(meta.integration)}`);
+  }
+
+  if (meta.source) {
+    lines.push(`<b>Source:</b> ${escapeHtml(meta.source)}`);
+  }
+
+  if (meta.message) {
+    lines.push("", `<b>Error:</b> ${escapeHtml(String(meta.message).slice(0, 400))}`);
+  }
+
+  if (meta.stack) {
+    lines.push("", `<b>Stack:</b> ${escapeHtml(String(meta.stack).slice(0, 300))}`);
   }
 
   return lines.join("\n");

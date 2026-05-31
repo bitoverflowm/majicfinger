@@ -27,7 +27,7 @@ function scheduleFlush() {
 function postJourney(body, { keepalive = false } = {}) {
   if (typeof window === "undefined") return;
 
-  const payload = JSON.stringify(body);
+  const payload = JSON.stringify({ sessionKind: "visitor", ...body });
   try {
     if (keepalive && typeof navigator !== "undefined" && navigator.sendBeacon) {
       const blob = new Blob([payload], { type: "application/json" });
@@ -179,6 +179,16 @@ export function handleLoginJourney(data, ctx = {}) {
         source: ctx.signupSource || "magic link",
         method: ctx.method || "magic link",
       },
+    });
+  }
+
+  if (userId || email) {
+    void import("@/lib/analytics/authJourneyClient").then(({ startAuthenticatedSession }) => {
+      startAuthenticatedSession({
+        email,
+        userId,
+        entryPath: typeof window !== "undefined" ? window.location.pathname : "/dashboard",
+      });
     });
   }
 }

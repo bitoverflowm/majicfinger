@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { Progress } from "@/components/ui/progress"
 
 import { userSwrFetcher } from "@/lib/hooks"
+import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJourneyInit"
 
 const Dashbaord = () => {
     const router = useRouter()
@@ -46,6 +47,7 @@ const Dashbaord = () => {
             <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
             <StateProvider>
                 <StateProviderV2>
+                    <AuthenticatedJourneyInit user={user} />
                     <LiveStreamManager />
                     <Toaster />
                     <main className="flex min-h-svh flex-col">

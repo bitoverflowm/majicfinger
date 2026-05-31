@@ -20,6 +20,7 @@ import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
+import { trackAuthEvent } from "@/lib/analytics/authJourneyClient";
 
 /** Brand fills for sidebar integration avatars (matches Connect home hub pills). */
 const INTEGRATION_LOGO_BG = {
@@ -100,6 +101,13 @@ export function ConnectIntegrationsPickerList({
     (row) => {
       if (!row.available || !row.id) return;
       if (!API_INTEGRATIONS.includes(row.id)) return;
+      trackAuthEvent("integration_select", {
+        label: row.name || row.id,
+        meta: {
+          integrationId: row.id,
+          integrationName: row.name || row.id,
+        },
+      });
       setIntegrationSidebar?.(row.id);
       if (connectHomeMode) {
         setRightPanelTab?.("integrations");

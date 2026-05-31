@@ -27,6 +27,7 @@ import {
   isConnectHubIntegrationAvailable,
 } from "@/lib/connectHomeWorkspace";
 import { deriveConnectFlowStep } from "@/lib/connectHomeFlow";
+import { trackAuthEvent } from "@/lib/analytics/authJourneyClient";
 import {
   connectHubDemoColumnGridClass,
   connectHubLayoutClass,
@@ -447,6 +448,13 @@ export default function ConnectDataStep1({
   const openConnectIntegration = useCallback(
     (integrationId) => {
       if (!API_INTEGRATIONS.includes(integrationId)) return;
+      trackAuthEvent("integration_select", {
+        meta: {
+          integrationId,
+          integrationName: integrationId,
+          source: "connect_home",
+        },
+      });
       setConnectedData?.([]);
       setConnectedCols?.([]);
       setIntegrationSidebar?.(integrationId);
@@ -926,18 +934,6 @@ export default function ConnectDataStep1({
                   )}
                 </div>
               ))}
-              <ConnectPillTooltip content="Browse all integrations">
-                <button
-                  type="button"
-                  onClick={() => activate?.(CONNECT_WORKSPACE.INTEGRATIONS_PICKER)}
-                  className={cn(
-                    hubIntegrationSurfaceClass,
-                    "justify-center border-dashed text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground",
-                  )}
-                >
-                  + more
-                </button>
-              </ConnectPillTooltip>
             </div>
           </section>
 
