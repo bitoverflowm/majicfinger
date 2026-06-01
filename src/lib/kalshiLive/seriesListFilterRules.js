@@ -1,3 +1,5 @@
+import { parseKalshiFixedPointCount } from "@/lib/kalshiLive/kalshiFixedPoint";
+
 /** @typedef {{ id: string; kind: "category" | "tags" | "min_updated_ts"; field: string; value: string | number }} KalshiLiveSeriesListFilter */
 
 export const KALSHI_LIVE_SERIES_LIST_SORT_OPTIONS = [
@@ -63,8 +65,7 @@ export function buildKalshiLiveSeriesListApiParams(filters, opts = {}) {
 }
 
 function parseVolumeFp(value) {
-  const n = parseFloat(String(value ?? "").replace(/,/g, ""));
-  return Number.isFinite(n) ? n : 0;
+  return parseKalshiFixedPointCount(value) ?? 0;
 }
 
 function parseTimeMs(value) {

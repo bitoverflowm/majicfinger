@@ -17,6 +17,11 @@ function isTokenIdKey(key) {
   return false;
 }
 
+/** Trade price OHLC on candlesticks — nullable numbers (null when no trade). */
+function isKalshiNullableTradePriceKey(key) {
+  return typeof key === "string" && /^price_.*_dollars$/.test(key);
+}
+
 /** Long digit-only strings (>15 chars) are token IDs - keep as string to avoid precision loss */
 function isLongTokenId(value) {
   const s = typeof value === "string" ? value.trim() : String(value);
@@ -49,6 +54,12 @@ function coerceCell(value, key) {
 
   // Preserve token/condition IDs: never coerce to number (avoids precision loss)
   if (isTokenIdKey(key) || isLongTokenId(value)) return s;
+
+  if (isKalshiNullableTradePriceKey(key)) {
+    if (value === null || value === undefined || s === "") return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
 
   if (s === "true") return true;
   if (s === "false") return false;

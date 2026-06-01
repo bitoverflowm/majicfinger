@@ -23,7 +23,7 @@ export const KALSHI_LIVE_SERIES_COLUMNS = [
   { name: "product_metadata", type: "string", description: "JSON object of internal product metadata" },
   {
     name: "volume_fp",
-    type: "string",
+    type: "number",
     label: "Volume",
     description:
       "Total contracts traded across all events in this series. Single-series pulls request this when Volume is selected; Series List always includes volume from the API.",

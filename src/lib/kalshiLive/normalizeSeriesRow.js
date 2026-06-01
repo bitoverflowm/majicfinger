@@ -1,3 +1,5 @@
+import { parseKalshiFixedPointCount } from "@/lib/kalshiLive/kalshiFixedPoint";
+
 function jsonCell(value) {
   if (value == null) return "";
   if (typeof value === "string") return value;
@@ -41,7 +43,7 @@ export function normalizeKalshiLiveSeriesRow(raw) {
     fee_multiplier: num("fee_multiplier"),
     additional_prohibitions: jsonCell(s.additional_prohibitions),
     product_metadata: jsonCell(s.product_metadata),
-    volume_fp: str("volume_fp"),
+    volume_fp: parseKalshiFixedPointCount(s.volume_fp),
     last_updated_ts: str("last_updated_ts"),
   };
 }

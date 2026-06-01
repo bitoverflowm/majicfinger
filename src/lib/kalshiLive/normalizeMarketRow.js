@@ -1,3 +1,5 @@
+import { parseKalshiFixedPointCount } from "@/lib/kalshiLive/kalshiFixedPoint";
+
 /**
  * Coerce a Kalshi Live /markets item into a flat sheet row with stable types.
  * @param {Record<string, unknown>} raw
@@ -19,6 +21,7 @@ export function normalizeKalshiLiveMarketRow(raw) {
     const n = Number(v);
     return Number.isFinite(n) ? Math.trunc(n) : null;
   };
+  const fp = (k) => parseKalshiFixedPointCount(m[k]);
 
   return {
     ticker: str("ticker"),
@@ -42,9 +45,9 @@ export function normalizeKalshiLiveMarketRow(raw) {
     no_bid_dollars: str("no_bid_dollars"),
     no_ask_dollars: str("no_ask_dollars"),
     last_price_dollars: str("last_price_dollars"),
-    volume_fp: str("volume_fp"),
-    volume_24h_fp: str("volume_24h_fp"),
-    open_interest_fp: str("open_interest_fp"),
+    volume_fp: fp("volume_fp"),
+    volume_24h_fp: fp("volume_24h_fp"),
+    open_interest_fp: fp("open_interest_fp"),
     liquidity_dollars: str("liquidity_dollars"),
     settlement_value_dollars: str("settlement_value_dollars"),
     can_close_early: bool("can_close_early"),

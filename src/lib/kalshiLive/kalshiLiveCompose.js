@@ -63,6 +63,7 @@ export function getKalshiLiveColumnType(endpointId, column) {
       return "string";
     }
     const row = KALSHI_LIVE_CANDLESTICK_COLUMNS.find((c) => c.name === column);
+    if (row?.type === "nullable_number") return "number";
     return row?.type || "string";
   }
   const cols =
