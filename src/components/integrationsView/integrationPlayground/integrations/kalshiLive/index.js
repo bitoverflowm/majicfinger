@@ -5,9 +5,14 @@ import { useCallback, useEffect, useRef } from "react";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
 import { fetchAllKalshiLiveMarketsPages } from "@/lib/kalshiLive/fetchKalshiLiveMarkets";
+import {
+  fetchKalshiLiveSeries,
+  summarizeKalshiLiveSeriesRequest,
+} from "@/lib/kalshiLive/fetchKalshiLiveSeries";
 import { ingestKalshiLiveAsView } from "@/lib/kalshiLive/ingestKalshiLiveAsView";
-import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
 import { summarizeKalshiLiveMarketsRequest } from "@/lib/kalshiLive/marketFilterRules";
+import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
+import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColumns";
 import { applyConnectHomePullData } from "@/lib/connectHomePullDestination";
 
 function genRequestCardId() {
@@ -31,6 +36,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveFilters,
     connectKalshiLiveLimit,
     connectKalshiLiveTickers,
+    connectKalshiLiveSeriesTicker,
     setConnectDataLakePullState,
     setDataSheets,
     activeSheetId,
@@ -39,53 +45,16 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
   const setRows = setConnectedData || setConnectedFromCtx;
 
-  const runPull = useCallback(async () => {
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
+  const runMarketsPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const filters = Array.isArray(connectKalshiLiveFilters) ? connectKalshiLiveFilters : [];
+      const limit = Number(connectKalshiLiveLimit) || 100;
+      const tickers = String(connectKalshiLiveTickers || "").trim();
+      const querySummary = summarizeKalshiLiveMarketsRequest(filters, { limit, tickers });
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
 
-    const endpointId = String(connectKalshiLiveEndpointId || "").trim();
-    if (endpointId !== "markets") {
-      setConnectDataLakePullState?.({
-        loading: false,
-        error: "Select the Markets endpoint first.",
-        label: "",
-        progress: 0,
-      });
-      return;
-    }
-
-    const cols = connectKalshiLiveColumnSelections?.[endpointId] || [];
-    if (!cols.length) {
-      setConnectDataLakePullState?.({
-        loading: false,
-        error: "Select at least one column.",
-        label: "",
-        progress: 0,
-      });
-      return;
-    }
-
-    const filters = Array.isArray(connectKalshiLiveFilters) ? connectKalshiLiveFilters : [];
-    const limit = Number(connectKalshiLiveLimit) || 100;
-    const tickers = String(connectKalshiLiveTickers || "").trim();
-    const querySummary = summarizeKalshiLiveMarketsRequest(filters, { limit, tickers });
-    const requestStartMs =
-      typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
-
-    setConnectDataLakePullState?.({
-      loading: true,
-      error: null,
-      label: "Fetching Kalshi Live markets…",
-      progress: 5,
-    });
-
-    const sheetId = activeSheetId;
-
-    try {
-      /** @type {Record<string, unknown>[]} */
       let accumulated = [];
-      /** @type {unknown[]} */
       let rawMarkets = [];
 
       await fetchAllKalshiLiveMarketsPages({
@@ -125,10 +94,11 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       });
 
       await ingestKalshiLiveAsView({
-        endpointId,
+        endpointId: "markets",
         markets: rawMarkets,
         selectedColumns: cols,
       });
+
       const elapsedMs =
         (typeof performance !== "undefined" && performance?.now
           ? performance.now()
@@ -162,6 +132,138 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       }
 
       applyConnectHomePullData(ctx, accumulated);
+    },
+    [
+      connectKalshiLiveFilters,
+      connectKalshiLiveLimit,
+      connectKalshiLiveTickers,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
+  const runSeriesPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const seriesTicker = String(connectKalshiLiveSeriesTicker || "").trim();
+      const includeVolume = kalshiLiveSeriesWantsIncludeVolume(cols);
+      const querySummary = summarizeKalshiLiveSeriesRequest({
+        seriesTicker,
+        includeVolume,
+      });
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      const series = await fetchKalshiLiveSeries({
+        seriesTicker,
+        includeVolume,
+        signal: ac.signal,
+      });
+
+      const { rows: accumulated } = await ingestKalshiLiveAsView({
+        endpointId: "series",
+        series,
+        selectedColumns: cols,
+      });
+
+      if (setRows) setRows(accumulated);
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      const requestCard = {
+        id: genRequestCardId(),
+        createdAt: Date.now(),
+        elapsedMs,
+        lake: "kalshi-live",
+        table: "series",
+        sheetId: sheetId || null,
+        querySummary,
+        loadedRowCount: accumulated.length,
+      };
+
+      if (sheetId && setDataSheets) {
+        setDataSheets((prev) =>
+          applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
+            provenance: {
+              source: "kalshi-live",
+              endpoint: "series",
+              seriesTicker,
+              includeVolume,
+              querySummary,
+            },
+            requestCards: [requestCard],
+          }),
+        );
+      }
+
+      applyConnectHomePullData(ctx, accumulated);
+    },
+    [connectKalshiLiveSeriesTicker, setConnectDataLakePullState, setDataSheets, setRows, ctx],
+  );
+
+  const runPull = useCallback(async () => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    const endpointId = String(connectKalshiLiveEndpointId || "").trim();
+    const cols = connectKalshiLiveColumnSelections?.[endpointId] || [];
+
+    if (!endpointId) {
+      setConnectDataLakePullState?.({
+        loading: false,
+        error: "Select Markets or Series first.",
+        label: "",
+        progress: 0,
+      });
+      return;
+    }
+
+    if (!cols.length) {
+      setConnectDataLakePullState?.({
+        loading: false,
+        error: "Select at least one column.",
+        label: "",
+        progress: 0,
+      });
+      return;
+    }
+
+    if (endpointId === "series") {
+      const seriesTicker = String(connectKalshiLiveSeriesTicker || "").trim();
+      if (!seriesTicker) {
+        setConnectDataLakePullState?.({
+          loading: false,
+          error: "Series ticker is required.",
+          label: "",
+          progress: 0,
+        });
+        return;
+      }
+    }
+
+    const sheetId = activeSheetId;
+
+    setConnectDataLakePullState?.({
+      loading: true,
+      error: null,
+      label:
+        endpointId === "series" ? "Fetching Kalshi Live series…" : "Fetching Kalshi Live markets…",
+      progress: 5,
+    });
+
+    try {
+      if (endpointId === "series") {
+        await runSeriesPull(ac, sheetId, cols);
+      } else if (endpointId === "markets") {
+        await runMarketsPull(ac, sheetId, cols);
+      } else {
+        throw new Error(`Unknown Kalshi Live endpoint: ${endpointId}`);
+      }
 
       setConnectDataLakePullState?.({
         loading: false,
@@ -182,14 +284,11 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
   }, [
     connectKalshiLiveEndpointId,
     connectKalshiLiveColumnSelections,
-    connectKalshiLiveFilters,
-    connectKalshiLiveLimit,
-    connectKalshiLiveTickers,
-    setConnectDataLakePullState,
-    setDataSheets,
+    connectKalshiLiveSeriesTicker,
     activeSheetId,
-    setRows,
-    ctx,
+    runMarketsPull,
+    runSeriesPull,
+    setConnectDataLakePullState,
   ]);
 
   useEffect(() => {

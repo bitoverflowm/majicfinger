@@ -6,7 +6,7 @@ import { Check, Plus, Trash2 } from "lucide-react";
 
 import { KalshiLiveConnectionStatusDot } from "@/components/connectData/KalshiLiveConnectionStatusDot";
 import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/KalshiLiveTimestampPicker";
-import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
+import { KalshiLivePowerToolsSearch } from "@/components/connectData/KalshiLivePowerToolsSearch";
 import { ConnectQueryComposeRunBar } from "@/components/connectData/ConnectQueryComposeRunBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +39,10 @@ import {
   KALSHI_LIVE_MARKET_STATUS_OPTIONS,
   KALSHI_LIVE_TIMESTAMP_FILTER_FIELDS,
 } from "@/lib/kalshiLive/marketsColumns";
-import { applyKalshiLivePowerSearchSelection } from "@/lib/kalshiLivePowerSearchPull";
+import {
+  applyKalshiLivePowerSearchSelection,
+  applyKalshiLiveSeriesPowerSearchSelection,
+} from "@/lib/kalshiLivePowerSearchPull";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +85,8 @@ export function KalshiLiveIntegrationsCore({
     setConnectKalshiLiveLimit,
     connectKalshiLiveTickers = "",
     setConnectKalshiLiveTickers,
+    connectKalshiLiveSeriesTicker = "",
+    setConnectKalshiLiveSeriesTicker,
     kalshiLivePingState = "idle",
     pingKalshiLiveExchange,
     connectDataLakePullState,
@@ -96,6 +101,8 @@ export function KalshiLiveIntegrationsCore({
   );
   const selectedColumns = connectKalshiLiveColumnSelections[selectedId] || [];
   const selectedSet = new Set(selectedColumns);
+  const isSeries = selectedId === "series";
+  const isMarkets = selectedId === "markets";
   const pullLoading = !!connectDataLakePullState?.loading;
 
   useEffect(() => {
@@ -104,8 +111,8 @@ export function KalshiLiveIntegrationsCore({
   }, [kalshiLivePingState, pingKalshiLiveExchange]);
 
   const filterValidation = useMemo(
-    () => validateKalshiLiveMarketFilters(connectKalshiLiveFilters),
-    [connectKalshiLiveFilters],
+    () => (isMarkets ? validateKalshiLiveMarketFilters(connectKalshiLiveFilters) : null),
+    [connectKalshiLiveFilters, isMarkets],
   );
 
   useEffect(() => {
@@ -115,13 +122,18 @@ export function KalshiLiveIntegrationsCore({
   const handleSelectEndpoint = useCallback(
     (id) => {
       setConnectKalshiLiveEndpointId?.(id);
-      setConnectKalshiLiveTickers?.("");
+      if (id === "series") {
+        setConnectKalshiLiveTickers?.("");
+      } else {
+        setConnectKalshiLiveSeriesTicker?.("");
+      }
       setFilterError(null);
       if (kalshiLivePingState === "idle") pingKalshiLiveExchange?.();
     },
     [
       setConnectKalshiLiveEndpointId,
       setConnectKalshiLiveTickers,
+      setConnectKalshiLiveSeriesTicker,
       kalshiLivePingState,
       pingKalshiLiveExchange,
     ],
@@ -183,31 +195,54 @@ export function KalshiLiveIntegrationsCore({
     [setConnectKalshiLiveFilters],
   );
 
-  const handlePowerSearch = useCallback(
+  const handlePowerSearchMarket = useCallback(
     (suggestion) => {
       runKalshiLiveAction(() => applyKalshiLivePowerSearchSelection(ctx, suggestion));
     },
     [ctx, runKalshiLiveAction],
   );
 
+  const handlePowerSearchSeries = useCallback(
+    (suggestion) => {
+      runKalshiLiveAction(() => applyKalshiLiveSeriesPowerSearchSelection(ctx, suggestion));
+    },
+    [ctx, runKalshiLiveAction],
+  );
+
   const handleRun = useCallback(() => {
+    if (isSeries) {
+      if (!String(connectKalshiLiveSeriesTicker || "").trim()) {
+        setFilterError("Enter a series ticker to pull.");
+        return;
+      }
+      setFilterError(null);
+      runKalshiLiveAction(() => onRunPull?.());
+      return;
+    }
     if (filterValidation) {
       setFilterError(filterValidation);
       return;
     }
     runKalshiLiveAction(() => onRunPull?.());
-  }, [filterValidation, onRunPull, runKalshiLiveAction]);
+  }, [
+    isSeries,
+    connectKalshiLiveSeriesTicker,
+    filterValidation,
+    onRunPull,
+    runKalshiLiveAction,
+  ]);
 
-  const getDisplayLabel = KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel;
+  const getDisplayLabel = useCallback(
+    (col) => KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(selectedId, col),
+    [selectedId],
+  );
 
   return (
     <div className={cn("space-y-3", className)}>
-      <KalshiPowerToolsSearch
-        onSelect={handlePowerSearch}
+      <KalshiLivePowerToolsSearch
+        onSelectMarket={handlePowerSearchMarket}
+        onSelectSeries={handlePowerSearchSeries}
         disabled={pullLoading}
-        suggestionsApiPath="/api/integrations/kalshi-live/search/suggestions"
-        entityTagLabel="Market"
-        parameterMode="market_search"
       />
 
       <div className={cn("space-y-3", selectedId ? "mt-5" : "mt-6")}>
@@ -278,15 +313,35 @@ export function KalshiLiveIntegrationsCore({
         <AnimatePresence>
           {selectedId ? (
             <motion.div
-              key="markets-compose"
+              key={`${selectedId}-compose`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               className="mt-4 space-y-4"
             >
+              {isSeries ? (
+                <div className="space-y-2 rounded-lg border border-border/50 bg-muted/10 p-3">
+                  <Label className="text-xs text-muted-foreground">Series ticker</Label>
+                  <Input
+                    className="h-9 font-mono text-sm"
+                    placeholder="e.g. KXHIGHNY"
+                    value={connectKalshiLiveSeriesTicker}
+                    onChange={(e) => {
+                      setConnectKalshiLiveSeriesTicker?.(e.target.value.toUpperCase());
+                      setFilterError(null);
+                    }}
+                  />
+                  <p className="text-[10px] leading-snug text-muted-foreground">
+                    Required — one series per pull. Use Power Tools (Series) or type a ticker here.
+                  </p>
+                </div>
+              ) : null}
+
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-xs font-semibold tracking-tight text-foreground">
-                    Select which columns you are interested in pulling
+                    {isSeries
+                      ? "Choose columns to show in the sheet"
+                      : "Select which columns you are interested in pulling"}
                   </h2>
                   <div className="flex shrink-0 gap-0.5">
                     <Button
@@ -366,148 +421,158 @@ export function KalshiLiveIntegrationsCore({
                 </ul>
               </div>
 
-              <div className="space-y-2 rounded-lg border border-border/50 bg-muted/10 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label className="text-xs text-muted-foreground">Query</Label>
-                  <div className="flex flex-col items-end gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-[10px] text-muted-foreground">Max rows</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={1000}
-                        className="h-7 w-24 text-[11px]"
-                        value={connectKalshiLiveLimit}
-                        onChange={(e) => {
-                          const n = Math.floor(Number(e.target.value));
-                          setConnectKalshiLiveLimit?.(
-                            Number.isFinite(n)
-                              ? Math.min(1000, Math.max(1, n))
-                              : KALSHI_LIVE_DEFAULT_LIMIT,
-                          );
-                        }}
-                      />
+              {isMarkets ? (
+                <div className="space-y-2 rounded-lg border border-border/50 bg-muted/10 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label className="text-xs text-muted-foreground">Query</Label>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-[10px] text-muted-foreground">Max rows</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={1000}
+                          className="h-7 w-24 text-[11px]"
+                          value={connectKalshiLiveLimit}
+                          onChange={(e) => {
+                            const n = Math.floor(Number(e.target.value));
+                            setConnectKalshiLiveLimit?.(
+                              Number.isFinite(n)
+                                ? Math.min(1000, Math.max(1, n))
+                                : KALSHI_LIVE_DEFAULT_LIMIT,
+                            );
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] leading-snug text-muted-foreground">
+                        Total markets to load (paginates until this cap).
+                      </p>
                     </div>
-                    <p className="text-[10px] leading-snug text-muted-foreground">
-                      Total markets to load (paginates until this cap).
-                    </p>
                   </div>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs">
-                        <Plus className="h-3.5 w-3.5" />
-                        Where
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-56">
-                      <DropdownMenuLabel className="text-xs">Filter by</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-xs"
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          addStatusFilter();
-                        }}
-                      >
-                        Status
-                      </DropdownMenuItem>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="text-xs">Timestamp</DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="max-h-[280px] overflow-y-auto">
-                          {KALSHI_LIVE_TIMESTAMP_FILTER_FIELDS.map((f) => (
-                            <DropdownMenuItem
-                              key={f.id}
-                              className="text-xs"
-                              onSelect={(e) => {
-                                e.preventDefault();
-                                addTimestampFilter(f.id);
-                              }}
-                            >
-                              {f.label}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  {connectKalshiLiveTickers ? (
-                    <span className="text-[10px] text-muted-foreground">
-                      ticker: <span className="font-mono text-foreground">{connectKalshiLiveTickers}</span>
-                      <button
-                        type="button"
-                        className="ml-1 text-primary hover:underline"
-                        onClick={() => setConnectKalshiLiveTickers?.("")}
-                      >
-                        clear
-                      </button>
-                    </span>
-                  ) : null}
-                </div>
-
-                {connectKalshiLiveFilters.length > 0 ? (
-                  <ul className="space-y-2">
-                    {connectKalshiLiveFilters.map((f) => (
-                      <li
-                        key={f.id}
-                        className="flex flex-wrap items-end gap-2 rounded-md border border-border/40 bg-background p-2"
-                      >
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          {f.kind === "status" ? "status" : f.field}
-                        </span>
-                        {f.kind === "status" ? (
-                          <Select
-                            value={String(f.value || "__any__")}
-                            onValueChange={(v) =>
-                              updateFilter(f.id, { value: v === "__any__" ? "" : v })
-                            }
-                          >
-                            <SelectTrigger className="h-8 w-36 text-xs">
-                              <SelectValue placeholder="Any status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__any__" className="text-xs">
-                                Any
-                              </SelectItem>
-                              {KALSHI_LIVE_MARKET_STATUS_OPTIONS.map((s) => (
-                                <SelectItem key={s} value={s} className="text-xs">
-                                  {s}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <KalshiLiveTimestampPicker
-                            value={f.value}
-                            onChange={(unix) => updateFilter(f.id, { value: unix })}
-                            className="min-w-[12rem] flex-1"
-                          />
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          aria-label="Remove filter"
-                          onClick={() => removeFilter(f.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs">
+                          <Plus className="h-3.5 w-3.5" />
+                          Where
                         </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-[11px] text-muted-foreground">No filters — returns up to your limit per page.</p>
-                )}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        <DropdownMenuLabel className="text-xs">Filter by</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-xs"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            addStatusFilter();
+                          }}
+                        >
+                          Status
+                        </DropdownMenuItem>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger className="text-xs">Timestamp</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="max-h-[280px] overflow-y-auto">
+                            {KALSHI_LIVE_TIMESTAMP_FILTER_FIELDS.map((f) => (
+                              <DropdownMenuItem
+                                key={f.id}
+                                className="text-xs"
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  addTimestampFilter(f.id);
+                                }}
+                              >
+                                {f.label}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    {connectKalshiLiveTickers ? (
+                      <span className="text-[10px] text-muted-foreground">
+                        ticker:{" "}
+                        <span className="font-mono text-foreground">{connectKalshiLiveTickers}</span>
+                        <button
+                          type="button"
+                          className="ml-1 text-primary hover:underline"
+                          onClick={() => setConnectKalshiLiveTickers?.("")}
+                        >
+                          clear
+                        </button>
+                      </span>
+                    ) : null}
+                  </div>
 
-                {filterError ? (
-                  <p className="text-[11px] text-destructive" role="alert">
-                    {filterError}
-                  </p>
-                ) : null}
-              </div>
+                  {connectKalshiLiveFilters.length > 0 ? (
+                    <ul className="space-y-2">
+                      {connectKalshiLiveFilters.map((f) => (
+                        <li
+                          key={f.id}
+                          className="flex flex-wrap items-end gap-2 rounded-md border border-border/40 bg-background p-2"
+                        >
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {f.kind === "status" ? "status" : f.field}
+                          </span>
+                          {f.kind === "status" ? (
+                            <Select
+                              value={String(f.value || "__any__")}
+                              onValueChange={(v) =>
+                                updateFilter(f.id, { value: v === "__any__" ? "" : v })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-36 text-xs">
+                                <SelectValue placeholder="Any status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__any__" className="text-xs">
+                                  Any
+                                </SelectItem>
+                                {KALSHI_LIVE_MARKET_STATUS_OPTIONS.map((s) => (
+                                  <SelectItem key={s} value={s} className="text-xs">
+                                    {s}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <KalshiLiveTimestampPicker
+                              value={f.value}
+                              onChange={(unix) => updateFilter(f.id, { value: unix })}
+                              className="min-w-[12rem] flex-1"
+                            />
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            aria-label="Remove filter"
+                            onClick={() => removeFilter(f.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      No filters — returns up to your max rows.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  Full series payload is fetched; only selected columns appear in the sheet. Select
+                  Volume to request total series volume from the API (include_volume).
+                </p>
+              )}
+
+              {filterError ? (
+                <p className="text-[11px] text-destructive" role="alert">
+                  {filterError}
+                </p>
+              ) : null}
 
               <ConnectQueryComposeRunBar
                 selectedCount={selectedColumns.length}

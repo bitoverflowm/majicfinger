@@ -2,6 +2,10 @@ import {
   getKalshiLiveMarketColumnLabel,
   KALSHI_LIVE_MARKETS_COLUMNS,
 } from "@/lib/kalshiLive/marketsColumns";
+import {
+  getKalshiLiveSeriesColumnLabel,
+  KALSHI_LIVE_SERIES_COLUMNS,
+} from "@/lib/kalshiLive/seriesColumns";
 
 /** Connect home — Kalshi Live API endpoints (unauthenticated). */
 export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
@@ -10,12 +14,30 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     title: "Markets",
     description: "Live market metadata, prices, and status from the Kalshi trade API.",
   },
+  {
+    id: "series",
+    title: "Series",
+    description:
+      "Template for recurring events (e.g. weekly jobs report). Pull one series by ticker — parent of related markets.",
+  },
 ];
 
 export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
 
+/** @param {string} endpointId */
+export function getKalshiLiveColumnsForEndpoint(endpointId) {
+  if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
+  return KALSHI_LIVE_MARKETS_COLUMNS;
+}
+
+/** @param {string} endpointId */
+export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col) {
+  if (endpointId === "series") return getKalshiLiveSeriesColumnLabel(col);
+  return getKalshiLiveMarketColumnLabel(col);
+}
+
 export const KALSHI_LIVE_CONNECT_CONFIG = {
   endpoints: KALSHI_LIVE_CONNECT_ENDPOINTS,
-  getColumnsForEndpoint: () => KALSHI_LIVE_MARKETS_COLUMNS,
-  getColumnDisplayLabel: getKalshiLiveMarketColumnLabel,
+  getColumnsForEndpoint: getKalshiLiveColumnsForEndpoint,
+  getColumnDisplayLabel: getKalshiLiveColumnDisplayLabelForEndpoint,
 };

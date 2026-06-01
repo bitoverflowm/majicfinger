@@ -1,5 +1,6 @@
 import { warmDuckDbWasm } from "@/lib/duckdb/duckdbWasmClient";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
+import { projectKalshiLiveSeriesRows } from "@/lib/kalshiLive/normalizeSeriesRow";
 
 /** @type {Map<string, { virtualFileName: string; viewName: string }>} */
 const kalshiLiveRegistry = new Map();
@@ -24,14 +25,22 @@ function viewNameFor(key) {
 /**
  * Register Kalshi Live rows in DuckDB-WASM (background; sheet uses inline rows immediately).
  *
- * @param {{ endpointId: string; markets: unknown[]; selectedColumns?: string[] }} opts
+ * @param {{
+ *   endpointId: string;
+ *   markets?: unknown[];
+ *   series?: Record<string, unknown> | null;
+ *   selectedColumns?: string[];
+ * }} opts
  */
 export async function ingestKalshiLiveAsView(opts) {
   const endpointId = String(opts.endpointId || "markets").trim() || "markets";
-  const sheetRows = projectKalshiLiveMarketRows(
-    opts.markets,
-    opts.selectedColumns,
-  );
+  const sheetRows =
+    endpointId === "series"
+      ? projectKalshiLiveSeriesRows(
+          opts.series ? [opts.series] : [],
+          opts.selectedColumns,
+        )
+      : projectKalshiLiveMarketRows(opts.markets, opts.selectedColumns);
 
   void registerKalshiLiveView(endpointId, sheetRows).catch((err) => {
     console.warn("[ingestKalshiLiveAsView] DuckDB registration failed:", err);
