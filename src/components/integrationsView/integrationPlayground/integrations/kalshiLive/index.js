@@ -10,6 +10,7 @@ import {
   summarizeKalshiLiveSeriesRequest,
 } from "@/lib/kalshiLive/fetchKalshiLiveSeries";
 import { ingestKalshiLiveAsView } from "@/lib/kalshiLive/ingestKalshiLiveAsView";
+import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksPull";
 import { fetchKalshiLiveSeriesListPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesListPull";
 import {
   applyKalshiLiveClientSort,
@@ -51,6 +52,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveLimit,
     connectKalshiLiveWhereFilters,
     connectKalshiLiveSortClauses,
+    connectKalshiLiveCandlestickTickers,
     setConnectDataLakePullState,
     setDataSheets,
     activeSheetId,
@@ -312,6 +314,91 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     ],
   );
 
+  const runCandlesticksPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
+        ? connectKalshiLiveWhereFilters
+        : [];
+      const sortClauses = Array.isArray(connectKalshiLiveSortClauses)
+        ? connectKalshiLiveSortClauses
+        : [];
+      const limit = Number(connectKalshiLiveLimit) || 1000;
+      const marketTickers = String(connectKalshiLiveCandlestickTickers || "").trim();
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Fetching Kalshi Live candlesticks…",
+        progress: 20,
+        error: null,
+      }));
+
+      const { raw, rows: accumulated, querySummary } = await fetchKalshiLiveCandlesticksPull({
+        marketTickers,
+        whereFilters,
+        sortClauses,
+        limit,
+        selectedColumns: cols,
+        signal: ac.signal,
+      });
+
+      if (setRows) setRows(accumulated);
+
+      await ingestKalshiLiveAsView({
+        endpointId: "candlesticks",
+        candlesticks: raw,
+        selectedColumns: cols,
+      });
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      const requestCard = {
+        id: genRequestCardId(),
+        createdAt: Date.now(),
+        elapsedMs,
+        lake: "kalshi-live",
+        table: "candlesticks",
+        sheetId: sheetId || null,
+        querySummary,
+        loadedRowCount: accumulated.length,
+      };
+
+      if (sheetId && setDataSheets) {
+        setDataSheets((prev) =>
+          applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
+            provenance: {
+              source: "kalshi-live",
+              endpoint: "candlesticks",
+              marketTickers,
+              whereFilters,
+              sortClauses,
+              limit,
+              querySummary,
+            },
+            requestCards: [requestCard],
+          }),
+        );
+      }
+
+      applyConnectHomePullData(ctx, accumulated);
+    },
+    [
+      connectKalshiLiveWhereFilters,
+      connectKalshiLiveSortClauses,
+      connectKalshiLiveLimit,
+      connectKalshiLiveCandlestickTickers,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
   const finishPullUi = useCallback(
     (patch) => {
       setConnectDataLakePullState?.((prev) => ({
@@ -338,7 +425,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     if (!endpointId) {
       setConnectDataLakePullState?.({
         loading: false,
-        error: "Select Markets, Series, or Series List first.",
+        error: "Select Markets, Series, Series List, or Market Candlesticks first.",
         label: "",
         progress: 0,
       });
@@ -365,7 +452,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
           ? "Fetching Kalshi Live series…"
           : endpointId === "seriesList"
             ? "Fetching Kalshi Live series list…"
-            : "Fetching Kalshi Live markets…",
+            : endpointId === "candlesticks"
+              ? "Fetching Kalshi Live candlesticks…"
+              : "Fetching Kalshi Live markets…",
       progress: 5,
     });
 
@@ -376,6 +465,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         await runSeriesListPull(ac, sheetId, cols);
       } else if (endpointId === "markets") {
         await runMarketsPull(ac, sheetId, cols);
+      } else if (endpointId === "candlesticks") {
+        await runCandlesticksPull(ac, sheetId, cols);
       } else {
         throw new Error(`Unknown Kalshi Live endpoint: ${endpointId}`);
       }
@@ -403,6 +494,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     runMarketsPull,
     runSeriesPull,
     runSeriesListPull,
+    runCandlesticksPull,
     setConnectDataLakePullState,
     finishPullUi,
   ]);

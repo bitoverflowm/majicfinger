@@ -1,4 +1,8 @@
 import {
+  getKalshiLiveCandlestickColumnLabel,
+  KALSHI_LIVE_CANDLESTICK_COLUMNS,
+} from "@/lib/kalshiLive/candlesticksColumns";
+import {
   getKalshiLiveMarketColumnLabel,
   KALSHI_LIVE_MARKETS_COLUMNS,
 } from "@/lib/kalshiLive/marketsColumns";
@@ -26,18 +30,26 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "Browse many series templates with category/tags filters. Sort by volume on our side when the API has no sort param.",
   },
+  {
+    id: "candlesticks",
+    title: "Market Candlesticks",
+    description:
+      "OHLC price, bid/ask, and volume for one or many markets. Enter tickers below; time range and interval use Where filters.",
+  },
 ];
 
 export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
 
 /** @param {string} endpointId */
 export function getKalshiLiveColumnsForEndpoint(endpointId) {
+  if (endpointId === "candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
   if (endpointId === "series" || endpointId === "seriesList") return KALSHI_LIVE_SERIES_COLUMNS;
   return KALSHI_LIVE_MARKETS_COLUMNS;
 }
 
 /** @param {string} endpointId */
 export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col) {
+  if (endpointId === "candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
   if (endpointId === "series" || endpointId === "seriesList") {
     return getKalshiLiveSeriesColumnLabel(col);
   }

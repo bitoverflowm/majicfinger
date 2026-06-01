@@ -1,3 +1,7 @@
+import {
+  KALSHI_LIVE_CANDLESTICK_API_FILTER_COLUMNS,
+  KALSHI_LIVE_CANDLESTICK_COLUMNS,
+} from "@/lib/kalshiLive/candlesticksColumns";
 import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
 import { validateKalshiLiveMarketFilters } from "@/lib/kalshiLive/marketFilterRules";
 import { KALSHI_LIVE_SERIES_COLUMNS } from "@/lib/kalshiLive/seriesColumns";
@@ -26,8 +30,20 @@ const MARKET_TS_LT = {
   updated_time: "max_updated_ts",
 };
 
+const CANDLESTICK_API_WHERE_COLUMNS = [
+  "start_ts",
+  "end_ts",
+  "period_interval",
+  "include_latest_before_start",
+];
+
 /** @param {string} endpointId */
 export function getKalshiLiveAllColumnNames(endpointId) {
+  if (endpointId === "candlesticks") {
+    const sheet = KALSHI_LIVE_CANDLESTICK_COLUMNS.map((c) => c.name);
+    const api = CANDLESTICK_API_WHERE_COLUMNS.filter((c) => !sheet.includes(c));
+    return [...api, ...sheet];
+  }
   const cols =
     endpointId === "markets"
       ? KALSHI_LIVE_MARKETS_COLUMNS
@@ -39,6 +55,16 @@ export function getKalshiLiveAllColumnNames(endpointId) {
 
 /** @param {string} endpointId */
 export function getKalshiLiveColumnType(endpointId, column) {
+  if (endpointId === "candlesticks") {
+    if (KALSHI_LIVE_CANDLESTICK_API_FILTER_COLUMNS.has(column)) {
+      if (column === "period_interval") return "number";
+      if (column === "include_latest_before_start") return "boolean";
+      if (column.endsWith("_ts")) return "timestamp";
+      return "string";
+    }
+    const row = KALSHI_LIVE_CANDLESTICK_COLUMNS.find((c) => c.name === column);
+    return row?.type || "string";
+  }
   const cols =
     endpointId === "markets"
       ? KALSHI_LIVE_MARKETS_COLUMNS
@@ -70,6 +96,10 @@ export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
   if (endpointId === "seriesList") {
     const { apiFilters } = partitionSeriesListWhere(list);
     return validateKalshiLiveSeriesListFilters(apiFilters);
+  }
+
+  if (endpointId === "candlesticks") {
+    return null;
   }
 
   return null;

@@ -11,6 +11,7 @@ import {
   ColumnPicker,
   HOVER_PREVIEW_SLOT_CLASS,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
+import { KalshiLiveCandlestickTickersField } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -57,6 +58,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveWhereFilters,
     connectKalshiLiveSortClauses = [],
     setConnectKalshiLiveSortClauses,
+    connectKalshiLiveCandlestickTickers = "",
+    setConnectKalshiLiveCandlestickTickers,
     setConnectActiveComposeOps,
     kalshiLivePingState = "idle",
     pingKalshiLiveExchange,
@@ -77,6 +80,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
   }, [selectedId]);
 
   const showHoverPreview = !!hoveredEndpointId && (!selectedId || hoveredEndpointId !== selectedId);
+  const hidePowerToolsForExplore =
+    hoveredEndpointId === "candlesticks" && !selectedId;
 
   useEffect(() => {
     if (kalshiLivePingState !== "idle") return;
@@ -89,6 +94,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectActiveComposeOps?.([]);
       setConnectKalshiLiveWhereFilters?.([]);
       setConnectKalshiLiveSortClauses?.([]);
+      if (id !== "candlesticks") setConnectKalshiLiveCandlestickTickers?.("");
       setFilterError(null);
       if (kalshiLivePingState === "idle") pingKalshiLiveExchange?.();
     },
@@ -97,6 +103,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectActiveComposeOps,
       setConnectKalshiLiveWhereFilters,
       setConnectKalshiLiveSortClauses,
+      setConnectKalshiLiveCandlestickTickers,
       kalshiLivePingState,
       pingKalshiLiveExchange,
     ],
@@ -107,12 +114,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectActiveComposeOps?.([]);
     setConnectKalshiLiveWhereFilters?.([]);
     setConnectKalshiLiveSortClauses?.([]);
+    setConnectKalshiLiveCandlestickTickers?.("");
     setFilterError(null);
   }, [
     setConnectKalshiLiveEndpointId,
     setConnectActiveComposeOps,
     setConnectKalshiLiveWhereFilters,
     setConnectKalshiLiveSortClauses,
+    setConnectKalshiLiveCandlestickTickers,
   ]);
 
   const patchColumns = useCallback(
@@ -252,7 +261,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                         className="absolute inset-0"
                       />
                     </motion.div>
-                  ) : (
+                  ) : hidePowerToolsForExplore ? null : (
                     <motion.div
                       key="power-tools"
                       initial={{ opacity: 0, y: 4 }}
@@ -297,6 +306,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                 onDeselectAll={() => patchColumns(selectedId, () => [])}
                 showComposeOperations={false}
               >
+                {selectedId === "candlesticks" ? (
+                  <KalshiLiveCandlestickTickersField
+                    className="mb-3"
+                    value={connectKalshiLiveCandlestickTickers}
+                    onChange={(v) => setConnectKalshiLiveCandlestickTickers?.(v)}
+                    disabled={pullLoading}
+                  />
+                ) : null}
                 <ConnectDataOperationsSection
                   selectedCount={selectedColumns.length}
                   operations={composeOperations}

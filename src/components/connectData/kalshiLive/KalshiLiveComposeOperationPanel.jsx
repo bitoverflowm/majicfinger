@@ -31,6 +31,8 @@ import {
 } from "@/config/kalshiLiveConnect";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { operatorSymbol } from "@/lib/dataLakeComposeHelpers";
+import { validateKalshiLiveCandlestickPull } from "@/lib/kalshiLive/candlestickCompose";
+import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import {
   getKalshiLiveAllColumnNames,
   getKalshiLiveColumnType,
@@ -46,6 +48,12 @@ function genId(prefix) {
 
 /** @param {string} endpointId @param {string} column */
 function operatorsForColumn(endpointId, column) {
+  if (endpointId === "candlesticks" && column === "period_interval") {
+    return [{ id: "eq", label: "is equal to" }];
+  }
+  if (endpointId === "candlesticks" && column === "include_latest_before_start") {
+    return [{ id: "eq", label: "is equal to" }];
+  }
   if (column === "category") return [{ id: "eq", label: "is equal to" }];
   if (column === "status") return [{ id: "eq", label: "is equal to" }];
   const type = getKalshiLiveColumnType(endpointId, column);
@@ -73,6 +81,13 @@ function operatorsForColumn(endpointId, column) {
 
 /** @param {string} endpointId @param {string} column */
 function defaultWhereValue(endpointId, column) {
+  if (endpointId === "candlesticks") {
+    const now = Math.floor(Date.now() / 1000);
+    if (column === "start_ts") return now - 24 * 60 * 60;
+    if (column === "end_ts") return now;
+    if (column === "period_interval") return 60;
+    if (column === "include_latest_before_start") return false;
+  }
   if (column === "category") return "Economics";
   if (column === "status") return "open";
   const type = getKalshiLiveColumnType(endpointId, column);
@@ -82,6 +97,8 @@ function defaultWhereValue(endpointId, column) {
   if (type === "number") return 0;
   return "";
 }
+
+const CANDLESTICK_ROW_LIMIT_MAX = 10_000;
 
 /**
  * @param {{
@@ -111,6 +128,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveLimit = KALSHI_LIVE_DEFAULT_LIMIT,
     setConnectKalshiLiveLimit,
     connectKalshiLiveColumnSelections = {},
+    connectKalshiLiveCandlestickTickers = "",
   } = ctx;
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
@@ -214,6 +232,17 @@ export function KalshiLiveComposeOperationPanel({
       return;
     }
 
+    if (endpointId === "candlesticks") {
+      const candleErr = validateKalshiLiveCandlestickPull(
+        connectKalshiLiveCandlestickTickers,
+        connectKalshiLiveWhereFilters,
+      );
+      if (candleErr) {
+        setFilterError?.(candleErr);
+        return;
+      }
+    }
+
     setFilterError?.(null);
     flushSync(() => {
       onRunPull?.();
@@ -224,11 +253,33 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveColumnSelections,
     endpointId,
     connectKalshiLiveWhereFilters,
+    connectKalshiLiveCandlestickTickers,
     setFilterError,
     onRunPull,
   ]);
 
+  const rowLimitMax = endpointId === "candlesticks" ? CANDLESTICK_ROW_LIMIT_MAX : 1000;
+
   const renderWhereValueInput = (f) => {
+    if (endpointId === "candlesticks" && f.column === "period_interval") {
+      return (
+        <Select
+          value={String(f.value ?? 60)}
+          onValueChange={(v) => updateWhereFilter(f.id, { value: Number(v) })}
+        >
+          <SelectTrigger className="h-7 min-w-[6rem] flex-1 text-[11px]">
+            <SelectValue placeholder="Interval" />
+          </SelectTrigger>
+          <SelectContent>
+            {KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
     if (f.column === "category") {
       return (
         <KalshiLiveCategorySelect
@@ -374,9 +425,9 @@ export function KalshiLiveComposeOperationPanel({
             </DropdownMenuContent>
           </DropdownMenu>
           <p className="text-[10px] leading-snug text-muted-foreground">
-            Filters on category, tags, and updated time use Kalshi API params when possible. Other
-            columns are filtered on our side after the pull. Category → Other matches custom text or
-            non-standard categories.
+            {endpointId === "candlesticks"
+              ? "start_ts, end_ts, and period_interval are sent to Kalshi. Other columns filter on our side after the pull."
+              : "Filters on category, tags, and updated time use Kalshi API params when possible. Other columns are filtered on our side after the pull. Category → Other matches custom text or non-standard categories."}
           </p>
         </div>
       );
@@ -452,13 +503,15 @@ export function KalshiLiveComposeOperationPanel({
             <Input
               type="number"
               min={1}
-              max={1000}
+              max={rowLimitMax}
               className="h-8 w-32 text-xs"
               value={connectKalshiLiveLimit}
               onChange={(e) => {
                 const n = Math.floor(Number(e.target.value));
                 setConnectKalshiLiveLimit?.(
-                  Number.isFinite(n) ? Math.min(1000, Math.max(1, n)) : KALSHI_LIVE_DEFAULT_LIMIT,
+                  Number.isFinite(n)
+                    ? Math.min(rowLimitMax, Math.max(1, n))
+                    : KALSHI_LIVE_DEFAULT_LIMIT,
                 );
               }}
             />
@@ -473,7 +526,9 @@ export function KalshiLiveComposeOperationPanel({
             </Button>
           </div>
           <p className="text-[10px] leading-snug text-muted-foreground">
-            Applied after API fetch, client filters, and sort.
+            {endpointId === "candlesticks"
+              ? "Max 10,000 candle rows total across all tickers (Kalshi batch cap). Applied after fetch, filters, and sort."
+              : "Applied after API fetch, client filters, and sort."}
           </p>
         </div>
       );

@@ -1,4 +1,5 @@
 import { warmDuckDbWasm } from "@/lib/duckdb/duckdbWasmClient";
+import { projectKalshiLiveCandlestickRows } from "@/lib/kalshiLive/normalizeCandlestickRow";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
 import { projectKalshiLiveSeriesRows } from "@/lib/kalshiLive/normalizeSeriesRow";
 
@@ -30,13 +31,19 @@ function viewNameFor(key) {
  *   markets?: unknown[];
  *   series?: Record<string, unknown> | null;
  *   seriesList?: unknown[];
+ *   candlesticks?: unknown[];
  *   selectedColumns?: string[];
  * }} opts
  */
 export async function ingestKalshiLiveAsView(opts) {
   const endpointId = String(opts.endpointId || "markets").trim() || "markets";
   let sheetRows;
-  if (endpointId === "markets") {
+  if (endpointId === "candlesticks") {
+    sheetRows = projectKalshiLiveCandlestickRows(
+      Array.isArray(opts.candlesticks) ? opts.candlesticks : [],
+      opts.selectedColumns,
+    );
+  } else if (endpointId === "markets") {
     sheetRows = projectKalshiLiveMarketRows(opts.markets, opts.selectedColumns);
   } else if (endpointId === "series") {
     sheetRows = projectKalshiLiveSeriesRows(
