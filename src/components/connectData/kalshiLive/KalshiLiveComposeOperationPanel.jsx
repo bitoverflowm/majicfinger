@@ -537,7 +537,8 @@ export function KalshiLiveComposeOperationPanel({
     return null;
   };
 
-  if (!openComposeOps.length) return null;
+  const selectedColumnCount =
+    (connectKalshiLiveColumnSelections?.[endpointId] || []).length;
 
   return (
     <motion.div className={cn("mt-4 space-y-3", className)}>
@@ -565,6 +566,14 @@ export function KalshiLiveComposeOperationPanel({
         ))}
       </AnimatePresence>
 
+      {!openComposeOps.length ? (
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          {endpointId === "candlesticks"
+            ? "Refine is optional — Run pull uses the last 24 hours and 1-hour candles unless you add Where filters."
+            : "Refine is optional — open Where, Sort, or limit above, or run with your column selection."}
+        </p>
+      ) : null}
+
       {filterError ? (
         <p className="text-[11px] text-destructive" role="alert">
           {filterError}
@@ -590,7 +599,13 @@ export function KalshiLiveComposeOperationPanel({
         >
           Start Over
         </Button>
-        <Button type="button" size="sm" className="h-8 gap-1 text-xs [&_svg]:!size-2" onClick={handleRunPull}>
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 gap-1 text-xs [&_svg]:!size-2"
+          disabled={!selectedColumnCount}
+          onClick={handleRunPull}
+        >
           Run pull
           <Play className="!size-2 shrink-0 fill-current" aria-hidden />
         </Button>
