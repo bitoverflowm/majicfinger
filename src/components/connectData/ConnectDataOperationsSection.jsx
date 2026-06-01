@@ -28,15 +28,20 @@ const OPERATION_ICONS = {
 };
 
 /**
- * @param {{ selectedCount: number; className?: string }} props
+ * @param {{
+ *   selectedCount: number;
+ *   className?: string;
+ *   operations?: import("@/lib/connectComposeOperations").ConnectComposeOperation[];
+ * }} props
  */
-export function ConnectDataOperationsSection({ selectedCount, className }) {
+export function ConnectDataOperationsSection({ selectedCount, className, operations }) {
   const sectionRef = useRef(null);
   const didScrollRef = useRef(false);
   const { connectActiveComposeOps = [], setConnectActiveComposeOps } = useMyStateV2() ?? {};
 
   const show = selectedCount > 0;
   const openSet = new Set(connectActiveComposeOps);
+  const operationList = operations ?? CONNECT_COMPOSE_OPERATIONS;
 
   useEffect(() => {
     if (!show) {
@@ -106,7 +111,7 @@ export function ConnectDataOperationsSection({ selectedCount, className }) {
         </motion.div>
 
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {CONNECT_COMPOSE_OPERATIONS.map((op, i) => {
+          {operationList.map((op, i) => {
             const Icon = OPERATION_ICONS[op.id] || Filter;
             const isOpen = openSet.has(op.id);
             return (

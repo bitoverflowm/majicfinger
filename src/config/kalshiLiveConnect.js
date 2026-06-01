@@ -20,19 +20,27 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "Template for recurring events (e.g. weekly jobs report). Pull one series by ticker — parent of related markets.",
   },
+  {
+    id: "seriesList",
+    title: "Series List",
+    description:
+      "Browse many series templates with category/tags filters. Sort by volume on our side when the API has no sort param.",
+  },
 ];
 
 export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
 
 /** @param {string} endpointId */
 export function getKalshiLiveColumnsForEndpoint(endpointId) {
-  if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
+  if (endpointId === "series" || endpointId === "seriesList") return KALSHI_LIVE_SERIES_COLUMNS;
   return KALSHI_LIVE_MARKETS_COLUMNS;
 }
 
 /** @param {string} endpointId */
 export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col) {
-  if (endpointId === "series") return getKalshiLiveSeriesColumnLabel(col);
+  if (endpointId === "series" || endpointId === "seriesList") {
+    return getKalshiLiveSeriesColumnLabel(col);
+  }
   return getKalshiLiveMarketColumnLabel(col);
 }
 
@@ -41,3 +49,11 @@ export const KALSHI_LIVE_CONNECT_CONFIG = {
   getColumnsForEndpoint: getKalshiLiveColumnsForEndpoint,
   getColumnDisplayLabel: getKalshiLiveColumnDisplayLabelForEndpoint,
 };
+
+/** Compose operations shown for Kalshi Live (subset of historical data-lake ops). */
+export const KALSHI_LIVE_COMPOSE_OPERATION_IDS = ["where", "sort", "row_limit"];
+
+/** @param {string} endpointId */
+export function getKalshiLiveComposeOperationIds(_endpointId) {
+  return KALSHI_LIVE_COMPOSE_OPERATION_IDS;
+}

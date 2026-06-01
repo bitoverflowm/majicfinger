@@ -22,9 +22,16 @@ export function applyKalshiLivePowerSearchSelection(ctx, suggestion) {
       ...(prev || {}),
       [endpointId]: columns,
     }));
-    ctx.setConnectKalshiLiveFilters?.([]);
-    ctx.setConnectKalshiLiveTickers?.(String(suggestion.ticker || "").trim());
-    ctx.setConnectKalshiLiveSeriesTicker?.("");
+    ctx.setConnectKalshiLiveWhereFilters?.([
+      {
+        id: `klw-${Date.now()}`,
+        column: "ticker",
+        op: "eq",
+        value: String(suggestion.ticker || "").trim(),
+      },
+    ]);
+    ctx.setConnectKalshiLiveSortClauses?.([]);
+    ctx.setConnectActiveComposeOps?.(["where"]);
   });
 
   prepareConnectHomePullSheet(ctx);
@@ -45,9 +52,16 @@ export function applyKalshiLiveSeriesPowerSearchSelection(ctx, suggestion) {
       ...(prev || {}),
       [endpointId]: columns,
     }));
-    ctx.setConnectKalshiLiveFilters?.([]);
-    ctx.setConnectKalshiLiveTickers?.("");
-    ctx.setConnectKalshiLiveSeriesTicker?.(String(suggestion.ticker || "").trim().toUpperCase());
+    ctx.setConnectKalshiLiveWhereFilters?.([
+      {
+        id: `klw-${Date.now()}`,
+        column: "ticker",
+        op: "eq",
+        value: String(suggestion.ticker || "").trim().toUpperCase(),
+      },
+    ]);
+    ctx.setConnectKalshiLiveSortClauses?.([]);
+    ctx.setConnectActiveComposeOps?.(["where"]);
   });
 
   prepareConnectHomePullSheet(ctx);

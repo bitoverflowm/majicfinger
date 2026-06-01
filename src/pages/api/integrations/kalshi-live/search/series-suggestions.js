@@ -1,6 +1,15 @@
+import { searchKalshiLiveSeriesSuggestions } from "@/lib/kalshiLive/kalshiLiveSeriesList";
+
+function parseBool(raw) {
+  const v = String(Array.isArray(raw) ? raw[0] : raw || "")
+    .trim()
+    .toLowerCase();
+  return v === "true" || v === "1" || v === "yes";
+}
+
 /**
  * GET /api/integrations/kalshi-live/search/series-suggestions?q=…
- * Ticker-only typeahead for Series (no list endpoint yet).
+ * Uses Kalshi GET /series (tags, category, then broad text match).
  */
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -10,22 +19,20 @@ export default async function handler(req, res) {
 
   const rawQ = req.query.q;
   const q = String(Array.isArray(rawQ) ? rawQ[0] : rawQ || "").trim();
-  if (q.length < 1) {
+  if (q.length < 2) {
     return res.status(200).json({ suggestions: [], q });
   }
 
-  const tickerLike = /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(q);
-  if (!tickerLike) {
-    return res.status(200).json({ suggestions: [], q });
+  const includeVolume = parseBool(req.query.include_volume);
+
+  try {
+    const suggestions = await searchKalshiLiveSeriesSuggestions(q, { includeVolume });
+    return res.status(200).json({ suggestions, q });
+  } catch (e) {
+    return res.status(502).json({
+      error: e instanceof Error ? e.message : "Series search failed",
+      suggestions: [],
+      q,
+    });
   }
-
-  const suggestions = [
-    {
-      entity: "series",
-      ticker: q.toUpperCase(),
-      title: q.toUpperCase(),
-    },
-  ];
-
-  return res.status(200).json({ suggestions, q });
 }

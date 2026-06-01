@@ -60,7 +60,7 @@ const columnRowVariants = {
   }),
 };
 
-const HOVER_PREVIEW_SLOT_CLASS = "h-[min(26rem,42vh)] min-h-[11rem] shrink-0";
+export const HOVER_PREVIEW_SLOT_CLASS = "h-[min(26rem,42vh)] min-h-[11rem] shrink-0";
 
 function getIntegrationMeta(integrationId) {
   const row = integrations_list.find((i) => i.clickHandler === integrationId);
@@ -108,7 +108,7 @@ function IntegrationWorkflowHeader({ name, description, compact = false, onGoBac
   );
 }
 
-function ColumnHoverPreview({ columns, getDisplayLabel, className }) {
+export function ColumnHoverPreview({ columns, getDisplayLabel, className }) {
   if (!columns?.length) return null;
   return (
     <motion.div
@@ -173,7 +173,7 @@ function PolymarketLegacyTradesReference({ intro, columns, getDisplayLabel }) {
   );
 }
 
-function ColumnPicker({
+export function ColumnPicker({
   sourceId,
   columns,
   getDisplayLabel,

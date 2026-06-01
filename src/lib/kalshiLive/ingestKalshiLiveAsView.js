@@ -29,18 +29,28 @@ function viewNameFor(key) {
  *   endpointId: string;
  *   markets?: unknown[];
  *   series?: Record<string, unknown> | null;
+ *   seriesList?: unknown[];
  *   selectedColumns?: string[];
  * }} opts
  */
 export async function ingestKalshiLiveAsView(opts) {
   const endpointId = String(opts.endpointId || "markets").trim() || "markets";
-  const sheetRows =
-    endpointId === "series"
-      ? projectKalshiLiveSeriesRows(
-          opts.series ? [opts.series] : [],
-          opts.selectedColumns,
-        )
-      : projectKalshiLiveMarketRows(opts.markets, opts.selectedColumns);
+  let sheetRows;
+  if (endpointId === "markets") {
+    sheetRows = projectKalshiLiveMarketRows(opts.markets, opts.selectedColumns);
+  } else if (endpointId === "series") {
+    sheetRows = projectKalshiLiveSeriesRows(
+      opts.series ? [opts.series] : [],
+      opts.selectedColumns,
+    );
+  } else if (endpointId === "seriesList") {
+    sheetRows = projectKalshiLiveSeriesRows(
+      Array.isArray(opts.seriesList) ? opts.seriesList : [],
+      opts.selectedColumns,
+    );
+  } else {
+    sheetRows = projectKalshiLiveMarketRows(opts.markets, opts.selectedColumns);
+  }
 
   void registerKalshiLiveView(endpointId, sheetRows).catch((err) => {
     console.warn("[ingestKalshiLiveAsView] DuckDB registration failed:", err);

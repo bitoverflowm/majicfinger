@@ -26,7 +26,7 @@ export const KALSHI_LIVE_SERIES_COLUMNS = [
     type: "string",
     label: "Volume",
     description:
-      "Total contracts traded across all events in this series (requires Volume column — sets include_volume=true)",
+      "Total contracts traded across all events in this series. Single-series pulls request this when Volume is selected; Series List always includes volume from the API.",
   },
   { name: "last_updated_ts", type: "timestamp", description: "When series metadata was last updated (ISO 8601)" },
 ];

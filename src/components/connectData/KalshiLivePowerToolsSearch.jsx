@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Search, Zap } from "lucide-react";
 
@@ -43,12 +43,13 @@ function entityTagClass(entity) {
 const SCOPE_HINT = {
   markets:
     "Search by any word, market ticker, or event ticker — pick a result to load markets data.",
-  series: "Search by series ticker only — pick a result to load that series.",
+  series:
+    "Search by title, category, tags, or series ticker — we query Kalshi’s series list and show matches.",
 };
 
 const SCOPE_PLACEHOLDER = {
   markets: "Search title, market ticker, event ticker…",
-  series: "Enter series ticker…",
+  series: "Search series title, category, tags, ticker…",
 };
 
 /**
@@ -80,6 +81,10 @@ export function KalshiLivePowerToolsSearch({
     [onScopeChange],
   );
 
+  const debounceRef = useRef(null);
+  const suggestAbortRef = useRef(null);
+  const suggestSeqRef = useRef(0);
+
   const [q, setQ] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -87,7 +92,7 @@ export function KalshiLivePowerToolsSearch({
   const [selectLoading, setSelectLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const minQueryLen = scope === "series" ? 1 : 2;
+  const minQueryLen = 2;
   const suggestionsPath =
     scope === "series"
       ? "/api/integrations/kalshi-live/search/series-suggestions"
@@ -95,6 +100,9 @@ export function KalshiLivePowerToolsSearch({
 
   const fetchSuggestions = useCallback(
     async (term) => {
+      const mySeq = ++suggestSeqRef.current;
+      suggestAbortRef.current?.abort();
+
       const trimmed = term.trim();
       if (trimmed.length < minQueryLen) {
         setSuggestions([]);
@@ -103,6 +111,8 @@ export function KalshiLivePowerToolsSearch({
         return;
       }
 
+      const ac = new AbortController();
+      suggestAbortRef.current = ac;
       setSuggestLoading(true);
       setError(null);
       try {
@@ -111,8 +121,11 @@ export function KalshiLivePowerToolsSearch({
         const res = await fetch(`${suggestionsPath}?${params.toString()}`, {
           headers: { Accept: "application/json" },
           credentials: "same-origin",
+          signal: ac.signal,
         });
         const data = await res.json().catch(() => ({}));
+        if (mySeq !== suggestSeqRef.current) return;
+
         if (!res.ok) {
           setSuggestions([]);
           setSuggestOpen(false);
@@ -123,15 +136,29 @@ export function KalshiLivePowerToolsSearch({
         setSuggestions(list);
         setSuggestOpen(list.length > 0 || trimmed.length >= minQueryLen);
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (mySeq !== suggestSeqRef.current) return;
         setSuggestions([]);
         setSuggestOpen(false);
         setError(e instanceof Error ? e.message : "Search failed");
       } finally {
-        setSuggestLoading(false);
+        if (mySeq === suggestSeqRef.current) {
+          setSuggestLoading(false);
+        }
       }
     },
     [minQueryLen, scope, suggestionsPath],
   );
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchSuggestions(q);
+    }, scope === "series" ? 400 : 320);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [q, fetchSuggestions, scope]);
 
   const handleScopeChange = (value) => {
     const next = value === "series" ? "series" : "markets";
@@ -183,19 +210,12 @@ export function KalshiLivePowerToolsSearch({
             type="search"
             placeholder={SCOPE_PLACEHOLDER[scope]}
             value={q}
-            onChange={(e) => {
-              const v = e.target.value;
-              setQ(v);
-              void fetchSuggestions(v);
-            }}
+            onChange={(e) => setQ(e.target.value)}
             onFocus={() => suggestions.length > 0 && setSuggestOpen(true)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
                 if (suggestOpen && suggestions.length > 0) handleSelect(suggestions[0]);
-                else if (scope === "series" && q.trim()) {
-                  handleSelect({ entity: "series", ticker: q.trim().toUpperCase(), title: q.trim() });
-                }
               }
             }}
             disabled={busy}
@@ -204,7 +224,7 @@ export function KalshiLivePowerToolsSearch({
               "flex h-10 w-full rounded-md border border-border bg-background py-2 pl-10 pr-3 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               busy && "opacity-70",
             )}
-            aria-label={scope === "series" ? "Kalshi Live series ticker search" : "Kalshi Live market search"}
+            aria-label={scope === "series" ? "Kalshi Live series search" : "Kalshi Live market search"}
           />
 
           <AnimatePresence>
@@ -242,6 +262,9 @@ export function KalshiLivePowerToolsSearch({
                       onClick={() => handleSelect(s)}
                     >
                       <span className="font-medium text-foreground line-clamp-2">{s.title || s.ticker}</span>
+                      {s.subtitle ? (
+                        <span className="text-xs text-muted-foreground line-clamp-1">{s.subtitle}</span>
+                      ) : null}
                       <span className="text-xs text-muted-foreground">
                         <span
                           className={cn(
