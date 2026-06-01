@@ -32,6 +32,7 @@ import {
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { operatorSymbol } from "@/lib/dataLakeComposeHelpers";
 import { validateKalshiLiveCandlestickPull } from "@/lib/kalshiLive/candlestickCompose";
+import { validateKalshiLiveTradesPull } from "@/lib/kalshiLive/tradeCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import {
   getKalshiLiveAllColumnNames,
@@ -88,6 +89,11 @@ function defaultWhereValue(endpointId, column) {
     if (column === "period_interval") return 60;
     if (column === "include_latest_before_start") return false;
   }
+  if (endpointId === "trades") {
+    const now = Math.floor(Date.now() / 1000);
+    if (column === "min_ts") return now - 24 * 60 * 60;
+    if (column === "max_ts") return now;
+  }
   if (column === "category") return "Economics";
   if (column === "status") return "open";
   const type = getKalshiLiveColumnType(endpointId, column);
@@ -129,6 +135,7 @@ export function KalshiLiveComposeOperationPanel({
     setConnectKalshiLiveLimit,
     connectKalshiLiveColumnSelections = {},
     connectKalshiLiveCandlestickTickers = "",
+    connectKalshiLiveTradesTicker = "",
   } = ctx;
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
@@ -243,6 +250,14 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "trades") {
+      const tradesErr = validateKalshiLiveTradesPull(connectKalshiLiveTradesTicker);
+      if (tradesErr) {
+        setFilterError?.(tradesErr);
+        return;
+      }
+    }
+
     setFilterError?.(null);
     flushSync(() => {
       onRunPull?.();
@@ -254,11 +269,18 @@ export function KalshiLiveComposeOperationPanel({
     endpointId,
     connectKalshiLiveWhereFilters,
     connectKalshiLiveCandlestickTickers,
+    connectKalshiLiveTradesTicker,
     setFilterError,
     onRunPull,
   ]);
 
-  const rowLimitMax = endpointId === "candlesticks" ? CANDLESTICK_ROW_LIMIT_MAX : 1000;
+  const TRADES_ROW_LIMIT_MAX = 10_000;
+  const rowLimitMax =
+    endpointId === "candlesticks"
+      ? CANDLESTICK_ROW_LIMIT_MAX
+      : endpointId === "trades"
+        ? TRADES_ROW_LIMIT_MAX
+        : 1000;
 
   const renderWhereValueInput = (f) => {
     if (endpointId === "candlesticks" && f.column === "period_interval") {
@@ -427,7 +449,9 @@ export function KalshiLiveComposeOperationPanel({
           <p className="text-[10px] leading-snug text-muted-foreground">
             {endpointId === "candlesticks"
               ? "start_ts, end_ts, and period_interval are sent to Kalshi. Other columns filter on our side after the pull."
-              : "Filters on category, tags, and updated time use Kalshi API params when possible. Other columns are filtered on our side after the pull. Category → Other matches custom text or non-standard categories."}
+              : endpointId === "trades"
+                ? "min_ts and max_ts are sent to Kalshi. Other columns filter on our side after the pull."
+                : "Filters on category, tags, and updated time use Kalshi API params when possible. Other columns are filtered on our side after the pull. Category → Other matches custom text or non-standard categories."}
           </p>
         </div>
       );
@@ -528,7 +552,9 @@ export function KalshiLiveComposeOperationPanel({
           <p className="text-[10px] leading-snug text-muted-foreground">
             {endpointId === "candlesticks"
               ? "Max 10,000 candle rows total across all tickers (Kalshi batch cap). Applied after fetch, filters, and sort."
-              : "Applied after API fetch, client filters, and sort."}
+              : endpointId === "trades"
+                ? "Max 10,000 trades total (paginated, 1,000 per API page). Applied after fetch, filters, and sort."
+                : "Applied after API fetch, client filters, and sort."}
           </p>
         </div>
       );
@@ -570,7 +596,9 @@ export function KalshiLiveComposeOperationPanel({
         <p className="text-[10px] leading-snug text-muted-foreground">
           {endpointId === "candlesticks"
             ? "Refine is optional — Run pull uses the last 24 hours and 1-hour candles unless you add Where filters."
-            : "Refine is optional — open Where, Sort, or limit above, or run with your column selection."}
+            : endpointId === "trades"
+              ? "Refine is optional — Run pull uses your row limit and optional min_ts / max_ts Where filters."
+              : "Refine is optional — open Where, Sort, or limit above, or run with your column selection."}
         </p>
       ) : null}
 

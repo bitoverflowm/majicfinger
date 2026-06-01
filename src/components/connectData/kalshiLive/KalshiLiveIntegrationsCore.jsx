@@ -12,6 +12,7 @@ import {
   HOVER_PREVIEW_SLOT_CLASS,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { KalshiLiveCandlestickTickersField } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickTickersField";
+import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -60,6 +61,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveSortClauses,
     connectKalshiLiveCandlestickTickers = "",
     setConnectKalshiLiveCandlestickTickers,
+    connectKalshiLiveTradesTicker = "",
+    setConnectKalshiLiveTradesTicker,
     setConnectActiveComposeOps,
     kalshiLivePingState = "idle",
     pingKalshiLiveExchange,
@@ -81,7 +84,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
 
   const showHoverPreview = !!hoveredEndpointId && (!selectedId || hoveredEndpointId !== selectedId);
   const hidePowerToolsForExplore =
-    hoveredEndpointId === "candlesticks" && !selectedId;
+    (hoveredEndpointId === "candlesticks" || hoveredEndpointId === "trades") && !selectedId;
 
   useEffect(() => {
     if (kalshiLivePingState !== "idle") return;
@@ -95,6 +98,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveWhereFilters?.([]);
       setConnectKalshiLiveSortClauses?.([]);
       if (id !== "candlesticks") setConnectKalshiLiveCandlestickTickers?.("");
+      if (id !== "trades") setConnectKalshiLiveTradesTicker?.("");
       setFilterError(null);
       if (kalshiLivePingState === "idle") pingKalshiLiveExchange?.();
     },
@@ -104,6 +108,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveWhereFilters,
       setConnectKalshiLiveSortClauses,
       setConnectKalshiLiveCandlestickTickers,
+      setConnectKalshiLiveTradesTicker,
       kalshiLivePingState,
       pingKalshiLiveExchange,
     ],
@@ -115,6 +120,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveWhereFilters?.([]);
     setConnectKalshiLiveSortClauses?.([]);
     setConnectKalshiLiveCandlestickTickers?.("");
+    setConnectKalshiLiveTradesTicker?.("");
     setFilterError(null);
   }, [
     setConnectKalshiLiveEndpointId,
@@ -122,6 +128,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveWhereFilters,
     setConnectKalshiLiveSortClauses,
     setConnectKalshiLiveCandlestickTickers,
+    setConnectKalshiLiveTradesTicker,
   ]);
 
   const patchColumns = useCallback(
@@ -311,6 +318,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                     className="mb-3"
                     value={connectKalshiLiveCandlestickTickers}
                     onChange={(v) => setConnectKalshiLiveCandlestickTickers?.(v)}
+                    disabled={pullLoading}
+                  />
+                ) : null}
+                {selectedId === "trades" ? (
+                  <KalshiLiveTradesTickerField
+                    className="mb-3"
+                    value={connectKalshiLiveTradesTicker}
+                    onChange={(v) => setConnectKalshiLiveTradesTicker?.(v)}
                     disabled={pullLoading}
                   />
                 ) : null}

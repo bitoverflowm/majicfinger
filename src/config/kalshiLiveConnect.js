@@ -10,6 +10,10 @@ import {
   getKalshiLiveSeriesColumnLabel,
   KALSHI_LIVE_SERIES_COLUMNS,
 } from "@/lib/kalshiLive/seriesColumns";
+import {
+  getKalshiLiveTradeColumnLabel,
+  KALSHI_LIVE_TRADES_COLUMNS,
+} from "@/lib/kalshiLive/tradesColumns";
 
 /** Connect home — Kalshi Live API endpoints (unauthenticated). */
 export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
@@ -36,6 +40,12 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "OHLC price, bid/ask, and volume for one or many markets. Enter tickers below; time range and interval use Where filters.",
   },
+  {
+    id: "trades",
+    title: "Trades",
+    description:
+      "Completed transactions for one market — price, size, and direction. Enter a market ticker; optional time filters via Where.",
+  },
 ];
 
 export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
@@ -43,6 +53,7 @@ export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
 /** @param {string} endpointId */
 export function getKalshiLiveColumnsForEndpoint(endpointId) {
   if (endpointId === "candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
+  if (endpointId === "trades") return KALSHI_LIVE_TRADES_COLUMNS;
   if (endpointId === "series" || endpointId === "seriesList") return KALSHI_LIVE_SERIES_COLUMNS;
   return KALSHI_LIVE_MARKETS_COLUMNS;
 }
@@ -50,6 +61,7 @@ export function getKalshiLiveColumnsForEndpoint(endpointId) {
 /** @param {string} endpointId */
 export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col) {
   if (endpointId === "candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
+  if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "series" || endpointId === "seriesList") {
     return getKalshiLiveSeriesColumnLabel(col);
   }
