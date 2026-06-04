@@ -186,7 +186,44 @@ export const kalshiHistoricalHub: HubPageConfig = {
               title: "Kalshi Weather Probability Calibration Chart",
               href: "/guides/kalshi-weather-probability-calibration-chart",
             },
+            {
+              title: "Kalshi Weather Volatility Chart",
+              href: "/guides/kalshi-weather-volatility-chart",
+              description:
+                "Calculate and visualize rolling volatility in Kalshi weather markets using historical trades.",
+            },
           ],
+        },
+      ],
+    },
+
+    {
+      type: "video_carousel",
+      anchorId: "video-instructions",
+      title: "Video Instructions",
+      description:
+        "Step-by-step walkthroughs for building Kalshi weather market charts on historical data — probability convergence, calibration, and volatility.",
+      videos: [
+        {
+          videoId: "6puApqBkg3A",
+          title: "Build a Kalshi Probability Convergence Chart",
+          description:
+            "Watch how to pull historical trades, bucket by time, and chart VWPA-style probability convergence for weather markets.",
+          guideHref: "/guides/kalshi-weather-probability-convergence-chart",
+        },
+        {
+          videoId: "75-Ox-ciLbY",
+          title: "Build a Kalshi Weather Probability Calibration Chart",
+          description:
+            "See how to bucket market outcomes and compare implied probabilities to long-run resolution rates.",
+          guideHref: "/guides/kalshi-weather-probability-calibration-chart",
+        },
+        {
+          videoId: "qdtTWOsU-yQ",
+          title: "Build a Kalshi Weather Volatility Chart",
+          description:
+            "Follow the full workflow for returns, rolling standard deviation, and intraday volatility clustering on weather trades.",
+          guideHref: "/guides/kalshi-weather-volatility-chart",
         },
       ],
     },

@@ -12,7 +12,9 @@ import type {
   HubSection,
   HubStatsSection,
   HubTextBlockSection,
+  HubVideoCarouselSection,
 } from "@/types/hub";
+import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
 
 const HubKalshiQueryBuilder = dynamic(
   () =>
@@ -225,6 +227,29 @@ function HubPublishedCharts({
   );
 }
 
+function HubVideoCarousel({ section }: { section: HubVideoCarouselSection }) {
+  return (
+    <section
+      id={section.anchorId}
+      className={cn("w-full px-6 py-20 md:py-28", section.anchorId && "scroll-mt-28")}
+    >
+      <div className="mx-auto w-full max-w-4xl space-y-4 text-center">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+          {section.title}
+        </h2>
+        {section.description ? (
+          <p className="mx-auto max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+            {section.description}
+          </p>
+        ) : null}
+      </div>
+      <div className="mx-auto mt-12 w-full max-w-5xl">
+        <HubVideoInstructionsCarousel videos={section.videos} />
+      </div>
+    </section>
+  );
+}
+
 function HubCta({ section }: { section: HubCtaSection }) {
   return (
     <section className="w-full px-6 py-20 md:py-28">
@@ -280,6 +305,8 @@ export function HubSectionRenderer({
           <HubPublishedCharts section={section} assets={assets} />
         </div>
       );
+    case "video_carousel":
+      return wrapper(<HubVideoCarousel section={section} />);
     case "cta":
       return wrapper(<HubCta section={section} />);
     default:

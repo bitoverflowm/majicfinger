@@ -73,6 +73,21 @@ export type HubPublishedChartsSection = {
   description?: string;
 };
 
+export type HubVideoInstruction = {
+  videoId: string;
+  title: string;
+  description?: string;
+  guideHref: string;
+};
+
+export type HubVideoCarouselSection = {
+  type: "video_carousel";
+  anchorId?: string;
+  title: string;
+  description?: string;
+  videos: HubVideoInstruction[];
+};
+
 export type HubSection =
   | HubHeroSection
   | HubStatsSection
@@ -80,7 +95,8 @@ export type HubSection =
   | HubTextBlockSection
   | HubLinkGroupSection
   | HubCtaSection
-  | HubPublishedChartsSection;
+  | HubPublishedChartsSection
+  | HubVideoCarouselSection;
 
 export type HubAssetFilter = {
   /** Match dashboards whose tags include any of these (case-insensitive). */
