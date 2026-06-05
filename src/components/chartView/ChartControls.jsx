@@ -256,6 +256,8 @@ export default function ChartControls() {
     handleToggleHorizontal,
     stackedBar,
     handleToggleStack,
+    barSeriesColumn,
+    setBarSeriesColumn,
     rainbowBar,
     setRainbowBar,
     setRainbowBarShuffleNonce,
@@ -1308,6 +1310,60 @@ export default function ChartControls() {
                         )}
                       </div>
                       {selChartType === "bar" && selY.length > 0 && (
+                        <div className="min-w-0 space-y-2 border-b border-border/60 pb-3 pt-2">
+                          <div>
+                            <p className="mb-1 text-xs font-bold text-muted-foreground">Break down bars by</p>
+                            <p className="mb-1 text-[10px] leading-snug text-muted-foreground">
+                              Pivot long data (e.g. outcome) into stacked or grouped series on the same X value.
+                            </p>
+                            <Select
+                              value={barSeriesColumn ?? "__none__"}
+                              onValueChange={(v) => setBarSeriesColumn(v === "__none__" ? null : v)}
+                            >
+                              <SelectTrigger className="min-w-0">
+                                <SelectValue placeholder="None" className="text-xs" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                <SelectItem value="__none__" className="text-xs">
+                                  None (one bar per Y column)
+                                </SelectItem>
+                                {(xOptions || [])
+                                  .filter((k) => k !== selX && !(selY || []).includes(k))
+                                  .map((k) => (
+                                    <SelectItem key={k} value={k} className="text-xs">
+                                      {formatColumnLabel(k)}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {barSeriesColumn ? (
+                            <div>
+                              <p className="mb-1 text-xs font-bold text-muted-foreground">Bar layout</p>
+                              <ToggleGroup
+                                type="single"
+                                variant="outline"
+                                size="sm"
+                                className="flex w-full min-w-0 justify-stretch [&>button]:min-w-0 [&>button]:flex-1"
+                                value={stackedBar ? "stacked" : "grouped"}
+                                onValueChange={(v) => {
+                                  if (v === "stacked") handleToggleStack(true);
+                                  if (v === "grouped") handleToggleStack(false);
+                                }}
+                                aria-label="Stacked or grouped bars"
+                              >
+                                <ToggleGroupItem value="grouped" className="text-xs">
+                                  Grouped
+                                </ToggleGroupItem>
+                                <ToggleGroupItem value="stacked" className="text-xs">
+                                  Stacked
+                                </ToggleGroupItem>
+                              </ToggleGroup>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                      {selChartType === "bar" && selY.length > 0 && !barSeriesColumn && (
                         <div className="pt-2">
                           <p className="mb-1 text-xs font-bold text-muted-foreground">Bars</p>
                           <div className="flex flex-wrap gap-2 py-1">
@@ -1441,7 +1497,7 @@ export default function ChartControls() {
                     </>
                   )}
 
-                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "line" && selChartType !== "treemap" && (
+                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "line" && selChartType !== "treemap" && !(selChartType === "bar" && barSeriesColumn) && (
                     <Button
                       type="button"
                       variant="secondary"

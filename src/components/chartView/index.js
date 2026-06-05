@@ -25,6 +25,7 @@ import { isCategoricalLabelColumn, looksLikeProseLabelValue } from "@/lib/chartC
 import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
 import { temporalToMs } from "@/lib/temporalParse";
 import { downsampleRowsForChart } from "@/lib/chartRenderCap";
+import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
 
 const ChartBuilderContext = createContext(null);
 
@@ -680,6 +681,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [expanded, setExpanded] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
   const [stackedBar, setStackedBar] = useState(false);
+  /** When set (bar charts), pivot long rows by this column into stacked/grouped series (e.g. outcome). */
+  const [barSeriesColumn, setBarSeriesColumn] = useState(null);
   /** Recharts `layout="vertical"` — bars extend horizontally; category axis moves to Y. */
   const [horizontal, setHorizontal] = useState(false);
   /** Bar chart: each bar (per Y series) picks from the active Shadcn palette via a stable hash. */
@@ -803,6 +806,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.expanded !== undefined) setExpanded(!!s.expanded);
     if (s.legendVisible !== undefined) setLegendVisible(!!s.legendVisible);
     if (s.stackedBar !== undefined) setStackedBar(!!s.stackedBar);
+    if (s.barSeriesColumn !== undefined) setBarSeriesColumn(s.barSeriesColumn || null);
     if (s.horizontal !== undefined) setHorizontal(!!s.horizontal);
     if (s.rainbowBar !== undefined) setRainbowBar(!!s.rainbowBar);
     if (s.rainbowBarShuffleNonce != null && Number.isFinite(Number(s.rainbowBarShuffleNonce))) {
@@ -1369,6 +1373,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     expanded,
     legendVisible,
     stackedBar,
+    barSeriesColumn,
     horizontal,
     rainbowBar,
     rainbowBarShuffleNonce,
@@ -1701,6 +1706,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     handleToggleLegend: setLegendVisible,
     stackedBar,
     handleToggleStack: setStackedBar,
+    barSeriesColumn,
+    setBarSeriesColumn,
     horizontal,
     handleToggleHorizontal: setHorizontal,
     rainbowBar,
@@ -1824,6 +1831,7 @@ export function ChartCanvas() {
     expanded,
     legendVisible,
     stackedBar,
+    barSeriesColumn,
     horizontal,
     rainbowBar,
     rainbowBarShuffleNonce,
@@ -1888,17 +1896,6 @@ export function ChartCanvas() {
 
   const rawData = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
-  const ySeries = useMemo(
-    () =>
-      yKeys.map((sourceKey, idx) => ({
-        id: `line:${idx}`,
-        sourceKey,
-        renderKey: `__chart_line_${idx}`,
-        label: `Line ${idx + 1}: ${stripSheetScopedColumnKey(sourceKey)}`,
-      })),
-    [yKeys],
-  );
-  const renderedYKeys = useMemo(() => ySeries.map((series) => series.renderKey), [ySeries]);
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
   const axesConfigured = usingSampleFallback || (!!selX && yKeys.length > 0);
   const xKey = selX || "month";
@@ -1942,9 +1939,35 @@ export function ChartCanvas() {
     });
   }, [plotRows, xAxisType, xKey, selX, sortXDir, effectiveTemporalSort]);
 
+  const barSeriesPivot = useMemo(() => {
+    if (selChartType !== "bar" || !barSeriesColumn || !yKeys[0]) return null;
+    return pivotBarChartBySeries(sortedPlotRows, xKey, yKeys[0], barSeriesColumn);
+  }, [selChartType, barSeriesColumn, sortedPlotRows, xKey, yKeys]);
+
+  const ySeries = useMemo(() => {
+    if (barSeriesPivot?.seriesKeys?.length) {
+      return barSeriesPivot.seriesKeys.map((seriesKey, idx) => ({
+        id: `bar:${idx}`,
+        sourceKey: seriesKey,
+        renderKey: seriesKey,
+        label: seriesKey,
+      }));
+    }
+    return yKeys.map((sourceKey, idx) => ({
+      id: `line:${idx}`,
+      sourceKey,
+      renderKey: `__chart_line_${idx}`,
+      label: `Line ${idx + 1}: ${stripSheetScopedColumnKey(sourceKey)}`,
+    }));
+  }, [barSeriesPivot, yKeys]);
+
+  const renderedYKeys = useMemo(() => ySeries.map((series) => series.renderKey), [ySeries]);
+
+  const plotRowsForMaterialize = barSeriesPivot?.rows ?? sortedPlotRows;
+
   const filteredPlotRows = useMemo(() => {
-    return materializeChartSeriesRows(sortedPlotRows, ySeries, chartLineFilters);
-  }, [sortedPlotRows, ySeries, chartLineFilters]);
+    return materializeChartSeriesRows(plotRowsForMaterialize, ySeries, chartLineFilters);
+  }, [plotRowsForMaterialize, ySeries, chartLineFilters]);
 
   const timeframedPlotRows = useMemo(() => {
     if (!chartUsesTimeframes) return filteredPlotRows;
