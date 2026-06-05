@@ -137,17 +137,46 @@ export function normalizeIfElseExpressionFromTab(tab) {
 
 /** @param {IfElseTab | null | undefined} tab */
 export function ifElseTabCanSubmit(tab) {
+  return getIfElseTabValidationErrors(tab).ok;
+}
+
+/** @returns {{ ok: boolean; message: string; fieldErrors: Record<string, string> }} */
+export function getIfElseTabValidationErrors(tab) {
+  const fieldErrors = {};
+  let message = "";
+  if (!String(tab?.column || "").trim()) {
+    fieldErrors.column = "Enter a resulting column name.";
+    message = fieldErrors.column;
+  }
   const clauses = Array.isArray(tab?.clauses) ? tab.clauses : [];
-  return clauses.some((clause) => {
+  let validClauseCount = 0;
+  clauses.forEach((clause, idx) => {
     const condition = clause?.condition || {};
-    return (
-      String(condition.leftColumn || "").trim() &&
-      conditionRightValueIsValid(
-        condition.operator,
-        condition.rightKind,
-        condition.rightColumn,
-        condition.rightValue,
-      )
+    const label = idx === 0 ? "If" : `Else if ${idx}`;
+    const left = String(condition.leftColumn || "").trim();
+    if (!left) {
+      fieldErrors[`clause.${clause.id}.leftColumn`] = "Choose a column.";
+      if (!message) message = `${label}: choose which column to evaluate.`;
+    }
+    const rightValid = conditionRightValueIsValid(
+      condition.operator,
+      condition.rightKind,
+      condition.rightColumn,
+      condition.rightValue,
     );
+    if (left && !rightValid) {
+      if (condition.rightKind === "column") {
+        fieldErrors[`clause.${clause.id}.rightColumn`] = "Choose a comparison column.";
+        if (!message) message = `${label}: choose a comparison column.`;
+      } else if (!["is_empty", "is_not_empty"].includes(String(condition.operator || ""))) {
+        fieldErrors[`clause.${clause.id}.rightValue`] = "Enter a comparison value.";
+        if (!message) message = `${label}: enter a comparison value.`;
+      }
+    }
+    if (left && rightValid) validClauseCount += 1;
   });
+  if (!validClauseCount && !message) {
+    message = "Add at least one valid if / else condition.";
+  }
+  return { ok: validClauseCount > 0 && !Object.keys(fieldErrors).length, message, fieldErrors };
 }

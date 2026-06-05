@@ -11,7 +11,7 @@ import { removeDataSheetFromWorkspace } from "@/lib/removeDataSheetFromWorkspace
 import {
   compareConditionValues,
   createEmptyIfElseTab,
-  ifElseTabCanSubmit,
+  getIfElseTabValidationErrors,
   ifElseTabFromOperation,
   normalizeIfElseExpressionFromTab,
 } from "@/lib/ifElseConditionValues";
@@ -113,6 +113,7 @@ import {
   bucketTabFromOperation,
   collectBucketTabsForSourceSheet,
   createEmptyBucketTab,
+  getBucketTabValidationErrors,
 } from "@/lib/bucketSheetTabs";
 import { aggregateBucketRows, formatBucketNumber } from "@/lib/sheetOperations/aggregateBucketRows";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
@@ -128,6 +129,33 @@ const QUARTER_LIKE = /^Q([1-4])\s*'?\s*(\d{2})$/i;
 const MONTH_LIKE = /^(\d{4})-(\d{2})$/;
 const YEAR_LIKE = /^(\d{4})$/;
 const SHEET_JSON_INITIAL_ROWS = 40;
+
+const EMPTY_MODAL_APPLY_STATE = { busy: false, progress: 0, label: "", error: null, fieldErrors: {} };
+
+const APPLY_FIELD_ERROR_CLASS = "border-destructive ring-1 ring-destructive";
+
+async function runModalApplyProgress(setState, steps, work) {
+  setState({ busy: true, progress: 5, label: "Starting…", error: null, fieldErrors: {} });
+  try {
+    for (const step of steps) {
+      setState((prev) => ({ ...prev, ...step }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const result = await work();
+    setState((prev) => ({ ...prev, progress: 100, label: "Complete" }));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    return result;
+  } catch (err) {
+    setState({
+      busy: false,
+      progress: 0,
+      label: "",
+      error: err?.message || "Operation failed.",
+      fieldErrors: err?.fieldErrors || {},
+    });
+    return false;
+  }
+}
 const SHEET_JSON_CHUNK_ROWS = 160;
 const BUCKET_AGG_FILTER_OPERATORS = [
   { value: "=", label: "=" },
@@ -457,6 +485,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [summarizeOpen, setSummarizeOpen] = useState(false);
     const [mathDialogOpen, setMathDialogOpen] = useState(false);
     const [ifElseDialogOpen, setIfElseDialogOpen] = useState(false);
+    const [ifElseApplyState, setIfElseApplyState] = useState(EMPTY_MODAL_APPLY_STATE);
+    const [bucketApplyState, setBucketApplyState] = useState(EMPTY_MODAL_APPLY_STATE);
     const [mathBaseCol, setMathBaseCol] = useState("");
     const [mathReferenceMode, setMathReferenceMode] = useState("row_wise");
     const [mathCurrentRowRef, setMathCurrentRowRef] = useState("current_row");
@@ -799,6 +829,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
     useEffect(() => {
       if (!ifElseDialogOpen) {
         ifElseDialogInitializedRef.current = false;
+        setIfElseApplyState(EMPTY_MODAL_APPLY_STATE);
         return;
       }
       if (ifElseDialogInitializedRef.current) return;
@@ -817,6 +848,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
 
     useEffect(() => {
       if (!mathDialogOpen) {
+        setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
         setMathDialogTab("basic");
         setStatsStdDevActive(false);
         setStatsStdSourceCol("");
@@ -1185,11 +1217,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setActiveIfElseTabId(tab.id);
     }, [nextFreeResultColumnName]);
 
-    const activeIfElseCanSubmit = useMemo(
-      () => ifElseTabCanSubmit(activeIfElseTab),
-      [activeIfElseTab],
-    );
-
     const renderMathOperandEditor = (label, value, onChange) => {
       const spec = value && typeof value === "object" ? value : { kind: "raw", value: "" };
       const kind = spec.kind || "raw";
@@ -1292,96 +1319,121 @@ const GridView = ({ startNew, fillViewport = false }) => {
       );
     };
 
-    const applyIfElseOperation = useCallback(() => {
+    const applyIfElseOperation = useCallback(async () => {
       const tab = activeIfElseTab;
       if (!tab) return;
       const rows = Array.isArray(connectedData) ? [...connectedData] : [];
       if (!rows.length) {
-        toast.error("Load sheet data before running a column calculation.");
-        return;
-      }
-      const out = String(tab.column || "").trim() || nextFreeResultColumnName();
-      if (!out) {
-        toast.error("Enter a name for the new column.");
-        return;
-      }
-      const expression = normalizeIfElseExpressionFromTab(tab);
-      if (!ifElseTabCanSubmit(tab)) {
-        toast.error("Add at least one valid if / else condition.");
-        return;
-      }
-      const next = rows.map((row) => {
-        if (!row || typeof row !== "object") return row;
-        return { ...row, [out]: evaluateIfElseExpression(row, expression) };
-      });
-      const inferredType = next.some((row) => row?.[out] != null && row?.[out] !== "" && !Number.isNaN(Number(row?.[out])))
-        ? "number"
-        : "string";
-      if (setDataTypes) {
-        setDataTypes((prev) => ({ ...(prev || {}), [out]: inferredType }));
-      }
-      const operation = createSheetOperation("computed.column", {
-        column: out,
-        expression,
-      });
-      const savedColumn = String(tab.savedColumn || "").trim();
-      const isNewColumnName = Boolean(savedColumn) && savedColumn !== out;
-
-      if (mathDestination === "new_sheet") {
-        const sheetName = `${out} calc`;
-        addNewSheetAndActivate?.((newId) => {
-          setSheetData?.(newId, next);
-          setDataSheets?.((prev) => appendSheetOperation(prev, newId, operation));
+        setIfElseApplyState({
+          busy: false,
+          progress: 0,
+          label: "",
+          error: "Load sheet data before running a column calculation.",
+          fieldErrors: {},
         });
-        toast.success("Applied if / else in a new sheet.");
+        return;
+      }
+      const validation = getIfElseTabValidationErrors(tab);
+      if (!validation.ok) {
+        setIfElseApplyState({
+          busy: false,
+          progress: 0,
+          label: "",
+          error: validation.message,
+          fieldErrors: validation.fieldErrors,
+        });
         return;
       }
 
-      if (!activeSheetId || !setDataSheets) {
-        toast.error("No active sheet to apply the operation.");
-        return;
-      }
+      const ok = await runModalApplyProgress(
+        setIfElseApplyState,
+        [
+          { progress: 25, label: "Evaluating conditions…" },
+          { progress: 55, label: "Writing column…" },
+          { progress: 85, label: "Saving operation…" },
+        ],
+        async () => {
+          const out = String(tab.column || "").trim() || nextFreeResultColumnName();
+          const expression = normalizeIfElseExpressionFromTab(tab);
+          const next = rows.map((row) => {
+            if (!row || typeof row !== "object") return row;
+            return { ...row, [out]: evaluateIfElseExpression(row, expression) };
+          });
+          const inferredType = next.some((row) => row?.[out] != null && row?.[out] !== "" && !Number.isNaN(Number(row?.[out])))
+            ? "number"
+            : "string";
+          if (setDataTypes) {
+            setDataTypes((prev) => ({ ...(prev || {}), [out]: inferredType }));
+          }
+          const operation = createSheetOperation("computed.column", {
+            column: out,
+            expression,
+          });
+          const savedColumn = String(tab.savedColumn || "").trim();
+          const isNewColumnName = Boolean(savedColumn) && savedColumn !== out;
 
-      if (tab.operationId && !isNewColumnName) {
-        setDataSheets?.((prev) => replaceSheetOperation(prev, activeSheetId, tab.operationId, operation));
-        setIfElseTabs((prev) =>
-          prev.map((t) =>
-            t.id === tab.id
-              ? { ...t, column: out, savedColumn: out, operationId: tab.operationId }
-              : t,
-          ),
-        );
-      } else if (tab.operationId && isNewColumnName) {
-        setDataSheets?.((prev) => appendSheetOperation(prev, activeSheetId, operation));
-        const history = Array.isArray(activeSheet?.operationHistory) ? activeSheet.operationHistory : [];
-        const restoredTab = ifElseTabFromOperation(history.find((op) => op?.id === tab.operationId));
-        const newTab = {
-          ...tab,
-          id: operation.id,
-          operationId: operation.id,
-          savedColumn: out,
-          column: out,
-        };
-        setIfElseTabs((prev) => [
-          ...prev.map((t) => (t.id === tab.id && restoredTab ? restoredTab : t)),
-          newTab,
-        ]);
-        setActiveIfElseTabId(operation.id);
-      } else {
-        setDataSheets?.((prev) => appendSheetOperation(prev, activeSheetId, operation));
-        setIfElseTabs((prev) =>
-          prev.map((t) =>
-            t.id === tab.id
-              ? { ...t, column: out, savedColumn: out, operationId: operation.id, id: operation.id }
-              : t,
-          ),
-        );
-        setActiveIfElseTabId(operation.id);
-      }
+          if (mathDestination === "new_sheet") {
+            const sheetName = `${out} calc`;
+            addNewSheetAndActivate?.((newId) => {
+              setSheetData?.(newId, next);
+              setDataSheets?.((prev) => appendSheetOperation(prev, newId, operation));
+            });
+            toast.success("Applied if / else in a new sheet.");
+            return true;
+          }
 
-      replaceCurrentSheetData?.(next);
-      setConnectedData?.(next);
-      toast.success(isNewColumnName ? "Applied if / else to a new column." : "Applied if / else to current sheet.");
+          if (!activeSheetId || !setDataSheets) {
+            throw new Error("No active sheet to apply the operation.");
+          }
+
+          if (tab.operationId && !isNewColumnName) {
+            setDataSheets?.((prev) => replaceSheetOperation(prev, activeSheetId, tab.operationId, operation));
+            setIfElseTabs((prev) =>
+              prev.map((t) =>
+                t.id === tab.id
+                  ? { ...t, column: out, savedColumn: out, operationId: tab.operationId }
+                  : t,
+              ),
+            );
+          } else if (tab.operationId && isNewColumnName) {
+            setDataSheets?.((prev) => appendSheetOperation(prev, activeSheetId, operation));
+            const history = Array.isArray(activeSheet?.operationHistory) ? activeSheet.operationHistory : [];
+            const restoredTab = ifElseTabFromOperation(history.find((op) => op?.id === tab.operationId));
+            const newTab = {
+              ...tab,
+              id: operation.id,
+              operationId: operation.id,
+              savedColumn: out,
+              column: out,
+            };
+            setIfElseTabs((prev) => [
+              ...prev.map((t) => (t.id === tab.id && restoredTab ? restoredTab : t)),
+              newTab,
+            ]);
+            setActiveIfElseTabId(operation.id);
+          } else {
+            setDataSheets?.((prev) => appendSheetOperation(prev, activeSheetId, operation));
+            setIfElseTabs((prev) =>
+              prev.map((t) =>
+                t.id === tab.id
+                  ? { ...t, column: out, savedColumn: out, operationId: operation.id, id: operation.id }
+                  : t,
+              ),
+            );
+            setActiveIfElseTabId(operation.id);
+          }
+
+          replaceCurrentSheetData?.(next);
+          setConnectedData?.(next);
+          toast.success(isNewColumnName ? "Applied if / else to a new column." : "Applied if / else to current sheet.");
+          return true;
+        },
+      );
+
+      if (ok) {
+        setIfElseApplyState(EMPTY_MODAL_APPLY_STATE);
+        setIfElseDialogOpen(false);
+      }
     }, [
       activeIfElseTab,
       activeSheet?.operationHistory,
@@ -1708,131 +1760,168 @@ const GridView = ({ startNew, fillViewport = false }) => {
       appendActiveSheetOperation,
     ]);
 
-    const applyStatsBucket = useCallback(() => {
+    const applyStatsBucket = useCallback(async () => {
       const rows = Array.isArray(connectedData) ? [...connectedData] : [];
       if (!rows.length) {
-        toast.error("Load sheet data before bucketing.");
+        setBucketApplyState({
+          busy: false,
+          progress: 0,
+          label: "",
+          error: "Load sheet data before bucketing.",
+          fieldErrors: {},
+        });
         return;
       }
       const tab = captureEditorAsBucketTab(activeBucketTab);
-      if (!bucketTabCanSubmit(tab, { suggestedNumericSize: statsBucketColumnProfile.suggestedSize })) {
-        toast.error("Finish configuring each bucket aggregation.");
-        return;
-      }
-      const bucketConfig = bucketRowsConfigFromTab(tab, statsBucketColumnProfile.suggestedSize || 1);
-      const next = aggregateBucketRows(rows, bucketConfig);
-      if (!next.length) {
-        toast.error("No bucket rows were generated.");
-        return;
-      }
-      const operation = createSheetOperation("bucket.sheet", bucketOperationPayloadFromTab(tab, activeSheetId));
-      const savedSheetName = String(tab.savedSheetName || "").trim();
-      const sheetName = String(tab.sheetName || "").trim();
-      const isNewSheetName = Boolean(savedSheetName) && savedSheetName !== sheetName;
-
-      const writeBucketSheet = (targetSheetId, op, { appendHistory }) => {
-        setSheetData?.(targetSheetId, next);
-        setDataSheets?.((prev) => {
-          const p = prev || {};
-          const sheet = p[targetSheetId];
-          if (!sheet) return prev;
-          const history = Array.isArray(sheet.operationHistory) ? sheet.operationHistory : [];
-          return {
-            ...p,
-            [targetSheetId]: {
-              ...sheet,
-              name: sheetName.slice(0, 80),
-              data: next,
-              rowCount: next.length,
-              fullRowCount: next.length,
-              sourceSheetId: activeSheetId || sheet.sourceSheetId,
-              operationHistory: appendHistory ? [...history, op] : history,
-            },
-          };
-        });
-      };
-
-      if (tab.operationId && tab.targetSheetId && !isNewSheetName) {
-        setDataSheets?.((prev) => {
-          let updated = replaceSheetOperation(prev, tab.targetSheetId, tab.operationId, operation);
-          const sheet = updated?.[tab.targetSheetId];
-          if (!sheet) return updated;
-          return {
-            ...updated,
-            [tab.targetSheetId]: {
-              ...sheet,
-              name: sheetName.slice(0, 80),
-              data: next,
-              rowCount: next.length,
-              fullRowCount: next.length,
-              sourceSheetId: activeSheetId || sheet.sourceSheetId,
-            },
-          };
-        });
-        setBucketTabs((prev) =>
-          prev.map((t) =>
-            t.id === tab.id
-              ? {
-                  ...captureEditorAsBucketTab(t),
-                  savedSheetName: sheetName,
-                  sheetName,
-                  operationId: tab.operationId,
-                  targetSheetId: tab.targetSheetId,
-                }
-              : t,
-          ),
-        );
-        toast.success(`Updated bucket sheet with ${next.length.toLocaleString()} row${next.length === 1 ? "" : "s"}.`);
-        return;
-      }
-
-      if (tab.operationId && tab.targetSheetId && isNewSheetName) {
-        const history = Array.isArray(dataSheets?.[tab.targetSheetId]?.operationHistory)
-          ? dataSheets[tab.targetSheetId].operationHistory
-          : [];
-        const restoredTab = bucketTabFromOperation(
-          history.find((op) => op?.id === tab.operationId),
-          tab.targetSheetId,
-          dataSheets?.[tab.targetSheetId]?.name,
-        );
-        addNewSheetAndActivate?.((newId) => {
-          writeBucketSheet(newId, operation, { appendHistory: true });
-          setBucketTabs((prev) => [
-            ...prev.map((t) => (t.id === tab.id && restoredTab ? restoredTab : t)),
-            {
-              ...captureEditorAsBucketTab(tab),
-              id: operation.id,
-              operationId: operation.id,
-              targetSheetId: newId,
-              savedSheetName: sheetName,
-              sheetName,
-            },
-          ]);
-          setActiveBucketTabId(operation.id);
-        });
-        toast.success(`Created bucket sheet "${sheetName}" with ${next.length.toLocaleString()} rows.`);
-        return;
-      }
-
-      addNewSheetAndActivate?.((newId) => {
-        writeBucketSheet(newId, operation, { appendHistory: true });
-        setBucketTabs((prev) =>
-          prev.map((t) =>
-            t.id === tab.id
-              ? {
-                  ...captureEditorAsBucketTab(t),
-                  id: operation.id,
-                  operationId: operation.id,
-                  targetSheetId: newId,
-                  savedSheetName: sheetName,
-                  sheetName,
-                }
-              : t,
-          ),
-        );
-        setActiveBucketTabId(operation.id);
+      const validation = getBucketTabValidationErrors(tab, {
+        suggestedNumericSize: statsBucketColumnProfile.suggestedSize,
       });
-      toast.success(`Created bucket sheet with ${next.length.toLocaleString()} row${next.length === 1 ? "" : "s"}.`);
+      if (!validation.ok) {
+        setBucketApplyState({
+          busy: false,
+          progress: 0,
+          label: "",
+          error: validation.message,
+          fieldErrors: validation.fieldErrors,
+        });
+        return;
+      }
+
+      const ok = await runModalApplyProgress(
+        setBucketApplyState,
+        [
+          { progress: 25, label: "Grouping rows…" },
+          { progress: 55, label: "Running aggregations…" },
+          { progress: 85, label: "Creating bucket sheet…" },
+        ],
+        async () => {
+          const bucketConfig = bucketRowsConfigFromTab(tab, statsBucketColumnProfile.suggestedSize || 1);
+          const next = aggregateBucketRows(rows, bucketConfig);
+          if (!next.length) {
+            throw new Error("No bucket rows were generated. Check your bucket column and aggregations.");
+          }
+          const operation = createSheetOperation("bucket.sheet", bucketOperationPayloadFromTab(tab, activeSheetId));
+          const savedSheetName = String(tab.savedSheetName || "").trim();
+          const sheetName = String(tab.sheetName || "").trim();
+          const isNewSheetName = Boolean(savedSheetName) && savedSheetName !== sheetName;
+
+          const writeBucketSheet = (targetSheetId, op, { appendHistory }) => {
+            setSheetData?.(targetSheetId, next);
+            setDataSheets?.((prev) => {
+              const p = prev || {};
+              const sheet = p[targetSheetId];
+              if (!sheet) return prev;
+              const history = Array.isArray(sheet.operationHistory) ? sheet.operationHistory : [];
+              return {
+                ...p,
+                [targetSheetId]: {
+                  ...sheet,
+                  name: sheetName.slice(0, 80),
+                  data: next,
+                  rowCount: next.length,
+                  fullRowCount: next.length,
+                  sourceSheetId: activeSheetId || sheet.sourceSheetId,
+                  operationHistory: appendHistory ? [...history, op] : history,
+                },
+              };
+            });
+          };
+
+          if (tab.operationId && tab.targetSheetId && !isNewSheetName) {
+            setDataSheets?.((prev) => {
+              const updated = replaceSheetOperation(prev, tab.targetSheetId, tab.operationId, operation);
+              const sheet = updated?.[tab.targetSheetId];
+              if (!sheet) return updated;
+              return {
+                ...updated,
+                [tab.targetSheetId]: {
+                  ...sheet,
+                  name: sheetName.slice(0, 80),
+                  data: next,
+                  rowCount: next.length,
+                  fullRowCount: next.length,
+                  sourceSheetId: activeSheetId || sheet.sourceSheetId,
+                },
+              };
+            });
+            setBucketTabs((prev) =>
+              prev.map((t) =>
+                t.id === tab.id
+                  ? {
+                      ...captureEditorAsBucketTab(t),
+                      savedSheetName: sheetName,
+                      sheetName,
+                      operationId: tab.operationId,
+                      targetSheetId: tab.targetSheetId,
+                    }
+                  : t,
+              ),
+            );
+            toast.success(`Updated bucket sheet with ${next.length.toLocaleString()} row${next.length === 1 ? "" : "s"}.`);
+            return true;
+          }
+
+          if (tab.operationId && tab.targetSheetId && isNewSheetName) {
+            const history = Array.isArray(dataSheets?.[tab.targetSheetId]?.operationHistory)
+              ? dataSheets[tab.targetSheetId].operationHistory
+              : [];
+            const restoredTab = bucketTabFromOperation(
+              history.find((op) => op?.id === tab.operationId),
+              tab.targetSheetId,
+              dataSheets?.[tab.targetSheetId]?.name,
+            );
+            await new Promise((resolve) => {
+              addNewSheetAndActivate?.((newId) => {
+                writeBucketSheet(newId, operation, { appendHistory: true });
+                setBucketTabs((prev) => [
+                  ...prev.map((t) => (t.id === tab.id && restoredTab ? restoredTab : t)),
+                  {
+                    ...captureEditorAsBucketTab(tab),
+                    id: operation.id,
+                    operationId: operation.id,
+                    targetSheetId: newId,
+                    savedSheetName: sheetName,
+                    sheetName,
+                  },
+                ]);
+                setActiveBucketTabId(operation.id);
+                resolve();
+              });
+            });
+            toast.success(`Created bucket sheet "${sheetName}" with ${next.length.toLocaleString()} rows.`);
+            return true;
+          }
+
+          await new Promise((resolve) => {
+            addNewSheetAndActivate?.((newId) => {
+              writeBucketSheet(newId, operation, { appendHistory: true });
+              setBucketTabs((prev) =>
+                prev.map((t) =>
+                  t.id === tab.id
+                    ? {
+                        ...captureEditorAsBucketTab(t),
+                        id: operation.id,
+                        operationId: operation.id,
+                        targetSheetId: newId,
+                        savedSheetName: sheetName,
+                        sheetName,
+                      }
+                    : t,
+                ),
+              );
+              setActiveBucketTabId(operation.id);
+              resolve();
+            });
+          });
+          toast.success(`Created bucket sheet with ${next.length.toLocaleString()} row${next.length === 1 ? "" : "s"}.`);
+          return true;
+        },
+      );
+
+      if (ok) {
+        setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
+        setMathDialogOpen(false);
+      }
     }, [
       activeBucketTab,
       activeSheetId,
@@ -3257,12 +3346,21 @@ const GridView = ({ startNew, fillViewport = false }) => {
                           <div className="space-y-1">
                             <Label className="text-xs">Resulting column name</Label>
                             <Input
-                              className="h-9 text-xs"
+                              className={cn(
+                                "h-9 text-xs",
+                                ifElseApplyState.fieldErrors.column && APPLY_FIELD_ERROR_CLASS,
+                              )}
                               value={activeIfElseTab.column}
-                              onChange={(e) => updateActiveIfElseTab({ column: e.target.value })}
+                              onChange={(e) => {
+                                updateActiveIfElseTab({ column: e.target.value });
+                                if (ifElseApplyState.error) setIfElseApplyState(EMPTY_MODAL_APPLY_STATE);
+                              }}
                               spellCheck={false}
                               placeholder={nextFreeResultColumnName()}
                             />
+                            {ifElseApplyState.fieldErrors.column ? (
+                              <p className="text-[10px] text-destructive">{ifElseApplyState.fieldErrors.column}</p>
+                            ) : null}
                             {activeIfElseTab.savedColumn &&
                             String(activeIfElseTab.column || "").trim() &&
                             activeIfElseTab.savedColumn !== String(activeIfElseTab.column || "").trim() ? (
@@ -3290,8 +3388,14 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                     ) : null}
                                   </div>
                                   <div className="grid gap-2 sm:grid-cols-[1.1fr_0.7fr_0.8fr_1.1fr]">
-                                    <Select value={condition.leftColumn || "__"} onValueChange={(v) => updateIfElseClause(clause.id, { condition: { leftColumn: v === "__" ? "" : v } })}>
-                                      <SelectTrigger className="h-9 text-xs">
+                                    <Select value={condition.leftColumn || "__"} onValueChange={(v) => {
+                                      updateIfElseClause(clause.id, { condition: { leftColumn: v === "__" ? "" : v } });
+                                      if (ifElseApplyState.error) setIfElseApplyState(EMPTY_MODAL_APPLY_STATE);
+                                    }}>
+                                      <SelectTrigger className={cn(
+                                        "h-9 text-xs",
+                                        ifElseApplyState.fieldErrors[`clause.${clause.id}.leftColumn`] && APPLY_FIELD_ERROR_CLASS,
+                                      )}>
                                         <SelectValue placeholder="Column" />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -3330,8 +3434,14 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       </SelectContent>
                                     </Select>
                                     {condition.rightKind === "column" ? (
-                                      <Select value={condition.rightColumn || "__"} onValueChange={(v) => updateIfElseClause(clause.id, { condition: { rightColumn: v === "__" ? "" : v } })}>
-                                        <SelectTrigger className="h-9 text-xs">
+                                      <Select value={condition.rightColumn || "__"} onValueChange={(v) => {
+                                        updateIfElseClause(clause.id, { condition: { rightColumn: v === "__" ? "" : v } });
+                                        if (ifElseApplyState.error) setIfElseApplyState(EMPTY_MODAL_APPLY_STATE);
+                                      }}>
+                                        <SelectTrigger className={cn(
+                                          "h-9 text-xs",
+                                          ifElseApplyState.fieldErrors[`clause.${clause.id}.rightColumn`] && APPLY_FIELD_ERROR_CLASS,
+                                        )}>
                                           <SelectValue placeholder="Column" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -3345,9 +3455,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       </Select>
                                     ) : (
                                       <Input
-                                        className="h-9 text-xs"
+                                        className={cn(
+                                          "h-9 text-xs",
+                                          ifElseApplyState.fieldErrors[`clause.${clause.id}.rightValue`] && APPLY_FIELD_ERROR_CLASS,
+                                        )}
                                         value={condition.rightValue ?? ""}
-                                        onChange={(e) => updateIfElseClause(clause.id, { condition: { rightValue: e.target.value } })}
+                                        onChange={(e) => {
+                                          updateIfElseClause(clause.id, { condition: { rightValue: e.target.value } });
+                                          if (ifElseApplyState.error) setIfElseApplyState(EMPTY_MODAL_APPLY_STATE);
+                                        }}
                                         placeholder='Value or ["Rain", "Wind"]'
                                         disabled={["is_empty", "is_not_empty"].includes(condition.operator)}
                                       />
@@ -3396,16 +3512,30 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         </div>
                       </div>
                     </div>
+                    <div className="space-y-2 border-t border-border/60 px-1 pt-2">
+                      {ifElseApplyState.busy ? (
+                        <ConnectProgressWithLabel
+                          label={ifElseApplyState.label || "Applying…"}
+                          progress={ifElseApplyState.progress}
+                        />
+                      ) : null}
+                      {ifElseApplyState.error ? (
+                        <Alert variant="destructive" className="py-2">
+                          <AlertTitle className="text-xs">Could not apply</AlertTitle>
+                          <AlertDescription className="text-xs">{ifElseApplyState.error}</AlertDescription>
+                        </Alert>
+                      ) : null}
+                    </div>
                     <DialogFooter className="gap-2 sm:gap-0">
-                      <Button type="button" variant="outline" onClick={() => setIfElseDialogOpen(false)}>
+                      <Button type="button" variant="outline" onClick={() => setIfElseDialogOpen(false)} disabled={ifElseApplyState.busy}>
                         Cancel
                       </Button>
                       <Button
                         type="button"
-                        onClick={applyIfElseOperation}
-                        disabled={!String(activeIfElseTab?.column || "").trim() || !activeIfElseCanSubmit}
+                        onClick={() => void applyIfElseOperation()}
+                        disabled={ifElseApplyState.busy}
                       >
-                        Apply to sheet
+                        {ifElseApplyState.busy ? "Applying…" : "Apply to sheet"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -3949,9 +4079,13 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       setStatsBucketColumn(next);
                                       setStatsBucketOutputColumn((prev) => (String(prev || "").trim() && prev !== "bucket" ? prev : next || "bucket"));
                                       setStatsBucketNumericSize("");
+                                      if (bucketApplyState.error) setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
                                     }}
                                   >
-                                    <SelectTrigger className="h-9 text-xs">
+                                    <SelectTrigger className={cn(
+                                      "h-9 text-xs",
+                                      bucketApplyState.fieldErrors.bucketColumn && APPLY_FIELD_ERROR_CLASS,
+                                    )}>
                                       <SelectValue placeholder="Select bucket column" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -3967,9 +4101,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 <div className="space-y-1">
                                   <Label className="text-xs">New bucket column name</Label>
                                   <Input
-                                    className="h-9 text-xs"
+                                    className={cn(
+                                      "h-9 text-xs",
+                                      bucketApplyState.fieldErrors.bucketOutputColumn && APPLY_FIELD_ERROR_CLASS,
+                                    )}
                                     value={statsBucketOutputColumn}
-                                    onChange={(e) => setStatsBucketOutputColumn(e.target.value)}
+                                    onChange={(e) => {
+                                      setStatsBucketOutputColumn(e.target.value);
+                                      if (bucketApplyState.error) setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
+                                    }}
                                     placeholder={statsBucketColumn || "bucket"}
                                     spellCheck={false}
                                   />
@@ -4023,10 +4163,16 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                         <Label className="text-xs">Range size</Label>
                                         <div className="flex gap-2">
                                           <Input
-                                            className="h-9 min-w-0 text-xs"
+                                            className={cn(
+                                              "h-9 min-w-0 text-xs",
+                                              bucketApplyState.fieldErrors.numericBucketSize && APPLY_FIELD_ERROR_CLASS,
+                                            )}
                                             inputMode="decimal"
                                             value={statsBucketNumericSize}
-                                            onChange={(e) => setStatsBucketNumericSize(e.target.value.replace(/[^0-9.\-]/g, ""))}
+                                            onChange={(e) => {
+                                              setStatsBucketNumericSize(e.target.value.replace(/[^0-9.\-]/g, ""));
+                                              if (bucketApplyState.error) setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
+                                            }}
                                             placeholder={String(statsBucketColumnProfile.suggestedSize || 1)}
                                           />
                                           <Button
@@ -4072,12 +4218,21 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               <div className="space-y-1">
                                 <Label className="text-xs">New sheet name</Label>
                                 <Input
-                                  className="h-9 text-xs"
+                                  className={cn(
+                                    "h-9 text-xs",
+                                    bucketApplyState.fieldErrors.sheetName && APPLY_FIELD_ERROR_CLASS,
+                                  )}
                                   value={statsBucketSheetName}
-                                  onChange={(e) => setStatsBucketSheetName(e.target.value)}
+                                  onChange={(e) => {
+                                    setStatsBucketSheetName(e.target.value);
+                                    if (bucketApplyState.error) setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
+                                  }}
                                   placeholder="Bucketed sheet"
                                   spellCheck={false}
                                 />
+                                {bucketApplyState.fieldErrors.sheetName ? (
+                                  <p className="text-[10px] text-destructive">{bucketApplyState.fieldErrors.sheetName}</p>
+                                ) : null}
                                 {activeBucketTab?.savedSheetName &&
                                 String(statsBucketSheetName || "").trim() &&
                                 activeBucketTab.savedSheetName !== String(statsBucketSheetName || "").trim() ? (
@@ -4131,7 +4286,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                               });
                                             }}
                                           >
-                                            <SelectTrigger className="h-8 text-xs">
+                                            <SelectTrigger className={cn(
+                                              "h-8 text-xs",
+                                              bucketApplyState.fieldErrors[`agg.${agg.id}.outputColumn`] && APPLY_FIELD_ERROR_CLASS,
+                                            )}>
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -4162,9 +4320,13 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                                   ? { outputColumn: agg.outputColumn || col || "subgroup" }
                                                   : null),
                                               });
+                                              if (bucketApplyState.error) setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
                                             }}
                                           >
-                                            <SelectTrigger className="h-8 text-xs">
+                                            <SelectTrigger className={cn(
+                                              "h-8 text-xs",
+                                              bucketApplyState.fieldErrors[`agg.${agg.id}.valueColumn`] && APPLY_FIELD_ERROR_CLASS,
+                                            )}>
                                               <SelectValue placeholder="Column" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -4206,9 +4368,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                         <div className="space-y-1">
                                           <Label className="text-[10px] text-muted-foreground">Generated column</Label>
                                           <Input
-                                            className="h-8 text-xs"
+                                            className={cn(
+                                              "h-8 text-xs",
+                                              bucketApplyState.fieldErrors[`agg.${agg.id}.outputColumn`] && APPLY_FIELD_ERROR_CLASS,
+                                            )}
                                             value={agg.outputColumn}
-                                            onChange={(e) => updateStatsBucketAggregation(agg.id, { outputColumn: e.target.value })}
+                                            onChange={(e) => {
+                                              updateStatsBucketAggregation(agg.id, { outputColumn: e.target.value });
+                                              if (bucketApplyState.error) setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
+                                            }}
                                             placeholder={agg.type === "weighted_average" ? "weighted_avg" : agg.type}
                                             spellCheck={false}
                                           />
@@ -4425,25 +4593,41 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         </div>
                       ) : null}
                     </div>
+                    {statsBucketActive ? (
+                      <div className="space-y-2 border-t border-border/60 px-1 pt-2">
+                        {bucketApplyState.busy ? (
+                          <ConnectProgressWithLabel
+                            label={bucketApplyState.label || "Creating bucket sheet…"}
+                            progress={bucketApplyState.progress}
+                          />
+                        ) : null}
+                        {bucketApplyState.error ? (
+                          <Alert variant="destructive" className="py-2">
+                            <AlertTitle className="text-xs">Could not create bucket sheet</AlertTitle>
+                            <AlertDescription className="text-xs">{bucketApplyState.error}</AlertDescription>
+                          </Alert>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <DialogFooter className="gap-2 sm:gap-0">
-                      <Button type="button" variant="outline" onClick={() => setMathDialogOpen(false)}>
+                      <Button type="button" variant="outline" onClick={() => setMathDialogOpen(false)} disabled={bucketApplyState.busy}>
                         Cancel
                       </Button>
                       <Button
                         type="button"
                         onClick={() => {
                           if (mathDialogTab === "stats") {
-                            if (statsBucketActive) applyStatsBucket();
+                            if (statsBucketActive) void applyStatsBucket();
                             else if (statsCumsumActive) applyStatsCumsum();
                             else applyStatsStdDev();
                           } else applySheetMathOperation();
                         }}
                         disabled={
+                          bucketApplyState.busy ||
                           (mathDialogTab === "stats" &&
                             ((!statsStdDevActive && !statsCumsumActive && !statsBucketActive) ||
                               (statsStdDevActive && !statsStdCanSubmit) ||
-                              (statsCumsumActive && !statsCumsumCanSubmit) ||
-                              (statsBucketActive && !statsBucketCanSubmit))) ||
+                              (statsCumsumActive && !statsCumsumCanSubmit))) ||
                           (mathDialogTab === "basic" &&
                             (!String(mathBasicColA || "").trim() ||
                               (mathOp !== "abs" && !String(mathBasicColB || "").trim()) ||
@@ -4455,7 +4639,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 (!String(mathBasicColA || "").trim() || !String(mathBasicColB || "").trim()))))
                         }
                       >
-                        {mathDialogTab === "stats" && statsBucketActive ? "Create bucket sheet" : "Apply to sheet"}
+                        {statsBucketActive && bucketApplyState.busy
+                          ? "Creating…"
+                          : mathDialogTab === "stats" && statsBucketActive
+                            ? "Create bucket sheet"
+                            : "Apply to sheet"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

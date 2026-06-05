@@ -98,32 +98,86 @@ export function bucketOperationPayloadFromTab(tab, sourceSheetId) {
   };
 }
 
-export function bucketTabCanSubmit(tab, { suggestedNumericSize } = {}) {
-  if (!tab) return false;
-  if (!String(tab.bucketColumn || "").trim()) return false;
-  if (!String(tab.bucketOutputColumn || "").trim()) return false;
-  if (!String(tab.sheetName || "").trim()) return false;
+export function bucketTabCanSubmit(tab, opts = {}) {
+  return getBucketTabValidationErrors(tab, opts).ok;
+}
+
+/** @returns {{ ok: boolean; message: string; fieldErrors: Record<string, string> }} */
+export function getBucketTabValidationErrors(tab, { suggestedNumericSize } = {}) {
+  const fieldErrors = {};
+  let message = "";
+  if (!tab) {
+    return { ok: false, message: "Bucket configuration is missing.", fieldErrors };
+  }
+  if (!String(tab.bucketColumn || "").trim()) {
+    fieldErrors.bucketColumn = "Choose a column to bucket.";
+    message = fieldErrors.bucketColumn;
+  }
+  if (!String(tab.bucketOutputColumn || "").trim()) {
+    fieldErrors.bucketOutputColumn = "Enter a bucket column name.";
+    if (!message) message = fieldErrors.bucketOutputColumn;
+  }
+  if (!String(tab.sheetName || "").trim()) {
+    fieldErrors.sheetName = "Enter a new sheet name.";
+    if (!message) message = fieldErrors.sheetName;
+  }
   if (tab.bucketMode === "number") {
     const size = Number(tab.numericBucketSize || suggestedNumericSize || 1);
-    if (!Number.isFinite(size) || size <= 0) return false;
+    if (!Number.isFinite(size) || size <= 0) {
+      fieldErrors.numericBucketSize = "Enter a valid range size.";
+      if (!message) message = fieldErrors.numericBucketSize;
+    }
   }
-  if (tab.bucketMode === "time" && !tab.timeInterval) return false;
+  if (tab.bucketMode === "time" && !tab.timeInterval) {
+    fieldErrors.timeInterval = "Choose a time interval.";
+    if (!message) message = fieldErrors.timeInterval;
+  }
   const aggregations = normalizeAggregations(tab.aggregations);
-  if (!aggregations.length) return false;
-  return aggregations.every((agg) => {
-    if (!agg.outputColumn) return false;
-    if (agg.type === "subgroup_by") return Boolean(agg.valueColumn);
+  if (!aggregations.length) {
+    message = message || "Add at least one aggregation.";
+  }
+  aggregations.forEach((agg, idx) => {
+    const label = `Aggregation ${idx + 1}`;
+    if (!agg.outputColumn) {
+      fieldErrors[`agg.${agg.id}.outputColumn`] = "Enter a generated column name.";
+      if (!message) message = `${label}: enter a generated column name.`;
+    }
+    if (agg.type === "subgroup_by" && !agg.valueColumn) {
+      fieldErrors[`agg.${agg.id}.valueColumn`] = "Choose a sub-group column.";
+      if (!message) message = `${label}: choose a sub-group column.`;
+    }
     if (agg.filterEnabled) {
       const needsValue = !["is_empty", "is_not_empty"].includes(agg.filterOperator);
-      if (!agg.filterColumn) return false;
-      if (needsValue && String(agg.filterValue ?? "").trim() === "") return false;
+      if (!agg.filterColumn) {
+        fieldErrors[`agg.${agg.id}.filterColumn`] = "Choose a filter column.";
+        if (!message) message = `${label}: choose a where column.`;
+      }
+      if (needsValue && String(agg.filterValue ?? "").trim() === "") {
+        fieldErrors[`agg.${agg.id}.filterValue`] = "Enter a filter value.";
+        if (!message) message = `${label}: enter a where value.`;
+      }
     }
-    if (agg.type === "count") return true;
-    if (!agg.valueColumn) return false;
-    if (agg.type === "weighted_average") return Boolean(agg.weightColumn);
-    if (agg.type === "product_ratio") return Boolean(agg.weightColumn && agg.denominatorColumn);
-    return true;
+    if (agg.type !== "subgroup_by" && agg.type !== "count" && !agg.valueColumn) {
+      fieldErrors[`agg.${agg.id}.valueColumn`] = "Choose a value column.";
+      if (!message) message = `${label}: choose a value column.`;
+    }
+    if (agg.type === "weighted_average" && !agg.weightColumn) {
+      fieldErrors[`agg.${agg.id}.weightColumn`] = "Choose a weight column.";
+      if (!message) message = `${label}: choose a weight column.`;
+    }
+    if (agg.type === "product_ratio") {
+      if (!agg.weightColumn) {
+        fieldErrors[`agg.${agg.id}.weightColumn`] = "Choose a multiplier column.";
+        if (!message) message = `${label}: choose a multiplier column.`;
+      }
+      if (!agg.denominatorColumn) {
+        fieldErrors[`agg.${agg.id}.denominatorColumn`] = "Choose a denominator aggregation.";
+        if (!message) message = `${label}: choose a denominator aggregation.`;
+      }
+    }
   });
+  const ok = Object.keys(fieldErrors).length === 0 && aggregations.length > 0;
+  return { ok, message: ok ? "" : message || "Finish configuring each bucket aggregation.", fieldErrors };
 }
 
 export function bucketRowsConfigFromTab(tab, suggestedNumericSize) {
