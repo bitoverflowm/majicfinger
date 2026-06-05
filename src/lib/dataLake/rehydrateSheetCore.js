@@ -53,16 +53,30 @@ function rowsToObjects(columns, rows) {
 
 function normalizeLimit(body, provenance, access) {
   const tierMax = Math.max(1, Math.floor(Number(access.maxComposeRows || access.maxSelectRows || 100)));
+  const savedFull = Math.max(
+    0,
+    Math.floor(Number(body?.fullRowCount) || 0),
+    Math.floor(Number(body?.saveMeta?.fullRowCount) || 0),
+    Math.floor(Number(body?.saveMeta?.estimatedFullRows) || 0),
+  );
   const explicitProv = provenance?.composeAthenaRowLimit;
+  let target = null;
   if (explicitProv != null && explicitProv !== "" && Number.isFinite(Number(explicitProv))) {
-    return Math.max(1, Math.min(Math.floor(Number(explicitProv)), tierMax));
-  }
-  if (access.unlimitedComposeRows) {
-    return tierMax;
+    target = Math.floor(Number(explicitProv));
   }
   const requested = Number(body?.maxRows);
   if (Number.isFinite(requested) && requested > 0) {
-    return Math.max(1, Math.min(Math.floor(requested), tierMax));
+    target = target == null ? Math.floor(requested) : Math.max(target, Math.floor(requested));
+  }
+  // Restore the row count the project had when saved, not a stale Basic-tier pull cap (12.5k).
+  if (savedFull > 0) {
+    target = target == null ? savedFull : Math.max(target, savedFull);
+  }
+  if (target != null) {
+    return Math.max(1, Math.min(target, tierMax));
+  }
+  if (access.unlimitedComposeRows) {
+    return tierMax;
   }
   return tierMax;
 }
@@ -332,18 +346,30 @@ export async function runRehydrateSheetCore(body, access, opts = {}) {
   const previewHash = previewRows.length ? hashJson(previewRows) : null;
   const expectedPreviewHash = body?.saveMeta?.previewHash || null;
 
+  const savedFull = Math.max(
+    0,
+    Math.floor(Number(body?.fullRowCount) || 0),
+    Math.floor(Number(body?.saveMeta?.fullRowCount) || 0),
+  );
+  let warning =
+    expectedPreviewHash && previewHash !== expectedPreviewHash
+      ? "Source data or query behavior changed since this project was saved."
+      : null;
+  if (savedFull > 0 && replayedRows.length < savedFull) {
+    const partial = `Reloaded ${replayedRows.length.toLocaleString()} of ${savedFull.toLocaleString()} saved rows (query limit ${limit.toLocaleString()}).`;
+    warning = warning ? `${warning} ${partial}` : partial;
+  }
+
   return {
     sheetId: body.sheetId || null,
     columns: replayedColumns,
     rows: replayedRows,
     rowCount: replayedRows.length,
+    requestedLimit: limit,
     queryExecutionId: result.queryExecutionId,
     dataScannedBytes: result.dataScannedBytes,
     previewHash,
     previewMatches: expectedPreviewHash ? previewHash === expectedPreviewHash : null,
-    warning:
-      expectedPreviewHash && previewHash !== expectedPreviewHash
-        ? "Source data or query behavior changed since this project was saved."
-        : null,
+    warning,
   };
 }

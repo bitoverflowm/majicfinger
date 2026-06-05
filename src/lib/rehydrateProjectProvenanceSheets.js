@@ -56,6 +56,7 @@ async function rehydrateOneSheet(dataSheets, sheetId) {
       sheetGraph,
       operationHistory: sheet.operationHistory || [],
       previewRows: sheet.data || [],
+      fullRowCount: sheet.fullRowCount ?? sheet.rowCount ?? null,
       saveMeta: sheet.saveMeta || null,
     }),
   });
@@ -92,8 +93,13 @@ export async function rehydrateProjectProvenanceSheets(dataSheets, hooks = {}) {
 
   for (const sheetId of order) {
     hooks.onSheetStart?.(sheetId);
-    base[sheetId] = await rehydrateOneSheet(base, sheetId);
-    hooks.onSheetDone?.(sheetId);
+    try {
+      base[sheetId] = await rehydrateOneSheet(base, sheetId);
+      hooks.onSheetDone?.(sheetId);
+    } catch (err) {
+      hooks.onSheetError?.(sheetId, err);
+      console.warn(`[rehydrateProjectProvenanceSheets] ${sheetId}:`, err?.message || err);
+    }
   }
   return base;
 }

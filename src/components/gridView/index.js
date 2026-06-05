@@ -438,6 +438,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
             sheetGraph,
             operationHistory: activeSheet.operationHistory || [],
             previewRows: activeSheet.data || [],
+            fullRowCount: activeSheet.fullRowCount ?? activeSheet.rowCount ?? null,
             saveMeta: activeSheet.saveMeta || null,
           }),
         });

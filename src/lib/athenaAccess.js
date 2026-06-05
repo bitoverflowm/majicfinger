@@ -13,7 +13,48 @@ import {
   userHasBasicHistoricalAccess,
   userHasPaidSubscription,
 } from "@/lib/athenaEntitlement";
+import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
 import { dbUserHasPaidAccess } from "@/lib/runYourself/serverPaidAccess";
+
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Match `/api/user` entitlement resolution so Athena caps align with the client UI. */
+async function resolveDbUserForSession(session) {
+  if (!session || typeof session !== "object") return null;
+  const uid = session.userId != null ? String(session.userId) : "";
+  if (uid && mongoose.Types.ObjectId.isValid(uid)) {
+    const byId = await User.findById(uid).lean();
+    if (byId) return byId;
+  }
+  if (session.email) {
+    const candidates = await User.find({
+      email: { $regex: new RegExp(`^${escapeRegex(String(session.email).trim())}$`, "i") },
+    }).lean();
+    if (candidates?.length) {
+      candidates.sort((a, b) => {
+        const score = (u) =>
+          (u?.lifetimeMember ? 100 : 0) +
+          (String(u?.subscriptionStatus || "").toLowerCase() === "active" ? 50 : 0) +
+          (u?.subscriptionTier ? 10 : 0);
+        return score(b) - score(a);
+      });
+      return candidates[0];
+    }
+  }
+  return null;
+}
+
+function mergedUserForLimits(session, dbUser) {
+  const merged = { ...(session || {}), ...(dbUser || {}) };
+  if (isOwnerFullAccessUser(merged)) {
+    merged.lifetimeMember = true;
+    merged.subscriptionStatus = merged.subscriptionStatus || "active";
+    merged.subscriptionTier = merged.subscriptionTier || "elite";
+  }
+  return merged;
+}
 
 function subscriberMaxSelectEnv() {
   const n = parseInt(process.env.ATHENA_SUBSCRIBER_MAX_SELECT || String(ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT), 10);
@@ -89,14 +130,14 @@ export async function getAthenaAccessForUserId(userId, options = {}) {
     if (!mongoose.Types.ObjectId.isValid(uid)) return freeLimits();
 
     await dbConnect();
-    const dbUser = await User.findById(uid).lean();
+    const dbUser = await resolveDbUserForSession({ userId: uid });
     if (!dbUser) return freeLimits();
 
     if (options.runYourselfForkPull || dbUserHasRunYourselfFullPullAccess(dbUser)) {
       return subscriberLimits();
     }
 
-    return limitsForDbUser(dbUser);
+    return limitsForDbUser(mergedUserForLimits({ userId: uid }, dbUser));
   } catch {
     /* ignore */
   }
@@ -118,14 +159,14 @@ export async function getAthenaAccessFromRequest(req) {
     const uid = session.userId != null ? String(session.userId) : "";
     if (uid && mongoose.Types.ObjectId.isValid(uid)) {
       await dbConnect();
-      const dbUser = await User.findById(uid).lean();
+      const dbUser = await resolveDbUserForSession(session);
       if (dbUser) {
         if (dbUserHasRunYourselfFullPullAccess(dbUser)) {
           return subscriberLimits();
         }
-        return limitsForDbUser({ ...session, ...dbUser });
+        return limitsForDbUser(mergedUserForLimits(session, dbUser));
       }
-      if (userHasExpandedAthenaAccess(session)) return subscriberLimits();
+      if (userHasExpandedAthenaAccess(mergedUserForLimits(session, null))) return subscriberLimits();
     }
   } catch {
     /* session invalid → free */

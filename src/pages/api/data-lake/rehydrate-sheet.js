@@ -54,6 +54,13 @@ export default async function handler(req, res) {
     if (e instanceof AthenaLakeRequestError) {
       return res.status(e.statusCode).json({ error: e.message, code: e.code });
     }
+    const awsCode = e?.code || e?.statusCode;
+    if (awsCode === "AccessDenied" || awsCode === "AccessDeniedException" || awsCode === 403) {
+      return res.status(403).json({
+        error: "Athena access denied — check server AWS credentials and Glue/Athena permissions.",
+        code: "ATHENA_ACCESS_DENIED",
+      });
+    }
     const code = e?.code || "INTERNAL";
     if (code === "CONFIG") {
       return res.status(503).json({ error: e.message, code: "CONFIG" });
