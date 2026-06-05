@@ -258,6 +258,8 @@ export default function ChartControls() {
     handleToggleStack,
     barSeriesColumn,
     setBarSeriesColumn,
+    barXAxisMode,
+    setBarXAxisMode,
     rainbowBar,
     setRainbowBar,
     setRainbowBarShuffleNonce,
@@ -351,6 +353,10 @@ export default function ChartControls() {
   const xAxisSelectValue = selX ?? CHART_X_AXIS_NONE;
   const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
   const canUseTimeSeriesX = !!selX && !!lineIsTemporalX;
+  const barXAxisIsDate =
+    selChartType === "bar" &&
+    !!selX &&
+    (getAxisType(selX, dataTypes, chartData) === "date" || lineIsTemporalX);
 
   const parseScopedLineKey = (value) => {
     const raw = String(value || "");
@@ -1267,6 +1273,33 @@ export default function ChartControls() {
                           </SelectContent>
                         </Select>
                       </div>
+                      {barXAxisIsDate ? (
+                        <div className="min-w-0 space-y-1 border-b border-border/60 pb-3">
+                          <Label className="text-xs text-muted-foreground">X-axis spacing</Label>
+                          <p className="text-[10px] leading-snug text-muted-foreground">
+                            Date mode spaces bars by calendar time. Categorical mode places each date at equal
+                            intervals.
+                          </p>
+                          <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
+                            className="mt-0.5 flex w-full min-w-0 justify-stretch [&>button]:min-w-0 [&>button]:flex-1"
+                            value={barXAxisMode}
+                            onValueChange={(v) => {
+                              if (v === "date" || v === "categorical") setBarXAxisMode(v);
+                            }}
+                            aria-label="Bar chart X-axis date or categorical spacing"
+                          >
+                            <ToggleGroupItem value="date" className="text-xs">
+                              Date
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="categorical" className="text-xs">
+                              Categorical
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                        </div>
+                      ) : null}
                       <div className="py-2">
                         {selY.length > 0 &&
                           selY.map((yValue, index) => (

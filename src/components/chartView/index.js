@@ -683,6 +683,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [stackedBar, setStackedBar] = useState(false);
   /** When set (bar charts), pivot long rows by this column into stacked/grouped series (e.g. outcome). */
   const [barSeriesColumn, setBarSeriesColumn] = useState(null);
+  /** Bar chart only: "date" = time-scaled X spacing; "categorical" = equidistant date labels. */
+  const [barXAxisMode, setBarXAxisMode] = useState("date");
   /** Recharts `layout="vertical"` — bars extend horizontally; category axis moves to Y. */
   const [horizontal, setHorizontal] = useState(false);
   /** Bar chart: each bar (per Y series) picks from the active Shadcn palette via a stable hash. */
@@ -807,6 +809,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.legendVisible !== undefined) setLegendVisible(!!s.legendVisible);
     if (s.stackedBar !== undefined) setStackedBar(!!s.stackedBar);
     if (s.barSeriesColumn !== undefined) setBarSeriesColumn(s.barSeriesColumn || null);
+    if (s.barXAxisMode === "date" || s.barXAxisMode === "categorical") setBarXAxisMode(s.barXAxisMode);
     if (s.horizontal !== undefined) setHorizontal(!!s.horizontal);
     if (s.rainbowBar !== undefined) setRainbowBar(!!s.rainbowBar);
     if (s.rainbowBarShuffleNonce != null && Number.isFinite(Number(s.rainbowBarShuffleNonce))) {
@@ -1374,6 +1377,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     legendVisible,
     stackedBar,
     barSeriesColumn,
+    barXAxisMode,
     horizontal,
     rainbowBar,
     rainbowBarShuffleNonce,
@@ -1708,6 +1712,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     handleToggleStack: setStackedBar,
     barSeriesColumn,
     setBarSeriesColumn,
+    barXAxisMode,
+    setBarXAxisMode,
     horizontal,
     handleToggleHorizontal: setHorizontal,
     rainbowBar,
@@ -1832,6 +1838,7 @@ export function ChartCanvas() {
     legendVisible,
     stackedBar,
     barSeriesColumn,
+    barXAxisMode,
     horizontal,
     rainbowBar,
     rainbowBarShuffleNonce,
@@ -1909,11 +1916,28 @@ export function ChartCanvas() {
     (xAxisType === "date" ||
       (xAxisType === "number" && lineIsTemporalX) ||
       (xAxisType === "string" && lineIsTemporalX));
-  const effectiveTemporalSort = !xIsCategoricalLabel && (lineIsTemporalX || useTimeSeriesX);
+
+  const barXIsTemporalDate =
+    selChartType === "bar" &&
+    !xIsCategoricalLabel &&
+    !!selX &&
+    (xAxisType === "date" || lineIsTemporalX);
+
+  const barUseDateXScale = barXIsTemporalDate && barXAxisMode === "date";
+
+  const effectiveUseTimeSeriesX = selChartType === "bar" ? barUseDateXScale : useTimeSeriesX;
+
+  const effectiveTemporalSort =
+    !xIsCategoricalLabel &&
+    (barXIsTemporalDate || lineIsTemporalX || effectiveUseTimeSeriesX);
 
   const cartesianChart =
     selChartType === "line" || selChartType === "area" || selChartType === "bar" || selChartType === "scatter";
   const chartUsesTimeframes = chartTimeframesEnabled && chartTimeframesAvailable;
+
+  const temporalNormalizeEnabled =
+    !xIsCategoricalLabel &&
+    (selChartType === "bar" ? barUseDateXScale : effectiveUseTimeSeriesX || chartUsesTimeframes);
 
   const plotRows = useMemo(() => {
     if (!cartesianChart) return rawData;
@@ -1922,9 +1946,9 @@ export function ChartCanvas() {
       xKey,
       xAxisType,
       lineIsTemporalX && !xIsCategoricalLabel,
-      !xIsCategoricalLabel && (useTimeSeriesX || chartUsesTimeframes),
+      temporalNormalizeEnabled,
     );
-  }, [rawData, cartesianChart, xKey, xAxisType, lineIsTemporalX, useTimeSeriesX, chartUsesTimeframes, xIsCategoricalLabel]);
+  }, [rawData, cartesianChart, xKey, xAxisType, lineIsTemporalX, temporalNormalizeEnabled, xIsCategoricalLabel]);
 
   const sortedPlotRows = useMemo(() => {
     if (!selX || !Array.isArray(plotRows) || plotRows.length <= 1) return plotRows;
@@ -1998,11 +2022,12 @@ export function ChartCanvas() {
   }, [rawData, xAxisType, xKey, selX, effectiveTemporalSort]);
 
   const firstPlotX = selX && plotRows.length ? plotRows[0]?.[xKey] : null;
-  /** Recharts: numeric scale for unix / epoch ms; Date objects need normalization (see useTimeSeriesX). */
+  /** Recharts: numeric scale for unix / epoch ms; Date objects need normalization (see effectiveUseTimeSeriesX). */
   const rechartsXAxisType =
     cartesianChart &&
     selX &&
     plotRows.length &&
+    !(selChartType === "bar" && barXIsTemporalDate && barXAxisMode === "categorical") &&
     typeof firstPlotX === "number" &&
     Number.isFinite(firstPlotX)
       ? "number"
@@ -2010,7 +2035,7 @@ export function ChartCanvas() {
 
   const xAxisNumberDomain =
     rechartsXAxisType === "number"
-      ? ((useTimeSeriesX || chartUsesTimeframes) && sortXDir === "desc" ? ["dataMax", "dataMin"] : ["dataMin", "dataMax"])
+      ? ((effectiveUseTimeSeriesX || chartUsesTimeframes) && sortXDir === "desc" ? ["dataMax", "dataMin"] : ["dataMin", "dataMax"])
       : undefined;
 
   /** Recharts Treemap: one synthetic root whose children are sheet rows (name ← X, value ← Y). */
@@ -2116,7 +2141,7 @@ export function ChartCanvas() {
     !xIsCategoricalLabel &&
     (selChartType === "line" || selChartType === "area" ? lineHumanReadableTime : false);
   const xOriginalTemporalLabelByMs = useMemo(() => {
-    if (!useTimeSeriesX || !selX || !Array.isArray(rawData)) return new Map();
+    if (!effectiveUseTimeSeriesX || !selX || !Array.isArray(rawData)) return new Map();
     const map = new Map();
     for (const row of rawData) {
       const raw = row?.[xKey];
@@ -2125,7 +2150,7 @@ export function ChartCanvas() {
       if (!map.has(ms)) map.set(ms, String(raw ?? ""));
     }
     return map;
-  }, [useTimeSeriesX, selX, rawData, xKey]);
+  }, [effectiveUseTimeSeriesX, selX, rawData, xKey]);
 
   const xAxisTicks = useMemo(() => {
     if (rechartsXAxisType !== "number" || !Array.isArray(finalRenderedData)) return undefined;
@@ -2152,7 +2177,7 @@ export function ChartCanvas() {
     }
     // When human-readable is on, never show the stored raw pivot string (often unix seconds);
     // the map is only for preserving non-formatted labels when the toggle is off.
-    if (useTimeSeriesX && Number.isFinite(Number(v)) && !xHumanReadable) {
+    if (effectiveUseTimeSeriesX && Number.isFinite(Number(v)) && !xHumanReadable) {
       const rawLabel = xOriginalTemporalLabelByMs.get(Number(v));
       if (rawLabel) return rawLabel;
     }
@@ -2176,7 +2201,8 @@ export function ChartCanvas() {
 
   const renderedReferenceLines = useMemo(() => {
     const axisType = selX ? getAxisType(xKey, dataTypes, finalRenderedData) : "string";
-    const isTemporalX = useTimeSeriesX || chartUsesTimeframes || lineIsTemporalX || axisType === "date";
+    const isTemporalX =
+      effectiveUseTimeSeriesX || chartUsesTimeframes || lineIsTemporalX || axisType === "date";
     return normalizeReferenceLines(referenceLines)
       .filter((line) => line.enabled)
       .map((line) => {
@@ -2225,7 +2251,7 @@ export function ChartCanvas() {
     referenceLines,
     selX,
     tickFillY,
-    useTimeSeriesX,
+    effectiveUseTimeSeriesX,
     xKey,
   ]);
 
@@ -2239,7 +2265,7 @@ export function ChartCanvas() {
       const forced = Number.isFinite(ms) ? formatEpochMsWithPreset(ms, forcedPreset) : "";
       if (forced) return forced;
     }
-    if (useTimeSeriesX && Number.isFinite(Number(label)) && !xHumanReadable) {
+    if (effectiveUseTimeSeriesX && Number.isFinite(Number(label)) && !xHumanReadable) {
       const rawLabel = xOriginalTemporalLabelByMs.get(Number(label));
       if (rawLabel) return rawLabel;
     }
