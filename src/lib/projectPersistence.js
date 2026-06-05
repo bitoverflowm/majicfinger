@@ -1,6 +1,7 @@
 import { isLakeBigintColumnName } from "@/lib/dataLake/lakeTableColumns";
 import { normalizeLakeBigintCellValue } from "@/lib/dataLake/lakeBigintNormalize";
 import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
+import { compareConditionValues } from "@/lib/ifElseConditionValues";
 
 export const PROJECT_FULL_DATA_SAFE_BYTES = 12 * 1024 * 1024;
 export const PROJECT_PREVIEW_ROW_LIMIT = 50000;
@@ -161,6 +162,29 @@ export function appendSheetOperation(dataSheets, sheetId, operation) {
     [sheetId]: {
       ...sheet,
       operationHistory: [...history, operation],
+    },
+  };
+}
+
+export function isIfElseComputedOperation(op) {
+  return op?.type === "computed.column" && op?.expression?.kind === "if-else";
+}
+
+export function replaceSheetOperation(dataSheets, sheetId, operationId, nextOperation) {
+  if (!sheetId || !operationId || !nextOperation) return dataSheets;
+  const sheets = dataSheets || {};
+  const sheet = sheets[sheetId];
+  if (!sheet) return dataSheets;
+  const history = normalizeOperationHistory(sheet);
+  return {
+    ...sheets,
+    [sheetId]: {
+      ...sheet,
+      operationHistory: history.map((op) =>
+        op?.id === operationId
+          ? { ...nextOperation, id: operationId, ts: Date.now() }
+          : op,
+      ),
     },
   };
 }
@@ -523,28 +547,6 @@ function rawComputedValue(value) {
   return Number.isFinite(n) ? n : text;
 }
 
-function compareComputedValues(left, operator, right) {
-  const op = String(operator || "=");
-  if (op === "is_empty") return left == null || left === "";
-  if (op === "is_not_empty") return left != null && left !== "";
-  if (op === "contains" || op === "not_contains") {
-    const hit = String(left ?? "").toLowerCase().includes(String(right ?? "").toLowerCase());
-    return op === "not_contains" ? !hit : hit;
-  }
-  const leftNum = Number(left);
-  const rightNum = Number(right);
-  const numeric = Number.isFinite(leftNum) && Number.isFinite(rightNum);
-  const a = numeric ? leftNum : String(left ?? "").toLowerCase();
-  const b = numeric ? rightNum : String(right ?? "").toLowerCase();
-  if (op === "=" || op === "eq") return a === b;
-  if (op === "!=" || op === "ne") return a !== b;
-  if (op === ">" || op === "gt") return numeric ? a > b : String(a).localeCompare(String(b)) > 0;
-  if (op === ">=" || op === "gte") return numeric ? a >= b : String(a).localeCompare(String(b)) >= 0;
-  if (op === "<" || op === "lt") return numeric ? a < b : String(a).localeCompare(String(b)) < 0;
-  if (op === "<=" || op === "lte") return numeric ? a <= b : String(a).localeCompare(String(b)) <= 0;
-  return false;
-}
-
 function resolveComputedOperand(row, operand) {
   const spec = operand && typeof operand === "object" ? operand : { kind: "raw", value: "" };
   if (spec.kind === "column") return row?.[spec.column];
@@ -568,8 +570,8 @@ function evaluateIfElseComputed(row, expr) {
     const left = row?.[condition.leftColumn];
     const right = condition.rightKind === "column"
       ? row?.[condition.rightColumn]
-      : rawComputedValue(condition.rightValue);
-    if (compareComputedValues(left, condition.operator, right)) {
+      : condition.rightValue;
+    if (compareConditionValues(left, condition.operator, right)) {
       return resolveComputedOperand(row, clause.then);
     }
   }
