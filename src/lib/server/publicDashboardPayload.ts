@@ -33,6 +33,24 @@ type Column = {
   chartLink?: { mode?: string; slug?: string } | null;
 };
 
+type CardGridRow = {
+  id?: string;
+  type: "cardGrid";
+  h2?: string;
+  caption?: string;
+  sheetId?: string;
+  rowLimit?: number;
+  fields?: Record<string, { column?: string | null; visible?: boolean }>;
+  sectionHeadingTheme?: Record<string, unknown>;
+  sectionSubheadingTheme?: Record<string, unknown>;
+  rankTheme?: Record<string, unknown>;
+  headerTheme?: Record<string, unknown>;
+  subheaderTheme?: Record<string, unknown>;
+  tagsTheme?: Record<string, unknown>;
+  valueTheme?: Record<string, unknown>;
+  sheetRows?: unknown[];
+};
+
 type Row =
   | {
       id?: string;
@@ -41,7 +59,8 @@ type Row =
       textVariant?: "heading" | "paragraph";
       textTheme?: Record<string, unknown>;
     }
-  | { id?: string; type: "cards"; columns?: Column[] };
+  | { id?: string; type: "cards"; columns?: Column[] }
+  | CardGridRow;
 
 export type PublicDashboardPayload = {
   success: boolean;
@@ -58,10 +77,16 @@ export type PublicDashboardPayload = {
   message?: string;
 };
 
-function hydrateLayout(layout: any, chartBundlesById: Map<string, any>) {
+function hydrateLayout(layout: any, chartBundlesById: Map<string, any>, dataSheets: Record<string, any>) {
   if (!layout || typeof layout !== "object") return { version: 1, rows: [] };
   const rows = Array.isArray(layout.rows) ? layout.rows : [];
   const nextRows = rows.map((row: any) => {
+    if (row?.type === "cardGrid") {
+      const sheetId = row.sheetId ? String(row.sheetId) : "";
+      const sheet = sheetId && dataSheets?.[sheetId] ? dataSheets[sheetId] : null;
+      const sheetRows = Array.isArray(sheet?.data) ? sheet.data : [];
+      return { ...row, sheetRows };
+    }
     if (!row || row.type !== "cards" || !Array.isArray(row.columns)) {
       return row;
     }
@@ -116,6 +141,16 @@ export async function getPublicDashboardPayload(
     }
   }
 
+  let dataSheets: Record<string, any> = {};
+  if (dash.data_set_id) {
+    const dataSetRaw = (await DataSet.findById(dash.data_set_id as any).lean()) as any;
+    if (dataSetRaw) {
+      const dataSet = await hydrateDataSetForPublicChartViewer(null, dataSetRaw);
+      dataSheets =
+        dataSet?.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
+    }
+  }
+
   const chartBundlesById = new Map<string, any>();
   for (const cid of chartIds) {
     const chart = (await Chart.findOne({
@@ -136,7 +171,7 @@ export async function getPublicDashboardPayload(
     });
   }
 
-  const layoutOut = hydrateLayout(dash.layout, chartBundlesById);
+  const layoutOut = hydrateLayout(dash.layout, chartBundlesById, dataSheets);
   return {
     success: true,
     data: {

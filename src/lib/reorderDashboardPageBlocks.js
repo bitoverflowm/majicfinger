@@ -14,7 +14,7 @@ function clampColSpan(n) {
   return Math.min(12, Math.max(1, Math.round(x)));
 }
 
-/** @typedef {{ kind: 'text', rowId: string } | { kind: 'slot', rowId: string, colId: string }} DashboardLayerItem */
+/** @typedef {{ kind: 'text', rowId: string } | { kind: 'slot', rowId: string, colId: string } | { kind: 'cardGrid', rowId: string }} DashboardLayerItem */
 
 /**
  * @param {object} layout
@@ -25,6 +25,8 @@ export function flattenDashboardLayers(layout) {
   for (const r of layout?.rows || []) {
     if (r?.type === "text") {
       flat.push({ kind: "text", rowId: r.id });
+    } else if (r?.type === "cardGrid") {
+      flat.push({ kind: "cardGrid", rowId: r.id });
     } else if (r?.type === "cards" && Array.isArray(r.columns)) {
       for (const col of r.columns) {
         if (col?.id) {
@@ -67,6 +69,15 @@ export function rebuildLayoutFromFlatLayers(flat, layout) {
     if (item.kind === "text") {
       const r = rowMap.get(item.rowId);
       if (r?.type === "text") {
+        newRows.push({ ...r });
+      }
+      idx += 1;
+      continue;
+    }
+
+    if (item.kind === "cardGrid") {
+      const r = rowMap.get(item.rowId);
+      if (r?.type === "cardGrid") {
         newRows.push({ ...r });
       }
       idx += 1;

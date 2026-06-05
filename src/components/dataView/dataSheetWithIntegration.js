@@ -292,6 +292,7 @@ export default function DataSheetWithIntegration({
   const setPageFormatDockTarget = contextStateV2?.setPageFormatDockTarget;
   const pageFormatDockTarget = contextStateV2?.pageFormatDockTarget;
   const setChartComposerDock = contextStateV2?.setChartComposerDock;
+  const setCardGridComposerDock = contextStateV2?.setCardGridComposerDock;
   const chartPickerEmphasis = contextStateV2?.chartPickerEmphasis;
   const setChartPickerEmphasis = contextStateV2?.setChartPickerEmphasis;
   const savedCharts = contextStateV2?.savedCharts;
@@ -1835,7 +1836,7 @@ export default function DataSheetWithIntegration({
                                     if (!layers.length) {
                                       return (
                                         <p className="text-[11px] leading-snug text-muted-foreground">
-                                          No blocks yet. Use Chart or Text in the bottom bar.
+                                          No blocks yet. Use Chart, Cards, or Text in the bottom bar.
                                         </p>
                                       );
                                     }
@@ -1850,6 +1851,124 @@ export default function DataSheetWithIntegration({
                                               aria-label="Dashboard layers in order"
                                             >
                                               {layers.map((item, i) => {
+                                              if (item.kind === "cardGrid") {
+                                                const block = rows.find(
+                                                  (r) => r.id === item.rowId && r.type === "cardGrid",
+                                                );
+                                                if (!block) {
+                                                  return (
+                                                    <Draggable
+                                                      key={`cardgrid-missing-${item.rowId}`}
+                                                      draggableId={`cardgrid-${item.rowId}`}
+                                                      index={i}
+                                                    >
+                                                      {(dragProvided, snapshot) => (
+                                                        <li
+                                                          ref={dragProvided.innerRef}
+                                                          {...dragProvided.draggableProps}
+                                                          className={cn(
+                                                            "rounded border border-border/50 px-2 py-1.5 text-[11px] text-muted-foreground",
+                                                            snapshot.isDragging &&
+                                                              "border-primary ring-1 ring-primary/20",
+                                                          )}
+                                                          style={dragProvided.draggableProps.style}
+                                                        >
+                                                          Cards (missing)
+                                                        </li>
+                                                      )}
+                                                    </Draggable>
+                                                  );
+                                                }
+                                                const draggableId = `cardgrid-${block.id}`;
+                                                const rowLabel =
+                                                  block.h2?.trim() ||
+                                                  (layersComposerProjectName
+                                                    ? `${layersComposerProjectName}: Cards`
+                                                    : "Cards");
+                                                return (
+                                                  <Draggable
+                                                    key={draggableId}
+                                                    draggableId={draggableId}
+                                                    index={i}
+                                                  >
+                                                    {(dragProvided, snapshot) => (
+                                                      <li
+                                                        ref={dragProvided.innerRef}
+                                                        {...dragProvided.draggableProps}
+                                                        className={cn(
+                                                          "flex flex-col gap-1.5 rounded border border-border/50 bg-background/80 px-2 py-1.5 text-xs text-foreground",
+                                                          snapshot.isDragging &&
+                                                            "border-primary shadow-md ring-1 ring-primary/20",
+                                                        )}
+                                                        style={dragProvided.draggableProps.style}
+                                                      >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                          <div className="flex min-w-0 flex-1 items-center gap-1">
+                                                            <button
+                                                              type="button"
+                                                              className={cn(
+                                                                "-ml-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                                                                "text-muted-foreground outline-none hover:bg-muted hover:text-foreground",
+                                                                "cursor-grab touch-none active:cursor-grabbing",
+                                                                "focus-visible:ring-2 focus-visible:ring-ring",
+                                                              )}
+                                                              aria-label={`Drag to reorder ${rowLabel}`}
+                                                              {...dragProvided.dragHandleProps}
+                                                            >
+                                                              <GripVertical
+                                                                className="h-4 w-4"
+                                                                aria-hidden
+                                                              />
+                                                            </button>
+                                                            <span className="min-w-0 truncate font-medium">
+                                                              {rowLabel}
+                                                            </span>
+                                                          </div>
+                                                          <TooltipProvider delayDuration={200}>
+                                                            <Tooltip>
+                                                              <TooltipTrigger asChild>
+                                                                <span className="inline-flex shrink-0">
+                                                                  <DestructiveIconButton
+                                                                    ariaLabel="delete"
+                                                                    title="delete"
+                                                                    onClick={() => {
+                                                                      setChartDashboardDraft?.((prev) => {
+                                                                        if (!prev) return prev;
+                                                                        return removeDashboardLayoutRowFromDraft(
+                                                                          prev,
+                                                                          block.id,
+                                                                        );
+                                                                      });
+                                                                      setCardGridComposerDock?.((dock) =>
+                                                                        dock?.rowId === block.id ? null : dock,
+                                                                      );
+                                                                      setPageFormatDockTarget?.((t) =>
+                                                                        t &&
+                                                                        typeof t === "object" &&
+                                                                        t.rowId === block.id
+                                                                          ? null
+                                                                          : t,
+                                                                      );
+                                                                    }}
+                                                                  />
+                                                                </span>
+                                                              </TooltipTrigger>
+                                                              <TooltipContent
+                                                                side="bottom"
+                                                                sideOffset={6}
+                                                                className="z-[100] text-xs"
+                                                              >
+                                                                delete
+                                                              </TooltipContent>
+                                                            </Tooltip>
+                                                          </TooltipProvider>
+                                                        </div>
+                                                      </li>
+                                                    )}
+                                                  </Draggable>
+                                                );
+                                              }
+
                                               if (item.kind === "text") {
                                                 const block = rows.find(
                                                   (r) => r.id === item.rowId && r.type === "text",

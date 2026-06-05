@@ -28,6 +28,7 @@ import {
   getFreeTextRowPublicStyle,
 } from "@/lib/dashboardFreeTextTheme";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
+import { DashboardCardGridSection } from "@/components/dashboardComposer/DashboardCardGridSection";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 
@@ -59,6 +60,17 @@ type Column = {
   chartLink?: { mode?: string; slug?: string } | null;
 };
 
+type CardGridRow = {
+  id?: string;
+  type: "cardGrid";
+  h2?: string;
+  caption?: string;
+  sheetId?: string;
+  rowLimit?: number;
+  fields?: Record<string, { column?: string | null; visible?: boolean }>;
+  sheetRows?: unknown[];
+};
+
 type Row =
   | {
       id?: string;
@@ -67,7 +79,8 @@ type Row =
       textVariant?: "heading" | "paragraph";
       textTheme?: Record<string, unknown>;
     }
-  | { id?: string; type: "cards"; columns?: Column[] };
+  | { id?: string; type: "cards"; columns?: Column[] }
+  | CardGridRow;
 
 type Payload = {
   success: boolean;
@@ -279,6 +292,18 @@ export default function PublicDashboardEmbedClient({
           ) : null}
 
           {rows.map((row) => {
+            if (row.type === "cardGrid") {
+              const sheetRows = Array.isArray(row.sheetRows)
+                ? (row.sheetRows as object[])
+                : [];
+              return (
+                <DashboardCardGridSection
+                  key={row.id || "cardGrid"}
+                  row={row}
+                  dataRows={sheetRows}
+                />
+              );
+            }
             if (row.type === "text") {
               const variant = row.textVariant === "heading" ? "heading" : "paragraph";
               const body = row.body || "";
