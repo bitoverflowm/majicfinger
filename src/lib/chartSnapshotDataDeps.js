@@ -56,6 +56,7 @@ export function collectChartSnapshotColumnsBySheetId(snapshot, defaultSheetId) {
   if (s.selZ) add(s.selZ);
   if (s.selColorCol) add(s.selColorCol);
   if (s.lineSeriesColumn) add(s.lineSeriesColumn);
+  if (s.barSeriesColumn) add(s.barSeriesColumn);
   if (s.chartFilterColumn) add(s.chartFilterColumn);
   if (s.rainbowLegendLabelColumn) add(s.rainbowLegendLabelColumn);
   for (const c of Array.isArray(s.tooltipExtraColumns) ? s.tooltipExtraColumns : []) add(c);

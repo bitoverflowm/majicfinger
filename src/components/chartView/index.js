@@ -901,9 +901,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
     for (const [sheetId, sheet] of entries) {
       const rows = Array.isArray(sheet?.data) ? sheet.data : [];
-      if (!rows.length) continue;
       const first = rows[0] || {};
-      const cols = Object.keys(first);
+      let cols = rows.length ? Object.keys(first) : [];
+      if (!cols.length && Array.isArray(sheet?.columns)) {
+        cols = sheet.columns
+          .map((c) => (typeof c === "string" ? c : c?.field || c?.name || ""))
+          .filter(Boolean);
+      }
       if (!cols.length) continue;
       groups.push({
         sheetId,
@@ -961,6 +965,22 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const idx = raw.indexOf("::");
       return idx > -1 ? raw.slice(idx + 2) : raw;
     };
+    const plotPlainCols = new Set(
+      [selX, ...(Array.isArray(selY) ? selY : []), barSeriesColumn]
+        .filter(Boolean)
+        .map((k) => deScope(k))
+        .filter(Boolean),
+    );
+    const sheetPlotScore = (sheetId) => {
+      const group = globalSheetColumnGroups.find((g) => g.sheetId === sheetId);
+      if (!group) return 0;
+      const sheetCols = new Set(group.options.map((o) => o.column));
+      let score = 0;
+      for (const col of plotPlainCols) {
+        if (sheetCols.has(col)) score += 1;
+      }
+      return score;
+    };
     const resolveToExistingKey = (value) => {
       if (!value) return null;
       if (colSet.has(value)) return value;
@@ -968,11 +988,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (plain && colSet.has(plain)) return plain;
       if (!plain) return null;
       // Back-compat: legacy snapshots stored unscoped keys but options are scoped (`sheet-1::col`).
-      // If several sheets share the same column name, prefer the active grid sheet so line charts
-      // use the same row count as the sheet you're viewing (avoids min-row merge with a short sheet).
       const matches = cols.filter((k) => deScope(k) === plain);
       if (!matches.length) return null;
       if (matches.length === 1) return matches[0];
+      const ranked = matches
+        .map((k) => {
+          const sid = k.includes("::") ? k.slice(0, k.indexOf("::")) : activeSheetId;
+          return { k, score: sheetPlotScore(sid) };
+        })
+        .sort((a, b) => b.score - a.score);
+      if (ranked[0]?.score > 0) return ranked[0].k;
       if (activeSheetId) {
         const onActive = matches.find((k) => k.startsWith(`${activeSheetId}::`));
         if (onActive) return onActive;
@@ -998,7 +1023,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     });
     setSelZ((z) => (z ? resolveToExistingKey(z) : z));
     setSelColorCol((c) => (c ? resolveToExistingKey(c) : c));
-  }, [demo, effectiveData, globalColumnOptions, activeSheetId]);
+    setBarSeriesColumn((col) => {
+      if (!col) return col;
+      const resolved = resolveToExistingKey(col);
+      if (!resolved) return null;
+      return resolved === col ? col : resolved;
+    });
+  }, [demo, effectiveData, globalColumnOptions, globalSheetColumnGroups, activeSheetId, selX, selY]);
 
   useEffect(() => {
     if (!rainbowLegendLabelColumn) return;
@@ -1222,9 +1253,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       ...filterColumns,
       ...tooltipExtraColumns,
       rainbowLegendLabelColumn,
+      barSeriesColumn,
     ].filter(Boolean);
     return keys.some((k) => String(k).includes("::"));
-  }, [selX, selY, selZ, selColorCol, lineSeriesColumn, chartFilterColumn, chartLineFilters, tooltipExtraColumns, rainbowLegendLabelColumn]);
+  }, [selX, selY, selZ, selColorCol, lineSeriesColumn, chartFilterColumn, chartLineFilters, tooltipExtraColumns, rainbowLegendLabelColumn, barSeriesColumn]);
 
   const crossSheetChartData = useMemo(() => {
     const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
@@ -1240,6 +1272,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       lineSeriesColumn,
       chartFilterColumn,
       rainbowLegendLabelColumn,
+      barSeriesColumn,
     ].filter(Boolean);
     const tooltipKeys = Array.isArray(tooltipExtraColumns) ? tooltipExtraColumns.filter(Boolean) : [];
     const filterKeys = normalizeChartLineFilters(chartLineFilters)
@@ -1291,17 +1324,23 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     lineSeriesColumn,
     tooltipExtraColumns,
     rainbowLegendLabelColumn,
+    barSeriesColumn,
     selColorCol,
     selX,
     selY,
     selZ,
   ]);
 
+  const barUsesCrossSheetData =
+    selChartType === "bar" && (!!barSeriesColumn || scopedKeysInUse);
+
   const lineChartData = useMemo(() => {
     const base =
-      selChartType === "line" || scopedKeysInUse ? crossSheetChartData : chartData;
+      selChartType === "line" || scopedKeysInUse || barUsesCrossSheetData
+        ? crossSheetChartData
+        : chartData;
     return downsampleRowsForChart(base);
-  }, [selChartType, scopedKeysInUse, crossSheetChartData, chartData]);
+  }, [selChartType, scopedKeysInUse, barUsesCrossSheetData, crossSheetChartData, chartData]);
 
   const chartTimeframesAvailable = useMemo(() => {
     const rows = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
@@ -1901,7 +1940,10 @@ export function ChartCanvas() {
   }, [xAxisTicksAngled, hideXAxisLabels]);
   const xAxisTickMargin = (xAxisTicksAngled ? 12 : 8) + (Number.isFinite(Number(xAxisLabelGapPx)) ? Number(xAxisLabelGapPx) : 0);
 
-  const rawData = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
+  const barUsesCrossSheetData =
+    selChartType === "bar" && (!!barSeriesColumn || scopedKeysInUse);
+  const rawData =
+    (selChartType === "line" || scopedKeysInUse || barUsesCrossSheetData ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
   const axesConfigured = usingSampleFallback || (!!selX && yKeys.length > 0);

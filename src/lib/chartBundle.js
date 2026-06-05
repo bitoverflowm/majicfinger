@@ -13,6 +13,18 @@ function stripInternalFromRows(rows) {
   });
 }
 
+function sheetColumnNames(sheet) {
+  const fromRows = [];
+  const rows = Array.isArray(sheet?.data) ? sheet.data : [];
+  if (rows.length && rows[0] && typeof rows[0] === "object") {
+    fromRows.push(...Object.keys(rows[0]));
+  }
+  const fromMeta = Array.isArray(sheet?.columns)
+    ? sheet.columns.map((c) => (typeof c === "string" ? c : c?.field || c?.name || "")).filter(Boolean)
+    : [];
+  return [...new Set([...fromRows, ...fromMeta])];
+}
+
 function collectAllColumnKeys(rows, dataSheets) {
   const keys = new Set();
   const addRows = (arr) => {
@@ -22,7 +34,10 @@ function collectAllColumnKeys(rows, dataSheets) {
     });
   };
   addRows(rows);
-  Object.values(dataSheets || {}).forEach((sheet) => addRows(sheet?.data));
+  Object.values(dataSheets || {}).forEach((sheet) => {
+    addRows(sheet?.data);
+    sheetColumnNames(sheet).forEach((k) => keys.add(k));
+  });
   return Array.from(keys);
 }
 
@@ -57,6 +72,16 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
   });
   s.selY = cleanY.length ? [...new Set(cleanY)] : fallback.selY;
 
+  if (s.barSeriesColumn !== undefined && s.barSeriesColumn !== null) {
+    const rawBar = String(s.barSeriesColumn || "");
+    if (rawBar.includes("::")) {
+      s.barSeriesColumn = rawBar;
+    } else {
+      const col = deScope(rawBar);
+      s.barSeriesColumn = col && keys.includes(col) ? col : null;
+    }
+  }
+
   if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
     const nextOverrides = {};
     for (const [rawKey, color] of Object.entries(s.lineColorOverrides)) {
@@ -85,9 +110,10 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     s.chartConfig = nextCfg;
   }
 
-  if (!s.selX || !Array.isArray(s.selY) || s.selY.length === 0) {
-    s.selX = fallback.selX;
-    s.selY = fallback.selY;
+  if (!s.selX) s.selX = fallback.selX;
+  if (!Array.isArray(s.selY) || s.selY.length === 0) s.selY = fallback.selY;
+  // Preserve saved chart type when axes were saved intentionally; only infer type when snapshot had none.
+  if (!allowedTypes.has(type)) {
     s.selChartType = fallback.selChartType;
   }
 

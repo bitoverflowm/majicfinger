@@ -99,6 +99,11 @@ export function coerceCategoricalBuilderAxes(snapshot, keys) {
   const xKey = deScopeAxisKey(s.selX);
   if (!xKey || xKey === labelCol) return s;
 
+  // Respect intentional time-series bar/line charts (e.g. year → volume with stacked breakdown).
+  if ((s.selChartType === "bar" || s.selChartType === "line") && isTemporalColumnKey(xKey)) {
+    return s;
+  }
+
   const xIsTemporal = isTemporalColumnKey(xKey);
   const xIsMetadata =
     /^(date|ticker|market_type|market_ticker|event_ticker|id|category)$/i.test(xKey) &&
