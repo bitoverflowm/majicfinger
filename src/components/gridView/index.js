@@ -71,6 +71,7 @@ import {
   Download,
   BarChart2,
   Sigma,
+  Code,
   GripVertical,
   ChevronDown,
   Pencil,
@@ -458,6 +459,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
 
     const [summarizeOpen, setSummarizeOpen] = useState(false);
     const [mathDialogOpen, setMathDialogOpen] = useState(false);
+    const [ifElseDialogOpen, setIfElseDialogOpen] = useState(false);
     const [mathBaseCol, setMathBaseCol] = useState("");
     const [mathReferenceMode, setMathReferenceMode] = useState("row_wise");
     const [mathCurrentRowRef, setMathCurrentRowRef] = useState("current_row");
@@ -800,6 +802,25 @@ const GridView = ({ startNew, fillViewport = false }) => {
     }, [mathDialogOpen, sheetColumnNamesForMath, nextFreeResultColumnName]);
 
     useEffect(() => {
+      if (!ifElseDialogOpen) return;
+      setMathOutCol((prev) => (String(prev || "").trim() ? prev : nextFreeResultColumnName()));
+    }, [ifElseDialogOpen, nextFreeResultColumnName]);
+
+    useEffect(() => {
+      if (!ifElseDialogOpen) {
+        setMathIfClauses([
+          {
+            id: "if-1",
+            condition: { leftColumn: "", operator: "=", rightKind: "raw", rightColumn: "", rightValue: "" },
+            then: { kind: "raw", value: "" },
+          },
+        ]);
+        setMathElseResult({ kind: "raw", value: "" });
+        setMathOutCol("");
+      }
+    }, [ifElseDialogOpen]);
+
+    useEffect(() => {
       if (!mathDialogOpen) {
         setMathDialogTab("basic");
         setStatsStdDevActive(false);
@@ -821,14 +842,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
         setMathBasicColA("");
         setMathBasicColB("");
         setMathFunctionType("row_operation");
-        setMathIfClauses([
-          {
-            id: "if-1",
-            condition: { leftColumn: "", operator: "=", rightKind: "raw", rightColumn: "", rightValue: "" },
-            then: { kind: "raw", value: "" },
-          },
-        ]);
-        setMathElseResult({ kind: "raw", value: "" });
       }
     }, [mathDialogOpen]);
 
@@ -1090,7 +1103,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
     }), [mathIfClauses, mathElseResult]);
 
     const ifElseCanSubmit = useMemo(() => {
-      if (mathFunctionType !== "if_else") return true;
       const clauses = Array.isArray(mathIfClauses) ? mathIfClauses : [];
       return clauses.some((clause) =>
         String(clause?.condition?.leftColumn || "").trim() &&
@@ -1098,7 +1110,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
           ? String(clause?.condition?.rightColumn || "").trim()
           : String(clause?.condition?.rightValue ?? "").trim() || ["is_empty", "is_not_empty"].includes(clause?.condition?.operator))
       );
-    }, [mathFunctionType, mathIfClauses]);
+    }, [mathIfClauses]);
 
     const renderMathOperandEditor = (label, value, onChange) => {
       const spec = value && typeof value === "object" ? value : { kind: "raw", value: "" };
@@ -1202,6 +1214,78 @@ const GridView = ({ startNew, fillViewport = false }) => {
       );
     };
 
+    const applyIfElseOperation = useCallback(() => {
+      const rows = Array.isArray(connectedData) ? [...connectedData] : [];
+      if (!rows.length) {
+        toast.error("Load sheet data before running a column calculation.");
+        return;
+      }
+      const out = String(mathOutCol || "").trim() || nextFreeResultColumnName();
+      if (!out) {
+        toast.error("Enter a name for the new column.");
+        return;
+      }
+      const expression = normalizeIfElseExpressionForSave();
+      if (!ifElseCanSubmit) {
+        toast.error("Add at least one valid if / else condition.");
+        return;
+      }
+      const next = rows.map((row) => {
+        if (!row || typeof row !== "object") return row;
+        return { ...row, [out]: evaluateIfElseExpression(row, expression) };
+      });
+      const inferredType = next.some((row) => row?.[out] != null && row?.[out] !== "" && !Number.isNaN(Number(row?.[out])))
+        ? "number"
+        : "string";
+      if (setDataTypes) {
+        setDataTypes((prev) => ({ ...(prev || {}), [out]: inferredType }));
+      }
+      const operation = createSheetOperation("computed.column", {
+        column: out,
+        expression: normalizeIfElseExpressionForSave(),
+      });
+      if (mathDestination === "new_sheet") {
+        const sheetName = `${out} calc`;
+        addNewSheetAndActivate?.((newId) => {
+          setSheetData?.(newId, next);
+          setDataSheets?.((prev) => {
+            const p = prev || {};
+            const sheet = p[newId];
+            if (!sheet) return prev;
+            return {
+              ...p,
+              [newId]: {
+                ...sheet,
+                name: sheetName.slice(0, 80),
+                operationHistory: [...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []), operation],
+              },
+            };
+          });
+        });
+        toast.success("Applied if / else in a new sheet.");
+      } else {
+        replaceCurrentSheetData?.(next);
+        setConnectedData?.(next);
+        appendActiveSheetOperation("computed.column", operation);
+        toast.success("Applied if / else to current sheet.");
+      }
+      setIfElseDialogOpen(false);
+    }, [
+      connectedData,
+      mathDestination,
+      normalizeIfElseExpressionForSave,
+      ifElseCanSubmit,
+      mathOutCol,
+      nextFreeResultColumnName,
+      addNewSheetAndActivate,
+      replaceCurrentSheetData,
+      setConnectedData,
+      setDataSheets,
+      setDataTypes,
+      setSheetData,
+      appendActiveSheetOperation,
+    ]);
+
     const applySheetMathOperation = useCallback(() => {
       const rows = Array.isArray(connectedData) ? [...connectedData] : [];
       if (!rows.length) {
@@ -1219,17 +1303,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       };
 
       let next;
-      if (mathDialogTab === "functions" && mathFunctionType === "if_else") {
-        const expression = normalizeIfElseExpressionForSave();
-        if (!ifElseCanSubmit) {
-          toast.error("Add at least one valid if / else condition.");
-          return;
-        }
-        next = rows.map((row) => {
-          if (!row || typeof row !== "object") return row;
-          return { ...row, [out]: evaluateIfElseExpression(row, expression) };
-        });
-      } else if (mathDialogTab === "basic" || (mathDialogTab === "functions" && mathFunctionType === "column")) {
+      if (mathDialogTab === "basic" || (mathDialogTab === "functions" && mathFunctionType === "column")) {
         const colA = String(mathBasicColA || "").trim();
         const colB = String(mathBasicColB || "").trim();
         const unaryAbs = mathOp === "abs";
@@ -1303,11 +1377,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
       const operation = createSheetOperation("computed.column", {
         column: out,
         expression:
-          mathDialogTab === "functions" && mathFunctionType === "if_else"
-            ? normalizeIfElseExpressionForSave()
-            : (mathDialogTab === "basic" || mathFunctionType === "column")
-              ? { kind: "binary", op: mathOp, leftColumn: mathBasicColA, rightColumn: mathOp === "abs" ? "" : mathBasicColB }
-              : { kind: "relative-row", op: mathOp, baseColumn: mathBaseCol, rowRef: mathRelativeRowRef },
+          (mathDialogTab === "basic" || mathFunctionType === "column")
+            ? { kind: "binary", op: mathOp, leftColumn: mathBasicColA, rightColumn: mathOp === "abs" ? "" : mathBasicColB }
+            : { kind: "relative-row", op: mathOp, baseColumn: mathBaseCol, rowRef: mathRelativeRowRef },
       });
       if (mathDestination === "new_sheet") {
         const sheetName = `${out} calc`;
@@ -1343,8 +1415,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
       mathBaseCol,
       mathDestination,
       mathFunctionType,
-      normalizeIfElseExpressionForSave,
-      ifElseCanSubmit,
       mathOp,
       mathOutCol,
       mathRelativeRowRef,
@@ -2964,6 +3034,181 @@ const GridView = ({ startNew, fillViewport = false }) => {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label="If / else"
+                        onClick={() => setIfElseDialogOpen(true)}
+                      >
+                        <Code className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      If / else
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Dialog open={ifElseDialogOpen} onOpenChange={setIfElseDialogOpen}>
+                  <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>If / else</DialogTitle>
+                      <DialogDescription>
+                        Set conditional values per row and write the result as a new column.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="min-h-0 space-y-3 overflow-y-auto py-2 pr-1">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Resulting column name</Label>
+                        <Input
+                          className="h-9 text-xs"
+                          value={mathOutCol}
+                          onChange={(e) => setMathOutCol(e.target.value)}
+                          spellCheck={false}
+                          placeholder={nextFreeResultColumnName()}
+                        />
+                      </div>
+                      <div className="space-y-3">
+                        {(Array.isArray(mathIfClauses) ? mathIfClauses : []).map((clause, idx) => {
+                          const condition = clause.condition || {};
+                          return (
+                            <div key={clause.id} className="space-y-2 rounded-lg border border-border/70 p-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  {idx === 0 ? "If" : `Else if ${idx}`}
+                                </span>
+                                {(mathIfClauses || []).length > 1 ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-2 w-2 items-center justify-center rounded-full bg-red-500 hover:bg-red-600"
+                                    aria-label={`Remove condition ${idx + 1}`}
+                                    onClick={() => removeMathIfClause(clause.id)}
+                                  />
+                                ) : null}
+                              </div>
+                              <div className="grid gap-2 sm:grid-cols-[1.1fr_0.7fr_0.8fr_1.1fr]">
+                                <Select value={condition.leftColumn || "__"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { leftColumn: v === "__" ? "" : v } })}>
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue placeholder="Column" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__">—</SelectItem>
+                                    {sheetColumnNamesForMath.map((c) => (
+                                      <SelectItem key={`ifelse-left-${clause.id}-${c}`} value={c} className="font-mono text-xs">
+                                        {c}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select value={condition.operator || "="} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { operator: v } })}>
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="=">=</SelectItem>
+                                    <SelectItem value="!=">!=</SelectItem>
+                                    <SelectItem value=">">&gt;</SelectItem>
+                                    <SelectItem value=">=">&gt;=</SelectItem>
+                                    <SelectItem value="<">&lt;</SelectItem>
+                                    <SelectItem value="<=">&lt;=</SelectItem>
+                                    <SelectItem value="contains">contains</SelectItem>
+                                    <SelectItem value="not_contains">does not contain</SelectItem>
+                                    <SelectItem value="is_empty">is empty</SelectItem>
+                                    <SelectItem value="is_not_empty">is not empty</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Select value={condition.rightKind || "raw"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { rightKind: v } })}>
+                                  <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="raw">Raw</SelectItem>
+                                    <SelectItem value="column">Column</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {condition.rightKind === "column" ? (
+                                  <Select value={condition.rightColumn || "__"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { rightColumn: v === "__" ? "" : v } })}>
+                                    <SelectTrigger className="h-9 text-xs">
+                                      <SelectValue placeholder="Column" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__">—</SelectItem>
+                                      {sheetColumnNamesForMath.map((c) => (
+                                        <SelectItem key={`ifelse-right-${clause.id}-${c}`} value={c} className="font-mono text-xs">
+                                          {c}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input
+                                    className="h-9 text-xs"
+                                    value={condition.rightValue ?? ""}
+                                    onChange={(e) => updateMathIfClause(clause.id, { condition: { rightValue: e.target.value } })}
+                                    placeholder='Value, e.g. Yes'
+                                    disabled={["is_empty", "is_not_empty"].includes(condition.operator)}
+                                  />
+                                )}
+                              </div>
+                              {renderMathOperandEditor("Then", clause.then, (next) => updateMathIfClause(clause.id, { then: next }))}
+                            </div>
+                          );
+                        })}
+                        <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={addMathElseIfClause}>
+                          + Else if
+                        </Button>
+                        {renderMathOperandEditor("Else", mathElseResult, setMathElseResult)}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Preview equation</Label>
+                        <div className="min-h-9 rounded-md border border-border/60 bg-muted/20 px-2 py-1 text-xs flex items-center font-mono leading-snug">
+                          <span className="line-clamp-2">
+                            {`${mathOutCol || nextFreeResultColumnName()} = if ${mathIfClauses?.[0]?.condition?.leftColumn || "column"} ${mathIfClauses?.[0]?.condition?.operator || "="} ${mathIfClauses?.[0]?.condition?.rightKind === "column" ? (mathIfClauses?.[0]?.condition?.rightColumn || "column") : (mathIfClauses?.[0]?.condition?.rightValue || "value")} then ... else ...`}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Apply to</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 text-xs"
+                            variant={mathDestination === "current_sheet" ? "default" : "outline"}
+                            onClick={() => setMathDestination("current_sheet")}
+                          >
+                            Current sheet
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 text-xs"
+                            variant={mathDestination === "new_sheet" ? "default" : "outline"}
+                            onClick={() => setMathDestination("new_sheet")}
+                          >
+                            New sheet
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button type="button" variant="outline" onClick={() => setIfElseDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={applyIfElseOperation}
+                        disabled={!String(mathOutCol || "").trim() || !ifElseCanSubmit}
+                      >
+                        Apply to sheet
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 <Dialog open={mathDialogOpen} onOpenChange={setMathDialogOpen}>
                   <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-2xl">
                     <DialogHeader>
@@ -3107,7 +3352,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   <SelectContent>
                                     <SelectItem value="row_operation">Basic row operation</SelectItem>
                                     <SelectItem value="column">Column</SelectItem>
-                                    <SelectItem value="if_else">If else</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -3164,98 +3408,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   </div>
                                 </div>
                               </>
-                            ) : mathFunctionType === "if_else" ? (
-                              <div className="space-y-3">
-                                {(Array.isArray(mathIfClauses) ? mathIfClauses : []).map((clause, idx) => {
-                                  const condition = clause.condition || {};
-                                  return (
-                                    <div key={clause.id} className="space-y-2 rounded-lg border border-border/70 p-2">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                          {idx === 0 ? "If" : `Else if ${idx}`}
-                                        </span>
-                                        {(mathIfClauses || []).length > 1 ? (
-                                          <button
-                                            type="button"
-                                            className="inline-flex h-2 w-2 items-center justify-center rounded-full bg-red-500 hover:bg-red-600"
-                                            aria-label={`Remove condition ${idx + 1}`}
-                                            onClick={() => removeMathIfClause(clause.id)}
-                                          />
-                                        ) : null}
-                                      </div>
-                                      <div className="grid gap-2 sm:grid-cols-[1.1fr_0.7fr_0.8fr_1.1fr]">
-                                        <Select value={condition.leftColumn || "__"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { leftColumn: v === "__" ? "" : v } })}>
-                                          <SelectTrigger className="h-9 text-xs">
-                                            <SelectValue placeholder="Column" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="__">—</SelectItem>
-                                            {sheetColumnNamesForMath.map((c) => (
-                                              <SelectItem key={`if-left-${clause.id}-${c}`} value={c} className="font-mono text-xs">
-                                                {c}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                        <Select value={condition.operator || "="} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { operator: v } })}>
-                                          <SelectTrigger className="h-9 text-xs">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="=">=</SelectItem>
-                                            <SelectItem value="!=">!=</SelectItem>
-                                            <SelectItem value=">">&gt;</SelectItem>
-                                            <SelectItem value=">=">&gt;=</SelectItem>
-                                            <SelectItem value="<">&lt;</SelectItem>
-                                            <SelectItem value="<=">&lt;=</SelectItem>
-                                            <SelectItem value="contains">contains</SelectItem>
-                                            <SelectItem value="not_contains">does not contain</SelectItem>
-                                            <SelectItem value="is_empty">is empty</SelectItem>
-                                            <SelectItem value="is_not_empty">is not empty</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                        <Select value={condition.rightKind || "raw"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { rightKind: v } })}>
-                                          <SelectTrigger className="h-9 text-xs">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="raw">Raw</SelectItem>
-                                            <SelectItem value="column">Column</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                        {condition.rightKind === "column" ? (
-                                          <Select value={condition.rightColumn || "__"} onValueChange={(v) => updateMathIfClause(clause.id, { condition: { rightColumn: v === "__" ? "" : v } })}>
-                                            <SelectTrigger className="h-9 text-xs">
-                                              <SelectValue placeholder="Column" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="__">—</SelectItem>
-                                              {sheetColumnNamesForMath.map((c) => (
-                                                <SelectItem key={`if-right-${clause.id}-${c}`} value={c} className="font-mono text-xs">
-                                                  {c}
-                                                </SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                        ) : (
-                                          <Input
-                                            className="h-9 text-xs"
-                                            value={condition.rightValue ?? ""}
-                                            onChange={(e) => updateMathIfClause(clause.id, { condition: { rightValue: e.target.value } })}
-                                            placeholder='Value, e.g. Yes'
-                                            disabled={["is_empty", "is_not_empty"].includes(condition.operator)}
-                                          />
-                                        )}
-                                      </div>
-                                      {renderMathOperandEditor("Then", clause.then, (next) => updateMathIfClause(clause.id, { then: next }))}
-                                    </div>
-                                  );
-                                })}
-                                <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={addMathElseIfClause}>
-                                  + Else if
-                                </Button>
-                                {renderMathOperandEditor("Else", mathElseResult, setMathElseResult)}
-                              </div>
                             ) : (
                               <div className="grid gap-2 sm:grid-cols-[1.3fr_0.8fr_1fr_0.6fr_1fr] items-end">
                                 <div className="space-y-1">
@@ -3339,11 +3491,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                             <div className="space-y-1">
                               <Label className="text-xs">Preview equation</Label>
                               <div className="min-h-9 rounded-md border border-border/60 bg-muted/20 px-2 py-1 text-xs flex items-center font-mono leading-snug">
-                                {mathFunctionType === "if_else" ? (
-                                  <span className="line-clamp-2">
-                                    {`${mathOutCol || nextFreeResultColumnName()} = if ${mathIfClauses?.[0]?.condition?.leftColumn || "column"} ${mathIfClauses?.[0]?.condition?.operator || "="} ${mathIfClauses?.[0]?.condition?.rightKind === "column" ? (mathIfClauses?.[0]?.condition?.rightColumn || "column") : (mathIfClauses?.[0]?.condition?.rightValue || "value")} then ... else ...`}
-                                  </span>
-                                ) : mathFunctionType === "column" ? (
+                                {mathFunctionType === "column" ? (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${mathBasicColA || "Column A"} ${
                                     mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
                                   } ${mathBasicColB || "Column B"} (per row)`
@@ -4052,8 +4200,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                             (!String(mathOutCol || "").trim() ||
                               (mathFunctionType === "row_operation" && !String(mathBaseCol || "").trim()) ||
                               (mathFunctionType === "column" &&
-                                (!String(mathBasicColA || "").trim() || !String(mathBasicColB || "").trim())) ||
-                              (mathFunctionType === "if_else" && !ifElseCanSubmit)))
+                                (!String(mathBasicColA || "").trim() || !String(mathBasicColB || "").trim()))))
                         }
                       >
                         {mathDialogTab === "stats" && statsBucketActive ? "Create bucket sheet" : "Apply to sheet"}
