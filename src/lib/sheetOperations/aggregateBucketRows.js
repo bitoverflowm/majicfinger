@@ -173,64 +173,137 @@ export function aggregateBucketRows(rows, config) {
       if (typeof av === "number" && typeof bv === "number") return av - bv;
       return String(av ?? "").localeCompare(String(bv ?? ""));
     })
-    .map((group) => {
-      const out = { [bucketOutputColumn]: group.rawBucket ?? "" };
-      for (const col of passthroughColumns) {
-        if (!col || col === bucketColumn || col === "_origIndex") continue;
-        out[col] = group.firstRow?.[col] ?? null;
-      }
-      for (const agg of aggregations) {
-        const type = String(agg.type || "count");
-        const valueColumn = String(agg.valueColumn || "").trim();
-        const weightColumn = String(agg.weightColumn || "").trim();
-        const denominatorColumn = String(agg.denominatorColumn || "").trim();
-        const outputColumn = String(agg.outputColumn || "").trim();
-        if (!outputColumn) continue;
-        const rowsForAgg = group.rows.filter((row) => rowMatchesAggregationFilter(row, agg));
+    .flatMap((group) =>
+      buildBucketOutputRows({
+        bucketOutputColumn,
+        bucketColumn,
+        passthroughColumns,
+        aggregations,
+        rawBucket: group.rawBucket ?? "",
+        rows: group.rows,
+        firstRow: group.firstRow,
+      }),
+    );
+}
 
-        if (type === "count") {
-          out[outputColumn] = valueColumn
-            ? rowsForAgg.reduce(
-                (count, row) => (row?.[valueColumn] == null || row?.[valueColumn] === "" ? count : count + 1),
-                0,
-              )
-            : rowsForAgg.length;
-          continue;
-        }
+function subgroupLabelForValue(raw) {
+  if (raw == null || raw === "") return "(empty)";
+  return raw;
+}
 
-        let sum = 0;
-        let count = 0;
-        let weightedSum = 0;
-        let weightSum = 0;
-        let productSum = 0;
-        let productCount = 0;
-        for (const row of rowsForAgg) {
-          const value = parseCellFiniteForStat(row, valueColumn);
-          if (value == null) continue;
-          if (type === "sum" || type === "average") {
-            sum += value;
-            count += 1;
-          } else if (type === "weighted_average") {
-            const weight = parseCellFiniteForStat(row, weightColumn);
-            if (weight == null) continue;
-            weightedSum += value * weight;
-            weightSum += weight;
-          } else if (type === "product_ratio") {
-            const weight = parseCellFiniteForStat(row, weightColumn);
-            if (weight == null) continue;
-            productSum += value * weight;
-            productCount += 1;
-          }
-        }
-        if (type === "sum") out[outputColumn] = count > 0 ? sum : null;
-        else if (type === "average") out[outputColumn] = count > 0 ? sum / count : null;
-        else if (type === "weighted_average") out[outputColumn] = weightSum !== 0 ? weightedSum / weightSum : null;
-        else if (type === "product_ratio") {
-          const denom = Number(out[denominatorColumn]);
-          out[outputColumn] =
-            productCount > 0 && Number.isFinite(denom) && denom !== 0 ? productSum / denom : null;
-        }
+function expandGroupsBySubgroup(leafGroups, agg) {
+  const col = String(agg.valueColumn || "").trim();
+  const outCol = String(agg.outputColumn || col).trim();
+  if (!col || !outCol) return leafGroups;
+
+  const next = [];
+  for (const group of leafGroups) {
+    const subMap = new Map();
+    for (const row of group.rows) {
+      const label = subgroupLabelForValue(row?.[col]);
+      const key = bucketKeyForValue(row?.[col]);
+      if (!subMap.has(key)) {
+        subMap.set(key, {
+          dimensions: { ...group.dimensions, [outCol]: label },
+          rows: [],
+        });
       }
-      return out;
+      subMap.get(key).rows.push(row);
+    }
+    next.push(...Array.from(subMap.values()));
+  }
+  return next.length ? next : leafGroups;
+}
+
+function computeMetricValue(rowsForAgg, agg, dimensions) {
+  const type = String(agg.type || "count");
+  const valueColumn = String(agg.valueColumn || "").trim();
+  const weightColumn = String(agg.weightColumn || "").trim();
+  const denominatorColumn = String(agg.denominatorColumn || "").trim();
+
+  if (type === "count") {
+    return valueColumn
+      ? rowsForAgg.reduce(
+          (count, row) => (row?.[valueColumn] == null || row?.[valueColumn] === "" ? count : count + 1),
+          0,
+        )
+      : rowsForAgg.length;
+  }
+
+  let sum = 0;
+  let count = 0;
+  let weightedSum = 0;
+  let weightSum = 0;
+  let productSum = 0;
+  let productCount = 0;
+  for (const row of rowsForAgg) {
+    const value = parseCellFiniteForStat(row, valueColumn);
+    if (value == null) continue;
+    if (type === "sum" || type === "average") {
+      sum += value;
+      count += 1;
+    } else if (type === "weighted_average") {
+      const weight = parseCellFiniteForStat(row, weightColumn);
+      if (weight == null) continue;
+      weightedSum += value * weight;
+      weightSum += weight;
+    } else if (type === "product_ratio") {
+      const weight = parseCellFiniteForStat(row, weightColumn);
+      if (weight == null) continue;
+      productSum += value * weight;
+      productCount += 1;
+    }
+  }
+  if (type === "sum") return count > 0 ? sum : null;
+  if (type === "average") return count > 0 ? sum / count : null;
+  if (type === "weighted_average") return weightSum !== 0 ? weightedSum / weightSum : null;
+  if (type === "product_ratio") {
+    const denom = Number(dimensions?.[denominatorColumn]);
+    return productCount > 0 && Number.isFinite(denom) && denom !== 0 ? productSum / denom : null;
+  }
+  return null;
+}
+
+function buildBucketOutputRows({
+  bucketOutputColumn,
+  bucketColumn,
+  passthroughColumns,
+  aggregations,
+  rawBucket,
+  rows,
+  firstRow,
+}) {
+  let leafGroups = [{
+    dimensions: { [bucketOutputColumn]: rawBucket },
+    rows,
+  }];
+
+  for (const col of passthroughColumns) {
+    if (!col || col === bucketColumn || col === bucketOutputColumn || col === "_origIndex") continue;
+    leafGroups[0].dimensions[col] = firstRow?.[col] ?? null;
+  }
+
+  for (const agg of aggregations) {
+    const type = String(agg.type || "count");
+    if (type === "subgroup_by") {
+      leafGroups = expandGroupsBySubgroup(leafGroups, agg);
+      continue;
+    }
+
+    const outputColumn = String(agg.outputColumn || "").trim();
+    if (!outputColumn) continue;
+
+    leafGroups = leafGroups.map((group) => {
+      const rowsForAgg = group.rows.filter((row) => rowMatchesAggregationFilter(row, agg));
+      return {
+        ...group,
+        dimensions: {
+          ...group.dimensions,
+          [outputColumn]: computeMetricValue(rowsForAgg, agg, group.dimensions),
+        },
+      };
     });
+  }
+
+  return leafGroups.map((group) => group.dimensions);
 }

@@ -106,6 +106,14 @@ import {
   createSheetOperation,
   replaceSheetOperation,
 } from "@/lib/projectPersistence";
+import {
+  bucketOperationPayloadFromTab,
+  bucketRowsConfigFromTab,
+  bucketTabCanSubmit,
+  bucketTabFromOperation,
+  collectBucketTabsForSourceSheet,
+  createEmptyBucketTab,
+} from "@/lib/bucketSheetTabs";
 import { aggregateBucketRows, formatBucketNumber } from "@/lib/sheetOperations/aggregateBucketRows";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
 import { temporalToMs } from "@/lib/temporalParse";
@@ -482,6 +490,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [statsBucketAggregations, setStatsBucketAggregations] = useState([
       { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", denominatorColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" },
     ]);
+    const [bucketTabs, setBucketTabs] = useState([]);
+    const [activeBucketTabId, setActiveBucketTabId] = useState(null);
+    const bucketPanelInitializedRef = useRef(false);
 
     // Combine Sheets (client-side join across already-loaded sheets)
     const [combineSheetsDialogOpen, setCombineSheetsDialogOpen] = useState(false);
@@ -972,40 +983,100 @@ const GridView = ({ startNew, fillViewport = false }) => {
       [statsBucketAggregations],
     );
 
+    const applyBucketTabToEditor = useCallback((tab) => {
+      if (!tab) return;
+      setStatsBucketColumn(tab.bucketColumn || "");
+      setStatsBucketOutputColumn(tab.bucketOutputColumn || "bucket");
+      setStatsBucketSheetName(tab.sheetName || "");
+      setStatsBucketMode(tab.bucketMode || "category");
+      setStatsBucketTimeInterval(tab.timeInterval || "day");
+      setStatsBucketNumericSize(tab.numericBucketSize || "");
+      setStatsBucketPassthroughCols(new Set(tab.passthroughColumns || []));
+      setStatsBucketAggregations(
+        (Array.isArray(tab.aggregations) ? tab.aggregations : []).map((agg) => ({ ...agg })),
+      );
+    }, []);
+
+    const captureEditorAsBucketTab = useCallback(
+      (baseTab) => ({
+        ...(baseTab || createEmptyBucketTab()),
+        bucketColumn: String(statsBucketColumn || "").trim(),
+        bucketOutputColumn: String(statsBucketOutputColumn || "").trim(),
+        sheetName: String(statsBucketSheetName || "").trim(),
+        bucketMode: statsBucketMode,
+        timeInterval: statsBucketTimeInterval,
+        numericBucketSize: statsBucketNumericSize,
+        passthroughColumns: Array.from(statsBucketPassthroughCols || []),
+        aggregations: normalizedStatsBucketAggregations.map((agg) => ({ ...agg })),
+      }),
+      [
+        normalizedStatsBucketAggregations,
+        statsBucketColumn,
+        statsBucketMode,
+        statsBucketNumericSize,
+        statsBucketOutputColumn,
+        statsBucketPassthroughCols,
+        statsBucketSheetName,
+        statsBucketTimeInterval,
+      ],
+    );
+
+    const activeBucketTab = useMemo(
+      () => bucketTabs.find((tab) => tab.id === activeBucketTabId) || bucketTabs[0] || null,
+      [bucketTabs, activeBucketTabId],
+    );
+
+    const handleBucketTabChange = useCallback(
+      (nextTabId) => {
+        if (!nextTabId || nextTabId === activeBucketTabId) return;
+        setBucketTabs((prev) =>
+          prev.map((tab) => (tab.id === activeBucketTabId ? captureEditorAsBucketTab(tab) : tab)),
+        );
+        const nextTab = bucketTabs.find((tab) => tab.id === nextTabId);
+        if (nextTab) applyBucketTabToEditor(nextTab);
+        setActiveBucketTabId(nextTabId);
+      },
+      [activeBucketTabId, applyBucketTabToEditor, bucketTabs, captureEditorAsBucketTab],
+    );
+
+    const addBucketTab = useCallback(() => {
+      const tab = createEmptyBucketTab(nextFreeResultColumnName() || "Bucketed sheet");
+      setBucketTabs((prev) => {
+        const synced = prev.map((t) => (t.id === activeBucketTabId ? captureEditorAsBucketTab(t) : t));
+        return [...synced, tab];
+      });
+      applyBucketTabToEditor(tab);
+      setActiveBucketTabId(tab.id);
+    }, [activeBucketTabId, applyBucketTabToEditor, captureEditorAsBucketTab, nextFreeResultColumnName]);
+
+    useEffect(() => {
+      if (!statsBucketActive) {
+        bucketPanelInitializedRef.current = false;
+        return;
+      }
+      if (bucketPanelInitializedRef.current) return;
+      bucketPanelInitializedRef.current = true;
+      const savedTabs = collectBucketTabsForSourceSheet(dataSheets, activeSheetId);
+      if (savedTabs.length) {
+        setBucketTabs(savedTabs);
+        setActiveBucketTabId(savedTabs[0].id);
+        applyBucketTabToEditor(savedTabs[0]);
+        return;
+      }
+      const tab = createEmptyBucketTab(statsBucketSheetName || "Bucketed sheet");
+      setBucketTabs([tab]);
+      setActiveBucketTabId(tab.id);
+    }, [statsBucketActive, dataSheets, activeSheetId, applyBucketTabToEditor, statsBucketSheetName]);
+
     const statsBucketCanSubmit = useMemo(() => {
       if (!statsBucketActive) return false;
-      if (!String(statsBucketColumn || "").trim()) return false;
-      if (!String(statsBucketOutputColumn || "").trim()) return false;
-      if (!String(statsBucketSheetName || "").trim()) return false;
-      if (statsBucketMode === "number") {
-        const size = Number(statsBucketNumericSize || statsBucketColumnProfile.suggestedSize || 1);
-        if (!Number.isFinite(size) || size <= 0) return false;
-      }
-      if (statsBucketMode === "time" && !statsBucketTimeInterval) return false;
-      if (!normalizedStatsBucketAggregations.length) return false;
-      return normalizedStatsBucketAggregations.every((agg) => {
-        if (!agg.outputColumn) return false;
-        if (agg.filterEnabled) {
-          const needsValue = !["is_empty", "is_not_empty"].includes(agg.filterOperator);
-          if (!agg.filterColumn) return false;
-          if (needsValue && String(agg.filterValue ?? "").trim() === "") return false;
-        }
-        if (agg.type === "count") return true;
-        if (!agg.valueColumn) return false;
-        if (agg.type === "weighted_average") return Boolean(agg.weightColumn);
-        if (agg.type === "product_ratio") return Boolean(agg.weightColumn && agg.denominatorColumn);
-        return true;
-      });
+      const tab = captureEditorAsBucketTab(activeBucketTab);
+      return bucketTabCanSubmit(tab, { suggestedNumericSize: statsBucketColumnProfile.suggestedSize });
     }, [
-      normalizedStatsBucketAggregations,
+      activeBucketTab,
+      captureEditorAsBucketTab,
       statsBucketActive,
-      statsBucketColumn,
       statsBucketColumnProfile.suggestedSize,
-      statsBucketMode,
-      statsBucketNumericSize,
-      statsBucketOutputColumn,
-      statsBucketSheetName,
-      statsBucketTimeInterval,
     ]);
 
     const statsBucketPreviewRows = useMemo(() => {
@@ -1643,78 +1714,135 @@ const GridView = ({ startNew, fillViewport = false }) => {
         toast.error("Load sheet data before bucketing.");
         return;
       }
-      const bucketColumn = String(statsBucketColumn || "").trim();
-      const bucketOutputColumn = String(statsBucketOutputColumn || "").trim();
-      const sheetName = String(statsBucketSheetName || "").trim();
-      if (!bucketColumn || !bucketOutputColumn || !sheetName) {
-        toast.error("Choose a bucket column, bucket output name, and new sheet name.");
-        return;
-      }
-      if (!statsBucketCanSubmit) {
+      const tab = captureEditorAsBucketTab(activeBucketTab);
+      if (!bucketTabCanSubmit(tab, { suggestedNumericSize: statsBucketColumnProfile.suggestedSize })) {
         toast.error("Finish configuring each bucket aggregation.");
         return;
       }
-      const passthroughColumns = Array.from(statsBucketPassthroughCols || []);
-      const aggregations = normalizedStatsBucketAggregations.map((agg) => ({ ...agg }));
-      const next = aggregateBucketRows(rows, {
-        bucketColumn,
-        bucketOutputColumn,
-        bucketMode: statsBucketMode,
-        timeInterval: statsBucketTimeInterval,
-        numericBucketSize: statsBucketNumericSize || statsBucketColumnProfile.suggestedSize || 1,
-        passthroughColumns,
-        aggregations,
-      });
+      const bucketConfig = bucketRowsConfigFromTab(tab, statsBucketColumnProfile.suggestedSize || 1);
+      const next = aggregateBucketRows(rows, bucketConfig);
       if (!next.length) {
         toast.error("No bucket rows were generated.");
         return;
       }
-      const operation = createSheetOperation("bucket.sheet", {
-        sourceSheetId: activeSheetId || null,
-        bucketColumn,
-        bucketOutputColumn,
-        bucketMode: statsBucketMode,
-        timeInterval: statsBucketTimeInterval,
-        numericBucketSize: statsBucketNumericSize || statsBucketColumnProfile.suggestedSize || 1,
-        passthroughColumns,
-        aggregations,
-        outputSheetName: sheetName,
-      });
-      addNewSheetAndActivate?.((newId) => {
-        setSheetData?.(newId, next);
+      const operation = createSheetOperation("bucket.sheet", bucketOperationPayloadFromTab(tab, activeSheetId));
+      const savedSheetName = String(tab.savedSheetName || "").trim();
+      const sheetName = String(tab.sheetName || "").trim();
+      const isNewSheetName = Boolean(savedSheetName) && savedSheetName !== sheetName;
+
+      const writeBucketSheet = (targetSheetId, op, { appendHistory }) => {
+        setSheetData?.(targetSheetId, next);
         setDataSheets?.((prev) => {
           const p = prev || {};
-          const sheet = p[newId];
+          const sheet = p[targetSheetId];
           if (!sheet) return prev;
+          const history = Array.isArray(sheet.operationHistory) ? sheet.operationHistory : [];
           return {
             ...p,
-            [newId]: {
+            [targetSheetId]: {
               ...sheet,
               name: sheetName.slice(0, 80),
+              data: next,
+              rowCount: next.length,
+              fullRowCount: next.length,
               sourceSheetId: activeSheetId || sheet.sourceSheetId,
-              operationHistory: [...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []), operation],
+              operationHistory: appendHistory ? [...history, op] : history,
             },
           };
         });
+      };
+
+      if (tab.operationId && tab.targetSheetId && !isNewSheetName) {
+        setDataSheets?.((prev) => {
+          let updated = replaceSheetOperation(prev, tab.targetSheetId, tab.operationId, operation);
+          const sheet = updated?.[tab.targetSheetId];
+          if (!sheet) return updated;
+          return {
+            ...updated,
+            [tab.targetSheetId]: {
+              ...sheet,
+              name: sheetName.slice(0, 80),
+              data: next,
+              rowCount: next.length,
+              fullRowCount: next.length,
+              sourceSheetId: activeSheetId || sheet.sourceSheetId,
+            },
+          };
+        });
+        setBucketTabs((prev) =>
+          prev.map((t) =>
+            t.id === tab.id
+              ? {
+                  ...captureEditorAsBucketTab(t),
+                  savedSheetName: sheetName,
+                  sheetName,
+                  operationId: tab.operationId,
+                  targetSheetId: tab.targetSheetId,
+                }
+              : t,
+          ),
+        );
+        toast.success(`Updated bucket sheet with ${next.length.toLocaleString()} row${next.length === 1 ? "" : "s"}.`);
+        return;
+      }
+
+      if (tab.operationId && tab.targetSheetId && isNewSheetName) {
+        const history = Array.isArray(dataSheets?.[tab.targetSheetId]?.operationHistory)
+          ? dataSheets[tab.targetSheetId].operationHistory
+          : [];
+        const restoredTab = bucketTabFromOperation(
+          history.find((op) => op?.id === tab.operationId),
+          tab.targetSheetId,
+          dataSheets?.[tab.targetSheetId]?.name,
+        );
+        addNewSheetAndActivate?.((newId) => {
+          writeBucketSheet(newId, operation, { appendHistory: true });
+          setBucketTabs((prev) => [
+            ...prev.map((t) => (t.id === tab.id && restoredTab ? restoredTab : t)),
+            {
+              ...captureEditorAsBucketTab(tab),
+              id: operation.id,
+              operationId: operation.id,
+              targetSheetId: newId,
+              savedSheetName: sheetName,
+              sheetName,
+            },
+          ]);
+          setActiveBucketTabId(operation.id);
+        });
+        toast.success(`Created bucket sheet "${sheetName}" with ${next.length.toLocaleString()} rows.`);
+        return;
+      }
+
+      addNewSheetAndActivate?.((newId) => {
+        writeBucketSheet(newId, operation, { appendHistory: true });
+        setBucketTabs((prev) =>
+          prev.map((t) =>
+            t.id === tab.id
+              ? {
+                  ...captureEditorAsBucketTab(t),
+                  id: operation.id,
+                  operationId: operation.id,
+                  targetSheetId: newId,
+                  savedSheetName: sheetName,
+                  sheetName,
+                }
+              : t,
+          ),
+        );
+        setActiveBucketTabId(operation.id);
       });
       toast.success(`Created bucket sheet with ${next.length.toLocaleString()} row${next.length === 1 ? "" : "s"}.`);
-      setMathDialogOpen(false);
     }, [
+      activeBucketTab,
       activeSheetId,
       addNewSheetAndActivate,
+      captureEditorAsBucketTab,
       connectedData,
-      normalizedStatsBucketAggregations,
+      dataSheets,
       setDataSheets,
       setSheetData,
-      statsBucketCanSubmit,
-      statsBucketColumn,
       statsBucketColumnProfile.suggestedSize,
-      statsBucketMode,
-      statsBucketNumericSize,
-      statsBucketOutputColumn,
-      statsBucketPassthroughCols,
-      statsBucketSheetName,
-      statsBucketTimeInterval,
     ]);
 
     const collectColumnNames = (rows) => {
@@ -3789,6 +3917,28 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   This groups the selected sheet into bucket rows. The current sheet will not be changed.
                                 </AlertDescription>
                               </Alert>
+                              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                <Tabs
+                                  value={activeBucketTabId || bucketTabs[0]?.id || ""}
+                                  onValueChange={handleBucketTabChange}
+                                  className="min-w-0 flex-1"
+                                >
+                                  <TabsList className="h-auto w-fit max-w-full flex-wrap justify-start p-0.5">
+                                    {bucketTabs.map((tab) => (
+                                      <TabsTrigger
+                                        key={tab.id}
+                                        value={tab.id}
+                                        className="h-7 max-w-[10rem] truncate px-2 text-xs"
+                                      >
+                                        {tab.sheetName || tab.savedSheetName || "New bucket"}
+                                      </TabsTrigger>
+                                    ))}
+                                  </TabsList>
+                                </Tabs>
+                                <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={addBucketTab}>
+                                  + Bucket
+                                </Button>
+                              </div>
                               <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="space-y-1">
                                   <Label className="text-xs">Column to bucket</Label>
@@ -3928,6 +4078,13 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   placeholder="Bucketed sheet"
                                   spellCheck={false}
                                 />
+                                {activeBucketTab?.savedSheetName &&
+                                String(statsBucketSheetName || "").trim() &&
+                                activeBucketTab.savedSheetName !== String(statsBucketSheetName || "").trim() ? (
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Applying will create a new bucket tab and keep &quot;{activeBucketTab.savedSheetName}&quot; unchanged.
+                                  </p>
+                                ) : null}
                               </div>
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between gap-2">
@@ -3959,13 +4116,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                             value={agg.type}
                                             onValueChange={(v) => {
                                               const baseName =
-                                                v === "weighted_average"
-                                                  ? "weighted_avg"
-                                                  : v === "product_ratio"
-                                                    ? "VWAP_price"
-                                                  : v === "average"
-                                                    ? "avg"
-                                                    : v;
+                                                v === "subgroup_by"
+                                                  ? (agg.valueColumn || "subgroup")
+                                                  : v === "weighted_average"
+                                                    ? "weighted_avg"
+                                                    : v === "product_ratio"
+                                                      ? "VWAP_price"
+                                                      : v === "average"
+                                                        ? "avg"
+                                                        : v;
                                               updateStatsBucketAggregation(agg.id, {
                                                 type: v,
                                                 outputColumn: agg.outputColumn || baseName,
@@ -3976,6 +4135,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
+                                              <SelectItem value="subgroup_by">Sub-group by</SelectItem>
                                               <SelectItem value="count">Count</SelectItem>
                                               <SelectItem value="sum">Sum</SelectItem>
                                               <SelectItem value="average">Average</SelectItem>
@@ -3986,17 +4146,30 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                         </div>
                                         <div className="space-y-1">
                                           <Label className="text-[10px] text-muted-foreground">
-                                            {agg.type === "count" ? "Count column (optional)" : "Value column"}
+                                            {agg.type === "subgroup_by"
+                                              ? "Sub-group column"
+                                              : agg.type === "count"
+                                                ? "Count column (optional)"
+                                                : "Value column"}
                                           </Label>
                                           <Select
-                                            value={agg.valueColumn || "__rows__"}
-                                            onValueChange={(v) => updateStatsBucketAggregation(agg.id, { valueColumn: v === "__rows__" ? "" : v })}
+                                            value={agg.type === "count" ? (agg.valueColumn || "__rows__") : (agg.valueColumn || "__")}
+                                            onValueChange={(v) => {
+                                              const col = v === "__rows__" || v === "__" ? "" : v;
+                                              updateStatsBucketAggregation(agg.id, {
+                                                valueColumn: col,
+                                                ...(agg.type === "subgroup_by"
+                                                  ? { outputColumn: agg.outputColumn || col || "subgroup" }
+                                                  : null),
+                                              });
+                                            }}
                                           >
                                             <SelectTrigger className="h-8 text-xs">
                                               <SelectValue placeholder="Column" />
                                             </SelectTrigger>
                                             <SelectContent>
                                               {agg.type === "count" ? <SelectItem value="__rows__">Rows in bucket</SelectItem> : null}
+                                              {agg.type !== "count" ? <SelectItem value="__">—</SelectItem> : null}
                                               {sheetColumnNamesForMath.map((c) => (
                                                 <SelectItem key={`bucket-agg-val-${agg.id}-${c}`} value={c} className="font-mono text-xs">
                                                   {c}
@@ -4069,6 +4242,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                           </p>
                                         </div>
                                       ) : null}
+                                      {agg.type !== "subgroup_by" ? (
                                       <div className="mt-2 space-y-2 rounded-md border border-border/50 bg-muted/10 p-2">
                                         <label className="flex items-center gap-2 text-xs">
                                           <Checkbox
@@ -4135,6 +4309,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                           </div>
                                         ) : null}
                                       </div>
+                                      ) : (
+                                        <p className="mt-2 text-[10px] text-muted-foreground">
+                                          Nests rows within each bucket by this column. Add another sub-group or a Sum/Count aggregation below.
+                                        </p>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
