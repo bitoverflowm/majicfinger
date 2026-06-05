@@ -41,6 +41,7 @@ import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
 import { cn } from "@/lib/utils";
 import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
+import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -358,6 +359,12 @@ export default function ChartControls() {
     !!selX &&
     (getAxisType(selX, dataTypes, chartData) === "date" || lineIsTemporalX);
 
+  const barBreakdownSeriesKeys = useMemo(() => {
+    if (selChartType !== "bar" || !barSeriesColumn || !selX || !selY?.[0]) return [];
+    const pivot = pivotBarChartBySeries(chartData || [], selX, selY[0], barSeriesColumn);
+    return pivot?.seriesKeys || [];
+  }, [selChartType, barSeriesColumn, selX, selY, chartData]);
+
   const parseScopedLineKey = (value) => {
     const raw = String(value || "");
     const splitIdx = raw.indexOf("::");
@@ -440,6 +447,23 @@ export default function ChartControls() {
       const next = { ...(prev || {}) };
       delete next[key];
       if (legacyKey) delete next[legacyKey];
+      return next;
+    });
+  };
+  const setBreakdownSeriesColorOverride = (seriesKey, index, color) => {
+    const key = seriesInstanceKey(index);
+    setLineColorOverrides((prev) => ({
+      ...(prev || {}),
+      [key]: color,
+      ...(seriesKey ? { [seriesKey]: color } : {}),
+    }));
+  };
+  const clearBreakdownSeriesColorOverride = (seriesKey, index) => {
+    const key = seriesInstanceKey(index);
+    setLineColorOverrides((prev) => {
+      const next = { ...(prev || {}) };
+      delete next[key];
+      if (seriesKey) delete next[seriesKey];
       return next;
     });
   };
@@ -1392,6 +1416,42 @@ export default function ChartControls() {
                                   Stacked
                                 </ToggleGroupItem>
                               </ToggleGroup>
+                            </div>
+                          ) : null}
+                          {barSeriesColumn && barBreakdownSeriesKeys.length > 0 ? (
+                            <div>
+                              <p className="mb-1 text-xs font-bold text-muted-foreground">Category colors</p>
+                              <p className="mb-1 text-[10px] leading-snug text-muted-foreground">
+                                Pick a color for each {formatColumnLabel(barSeriesColumn)} value.
+                              </p>
+                              <div className="flex flex-wrap gap-2 py-1">
+                                {barBreakdownSeriesKeys.map((seriesKey, index) => (
+                                  <div key={`${seriesKey}-${index}`} className="inline-flex items-center gap-1">
+                                    <Badge variant="secondary" className="gap-2 py-1 pl-2 pr-1 text-xs">
+                                      <span className="inline-flex items-center gap-1">
+                                        <span
+                                          className="inline-block h-2 w-2 rounded-full"
+                                          style={{ backgroundColor: getSeriesColor(seriesKey, index) }}
+                                        />
+                                        {seriesKey}
+                                      </span>
+                                    </Badge>
+                                    <ChartColorPalettePopover
+                                      value={
+                                        lineColorOverrides?.[seriesInstanceKey(index)] ??
+                                        lineColorOverrides?.[seriesKey] ??
+                                        null
+                                      }
+                                      swatchColor={getSeriesColor(seriesKey, index)}
+                                      onChange={(color) =>
+                                        setBreakdownSeriesColorOverride(seriesKey, index, color)
+                                      }
+                                      onClear={() => clearBreakdownSeriesColorOverride(seriesKey, index)}
+                                      ariaLabel={`Pick color for ${seriesKey}`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           ) : null}
                         </div>
