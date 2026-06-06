@@ -88,8 +88,12 @@ export async function hydrateChartSheetsForDataSet({
   let allCharts = [];
   if (userId) {
     try {
-      const freshRes = await fetch(`/api/charts?uid=${userId}`, {
+      const chartListUrl = dataSetId
+        ? `/api/charts?uid=${encodeURIComponent(userId)}&data_set_id=${encodeURIComponent(dataSetId)}`
+        : `/api/charts?uid=${encodeURIComponent(userId)}`;
+      const freshRes = await fetch(chartListUrl, {
         method: "GET",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
       });
       const freshJson = await freshRes.json();
@@ -117,6 +121,7 @@ export async function hydrateChartSheetsForDataSet({
       try {
         const res = await fetch(`/api/charts/chart/${meta._id}`, {
           method: "GET",
+          credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
         });
         const json = await res.json();
@@ -180,6 +185,11 @@ export async function hydrateChartSheetsForDataSet({
  * @param {Function} [opts.setLoadedChartBuilderSnapshot]
  * @param {Function} [opts.setRefetchChartDashboardsTick]
  */
+function yieldToPaint() {
+  if (typeof window === "undefined") return Promise.resolve();
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
 export async function loadFullProjectFromApi({
   dataSetId,
   userId,
@@ -199,36 +209,47 @@ export async function loadFullProjectFromApi({
   if (!dataSetId) throw new Error("Missing project id");
   const response = await fetch(`/api/dataSets/dataSet/${dataSetId}`, {
     method: "GET",
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
   });
   const res = await response.json().catch(() => ({}));
   if (!response.ok || !res?.data) {
     throw new Error(res?.message || "Failed to load project");
   }
+
+  const incomingSheets =
+    res.data?.data_sheets && typeof res.data.data_sheets === "object" ? res.data.data_sheets : null;
+  const firstSheetId = incomingSheets ? Object.keys(incomingSheets)[0] : null;
+
   applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData });
   setLoadedDataMeta?.(res.data);
 
-  let sheetsForCharts = res.data?.data_sheets;
-  const incomingSheets =
-    res.data?.data_sheets && typeof res.data.data_sheets === "object" ? res.data.data_sheets : null;
-  if (incomingSheets && Object.keys(incomingSheets).length > 0 && setDataSheets) {
-    try {
-      const rehydrated = await rehydrateProjectProvenanceSheets(incomingSheets);
-      sheetsForCharts = rehydrated;
-      setDataSheets(rehydrated);
-      const firstKey = Object.keys(rehydrated)[0];
-      if (firstKey) {
-        setActiveSheetId?.(firstKey);
-        setConnectedData?.(Array.isArray(rehydrated[firstKey]?.data) ? rehydrated[firstKey].data : []);
-      }
-    } catch (e) {
-      console.warn("[loadFullProjectFromApi] Provenance rehydrate failed:", e?.message || e);
-    }
-  }
-
   const rid = res.data?._id ?? dataSetId;
   if (rid != null) setLoadedDataId?.(rid);
-  await hydrateChartSheetsForDataSet({
+
+  await yieldToPaint();
+
+  const rehydrateTask = (async () => {
+    if (!incomingSheets || !Object.keys(incomingSheets).length || !setDataSheets) {
+      return incomingSheets;
+    }
+    try {
+      return await rehydrateProjectProvenanceSheets(incomingSheets, {
+        onSheetDone: (sheetId, updated, allSheets) => {
+          if (!firstSheetId || sheetId === firstSheetId) {
+            setDataSheets({ ...allSheets });
+            setActiveSheetId?.(sheetId);
+            setConnectedData?.(Array.isArray(updated?.data) ? updated.data : []);
+          }
+        },
+      });
+    } catch (e) {
+      console.warn("[loadFullProjectFromApi] Provenance rehydrate failed:", e?.message || e);
+      return incomingSheets;
+    }
+  })();
+
+  const chartsTask = hydrateChartSheetsForDataSet({
     dataSetId,
     userId,
     preferredChartId,
@@ -237,9 +258,21 @@ export async function loadFullProjectFromApi({
     setActiveChartSheetId,
     setLoadedChartMeta,
     setLoadedChartBuilderSnapshot,
-    dataSheets: sheetsForCharts,
+    dataSheets: incomingSheets,
     legacyRows: res.data?.data,
   });
+
+  const [rehydrated] = await Promise.all([rehydrateTask, chartsTask]);
+
+  if (rehydrated && setDataSheets) {
+    setDataSheets(rehydrated);
+    const activeKey = firstSheetId && rehydrated[firstSheetId] ? firstSheetId : Object.keys(rehydrated)[0];
+    if (activeKey) {
+      setActiveSheetId?.(activeKey);
+      setConnectedData?.(Array.isArray(rehydrated[activeKey]?.data) ? rehydrated[activeKey].data : []);
+    }
+  }
+
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
 }
 

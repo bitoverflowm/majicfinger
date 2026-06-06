@@ -299,8 +299,6 @@ export default function ChartControls() {
     setBodyContent,
     bodyContentColor,
     setBodyContentColor,
-    outerBoxColor,
-    setOuterBoxColor,
     innerBoxColor,
     setInnerBoxColor,
     gridVisible,
@@ -1610,15 +1608,6 @@ export default function ChartControls() {
                   Design
                 </AccordionTrigger>
                 <AccordionContent className="pt-2">
-                  <div className="flex min-w-0 items-center gap-2 border-b border-border/60 pb-3">
-                    <Label className="w-24 shrink-0 text-xs text-muted-foreground">Outer box</Label>
-                    <ChartColorPalettePopover
-                      value={outerBoxColor}
-                      onChange={setOuterBoxColor}
-                      ariaLabel="Outer box background"
-                      onClear={() => setOuterBoxColor(null)}
-                    />
-                  </div>
                   <div className="flex min-w-0 items-center gap-2 border-b border-border/60 pb-3">
                     <Label className="w-24 shrink-0 text-xs text-muted-foreground">Inner box</Label>
                     <ChartColorPalettePopover

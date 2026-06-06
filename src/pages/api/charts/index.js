@@ -6,7 +6,7 @@ import { assertQueryUserMatchesSession, requireLoginSession } from "@/lib/resour
 
 export default async function handler(req, res) {
     const {
-        query: { uid },
+        query: { uid, data_set_id: dataSetIdQuery },
         method,
         body: { chart_name, chart_properties, created_date, last_saved_date, labels, user_id, data_set_id }, // Destructure these from req.body
     } = req;
@@ -19,8 +19,14 @@ export default async function handler(req, res) {
                 const session = await requireLoginSession(req, res);
                 if (!session) return;
                 if (!assertQueryUserMatchesSession(uid, session, res)) return;
-                const savedCharts = await Chart.find({ user_id: session.userId })
+                const filter = { user_id: session.userId };
+                const dataSetId = Array.isArray(dataSetIdQuery) ? dataSetIdQuery[0] : dataSetIdQuery;
+                if (dataSetId && mongoose.Types.ObjectId.isValid(String(dataSetId))) {
+                    filter.data_set_id = new mongoose.Types.ObjectId(String(dataSetId));
+                }
+                const savedCharts = await Chart.find(filter)
                     .select('chart_name last_saved_date labels user_id data_set_id public_slug is_public')
+                    .lean()
                     .exec();
 
                 res.status(200).json({ success: true, data: savedCharts || [] });

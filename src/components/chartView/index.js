@@ -714,7 +714,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [subTitleColor, setSubTitleColor] = useState(null);
   const [bodyHeadingColor, setBodyHeadingColor] = useState(null);
   const [bodyContentColor, setBodyContentColor] = useState(null);
-  const [outerBoxColor, setOuterBoxColor] = useState(null);
   const [innerBoxColor, setInnerBoxColor] = useState(null);
 
   const [gridVisible, setGridVisible] = useState(true);
@@ -835,7 +834,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.subTitleColor !== undefined) setSubTitleColor(s.subTitleColor);
     if (s.bodyHeadingColor !== undefined) setBodyHeadingColor(s.bodyHeadingColor);
     if (s.bodyContentColor !== undefined) setBodyContentColor(s.bodyContentColor);
-    if (s.outerBoxColor !== undefined) setOuterBoxColor(s.outerBoxColor);
     if (s.innerBoxColor !== undefined) setInnerBoxColor(s.innerBoxColor);
     if (s.gridVisible !== undefined) setGridVisible(!!s.gridVisible);
     if (s.yAxisLineVisible !== undefined) setYAxisLineVisible(!!s.yAxisLineVisible);
@@ -1438,7 +1436,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     subTitleColor,
     bodyHeadingColor,
     bodyContentColor,
-    outerBoxColor,
     innerBoxColor,
     gridVisible,
     yAxisLineVisible,
@@ -1552,8 +1549,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
       const paletteChrome = Array.isArray(selectedPalette) && selectedPalette.length > 0 ? selectedPalette : null;
       const padColor =
-        outerBoxColor ||
-        (paletteChrome && paletteChrome.length > 1 ? paletteChrome[1] : null) ||
+        innerBoxColor ||
+        (paletteChrome && paletteChrome.length > 2 ? paletteChrome[2] : null) ||
         (dark ? "#000000" : "#ffffff");
 
       ctx.fillStyle = padColor;
@@ -1577,7 +1574,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     } catch {
       return null;
     }
-  }, [outerBoxColor, dark, selectedPalette]);
+  }, [innerBoxColor, dark, selectedPalette]);
 
   const wsStop = polymarketWsState?.stop ?? chainlinkWsState?.stop;
   const wsStart = polymarketWsState?.start ?? chainlinkWsState?.start;
@@ -1698,8 +1695,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setBodyHeadingColor,
     bodyContentColor,
     setBodyContentColor,
-    outerBoxColor,
-    setOuterBoxColor,
     innerBoxColor,
     setInnerBoxColor,
     gridVisible,
@@ -1892,7 +1887,6 @@ export function ChartCanvas() {
     bodyContentHidden,
     bodyContent,
     bodyContentColor,
-    outerBoxColor,
     innerBoxColor,
     gridVisible,
     yAxisLineVisible,
@@ -2373,17 +2367,11 @@ export function ChartCanvas() {
 
       <div className="flex min-h-0 flex-1 flex-col px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2">
         <div
-          className="relative flex min-h-0 w-full max-w-[min(100%,100rem)] flex-1 flex-col rounded-xl p-1.5 transition-[padding] duration-300 ease-out sm:p-2.5"
+          className="relative flex min-h-0 w-full max-w-[min(100%,100rem)] flex-1 flex-col rounded-xl"
           ref={chartRef}
         >
-          <div
-            className="flex min-h-0 flex-1 flex-col rounded-xl px-1 py-2 shadow-xl transition-[padding] duration-300 ease-out sm:px-2.5 sm:py-3"
-            style={{
-              backgroundColor: outerBoxColor || activePalette?.[1] || (dark ? "#000000" : "#ffffff"),
-            }}
-          >
             <Card
-              className="flex min-h-0 flex-1 flex-col gap-0 border-0 py-4"
+              className="flex min-h-0 flex-1 flex-col gap-0 border-0 py-4 shadow-xl"
               style={{
                 backgroundColor: innerBoxColor || activePalette?.[2] || (dark ? "#000000" : "#ffffff"),
               }}
@@ -2875,7 +2863,6 @@ export function ChartCanvas() {
                 </CardFooter>
               ) : null}
             </Card>
-          </div>
         </div>
       </div>
     </div>

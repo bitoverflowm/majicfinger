@@ -13,7 +13,36 @@ import {
 function sheetNeedsRehydrate(sheet) {
   if (!sheet?.provenance || sheet.provenance.kind !== "compose") return false;
   if (sheet.rehydrationStatus === "complete" && sheet.storageMode === "inline") return false;
+  const loaded = Array.isArray(sheet?.data) ? sheet.data.length : 0;
+  const full = resolvePersistedFullRowCount(sheet, loaded);
+  if (full > 0 && loaded >= full) return false;
   return sheet.storageMode === "provenance" || sheet.rehydrationStatus !== "complete";
+}
+
+/** Group sheets into parallel waves (dependencies before dependents). */
+function rehydrateWaves(sheetIds, dataSheets) {
+  const remaining = new Set(sheetIds);
+  const done = new Set();
+  const waves = [];
+
+  const depsOf = (id) =>
+    (dataSheets?.[id]?.provenance?.serverSheetJoins || [])
+      .map((j) => String(j?.targetSheetId || "").trim())
+      .filter((depId) => depId && remaining.has(depId));
+
+  while (remaining.size > 0) {
+    const wave = [...remaining].filter((id) => depsOf(id).every((depId) => done.has(depId)));
+    if (!wave.length) {
+      waves.push([...remaining]);
+      break;
+    }
+    waves.push(wave);
+    for (const id of wave) {
+      remaining.delete(id);
+      done.add(id);
+    }
+  }
+  return waves;
 }
 
 /** Topological order: dependency sheets before dependents. */
@@ -78,7 +107,11 @@ async function rehydrateOneSheet(dataSheets, sheetId) {
 
 /**
  * @param {Record<string, object>} dataSheets
- * @param {{ onSheetStart?: (sheetId: string) => void; onSheetDone?: (sheetId: string) => void }} [hooks]
+ * @param {{
+ *   onSheetStart?: (sheetId: string) => void;
+ *   onSheetDone?: (sheetId: string, sheet: object, allSheets: Record<string, object>) => void;
+ *   onSheetError?: (sheetId: string, err: unknown) => void;
+ * }} [hooks]
  * @returns {Promise<Record<string, object>>}
  */
 export async function rehydrateProjectProvenanceSheets(dataSheets, hooks = {}) {
@@ -86,15 +119,21 @@ export async function rehydrateProjectProvenanceSheets(dataSheets, hooks = {}) {
   const order = orderSheetsForRehydrate(base);
   if (!order.length) return base;
 
-  for (const sheetId of order) {
-    hooks.onSheetStart?.(sheetId);
-    try {
-      base[sheetId] = await rehydrateOneSheet(base, sheetId);
-      hooks.onSheetDone?.(sheetId);
-    } catch (err) {
-      hooks.onSheetError?.(sheetId, err);
-      console.warn(`[rehydrateProjectProvenanceSheets] ${sheetId}:`, err?.message || err);
-    }
+  const waves = rehydrateWaves(order, base);
+  for (const wave of waves) {
+    await Promise.all(
+      wave.map(async (sheetId) => {
+        hooks.onSheetStart?.(sheetId);
+        try {
+          const updated = await rehydrateOneSheet(base, sheetId);
+          base[sheetId] = updated;
+          hooks.onSheetDone?.(sheetId, updated, base);
+        } catch (err) {
+          hooks.onSheetError?.(sheetId, err);
+          console.warn(`[rehydrateProjectProvenanceSheets] ${sheetId}:`, err?.message || err);
+        }
+      }),
+    );
   }
   return base;
 }
