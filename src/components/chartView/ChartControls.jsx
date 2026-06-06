@@ -221,6 +221,8 @@ export default function ChartControls() {
     setYAxisDivisor,
     yAxisCompact,
     setYAxisCompact,
+    valuesNormalized,
+    setValuesNormalized,
     dataTypes,
     chartData,
     getAxisType,
@@ -642,6 +644,23 @@ export default function ChartControls() {
 
   const showYAxisFormat =
     selY?.[0] && chartData?.length && getAxisType(selY[0], dataTypes, chartData) === "number";
+  const showNormalizeControl =
+    (selChartType === "line" || selChartType === "area" || selChartType === "bar") &&
+    Array.isArray(selY) &&
+    selY.length > 0;
+  const normalizeValuesControl = showNormalizeControl ? (
+    <div className="flex items-center gap-2 border-t py-2">
+      <Switch
+        id="chart-data-normalize"
+        checked={!!valuesNormalized}
+        onCheckedChange={setValuesNormalized}
+        className="scale-75 origin-left"
+      />
+      <Label htmlFor="chart-data-normalize" className="cursor-pointer text-xs text-muted-foreground">
+        Normalize
+      </Label>
+    </div>
+  ) : null;
   const yAxisFormatControls = showYAxisFormat ? (
     <Collapsible open={yAxisFormatOpen} onOpenChange={setYAxisFormatOpen} className="border-t py-2">
       <CollapsibleTrigger asChild>
@@ -1184,6 +1203,7 @@ export default function ChartControls() {
                         />
 
                         {yAxisFormatControls}
+                        {normalizeValuesControl}
                         {lineSeriesControls}
                       </div>
                     </>
@@ -1274,6 +1294,7 @@ export default function ChartControls() {
                         />
                       </div>
                       {yAxisFormatControls}
+                      {normalizeValuesControl}
                     </>
                   ) : (
                     <>
@@ -1492,6 +1513,7 @@ export default function ChartControls() {
                         </div>
                       )}
                       {yAxisFormatControls}
+                      {selChartType === "bar" ? normalizeValuesControl : null}
                     </>
                   )}
 

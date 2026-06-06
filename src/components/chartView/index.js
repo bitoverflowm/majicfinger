@@ -20,7 +20,11 @@ import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtr
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { coerceChartPlotNumber, sanitizeCartesianRowsForPlotting } from "@/lib/chartDataSanitize";
+import {
+  coerceChartPlotNumber,
+  normalizeCartesianSeriesToBaseline,
+  sanitizeCartesianRowsForPlotting,
+} from "@/lib/chartDataSanitize";
 import { isCategoricalLabelColumn, looksLikeProseLabelValue } from "@/lib/chartCategoricalColumns";
 import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
 import { temporalToMs } from "@/lib/temporalParse";
@@ -669,6 +673,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [scatterColorEnabled, setScatterColorEnabled] = useState(false);
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
   const [yAxisCompact, setYAxisCompact] = useState(true);
+  /** Line/area/bar: scale each plotted series to 100 at its first value (valₙ / val₀ × 100). */
+  const [valuesNormalized, setValuesNormalized] = useState(false);
   const [sortXDir, setSortXDir] = useState("asc");
   const [sortYDir, setSortYDir] = useState(null);
 
@@ -821,6 +827,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     else if (s.selColorCol) setScatterColorEnabled(true);
     if (s.yAxisDivisor != null) setYAxisDivisor(s.yAxisDivisor);
     if (s.yAxisCompact !== undefined) setYAxisCompact(!!s.yAxisCompact);
+    if (s.valuesNormalized !== undefined) setValuesNormalized(!!s.valuesNormalized);
     if (s.sortXDir != null) setSortXDir(s.sortXDir);
     if (s.sortYDir !== undefined) setSortYDir(s.sortYDir);
     if (s.selectedShadBaseId != null) setSelectedShadBaseId(s.selectedShadBaseId);
@@ -1427,6 +1434,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     scatterColorEnabled,
     yAxisDivisor,
     yAxisCompact,
+    valuesNormalized,
     sortXDir,
     sortYDir,
     selectedShadBaseId,
@@ -1699,6 +1707,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setYAxisDivisor,
     yAxisCompact,
     setYAxisCompact,
+    valuesNormalized,
+    setValuesNormalized,
 
     chartData: scopedKeysInUse ? crossSheetChartData : chartData,
     getAxisType,
@@ -1932,6 +1942,7 @@ export function ChartCanvas() {
     scatterColorEnabled,
     yAxisDivisor,
     yAxisCompact,
+    valuesNormalized,
     sortXDir,
   } = useChartBuilder();
 
@@ -2056,17 +2067,25 @@ export function ChartCanvas() {
     return bucketTemporalRowsForChart(filteredPlotRows, xKey, renderedYKeys, chartTimeframe, sortXDir);
   }, [chartUsesTimeframes, filteredPlotRows, xKey, renderedYKeys, chartTimeframe, sortXDir]);
 
+  const normalizedPlotRows = useMemo(() => {
+    if (!valuesNormalized) return timeframedPlotRows;
+    if (selChartType !== "line" && selChartType !== "area" && selChartType !== "bar") {
+      return timeframedPlotRows;
+    }
+    return normalizeCartesianSeriesToBaseline(timeframedPlotRows, renderedYKeys);
+  }, [valuesNormalized, selChartType, timeframedPlotRows, renderedYKeys]);
+
   /** Drop non-finite Y (and numeric/date X) so Recharts draws gaps instead of bogus points. */
   const finalRenderedData = useMemo(() => {
-    if (!cartesianChart) return timeframedPlotRows;
-    return sanitizeCartesianRowsForPlotting(timeframedPlotRows, {
+    if (!cartesianChart) return normalizedPlotRows;
+    return sanitizeCartesianRowsForPlotting(normalizedPlotRows, {
       xKey,
       yKeys: renderedYKeys,
       xAxisType,
       dataTypes,
       getAxisType,
     });
-  }, [cartesianChart, timeframedPlotRows, xKey, renderedYKeys, xAxisType, dataTypes]);
+  }, [cartesianChart, normalizedPlotRows, xKey, renderedYKeys, xAxisType, dataTypes]);
 
   /** Treemap keeps raw pivot labels (not epoch ms). */
   const treemapRows = useMemo(() => {

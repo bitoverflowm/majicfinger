@@ -51,6 +51,42 @@ function sanitizePlotNumericOrDate(value, treatAsDate) {
  *   getAxisType: (key: string, dataTypes: unknown, data: unknown) => string,
  * }} opts
  */
+/**
+ * Scale each Y series to a baseline of 100 using its first finite value: (valₙ / val₀) × 100.
+ * @param {Array<Record<string, unknown>>|undefined} rows
+ * @param {string[]} yKeys
+ * @returns {Array<Record<string, unknown>>|undefined}
+ */
+export function normalizeCartesianSeriesToBaseline(rows, yKeys) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+  const keys = Array.isArray(yKeys) ? yKeys.filter(Boolean) : [];
+  if (!keys.length) return rows;
+
+  const baselines = {};
+  for (const yKey of keys) {
+    for (const row of rows) {
+      const v = coerceChartPlotNumber(row?.[yKey]);
+      if (v != null && Number.isFinite(v) && v !== 0) {
+        baselines[yKey] = v;
+        break;
+      }
+    }
+  }
+
+  return rows.map((row) => {
+    if (!row || typeof row !== "object") return row;
+    const out = { ...row };
+    for (const yKey of keys) {
+      const base = baselines[yKey];
+      if (base == null || base === 0) continue;
+      const v = coerceChartPlotNumber(row?.[yKey]);
+      if (v == null || !Number.isFinite(v)) continue;
+      out[yKey] = (v / base) * 100;
+    }
+    return out;
+  });
+}
+
 export function sanitizeCartesianRowsForPlotting(rows, { xKey, yKeys, xAxisType, dataTypes, getAxisType }) {
   if (!Array.isArray(rows) || !rows.length) return rows;
   const yList = Array.isArray(yKeys) ? yKeys.filter(Boolean) : [];
