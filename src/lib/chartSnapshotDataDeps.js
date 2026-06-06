@@ -2,6 +2,7 @@
  * Derive which sheet columns a saved Recharts builder snapshot may read.
  * Used to trim public embed / dashboard payloads after full lake rehydrate.
  */
+import { resolvePersistedFullRowCount } from "@/lib/projectPersistence";
 
 /**
  * @param {unknown} key
@@ -162,4 +163,61 @@ export function projectRowObjectsToColumnSet(rows, columnSet) {
     }
     return next;
   });
+}
+
+function sheetIdsReferencedByChart(chartLean, workspaceDataSheets) {
+  const cp = Array.isArray(chartLean?.chart_properties)
+    ? chartLean.chart_properties[0]
+    : chartLean?.chart_properties;
+  const snapshot = cp?.rechartsBuilder?.v === 1 ? cp.rechartsBuilder : null;
+  const defaultId = primarySheetIdForChartSnapshot(workspaceDataSheets || {}, snapshot);
+  const colsBySheet = collectChartSnapshotColumnsBySheetId(snapshot, defaultId);
+  if (colsBySheet.size) return [...colsBySheet.keys()];
+  return defaultId ? [defaultId] : [];
+}
+
+function sheetHasUsableChartRows(sheet) {
+  if (!sheet || typeof sheet !== "object") return false;
+  const rows = Array.isArray(sheet.data) ? sheet.data.length : 0;
+  if (rows === 0) return false;
+  const full = resolvePersistedFullRowCount(sheet, rows);
+  const isProvenance =
+    sheet.storageMode === "provenance" ||
+    (sheet?.provenance && typeof sheet.provenance === "object" && sheet.provenance.kind === "compose");
+  if (isProvenance) {
+    if (sheet.rehydrationStatus === "complete") return true;
+    if (full > 0) return rows >= full;
+    return rows > 0;
+  }
+  return true;
+}
+
+/**
+ * Per-chart workspace readiness — only tracks sheets referenced by the saved snapshot.
+ *
+ * @param {object | null | undefined} chartLean
+ * @param {Record<string, unknown> | null | undefined} workspaceDataSheets
+ * @returns {{ sheetIds: string[]; sig: string; ready: boolean }}
+ */
+export function getChartWorkspaceDependencyState(chartLean, workspaceDataSheets) {
+  const sheets =
+    workspaceDataSheets && typeof workspaceDataSheets === "object" ? workspaceDataSheets : {};
+  const sheetIds = sheetIdsReferencedByChart(chartLean, sheets);
+  if (!sheetIds.length) {
+    return { sheetIds: [], sig: "", ready: false };
+  }
+
+  const parts = [];
+  let ready = true;
+  for (const sid of sheetIds) {
+    const sheet = sheets[sid];
+    const rows = Array.isArray(sheet?.data) ? sheet.data.length : 0;
+    const full = resolvePersistedFullRowCount(sheet, rows);
+    const status = String(sheet?.rehydrationStatus || "");
+    const usable = sheetHasUsableChartRows(sheet);
+    if (!usable) ready = false;
+    parts.push(`${sid}:${rows}:${full}:${status}:${usable ? 1 : 0}`);
+  }
+
+  return { sheetIds, sig: parts.sort().join("|"), ready };
 }

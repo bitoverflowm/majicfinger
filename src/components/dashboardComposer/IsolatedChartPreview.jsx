@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { buildPublicChartBundle } from "@/lib/chartBundle";
+import { getChartWorkspaceDependencyState } from "@/lib/chartSnapshotDataDeps";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -53,64 +54,113 @@ export function IsolatedChartPreview({
 }) {
   const [err, setErr] = useState(null);
   const [bundle, setBundle] = useState(null);
+  const [chartLean, setChartLean] = useState(null);
+  const appliedBundleSigRef = useRef("");
 
   const chartOptions = useMemo(
     () => mapSavedChartsToPickerOptions(savedCharts, savedDataSets, loadedDataMeta),
     [savedCharts, savedDataSets, loadedDataMeta],
   );
 
-  const workspaceSheetSig = useMemo(() => {
-    if (!workspaceDataSheets || typeof workspaceDataSheets !== "object") return "";
-    const entries = Object.entries(workspaceDataSheets);
-    if (!entries.length) return "";
-    return entries
-      .map(([id, s]) => `${id}:${Array.isArray(s?.data) ? s.data.length : 0}`)
-      .sort()
-      .join("|");
-  }, [workspaceDataSheets]);
+  const chartDeps = useMemo(() => {
+    if (!chartLean) return { sig: "", ready: false, sheetIds: [] };
+    const hasWorkspace =
+      workspaceDataSheets &&
+      typeof workspaceDataSheets === "object" &&
+      Object.keys(workspaceDataSheets).length > 0;
+    if (!hasWorkspace) return { sig: "", ready: false, sheetIds: [] };
+    return getChartWorkspaceDependencyState(chartLean, workspaceDataSheets);
+  }, [chartLean, workspaceDataSheets]);
 
   useEffect(() => {
     let cancelled = false;
     if (!chartId) {
+      setChartLean(null);
       setBundle(null);
       setErr(null);
+      appliedBundleSigRef.current = "";
       return undefined;
     }
-    setErr(null);
+
+    setChartLean(null);
     setBundle(null);
+    setErr(null);
+    appliedBundleSigRef.current = "";
+
     (async () => {
       try {
-        if (workspaceSheetSig) {
-          const cr = await fetch(`/api/charts/chart/${chartId}`);
-          const cj = await cr.json();
-          const chart = cj?.data;
-          if (!chart?.data_set_id) {
-            if (!cancelled) setErr("Chart not found");
-            return;
-          }
-          const b = buildPublicChartBundle(chart, {
-            data_sheets: workspaceDataSheets,
-            data: [],
-          });
-          if (!cancelled) setBundle(b);
+        const cr = await fetch(`/api/charts/chart/${chartId}`);
+        const cj = await cr.json();
+        const chart = cj?.data;
+        if (!chart?.data_set_id) {
+          if (!cancelled) setErr("Chart not found");
           return;
         }
+        if (!cancelled) setChartLean(chart);
+      } catch {
+        if (!cancelled) setErr("Failed to load");
+      }
+    })();
 
+    return () => {
+      cancelled = true;
+    };
+  }, [chartId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!chartId || !chartLean) return undefined;
+
+    const hasWorkspace =
+      workspaceDataSheets &&
+      typeof workspaceDataSheets === "object" &&
+      Object.keys(workspaceDataSheets).length > 0;
+
+    if (hasWorkspace) {
+      if (!chartDeps.ready) return undefined;
+      const sig = `workspace:${chartId}:${chartDeps.sig}`;
+      if (sig === appliedBundleSigRef.current) return undefined;
+      try {
+        const b = buildPublicChartBundle(chartLean, {
+          data_sheets: workspaceDataSheets,
+          data: [],
+        });
+        if (!cancelled) {
+          appliedBundleSigRef.current = sig;
+          setErr(null);
+          setBundle(b);
+        }
+      } catch {
+        if (!cancelled) setErr("Failed to load chart data");
+      }
+      return undefined;
+    }
+
+    const sig = `bundle-api:${chartId}`;
+    if (sig === appliedBundleSigRef.current) return undefined;
+
+    (async () => {
+      try {
         const br = await fetch(`/api/charts/chart/${chartId}/bundle`);
         const bj = await br.json();
         if (!bj?.success || !bj?.data) {
           if (!cancelled) setErr(bj?.message || "Failed to load chart");
           return;
         }
-        if (!cancelled) setBundle(bj.data);
+        if (!cancelled) {
+          appliedBundleSigRef.current = sig;
+          setErr(null);
+          setBundle(bj.data);
+        }
       } catch {
         if (!cancelled) setErr("Failed to load");
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [chartId, workspaceSheetSig, workspaceDataSheets]);
+  }, [chartId, chartLean, chartDeps.ready, chartDeps.sig, workspaceDataSheets]);
 
   const chartSnapshot = useMemo(() => {
     if (!bundle?.rechartsBuilder || bundle.rechartsBuilder.v !== 1) return undefined;
