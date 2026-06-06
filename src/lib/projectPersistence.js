@@ -195,29 +195,77 @@ function sheetColumns(sheet, rows) {
     : inferColumnsFromRows(rows);
 }
 
+/** Saved Data Lake query — full row count can exceed in-memory rows after preview/partial rehydrate. */
+export function sheetHasComposeProvenance(sheet) {
+  const prov = sheet?.provenance;
+  return !!(
+    prov &&
+    typeof prov === "object" &&
+    (prov.kind === "compose" || prov.kind === "compose_browser_join")
+  );
+}
+
+/**
+ * Never shrink a provenance sheet's recorded full size below what was already saved.
+ * @param {object | null | undefined} sheet
+ * @param {number} inMemoryRowCount
+ */
+export function resolvePersistedFullRowCount(sheet, inMemoryRowCount) {
+  const memory = Math.max(0, Math.floor(Number(inMemoryRowCount) || 0));
+  const prior = Math.max(
+    0,
+    Math.floor(Number(sheet?.fullRowCount) || 0),
+    Math.floor(Number(sheet?.rowCount) || 0),
+    Math.floor(Number(sheet?.saveMeta?.fullRowCount) || 0),
+  );
+  return Math.max(prior, memory);
+}
+
+export function isPartialProvenanceReload(sheet, loadedRowCount) {
+  if (!sheetHasComposeProvenance(sheet)) return false;
+  const full = resolvePersistedFullRowCount(sheet, 0);
+  const loaded = Math.max(0, Math.floor(Number(loadedRowCount) || 0));
+  return full > 0 && loaded < full;
+}
+
 function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, estimatedFullBytes }) {
   const rowList = Array.isArray(rows) ? rows : [];
-  const data = storageMode === "inline" ? rowList : rowList.slice(0, previewLimit);
+  const hasProvenance = sheetHasComposeProvenance(sheet);
+  const effectiveStorageMode = hasProvenance ? "provenance" : storageMode;
+  const data = effectiveStorageMode === "inline" ? rowList : rowList.slice(0, previewLimit);
   const columns = sheetColumns(sheet, rowList);
   const operationHistory = normalizeOperationHistory(sheet);
   const savedAt = new Date().toISOString();
+  const fullRowCount = resolvePersistedFullRowCount(sheet, rowList.length);
+  const fullyLoadedInMemory = rowList.length >= fullRowCount;
+  const rehydrationStatus =
+    effectiveStorageMode === "provenance"
+      ? fullyLoadedInMemory
+        ? "complete"
+        : "preview"
+      : "complete";
   return {
     name: String(sheet?.name || sheetId),
     data,
-    storageMode,
+    storageMode: effectiveStorageMode,
     rowCount: rowList.length,
-    fullRowCount: rowList.length,
+    fullRowCount,
     previewRowCount: data.length,
     columns,
     dataTypes: sheet?.dataTypes || null,
     provenance: sheet?.provenance ?? null,
     operationHistory,
     requestCards: Array.isArray(sheet?.requestCards) ? sheet.requestCards : [],
-    rehydrationStatus: storageMode === "provenance" ? "preview" : "complete",
+    rehydrationStatus,
     saveMeta: {
-      truncated: storageMode === "provenance",
+      ...(sheet?.saveMeta && typeof sheet.saveMeta === "object" ? sheet.saveMeta : {}),
+      truncated: effectiveStorageMode === "provenance",
       savedAt,
-      estimatedFullBytes,
+      fullRowCount,
+      estimatedFullBytes:
+        hasProvenance && !fullyLoadedInMemory && sheet?.saveMeta?.estimatedFullBytes != null
+          ? sheet.saveMeta.estimatedFullBytes
+          : estimatedFullBytes,
       previewHash: hashJson(data),
       columnHash: hashJson(columns),
     },
@@ -234,8 +282,8 @@ function buildSheets(dataSheets, previewLimit, forceProvenance) {
     if (!hasData && !hasName) return acc;
     const estimatedFullBytes = estimateJsonBytes(rows);
     const shouldProvenance =
-      forceProvenance &&
-      (rows.length > previewLimit || estimatedFullBytes > 1024 * 1024);
+      sheetHasComposeProvenance(sheet) ||
+      (forceProvenance && (rows.length > previewLimit || estimatedFullBytes > 1024 * 1024));
     acc[sheetId] = buildSheetRecord(sheetId, sheet, rows, {
       storageMode: shouldProvenance ? "provenance" : "inline",
       previewLimit,

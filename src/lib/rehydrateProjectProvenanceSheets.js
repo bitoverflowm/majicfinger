@@ -3,7 +3,14 @@
  * (dependency order) so users see full data, not Mongo preview rows (~12.5k after save shrink).
  */
 
-import { buildSheetProvenanceGraphForRehydrate } from "@/lib/dataLake/rehydrateSheetCore";
+import {
+  buildRehydrateSheetRequestBody,
+  buildSheetProvenanceGraphForRehydrate,
+} from "@/lib/dataLake/rehydrateSheetCore";
+import {
+  isPartialProvenanceReload,
+  resolvePersistedFullRowCount,
+} from "@/lib/projectPersistence";
 
 function sheetNeedsRehydrate(sheet) {
   if (!sheet?.provenance || sheet.provenance.kind !== "compose") return false;
@@ -50,32 +57,34 @@ async function rehydrateOneSheet(dataSheets, sheetId) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({
-      sheetId,
-      provenance: sheet.provenance,
-      sheetGraph,
-      operationHistory: sheet.operationHistory || [],
-      previewRows: sheet.data || [],
-      fullRowCount: sheet.fullRowCount ?? sheet.rowCount ?? null,
-      saveMeta: sheet.saveMeta || null,
-    }),
+    body: JSON.stringify(
+      buildRehydrateSheetRequestBody({
+        sheetId,
+        provenance: sheet.provenance,
+        sheetGraph,
+        sheet,
+      }),
+    ),
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) {
     throw new Error(json?.error || res.statusText || `Rehydrate ${res.status}`);
   }
   const rows = Array.isArray(json?.rows) ? json.rows : [];
+  const partial = isPartialProvenanceReload(sheet, rows.length);
+  const fullRowCount = resolvePersistedFullRowCount(sheet, json?.rowCount ?? rows.length);
   return {
     ...sheet,
     data: rows,
-    storageMode: "inline",
-    rehydrationStatus: "complete",
+    storageMode: partial ? "provenance" : "inline",
+    rehydrationStatus: partial ? "preview" : "complete",
     rowCount: rows.length,
-    fullRowCount: json?.rowCount ?? rows.length,
+    fullRowCount,
     columns: Array.isArray(json?.columns) ? json.columns : sheet.columns,
     saveMeta: {
       ...(sheet.saveMeta || {}),
-      truncated: false,
+      fullRowCount,
+      truncated: partial,
       rehydratedAt: new Date().toISOString(),
     },
   };

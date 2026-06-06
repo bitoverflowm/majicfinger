@@ -6,7 +6,11 @@ import {
   primarySheetIdForChartData,
   projectRowObjectsToColumnSet,
 } from "@/lib/chartSnapshotDataDeps";
-import { buildSheetProvenanceGraphForRehydrate, runRehydrateSheetCore } from "@/lib/dataLake/rehydrateSheetCore";
+import {
+  buildRehydrateSheetRequestBody,
+  buildSheetProvenanceGraphForRehydrate,
+  runRehydrateSheetCore,
+} from "@/lib/dataLake/rehydrateSheetCore";
 
 function cloneLeanDoc(doc) {
   try {
@@ -79,14 +83,12 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
     const colSet = colsBySheet.get(sheetId);
     try {
       const sheetGraph = buildSheetProvenanceGraphForRehydrate(dataSheets, sheetId);
-      const body = {
+      const body = buildRehydrateSheetRequestBody({
         sheetId,
         provenance: sheet.provenance,
         sheetGraph,
-        operationHistory: sheet.operationHistory || [],
-        previewRows: sheet.data || [],
-        saveMeta: sheet.saveMeta || null,
-      };
+        sheet,
+      });
       const json = await runRehydrateSheetCore(body, access);
       let rows = Array.isArray(json?.rows) ? json.rows : [];
       if (colSet && colSet.size > 0) rows = projectRowObjectsToColumnSet(rows, colSet);

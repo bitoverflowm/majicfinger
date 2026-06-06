@@ -1,4 +1,8 @@
-import { runRehydrateSheetCore, buildSheetProvenanceGraphForRehydrate } from "@/lib/dataLake/rehydrateSheetCore";
+import {
+  buildRehydrateSheetRequestBody,
+  buildSheetProvenanceGraphForRehydrate,
+  runRehydrateSheetCore,
+} from "@/lib/dataLake/rehydrateSheetCore";
 import { replayOperations } from "@/lib/projectPersistence";
 import { refreshForkOperationHistory } from "@/lib/runYourself/refreshForkSheetRequestMetadata";
 import { normalizeLakeBigintFieldsInRows } from "@/lib/dataLake/lakeBigintNormalize";
@@ -26,15 +30,13 @@ export async function replayForkedProjectSheets({ dataSheets, sheetOrder, access
 
     if (hasCompose) {
       const sheetGraph = buildSheetProvenanceGraphForRehydrate(sheets, sheetId);
-      const body = {
+      const body = buildRehydrateSheetRequestBody({
         sheetId,
         provenance,
         sheetGraph,
-        operationHistory: sheet.operationHistory || [],
+        sheet,
         maxRows: forkReplay ? undefined : sheet.fullRowCount || sheet.rowCount || undefined,
-        previewRows: [],
-        saveMeta: sheet.saveMeta || null,
-      };
+      });
       try {
         const json = await runRehydrateSheetCore(body, access);
         const rows = normalizeLakeBigintFieldsInRows(Array.isArray(json?.rows) ? json.rows : []);

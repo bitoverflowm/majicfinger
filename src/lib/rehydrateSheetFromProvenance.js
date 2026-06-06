@@ -1,6 +1,7 @@
 /**
  * Re-run a saved Data Lake provenance query into a target sheet (Connect home replay + grid rehydrate).
  */
+import { buildRehydrateSheetRequestBody } from "@/lib/dataLake/rehydrateSheetCore";
 
 function safeSheetGraphName(name, id) {
   let t = String(name || id || "sheet").replace(/[^a-zA-Z0-9_]+/g, "_");
@@ -49,14 +50,14 @@ export async function rehydrateSheetFromProvenance({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({
-      sheetId: targetSheetId,
-      provenance,
-      sheetGraph,
-      operationHistory: sourceSheet?.operationHistory || [],
-      previewRows: sourceSheet?.data || [],
-      saveMeta: sourceSheet?.saveMeta || null,
-    }),
+    body: JSON.stringify(
+      buildRehydrateSheetRequestBody({
+        sheetId: targetSheetId,
+        provenance,
+        sheetGraph,
+        sheet: sourceSheet,
+      }),
+    ),
   });
 
   const json = await res.json().catch(() => null);

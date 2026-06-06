@@ -9,7 +9,7 @@ import {
   buildComposeFiltersWhereSql,
   collectKalshiMarketsMaterializedVirtuals,
 } from "@/lib/dataLake/composeWherePredicateSql";
-import { replayOperations, hashJson } from "@/lib/projectPersistence";
+import { replayOperations, hashJson, PROJECT_MIN_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence";
 import { normalizeLakeBigintFieldsInRows } from "@/lib/dataLake/lakeBigintNormalize";
 
 export function safeIdentifierForSheetGraph(s) {
@@ -24,6 +24,43 @@ export function safeIdentifierForSheetGraph(s) {
  * @param {Record<string, any>} dataSheets
  * @param {string} rootSheetId
  */
+/** How many leading rows to hash-compare after replay (never send full preview rows in POST body). */
+export function resolvePreviewRowCountForRehydrate(sheetOrBody) {
+  const src = sheetOrBody && typeof sheetOrBody === "object" ? sheetOrBody : {};
+  const fromField = Number(src.previewRowCount);
+  if (Number.isFinite(fromField) && fromField >= 0) return Math.floor(fromField);
+  // Backward compat: older clients sent previewRows in the request body.
+  if (Array.isArray(src.previewRows)) return src.previewRows.length;
+  if (src?.saveMeta?.previewHash) return PROJECT_MIN_PREVIEW_ROW_LIMIT;
+  return 0;
+}
+
+/**
+ * Minimal POST body for /api/data-lake/rehydrate-sheet — Athena + operation replay only.
+ *
+ * @param {{
+ *   sheetId: string;
+ *   provenance: object;
+ *   sheetGraph?: object;
+ *   sheet?: object;
+ *   maxRows?: number;
+ * }} args
+ */
+export function buildRehydrateSheetRequestBody({ sheetId, provenance, sheetGraph, sheet, maxRows }) {
+  const src = sheet && typeof sheet === "object" ? sheet : {};
+  return {
+    sheetId,
+    provenance,
+    sheetGraph: sheetGraph && typeof sheetGraph === "object" ? sheetGraph : {},
+    operationHistory: Array.isArray(src.operationHistory) ? src.operationHistory : [],
+    previewRowCount: resolvePreviewRowCountForRehydrate(src),
+    fullRowCount:
+      src.fullRowCount ?? src.rowCount ?? src.saveMeta?.fullRowCount ?? src.saveMeta?.estimatedFullRows ?? null,
+    saveMeta: src.saveMeta || null,
+    ...(maxRows != null && maxRows !== "" ? { maxRows } : {}),
+  };
+}
+
 export function buildSheetProvenanceGraphForRehydrate(dataSheets, rootSheetId) {
   const out = {};
   const visit = (id) => {
@@ -342,7 +379,8 @@ export async function runRehydrateSheetCore(body, access, opts = {}) {
       replayedColumns.push(col);
     }
   }
-  const previewRows = replayedRows.slice(0, Array.isArray(body.previewRows) ? body.previewRows.length : 0);
+  const previewSampleSize = resolvePreviewRowCountForRehydrate(body);
+  const previewRows = previewSampleSize > 0 ? replayedRows.slice(0, previewSampleSize) : [];
   const previewHash = previewRows.length ? hashJson(previewRows) : null;
   const expectedPreviewHash = body?.saveMeta?.previewHash || null;
 

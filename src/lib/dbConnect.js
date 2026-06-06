@@ -1,24 +1,24 @@
 //import { MongoClient } from 'mongodb'
-import mongoose from 'mongoose'
+import mongoose from "mongoose";
+import {
+  mongoDatabaseTarget,
+  missingMongoUriMessage,
+  resolveAppMongoUri,
+  useProductionDatabase,
+} from "@/lib/resolveMongoUri";
 
-
-const isProduction = process.env.NODE_ENV === 'production';
-let MONGODB_URI
-
-
-if (isProduction) {
-  MONGODB_URI = process.env.MONGODB_URI
-} else {
-  MONGODB_URI = process.env.MONGODB_URI_DEV
-}
-
+const MONGODB_URI = resolveAppMongoUri();
 
 if (!MONGODB_URI) {
-  throw new Error(
-    'Please define the MONGODB_URI environment variable inside .env.local'
-  )
-}else{
-  console.log('Found mongodb_uri. Connecting now.')
+  throw new Error(missingMongoUriMessage());
+}
+
+if (useProductionDatabase() && process.env.NODE_ENV !== "production") {
+  console.warn(
+    "[db] USE_PRODUCTION_DB is on — connecting to production Mongo (MONGODB_URI).",
+  );
+} else {
+  console.log(`[db] Using ${mongoDatabaseTarget()} Mongo.`);
 }
 
 /**
@@ -33,8 +33,19 @@ if (!cached) {
 }
 
 async function dbConnect() {
+  if (cached.uri && cached.uri !== MONGODB_URI) {
+    try {
+      await mongoose.disconnect();
+    } catch {
+      /* ignore */
+    }
+    cached.conn = null;
+    cached.promise = null;
+  }
+  cached.uri = MONGODB_URI;
+
   if (cached.conn) {
-    return cached.conn
+    return cached.conn;
   }
 
   if (!cached.promise) {

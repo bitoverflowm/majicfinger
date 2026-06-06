@@ -101,10 +101,13 @@ import {
   connectGridToolbarCompactClass,
 } from "@/lib/connectGridCompact";
 import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
+import { buildRehydrateSheetRequestBody } from "@/lib/dataLake/rehydrateSheetCore";
 import {
   appendSheetOperation,
   createSheetOperation,
+  isPartialProvenanceReload,
   replaceSheetOperation,
+  resolvePersistedFullRowCount,
 } from "@/lib/projectPersistence";
 import {
   bucketOperationPayloadFromTab,
@@ -432,19 +435,20 @@ const GridView = ({ startNew, fillViewport = false }) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({
-            sheetId: activeSheetId,
-            provenance: activeSheet.provenance,
-            sheetGraph,
-            operationHistory: activeSheet.operationHistory || [],
-            previewRows: activeSheet.data || [],
-            fullRowCount: activeSheet.fullRowCount ?? activeSheet.rowCount ?? null,
-            saveMeta: activeSheet.saveMeta || null,
-          }),
+          body: JSON.stringify(
+            buildRehydrateSheetRequestBody({
+              sheetId: activeSheetId,
+              provenance: activeSheet.provenance,
+              sheetGraph,
+              sheet: activeSheet,
+            }),
+          ),
         });
         const json = await res.json().catch(() => null);
         if (!res.ok) throw new Error(json?.error || res.statusText || `Rehydrate ${res.status}`);
         const rows = Array.isArray(json?.rows) ? json.rows : [];
+        const partial = isPartialProvenanceReload(activeSheet, rows.length);
+        const fullRowCount = resolvePersistedFullRowCount(activeSheet, json?.rowCount ?? rows.length);
         setConnectedData?.(rows);
         setDataSheets?.((prev) => {
           const p = prev || {};
@@ -454,16 +458,26 @@ const GridView = ({ startNew, fillViewport = false }) => {
             [activeSheetId]: {
               ...sheet,
               data: rows,
-              storageMode: "inline",
-              rehydrationStatus: "complete",
+              storageMode: partial ? "provenance" : "inline",
+              rehydrationStatus: partial ? "preview" : "complete",
               rowCount: rows.length,
-              fullRowCount: json?.rowCount ?? rows.length,
+              fullRowCount,
               columns: Array.isArray(json?.columns) ? json.columns : sheet.columns,
+              saveMeta: {
+                ...(sheet.saveMeta || {}),
+                fullRowCount,
+                truncated: partial,
+                rehydratedAt: new Date().toISOString(),
+              },
             },
           };
         });
         if (json?.warning) toast.warning(json.warning);
-        else toast.success("Reloaded full sheet data from saved query.");
+        else if (partial) {
+          toast.warning(
+            `Loaded ${rows.length.toLocaleString()} of ${fullRowCount.toLocaleString()} rows. Save will keep the full query — not this partial reload.`,
+          );
+        } else toast.success("Reloaded full sheet data from saved query.");
       } catch (e) {
         toast.error(e?.message || "Failed to reload saved query.");
       } finally {

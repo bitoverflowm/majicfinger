@@ -6,7 +6,8 @@
     "node": "20.x"
   },
   "scripts": {
-    "dev": "node scripts/build-search-index.js && next dev",
+    "dev": "node scripts/run-dev.js",
+    "dev:prod-db": "node scripts/run-dev.js --prod-db",
     "build": "node scripts/build-search-index.js && next build",
     "start": "next start",
     "lint": "next lint",

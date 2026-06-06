@@ -1,15 +1,12 @@
 import mongoose from "mongoose";
+import { mongoDatabaseTarget, resolveAppMongoUri } from "@/lib/resolveMongoUri";
 
 /**
  * Mongo URI for read-only public marketing content (published charts, hub assets).
- * In local dev, prefer production so hub pages match what ships on lycheedata.com.
+ * Follows the same dev vs prod target as dbConnect (incl. USE_PRODUCTION_DB).
  */
 function getPublicReadUri() {
-  const isProduction = process.env.NODE_ENV === "production";
-  if (isProduction) {
-    return process.env.MONGODB_URI;
-  }
-  return process.env.MONGODB_URI || process.env.MONGODB_URI_DEV;
+  return resolveAppMongoUri() || process.env.MONGODB_URI || process.env.MONGODB_URI_DEV;
 }
 
 /** @type {{ conn: import("mongoose").Connection | null; promise: Promise<import("mongoose").Connection> | null }} */
@@ -19,7 +16,7 @@ export default async function dbConnectPublicRead() {
   const uri = getPublicReadUri();
   if (!uri) {
     throw new Error(
-      "Please define MONGODB_URI (or MONGODB_URI_DEV) for public read queries",
+      `Please define Mongo URI for public read queries (${mongoDatabaseTarget()} target).`,
     );
   }
 
