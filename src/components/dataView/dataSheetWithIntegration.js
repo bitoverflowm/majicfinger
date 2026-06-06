@@ -116,6 +116,7 @@ import {
 import {
   mapSavedChartsToPickerOptions,
   projectNameForDataSetId,
+  stripProjectPrefixFromPickerLabel,
 } from "@/lib/dashboardChartPickerLabels";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 const INTEGRATION_OPTIONS = [
@@ -164,13 +165,24 @@ const RIGHT_PANEL_TAB_ITEMS = [
 ];
 
 /** Compact controls for the dashboard tab in the narrow right drawer only. */
+const DASH_PANEL_SCROLL =
+  "h-full min-w-0 w-full max-w-full overflow-x-hidden overflow-y-auto px-1.5 py-1 text-[10px] leading-snug text-muted-foreground";
+const DASH_PANEL_ROOT = "grid w-full min-w-0 max-w-full gap-2 overflow-hidden [&>*]:min-w-0";
+const DASH_PANEL_SECTION = "grid w-full min-w-0 max-w-full gap-1 overflow-hidden";
 const DASH_PANEL_LABEL = "text-[10px] font-medium leading-tight text-foreground";
-const DASH_PANEL_INPUT = "h-7 w-full min-w-0 px-2 text-xs text-foreground";
-const DASH_PANEL_SELECT = "h-7 w-full min-w-0 px-2 text-xs text-foreground";
+const DASH_PANEL_INPUT =
+  "h-7 w-full min-w-0 max-w-full px-2 text-xs text-foreground";
+const DASH_PANEL_SELECT = cn(
+  "h-7 w-full min-w-0 max-w-full overflow-hidden px-2 text-xs text-foreground",
+  "[&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate [&>span]:text-left",
+  "[&_svg]:ml-1 [&_svg]:shrink-0",
+);
+const DASH_PANEL_COLLAPSIBLE =
+  "w-full min-w-0 max-w-full overflow-hidden rounded-md border border-border/70 bg-muted/15";
 const DASH_PANEL_COLLAPSE_TRIGGER =
-  "flex w-full items-center justify-between gap-1.5 px-1.5 py-1 text-left text-[10px] font-medium text-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180";
+  "flex w-full min-w-0 items-center justify-between gap-1.5 overflow-hidden px-1.5 py-1 text-left text-[10px] font-medium text-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180";
 const DASH_PANEL_LAYER_ITEM =
-  "flex flex-col gap-1 rounded border border-border/50 bg-background/80 px-1.5 py-1 text-[10px] text-foreground";
+  "flex min-w-0 max-w-full flex-col gap-1 overflow-hidden rounded border border-border/50 bg-background/80 px-1.5 py-1 text-[10px] text-foreground";
 const DASH_PANEL_DRAG_HANDLE =
   "-ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground cursor-grab touch-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -1574,18 +1586,18 @@ export default function DataSheetWithIntegration({
                         </div>
                       </TabsContent>
 
-                      <TabsContent value="dashboard" className="m-0 h-full min-w-0 w-full max-w-full">
-                        <div className="h-full min-w-0 w-full max-w-full overflow-auto px-1.5 py-1 text-[10px] leading-snug text-muted-foreground">
+                      <TabsContent value="dashboard" className="m-0 h-full min-w-0 w-full max-w-full overflow-hidden">
+                        <div className={DASH_PANEL_SCROLL}>
                           {!effectiveDashboardMode ? (
                             <p>
                               Open the dashboard composer to edit rows and cards, or choose this tab again after
                               switching workspace.
                             </p>
                           ) : chartDashboardDraft ? (
-                            <div className="grid gap-2">
-                              <div className="grid gap-1">
-                                <div className="flex items-center justify-between gap-1">
-                                  <div className="flex min-w-0 items-center gap-1">
+                            <div className={DASH_PANEL_ROOT}>
+                              <div className={DASH_PANEL_SECTION}>
+                                <div className="flex w-full min-w-0 items-center justify-between gap-1 overflow-hidden">
+                                  <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
                                     <Label
                                       htmlFor="dash-associated-project"
                                       className={DASH_PANEL_LABEL}
@@ -1650,25 +1662,26 @@ export default function DataSheetWithIntegration({
                                     </TooltipProvider>
                                   </div>
                                 </div>
-                                <Select
-                                  value={
-                                    chartDashboardDraft.data_set_id
-                                      ? String(chartDashboardDraft.data_set_id)
-                                      : ""
-                                  }
-                                  onValueChange={(v) =>
-                                    setChartDashboardDraft?.((prev) => ({
-                                      ...(prev || {}),
-                                      data_set_id: v,
-                                    }))
-                                  }
-                                >
-                                  <SelectTrigger
-                                    id="dash-associated-project"
-                                    className={DASH_PANEL_SELECT}
+                                <div className="w-full min-w-0 max-w-full overflow-hidden">
+                                  <Select
+                                    value={
+                                      chartDashboardDraft.data_set_id
+                                        ? String(chartDashboardDraft.data_set_id)
+                                        : ""
+                                    }
+                                    onValueChange={(v) =>
+                                      setChartDashboardDraft?.((prev) => ({
+                                        ...(prev || {}),
+                                        data_set_id: v,
+                                      }))
+                                    }
                                   >
-                                    <SelectValue placeholder="Select project" />
-                                  </SelectTrigger>
+                                    <SelectTrigger
+                                      id="dash-associated-project"
+                                      className={DASH_PANEL_SELECT}
+                                    >
+                                      <SelectValue placeholder="Select project" />
+                                    </SelectTrigger>
                                   <SelectContent>
                                     {dashboardDataSetOptions.map((d) => (
                                       <SelectItem key={d.id} value={d.id}>
@@ -1676,9 +1689,10 @@ export default function DataSheetWithIntegration({
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
-                                </Select>
+                                  </Select>
+                                </div>
                               </div>
-                              <div className="grid gap-1">
+                              <div className={DASH_PANEL_SECTION}>
                                 <Label htmlFor="dash-name-panel" className={DASH_PANEL_LABEL}>
                                   Internal name
                                 </Label>
@@ -1698,7 +1712,7 @@ export default function DataSheetWithIntegration({
                               <Collapsible
                                 open={headingsPanelOpen}
                                 onOpenChange={setHeadingsPanelOpen}
-                                className="rounded-md border border-border/70 bg-muted/15"
+                                className={DASH_PANEL_COLLAPSIBLE}
                               >
                                 <CollapsibleTrigger asChild>
                                   <button type="button" className={DASH_PANEL_COLLAPSE_TRIGGER}>
@@ -1763,7 +1777,7 @@ export default function DataSheetWithIntegration({
 
                               <Collapsible
                                 defaultOpen={false}
-                                className="rounded-md border border-border/70 bg-muted/15"
+                                className={DASH_PANEL_COLLAPSIBLE}
                               >
                                 <CollapsibleTrigger asChild>
                                   <button type="button" className={DASH_PANEL_COLLAPSE_TRIGGER}>
@@ -1776,26 +1790,28 @@ export default function DataSheetWithIntegration({
                                     <Label htmlFor="dash-bg-style" className={DASH_PANEL_LABEL}>
                                       Background style
                                     </Label>
-                                    <Select
-                                      value={chartDashboardDraft.theme?.background || "none"}
-                                      onValueChange={(v) =>
-                                        setChartDashboardDraft?.((prev) => ({
-                                          ...(prev || {}),
-                                          theme: { ...(prev?.theme || {}), background: v },
-                                        }))
-                                      }
-                                    >
-                                      <SelectTrigger
-                                        id="dash-bg-style"
-                                        className={DASH_PANEL_SELECT}
+                                    <div className="w-full min-w-0 max-w-full overflow-hidden">
+                                      <Select
+                                        value={chartDashboardDraft.theme?.background || "none"}
+                                        onValueChange={(v) =>
+                                          setChartDashboardDraft?.((prev) => ({
+                                            ...(prev || {}),
+                                            theme: { ...(prev?.theme || {}), background: v },
+                                          }))
+                                        }
                                       >
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
-                                        <SelectItem value="dotPattern">Dot pattern</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                        <SelectTrigger
+                                          id="dash-bg-style"
+                                          className={DASH_PANEL_SELECT}
+                                        >
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="none">None</SelectItem>
+                                          <SelectItem value="dotPattern">Dot pattern</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
                                   </div>
                                   <div className="flex flex-wrap items-center gap-1.5">
                                     <Label className={DASH_PANEL_LABEL}>Background color</Label>
@@ -1822,7 +1838,7 @@ export default function DataSheetWithIntegration({
 
                               <Collapsible
                                 defaultOpen
-                                className="rounded-md border border-border/70 bg-muted/15"
+                                className={DASH_PANEL_COLLAPSIBLE}
                               >
                                 <CollapsibleTrigger asChild>
                                   <button type="button" className={DASH_PANEL_COLLAPSE_TRIGGER}>
@@ -1850,7 +1866,7 @@ export default function DataSheetWithIntegration({
                                             <ul
                                               ref={dropProvided.innerRef}
                                               {...dropProvided.droppableProps}
-                                              className="flex flex-col gap-1"
+                                              className="flex w-full min-w-0 max-w-full flex-col gap-1 overflow-hidden"
                                               aria-label="Dashboard layers in order"
                                             >
                                               {layers.map((item, i) => {
@@ -1883,11 +1899,10 @@ export default function DataSheetWithIntegration({
                                                   );
                                                 }
                                                 const draggableId = `cardgrid-${block.id}`;
-                                                const rowLabel =
-                                                  block.h2?.trim() ||
-                                                  (layersComposerProjectName
-                                                    ? `${layersComposerProjectName}: Cards`
-                                                    : "Cards");
+                                                const rowLabel = stripProjectPrefixFromPickerLabel(
+                                                  block.h2?.trim() || "Cards",
+                                                  layersComposerProjectName,
+                                                ) || "Cards";
                                                 return (
                                                   <Draggable
                                                     key={draggableId}
@@ -1918,7 +1933,10 @@ export default function DataSheetWithIntegration({
                                                                 aria-hidden
                                                               />
                                                             </button>
-                                                            <span className="min-w-0 truncate font-medium leading-tight">
+                                                            <span
+                                                              className="min-w-0 flex-1 truncate font-medium leading-tight"
+                                                              title={rowLabel}
+                                                            >
                                                               {rowLabel}
                                                             </span>
                                                           </div>
@@ -2030,7 +2048,10 @@ export default function DataSheetWithIntegration({
                                                                 aria-hidden
                                                               />
                                                             </button>
-                                                            <span className="min-w-0 truncate font-medium leading-tight">
+                                                            <span
+                                                              className="min-w-0 flex-1 truncate font-medium leading-tight"
+                                                              title={rowLabel}
+                                                            >
                                                               {rowLabel}
                                                             </span>
                                                           </div>
@@ -2103,7 +2124,7 @@ export default function DataSheetWithIntegration({
                                                         ref={dragProvided.innerRef}
                                                         {...dragProvided.draggableProps}
                                                         className={cn(
-                                                          "rounded border border-border/50 px-2 py-1.5 text-[11px] text-muted-foreground",
+                                                          "rounded border border-border/50 px-1.5 py-1 text-[10px] text-muted-foreground",
                                                           snapshot.isDragging &&
                                                             "border-primary ring-1 ring-primary/20",
                                                         )}
@@ -2120,12 +2141,16 @@ export default function DataSheetWithIntegration({
                                               const pickedName = dashboardChartPickerOptions.find(
                                                 (c) => c.id === chartIdStr,
                                               )?.name;
-                                              const rowLabel =
-                                                pickedName?.trim() ||
-                                                col.h2?.trim() ||
-                                                (layersComposerProjectName
-                                                  ? `${layersComposerProjectName}: Chart`
-                                                  : "Chart");
+                                              const rowLabel = stripProjectPrefixFromPickerLabel(
+                                                pickedName?.trim() || col.h2?.trim() || "Chart",
+                                                layersComposerProjectName,
+                                              ) || "Chart";
+                                              const shortPickedName = pickedName
+                                                ? stripProjectPrefixFromPickerLabel(
+                                                    pickedName,
+                                                    layersComposerProjectName,
+                                                  )
+                                                : "";
                                               const emphasizePicker =
                                                 chartPickerEmphasis?.rowId === item.rowId &&
                                                 chartPickerEmphasis?.colId === col.id;
@@ -2159,7 +2184,10 @@ export default function DataSheetWithIntegration({
                                                               aria-hidden
                                                             />
                                                           </button>
-                                                          <span className="min-w-0 truncate font-medium leading-tight">
+                                                          <span
+                                                            className="min-w-0 flex-1 truncate font-medium leading-tight"
+                                                            title={pickedName?.trim() || rowLabel}
+                                                          >
                                                             {rowLabel}
                                                           </span>
                                                         </div>
@@ -2211,47 +2239,45 @@ export default function DataSheetWithIntegration({
                                                           </Tooltip>
                                                         </TooltipProvider>
                                                       </div>
-                                                      <Select
-                                                        value={
-                                                          col.chart_id ? String(col.chart_id) : undefined
-                                                        }
-                                                        onValueChange={(v) => {
-                                                          patchChartDashboardColumn(
-                                                            setChartDashboardDraft,
-                                                            item.rowId,
-                                                            col.id,
-                                                            {
-                                                              chart_id: v === "__none__" ? null : v,
-                                                            },
-                                                          );
-                                                          if (v !== "__none__")
-                                                            setChartPickerEmphasis?.(null);
-                                                        }}
-                                                      >
-                                                        <SelectTrigger
-                                                          className={cn(
-                                                            "h-7 w-full px-2 text-[10px]",
-                                                            emphasizePicker &&
-                                                              "border-green-500 ring-2 ring-green-500 ring-offset-1 ring-offset-background dark:border-green-400 dark:ring-green-400",
-                                                          )}
+                                                      <div className="w-full min-w-0 max-w-full overflow-hidden">
+                                                        <Select
+                                                          value={
+                                                            col.chart_id ? String(col.chart_id) : undefined
+                                                          }
+                                                          onValueChange={(v) => {
+                                                            patchChartDashboardColumn(
+                                                              setChartDashboardDraft,
+                                                              item.rowId,
+                                                              col.id,
+                                                              {
+                                                                chart_id: v === "__none__" ? null : v,
+                                                              },
+                                                            );
+                                                            if (v !== "__none__")
+                                                              setChartPickerEmphasis?.(null);
+                                                          }}
                                                         >
-                                                          <SelectValue
-                                                            placeholder={
-                                                              layersComposerProjectName
-                                                                ? `${layersComposerProjectName}: select chart`
-                                                                : "Select chart"
-                                                            }
-                                                          />
-                                                        </SelectTrigger>
-                                                        <SelectContent className="z-[200]">
-                                                          <SelectItem value="__none__">No chart</SelectItem>
-                                                          {dashboardChartPickerOptions.map((c) => (
-                                                            <SelectItem key={c.id} value={c.id}>
-                                                              {c.name}
-                                                            </SelectItem>
-                                                          ))}
-                                                        </SelectContent>
-                                                      </Select>
+                                                          <SelectTrigger
+                                                            className={cn(
+                                                              DASH_PANEL_SELECT,
+                                                              emphasizePicker &&
+                                                                "border-green-500 ring-2 ring-green-500 ring-offset-1 ring-offset-background dark:border-green-400 dark:ring-green-400",
+                                                            )}
+                                                          >
+                                                            <SelectValue placeholder="Select chart">
+                                                              {shortPickedName || undefined}
+                                                            </SelectValue>
+                                                          </SelectTrigger>
+                                                          <SelectContent className="z-[200]">
+                                                            <SelectItem value="__none__">No chart</SelectItem>
+                                                            {dashboardChartPickerOptions.map((c) => (
+                                                              <SelectItem key={c.id} value={c.id}>
+                                                                {c.name}
+                                                              </SelectItem>
+                                                            ))}
+                                                          </SelectContent>
+                                                        </Select>
+                                                      </div>
                                                     </li>
                                                   )}
                                                 </Draggable>

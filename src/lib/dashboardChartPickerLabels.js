@@ -47,3 +47,24 @@ export function mapSavedChartsToPickerOptions(savedCharts, savedDataSets, loaded
     name: chartPickerDisplayName(c, savedDataSets, loadedDataMeta),
   }));
 }
+
+/**
+ * Drop a leading "Project: " prefix for compact side-panel labels.
+ * @param {unknown} name
+ * @param {unknown} projectName
+ * @returns {string}
+ */
+export function stripProjectPrefixFromPickerLabel(name, projectName) {
+  const n = String(name ?? "").trim();
+  if (!n) return "";
+  const project = String(projectName ?? "").trim();
+  if (project) {
+    const prefix = `${project}: `;
+    if (n.startsWith(prefix)) {
+      const rest = n.slice(prefix.length).trim();
+      return rest || n;
+    }
+  }
+  const colon = n.indexOf(": ");
+  return colon >= 0 ? n.slice(colon + 2).trim() || n : n;
+}
