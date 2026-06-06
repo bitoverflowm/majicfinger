@@ -1,8 +1,7 @@
 /**
  * Poll GET /api/data-lake/athena-query/status until SUCCEEDED (shared by compose pulls + replay).
- * Large results are downloaded in pages via /api/data-lake/athena-query/rows.
+ * Status-only polls while Athena runs; one bulk row download when complete (server paginates AWS internally).
  */
-import { sortRowsChronologicallyByDetectedBucketColumn } from "@/lib/dataLake/sortAthenaDateBuckets";
 
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
@@ -22,18 +21,18 @@ function sleep(ms, signal) {
 /**
  * @param {string} queryExecutionId
  * @param {number | null} rowLimit — null fetches full result (`limit=all`)
- * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number; pageRowLimit?: number }} [opts]
+ * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number }} [opts]
  */
 export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts = {}) {
-  const { signal, pollIntervalMs = 900, maxWaitMs = 600000, pageRowLimit = 4000 } = opts;
+  const { signal, pollIntervalMs = 900, maxWaitMs = 600000 } = opts;
   const qeid = String(queryExecutionId || "").trim();
   if (!qeid) throw new Error("Missing queryExecutionId");
 
-  const statusQ = new URLSearchParams({ queryExecutionId: qeid, includeRows: "0" });
+  const pollQ = new URLSearchParams({ queryExecutionId: qeid, includeRows: "0" });
   if (rowLimit == null) {
-    statusQ.set("limit", "all");
+    pollQ.set("limit", "all");
   } else {
-    statusQ.set("limit", String(Math.max(1, Math.floor(Number(rowLimit) || 1))));
+    pollQ.set("limit", String(Math.max(1, Math.floor(Number(rowLimit) || 1))));
   }
 
   const deadline = Date.now() + maxWaitMs;
@@ -41,7 +40,7 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const stRes = await fetch(`/api/data-lake/athena-query/status?${statusQ.toString()}`, {
+    const stRes = await fetch(`/api/data-lake/athena-query/status?${pollQ.toString()}`, {
       method: "GET",
       credentials: "same-origin",
       signal,
@@ -80,69 +79,50 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
     throw new Error("Timed out waiting for Athena");
   }
 
-  const targetRows = rowLimit == null ? null : Math.max(1, Math.floor(Number(rowLimit) || 1));
-  let columns = [];
-  const allRows = [];
-  let nextToken = null;
+  const fetchQ = new URLSearchParams({ queryExecutionId: qeid, includeRows: "1" });
+  if (rowLimit == null) {
+    fetchQ.set("limit", "all");
+  } else {
+    fetchQ.set("limit", String(Math.max(1, Math.floor(Number(rowLimit) || 1))));
+  }
 
-  do {
-    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    const rowsQ = new URLSearchParams({
-      queryExecutionId: qeid,
-      limit: String(Math.max(1, Math.floor(Number(pageRowLimit) || 4000))),
-    });
-    if (nextToken) rowsQ.set("nextToken", nextToken);
-
-    const pageRes = await fetch(`/api/data-lake/athena-query/rows?${rowsQ.toString()}`, {
-      method: "GET",
-      credentials: "same-origin",
-      signal,
-    });
-
-    let page = {};
-    try {
-      page = await pageRes.json();
-    } catch (parseErr) {
-      throw new Error(
-        `Failed to read Athena rows JSON (${pageRes.status}): ${parseErr?.message || parseErr}`,
-      );
-    }
-
-    if (pageRes.status === 409 && page.code === "NOT_READY") {
-      await sleep(pollIntervalMs, signal);
-      continue;
-    }
-    if (!pageRes.ok) {
-      throw new Error(page.error || pageRes.statusText || `Athena rows ${pageRes.status}`);
-    }
-
-    if (Array.isArray(page.columns) && page.columns.length && !columns.length) {
-      columns = page.columns;
-    }
-    const chunk = Array.isArray(page.rows) ? page.rows : [];
-    for (const row of chunk) {
-      if (targetRows != null && allRows.length >= targetRows) break;
-      allRows.push(row);
-    }
-    nextToken = page.nextToken || null;
-    if (targetRows != null && allRows.length >= targetRows) {
-      nextToken = null;
-    }
-  } while (nextToken);
-
-  const sorted = sortRowsChronologicallyByDetectedBucketColumn({
-    columns,
-    rows: allRows,
+  const fetchRes = await fetch(`/api/data-lake/athena-query/status?${fetchQ.toString()}`, {
+    method: "GET",
+    credentials: "same-origin",
+    signal,
   });
 
-  const rowCount = sorted.length;
+  let result = {};
+  try {
+    result = await fetchRes.json();
+  } catch (parseErr) {
+    const hint = fetchRes.status === 200 ? " Response may be too large for the browser to parse." : "";
+    throw new Error(
+      `Failed to read Athena result JSON (${fetchRes.status}): ${parseErr?.message || parseErr}${hint}`,
+    );
+  }
+
+  if (fetchRes.status === 502 && result.code === "ATHENA_FAILED") {
+    throw new Error(result.error || "Athena query failed");
+  }
+  if (!fetchRes.ok) {
+    throw new Error(result.error || fetchRes.statusText || `Athena result ${fetchRes.status}`);
+  }
+
+  const rows = Array.isArray(result.rows) ? result.rows : [];
+  const rowCount = result.rowCount ?? rows.length;
+  if (rowCount > 0 && rows.length === 0) {
+    throw new Error(
+      "Athena reported rows but the download was empty (response may be truncated).",
+    );
+  }
 
   return {
-    columns,
-    rows: sorted,
+    columns: result.columns || [],
+    rows,
     rowCount,
-    dataScannedBytes,
+    dataScannedBytes: result.dataScannedBytes ?? dataScannedBytes,
     queryExecutionId: qeid,
-    truncated: targetRows != null && rowCount >= targetRows,
+    truncated: !!result.truncated,
   };
 }

@@ -1,8 +1,10 @@
 /**
- * Single poll: Athena execution state; when SUCCEEDED, returns result rows (capped).
+ * Athena execution state; when SUCCEEDED and includeRows≠0, returns full result rows.
  *
- * GET ?queryExecutionId=…&limit=…
- *   limit — row cap for GetQueryResults pagination (default 100), or "all" to paginate entire result
+ * GET ?queryExecutionId=…&limit=…&includeRows=0|1
+ *   includeRows=0 — state only (fast poll while query runs)
+ *   includeRows=1 — fetch all rows in one response (server paginates AWS GetQueryResults internally)
+ *   limit — row cap (default 100), or "all" for full result
  */
 import {
   getAthenaQueryState,
