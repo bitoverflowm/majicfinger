@@ -329,30 +329,13 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
 
   const addChart = useCallback(() => {
     persistActiveChartSnapshot();
-    addNewChartAndActivate?.((newId) => {
-      setLoadedChartBuilderSnapshot?.(null);
-      setLoadedChartMeta?.(null);
-      setChartSheets?.((prev) => {
-        const created = Object.values(prev || {}).filter((c) => c?.userCreated).length;
-        const chartName = `Chart ${created + 1}`;
-        const cur = prev?.[newId] || {};
-        return {
-          ...(prev || {}),
-          [newId]: {
-            ...cur,
-            name: chartName,
-            snapshot: null,
-            chartMeta: null,
-            userCreated: true,
-          },
-        };
-      });
-    });
+    setLoadedChartBuilderSnapshot?.(null);
+    setLoadedChartMeta?.(null);
+    addNewChartAndActivate?.();
     openChartPanel();
   }, [
     addNewChartAndActivate,
     persistActiveChartSnapshot,
-    setChartSheets,
     setLoadedChartBuilderSnapshot,
     setLoadedChartMeta,
     openChartPanel,
@@ -493,7 +476,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
                   className={cn(actionChipBase, textSize, chartViewActive ? actionChipActive : actionChipIdle)}
                   onClick={addChart}
                 >
-                  Chart
+                  + Chart
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
