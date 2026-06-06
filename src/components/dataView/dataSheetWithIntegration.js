@@ -1067,7 +1067,7 @@ export default function DataSheetWithIntegration({
       : cn(
           connectHomeDrawerAsideFixedClass,
           connectHomeMode
-            ? "right-0 max-md:right-0 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
+            ? "right-2 sm:right-4 md:right-6 lg:right-8 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
             : "right-2 sm:right-4",
         );
 
@@ -1349,7 +1349,7 @@ export default function DataSheetWithIntegration({
                     : "right-2 sm:right-4"),
                 drawerAsideWidthClass,
                 isPanelClosing || !isPanelOpen ? "translate-x-full" : "translate-x-0",
-                connectHomeMode && "rounded-r-none border-r-0 shadow-lg",
+                connectHomeMode && "shadow-lg",
               )}
             >
               <div className="h-full min-h-0 w-full flex flex-col">
