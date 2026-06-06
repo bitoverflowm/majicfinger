@@ -41,6 +41,7 @@ import {
   Info,
   GripVertical,
 } from "lucide-react";
+import { resolvePaletteSeedForNewChart } from "@/lib/chartPaletteSnapshot";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -161,6 +162,17 @@ const RIGHT_PANEL_TAB_ITEMS = [
   { value: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { value: "export", label: "Export", Icon: Share2 },
 ];
+
+/** Compact controls for the dashboard tab in the narrow right drawer only. */
+const DASH_PANEL_LABEL = "text-[10px] font-medium leading-tight text-foreground";
+const DASH_PANEL_INPUT = "h-7 w-full min-w-0 px-2 text-xs text-foreground";
+const DASH_PANEL_SELECT = "h-7 w-full min-w-0 px-2 text-xs text-foreground";
+const DASH_PANEL_COLLAPSE_TRIGGER =
+  "flex w-full items-center justify-between gap-1.5 px-1.5 py-1 text-left text-[10px] font-medium text-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180";
+const DASH_PANEL_LAYER_ITEM =
+  "flex flex-col gap-1 rounded border border-border/50 bg-background/80 px-1.5 py-1 text-[10px] text-foreground";
+const DASH_PANEL_DRAG_HANDLE =
+  "-ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground cursor-grab touch-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring";
 
 export default function DataSheetWithIntegration({
   user,
@@ -1067,7 +1079,7 @@ export default function DataSheetWithIntegration({
       : cn(
           connectHomeDrawerAsideFixedClass,
           connectHomeMode
-            ? "right-2 sm:right-4 md:right-6 lg:right-8 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
+            ? "right-0 top-[calc(4.5rem+0.5rem)] max-h-[calc(100dvh-4.5rem-0.75rem)]"
             : "right-2 sm:right-4",
         );
 
@@ -1239,21 +1251,20 @@ export default function DataSheetWithIntegration({
                   variant="outline"
                   size="sm"
                   className="h-6 px-2 text-[10px]"
-                  onClick={() => {
-                    persistActiveChartSnapshot();
-                    addNewChartAndActivate?.((newId) => {
-                      setLoadedChartBuilderSnapshot?.(null);
-                      setLoadedChartMeta?.(null);
-                      setChartSheets?.((prev) => {
-                        const nextNum = Object.keys(prev || {}).length;
-                        const chartName = `Chart ${nextNum}`;
-                        const cur = prev?.[newId] || {};
-                        return {
-                          ...(prev || {}),
-                          [newId]: { ...cur, name: chartName, snapshot: null, chartMeta: null },
-                        };
-                      });
+                  onClick={async () => {
+                    const flushedSnapshot = await flushActiveChartSnapshot();
+                    const paletteSeed = resolvePaletteSeedForNewChart({
+                      chartSheets,
+                      activeChartSheetId,
+                      flushedSnapshot,
                     });
+                    setLoadedChartMeta?.(null);
+                    addNewChartAndActivate?.(
+                      () => {
+                        setLoadedChartBuilderSnapshot?.(paletteSeed);
+                      },
+                      { initialSnapshot: paletteSeed },
+                    );
                   }}
                 >
                   <Plus className="mr-1 h-3 w-3" /> New chart
@@ -1356,7 +1367,7 @@ export default function DataSheetWithIntegration({
                 <div
                   className={cn(
                     "flex h-full flex-col border bg-background/80 backdrop-blur-sm shadow-sm",
-                    isDemo && connectHomeMode ? "rounded-l-lg rounded-r-none" : "rounded-lg",
+                    connectHomeMode ? "rounded-l-lg rounded-r-none border-r-0" : "rounded-lg",
                   )}
                 >
                   <Tabs
@@ -1564,20 +1575,20 @@ export default function DataSheetWithIntegration({
                       </TabsContent>
 
                       <TabsContent value="dashboard" className="m-0 h-full min-w-0 w-full max-w-full">
-                        <div className="h-full min-w-0 w-full max-w-full overflow-auto p-2 text-xs text-muted-foreground">
+                        <div className="h-full min-w-0 w-full max-w-full overflow-auto px-1.5 py-1 text-[10px] leading-snug text-muted-foreground">
                           {!effectiveDashboardMode ? (
                             <p>
                               Open the dashboard composer to edit rows and cards, or choose this tab again after
                               switching workspace.
                             </p>
                           ) : chartDashboardDraft ? (
-                            <div className="grid gap-3">
-                              <div className="grid gap-1.5">
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex min-w-0 items-center gap-1.5">
+                            <div className="grid gap-2">
+                              <div className="grid gap-1">
+                                <div className="flex items-center justify-between gap-1">
+                                  <div className="flex min-w-0 items-center gap-1">
                                     <Label
                                       htmlFor="dash-associated-project"
-                                      className="text-xs font-medium text-foreground"
+                                      className={DASH_PANEL_LABEL}
                                     >
                                       Associated Project
                                     </Label>
@@ -1589,7 +1600,7 @@ export default function DataSheetWithIntegration({
                                             className="-m-0.5 inline-flex rounded-full p-0.5 text-muted-foreground hover:text-foreground"
                                             aria-label="About associated project"
                                           >
-                                            <Info className="h-3.5 w-3.5 shrink-0" />
+                                            <Info className="h-3 w-3 shrink-0" />
                                           </button>
                                         </TooltipTrigger>
                                         <TooltipContent
@@ -1654,7 +1665,7 @@ export default function DataSheetWithIntegration({
                                 >
                                   <SelectTrigger
                                     id="dash-associated-project"
-                                    className="h-9 w-full min-w-0 text-sm text-foreground"
+                                    className={DASH_PANEL_SELECT}
                                   >
                                     <SelectValue placeholder="Select project" />
                                   </SelectTrigger>
@@ -1667,13 +1678,13 @@ export default function DataSheetWithIntegration({
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <div className="grid gap-1.5">
-                                <Label htmlFor="dash-name-panel" className="text-xs text-foreground">
+                              <div className="grid gap-1">
+                                <Label htmlFor="dash-name-panel" className={DASH_PANEL_LABEL}>
                                   Internal name
                                 </Label>
                                 <Input
                                   id="dash-name-panel"
-                                  className="h-9 w-full min-w-0 text-sm text-foreground"
+                                  className={DASH_PANEL_INPUT}
                                   placeholder="name your dashboard"
                                   value={chartDashboardDraft.dashboard_name || ""}
                                   onChange={(e) =>
@@ -1690,23 +1701,20 @@ export default function DataSheetWithIntegration({
                                 className="rounded-md border border-border/70 bg-muted/15"
                               >
                                 <CollapsibleTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left text-xs font-medium text-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180"
-                                  >
+                                  <button type="button" className={DASH_PANEL_COLLAPSE_TRIGGER}>
                                     <span>Headings</span>
-                                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+                                    <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-200" />
                                   </button>
                                 </CollapsibleTrigger>
-                                <CollapsibleContent className="space-y-3 border-t border-border/60 px-2 pb-3 pt-2">
-                                  <div className="grid gap-1.5">
-                                    <Label htmlFor="dash-page-title-panel" className="text-xs text-foreground">
+                                <CollapsibleContent className="space-y-2 border-t border-border/60 px-1.5 pb-2 pt-1.5">
+                                  <div className="grid gap-1">
+                                    <Label htmlFor="dash-page-title-panel" className={DASH_PANEL_LABEL}>
                                       Page title
                                     </Label>
                                     <Input
                                       id="dash-page-title-panel"
                                       className={cn(
-                                        "h-9 w-full min-w-0 text-sm text-foreground",
+                                        DASH_PANEL_INPUT,
                                         getPageTextBlockSidebarClasses(chartDashboardDraft?.theme, "pageTitle"),
                                       )}
                                       style={getPageTextBlockSidebarStyle(chartDashboardDraft?.theme, "pageTitle")}
@@ -1724,15 +1732,15 @@ export default function DataSheetWithIntegration({
                                       placeholder="Your Title"
                                     />
                                   </div>
-                                  <div className="grid gap-1.5">
-                                    <Label htmlFor="dash-page-subheading-panel" className="text-xs text-foreground">
+                                  <div className="grid gap-1">
+                                    <Label htmlFor="dash-page-subheading-panel" className={DASH_PANEL_LABEL}>
                                       Page subheading
                                     </Label>
                                     <Textarea
                                       id="dash-page-subheading-panel"
-                                      rows={3}
+                                      rows={2}
                                       className={cn(
-                                        "min-h-[4rem] w-full min-w-0 resize-y text-sm text-foreground",
+                                        "min-h-[2.75rem] w-full min-w-0 resize-y px-2 py-1 text-xs text-foreground",
                                         getPageTextBlockSidebarClasses(chartDashboardDraft?.theme, "pageSubheading"),
                                       )}
                                       style={getPageTextBlockSidebarStyle(chartDashboardDraft?.theme, "pageSubheading")}
@@ -1758,17 +1766,14 @@ export default function DataSheetWithIntegration({
                                 className="rounded-md border border-border/70 bg-muted/15"
                               >
                                 <CollapsibleTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left text-xs font-medium text-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180"
-                                  >
+                                  <button type="button" className={DASH_PANEL_COLLAPSE_TRIGGER}>
                                     <span>Design</span>
-                                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+                                    <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-200" />
                                   </button>
                                 </CollapsibleTrigger>
-                                <CollapsibleContent className="space-y-3 border-t border-border/60 px-2 pb-3 pt-2">
-                                  <div className="grid gap-1.5">
-                                    <Label htmlFor="dash-bg-style" className="text-xs text-foreground">
+                                <CollapsibleContent className="space-y-2 border-t border-border/60 px-1.5 pb-2 pt-1.5">
+                                  <div className="grid gap-1">
+                                    <Label htmlFor="dash-bg-style" className={DASH_PANEL_LABEL}>
                                       Background style
                                     </Label>
                                     <Select
@@ -1782,7 +1787,7 @@ export default function DataSheetWithIntegration({
                                     >
                                       <SelectTrigger
                                         id="dash-bg-style"
-                                        className="h-9 w-full min-w-0 text-sm text-foreground"
+                                        className={DASH_PANEL_SELECT}
                                       >
                                         <SelectValue />
                                       </SelectTrigger>
@@ -1792,8 +1797,8 @@ export default function DataSheetWithIntegration({
                                       </SelectContent>
                                     </Select>
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <Label className="text-xs text-foreground">Background color</Label>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <Label className={DASH_PANEL_LABEL}>Background color</Label>
                                     <ChartColorPalettePopover
                                       value={chartDashboardDraft.theme?.background_color || null}
                                       onChange={(color) =>
@@ -1803,7 +1808,7 @@ export default function DataSheetWithIntegration({
                                         }))
                                       }
                                       ariaLabel="Dashboard background color"
-                                      triggerClassName="h-7 w-7"
+                                      triggerClassName="h-6 w-6"
                                       onClear={() =>
                                         setChartDashboardDraft?.((prev) => ({
                                           ...(prev || {}),
@@ -1820,15 +1825,12 @@ export default function DataSheetWithIntegration({
                                 className="rounded-md border border-border/70 bg-muted/15"
                               >
                                 <CollapsibleTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left text-xs font-medium text-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180"
-                                  >
+                                  <button type="button" className={DASH_PANEL_COLLAPSE_TRIGGER}>
                                     <span>Layers</span>
-                                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+                                    <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-200" />
                                   </button>
                                 </CollapsibleTrigger>
-                                <CollapsibleContent className="border-t border-border/60 px-2 pb-3 pt-2">
+                                <CollapsibleContent className="border-t border-border/60 px-1.5 pb-2 pt-1.5">
                                   {(() => {
                                     const rows = chartDashboardDraft?.layout?.rows ?? [];
                                     const layers = flattenDashboardLayers(
@@ -1836,7 +1838,7 @@ export default function DataSheetWithIntegration({
                                     );
                                     if (!layers.length) {
                                       return (
-                                        <p className="text-[11px] leading-snug text-muted-foreground">
+                                        <p className="text-[10px] leading-snug text-muted-foreground">
                                           No blocks yet. Use Chart, Cards, or Text in the bottom bar.
                                         </p>
                                       );
@@ -1848,7 +1850,7 @@ export default function DataSheetWithIntegration({
                                             <ul
                                               ref={dropProvided.innerRef}
                                               {...dropProvided.droppableProps}
-                                              className="flex flex-col gap-1.5"
+                                              className="flex flex-col gap-1"
                                               aria-label="Dashboard layers in order"
                                             >
                                               {layers.map((item, i) => {
@@ -1868,7 +1870,7 @@ export default function DataSheetWithIntegration({
                                                           ref={dragProvided.innerRef}
                                                           {...dragProvided.draggableProps}
                                                           className={cn(
-                                                            "rounded border border-border/50 px-2 py-1.5 text-[11px] text-muted-foreground",
+                                                            "rounded border border-border/50 px-1.5 py-1 text-[10px] text-muted-foreground",
                                                             snapshot.isDragging &&
                                                               "border-primary ring-1 ring-primary/20",
                                                           )}
@@ -1897,31 +1899,26 @@ export default function DataSheetWithIntegration({
                                                         ref={dragProvided.innerRef}
                                                         {...dragProvided.draggableProps}
                                                         className={cn(
-                                                          "flex flex-col gap-1.5 rounded border border-border/50 bg-background/80 px-2 py-1.5 text-xs text-foreground",
+                                                          DASH_PANEL_LAYER_ITEM,
                                                           snapshot.isDragging &&
                                                             "border-primary shadow-md ring-1 ring-primary/20",
                                                         )}
                                                         style={dragProvided.draggableProps.style}
                                                       >
-                                                        <div className="flex items-center justify-between gap-2">
-                                                          <div className="flex min-w-0 flex-1 items-center gap-1">
+                                                        <div className="flex items-center justify-between gap-1">
+                                                          <div className="flex min-w-0 flex-1 items-center gap-0.5">
                                                             <button
                                                               type="button"
-                                                              className={cn(
-                                                                "-ml-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                                                                "text-muted-foreground outline-none hover:bg-muted hover:text-foreground",
-                                                                "cursor-grab touch-none active:cursor-grabbing",
-                                                                "focus-visible:ring-2 focus-visible:ring-ring",
-                                                              )}
+                                                              className={DASH_PANEL_DRAG_HANDLE}
                                                               aria-label={`Drag to reorder ${rowLabel}`}
                                                               {...dragProvided.dragHandleProps}
                                                             >
                                                               <GripVertical
-                                                                className="h-4 w-4"
+                                                                className="h-3 w-3"
                                                                 aria-hidden
                                                               />
                                                             </button>
-                                                            <span className="min-w-0 truncate font-medium">
+                                                            <span className="min-w-0 truncate font-medium leading-tight">
                                                               {rowLabel}
                                                             </span>
                                                           </div>
@@ -1986,7 +1983,7 @@ export default function DataSheetWithIntegration({
                                                           ref={dragProvided.innerRef}
                                                           {...dragProvided.draggableProps}
                                                           className={cn(
-                                                            "rounded border border-border/50 px-2 py-1.5 text-[11px] text-muted-foreground",
+                                                            "rounded border border-border/50 px-1.5 py-1 text-[10px] text-muted-foreground",
                                                             snapshot.isDragging &&
                                                               "border-primary ring-1 ring-primary/20",
                                                           )}
@@ -2014,31 +2011,26 @@ export default function DataSheetWithIntegration({
                                                         ref={dragProvided.innerRef}
                                                         {...dragProvided.draggableProps}
                                                         className={cn(
-                                                          "flex flex-col gap-1.5 rounded border border-border/50 bg-background/80 px-2 py-1.5 text-xs text-foreground",
+                                                          DASH_PANEL_LAYER_ITEM,
                                                           snapshot.isDragging &&
                                                             "border-primary shadow-md ring-1 ring-primary/20",
                                                         )}
                                                         style={dragProvided.draggableProps.style}
                                                       >
-                                                        <div className="flex items-center justify-between gap-2">
-                                                          <div className="flex min-w-0 flex-1 items-center gap-1">
+                                                        <div className="flex items-center justify-between gap-1">
+                                                          <div className="flex min-w-0 flex-1 items-center gap-0.5">
                                                             <button
                                                               type="button"
-                                                              className={cn(
-                                                                "-ml-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                                                                "text-muted-foreground outline-none hover:bg-muted hover:text-foreground",
-                                                                "cursor-grab touch-none active:cursor-grabbing",
-                                                                "focus-visible:ring-2 focus-visible:ring-ring",
-                                                              )}
+                                                              className={DASH_PANEL_DRAG_HANDLE}
                                                               aria-label={`Drag to reorder ${rowLabel}`}
                                                               {...dragProvided.dragHandleProps}
                                                             >
                                                               <GripVertical
-                                                                className="h-4 w-4"
+                                                                className="h-3 w-3"
                                                                 aria-hidden
                                                               />
                                                             </button>
-                                                            <span className="min-w-0 truncate font-medium">
+                                                            <span className="min-w-0 truncate font-medium leading-tight">
                                                               {rowLabel}
                                                             </span>
                                                           </div>
@@ -2148,31 +2140,26 @@ export default function DataSheetWithIntegration({
                                                       ref={dragProvided.innerRef}
                                                       {...dragProvided.draggableProps}
                                                       className={cn(
-                                                        "flex flex-col gap-1.5 rounded border border-border/50 bg-background/80 px-2 py-1.5 text-xs text-foreground",
+                                                        DASH_PANEL_LAYER_ITEM,
                                                         snapshot.isDragging &&
                                                           "border-primary shadow-md ring-1 ring-primary/20",
                                                       )}
                                                       style={dragProvided.draggableProps.style}
                                                     >
-                                                      <div className="flex items-center justify-between gap-2">
-                                                        <div className="flex min-w-0 flex-1 items-center gap-1">
+                                                      <div className="flex items-center justify-between gap-1">
+                                                        <div className="flex min-w-0 flex-1 items-center gap-0.5">
                                                           <button
                                                             type="button"
-                                                            className={cn(
-                                                              "-ml-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                                                              "text-muted-foreground outline-none hover:bg-muted hover:text-foreground",
-                                                              "cursor-grab touch-none active:cursor-grabbing",
-                                                              "focus-visible:ring-2 focus-visible:ring-ring",
-                                                            )}
+                                                            className={DASH_PANEL_DRAG_HANDLE}
                                                             aria-label={`Drag to reorder ${rowLabel}`}
                                                             {...dragProvided.dragHandleProps}
                                                           >
                                                             <GripVertical
-                                                              className="h-4 w-4"
+                                                              className="h-3 w-3"
                                                               aria-hidden
                                                             />
                                                           </button>
-                                                          <span className="min-w-0 truncate font-medium">
+                                                          <span className="min-w-0 truncate font-medium leading-tight">
                                                             {rowLabel}
                                                           </span>
                                                         </div>
@@ -2243,9 +2230,9 @@ export default function DataSheetWithIntegration({
                                                       >
                                                         <SelectTrigger
                                                           className={cn(
-                                                            "h-8 w-full text-xs",
+                                                            "h-7 w-full px-2 text-[10px]",
                                                             emphasizePicker &&
-                                                              "border-green-500 ring-2 ring-green-500 ring-offset-2 ring-offset-background dark:border-green-400 dark:ring-green-400",
+                                                              "border-green-500 ring-2 ring-green-500 ring-offset-1 ring-offset-background dark:border-green-400 dark:ring-green-400",
                                                           )}
                                                         >
                                                           <SelectValue

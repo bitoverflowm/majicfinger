@@ -22,6 +22,7 @@ import {
   connectHomeAnySheetHasData,
   isConnectUserDataPullActive,
 } from "@/lib/connectHomePullDestination";
+import { resolvePaletteSeedForNewChart } from "@/lib/chartPaletteSnapshot";
 import { CONNECT_HOME_CENTER_VIEW, normalizeConnectHomeCenterView } from "@/lib/connectHomeFlow";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { cn } from "@/lib/utils";
@@ -327,15 +328,27 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     setRightPanelOpen?.(true);
   }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
 
-  const addChart = useCallback(() => {
-    persistActiveChartSnapshot();
-    setLoadedChartBuilderSnapshot?.(null);
+  const addChart = useCallback(async () => {
+    const flushedSnapshot =
+      typeof chartSnapshotFlusher === "function" ? await chartSnapshotFlusher() : null;
+    const paletteSeed = resolvePaletteSeedForNewChart({
+      chartSheets,
+      activeChartSheetId,
+      flushedSnapshot,
+    });
     setLoadedChartMeta?.(null);
-    addNewChartAndActivate?.();
+    addNewChartAndActivate?.(
+      () => {
+        setLoadedChartBuilderSnapshot?.(paletteSeed);
+      },
+      { initialSnapshot: paletteSeed },
+    );
     openChartPanel();
   }, [
+    activeChartSheetId,
     addNewChartAndActivate,
-    persistActiveChartSnapshot,
+    chartSheets,
+    chartSnapshotFlusher,
     setLoadedChartBuilderSnapshot,
     setLoadedChartMeta,
     openChartPanel,

@@ -755,10 +755,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [tooltipExtraColumns, setTooltipExtraColumns] = useState([]);
 
   const snapshotAppliedRef = useRef(false);
+  const paletteAppliedRef = useRef(false);
   const snapshotPayloadRef = useRef(null);
 
   useEffect(() => {
     snapshotAppliedRef.current = false;
+    paletteAppliedRef.current = false;
     snapshotPayloadRef.current = initialBuilderSnapshot ?? null;
   }, [initialBuilderSnapshot]);
 
@@ -768,11 +770,31 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (!snap || snap.v !== 1) {
       return;
     }
+    const s = snap;
+    if (!paletteAppliedRef.current) {
+      paletteAppliedRef.current = true;
+      if (s.selectedShadBaseId != null) setSelectedShadBaseId(s.selectedShadBaseId);
+      if (Array.isArray(s.selectedPalette) && s.selectedPalette.length) setSelectedPalette(s.selectedPalette);
+      if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
+        setLineColorOverrides(s.lineColorOverrides);
+      }
+      if (s.dark !== undefined) setDark(!!s.dark);
+      if (s.titleColor !== undefined) setTitleColor(s.titleColor);
+      if (s.subTitleColor !== undefined) setSubTitleColor(s.subTitleColor);
+      if (s.bodyHeadingColor !== undefined) setBodyHeadingColor(s.bodyHeadingColor);
+      if (s.bodyContentColor !== undefined) setBodyContentColor(s.bodyContentColor);
+      if (s.innerBoxColor !== undefined) setInnerBoxColor(s.innerBoxColor);
+      if (s.gridLineColor !== undefined) setGridLineColor(s.gridLineColor);
+      if (s.chartTextColor !== undefined) setChartTextColor(s.chartTextColor);
+      if (s.xAxisTickColor !== undefined) setXAxisTickColor(s.xAxisTickColor);
+      if (s.yAxisTickColor !== undefined) setYAxisTickColor(s.yAxisTickColor);
+      if (s.chartConfig && typeof s.chartConfig === "object") setChartConfig(s.chartConfig);
+      if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
+    }
     const rows = Array.isArray(effectiveData) ? effectiveData : [];
     if (!rows.length) return;
     if (snapshotAppliedRef.current) return;
     snapshotAppliedRef.current = true;
-    const s = snap;
     if (s.selChartType != null) setSelChartType(s.selChartType);
     if (s.selX !== undefined) setSelX(s.selX);
     if (Array.isArray(s.selY)) setSelY(s.selY);

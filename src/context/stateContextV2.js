@@ -771,7 +771,8 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
     const [chartSnapshotFlusher, setChartSnapshotFlusher] = useState(() => async () => null);
 
-    const addNewChartAndActivate = useCallback((onNewChart) => {
+    const addNewChartAndActivate = useCallback((onNewChart, options = {}) => {
+      const { initialSnapshot = null } = options;
       setChartSheets((prev) => {
         let n = Object.keys(prev || {}).length + 1;
         let newId = `chart-${n}`;
@@ -785,7 +786,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
           ...(prev || {}),
           [newId]: {
             name: `Chart ${n}`,
-            snapshot: null,
+            snapshot: initialSnapshot,
             chartMeta: null,
             userCreated: true,
           },
