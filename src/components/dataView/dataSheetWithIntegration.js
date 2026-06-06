@@ -942,9 +942,10 @@ export default function DataSheetWithIntegration({
   const panelAnimatingOpen = isPanelOpen && !isPanelClosing;
   const chartSheetIds = useMemo(() => Object.keys(chartSheets || {}), [chartSheets]);
   const chartSnapshotSeed = useMemo(() => {
-    if (!activeChartSheetId) return loadedChartBuilderSnapshot;
-    const entry = chartSheets?.[activeChartSheetId];
-    return entry?.snapshot ?? loadedChartBuilderSnapshot;
+    if (activeChartSheetId && chartSheets?.[activeChartSheetId]) {
+      return chartSheets[activeChartSheetId].snapshot ?? null;
+    }
+    return loadedChartBuilderSnapshot ?? null;
   }, [activeChartSheetId, chartSheets, loadedChartBuilderSnapshot]);
 
   const persistActiveChartSnapshot = useCallback(() => {

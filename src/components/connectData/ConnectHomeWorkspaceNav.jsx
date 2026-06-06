@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 
 const WORKSPACE_ACTION_TOOLTIPS = {
   integration: "Add more data and connect to another integration",
-  chart: "Visualize your data",
+  chart: "Add a new empty chart",
   dashboard: "Create a dashboard",
   export: "Share and download your work",
 };

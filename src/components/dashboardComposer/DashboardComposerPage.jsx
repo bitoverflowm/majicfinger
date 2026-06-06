@@ -676,7 +676,7 @@ export default function DashboardComposerPage({ user }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto scroll-pb-40 px-6 pt-6 pb-40">
       <div
-        className="relative rounded-lg border p-6 shadow-sm"
+        className="relative w-full min-w-0"
         style={{ backgroundColor: bg || undefined }}
       >
         {showDots ? (

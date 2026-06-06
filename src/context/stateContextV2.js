@@ -773,19 +773,25 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
     const addNewChartAndActivate = useCallback((onNewChart) => {
       setChartSheets((prev) => {
-        const keys = Object.keys(prev || {});
-        const nextNum = keys.length + 1;
-        const newId = `chart-${nextNum}`;
-        setTimeout(() => {
-          setActiveChartSheetId(newId);
-          if (typeof onNewChart === "function") onNewChart(newId);
-        }, 0);
+        let n = Object.keys(prev || {}).length + 1;
+        let newId = `chart-${n}`;
+        while (prev?.[newId]) {
+          n += 1;
+          newId = `chart-${n}`;
+        }
+        setActiveChartSheetId(newId);
+        if (typeof onNewChart === "function") onNewChart(newId);
         return {
           ...(prev || {}),
-          [newId]: { name: `Chart ${nextNum}`, snapshot: null, chartMeta: null, userCreated: true },
+          [newId]: {
+            name: `Chart ${n}`,
+            snapshot: null,
+            chartMeta: null,
+            userCreated: true,
+          },
         };
       });
-    }, []);
+    }, [setActiveChartSheetId]);
 
     // Memoize the context value to optimize performance
     const providerValue = useMemo(() => ({
