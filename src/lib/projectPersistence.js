@@ -205,8 +205,21 @@ export function sheetHasComposeProvenance(sheet) {
   );
 }
 
+/** Largest `loadedRowCount` recorded on integration request cards for this sheet. */
+export function maxRequestCardLoadedRowCount(sheet) {
+  const cards = Array.isArray(sheet?.requestCards) ? sheet.requestCards : [];
+  let max = 0;
+  for (const card of cards) {
+    const n = Math.floor(Number(card?.loadedRowCount) || 0);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max;
+}
+
 /**
  * Never shrink a provenance sheet's recorded full size below what was already saved.
+ * Request cards keep the original Athena row count even when a partial reload overwrote sheet rows.
+ *
  * @param {object | null | undefined} sheet
  * @param {number} inMemoryRowCount
  */
@@ -217,8 +230,14 @@ export function resolvePersistedFullRowCount(sheet, inMemoryRowCount) {
     Math.floor(Number(sheet?.fullRowCount) || 0),
     Math.floor(Number(sheet?.rowCount) || 0),
     Math.floor(Number(sheet?.saveMeta?.fullRowCount) || 0),
+    maxRequestCardLoadedRowCount(sheet),
   );
   return Math.max(prior, memory);
+}
+
+/** Target row count for Athena replay/rehydrate (ignores current in-memory preview size). */
+export function resolveSheetIntentFullRowCount(sheet) {
+  return resolvePersistedFullRowCount(sheet, 0);
 }
 
 export function isPartialProvenanceReload(sheet, loadedRowCount) {

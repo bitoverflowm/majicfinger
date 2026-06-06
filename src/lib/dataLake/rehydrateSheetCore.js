@@ -9,7 +9,12 @@ import {
   buildComposeFiltersWhereSql,
   collectKalshiMarketsMaterializedVirtuals,
 } from "@/lib/dataLake/composeWherePredicateSql";
-import { replayOperations, hashJson, PROJECT_MIN_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence";
+import {
+  replayOperations,
+  hashJson,
+  PROJECT_MIN_PREVIEW_ROW_LIMIT,
+  resolveSheetIntentFullRowCount,
+} from "@/lib/projectPersistence";
 import { normalizeLakeBigintFieldsInRows } from "@/lib/dataLake/lakeBigintNormalize";
 
 export function safeIdentifierForSheetGraph(s) {
@@ -54,8 +59,8 @@ export function buildRehydrateSheetRequestBody({ sheetId, provenance, sheetGraph
     sheetGraph: sheetGraph && typeof sheetGraph === "object" ? sheetGraph : {},
     operationHistory: Array.isArray(src.operationHistory) ? src.operationHistory : [],
     previewRowCount: resolvePreviewRowCountForRehydrate(src),
-    fullRowCount:
-      src.fullRowCount ?? src.rowCount ?? src.saveMeta?.fullRowCount ?? src.saveMeta?.estimatedFullRows ?? null,
+    fullRowCount: resolveSheetIntentFullRowCount(src) || null,
+    intentFullRowCount: resolveSheetIntentFullRowCount(src) || null,
     saveMeta: src.saveMeta || null,
     ...(maxRows != null && maxRows !== "" ? { maxRows } : {}),
   };
@@ -96,18 +101,28 @@ function normalizeLimit(body, provenance, access) {
     Math.floor(Number(body?.saveMeta?.fullRowCount) || 0),
     Math.floor(Number(body?.saveMeta?.estimatedFullRows) || 0),
   );
+  const intentFull = Math.max(
+    savedFull,
+    Math.floor(Number(body?.intentFullRowCount) || 0),
+  );
   const explicitProv = provenance?.composeAthenaRowLimit;
   let target = null;
-  if (explicitProv != null && explicitProv !== "" && Number.isFinite(Number(explicitProv))) {
+  // User-set compose row cap in provenance — only when no stronger intent from request history.
+  if (
+    explicitProv != null &&
+    explicitProv !== "" &&
+    Number.isFinite(Number(explicitProv)) &&
+    (intentFull <= 0 || Math.floor(Number(explicitProv)) <= intentFull)
+  ) {
     target = Math.floor(Number(explicitProv));
   }
   const requested = Number(body?.maxRows);
   if (Number.isFinite(requested) && requested > 0) {
     target = target == null ? Math.floor(requested) : Math.max(target, Math.floor(requested));
   }
-  // Restore the row count the project had when saved, not a stale Basic-tier pull cap (12.5k).
-  if (savedFull > 0) {
-    target = target == null ? savedFull : Math.max(target, savedFull);
+  // Restore the row count from request cards / saved metadata, not a stale partial reload (12.5k).
+  if (intentFull > 0) {
+    target = target == null ? intentFull : Math.max(target, intentFull);
   }
   if (target != null) {
     return Math.max(1, Math.min(target, tierMax));
@@ -388,13 +403,17 @@ export async function runRehydrateSheetCore(body, access, opts = {}) {
     0,
     Math.floor(Number(body?.fullRowCount) || 0),
     Math.floor(Number(body?.saveMeta?.fullRowCount) || 0),
+    Math.floor(Number(body?.intentFullRowCount) || 0),
   );
   let warning =
     expectedPreviewHash && previewHash !== expectedPreviewHash
       ? "Source data or query behavior changed since this project was saved."
       : null;
   if (savedFull > 0 && replayedRows.length < savedFull) {
-    const partial = `Reloaded ${replayedRows.length.toLocaleString()} of ${savedFull.toLocaleString()} saved rows (query limit ${limit.toLocaleString()}).`;
+    const tierCapped = limit > 0 && limit < savedFull && replayedRows.length >= limit;
+    const partial = tierCapped
+      ? `Reloaded ${replayedRows.length.toLocaleString()} of ${savedFull.toLocaleString()} rows — your plan caps Athena pulls at ${limit.toLocaleString()} rows per query.`
+      : `Reloaded ${replayedRows.length.toLocaleString()} of ${savedFull.toLocaleString()} saved rows (query limit ${limit.toLocaleString()}).`;
     warning = warning ? `${warning} ${partial}` : partial;
   }
 

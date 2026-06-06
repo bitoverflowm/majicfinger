@@ -17,6 +17,7 @@ import {
   requestCardSummaryLabel,
 } from "@/lib/connectHomeRequestHistory";
 import { rehydrateSheetFromProvenance } from "@/lib/rehydrateSheetFromProvenance";
+import { resolvePersistedFullRowCount } from "@/lib/projectPersistence";
 import { cn } from "@/lib/utils";
 
 function startReplayPullProgress(setConnectDataLakePullState) {
@@ -163,6 +164,7 @@ export function ConnectHomeRequestHistory({ className }) {
           const querySummary = formatConnectRequestCardQuery(sourceCard, {
             provenance: replayProvenance,
           });
+          const intentFullRowCount = resolvePersistedFullRowCount(replaySource, json?.rowCount ?? rows.length);
           const replayCard = sourceCard
             ? {
                 ...sourceCard,
@@ -174,6 +176,14 @@ export function ConnectHomeRequestHistory({ className }) {
                 querySummary: querySummary || sourceCard.querySummary,
               }
             : null;
+          const priorCards = Array.isArray(replaySource?.requestCards)
+            ? replaySource.requestCards
+            : Array.isArray(cur.requestCards)
+              ? cur.requestCards
+              : [];
+          const requestCards = replayCard
+            ? [replayCard, ...priorCards.filter((c) => c?.id && c.id !== sourceCard?.id)]
+            : priorCards;
           return {
             ...p,
             [targetSheetId]: {
@@ -181,12 +191,19 @@ export function ConnectHomeRequestHistory({ className }) {
               name,
               data: rows,
               provenance: replayProvenance,
-              storageMode: "inline",
-              rehydrationStatus: "complete",
+              operationHistory: replaySource?.operationHistory || cur.operationHistory || [],
+              storageMode: rows.length >= intentFullRowCount ? "inline" : "provenance",
+              rehydrationStatus: rows.length >= intentFullRowCount ? "complete" : "preview",
               rowCount: rows.length,
-              fullRowCount: json?.rowCount ?? rows.length,
+              fullRowCount: intentFullRowCount,
               columns: Array.isArray(json?.columns) ? json.columns : cur.columns,
-              ...(replayCard ? { requestCards: [replayCard] } : {}),
+              requestCards,
+              saveMeta: {
+                ...(cur.saveMeta || {}),
+                fullRowCount: intentFullRowCount,
+                truncated: rows.length < intentFullRowCount,
+                rehydratedAt: new Date().toISOString(),
+              },
             },
           };
         });
