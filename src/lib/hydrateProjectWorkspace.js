@@ -3,6 +3,7 @@ import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { rehydrateProjectProvenanceSheets } from "@/lib/rehydrateProjectProvenanceSheets";
+import { stripProvenanceRowPayloadForLoad } from "@/lib/projectPersistence";
 
 /**
  * Shared helpers to load a saved DataSet (project) into sheet + chart workspace state.
@@ -13,6 +14,13 @@ import { rehydrateProjectProvenanceSheets } from "@/lib/rehydrateProjectProvenan
  * @param {object} ds DataSet document from `/api/dataSets/dataSet/:id`
  * @param {{ setDataSheets?: Function; setActiveSheetId?: Function; setConnectedData?: Function }} setters
  */
+function pickInitialActiveSheetId(sheets) {
+  const entries = Object.entries(sheets || {});
+  const withData = entries.find(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length > 0);
+  if (withData) return withData[0];
+  return entries[0]?.[0] || null;
+}
+
 export function applyDataSetToWorkspace(ds, { setDataSheets, setActiveSheetId, setConnectedData }) {
   const incomingSheets = ds?.data_sheets && typeof ds.data_sheets === "object" ? ds.data_sheets : null;
   if (incomingSheets && Object.keys(incomingSheets).length > 0) {
@@ -22,12 +30,13 @@ export function applyDataSetToWorkspace(ds, { setDataSheets, setActiveSheetId, s
         ...sheet,
         data: Array.isArray(sheet?.data) ? sheet.data : [],
         storageMode: mode,
-        rehydrationStatus: mode === "provenance" ? (sheet?.rehydrationStatus || "preview") : "complete",
+        rehydrationStatus:
+          mode === "provenance" ? (sheet?.rehydrationStatus || "pending") : "complete",
       };
       return acc;
     }, {});
     setDataSheets?.(normalizedSheets);
-    const firstId = Object.keys(incomingSheets)[0];
+    const firstId = pickInitialActiveSheetId(normalizedSheets) || Object.keys(incomingSheets)[0];
     setActiveSheetId?.(firstId);
     const firstRows = normalizedSheets?.[firstId]?.data || [];
     setConnectedData?.(firstRows);
@@ -217,37 +226,19 @@ export async function loadFullProjectFromApi({
     throw new Error(res?.message || "Failed to load project");
   }
 
+  const stripped = stripProvenanceRowPayloadForLoad(res.data);
   const incomingSheets =
-    res.data?.data_sheets && typeof res.data.data_sheets === "object" ? res.data.data_sheets : null;
-  const firstSheetId = incomingSheets ? Object.keys(incomingSheets)[0] : null;
+    stripped?.data_sheets && typeof stripped.data_sheets === "object" ? stripped.data_sheets : null;
+  const preferredSheetId = incomingSheets ? pickInitialActiveSheetId(incomingSheets) : null;
+  const firstSheetId = preferredSheetId || (incomingSheets ? Object.keys(incomingSheets)[0] : null);
 
-  applyDataSetToWorkspace(res.data, { setDataSheets, setActiveSheetId, setConnectedData });
-  setLoadedDataMeta?.(res.data);
+  applyDataSetToWorkspace(stripped, { setDataSheets, setActiveSheetId, setConnectedData });
+  setLoadedDataMeta?.(stripped);
 
-  const rid = res.data?._id ?? dataSetId;
+  const rid = stripped?._id ?? dataSetId;
   if (rid != null) setLoadedDataId?.(rid);
 
   await yieldToPaint();
-
-  const rehydrateTask = (async () => {
-    if (!incomingSheets || !Object.keys(incomingSheets).length || !setDataSheets) {
-      return incomingSheets;
-    }
-    try {
-      return await rehydrateProjectProvenanceSheets(incomingSheets, {
-        onSheetDone: (sheetId, updated, allSheets) => {
-          if (!firstSheetId || sheetId === firstSheetId) {
-            setDataSheets({ ...allSheets });
-            setActiveSheetId?.(sheetId);
-            setConnectedData?.(Array.isArray(updated?.data) ? updated.data : []);
-          }
-        },
-      });
-    } catch (e) {
-      console.warn("[loadFullProjectFromApi] Provenance rehydrate failed:", e?.message || e);
-      return incomingSheets;
-    }
-  })();
 
   const chartsTask = hydrateChartSheetsForDataSet({
     dataSetId,
@@ -259,18 +250,42 @@ export async function loadFullProjectFromApi({
     setLoadedChartMeta,
     setLoadedChartBuilderSnapshot,
     dataSheets: incomingSheets,
-    legacyRows: res.data?.data,
+    legacyRows: stripped?.data,
   });
 
-  const [rehydrated] = await Promise.all([rehydrateTask, chartsTask]);
+  await chartsTask;
 
-  if (rehydrated && setDataSheets) {
-    setDataSheets(rehydrated);
-    const activeKey = firstSheetId && rehydrated[firstSheetId] ? firstSheetId : Object.keys(rehydrated)[0];
-    if (activeKey) {
-      setActiveSheetId?.(activeKey);
-      setConnectedData?.(Array.isArray(rehydrated[activeKey]?.data) ? rehydrated[activeKey].data : []);
-    }
+  if (incomingSheets && Object.keys(incomingSheets).length && setDataSheets) {
+    void rehydrateProjectProvenanceSheets(incomingSheets, {
+      onSheetDone: (sheetId, updated, allSheets) => {
+        setDataSheets({ ...allSheets });
+        const activeKey = firstSheetId && allSheets[firstSheetId]?.data?.length
+          ? firstSheetId
+          : pickInitialActiveSheetId(allSheets) || sheetId;
+        if (activeKey && Array.isArray(allSheets[activeKey]?.data) && allSheets[activeKey].data.length) {
+          setActiveSheetId?.(activeKey);
+          setConnectedData?.(allSheets[activeKey].data);
+        } else if (sheetId === firstSheetId || !allSheets[firstSheetId]?.data?.length) {
+          setActiveSheetId?.(sheetId);
+          setConnectedData?.(Array.isArray(updated?.data) ? updated.data : []);
+        }
+      },
+    })
+      .then((rehydrated) => {
+        if (!rehydrated || !setDataSheets) return;
+        setDataSheets(rehydrated);
+        const activeKey =
+          (firstSheetId && Array.isArray(rehydrated[firstSheetId]?.data) && rehydrated[firstSheetId].data.length
+            ? firstSheetId
+            : null) || pickInitialActiveSheetId(rehydrated);
+        if (activeKey) {
+          setActiveSheetId?.(activeKey);
+          setConnectedData?.(Array.isArray(rehydrated[activeKey]?.data) ? rehydrated[activeKey].data : []);
+        }
+      })
+      .catch((e) => {
+        console.warn("[loadFullProjectFromApi] Provenance rehydrate failed:", e?.message || e);
+      });
   }
 
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);

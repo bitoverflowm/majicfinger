@@ -205,6 +205,66 @@ export function sheetHasComposeProvenance(sheet) {
   );
 }
 
+/**
+ * Strip persisted row payloads from compose/provenance sheets (load + save hygiene).
+ * @param {Record<string, object>} dataSheets
+ * @returns {Record<string, object>}
+ */
+export function stripProvenanceRowPayloadFromSheets(dataSheets) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  return Object.entries(sheets).reduce((acc, [sheetId, sheet]) => {
+    if (!sheet || typeof sheet !== "object") {
+      acc[sheetId] = sheet;
+      return acc;
+    }
+    if (!sheetHasComposeProvenance(sheet)) {
+      acc[sheetId] = sheet;
+      return acc;
+    }
+    const fullRowCount = resolvePersistedFullRowCount(sheet, 0);
+    acc[sheetId] = {
+      ...sheet,
+      data: [],
+      storageMode: "provenance",
+      previewRowCount: 0,
+      rowCount: fullRowCount || sheet.rowCount || 0,
+      fullRowCount: fullRowCount || sheet.fullRowCount || sheet.rowCount || 0,
+      rehydrationStatus: "pending",
+      saveMeta: {
+        ...(sheet.saveMeta && typeof sheet.saveMeta === "object" ? sheet.saveMeta : {}),
+        recipeOnly: true,
+        persistRows: false,
+      },
+    };
+    return acc;
+  }, {});
+}
+
+/**
+ * @param {object} dataSet
+ * @returns {object}
+ */
+export function stripProvenanceRowPayloadForLoad(dataSet) {
+  if (!dataSet || typeof dataSet !== "object") return dataSet;
+  const dataSheets = dataSet.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
+  const nextSheets = stripProvenanceRowPayloadFromSheets(dataSheets);
+  const hasInlineRows = Object.values(nextSheets).some((s) => Array.isArray(s?.data) && s.data.length > 0);
+  return {
+    ...dataSet,
+    data: hasInlineRows ? dataSet.data : [],
+    data_sheets: nextSheets,
+  };
+}
+
+/**
+ * Server-side guard: never persist row bulk for compose provenance sheets.
+ * @param {Record<string, object>} dataSheets
+ * @returns {Record<string, object>}
+ */
+export function sanitizeProvenanceSheetsForPersist(dataSheets) {
+  return stripProvenanceRowPayloadFromSheets(dataSheets);
+}
+
 /** Largest `loadedRowCount` recorded on integration request cards for this sheet. */
 export function maxRequestCardLoadedRowCount(sheet) {
   const cards = Array.isArray(sheet?.requestCards) ? sheet.requestCards : [];
@@ -251,23 +311,26 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
   const rowList = Array.isArray(rows) ? rows : [];
   const hasProvenance = sheetHasComposeProvenance(sheet);
   const effectiveStorageMode = hasProvenance ? "provenance" : storageMode;
-  const data = effectiveStorageMode === "inline" ? rowList : rowList.slice(0, previewLimit);
+  const recipeOnly = hasProvenance;
+  const data = recipeOnly
+    ? []
+    : effectiveStorageMode === "inline"
+      ? rowList
+      : rowList.slice(0, previewLimit);
   const columns = sheetColumns(sheet, rowList);
   const operationHistory = normalizeOperationHistory(sheet);
   const savedAt = new Date().toISOString();
   const fullRowCount = resolvePersistedFullRowCount(sheet, rowList.length);
-  const fullyLoadedInMemory = rowList.length >= fullRowCount;
-  const rehydrationStatus =
-    effectiveStorageMode === "provenance"
-      ? fullyLoadedInMemory
-        ? "complete"
-        : "preview"
+  const rehydrationStatus = recipeOnly
+    ? "pending"
+    : effectiveStorageMode === "provenance"
+      ? "preview"
       : "complete";
   return {
     name: String(sheet?.name || sheetId),
     data,
     storageMode: effectiveStorageMode,
-    rowCount: rowList.length,
+    rowCount: fullRowCount || rowList.length,
     fullRowCount,
     previewRowCount: data.length,
     columns,
@@ -278,14 +341,16 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
     rehydrationStatus,
     saveMeta: {
       ...(sheet?.saveMeta && typeof sheet.saveMeta === "object" ? sheet.saveMeta : {}),
-      truncated: effectiveStorageMode === "provenance",
+      truncated: recipeOnly || effectiveStorageMode === "provenance",
+      recipeOnly,
+      persistRows: !recipeOnly,
       savedAt,
       fullRowCount,
       estimatedFullBytes:
-        hasProvenance && !fullyLoadedInMemory && sheet?.saveMeta?.estimatedFullBytes != null
+        hasProvenance && sheet?.saveMeta?.estimatedFullBytes != null
           ? sheet.saveMeta.estimatedFullBytes
           : estimatedFullBytes,
-      previewHash: hashJson(data),
+      previewHash: recipeOnly ? null : hashJson(data),
       columnHash: hashJson(columns),
     },
   };
@@ -322,10 +387,11 @@ function shrinkProvenancePreviewsUntilWithinBudget(payload, safeBytes) {
     const trimmedSheets = Object.entries(sheets).reduce((acc, [sheetId, sheet]) => {
       const rows = Array.isArray(sheet?.data) ? sheet.data : [];
       const isProvenance = sheet?.storageMode === "provenance";
+      const recipeOnly = sheetHasComposeProvenance(sheet);
       acc[sheetId] = {
         ...sheet,
-        data: isProvenance ? rows.slice(0, previewLimit) : rows,
-        previewRowCount: isProvenance ? Math.min(rows.length, previewLimit) : sheet?.previewRowCount,
+        data: recipeOnly ? [] : isProvenance ? rows.slice(0, previewLimit) : rows,
+        previewRowCount: recipeOnly ? 0 : isProvenance ? Math.min(rows.length, previewLimit) : sheet?.previewRowCount,
         saveMeta: {
           ...(sheet?.saveMeta || {}),
           previewHash: isProvenance ? hashJson(rows.slice(0, previewLimit)) : sheet?.saveMeta?.previewHash,
@@ -392,9 +458,10 @@ export function prepareProjectDataPayload({
   safeBytes = PROJECT_FULL_DATA_SAFE_BYTES,
 }) {
   const inlineSheets = buildSheets(dataSheets, PROJECT_PREVIEW_ROW_LIMIT, false);
+  const firstInlineRows = Object.values(inlineSheets).find((s) => Array.isArray(s?.data) && s.data.length)?.data || [];
   const inlinePayload = {
     data_set_name: projectName,
-    data: Array.isArray(connectedData) ? connectedData : [],
+    data: firstInlineRows.length ? firstInlineRows : Array.isArray(connectedData) ? connectedData : [],
     data_sheets: inlineSheets,
     ...baseFields,
   };

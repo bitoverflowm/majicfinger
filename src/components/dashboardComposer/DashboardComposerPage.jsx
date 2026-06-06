@@ -29,9 +29,8 @@ import {
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft";
 import {
-  applyDataSetToWorkspace,
   firstDashboardLayoutChartId,
-  hydrateChartSheetsForDataSet,
+  loadFullProjectFromApi,
 } from "@/lib/hydrateProjectWorkspace";
 import { IsolatedChartPreview } from "./IsolatedChartPreview";
 import DotPattern from "@/components/magicui/dot-pattern";
@@ -206,6 +205,8 @@ export default function DashboardComposerPage({ user }) {
 
   const [dashboardLoadProgress, setDashboardLoadProgress] = useState(8);
   const [dashboardLoadStage, setDashboardLoadStage] = useState("Loading dashboard");
+  /** Block autosave toasts / writes until dashboard + project hydration finish. */
+  const [dashboardLoadReady, setDashboardLoadReady] = useState(true);
   const openPageTitleDock = useCallback(() => {
     setPageTitleFormatDockOpen?.(true);
   }, [setPageTitleFormatDockOpen]);
@@ -232,6 +233,7 @@ export default function DashboardComposerPage({ user }) {
   useEffect(() => {
     if (!activeChartDashboardId || !hasDbUser) return;
     let cancelled = false;
+    setDashboardLoadReady(false);
     setDashboardLoadProgress(12);
     setDashboardLoadStage("Loading dashboard");
     (async () => {
@@ -277,31 +279,21 @@ export default function DashboardComposerPage({ user }) {
         if (dataSetId && user?.userId) {
           if (!cancelled) setDashboardLoadStage("Loading project data");
           try {
-            const dsRes = await fetch(`/api/dataSets/dataSet/${dataSetId}`);
-            const dsJson = await dsRes.json();
-            if (cancelled) return;
-            if (dsJson?.success && dsJson?.data) {
-              applyDataSetToWorkspace(dsJson.data, {
-                setDataSheets,
-                setActiveSheetId,
-                setConnectedData,
-              });
-              setLoadedDataMeta?.(dsJson.data);
-              setLoadedDataId?.(String(dsJson.data._id ?? dataSetId));
-              const preferredChartId = firstDashboardLayoutChartId(layout);
-              await hydrateChartSheetsForDataSet({
-                dataSetId,
-                userId: user.userId,
-                preferredChartId,
-                setSavedCharts,
-                setChartSheets,
-                setActiveChartSheetId,
-                setLoadedChartMeta,
-                setLoadedChartBuilderSnapshot,
-              });
-            } else if (!cancelled) {
-              toast.warning(dsJson?.message || "Could not load the project linked to this dashboard.");
-            }
+            await loadFullProjectFromApi({
+              dataSetId,
+              userId: user.userId,
+              preferredChartId: firstDashboardLayoutChartId(layout),
+              setDataSheets,
+              setActiveSheetId,
+              setConnectedData,
+              setLoadedDataMeta,
+              setLoadedDataId,
+              setSavedCharts,
+              setChartSheets,
+              setActiveChartSheetId,
+              setLoadedChartMeta,
+              setLoadedChartBuilderSnapshot,
+            });
           } catch {
             if (!cancelled) toast.warning("Could not load the project linked to this dashboard.");
           }
@@ -313,10 +305,13 @@ export default function DashboardComposerPage({ user }) {
           toast.error("Failed to load dashboard");
           setActiveChartDashboardId?.(null);
         }
+      } finally {
+        if (!cancelled) setDashboardLoadReady(true);
       }
     })();
     return () => {
       cancelled = true;
+      setDashboardLoadReady(true);
     };
   }, [
     activeChartDashboardId,
@@ -523,7 +518,7 @@ export default function DashboardComposerPage({ user }) {
   }, [draftPresent, addChart, addTextBlock, addCardGrid, setDashboardComposerLayoutActions]);
 
   useEffect(() => {
-    if (!draft || !hasDbUser || !user?.userId) return;
+    if (!dashboardLoadReady || !draft || !hasDbUser || !user?.userId) return;
     const name = String(draft.dashboard_name || "").trim();
     const title = String(draft.page_heading || "").trim();
     const pid = draft.data_set_id ? String(draft.data_set_id).trim() : "";
@@ -557,6 +552,7 @@ export default function DashboardComposerPage({ user }) {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
   }, [
+    dashboardLoadReady,
     draft?.dashboard_name,
     draft?.seo_title,
     draft?.tags,
@@ -869,6 +865,7 @@ export default function DashboardComposerPage({ user }) {
                           <div className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-hidden">
                             <IsolatedChartPreview
                               chartId={col.chart_id}
+                              workspaceDataSheets={dataSheets}
                               savedCharts={savedCharts}
                               savedDataSets={savedDataSets}
                               loadedDataMeta={loadedDataMeta}

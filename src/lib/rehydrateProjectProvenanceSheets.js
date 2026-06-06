@@ -16,7 +16,8 @@ function sheetNeedsRehydrate(sheet) {
   const loaded = Array.isArray(sheet?.data) ? sheet.data.length : 0;
   const full = resolvePersistedFullRowCount(sheet, loaded);
   if (full > 0 && loaded >= full) return false;
-  return sheet.storageMode === "provenance" || sheet.rehydrationStatus !== "complete";
+  if (sheet.storageMode === "provenance" || sheet.rehydrationStatus === "pending") return true;
+  return sheet.rehydrationStatus !== "complete";
 }
 
 /** Group sheets into parallel waves (dependencies before dependents). */
@@ -91,8 +92,8 @@ async function rehydrateOneSheet(dataSheets, sheetId) {
   return {
     ...sheet,
     data: rows,
-    storageMode: partial ? "provenance" : "inline",
-    rehydrationStatus: partial ? "preview" : "complete",
+    storageMode: "provenance",
+    rehydrationStatus: partial ? "pending" : "complete",
     rowCount: rows.length,
     fullRowCount,
     columns: Array.isArray(json?.columns) ? json.columns : sheet.columns,

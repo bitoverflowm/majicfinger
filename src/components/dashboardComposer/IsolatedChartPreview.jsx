@@ -41,10 +41,11 @@ const CHART_SLOT_INNER = "flex min-h-0 w-full flex-1 flex-col overflow-y-auto ov
 
 /**
  * Nested StateProviderV2 so ChartBuilderProvider reads isolated connectedData / dataSheets.
- * @param {{ chartId?: string | null; savedCharts?: unknown[]; savedDataSets?: unknown[]; loadedDataMeta?: unknown; onSelectChart?: (chartId: string) => void }} props
+ * @param {{ chartId?: string | null; workspaceDataSheets?: Record<string, unknown> | null; savedCharts?: unknown[]; savedDataSets?: unknown[]; loadedDataMeta?: unknown; onSelectChart?: (chartId: string) => void }} props
  */
 export function IsolatedChartPreview({
   chartId,
+  workspaceDataSheets = null,
   savedCharts = [],
   savedDataSets = [],
   loadedDataMeta = null,
@@ -58,6 +59,16 @@ export function IsolatedChartPreview({
     [savedCharts, savedDataSets, loadedDataMeta],
   );
 
+  const workspaceSheetSig = useMemo(() => {
+    if (!workspaceDataSheets || typeof workspaceDataSheets !== "object") return "";
+    const entries = Object.entries(workspaceDataSheets);
+    if (!entries.length) return "";
+    return entries
+      .map(([id, s]) => `${id}:${Array.isArray(s?.data) ? s.data.length : 0}`)
+      .sort()
+      .join("|");
+  }, [workspaceDataSheets]);
+
   useEffect(() => {
     let cancelled = false;
     if (!chartId) {
@@ -69,22 +80,29 @@ export function IsolatedChartPreview({
     setBundle(null);
     (async () => {
       try {
-        const cr = await fetch(`/api/charts/chart/${chartId}`);
-        const cj = await cr.json();
-        const chart = cj?.data;
-        if (!chart?.data_set_id) {
-          if (!cancelled) setErr("Chart not found");
+        if (workspaceSheetSig) {
+          const cr = await fetch(`/api/charts/chart/${chartId}`);
+          const cj = await cr.json();
+          const chart = cj?.data;
+          if (!chart?.data_set_id) {
+            if (!cancelled) setErr("Chart not found");
+            return;
+          }
+          const b = buildPublicChartBundle(chart, {
+            data_sheets: workspaceDataSheets,
+            data: [],
+          });
+          if (!cancelled) setBundle(b);
           return;
         }
-        const dr = await fetch(`/api/dataSets/dataSet/${chart.data_set_id}`);
-        const dj = await dr.json();
-        const ds = dj?.data;
-        if (!ds) {
-          if (!cancelled) setErr("Dataset not found");
+
+        const br = await fetch(`/api/charts/chart/${chartId}/bundle`);
+        const bj = await br.json();
+        if (!bj?.success || !bj?.data) {
+          if (!cancelled) setErr(bj?.message || "Failed to load chart");
           return;
         }
-        const b = buildPublicChartBundle(chart, ds);
-        if (!cancelled) setBundle(b);
+        if (!cancelled) setBundle(bj.data);
       } catch {
         if (!cancelled) setErr("Failed to load");
       }
@@ -92,7 +110,7 @@ export function IsolatedChartPreview({
     return () => {
       cancelled = true;
     };
-  }, [chartId]);
+  }, [chartId, workspaceSheetSig, workspaceDataSheets]);
 
   const chartSnapshot = useMemo(() => {
     if (!bundle?.rechartsBuilder || bundle.rechartsBuilder.v !== 1) return undefined;

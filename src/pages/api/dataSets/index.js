@@ -4,7 +4,11 @@ import User from "@/models/Users";
 import mongoose from 'mongoose';
 import { assertQueryUserMatchesSession, requireLoginSession } from "@/lib/resourceOwnership";
 import { buildLightweightDataSetListPipeline } from "@/lib/dataSetListQuery";
-import { buildProjectRevision, summarizeDataSetForList } from "@/lib/projectPersistence";
+import {
+    buildProjectRevision,
+    sanitizeProvenanceSheetsForPersist,
+    summarizeDataSetForList,
+} from "@/lib/projectPersistence";
 import {
     summarizeAdvancedDataStorage,
     userCanUseAdvancedDataStorage,
@@ -69,10 +73,14 @@ export default async function handler(req, res) {
                         });
                     }
                 }
+                const sanitizedSheets = sanitizeProvenanceSheetsForPersist(
+                    data_sheets && typeof data_sheets === "object" ? data_sheets : {},
+                );
+                const firstInline = Object.values(sanitizedSheets).find((s) => Array.isArray(s?.data) && s.data.length);
                 const newDataSet = await DataSet.create({
                     data_set_name,
-                    data,
-                    data_sheets,
+                    data: firstInline?.data || [],
+                    data_sheets: sanitizedSheets,
                     created_date: new Date(created_date),
                     last_saved_date: new Date(last_saved_date),
                     labels,

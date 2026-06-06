@@ -37,6 +37,10 @@ export default async function handler(req, res) {
       ? null
       : Math.min(500000, Math.max(1, parseInt(String(limStr || "100"), 10) || 100));
 
+  const rawIncludeRows = req.query.includeRows;
+  const includeRowsStr = String(Array.isArray(rawIncludeRows) ? rawIncludeRows[0] : rawIncludeRows ?? "1").trim();
+  const includeRows = includeRowsStr !== "0" && includeRowsStr.toLowerCase() !== "false";
+
   try {
     const { state, reason, dataScannedBytes } = await getAthenaQueryState(qeid);
 
@@ -62,6 +66,14 @@ export default async function handler(req, res) {
         state,
         queryExecutionId: qeid,
         reason: reason || undefined,
+        dataScannedBytes,
+      });
+    }
+
+    if (!includeRows) {
+      return res.status(200).json({
+        state: "SUCCEEDED",
+        queryExecutionId: qeid,
         dataScannedBytes,
       });
     }

@@ -1,4 +1,8 @@
 import { coerceCategoricalBuilderAxes, inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
+import {
+  dataSheetsReferencedBySnapshot,
+  primarySheetIdForChartSnapshot,
+} from "@/lib/chartSnapshotDataDeps";
 
 /** Per-series line colors in the builder UI are keyed as `line:0`, not as sheet columns; keep them when sanitizing snapshots. */
 function isLineSeriesInstanceOverrideKey(rawKey) {
@@ -141,7 +145,11 @@ export function buildPublicChartBundle(chartLean, dataSetLean) {
     cp && typeof cp === "object" && cp.rechartsBuilder && cp.rechartsBuilder.v === 1
       ? cp.rechartsBuilder
       : inferDefaultBuilderSnapshot(rowsForFallback);
-  const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, rowsForFallback, dataSheets);
+  const primaryId = primarySheetIdForChartSnapshot(dataSheets, rechartsBuilderRaw);
+  const scopedSheets = dataSheetsReferencedBySnapshot(dataSheets, rechartsBuilderRaw);
+  const primaryRows = Array.isArray(dataSheets[primaryId]?.data) ? dataSheets[primaryId].data : [];
+  const rowsForNormalize = primaryRows.length ? primaryRows : rowsForFallback;
+  const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, rowsForNormalize, scopedSheets);
 
   const publicChart = {
     chart_name: chartLean.chart_name,
@@ -149,7 +157,7 @@ export function buildPublicChartBundle(chartLean, dataSetLean) {
     rechartsBuilder,
   };
 
-  const rows = rowsForFallback;
+  const rows = primaryRows.length ? primaryRows : rowsForFallback;
 
   return {
     chart: publicChart,

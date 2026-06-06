@@ -415,6 +415,59 @@ export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
   };
 }
 
+/** Max rows returned per HTTP page (keeps API responses under Next.js size limits). */
+export const ATHENA_RESULT_PAGE_ROW_CAP = 4000;
+
+/**
+ * One GetQueryResults page for chunked client downloads.
+ * @param {string} queryExecutionId
+ * @param {{ nextToken?: string | null; maxRows?: number }} [opts]
+ */
+export async function fetchAthenaQueryResultsPage(queryExecutionId, opts = {}) {
+  const athena = new AWS.Athena({ region: getRegion() });
+  const maxRows = Math.min(
+    1000,
+    Math.max(1, Math.floor(Number(opts.maxRows) || ATHENA_RESULT_PAGE_ROW_CAP)),
+  );
+  const page = await athena
+    .getQueryResults({
+      QueryExecutionId: queryExecutionId,
+      NextToken: opts.nextToken || undefined,
+      MaxResults: maxRows,
+    })
+    .promise();
+
+  const rs = page.ResultSet;
+  const meta = rs?.ResultSetMetadata?.ColumnInfo;
+  const rawRows = rs?.Rows || [];
+  const columnNames = [];
+  let startIdx = 0;
+
+  if (!opts.nextToken && meta?.length) {
+    for (const c of meta) {
+      columnNames.push(c.Name || "");
+    }
+  }
+  if (!opts.nextToken && rawRows.length > 0) {
+    if (!columnNames.length) {
+      columnNames.push(...(rawRows[0].Data?.map((d) => d.VarCharValue ?? "") || []));
+    }
+    startIdx = 1;
+  }
+
+  const dataRows = [];
+  for (let i = startIdx; i < rawRows.length; i++) {
+    dataRows.push(rawRows[i].Data?.map((d) => d.VarCharValue ?? "") || []);
+  }
+
+  return {
+    columns: columnNames,
+    rows: dataRows,
+    nextToken: page.NextToken || null,
+    rowCount: dataRows.length,
+  };
+}
+
 /**
  * Sync path: start → poll until done or timeout → fetch rows.
  * @param {object} opts

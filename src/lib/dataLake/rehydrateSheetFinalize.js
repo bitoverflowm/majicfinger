@@ -57,8 +57,12 @@ export function finalizeRehydrateSheetResult(body, athenaResult, requestedLimit)
     Math.floor(Number(body?.saveMeta?.fullRowCount) || 0),
     Math.floor(Number(body?.intentFullRowCount) || 0),
   );
+  const recipeOnly =
+    body?.saveMeta?.recipeOnly === true ||
+    body?.saveMeta?.persistRows === false ||
+    resolvePreviewRowCountForRehydrate(body) === 0;
   let warning =
-    expectedPreviewHash && previewHash !== expectedPreviewHash
+    !recipeOnly && expectedPreviewHash && previewHash !== expectedPreviewHash
       ? "Source data or query behavior changed since this project was saved."
       : null;
   if (savedFull > 0 && replayedRows.length < savedFull) {

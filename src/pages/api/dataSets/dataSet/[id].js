@@ -2,7 +2,11 @@ import dbConnect from "@/lib/dbConnect";
 import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
 import { assertDocumentOwner, requireLoginSession } from "@/lib/resourceOwnership";
-import { buildProjectRevision } from "@/lib/projectPersistence";
+import {
+    buildProjectRevision,
+    sanitizeProvenanceSheetsForPersist,
+    stripProvenanceRowPayloadForLoad,
+} from "@/lib/projectPersistence";
 import {
     summarizeAdvancedDataStorage,
     userCanUseAdvancedDataStorage,
@@ -32,8 +36,9 @@ export default async function handler(req, res) {
             try {
                 const session = await requireLoginSession(req, res);
                 if (!session) return;
-                const dataSet = await DataSet.findById(id).lean();
-                if (!assertDocumentOwner(dataSet, session, res)) return;
+                const dataSetRaw = await DataSet.findById(id).lean();
+                if (!assertDocumentOwner(dataSetRaw, session, res)) return;
+                const dataSet = stripProvenanceRowPayloadForLoad(dataSetRaw);
                 if (dataSet.forked_from_user_id) {
                     const forkUser = await User.findById(dataSet.forked_from_user_id)
                         .select("user_name")
@@ -78,11 +83,15 @@ export default async function handler(req, res) {
                         });
                     }
                 }
+                const sanitizedSheets = sanitizeProvenanceSheetsForPersist(
+                    body.data_sheets && typeof body.data_sheets === "object" ? body.data_sheets : {},
+                );
+                const firstInline = Object.values(sanitizedSheets).find((s) => Array.isArray(s?.data) && s.data.length);
                 const update = {
                     $set: {
                         data_set_name: body.data_set_name,
-                        data: body.data,
-                        data_sheets: body.data_sheets,
+                        data: firstInline?.data || [],
+                        data_sheets: sanitizedSheets,
                         last_saved_date: new Date(),
                         labels: body.labels,
                         source: body.source,
@@ -139,11 +148,12 @@ export default async function handler(req, res) {
                     delete nextSheets[sheetId];
                 }
                 const changedSheets = patch.changedSheets && typeof patch.changedSheets === "object" ? patch.changedSheets : {};
-                for (const [sheetId, sheet] of Object.entries(changedSheets)) {
+                const sanitizedChanged = sanitizeProvenanceSheetsForPersist(changedSheets);
+                for (const [sheetId, sheet] of Object.entries(sanitizedChanged)) {
                     nextSheets[sheetId] = sheet;
                 }
-                const firstSheet = Object.values(nextSheets)[0];
-                const nextData = Array.isArray(firstSheet?.data) ? firstSheet.data : [];
+                const firstWithData = Object.values(nextSheets).find((s) => Array.isArray(s?.data) && s.data.length);
+                const nextData = Array.isArray(firstWithData?.data) ? firstWithData.data : [];
                 const nextProject = {
                     data_set_name: patch.data_set_name ?? existing.data_set_name,
                     data_sheets: nextSheets,

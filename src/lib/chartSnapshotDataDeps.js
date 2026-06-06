@@ -24,6 +24,57 @@ export function primarySheetIdForChartData(dataSheets) {
 }
 
 /**
+ * Prefer the sheet explicitly referenced by a saved builder snapshot (scoped axis keys).
+ *
+ * @param {Record<string, unknown>} dataSheets
+ * @param {Record<string, unknown> | null | undefined} snapshot
+ * @returns {string}
+ */
+export function primarySheetIdForChartSnapshot(dataSheets, snapshot) {
+  const defaultId = primarySheetIdForChartData(dataSheets);
+  if (!snapshot || typeof snapshot !== "object") return defaultId;
+
+  const pickScoped = (key) => {
+    const raw = String(key || "");
+    const idx = raw.indexOf("::");
+    if (idx > -1) return raw.slice(0, idx).trim() || null;
+    return null;
+  };
+
+  for (const key of [snapshot.selX, ...(Array.isArray(snapshot.selY) ? snapshot.selY : [])]) {
+    const sid = pickScoped(key);
+    if (sid && dataSheets?.[sid]) return sid;
+  }
+  if (snapshot.barSeriesColumn) {
+    const sid = pickScoped(snapshot.barSeriesColumn);
+    if (sid && dataSheets?.[sid]) return sid;
+  }
+
+  const colsBySheet = collectChartSnapshotColumnsBySheetId(snapshot, defaultId);
+  for (const sid of colsBySheet.keys()) {
+    if (dataSheets?.[sid]) return sid;
+  }
+  return defaultId;
+}
+
+/**
+ * Trim multi-sheet projects to only sheets referenced by the chart snapshot.
+ *
+ * @param {Record<string, unknown>} dataSheets
+ * @param {Record<string, unknown> | null | undefined} snapshot
+ * @returns {Record<string, unknown>}
+ */
+export function dataSheetsReferencedBySnapshot(dataSheets, snapshot) {
+  const defaultId = primarySheetIdForChartData(dataSheets);
+  const colsBySheet = collectChartSnapshotColumnsBySheetId(snapshot, defaultId);
+  const out = {};
+  for (const sid of colsBySheet.keys()) {
+    if (dataSheets?.[sid]) out[sid] = dataSheets[sid];
+  }
+  return Object.keys(out).length ? out : dataSheets || {};
+}
+
+/**
  * Map sheetId -> Set of physical column names referenced by the snapshot.
  *
  * @param {Record<string, unknown> | null | undefined} snapshot

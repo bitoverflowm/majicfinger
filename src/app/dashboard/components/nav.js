@@ -746,7 +746,7 @@ const Nav = () => {
       });
       const dataPayload = savePayloadResult.payload;
       if (savePayloadResult.mode === "hybrid") {
-        toast.info("Large sheets will save as previews plus replayable query history.");
+        toast.info("Large Data Lake sheets save as query recipes only — rows reload from Athena on open.");
       }
       for (const warning of savePayloadResult.warnings || []) {
         toast.warning(warning);

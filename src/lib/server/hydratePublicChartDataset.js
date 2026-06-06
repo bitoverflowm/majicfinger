@@ -1,9 +1,8 @@
 import { getAthenaAccessForUserId } from "@/lib/athenaAccess";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
-import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import {
   collectChartSnapshotColumnsBySheetId,
-  primarySheetIdForChartData,
+  primarySheetIdForChartSnapshot,
   projectRowObjectsToColumnSet,
 } from "@/lib/chartSnapshotDataDeps";
 import {
@@ -65,9 +64,8 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
     cp && typeof cp === "object" && cp.rechartsBuilder && cp.rechartsBuilder.v === 1
       ? cp.rechartsBuilder
       : inferDefaultBuilderSnapshot(rowsForFallback);
-  const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, rowsForFallback, dataSheets);
-  const primaryId = primarySheetIdForChartData(dataSheets);
-  const colsBySheet = collectChartSnapshotColumnsBySheetId(rechartsBuilder, primaryId);
+  const primaryId = primarySheetIdForChartSnapshot(dataSheets, rechartsBuilderRaw);
+  const colsBySheet = collectChartSnapshotColumnsBySheetId(rechartsBuilderRaw, primaryId);
 
   const access = await getAthenaAccessForUserId(chartLean?.user_id);
   /** @type {Set<string>} */
