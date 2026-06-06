@@ -16,20 +16,7 @@
  * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number }} [pollOpts]
  * @returns {Promise<{ columns: string[]; rows: string[][]; rowCount: number; dataScannedBytes: number | null; queryExecutionId: string; sql?: string }>}
  */
-function sleep(ms, signal) {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException("Aborted", "AbortError"));
-      return;
-    }
-    const t = setTimeout(resolve, ms);
-    const onAbort = () => {
-      clearTimeout(t);
-      reject(new DOMException("Aborted", "AbortError"));
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
+import { pollAthenaQueryUntilDone } from "@/lib/dataLake/pollAthenaQueryStatus";
 
 export async function fetchAthenaLakeSample(
   {
@@ -101,70 +88,14 @@ export async function fetchAthenaLakeSample(
     throw new Error("Athena start response missing queryExecutionId");
   }
 
-  const deadline = Date.now() + maxWaitMs;
-  const q = new URLSearchParams({ queryExecutionId });
-  if (rowLimit == null) {
-    q.set("limit", "all");
-  } else {
-    q.set("limit", String(rowLimit));
-  }
+  const result = await pollAthenaQueryUntilDone(queryExecutionId, rowLimit, {
+    signal,
+    pollIntervalMs,
+    maxWaitMs,
+  });
 
-  while (Date.now() < deadline) {
-    if (signal?.aborted) {
-      throw new DOMException("Aborted", "AbortError");
-    }
-
-    const stRes = await fetch(`/api/data-lake/athena-query/status?${q.toString()}`, {
-      method: "GET",
-      credentials: "same-origin",
-      signal,
-    });
-
-    let j = {};
-    try {
-      j = await stRes.json();
-    } catch (parseErr) {
-      const hint =
-        stRes.status === 200
-          ? " Response may be too large for the browser to parse."
-          : "";
-      throw new Error(
-        `Failed to read Athena status JSON (${stRes.status}): ${parseErr?.message || parseErr}${hint}`,
-      );
-    }
-
-    if (stRes.status === 502 && j.code === "ATHENA_FAILED") {
-      throw new Error(j.error || "Athena query failed");
-    }
-
-    if (!stRes.ok && stRes.status !== 502) {
-      throw new Error(j.error || stRes.statusText || `Athena status ${stRes.status}`);
-    }
-
-    if (j.state === "SUCCEEDED" && Array.isArray(j.columns)) {
-      const rows = j.rows || [];
-      const rowCount = j.rowCount ?? rows.length;
-      if (rowCount > 0 && rows.length === 0) {
-        throw new Error(
-          "Athena reported rows but the download was empty (response may be truncated). Try a smaller filter or SQL LIMIT.",
-        );
-      }
-      return {
-        columns: j.columns || [],
-        rows,
-        rowCount,
-        dataScannedBytes: j.dataScannedBytes ?? null,
-        queryExecutionId,
-        sql: startJson.sql || undefined,
-      };
-    }
-
-    if (j.state === "FAILED" || j.state === "CANCELLED") {
-      throw new Error(j.error || `Athena ${j.state}`);
-    }
-
-    await sleep(pollIntervalMs, signal);
-  }
-
-  throw new Error("Timed out waiting for Athena (increase maxWaitMs or check query in console)");
+  return {
+    ...result,
+    sql: startJson.sql || undefined,
+  };
 }

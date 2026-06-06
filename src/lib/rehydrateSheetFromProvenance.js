@@ -1,7 +1,7 @@
 /**
  * Re-run a saved Data Lake provenance query into a target sheet (Connect home replay + grid rehydrate).
  */
-import { buildRehydrateSheetRequestBody } from "@/lib/dataLake/rehydrateSheetCore";
+import { rehydrateSheetAsync } from "@/lib/rehydrateSheetAsync";
 
 function safeSheetGraphName(name, id) {
   let t = String(name || id || "sheet").replace(/[^a-zA-Z0-9_]+/g, "_");
@@ -31,6 +31,7 @@ function buildSheetGraph(dataSheets, rootSheetId) {
  *   provenance: object;
  *   dataSheets: Record<string, object>;
  *   sourceSheetId?: string;
+ *   pollOpts?: { signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number };
  * }} args
  */
 export async function rehydrateSheetFromProvenance({
@@ -38,6 +39,7 @@ export async function rehydrateSheetFromProvenance({
   provenance,
   dataSheets,
   sourceSheetId,
+  pollOpts,
 }) {
   if (!targetSheetId || !provenance) {
     throw new Error("Missing sheet or saved query to replay.");
@@ -46,25 +48,13 @@ export async function rehydrateSheetFromProvenance({
   const sourceSheet = sourceSheetId ? dataSheets?.[sourceSheetId] : dataSheets?.[targetSheetId];
   const sheetGraph = buildSheetGraph(dataSheets, sourceSheetId || targetSheetId);
 
-  const res = await fetch("/api/data-lake/rehydrate-sheet", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify(
-      buildRehydrateSheetRequestBody({
-        sheetId: targetSheetId,
-        provenance,
-        sheetGraph,
-        sheet: sourceSheet,
-      }),
-    ),
+  const { rows, json } = await rehydrateSheetAsync({
+    sheetId: targetSheetId,
+    provenance,
+    sheetGraph,
+    sheet: sourceSheet,
+    pollOpts,
   });
 
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(json?.error || res.statusText || `Rehydrate ${res.status}`);
-  }
-
-  const rows = Array.isArray(json?.rows) ? json.rows : [];
   return { rows, json, sourceSheet };
 }

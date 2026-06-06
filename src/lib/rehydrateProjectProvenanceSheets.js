@@ -3,10 +3,8 @@
  * (dependency order) so users see full data, not Mongo preview rows (~12.5k after save shrink).
  */
 
-import {
-  buildRehydrateSheetRequestBody,
-  buildSheetProvenanceGraphForRehydrate,
-} from "@/lib/dataLake/rehydrateSheetCore";
+import { buildSheetProvenanceGraphForRehydrate } from "@/lib/dataLake/rehydrateSheetCore";
+import { rehydrateSheetAsync } from "@/lib/rehydrateSheetAsync";
 import {
   isPartialProvenanceReload,
   resolvePersistedFullRowCount,
@@ -53,24 +51,12 @@ async function rehydrateOneSheet(dataSheets, sheetId) {
   if (!sheet?.provenance) return sheet;
 
   const sheetGraph = buildSheetProvenanceGraphForRehydrate(dataSheets, sheetId);
-  const res = await fetch("/api/data-lake/rehydrate-sheet", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify(
-      buildRehydrateSheetRequestBody({
-        sheetId,
-        provenance: sheet.provenance,
-        sheetGraph,
-        sheet,
-      }),
-    ),
+  const { rows, json } = await rehydrateSheetAsync({
+    sheetId,
+    provenance: sheet.provenance,
+    sheetGraph,
+    sheet,
   });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(json?.error || res.statusText || `Rehydrate ${res.status}`);
-  }
-  const rows = Array.isArray(json?.rows) ? json.rows : [];
   const partial = isPartialProvenanceReload(sheet, rows.length);
   const fullRowCount = resolvePersistedFullRowCount(sheet, json?.rowCount ?? rows.length);
   return {

@@ -101,7 +101,7 @@ import {
   connectGridToolbarCompactClass,
 } from "@/lib/connectGridCompact";
 import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
-import { buildRehydrateSheetRequestBody } from "@/lib/dataLake/rehydrateSheetCore";
+import { rehydrateSheetAsync } from "@/lib/rehydrateSheetAsync";
 import {
   appendSheetOperation,
   createSheetOperation,
@@ -431,22 +431,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
       collectSheetGraph(activeSheetId);
       setRehydrateBusy(true);
       try {
-        const res = await fetch("/api/data-lake/rehydrate-sheet", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify(
-            buildRehydrateSheetRequestBody({
-              sheetId: activeSheetId,
-              provenance: activeSheet.provenance,
-              sheetGraph,
-              sheet: activeSheet,
-            }),
-          ),
+        const { rows, json } = await rehydrateSheetAsync({
+          sheetId: activeSheetId,
+          provenance: activeSheet.provenance,
+          sheetGraph,
+          sheet: activeSheet,
         });
-        const json = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(json?.error || res.statusText || `Rehydrate ${res.status}`);
-        const rows = Array.isArray(json?.rows) ? json.rows : [];
         const partial = isPartialProvenanceReload(activeSheet, rows.length);
         const fullRowCount = resolvePersistedFullRowCount(activeSheet, json?.rowCount ?? rows.length);
         setConnectedData?.(rows);

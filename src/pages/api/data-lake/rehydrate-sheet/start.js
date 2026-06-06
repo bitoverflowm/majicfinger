@@ -1,10 +1,10 @@
 /**
- * Rebuild a saved provenance-backed sheet from Data Lake query history (synchronous).
- * Browser replay should use POST /api/data-lake/rehydrate-sheet/start + poll athena-query/status instead.
+ * Start a provenance sheet rehydrate/replay — returns queryExecutionId immediately.
+ * Client polls GET /api/data-lake/athena-query/status, then applies operationHistory locally.
  */
 import { AthenaLakeRequestError } from "@/lib/dataLake/validateAthenaLakeRequest";
 import { getAthenaAccessFromRequest } from "@/lib/athenaAccess";
-import { runRehydrateSheetCore } from "@/lib/dataLake/rehydrateSheetCore";
+import { startRehydrateSheetQuery } from "@/lib/dataLake/rehydrateSheetCore";
 
 export const config = {
   api: {
@@ -49,8 +49,11 @@ export default async function handler(req, res) {
 
   try {
     const access = await getAthenaAccessFromRequest(req);
-    const payload = await runRehydrateSheetCore(body, access);
-    return res.status(200).json(payload);
+    const started = await startRehydrateSheetQuery(body, access);
+    return res.status(202).json({
+      ...started,
+      state: "RUNNING",
+    });
   } catch (e) {
     if (e instanceof AthenaLakeRequestError) {
       return res.status(e.statusCode).json({ error: e.message, code: e.code });
@@ -65,12 +68,6 @@ export default async function handler(req, res) {
     const code = e?.code || "INTERNAL";
     if (code === "CONFIG") {
       return res.status(503).json({ error: e.message, code: "CONFIG" });
-    }
-    if (code === "TIMEOUT") {
-      return res.status(408).json({ error: e.message, code: "TIMEOUT", queryExecutionId: e.queryExecutionId });
-    }
-    if (code === "ATHENA_FAILED") {
-      return res.status(502).json({ error: e.message, code: "ATHENA_FAILED", queryExecutionId: e.queryExecutionId });
     }
     if (code === "BAD_REQUEST") {
       return res.status(400).json({ error: e.message, code: "BAD_REQUEST" });

@@ -3,19 +3,22 @@
  */
 import AWS from "aws-sdk";
 import { validateAthenaLakeQueryBody } from "@/lib/dataLake/validateAthenaLakeRequest";
-import { runAthenaBoundedSelect, getAthenaQueryState, fetchAthenaQueryResultRows } from "@/lib/dataLake/runAthenaSelect";
+import {
+  runAthenaBoundedSelect,
+  startAthenaBoundedQuery,
+  getAthenaQueryState,
+  fetchAthenaQueryResultRows,
+} from "@/lib/dataLake/runAthenaSelect";
+import { finalizeRehydrateSheetResult } from "@/lib/dataLake/rehydrateSheetFinalize";
+export {
+  buildRehydrateSheetRequestBody,
+  resolvePreviewRowCountForRehydrate,
+} from "@/lib/dataLake/rehydrateSheetShared";
 import { buildComposeAthenaSelectSql } from "@/lib/dataLake/buildComposeAthenaSql";
 import {
   buildComposeFiltersWhereSql,
   collectKalshiMarketsMaterializedVirtuals,
 } from "@/lib/dataLake/composeWherePredicateSql";
-import {
-  replayOperations,
-  hashJson,
-  PROJECT_MIN_PREVIEW_ROW_LIMIT,
-  resolveSheetIntentFullRowCount,
-} from "@/lib/projectPersistence";
-import { normalizeLakeBigintFieldsInRows } from "@/lib/dataLake/lakeBigintNormalize";
 
 export function safeIdentifierForSheetGraph(s) {
   const t = String(s || "").trim().replace(/[^a-zA-Z0-9_]+/g, "_");
@@ -29,43 +32,6 @@ export function safeIdentifierForSheetGraph(s) {
  * @param {Record<string, any>} dataSheets
  * @param {string} rootSheetId
  */
-/** How many leading rows to hash-compare after replay (never send full preview rows in POST body). */
-export function resolvePreviewRowCountForRehydrate(sheetOrBody) {
-  const src = sheetOrBody && typeof sheetOrBody === "object" ? sheetOrBody : {};
-  const fromField = Number(src.previewRowCount);
-  if (Number.isFinite(fromField) && fromField >= 0) return Math.floor(fromField);
-  // Backward compat: older clients sent previewRows in the request body.
-  if (Array.isArray(src.previewRows)) return src.previewRows.length;
-  if (src?.saveMeta?.previewHash) return PROJECT_MIN_PREVIEW_ROW_LIMIT;
-  return 0;
-}
-
-/**
- * Minimal POST body for /api/data-lake/rehydrate-sheet — Athena + operation replay only.
- *
- * @param {{
- *   sheetId: string;
- *   provenance: object;
- *   sheetGraph?: object;
- *   sheet?: object;
- *   maxRows?: number;
- * }} args
- */
-export function buildRehydrateSheetRequestBody({ sheetId, provenance, sheetGraph, sheet, maxRows }) {
-  const src = sheet && typeof sheet === "object" ? sheet : {};
-  return {
-    sheetId,
-    provenance,
-    sheetGraph: sheetGraph && typeof sheetGraph === "object" ? sheetGraph : {},
-    operationHistory: Array.isArray(src.operationHistory) ? src.operationHistory : [],
-    previewRowCount: resolvePreviewRowCountForRehydrate(src),
-    fullRowCount: resolveSheetIntentFullRowCount(src) || null,
-    intentFullRowCount: resolveSheetIntentFullRowCount(src) || null,
-    saveMeta: src.saveMeta || null,
-    ...(maxRows != null && maxRows !== "" ? { maxRows } : {}),
-  };
-}
-
 export function buildSheetProvenanceGraphForRehydrate(dataSheets, rootSheetId) {
   const out = {};
   const visit = (id) => {
@@ -80,17 +46,6 @@ export function buildSheetProvenanceGraphForRehydrate(dataSheets, rootSheetId) {
   };
   visit(String(rootSheetId || "").trim());
   return out;
-}
-
-function rowsToObjects(columns, rows) {
-  const cols = Array.isArray(columns) ? columns : [];
-  return (Array.isArray(rows) ? rows : []).map((row) => {
-    const arr = Array.isArray(row) ? row : [];
-    return cols.reduce((acc, col, idx) => {
-      acc[col] = arr[idx] === "" || arr[idx] == null ? null : arr[idx];
-      return acc;
-    }, {});
-  });
 }
 
 function normalizeLimit(body, provenance, access) {
@@ -154,7 +109,7 @@ function assertAthenaConfig() {
   return output;
 }
 
-async function executeAthenaSql({ database, sql, maxWaitMs, rowLimit }) {
+async function startAthenaSqlExecution({ database, sql }) {
   const output = assertAthenaConfig();
   const workGroup = process.env.DATA_LAKE_ATHENA_WORKGROUP || "primary";
   const catalog = process.env.DATA_LAKE_ATHENA_CATALOG || "AwsDataCatalog";
@@ -174,6 +129,11 @@ async function executeAthenaSql({ database, sql, maxWaitMs, rowLimit }) {
       QueryExecutionContext: { Catalog: catalog, Database: db },
     })
     .promise();
+  return QueryExecutionId;
+}
+
+async function executeAthenaSql({ database, sql, maxWaitMs, rowLimit }) {
+  const QueryExecutionId = await startAthenaSqlExecution({ database, sql });
 
   const deadline = Date.now() + maxWaitMs;
   let status = "RUNNING";
@@ -196,6 +156,7 @@ async function executeAthenaSql({ database, sql, maxWaitMs, rowLimit }) {
 
   if (status !== "SUCCEEDED") {
     try {
+      const athena = new AWS.Athena({ region: getRegion() });
       await athena.stopQueryExecution({ QueryExecutionId }).promise();
     } catch {
       /* ignore */
@@ -228,7 +189,7 @@ function buildWhereSql(validated) {
   return { whereSql, materializedVirtuals };
 }
 
-async function runComposeWithSheetGraph({ provenance, body, access, limit, maxWaitMs }) {
+async function buildComposeWithSheetGraphSql({ provenance, body, access, limit }) {
   const sheetGraph = body?.sheetGraph && typeof body.sheetGraph === "object" ? body.sheetGraph : {};
   const rootSheetId = String(body?.sheetId || "root");
   const rootEntry = {
@@ -317,7 +278,70 @@ async function runComposeWithSheetGraph({ provenance, body, access, limit, maxWa
   const depIds = cteDefsInOrder.filter((id) => id !== rootSheetId);
   const cteDefs = depIds.map((id) => `${cteSqlById.get(id).cteName} AS (${cteSqlById.get(id).sql})`);
   const sql = cteDefs.length ? `WITH ${cteDefs.join(", ")} ${rootSql}` : rootSql;
+  return { database, sql };
+}
+
+async function runComposeWithSheetGraph({ provenance, body, access, limit, maxWaitMs }) {
+  const { database, sql } = await buildComposeWithSheetGraphSql({ provenance, body, access, limit });
   return executeAthenaSql({ database, sql, maxWaitMs, rowLimit: limit });
+}
+
+/**
+ * Start Athena for a rehydrate/replay (returns immediately — poll status separately).
+ *
+ * @param {object} body
+ * @param {{ maxComposeRows: number; maxSelectRows: number; unlimitedComposeRows?: boolean }} access
+ */
+export async function startRehydrateSheetQuery(body, access) {
+  const provenance = body.provenance && typeof body.provenance === "object" ? body.provenance : null;
+  if (!provenance || provenance.kind !== "compose") {
+    const err = new Error("Missing compose provenance");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+
+  const limit = normalizeLimit(body, provenance, access);
+  const hasServerDeps = Array.isArray(provenance.serverSheetJoins) && provenance.serverSheetJoins.length > 0;
+
+  if (hasServerDeps) {
+    const { database, sql } = await buildComposeWithSheetGraphSql({ provenance, body, access, limit });
+    const queryExecutionId = await startAthenaSqlExecution({ database, sql });
+    return { queryExecutionId, rowLimit: limit, sql, requestedLimit: limit };
+  }
+
+  const validated = validateAthenaLakeQueryBody(
+    {
+      lake: provenance.lake,
+      table: provenance.table,
+      queryType: "compose",
+      compose: provenance.composeSpec || {},
+      filters: provenance.composeFilters && typeof provenance.composeFilters === "object" ? provenance.composeFilters : null,
+      caseSensitive: true,
+      limit,
+    },
+    access,
+  );
+  const started = await startAthenaBoundedQuery({
+    physicalTableName: validated.physical,
+    database: validated.database,
+    columns: validated.columns,
+    queryType: validated.queryType,
+    compose: validated.compose,
+    lake: validated.lake,
+    table: validated.table,
+    filters: validated.filters,
+    caseSensitive: validated.caseSensitive,
+    limit: validated.limit,
+    demo: validated.demo,
+    composeSqlCap: validated.maxComposeRows,
+    unlimitedComposeRows: access.unlimitedComposeRows,
+  });
+  return {
+    queryExecutionId: started.queryExecutionId,
+    rowLimit: started.rowLimit ?? limit,
+    sql: started.sql,
+    requestedLimit: limit,
+  };
 }
 
 /**
@@ -372,61 +396,5 @@ export async function runRehydrateSheetCore(body, access, opts = {}) {
         });
       })();
 
-  const rawObjects = rowsToObjects(result.columns, result.rows);
-  const replayedRows = normalizeLakeBigintFieldsInRows(
-    replayOperations({
-      rows: rawObjects,
-      operations: Array.isArray(body.operationHistory) ? body.operationHistory : [],
-    }),
-  );
-  const replayedColumns = [];
-  const seenColumns = new Set();
-  for (const col of Array.isArray(result.columns) ? result.columns : []) {
-    if (seenColumns.has(col)) continue;
-    seenColumns.add(col);
-    replayedColumns.push(col);
-  }
-  for (const row of replayedRows) {
-    if (!row || typeof row !== "object") continue;
-    for (const col of Object.keys(row)) {
-      if (seenColumns.has(col)) continue;
-      seenColumns.add(col);
-      replayedColumns.push(col);
-    }
-  }
-  const previewSampleSize = resolvePreviewRowCountForRehydrate(body);
-  const previewRows = previewSampleSize > 0 ? replayedRows.slice(0, previewSampleSize) : [];
-  const previewHash = previewRows.length ? hashJson(previewRows) : null;
-  const expectedPreviewHash = body?.saveMeta?.previewHash || null;
-
-  const savedFull = Math.max(
-    0,
-    Math.floor(Number(body?.fullRowCount) || 0),
-    Math.floor(Number(body?.saveMeta?.fullRowCount) || 0),
-    Math.floor(Number(body?.intentFullRowCount) || 0),
-  );
-  let warning =
-    expectedPreviewHash && previewHash !== expectedPreviewHash
-      ? "Source data or query behavior changed since this project was saved."
-      : null;
-  if (savedFull > 0 && replayedRows.length < savedFull) {
-    const tierCapped = limit > 0 && limit < savedFull && replayedRows.length >= limit;
-    const partial = tierCapped
-      ? `Reloaded ${replayedRows.length.toLocaleString()} of ${savedFull.toLocaleString()} rows — your plan caps Athena pulls at ${limit.toLocaleString()} rows per query.`
-      : `Reloaded ${replayedRows.length.toLocaleString()} of ${savedFull.toLocaleString()} saved rows (query limit ${limit.toLocaleString()}).`;
-    warning = warning ? `${warning} ${partial}` : partial;
-  }
-
-  return {
-    sheetId: body.sheetId || null,
-    columns: replayedColumns,
-    rows: replayedRows,
-    rowCount: replayedRows.length,
-    requestedLimit: limit,
-    queryExecutionId: result.queryExecutionId,
-    dataScannedBytes: result.dataScannedBytes,
-    previewHash,
-    previewMatches: expectedPreviewHash ? previewHash === expectedPreviewHash : null,
-    warning,
-  };
+  return finalizeRehydrateSheetResult(body, result, limit);
 }
