@@ -431,26 +431,34 @@ export function summarizeDataSetForList(ds) {
   const source = typeof ds.toObject === "function" ? ds.toObject() : ds;
   const dataSheets = source.data_sheets && typeof source.data_sheets === "object" ? source.data_sheets : {};
   const summarizedSheets = Object.entries(dataSheets).reduce((acc, [sheetId, sheet]) => {
-    const preview = Array.isArray(sheet?.data) ? sheet.data.slice(0, 25) : [];
+    const hasInlineData = Array.isArray(sheet?.data) && sheet.data.length > 0;
+    const preview = hasInlineData ? sheet.data.slice(0, PROJECT_MIN_PREVIEW_ROW_LIMIT) : [];
+    const rowCount =
+      sheet?.rowCount ??
+      sheet?.fullRowCount ??
+      (hasInlineData ? sheet.data.length : 0);
+    const fullRowCount = sheet?.fullRowCount ?? sheet?.rowCount ?? rowCount;
+    const previewRowCount =
+      Number.isFinite(Number(sheet?.previewRowCount)) && Number(sheet.previewRowCount) >= 0
+        ? Math.floor(Number(sheet.previewRowCount))
+        : preview.length;
     acc[sheetId] = {
       name: sheet?.name || sheetId,
       data: preview,
       storageMode: sheet?.storageMode || "inline",
-      rowCount: sheet?.rowCount ?? sheet?.fullRowCount ?? (Array.isArray(sheet?.data) ? sheet.data.length : 0),
-      fullRowCount: sheet?.fullRowCount ?? sheet?.rowCount ?? (Array.isArray(sheet?.data) ? sheet.data.length : 0),
-      previewRowCount: preview.length,
-      columns: Array.isArray(sheet?.columns) ? sheet.columns : inferColumnsFromRows(preview),
-      provenance: sheet?.provenance ?? null,
-      operationHistory: Array.isArray(sheet?.operationHistory) ? sheet.operationHistory : [],
-      requestCards: Array.isArray(sheet?.requestCards) ? sheet.requestCards : [],
+      rowCount,
+      fullRowCount,
+      previewRowCount,
+      columns: Array.isArray(sheet?.columns) ? sheet.columns : hasInlineData ? inferColumnsFromRows(preview) : [],
       rehydrationStatus: sheet?.rehydrationStatus || (sheet?.storageMode === "provenance" ? "preview" : "complete"),
       saveMeta: sheet?.saveMeta || null,
     };
     return acc;
   }, {});
+  const { data: _legacyData, ...rest } = source;
   return {
-    ...source,
-    data: Array.isArray(source.data) ? source.data.slice(0, 25) : [],
+    ...rest,
+    data: [],
     data_sheets: summarizedSheets,
   };
 }

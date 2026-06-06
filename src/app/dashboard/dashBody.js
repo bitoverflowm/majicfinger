@@ -152,6 +152,7 @@ const DashBody = ({ user }) => {
         if(user && !isDemo && hasDbBackedUserId){
             fetch(`/api/dataSets?uid=${user.userId}`, {
                 method: 'GET',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                 },

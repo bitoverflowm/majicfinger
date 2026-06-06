@@ -3,6 +3,7 @@ import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
 import mongoose from 'mongoose';
 import { assertQueryUserMatchesSession, requireLoginSession } from "@/lib/resourceOwnership";
+import { buildLightweightDataSetListPipeline } from "@/lib/dataSetListQuery";
 import { buildProjectRevision, summarizeDataSetForList } from "@/lib/projectPersistence";
 import {
     summarizeAdvancedDataStorage,
@@ -31,10 +32,9 @@ export default async function handler(req, res) {
                 const session = await requireLoginSession(req, res);
                 if (!session) return;
                 if (!assertQueryUserMatchesSession(uid, session, res)) return;
-                const savedDataSets = await DataSet.find({ user_id: session.userId })
-                    .select('data_set_name created_date last_saved_date labels source user_id data_sheets')
-                    .lean()
-                    .exec();
+                const savedDataSets = await DataSet.aggregate(
+                    buildLightweightDataSetListPipeline(session.userId),
+                ).exec();
 
                 res.status(200).json({
                     success: true,
