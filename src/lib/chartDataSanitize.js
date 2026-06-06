@@ -87,6 +87,54 @@ export function normalizeCartesianSeriesToBaseline(rows, yKeys) {
   });
 }
 
+/** Min-max scale each Y series to 0–100: ((valₙ − min) / (max − min)) × 100. */
+export function normalizeCartesianSeriesMinMax(rows, yKeys) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+  const keys = Array.isArray(yKeys) ? yKeys.filter(Boolean) : [];
+  if (!keys.length) return rows;
+
+  const ranges = {};
+  for (const yKey of keys) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const row of rows) {
+      const v = coerceChartPlotNumber(row?.[yKey]);
+      if (v == null || !Number.isFinite(v)) continue;
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+    if (Number.isFinite(min) && Number.isFinite(max)) {
+      ranges[yKey] = { min, max };
+    }
+  }
+
+  return rows.map((row) => {
+    if (!row || typeof row !== "object") return row;
+    const out = { ...row };
+    for (const yKey of keys) {
+      const range = ranges[yKey];
+      if (!range) continue;
+      const v = coerceChartPlotNumber(row?.[yKey]);
+      if (v == null || !Number.isFinite(v)) continue;
+      if (range.max === range.min) {
+        out[yKey] = 100;
+        continue;
+      }
+      out[yKey] = ((v - range.min) / (range.max - range.min)) * 100;
+    }
+    return out;
+  });
+}
+
+/**
+ * @param {"basic"|"min-max"} mode
+ */
+export function applyCartesianSeriesNormalization(rows, yKeys, mode) {
+  if (mode === "basic") return normalizeCartesianSeriesToBaseline(rows, yKeys);
+  if (mode === "min-max") return normalizeCartesianSeriesMinMax(rows, yKeys);
+  return rows;
+}
+
 export function sanitizeCartesianRowsForPlotting(rows, { xKey, yKeys, xAxisType, dataTypes, getAxisType }) {
   if (!Array.isArray(rows) || !rows.length) return rows;
   const yList = Array.isArray(yKeys) ? yKeys.filter(Boolean) : [];

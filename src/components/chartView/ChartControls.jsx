@@ -221,8 +221,8 @@ export default function ChartControls() {
     setYAxisDivisor,
     yAxisCompact,
     setYAxisCompact,
-    valuesNormalized,
-    setValuesNormalized,
+    normalizeMode,
+    setNormalizeMode,
     dataTypes,
     chartData,
     getAxisType,
@@ -649,16 +649,41 @@ export default function ChartControls() {
     Array.isArray(selY) &&
     selY.length > 0;
   const normalizeValuesControl = showNormalizeControl ? (
-    <div className="flex items-center gap-2 border-t py-2">
+    <div className="flex min-w-0 items-center gap-2 border-t py-2">
       <Switch
         id="chart-data-normalize"
-        checked={!!valuesNormalized}
-        onCheckedChange={setValuesNormalized}
-        className="scale-75 origin-left"
+        checked={normalizeMode === "basic" || normalizeMode === "min-max"}
+        onCheckedChange={(on) => setNormalizeMode(on ? "basic" : null)}
+        className="shrink-0 scale-75 origin-left"
       />
-      <Label htmlFor="chart-data-normalize" className="cursor-pointer text-xs text-muted-foreground">
-        Normalize
-      </Label>
+      {normalizeMode === "basic" || normalizeMode === "min-max" ? (
+        <Select
+          value={normalizeMode}
+          onValueChange={(v) => {
+            if (v === "basic" || v === "min-max") setNormalizeMode(v);
+          }}
+        >
+          <SelectTrigger
+            id="chart-data-normalize"
+            className="h-8 min-w-0 flex-1 text-xs"
+            aria-label="Normalize mode"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="text-xs">
+            <SelectItem value="basic" className="text-xs">
+              Basic
+            </SelectItem>
+            <SelectItem value="min-max" className="text-xs">
+              Min-max
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      ) : (
+        <Label htmlFor="chart-data-normalize" className="cursor-pointer text-xs text-muted-foreground">
+          Normalize
+        </Label>
+      )}
     </div>
   ) : null;
   const yAxisFormatControls = showYAxisFormat ? (

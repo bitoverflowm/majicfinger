@@ -21,8 +21,8 @@ import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
+  applyCartesianSeriesNormalization,
   coerceChartPlotNumber,
-  normalizeCartesianSeriesToBaseline,
   sanitizeCartesianRowsForPlotting,
 } from "@/lib/chartDataSanitize";
 import { isCategoricalLabelColumn, looksLikeProseLabelValue } from "@/lib/chartCategoricalColumns";
@@ -673,8 +673,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [scatterColorEnabled, setScatterColorEnabled] = useState(false);
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
   const [yAxisCompact, setYAxisCompact] = useState(true);
-  /** Line/area/bar: scale each plotted series to 100 at its first value (valₙ / val₀ × 100). */
-  const [valuesNormalized, setValuesNormalized] = useState(false);
+  /** Line/area/bar: null = off; "basic" = baseline index; "min-max" = min-max scale to 0–100. */
+  const [normalizeMode, setNormalizeMode] = useState(null);
   const [sortXDir, setSortXDir] = useState("asc");
   const [sortYDir, setSortYDir] = useState(null);
 
@@ -827,7 +827,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     else if (s.selColorCol) setScatterColorEnabled(true);
     if (s.yAxisDivisor != null) setYAxisDivisor(s.yAxisDivisor);
     if (s.yAxisCompact !== undefined) setYAxisCompact(!!s.yAxisCompact);
-    if (s.valuesNormalized !== undefined) setValuesNormalized(!!s.valuesNormalized);
+    if (s.normalizeMode === "basic" || s.normalizeMode === "min-max") {
+      setNormalizeMode(s.normalizeMode);
+    } else if (s.valuesNormalized) {
+      setNormalizeMode("basic");
+    } else if (s.normalizeMode === null || s.normalizeMode === false || s.normalizeMode === "off") {
+      setNormalizeMode(null);
+    }
     if (s.sortXDir != null) setSortXDir(s.sortXDir);
     if (s.sortYDir !== undefined) setSortYDir(s.sortYDir);
     if (s.selectedShadBaseId != null) setSelectedShadBaseId(s.selectedShadBaseId);
@@ -1434,7 +1440,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     scatterColorEnabled,
     yAxisDivisor,
     yAxisCompact,
-    valuesNormalized,
+    normalizeMode,
     sortXDir,
     sortYDir,
     selectedShadBaseId,
@@ -1707,8 +1713,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setYAxisDivisor,
     yAxisCompact,
     setYAxisCompact,
-    valuesNormalized,
-    setValuesNormalized,
+    normalizeMode,
+    setNormalizeMode,
 
     chartData: scopedKeysInUse ? crossSheetChartData : chartData,
     getAxisType,
@@ -1942,7 +1948,7 @@ export function ChartCanvas() {
     scatterColorEnabled,
     yAxisDivisor,
     yAxisCompact,
-    valuesNormalized,
+    normalizeMode,
     sortXDir,
   } = useChartBuilder();
 
@@ -2068,12 +2074,12 @@ export function ChartCanvas() {
   }, [chartUsesTimeframes, filteredPlotRows, xKey, renderedYKeys, chartTimeframe, sortXDir]);
 
   const normalizedPlotRows = useMemo(() => {
-    if (!valuesNormalized) return timeframedPlotRows;
+    if (!normalizeMode) return timeframedPlotRows;
     if (selChartType !== "line" && selChartType !== "area" && selChartType !== "bar") {
       return timeframedPlotRows;
     }
-    return normalizeCartesianSeriesToBaseline(timeframedPlotRows, renderedYKeys);
-  }, [valuesNormalized, selChartType, timeframedPlotRows, renderedYKeys]);
+    return applyCartesianSeriesNormalization(timeframedPlotRows, renderedYKeys, normalizeMode);
+  }, [normalizeMode, selChartType, timeframedPlotRows, renderedYKeys]);
 
   /** Drop non-finite Y (and numeric/date X) so Recharts draws gaps instead of bogus points. */
   const finalRenderedData = useMemo(() => {
