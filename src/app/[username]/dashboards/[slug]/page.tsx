@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PublicDashboardEmbedClient from "@/components/publicEmbed/PublicDashboardEmbedClient";
 import { PublicDashboardChartSeoLayer } from "@/components/publicEmbed/PublicDashboardChartSeoLayer";
+import { PublishedDashboardMoreSection } from "@/components/publicEmbed/PublishedDashboardMoreSection";
 import { PublicDashboardSeoNav } from "@/components/publicEmbed/PublicDashboardSeoNav";
 import { getPublicDashboardPageContext } from "@/lib/server/publicDashboardPageContext";
 import {
@@ -68,6 +69,7 @@ export default async function PublicDashboardPage({
         initialPayload={shellPayload}
         clusterHref={cluster?.href ?? null}
       />
+      <PublishedDashboardMoreSection excludeUsername={username} excludeSlug={slug} />
     </div>
   );
 }

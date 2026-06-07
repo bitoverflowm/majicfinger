@@ -55,6 +55,7 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
       const res = await fetch(`/api/chart-dashboards/${draft._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           ...base,
           ...(publish ? { is_public: publish.is_public, public_slug: publish.public_slug } : {}),
@@ -90,6 +91,33 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
     if (!j?.success || !j?.data?._id) {
       return { ok: false, message: j?.message || "Save failed" };
     }
+
+    const createdId = String(j.data._id);
+    if (includePublishFields && draft.is_public) {
+      const raw = normalizeChartEmbedSlug(String(draft.public_slug || draft.dashboard_name || ""));
+      if (!isValidChartEmbedSlug(raw)) {
+        return { ok: false, message: "Invalid public slug (use lowercase letters, numbers, hyphens)." };
+      }
+      const pubRes = await fetch(`/api/chart-dashboards/${createdId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          dashboard_name: j.data.dashboard_name,
+          layout: j.data.layout,
+          theme: j.data.theme,
+          data_set_id: j.data.data_set_id,
+          is_public: true,
+          public_slug: raw,
+        }),
+      });
+      const pubJson = await pubRes.json();
+      if (!pubJson?.success) {
+        return { ok: false, message: pubJson?.message || "Publish failed" };
+      }
+      return { ok: true, created: pubJson.data || j.data };
+    }
+
     return { ok: true, created: j.data };
   } catch {
     return { ok: false, message: "Save failed" };

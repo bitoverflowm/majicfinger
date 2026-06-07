@@ -33,6 +33,10 @@ import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
+import {
+  createSaveProjectProgressTicker,
+  rebuildDashboardPublishCache,
+} from "@/lib/dashboardPublishCache"
 import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace"
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport"
@@ -370,6 +374,7 @@ const Nav = () => {
   const [saveProjectBusy, setSaveProjectBusy] = useState(false)
   const [saveProjectProgress, setSaveProjectProgress] = useState(0)
   const [saveProjectMessage, setSaveProjectMessage] = useState("")
+  const saveProjectProgressRef = useRef(0)
   const [largeProjectUpgradeOpen, setLargeProjectUpgradeOpen] = useState(false)
   const [largeProjectUpgradeSummary, setLargeProjectUpgradeSummary] = useState(null)
   const connectProjectLoadState = contextStateV2?.connectProjectLoadState ?? {}
@@ -695,6 +700,7 @@ const Nav = () => {
       return;
     }
     const bump = (pct, msg) => {
+      saveProjectProgressRef.current = pct;
       setSaveProjectProgress(pct);
       setSaveProjectMessage(msg);
     };
@@ -858,12 +864,23 @@ const Nav = () => {
         dashDraft.data_set_id &&
         (dashDraft._id || (dashDraft.layout && typeof dashDraft.layout === "object"));
       if (hasDashboardToSave) {
-        bump(88, "Saving dashboard…");
-        const dashResult = await persistChartDashboardDraft({
-          draft: dashDraft,
-          userId: user.userId,
-          includePublishFields: true,
-        });
+        bump(86, "Saving dashboard settings…");
+        const publishTicker = createSaveProjectProgressTicker(
+          bump,
+          () => saveProjectProgressRef.current,
+          { min: 86, max: 92 },
+        );
+        publishTicker.start();
+        let dashResult;
+        try {
+          dashResult = await persistChartDashboardDraft({
+            draft: dashDraft,
+            userId: user.userId,
+            includePublishFields: true,
+          });
+        } finally {
+          publishTicker.stop();
+        }
         if (!dashResult.ok) {
           toast.warning(dashResult.message);
         } else {
@@ -872,8 +889,25 @@ const Nav = () => {
             setChartDashboardDraft?.((prev) => mergeCreatedChartDashboardDraft(prev, dashResult.created));
             setActiveChartDashboardId?.(String(dashResult.created._id));
           }
-          // If public, generate an OG cover image for link previews / SEO.
           if (dashDraft?.is_public && dashDraft?.public_slug && savedDashId) {
+            const cacheTicker = createSaveProjectProgressTicker(
+              bump,
+              () => saveProjectProgressRef.current,
+              { min: 89, max: 96 },
+            );
+            cacheTicker.start();
+            let cacheResult;
+            try {
+              cacheResult = await rebuildDashboardPublishCache(savedDashId, dashDraft.layout, bump);
+            } finally {
+              cacheTicker.stop();
+            }
+            if (!cacheResult.ok) {
+              toast.warning(
+                cacheResult.message ||
+                  "Dashboard saved, but public preview cache failed. Republish to retry.",
+              );
+            }
             bump(94, "Generating dashboard cover image…");
             await uploadDashboardOgImage(
               savedDashId,
@@ -896,6 +930,7 @@ const Nav = () => {
       toast.error("Failed to save project.");
     } finally {
       setSaveProjectBusy(false);
+      saveProjectProgressRef.current = 0;
       setSaveProjectProgress(0);
       setSaveProjectMessage("");
     }
@@ -1373,6 +1408,12 @@ const Nav = () => {
                               <p className="text-xs text-muted-foreground tabular-nums">
                                 {Math.min(100, Math.round(saveProjectProgress))}%
                               </p>
+                              {saveProjectProgress >= 85 ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Public dashboards prepare card and chart previews from your data lake.
+                                  This can take a minute on large projects — progress will keep updating.
+                                </p>
+                              ) : null}
                             </div>
                           ) : (
                             <form onSubmit={handleSaveProjectSubmit}>
