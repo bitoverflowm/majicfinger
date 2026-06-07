@@ -1,17 +1,11 @@
 import dbConnect from "@/lib/dbConnect";
 import ChartDashboard from "@/models/ChartDashboards";
-import Chart from "@/models/Charts";
-import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
-import mongoose from "mongoose";
-import { buildPublicChartBundle } from "@/lib/chartBundle";
-import { hydrateDataSetForPublicChartViewer } from "@/lib/server/hydratePublicChartDataset";
 import {
-  attachCardGridSheetRows,
-  hydrateCardGridSheetsForPublicDashboard,
-} from "@/lib/server/hydrateDashboardCardGridSheets";
-import { applyCardGridSnapshotsToSheets } from "@/lib/server/dashboardCardGridSnapshots";
-import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
+  buildPublicDashboardResponseData,
+  hydrateLayoutWithChartBundles,
+} from "@/lib/server/publicDashboardHydration";
+import { getPublicDashboardPageContext } from "@/lib/server/publicDashboardPageContext";
 
 type ChartPayload = {
   chart?: {
@@ -83,76 +77,6 @@ export type PublicDashboardPayload = {
   message?: string;
 };
 
-function hydrateLayout(layout: any, chartBundlesById: Map<string, any>, dataSheets: Record<string, any>) {
-  if (!layout || typeof layout !== "object") return { version: 1, rows: [] };
-  const withCardRows = attachCardGridSheetRows(layout, dataSheets);
-  const rows = Array.isArray(withCardRows.rows) ? withCardRows.rows : [];
-  const nextRows = rows.map((row: any) => {
-    if (row?.type === "cardGrid") {
-      return row;
-    }
-    if (!row || row.type !== "cards" || !Array.isArray(row.columns)) {
-      return row;
-    }
-    const columns = row.columns.map((col: any) => {
-      if (!col || !col.chart_id) {
-        return { ...col, chartPayload: null, chartLink: null };
-      }
-      const id = String(col.chart_id);
-      const bundle = chartBundlesById.get(id);
-      const meta = bundle?.meta;
-      return {
-        ...col,
-        chartPayload: bundle
-          ? { chart: bundle.chart, rows: bundle.rows, dataSheets: bundle.dataSheets }
-          : null,
-        chartLink:
-          meta?.is_public && meta?.public_slug
-            ? { mode: "chart_public", slug: meta.public_slug }
-            : null,
-      };
-    });
-    return { ...row, columns };
-  });
-  return { ...withCardRows, rows: nextRows };
-}
-
-/** Fast layout for SSR / OG crawlers — no chart bundles, no Athena. */
-function buildShellLayout(layout: any, cardGridSnapshots: Record<string, unknown> | null | undefined) {
-  if (!layout || typeof layout !== "object") return { version: 1, rows: [] };
-  const snapshots =
-    cardGridSnapshots && typeof cardGridSnapshots === "object" ? cardGridSnapshots : {};
-  const rows = Array.isArray(layout.rows) ? layout.rows : [];
-  const nextRows = rows.map((row: any) => {
-    if (row?.type === "cardGrid") {
-      const sheetId = row.sheetId ? String(row.sheetId) : "";
-      const limit = clampCardGridRowLimit(row.rowLimit);
-      const saved = sheetId && Array.isArray(snapshots[sheetId]) ? snapshots[sheetId] : [];
-      const sheetRows = saved.slice(0, limit);
-      return { ...row, sheetRows };
-    }
-    if (row?.type === "cards" && Array.isArray(row.columns)) {
-      const columns = row.columns.map((col: any) => {
-        if (!col?.chart_id) {
-          return { ...col, chartPayload: null, chartLink: null };
-        }
-        return {
-          ...col,
-          chartPayload: {
-            chart: { chart_name: String(col.h2 || col.caption || "Chart") },
-            rows: [],
-            dataSheets: {},
-          },
-          chartLink: null,
-        };
-      });
-      return { ...row, columns };
-    }
-    return row;
-  });
-  return { ...layout, rows: nextRows };
-}
-
 /**
  * Lightweight dashboard payload for SSR (HTML shell, OG/social crawlers).
  * Chart/card data loads client-side via /api/public/dashboards/...
@@ -161,40 +85,9 @@ export async function getPublicDashboardShellPayload(
   username: string,
   slug: string,
 ): Promise<PublicDashboardPayload> {
-  if (!username || !slug) return { success: false, message: "Missing username or slug" };
-  await dbConnect();
-  const user = (await User.findOne({ user_name: String(username || "").trim() })
-    .select("_id user_name profile_pic")
-    .lean()) as any;
-  if (!user || !user._id) return { success: false, message: "User not found" };
-
-  const dash = (await ChartDashboard.findOne({
-    user_id: user._id as any,
-    public_slug: String(slug || "").trim(),
-    is_public: true,
-  })
-    .select(
-      "page_heading page_subheading dashboard_name theme layout tags card_grid_snapshots",
-    )
-    .lean()) as any;
-
-  if (!dash) return { success: false, message: "Dashboard not found" };
-
-  const layoutOut = buildShellLayout(dash.layout, dash.card_grid_snapshots);
-
-  return {
-    success: true,
-    data: {
-      page_heading: dash.page_heading || "",
-      page_subheading: dash.page_subheading || "",
-      dashboard_name: dash.dashboard_name || "",
-      theme: dash.theme || {},
-      layout: layoutOut,
-      owner_handle: user.user_name,
-      owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
-      tags: Array.isArray(dash.tags) ? dash.tags.map((t: any) => String(t || "").trim()).filter(Boolean) : [],
-    },
-  };
+  const ctx = await getPublicDashboardPageContext(username, slug);
+  if (!ctx) return { success: false, message: "Dashboard not found" };
+  return ctx.shellPayload as PublicDashboardPayload;
 }
 
 export async function getPublicDashboardPayload(
@@ -214,62 +107,26 @@ export async function getPublicDashboardPayload(
 
   if (!dash) return { success: false, message: "Dashboard not found" };
 
-  const chartIds = new Set<string>();
-  const rows = Array.isArray(dash.layout?.rows) ? dash.layout.rows : [];
-  for (const row of rows) {
-    if (!row || row.type !== "cards" || !Array.isArray(row.columns)) continue;
-    for (const col of row.columns) {
-      if (col?.chart_id && mongoose.Types.ObjectId.isValid(String(col.chart_id))) {
-        chartIds.add(String(col.chart_id));
-      }
-    }
-  }
+  const data = await buildPublicDashboardResponseData(dash, user);
+  delete (data as { _cacheHit?: boolean })._cacheHit;
 
-  let dataSheets: Record<string, any> = {};
-  if (dash.data_set_id) {
-    const dataSetRaw = (await DataSet.findById(dash.data_set_id as any).lean()) as any;
-    if (dataSetRaw) {
-      const dataSet = await hydrateDataSetForPublicChartViewer(null, dataSetRaw);
-      dataSheets =
-        dataSet?.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
-      applyCardGridSnapshotsToSheets(dataSheets, dash.layout, dash.card_grid_snapshots);
-      await hydrateCardGridSheetsForPublicDashboard(dataSheets, dash.layout, user._id);
-    }
-  }
-
-  const chartBundlesById = new Map<string, any>();
-  for (const cid of chartIds) {
-    const chart = (await Chart.findOne({
-      _id: cid,
-      user_id: user._id,
-    }).lean()) as any;
-    if (!chart) continue;
-    const dataSetRaw = (await DataSet.findById(chart.data_set_id as any).lean()) as any;
-    if (!dataSetRaw) continue;
-    const dataSet = await hydrateDataSetForPublicChartViewer(chart, dataSetRaw);
-    const bundle = buildPublicChartBundle(chart, dataSet);
-    chartBundlesById.set(cid, {
-      ...bundle,
-      meta: {
-        public_slug: chart.public_slug,
-        is_public: !!chart.is_public,
-      },
-    });
-  }
-
-  const layoutOut = hydrateLayout(dash.layout, chartBundlesById, dataSheets);
   return {
     success: true,
     data: {
-      page_heading: dash.page_heading || "",
-      page_subheading: dash.page_subheading || "",
-      dashboard_name: dash.dashboard_name || "",
-      theme: dash.theme || {},
-      layout: layoutOut,
-      owner_handle: user.user_name,
-      owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
-      tags: Array.isArray(dash.tags) ? dash.tags.map((t: any) => String(t || "").trim()).filter(Boolean) : [],
+      page_heading: data.page_heading,
+      page_subheading: data.page_subheading,
+      dashboard_name: data.dashboard_name,
+      theme: data.theme,
+      layout: data.layout as PublicDashboardPayload["data"] extends infer D
+        ? D extends { layout?: infer L }
+          ? L
+          : never
+        : never,
+      owner_handle: data.owner_handle,
+      owner_profile_pic: data.owner_profile_pic,
+      tags: data.tags,
     },
   };
 }
 
+export { hydrateLayoutWithChartBundles };

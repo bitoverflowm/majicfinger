@@ -6,6 +6,7 @@ import DotPattern from "@/components/magicui/dot-pattern";
 import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
+import { LazyPublicDashboardChart } from "@/components/publicEmbed/LazyPublicDashboardChart";
 import { ChartEmbedSkeleton, CardGridSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -108,14 +109,6 @@ const TAG_STYLES = [
   "bg-lime-500/15 text-lime-800 dark:text-lime-300 border-lime-500/30",
 ];
 
-function chartPayloadHasData(chartPayload: ChartPayload | null | undefined): boolean {
-  if (!chartPayload) return false;
-  if (Array.isArray(chartPayload.rows) && chartPayload.rows.length > 0) return true;
-  return Object.values(chartPayload.dataSheets || {}).some(
-    (s) => Array.isArray((s as { data?: unknown[] })?.data) && (s as { data: unknown[] }).data.length > 0,
-  );
-}
-
 function resolveCardHref(col: Column, ownerHandle: string | undefined) {
   const mode = col.link?.mode || "none";
   if (mode === "custom" && col.link?.url?.trim()) return col.link.url.trim();
@@ -137,7 +130,14 @@ export default function PublicDashboardEmbedClient({
   clusterHref?: string | null;
 }) {
   const [payload, setPayload] = useState<Payload | null>(() => initialPayload);
-  const [chartsLoading, setChartsLoading] = useState(() => !!initialPayload?.success);
+  const [cardGridLoading, setCardGridLoading] = useState(() => {
+    const rows = initialPayload?.data?.layout?.rows || [];
+    return rows.some(
+      (r) =>
+        r.type === "cardGrid" &&
+        (!Array.isArray((r as CardGridRow).sheetRows) || (r as CardGridRow).sheetRows!.length === 0),
+    );
+  });
   const [err, setErr] = useState<string | null>(() => (initialPayload && !initialPayload.success ? initialPayload.message || "Not found" : null));
   const [isEmbedded, setIsEmbedded] = useState(
     () => typeof window !== "undefined" && window.self !== window.top,
@@ -163,33 +163,40 @@ export default function PublicDashboardEmbedClient({
   }, []);
 
   useEffect(() => {
+    if (!cardGridLoading) return;
     let cancelled = false;
-    setChartsLoading(true);
     fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`)
       .then((r) => r.json())
       .then((j: Payload) => {
-        if (cancelled) return;
-        if (!j?.success) {
-          if (!initialPayload?.success) {
-            setErr(j?.message || "Not found");
-          }
-          return;
-        }
-        setPayload(j);
-        setErr(null);
+        if (cancelled || !j?.success || !j.data?.layout?.rows) return;
+        setPayload((prev) => {
+          if (!prev?.data?.layout?.rows) return j;
+          const prevRows = prev.data.layout.rows;
+          const nextRows = prevRows.map((row, i) => {
+            if (row.type !== "cardGrid") return row;
+            const fetchedRow = j.data?.layout?.rows?.[i];
+            if (fetchedRow?.type !== "cardGrid") return row;
+            const sheetRows = Array.isArray(fetchedRow.sheetRows) ? fetchedRow.sheetRows : [];
+            if (!sheetRows.length) return row;
+            return { ...row, sheetRows };
+          });
+          return {
+            ...prev,
+            data: {
+              ...prev.data,
+              layout: { ...prev.data.layout, rows: nextRows },
+            },
+          };
+        });
       })
-      .catch(() => {
-        if (!cancelled && !initialPayload?.success) {
-          setErr("Failed to load dashboard");
-        }
-      })
+      .catch(() => {})
       .finally(() => {
-        if (!cancelled) setChartsLoading(false);
+        if (!cancelled) setCardGridLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [username, slug, initialPayload?.success]);
+  }, [username, slug, cardGridLoading]);
 
   if (err) {
     return (
@@ -363,7 +370,7 @@ export default function PublicDashboardEmbedClient({
                 ? (row.sheetRows as object[])
                 : [];
               const cardLimit = clampCardGridRowLimit(row.rowLimit);
-              if (chartsLoading && sheetRows.length === 0) {
+              if (cardGridLoading && sheetRows.length === 0) {
                 return (
                   <div key={row.id || "cardGrid"} className="space-y-4">
                     {(row.h2?.trim() || row.caption?.trim()) ? (
@@ -440,21 +447,30 @@ export default function PublicDashboardEmbedClient({
                           {col.caption}
                         </p>
                       ) : null}
-                      {col.chartPayload ? (
+                      {col.chart_id ? (
                         <div className="flex min-h-0 flex-1 flex-col">
-                          {chartsLoading && !chartPayloadHasData(col.chartPayload) ? (
-                            <ChartEmbedSkeleton className="min-h-[200px]" />
-                          ) : (
-                            <PublicDashboardChartBlock
-                              chartPayload={col.chartPayload}
-                              ownerHandle={ownerHandle}
-                              chartSlug={col.chartLink?.slug}
-                              chartId={col.chart_id ? String(col.chart_id) : undefined}
-                              layoutColumnKey={col.id}
-                              dashboardSlug={slug}
-                              chartTitle={col.h2 || col.chartPayload.chart?.chart_name}
-                            />
-                          )}
+                          <LazyPublicDashboardChart
+                            username={username}
+                            slug={slug}
+                            chartId={String(col.chart_id)}
+                            initialPayload={col.chartPayload}
+                            ownerHandle={ownerHandle}
+                            layoutColumnKey={col.id}
+                            chartSlug={col.chartLink?.slug}
+                            chartTitle={col.h2 || col.chartPayload?.chart?.chart_name}
+                          />
+                        </div>
+                      ) : col.chartPayload ? (
+                        <div className="flex min-h-0 flex-1 flex-col">
+                          <PublicDashboardChartBlock
+                            chartPayload={col.chartPayload}
+                            ownerHandle={ownerHandle}
+                            chartSlug={col.chartLink?.slug}
+                            chartId={col.chart_id ? String(col.chart_id) : undefined}
+                            layoutColumnKey={col.id}
+                            dashboardSlug={slug}
+                            chartTitle={col.h2 || col.chartPayload.chart?.chart_name}
+                          />
                         </div>
                       ) : (
                         <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">

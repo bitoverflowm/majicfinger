@@ -7,6 +7,27 @@ import { getLoginSession } from "@/lib/auth";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { validateDashboardPublishSeo } from "@/lib/dashboardPublishSeo";
 import { buildDashboardCardGridSnapshots } from "@/lib/server/dashboardCardGridSnapshots";
+import { buildPublishedChartBundlesForDashboard } from "@/lib/server/publicDashboardHydration";
+
+async function rebuildPublishedDashboardCaches($set, dash, layoutForValidation) {
+  try {
+    const dataSetId = $set.data_set_id !== undefined ? $set.data_set_id : dash.data_set_id;
+    const dataSetRaw = dataSetId ? await DataSet.findById(dataSetId).lean() : null;
+    if (dataSetRaw) {
+      $set.card_grid_snapshots = await buildDashboardCardGridSnapshots(
+        { layout: layoutForValidation, user_id: dash.user_id },
+        dataSetRaw,
+      );
+    }
+    $set.published_chart_bundles = await buildPublishedChartBundlesForDashboard(
+      { layout: layoutForValidation },
+      dash.user_id,
+    );
+    $set.published_payload_built_at = new Date();
+  } catch {
+    /* keep existing snapshots if rebuild fails */
+  }
+}
 
 function collectChartIdsFromLayoutWithValidation(layout) {
   const ids = new Set();
@@ -160,17 +181,7 @@ export default async function handler(req, res) {
               });
             }
             $set.public_slug = raw;
-            try {
-              const dataSetRaw = await DataSet.findById(dash.data_set_id).lean();
-              if (dataSetRaw) {
-                $set.card_grid_snapshots = await buildDashboardCardGridSnapshots(
-                  { layout: layoutForValidation, user_id: dash.user_id },
-                  dataSetRaw,
-                );
-              }
-            } catch {
-              /* keep existing snapshots if rebuild fails */
-            }
+            await rebuildPublishedDashboardCaches($set, dash, layoutForValidation);
           } else {
             const updated = await ChartDashboard.findByIdAndUpdate(
               id,
@@ -179,6 +190,14 @@ export default async function handler(req, res) {
             );
             return res.status(200).json({ success: true, data: updated });
           }
+        }
+
+        const layoutChangedOnPublic =
+          dash.is_public &&
+          !wantsEmbed &&
+          ($set.layout !== undefined || $set.data_set_id !== undefined);
+        if (layoutChangedOnPublic) {
+          await rebuildPublishedDashboardCaches($set, dash, layoutForValidation);
         }
 
         const updated = await ChartDashboard.findByIdAndUpdate(id, { $set }, { new: true, runValidators: true });

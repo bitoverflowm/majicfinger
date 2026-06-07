@@ -84,6 +84,15 @@ const ChartDashboardSchema = new mongoose.Schema({
     type: Schema.Types.Mixed,
     default: () => ({}),
   },
+  /** Precomputed chart bundles (chartId -> bundle) built at publish for fast public loads. */
+  published_chart_bundles: {
+    type: Schema.Types.Mixed,
+    default: () => ({}),
+  },
+  /** When published_chart_bundles was last rebuilt. */
+  published_payload_built_at: {
+    type: Date,
+  },
 });
 
 // Only enforce uniqueness when a real embed slug exists. A *sparse* unique index still

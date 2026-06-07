@@ -3,10 +3,7 @@ import { notFound } from "next/navigation";
 import PublicDashboardEmbedClient from "@/components/publicEmbed/PublicDashboardEmbedClient";
 import { PublicDashboardChartSeoLayer } from "@/components/publicEmbed/PublicDashboardChartSeoLayer";
 import { PublicDashboardSeoNav } from "@/components/publicEmbed/PublicDashboardSeoNav";
-import { getPublicDashboardMeta } from "@/lib/server/publicDashboardMeta";
-import {
-  getPublicDashboardShellPayload,
-} from "@/lib/server/publicDashboardPayload";
+import { getPublicDashboardPageContext } from "@/lib/server/publicDashboardPageContext";
 import {
   buildDashboardJsonLd,
   buildDashboardMetadata,
@@ -23,11 +20,11 @@ export async function generateMetadata({
   params: Promise<{ username: string; slug: string }>;
 }): Promise<Metadata> {
   const { username, slug } = await params;
-  const meta = await getPublicDashboardMeta(username, slug);
-  if (!meta) {
+  const ctx = await getPublicDashboardPageContext(username, slug);
+  if (!ctx?.meta) {
     return { robots: { index: false, follow: false } };
   }
-  return buildDashboardMetadata(meta, username, slug);
+  return buildDashboardMetadata(ctx.meta, username, slug);
 }
 
 export default async function PublicDashboardPage({
@@ -36,14 +33,13 @@ export default async function PublicDashboardPage({
   params: Promise<{ username: string; slug: string }>;
 }) {
   const { username, slug } = await params;
-  const [shellPayload, meta] = await Promise.all([
-    getPublicDashboardShellPayload(username, slug),
-    getPublicDashboardMeta(username, slug),
-  ]);
+  const ctx = await getPublicDashboardPageContext(username, slug);
 
-  if (!shellPayload.success || !meta) {
+  if (!ctx?.shellPayload?.success || !ctx.meta) {
     notFound();
   }
+
+  const { shellPayload, meta } = ctx;
 
   const summary = extractDashboardSeoSummary(shellPayload);
   const cluster = resolveClusterForDashboardMeta(meta);
