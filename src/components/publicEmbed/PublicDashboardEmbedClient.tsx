@@ -6,7 +6,8 @@ import DotPattern from "@/components/magicui/dot-pattern";
 import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
-import { Progress } from "@/components/ui/progress";
+import { ChartEmbedSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import {
@@ -206,9 +207,21 @@ export default function PublicDashboardEmbedClient({
 
   if (!payload?.success || !payload.data) {
     return (
-      <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
-        <p>Loading dashboard…</p>
-        <Progress indeterminate className="h-2.5 w-full max-w-xs" indicatorClassName="bg-primary" />
+      <div className="relative w-full px-6 py-10 sm:px-10">
+        <div className="mx-auto max-w-6xl space-y-8">
+          <div className="space-y-3">
+            <Skeleton className="h-9 w-2/3 max-w-lg" />
+            <Skeleton className="h-5 w-full max-w-2xl" />
+            <Skeleton className="h-4 w-1/2 max-w-md" />
+          </div>
+          <div className="grid gap-4" style={CHART_CARDS_GRID_STYLE}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{ gridColumn: "span 12" }}>
+                <ChartEmbedSkeleton className="min-h-[280px]" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -413,9 +426,7 @@ export default function PublicDashboardEmbedClient({
                       {col.chartPayload ? (
                         <div className="flex min-h-0 flex-1 flex-col">
                           {chartsLoading && !chartPayloadHasData(col.chartPayload) ? (
-                            <div className="flex min-h-[200px] flex-1 items-center justify-center rounded-md border bg-muted/20 text-xs text-muted-foreground">
-                              Loading chart…
-                            </div>
+                            <ChartEmbedSkeleton className="min-h-[200px]" />
                           ) : (
                             <PublicDashboardChartBlock
                               chartPayload={col.chartPayload}

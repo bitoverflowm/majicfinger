@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  HUB_CHART_EMBED_HEIGHT,
+  HubChartEmbedSkeleton,
+} from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { cn } from "@/lib/utils";
-
-const HUB_CHART_EMBED_HEIGHT = "h-[570px] md:h-[630px]";
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
@@ -25,15 +26,6 @@ function DataSheetsLoader({ rows, dataSheets }) {
     setConnectedData?.(firstRows.length ? firstRows : Array.isArray(rows) ? rows : []);
   }, [rows, dataSheets, setDataSheets, setActiveSheetId, setConnectedData]);
   return null;
-}
-
-function HubChartEmbedSkeleton() {
-  return (
-    <div className={cn("flex flex-col gap-4 p-4", HUB_CHART_EMBED_HEIGHT)}>
-      <Skeleton className="h-3 w-24" />
-      <Skeleton className="min-h-0 flex-1 w-full rounded-lg" />
-    </div>
-  );
 }
 
 function HubChartEmbedBody({ chartPayload, username, slug }) {

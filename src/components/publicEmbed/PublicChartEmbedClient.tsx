@@ -5,7 +5,7 @@ import Link from "next/link";
 import { StateProviderV2 } from "@/context/stateContextV2";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
-import { Progress } from "@/components/ui/progress";
+import { PublicChartPageSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
@@ -64,8 +64,7 @@ export default function PublicChartEmbedClient({
 }) {
   const [payload, setPayload] = useState<PublicPayload | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [loadProgress, setLoadProgress] = useState(8);
-  const [loadStage, setLoadStage] = useState("Preparing data");
+  const [loading, setLoading] = useState(true);
   const [isEmbedded, setIsEmbedded] = useState(
     () => typeof window !== "undefined" && window.self !== window.top,
   );
@@ -106,61 +105,55 @@ export default function PublicChartEmbedClient({
     let cancelled = false;
     setPayload(null);
     setErr(null);
-    setLoadProgress(12);
-    setLoadStage("Preparing data");
+    setLoading(true);
     fetch(
       `/api/public/charts/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`,
     )
-      .then(async (r) => {
-        if (!cancelled) {
-          setLoadProgress(48);
-          setLoadStage("Pulling chart properties");
-        }
-        return r.json();
-      })
+      .then((r) => r.json())
       .then((j: PublicPayload) => {
         if (cancelled) return;
-        setLoadProgress(82);
-        setLoadStage("Constructing chart");
         if (!j?.success) {
           setErr(j?.message || "Not found");
           return;
         }
-        setLoadProgress(100);
         setPayload(j);
       })
       .catch(() => {
         if (!cancelled) setErr("Failed to load chart");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [username, slug]);
 
-  if (err) {
-    return (
-      <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
-        <p>{err}</p>
-        <Link
-          href={SITE}
-          className="text-foreground underline"
-          {...publicEmbedOutboundLinkProps(isEmbedded)}
-        >
-          Lychee Data
-        </Link>
-      </div>
-    );
+  if (loading || !payload?.success || !payload.data) {
+    if (err) {
+      return (
+        <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
+          <p>{err}</p>
+          <Link
+            href={SITE}
+            className="text-foreground underline"
+            {...publicEmbedOutboundLinkProps(isEmbedded)}
+          >
+            Lychee Data
+          </Link>
+        </div>
+      );
+    }
+    return <PublicChartPageSkeleton />;
   }
 
-  const hasRowsInAnySheet = Object.values(dataSheets || {}).some((sheet: any) => Array.isArray(sheet?.data) && sheet.data.length > 0);
-  if (!payload || !payload.success || !payload.data || (!rows.length && !hasRowsInAnySheet)) {
+  const hasRowsInAnySheet = Object.values(dataSheets || {}).some(
+    (sheet: { data?: unknown[] }) => Array.isArray(sheet?.data) && sheet.data.length > 0,
+  );
+  if (!rows.length && !hasRowsInAnySheet) {
     return (
-      <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
-        <p className="text-center text-sm font-medium">{loadStage}</p>
-        <div className="w-full max-w-sm space-y-1">
-          <Progress value={loadProgress} className="h-2 w-full" />
-          <p className="text-center text-xs text-muted-foreground">{Math.max(1, Math.min(100, loadProgress))}%</p>
-        </div>
+      <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
+        <p>Chart unavailable</p>
       </div>
     );
   }

@@ -16,6 +16,7 @@ import type {
   HubVideoCarouselSection,
 } from "@/types/hub";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
+import { HubChartEmbedSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
 
 const HubKalshiQueryBuilder = dynamic(
   () =>
@@ -28,7 +29,14 @@ const HubKalshiQueryBuilder = dynamic(
 const HubPublishedChartEmbed = dynamic(
   () =>
     import("@/components/hubs/HubPublishedChartEmbed").then((m) => m.HubPublishedChartEmbed),
-  { ssr: false, loading: () => <div className="h-[570px] animate-pulse rounded-xl bg-muted/40 md:h-[630px]" /> },
+  {
+    ssr: false,
+    loading: () => (
+      <article className="overflow-hidden rounded-xl border border-border bg-card/40">
+        <HubChartEmbedSkeleton />
+      </article>
+    ),
+  },
 );
 
 function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "primary" | "secondary" }) {
