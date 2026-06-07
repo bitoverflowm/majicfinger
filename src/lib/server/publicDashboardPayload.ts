@@ -6,6 +6,11 @@ import User from "@/models/Users";
 import mongoose from "mongoose";
 import { buildPublicChartBundle } from "@/lib/chartBundle";
 import { hydrateDataSetForPublicChartViewer } from "@/lib/server/hydratePublicChartDataset";
+import {
+  attachCardGridSheetRows,
+  hydrateCardGridSheetsForPublicDashboard,
+} from "@/lib/server/hydrateDashboardCardGridSheets";
+import { applyCardGridSnapshotsToSheets } from "@/lib/server/dashboardCardGridSnapshots";
 
 type ChartPayload = {
   chart?: {
@@ -79,13 +84,11 @@ export type PublicDashboardPayload = {
 
 function hydrateLayout(layout: any, chartBundlesById: Map<string, any>, dataSheets: Record<string, any>) {
   if (!layout || typeof layout !== "object") return { version: 1, rows: [] };
-  const rows = Array.isArray(layout.rows) ? layout.rows : [];
+  const withCardRows = attachCardGridSheetRows(layout, dataSheets);
+  const rows = Array.isArray(withCardRows.rows) ? withCardRows.rows : [];
   const nextRows = rows.map((row: any) => {
     if (row?.type === "cardGrid") {
-      const sheetId = row.sheetId ? String(row.sheetId) : "";
-      const sheet = sheetId && dataSheets?.[sheetId] ? dataSheets[sheetId] : null;
-      const sheetRows = Array.isArray(sheet?.data) ? sheet.data : [];
-      return { ...row, sheetRows };
+      return row;
     }
     if (!row || row.type !== "cards" || !Array.isArray(row.columns)) {
       return row;
@@ -110,7 +113,7 @@ function hydrateLayout(layout: any, chartBundlesById: Map<string, any>, dataShee
     });
     return { ...row, columns };
   });
-  return { ...layout, rows: nextRows };
+  return { ...withCardRows, rows: nextRows };
 }
 
 export async function getPublicDashboardPayload(
@@ -148,6 +151,8 @@ export async function getPublicDashboardPayload(
       const dataSet = await hydrateDataSetForPublicChartViewer(null, dataSetRaw);
       dataSheets =
         dataSet?.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
+      applyCardGridSnapshotsToSheets(dataSheets, dash.layout, dash.card_grid_snapshots);
+      await hydrateCardGridSheetsForPublicDashboard(dataSheets, dash.layout, user._id);
     }
   }
 

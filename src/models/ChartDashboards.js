@@ -79,6 +79,11 @@ const ChartDashboardSchema = new mongoose.Schema({
   og_image_updated_at: {
     type: Date,
   },
+  /** Inline row snapshots for cardGrid sections (sheetId -> rows[]) at last publish/save. */
+  card_grid_snapshots: {
+    type: Schema.Types.Mixed,
+    default: () => ({}),
+  },
 });
 
 // Only enforce uniqueness when a real embed slug exists. A *sparse* unique index still

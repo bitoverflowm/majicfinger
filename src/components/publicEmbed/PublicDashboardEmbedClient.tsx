@@ -6,7 +6,8 @@ import DotPattern from "@/components/magicui/dot-pattern";
 import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
-import { ChartEmbedSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
+import { ChartEmbedSkeleton, CardGridSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
+import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
@@ -361,6 +362,22 @@ export default function PublicDashboardEmbedClient({
               const sheetRows = Array.isArray(row.sheetRows)
                 ? (row.sheetRows as object[])
                 : [];
+              const cardLimit = clampCardGridRowLimit(row.rowLimit);
+              if (chartsLoading && sheetRows.length === 0) {
+                return (
+                  <div key={row.id || "cardGrid"} className="space-y-4">
+                    {(row.h2?.trim() || row.caption?.trim()) ? (
+                      <div className="space-y-1">
+                        {row.h2?.trim() ? <h2 className="text-xl font-semibold">{row.h2}</h2> : null}
+                        {row.caption?.trim() ? (
+                          <p className="text-sm text-muted-foreground">{row.caption}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <CardGridSkeleton count={Math.min(cardLimit, 4)} />
+                  </div>
+                );
+              }
               return (
                 <DashboardCardGridSection
                   key={row.id || "cardGrid"}

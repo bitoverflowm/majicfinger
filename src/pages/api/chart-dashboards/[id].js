@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { validateDashboardPublishSeo } from "@/lib/dashboardPublishSeo";
+import { buildDashboardCardGridSnapshots } from "@/lib/server/dashboardCardGridSnapshots";
 
 function collectChartIdsFromLayoutWithValidation(layout) {
   const ids = new Set();
@@ -159,6 +160,17 @@ export default async function handler(req, res) {
               });
             }
             $set.public_slug = raw;
+            try {
+              const dataSetRaw = await DataSet.findById(dash.data_set_id).lean();
+              if (dataSetRaw) {
+                $set.card_grid_snapshots = await buildDashboardCardGridSnapshots(
+                  { layout: layoutForValidation, user_id: dash.user_id },
+                  dataSetRaw,
+                );
+              }
+            } catch {
+              /* keep existing snapshots if rebuild fails */
+            }
           } else {
             const updated = await ChartDashboard.findByIdAndUpdate(
               id,
