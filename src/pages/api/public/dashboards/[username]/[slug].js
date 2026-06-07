@@ -7,10 +7,16 @@ import mongoose from "mongoose";
 import { buildPublicChartBundle } from "@/lib/chartBundle";
 import { hydrateDataSetForPublicChartViewer } from "@/lib/server/hydratePublicChartDataset";
 
-function hydrateLayout(layout, chartBundlesById) {
+function hydrateLayout(layout, chartBundlesById, dataSheets = {}) {
   if (!layout || typeof layout !== "object") return { version: 1, rows: [] };
   const rows = Array.isArray(layout.rows) ? layout.rows : [];
   const nextRows = rows.map((row) => {
+    if (row?.type === "cardGrid") {
+      const sheetId = row.sheetId ? String(row.sheetId) : "";
+      const sheet = sheetId && dataSheets?.[sheetId] ? dataSheets[sheetId] : null;
+      const sheetRows = Array.isArray(sheet?.data) ? sheet.data : [];
+      return { ...row, sheetRows };
+    }
     if (!row || row.type !== "cards" || !Array.isArray(row.columns)) {
       return row;
     }
@@ -73,6 +79,16 @@ export default async function handler(req, res) {
       }
     }
 
+    let dataSheets = {};
+    if (dash.data_set_id) {
+      const dataSetRaw = await DataSet.findById(dash.data_set_id).lean();
+      if (dataSetRaw) {
+        const dataSet = await hydrateDataSetForPublicChartViewer(null, dataSetRaw);
+        dataSheets =
+          dataSet?.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
+      }
+    }
+
     const chartBundlesById = new Map();
     for (const cid of chartIds) {
       const chart = await Chart.findOne({
@@ -93,7 +109,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const layoutOut = hydrateLayout(dash.layout, chartBundlesById);
+    const layoutOut = hydrateLayout(dash.layout, chartBundlesById, dataSheets);
 
     return res.status(200).json({
       success: true,
@@ -104,6 +120,10 @@ export default async function handler(req, res) {
         theme: dash.theme || {},
         layout: layoutOut,
         owner_handle: user.user_name,
+        owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
+        tags: Array.isArray(dash.tags)
+          ? dash.tags.map((t) => String(t || "").trim()).filter(Boolean)
+          : [],
       },
     });
   } catch (e) {

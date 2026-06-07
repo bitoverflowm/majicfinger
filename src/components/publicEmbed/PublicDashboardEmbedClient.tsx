@@ -6,7 +6,6 @@ import DotPattern from "@/components/magicui/dot-pattern";
 import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
-import { ChartSeoFallback } from "@/components/publicEmbed/ChartSeoFallback";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
@@ -107,6 +106,14 @@ const TAG_STYLES = [
   "bg-lime-500/15 text-lime-800 dark:text-lime-300 border-lime-500/30",
 ];
 
+function chartPayloadHasData(chartPayload: ChartPayload | null | undefined): boolean {
+  if (!chartPayload) return false;
+  if (Array.isArray(chartPayload.rows) && chartPayload.rows.length > 0) return true;
+  return Object.values(chartPayload.dataSheets || {}).some(
+    (s) => Array.isArray((s as { data?: unknown[] })?.data) && (s as { data: unknown[] }).data.length > 0,
+  );
+}
+
 function resolveCardHref(col: Column, ownerHandle: string | undefined) {
   const mode = col.link?.mode || "none";
   if (mode === "custom" && col.link?.url?.trim()) return col.link.url.trim();
@@ -128,6 +135,7 @@ export default function PublicDashboardEmbedClient({
   clusterHref?: string | null;
 }) {
   const [payload, setPayload] = useState<Payload | null>(() => initialPayload);
+  const [chartsLoading, setChartsLoading] = useState(() => !!initialPayload?.success);
   const [err, setErr] = useState<string | null>(() => (initialPayload && !initialPayload.success ? initialPayload.message || "Not found" : null));
   const [isEmbedded, setIsEmbedded] = useState(
     () => typeof window !== "undefined" && window.self !== window.top,
@@ -154,26 +162,32 @@ export default function PublicDashboardEmbedClient({
 
   useEffect(() => {
     let cancelled = false;
-    if (initialPayload) return () => { cancelled = true; };
-    setErr(null);
-    setPayload(null);
+    setChartsLoading(true);
     fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`)
       .then((r) => r.json())
       .then((j: Payload) => {
         if (cancelled) return;
         if (!j?.success) {
-          setErr(j?.message || "Not found");
+          if (!initialPayload?.success) {
+            setErr(j?.message || "Not found");
+          }
           return;
         }
         setPayload(j);
+        setErr(null);
       })
       .catch(() => {
-        if (!cancelled) setErr("Failed to load dashboard");
+        if (!cancelled && !initialPayload?.success) {
+          setErr("Failed to load dashboard");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setChartsLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [username, slug, initialPayload]);
+  }, [username, slug, initialPayload?.success]);
 
   if (err) {
     return (
@@ -398,20 +412,21 @@ export default function PublicDashboardEmbedClient({
                       ) : null}
                       {col.chartPayload ? (
                         <div className="flex min-h-0 flex-1 flex-col">
-                          <ChartSeoFallback
-                            title={col.h2 || col.chartPayload.chart?.chart_name || "Chart"}
-                            chartPayload={col.chartPayload as Parameters<typeof ChartSeoFallback>[0]["chartPayload"]}
-                            id={col.id || String(col.chart_id)}
-                          />
-                          <PublicDashboardChartBlock
-                            chartPayload={col.chartPayload}
-                            ownerHandle={ownerHandle}
-                            chartSlug={col.chartLink?.slug}
-                            chartId={col.chart_id ? String(col.chart_id) : undefined}
-                            layoutColumnKey={col.id}
-                            dashboardSlug={slug}
-                            chartTitle={col.h2 || col.chartPayload.chart?.chart_name}
-                          />
+                          {chartsLoading && !chartPayloadHasData(col.chartPayload) ? (
+                            <div className="flex min-h-[200px] flex-1 items-center justify-center rounded-md border bg-muted/20 text-xs text-muted-foreground">
+                              Loading chart…
+                            </div>
+                          ) : (
+                            <PublicDashboardChartBlock
+                              chartPayload={col.chartPayload}
+                              ownerHandle={ownerHandle}
+                              chartSlug={col.chartLink?.slug}
+                              chartId={col.chart_id ? String(col.chart_id) : undefined}
+                              layoutColumnKey={col.id}
+                              dashboardSlug={slug}
+                              chartTitle={col.h2 || col.chartPayload.chart?.chart_name}
+                            />
+                          )}
                         </div>
                       ) : (
                         <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">

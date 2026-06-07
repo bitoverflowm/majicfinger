@@ -18,7 +18,7 @@ function sampleRows(payload: ChartPayload | null | undefined, max = 5): unknown[
 }
 
 function summarizeRows(rows: unknown[]): string {
-  if (!rows.length) return "Chart data available after page load.";
+  if (!rows.length) return "Interactive chart visualization.";
   const first = rows[0];
   if (!first || typeof first !== "object") return `${rows.length} data points.`;
   const keys = Object.keys(first as object).slice(0, 4);
@@ -32,34 +32,23 @@ function summarizeRows(rows: unknown[]): string {
   return `${rows.length}+ rows. Sample: ${preview}`;
 }
 
+/** Server-only SEO fallback text for charts (no script tags — avoids hydration crashes). */
 export function ChartSeoFallback({
   title,
   chartPayload,
-  id,
 }: {
   title: string;
-  chartPayload: ChartPayload | null | undefined;
-  id?: string;
+  chartPayload?: ChartPayload | null;
 }) {
   const chartName = chartPayload?.chart?.chart_name || title;
   const rows = sampleRows(chartPayload);
   const summary = summarizeRows(rows);
-  const structuredData = {
-    name: chartName,
-    rowCount: rows.length,
-    sample: rows.slice(0, 5),
-  };
 
   return (
-    <div className="sr-only" aria-hidden="false">
+    <div className="sr-only">
       <figure aria-label={chartName}>
         <figcaption>{title || chartName}</figcaption>
         <p>{summary}</p>
-        <script
-          type="application/json"
-          id={id ? `chart-data-${id}` : undefined}
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
       </figure>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PublicDashboardEmbedClient from "@/components/publicEmbed/PublicDashboardEmbedClient";
+import { PublicDashboardChartSeoLayer } from "@/components/publicEmbed/PublicDashboardChartSeoLayer";
 import { PublicDashboardSeoNav } from "@/components/publicEmbed/PublicDashboardSeoNav";
 import { getPublicDashboardMeta } from "@/lib/server/publicDashboardMeta";
 import { getPublicDashboardPayload } from "@/lib/server/publicDashboardPayload";
@@ -10,6 +11,7 @@ import {
   extractDashboardSeoSummary,
   resolveClusterForDashboardMeta,
 } from "@/lib/server/publicDashboardSeo";
+import { stripDashboardPayloadChartData } from "@/lib/server/stripDashboardPayloadChartData";
 
 export async function generateMetadata({
   params,
@@ -21,9 +23,7 @@ export async function generateMetadata({
   if (!meta) {
     return { robots: { index: false, follow: false } };
   }
-  const payload = await getPublicDashboardPayload(username, slug);
-  const summary = extractDashboardSeoSummary(payload);
-  return buildDashboardMetadata(meta, username, slug, summary);
+  return buildDashboardMetadata(meta, username, slug);
 }
 
 export default async function PublicDashboardPage({
@@ -32,18 +32,19 @@ export default async function PublicDashboardPage({
   params: Promise<{ username: string; slug: string }>;
 }) {
   const { username, slug } = await params;
-  const [initialPayload, meta] = await Promise.all([
+  const [fullPayload, meta] = await Promise.all([
     getPublicDashboardPayload(username, slug),
     getPublicDashboardMeta(username, slug),
   ]);
 
-  if (!initialPayload.success || !meta) {
+  if (!fullPayload.success || !meta) {
     notFound();
   }
 
-  const summary = extractDashboardSeoSummary(initialPayload);
+  const summary = extractDashboardSeoSummary(fullPayload);
   const cluster = resolveClusterForDashboardMeta(meta);
   const jsonLd = buildDashboardJsonLd({ meta, username, slug, summary, cluster });
+  const shellPayload = stripDashboardPayloadChartData(fullPayload);
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,6 +56,7 @@ export default async function PublicDashboardPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd.breadcrumb) }}
       />
+      <PublicDashboardChartSeoLayer layout={fullPayload.data?.layout} />
       <PublicDashboardSeoNav
         username={username}
         slug={slug}
@@ -64,7 +66,7 @@ export default async function PublicDashboardPage({
       <PublicDashboardEmbedClient
         username={username}
         slug={slug}
-        initialPayload={initialPayload}
+        initialPayload={shellPayload}
         clusterHref={cluster?.href ?? null}
       />
     </div>
