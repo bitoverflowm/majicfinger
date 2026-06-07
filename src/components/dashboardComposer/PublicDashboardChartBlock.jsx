@@ -31,6 +31,7 @@ export function PublicDashboardChartBlock({
   layoutColumnKey,
   dashboardSlug,
   dashboardRunnable = false,
+  chartTitle,
 }) {
   const rows = chartPayload?.rows ?? [];
   const dataSheets = chartPayload?.dataSheets ?? {};
@@ -65,9 +66,17 @@ export function PublicDashboardChartBlock({
 
   const showRunCta = !!(ownerHandle && (chartSlug || (dashboardSlug && chartId)));
 
+  const ariaLabel =
+    chartTitle ||
+    chart?.chart_name ||
+    chartSlug ||
+    "Interactive data chart";
+
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
+        role="img"
+        aria-label={ariaLabel}
         className="relative flex min-h-0 w-full flex-1 flex-col rounded-md border bg-card/50 p-2"
         style={{
           backgroundColor: cp0.bgColor || undefined,

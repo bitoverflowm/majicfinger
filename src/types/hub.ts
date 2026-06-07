@@ -73,6 +73,13 @@ export type HubPublishedChartsSection = {
   description?: string;
 };
 
+export type HubPublishedDashboardsSection = {
+  type: "published_dashboards";
+  anchorId?: string;
+  title: string;
+  description?: string;
+};
+
 export type HubVideoInstruction = {
   videoId: string;
   title: string;
@@ -96,6 +103,7 @@ export type HubSection =
   | HubLinkGroupSection
   | HubCtaSection
   | HubPublishedChartsSection
+  | HubPublishedDashboardsSection
   | HubVideoCarouselSection;
 
 export type HubAssetFilter = {
@@ -109,6 +117,8 @@ export type HubAssetFilter = {
   username?: string;
   /** When true, keyword and lake chart queries are not scoped to `username`. */
   chartSearchAllUsers?: boolean;
+  /** When true, dashboard tag queries are not scoped to `username`. */
+  dashboardSearchAllUsers?: boolean;
   /** Include public charts whose dataset sheets pull from this data lake (e.g. "kalshi"). */
   chartLake?: string;
 };

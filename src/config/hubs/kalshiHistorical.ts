@@ -47,6 +47,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
   assetFilter: {
     username: "misterrpink",
     chartSearchAllUsers: true,
+    dashboardSearchAllUsers: true,
     chartLake: "kalshi",
     dashboardTags: ["kalshi", "historical data", "volume"],
     chartKeywords: ["kalshi"],
@@ -236,8 +237,16 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
-      type: "link_group",
+      type: "published_dashboards",
+      anchorId: "published-dashboards",
       title: "Kalshi Dashboards",
+      description:
+        "Live, shareable Kalshi dashboards — volume trends, market analysis, and weather prediction market insights built on historical data.",
+    },
+
+    {
+      type: "link_group",
+      title: "Kalshi Resources",
       groups: [
         {
           label: "Volume & Market Analysis",

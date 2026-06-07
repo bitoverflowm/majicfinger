@@ -5,8 +5,9 @@ import DataSet from "@/models/DataSets";
 import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
+import { validateDashboardPublishSeo } from "@/lib/dashboardPublishSeo";
 
-function collectChartIdsFromLayout(layout) {
+function collectChartIdsFromLayoutWithValidation(layout) {
   const ids = new Set();
   if (!layout || typeof layout !== "object") return ids;
   const rows = Array.isArray(layout.rows) ? layout.rows : [];
@@ -109,7 +110,7 @@ export default async function handler(req, res) {
         }
 
         const layoutForValidation = $set.layout !== undefined ? $set.layout : dash.layout;
-        const chartIds = collectChartIdsFromLayout(layoutForValidation);
+        const chartIds = collectChartIdsFromLayoutWithValidation(layoutForValidation);
         for (const cid of chartIds) {
           const ch = await Chart.findById(cid).lean();
           if (!ch || String(ch.user_id) !== String(session.userId)) {
@@ -124,6 +125,16 @@ export default async function handler(req, res) {
           const pub = !!req.body.is_public;
           $set.is_public = pub;
           if (pub) {
+            const seoError = validateDashboardPublishSeo({
+              layout: layoutForValidation,
+              page_heading:
+                $set.page_heading !== undefined ? $set.page_heading : dash.page_heading,
+              page_subheading:
+                $set.page_subheading !== undefined ? $set.page_subheading : dash.page_subheading,
+            });
+            if (seoError) {
+              return res.status(400).json({ success: false, message: seoError });
+            }
             if (!dash.is_public && !dash.published_at) {
               $set.published_at = new Date();
             }

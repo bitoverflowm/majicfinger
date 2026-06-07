@@ -14,6 +14,7 @@ type SearchIndexItem = {
   integration: string[];
   topics: string[];
   tags: string[];
+  username?: string;
 };
 
 const CONTENT_TYPES = [
@@ -22,9 +23,16 @@ const CONTENT_TYPES = [
   "integrations",
   "concepts",
   "playbooks",
+  "dashboards",
 ] as const;
 
 function hrefForSearchItem(item: SearchIndexItem): string {
+  if (item.contentType === "dashboards") {
+    const parts = item.slug.split("/");
+    if (parts.length >= 2) {
+      return `/${encodeURIComponent(parts[0])}/dashboards/${encodeURIComponent(parts.slice(1).join("/"))}`;
+    }
+  }
   // Blog MDX is rendered under /guides/[slug] (same route as guides); /blog/[slug] has no app route.
   if (item.contentType === "blog") {
     return `/guides/${item.slug}`;
@@ -106,7 +114,7 @@ export default function SearchPage() {
         <Section>
           <H1>Search</H1>
           <P className="text-muted-foreground">
-            Search across guides, blog posts, integrations, concepts, and playbooks.
+            Search across guides, blog posts, integrations, concepts, playbooks, and published dashboards.
           </P>
         </Section>
 

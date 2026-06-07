@@ -12,7 +12,9 @@ export async function getPublicDashboardMeta(username, slug) {
     public_slug: String(slug).trim(),
     is_public: true,
   })
-    .select("page_heading page_subheading dashboard_name seo_title tags keywords published_at og_image_data")
+    .select(
+      "page_heading page_subheading dashboard_name seo_title tags keywords published_at last_edited_date og_image_data",
+    )
     .lean();
   if (!dash) return null;
   const pageTitle = (dash.page_heading || dash.dashboard_name || "Dashboard").trim();
@@ -21,6 +23,7 @@ export async function getPublicDashboardMeta(username, slug) {
   const tags = Array.isArray(dash.tags) ? dash.tags.filter(Boolean) : [];
   const keywords = Array.isArray(dash.keywords) ? dash.keywords.filter(Boolean) : [];
   const publishedAt = dash.published_at || null;
+  const lastEditedDate = dash.last_edited_date || null;
   const hasOgImageData = !!dash.og_image_data;
   return {
     project_name: pageTitle,
@@ -29,6 +32,7 @@ export async function getPublicDashboardMeta(username, slug) {
     tags,
     keywords,
     published_at: publishedAt,
+    last_edited_date: lastEditedDate,
     has_og_image_data: hasOgImageData,
   };
 }

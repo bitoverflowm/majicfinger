@@ -3,6 +3,7 @@ import {
   getPublishedDashboardsForLanding,
   type LandingDashboardCard,
 } from "@/lib/landing/publishedDashboards";
+import { getAllPublishedDashboards } from "@/lib/landing/allPublishedDashboards";
 import { LandingDashboardCardItem } from "@/components/sections/landing-dashboard-card";
 
 export type { LandingDashboardCard };
@@ -11,12 +12,17 @@ export async function DashboardsSection({
   username = "misterrpink",
   limit = 12,
   showCta = true,
+  allUsers = false,
 }: {
   username?: string;
   limit?: number;
   showCta?: boolean;
+  /** When true, lists published dashboards from all users (gallery / SEO index). */
+  allUsers?: boolean;
 }) {
-  const { dashboards, profilePic } = await getPublishedDashboardsForLanding(username, limit);
+  const dashboards = allUsers
+    ? await getAllPublishedDashboards(limit)
+    : (await getPublishedDashboardsForLanding(username, limit)).dashboards;
 
   if (!dashboards.length) return null;
 
@@ -27,10 +33,10 @@ export async function DashboardsSection({
           Dashboards
         </p>
         <h2 className="mx-auto mt-4 max-w-xs text-3xl font-semibold sm:max-w-none sm:text-4xl md:text-5xl">
-          Dashboards Gallery
+          {allUsers ? "All Published Dashboards" : "Dashboards Gallery"}
         </h2>
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
-          Live, shareable dashboards built with Lychee.
+          Live, shareable dashboards built with Lychee — indexed and searchable.
         </p>
         {showCta ? (
           <div className="pt-2">
@@ -50,7 +56,7 @@ export async function DashboardsSection({
           <LandingDashboardCardItem
             key={`${d.username}-${d.slug}`}
             dashboard={d}
-            profilePic={profilePic}
+            profilePic={null}
             priority={idx <= 1}
           />
         ))}

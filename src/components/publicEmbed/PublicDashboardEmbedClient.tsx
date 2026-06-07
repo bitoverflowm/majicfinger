@@ -6,6 +6,7 @@ import DotPattern from "@/components/magicui/dot-pattern";
 import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
+import { ChartSeoFallback } from "@/components/publicEmbed/ChartSeoFallback";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
@@ -119,10 +120,12 @@ export default function PublicDashboardEmbedClient({
   username,
   slug,
   initialPayload = null,
+  clusterHref = null,
 }: {
   username: string;
   slug: string;
   initialPayload?: Payload | null;
+  clusterHref?: string | null;
 }) {
   const [payload, setPayload] = useState<Payload | null>(() => initialPayload);
   const [err, setErr] = useState<string | null>(() => (initialPayload && !initialPayload.success ? initialPayload.message || "Not found" : null));
@@ -226,24 +229,60 @@ export default function PublicDashboardEmbedClient({
           />
         ) : null}
         <div className="relative z-[1] mx-auto max-w-6xl space-y-8">
-          {d.page_heading?.trim() || d.page_subheading?.trim() ? (
-            <div className="space-y-3">
-              {d.page_heading?.trim() ? (
-                <h1
-                  className={getPageTitlePublicClassName(d.theme)}
-                  style={getPageTitlePublicStyle(d.theme)}
+          <div className="space-y-3">
+            <h1
+              className={getPageTitlePublicClassName(d.theme)}
+              style={getPageTitlePublicStyle(d.theme)}
+            >
+              {d.page_heading?.trim() || d.dashboard_name?.trim() || slug.replace(/-/g, " ")}
+            </h1>
+            {d.page_subheading?.trim() ? (
+              <p
+                className={getPageTextBlockPublicClassName(d.theme, "pageSubheading")}
+                style={getPageTextBlockPublicStyle(d.theme, "pageSubheading")}
+              >
+                {d.page_subheading}
+              </p>
+            ) : null}
+
+            {clusterHref ? (
+              <p className="text-sm text-muted-foreground">
+                Part of{" "}
+                <Link
+                  href={clusterHref}
+                  className="font-medium text-foreground underline underline-offset-2"
+                  {...publicEmbedOutboundLinkProps(isEmbedded)}
                 >
-                  {d.page_heading}
-                </h1>
-              ) : null}
-              {d.page_subheading?.trim() ? (
-                <p
-                  className={getPageTextBlockPublicClassName(d.theme, "pageSubheading")}
-                  style={getPageTextBlockPublicStyle(d.theme, "pageSubheading")}
+                  {clusterHref.replace(/^\//, "").replace(/-/g, " ")}
+                </Link>
+                {" · "}
+                <Link
+                  href="/dashboards-gallery"
+                  className="font-medium text-foreground underline underline-offset-2"
+                  {...publicEmbedOutboundLinkProps(isEmbedded)}
                 >
-                  {d.page_subheading}
-                </p>
-              ) : null}
+                  Browse all dashboards
+                </Link>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                <Link
+                  href="/dashboards-gallery"
+                  className="font-medium text-foreground underline underline-offset-2"
+                  {...publicEmbedOutboundLinkProps(isEmbedded)}
+                >
+                  Browse all dashboards
+                </Link>
+                {" · "}
+                <Link
+                  href="/guides"
+                  className="font-medium text-foreground underline underline-offset-2"
+                  {...publicEmbedOutboundLinkProps(isEmbedded)}
+                >
+                  Data guides
+                </Link>
+              </p>
+            )}
 
               <div className="flex flex-col gap-2 pt-1">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -289,7 +328,6 @@ export default function PublicDashboardEmbedClient({
                 ) : null}
               </div>
             </div>
-          ) : null}
 
           {rows.map((row) => {
             if (row.type === "cardGrid") {
@@ -360,6 +398,11 @@ export default function PublicDashboardEmbedClient({
                       ) : null}
                       {col.chartPayload ? (
                         <div className="flex min-h-0 flex-1 flex-col">
+                          <ChartSeoFallback
+                            title={col.h2 || col.chartPayload.chart?.chart_name || "Chart"}
+                            chartPayload={col.chartPayload as Parameters<typeof ChartSeoFallback>[0]["chartPayload"]}
+                            id={col.id || String(col.chart_id)}
+                          />
                           <PublicDashboardChartBlock
                             chartPayload={col.chartPayload}
                             ownerHandle={ownerHandle}
@@ -367,6 +410,7 @@ export default function PublicDashboardEmbedClient({
                             chartId={col.chart_id ? String(col.chart_id) : undefined}
                             layoutColumnKey={col.id}
                             dashboardSlug={slug}
+                            chartTitle={col.h2 || col.chartPayload.chart?.chart_name}
                           />
                         </div>
                       ) : (

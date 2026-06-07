@@ -164,6 +164,7 @@ export async function queryHubPublishedAssets(
 
     const username = filter.username?.trim() || "";
     const chartOwnerScoped = username && !filter.chartSearchAllUsers;
+    const dashboardOwnerScoped = username && !filter.dashboardSearchAllUsers;
     let userId: string | null = null;
 
     if (username) {
@@ -298,7 +299,7 @@ export async function queryHubPublishedAssets(
         is_public: true,
         public_slug: { $type: "string", $gt: "" },
       };
-      if (userId) query.user_id = userId;
+      if (dashboardOwnerScoped && userId) query.user_id = userId;
 
       const allDashboards = (await DashboardModel.find(query)
         .select("user_id public_slug page_heading page_subheading og_image_data tags")
@@ -358,7 +359,7 @@ export async function queryHubPublishedAssets(
     applyStaticChartFallback(charts, seenCharts, filter);
   }
 
-  charts.sort((a, b) => b.title.localeCompare(a.title, undefined, { sensitivity: "base" }));
+  dashboards.sort((a, b) => b.title.localeCompare(a.title, undefined, { sensitivity: "base" }));
 
   return { charts, dashboards };
 }

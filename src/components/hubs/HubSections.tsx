@@ -8,6 +8,7 @@ import type {
   HubLinkGroupSection,
   HubPublishedAssets,
   HubPublishedChartsSection,
+  HubPublishedDashboardsSection,
   HubQuerySection,
   HubSection,
   HubStatsSection,
@@ -189,6 +190,52 @@ function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
   );
 }
 
+function HubPublishedDashboards({
+  section,
+  assets,
+}: {
+  section: HubPublishedDashboardsSection;
+  assets: HubPublishedAssets;
+}) {
+  const { dashboards } = assets;
+  if (!dashboards.length) return null;
+
+  return (
+    <section
+      id={section.anchorId}
+      className={cn("w-full py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+    >
+      <div className="mx-auto max-w-2xl space-y-4 px-6 text-center">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+          {section.title}
+        </h2>
+        {section.description ? (
+          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+            {section.description}
+          </p>
+        ) : null}
+      </div>
+      <ul className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-4 px-6 sm:grid-cols-2">
+        {dashboards.map((dash) => (
+          <li key={`${dash.username}-${dash.slug}`}>
+            <Link
+              href={`/${encodeURIComponent(dash.username)}/dashboards/${encodeURIComponent(dash.slug)}`}
+              className="group block rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md"
+              prefetch={false}
+            >
+              <h3 className="font-semibold text-foreground group-hover:text-primary">{dash.title}</h3>
+              {dash.description ? (
+                <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{dash.description}</p>
+              ) : null}
+              <p className="mt-2 text-xs text-muted-foreground">@{dash.username}</p>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function HubPublishedCharts({
   section,
   assets,
@@ -305,6 +352,8 @@ export function HubSectionRenderer({
           <HubPublishedCharts section={section} assets={assets} />
         </div>
       );
+    case "published_dashboards":
+      return wrapper(<HubPublishedDashboards section={section} assets={assets} />);
     case "video_carousel":
       return wrapper(<HubVideoCarousel section={section} />);
     case "cta":

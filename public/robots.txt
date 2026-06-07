@@ -17,5 +17,5 @@ Disallow: /logout
 Disallow: /signup
 Disallow: /auth/
 
-# Optional: add a sitemap at /sitemap.xml and keep this line
-Sitemap: /sitemap.xml
+# Public published dashboards and charts are crawlable at /{username}/dashboards/* and /{username}/charts/*
+Sitemap: https://lycheedata.com/sitemap.xml
