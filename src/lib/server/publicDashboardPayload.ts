@@ -11,6 +11,7 @@ import {
   hydrateCardGridSheetsForPublicDashboard,
 } from "@/lib/server/hydrateDashboardCardGridSheets";
 import { applyCardGridSnapshotsToSheets } from "@/lib/server/dashboardCardGridSnapshots";
+import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
 
 type ChartPayload = {
   chart?: {
@@ -114,6 +115,86 @@ function hydrateLayout(layout: any, chartBundlesById: Map<string, any>, dataShee
     return { ...row, columns };
   });
   return { ...withCardRows, rows: nextRows };
+}
+
+/** Fast layout for SSR / OG crawlers — no chart bundles, no Athena. */
+function buildShellLayout(layout: any, cardGridSnapshots: Record<string, unknown> | null | undefined) {
+  if (!layout || typeof layout !== "object") return { version: 1, rows: [] };
+  const snapshots =
+    cardGridSnapshots && typeof cardGridSnapshots === "object" ? cardGridSnapshots : {};
+  const rows = Array.isArray(layout.rows) ? layout.rows : [];
+  const nextRows = rows.map((row: any) => {
+    if (row?.type === "cardGrid") {
+      const sheetId = row.sheetId ? String(row.sheetId) : "";
+      const limit = clampCardGridRowLimit(row.rowLimit);
+      const saved = sheetId && Array.isArray(snapshots[sheetId]) ? snapshots[sheetId] : [];
+      const sheetRows = saved.slice(0, limit);
+      return { ...row, sheetRows };
+    }
+    if (row?.type === "cards" && Array.isArray(row.columns)) {
+      const columns = row.columns.map((col: any) => {
+        if (!col?.chart_id) {
+          return { ...col, chartPayload: null, chartLink: null };
+        }
+        return {
+          ...col,
+          chartPayload: {
+            chart: { chart_name: String(col.h2 || col.caption || "Chart") },
+            rows: [],
+            dataSheets: {},
+          },
+          chartLink: null,
+        };
+      });
+      return { ...row, columns };
+    }
+    return row;
+  });
+  return { ...layout, rows: nextRows };
+}
+
+/**
+ * Lightweight dashboard payload for SSR (HTML shell, OG/social crawlers).
+ * Chart/card data loads client-side via /api/public/dashboards/...
+ */
+export async function getPublicDashboardShellPayload(
+  username: string,
+  slug: string,
+): Promise<PublicDashboardPayload> {
+  if (!username || !slug) return { success: false, message: "Missing username or slug" };
+  await dbConnect();
+  const user = (await User.findOne({ user_name: String(username || "").trim() })
+    .select("_id user_name profile_pic")
+    .lean()) as any;
+  if (!user || !user._id) return { success: false, message: "User not found" };
+
+  const dash = (await ChartDashboard.findOne({
+    user_id: user._id as any,
+    public_slug: String(slug || "").trim(),
+    is_public: true,
+  })
+    .select(
+      "page_heading page_subheading dashboard_name theme layout tags card_grid_snapshots",
+    )
+    .lean()) as any;
+
+  if (!dash) return { success: false, message: "Dashboard not found" };
+
+  const layoutOut = buildShellLayout(dash.layout, dash.card_grid_snapshots);
+
+  return {
+    success: true,
+    data: {
+      page_heading: dash.page_heading || "",
+      page_subheading: dash.page_subheading || "",
+      dashboard_name: dash.dashboard_name || "",
+      theme: dash.theme || {},
+      layout: layoutOut,
+      owner_handle: user.user_name,
+      owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
+      tags: Array.isArray(dash.tags) ? dash.tags.map((t: any) => String(t || "").trim()).filter(Boolean) : [],
+    },
+  };
 }
 
 export async function getPublicDashboardPayload(

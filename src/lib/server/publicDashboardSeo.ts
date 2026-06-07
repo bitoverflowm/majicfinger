@@ -52,7 +52,7 @@ export function extractDashboardSeoSummary(payload: PublicDashboardPayload): Das
     }
     if (row.type === "cards" && Array.isArray((row as { columns?: unknown[] }).columns)) {
       for (const col of (row as { columns: Array<Record<string, unknown>> }).columns) {
-        if (col?.chartPayload) chartCount += 1;
+        if (col?.chart_id || col?.chartPayload) chartCount += 1;
         const h2 = String(col?.h2 || "").trim();
         if (h2) chartTitles.push(h2);
         const chartName = String(

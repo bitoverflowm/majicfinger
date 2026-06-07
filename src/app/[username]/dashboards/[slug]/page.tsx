@@ -4,14 +4,18 @@ import PublicDashboardEmbedClient from "@/components/publicEmbed/PublicDashboard
 import { PublicDashboardChartSeoLayer } from "@/components/publicEmbed/PublicDashboardChartSeoLayer";
 import { PublicDashboardSeoNav } from "@/components/publicEmbed/PublicDashboardSeoNav";
 import { getPublicDashboardMeta } from "@/lib/server/publicDashboardMeta";
-import { getPublicDashboardPayload } from "@/lib/server/publicDashboardPayload";
+import {
+  getPublicDashboardShellPayload,
+} from "@/lib/server/publicDashboardPayload";
 import {
   buildDashboardJsonLd,
   buildDashboardMetadata,
   extractDashboardSeoSummary,
   resolveClusterForDashboardMeta,
 } from "@/lib/server/publicDashboardSeo";
-import { stripDashboardPayloadChartData } from "@/lib/server/stripDashboardPayloadChartData";
+
+/** HTML shell only — heavy chart/card data loads client-side via API. */
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -32,19 +36,18 @@ export default async function PublicDashboardPage({
   params: Promise<{ username: string; slug: string }>;
 }) {
   const { username, slug } = await params;
-  const [fullPayload, meta] = await Promise.all([
-    getPublicDashboardPayload(username, slug),
+  const [shellPayload, meta] = await Promise.all([
+    getPublicDashboardShellPayload(username, slug),
     getPublicDashboardMeta(username, slug),
   ]);
 
-  if (!fullPayload.success || !meta) {
+  if (!shellPayload.success || !meta) {
     notFound();
   }
 
-  const summary = extractDashboardSeoSummary(fullPayload);
+  const summary = extractDashboardSeoSummary(shellPayload);
   const cluster = resolveClusterForDashboardMeta(meta);
   const jsonLd = buildDashboardJsonLd({ meta, username, slug, summary, cluster });
-  const shellPayload = stripDashboardPayloadChartData(fullPayload);
 
   return (
     <div className="min-h-screen bg-background">
@@ -56,7 +59,7 @@ export default async function PublicDashboardPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd.breadcrumb) }}
       />
-      <PublicDashboardChartSeoLayer layout={fullPayload.data?.layout} />
+      <PublicDashboardChartSeoLayer layout={shellPayload.data?.layout} />
       <PublicDashboardSeoNav
         username={username}
         slug={slug}
