@@ -117,7 +117,7 @@ function HubQuery({ section }: { section: HubQuerySection }) {
           </p>
         </div>
 
-        <div className="relative z-20 -mx-6 mt-12 w-[calc(100%+3rem)]">
+        <div className="relative z-20 mx-auto mt-12 w-full max-w-4xl px-2 sm:px-4">
           <HubKalshiQueryBuilder />
         </div>
 

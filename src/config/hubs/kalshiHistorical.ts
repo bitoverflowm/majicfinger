@@ -159,6 +159,10 @@ export const kalshiHistoricalHub: HubPageConfig = {
           label: "Volume Analysis",
           links: [
             {
+              title: "Kalshi Volume Dashboard",
+              href: "/misterrpink/dashboards/kalshi-volume-dashboard",
+            },
+            {
               title: "Kalshi Volume Meaning",
               href: "/guides/kalshi-volume",
             },
@@ -166,15 +170,15 @@ export const kalshiHistoricalHub: HubPageConfig = {
               title: "Kalshi Volume Chart Guide",
               href: "/guides/kalshi-volume-chart-guide",
             },
-            {
-              title: "Kalshi Volume Dashboard",
-              href: "/misterrpink/dashboards/kalshi-volume-dashboard",
-            },
           ],
         },
         {
           label: "Weather Markets",
           links: [
+            {
+              title: "kalshi Historical Weather Data, Prices, Volume & Markets Dashboard",
+              href: "/misterrpink/dashboards/kalshi-historical-weather-datas",
+            },
             {
               title: "Kalshi Weather Prediction Markets Analysis",
               href: "/guides/kalshi-weather-prediction-markets-analysis",

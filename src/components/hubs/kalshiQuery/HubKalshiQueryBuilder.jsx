@@ -217,7 +217,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
         )}
       >
         <div className="space-y-3">
-          <h3 className="text-base font-semibold text-foreground">Build your query</h3>
+          <h3 className="text-base font-semibold text-foreground">Get Kalshi Historical Data Now:</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Choose Markets or Trades, pick columns, add filters, then run your query in Lychee.
           </p>
