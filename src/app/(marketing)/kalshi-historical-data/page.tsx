@@ -3,6 +3,9 @@ import { kalshiHistoricalHub } from "@/config/hubs/kalshiHistorical";
 import { buildHubMetadata } from "@/lib/hubs/metadata";
 import { queryHubPublishedAssets } from "@/lib/hubs/queryPublishedAssets";
 
+/** Hub assets come from Mongo at request time — avoid blocking static generation at build. */
+export const dynamic = "force-dynamic";
+
 export const metadata = buildHubMetadata(kalshiHistoricalHub);
 
 export default async function KalshiHistoricalDataHubPage() {

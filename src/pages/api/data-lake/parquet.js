@@ -14,7 +14,7 @@
  *
  * Client enables proxy with NEXT_PUBLIC_DATA_LAKE_USE_S3_PROXY=true
  */
-import AWS from "aws-sdk";
+import { GetObjectCommand, getS3Client } from "@/lib/awsClients";
 
 function getBucket() {
   return process.env.DATA_LAKE_S3_BUCKET || process.env.S3_BUCKET_NAME || "";
@@ -88,26 +88,21 @@ export default async function handler(req, res) {
 
   const key = prefix ? `${prefix}/${rel}` : rel;
 
-  const s3 = new AWS.S3({
-    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1",
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  });
-
   try {
-    const data = await s3.getObject({ Bucket: bucket, Key: key }).promise();
+    const data = await getS3Client().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
     const body = data.Body;
     if (!body) {
       return res.status(404).json({ message: "Empty object" });
     }
+    const bytes = await body.transformToByteArray();
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader("Cache-Control", "private, max-age=120");
     if (data.ContentLength != null) {
       res.setHeader("Content-Length", String(data.ContentLength));
     }
-    return res.status(200).send(body);
+    return res.status(200).send(Buffer.from(bytes));
   } catch (e) {
-    const code = e?.code || e?.statusCode;
+    const code = e?.name || e?.code || e?.$metadata?.httpStatusCode;
     if (code === "NoSuchKey" || code === "NotFound") {
       return res.status(404).json({ message: "Object not found", key });
     }

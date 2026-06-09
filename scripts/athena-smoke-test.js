@@ -1,6 +1,6 @@
 /**
  * Verifies Athena connectivity: StartQueryExecution → poll → GetQueryResults.
- * Uses aws-sdk v2 (same as src/pages/api/data-lake/parquet.js).
+ * Uses @aws-sdk/client-athena (v3).
  *
  * Env:
  *   AWS_REGION or AWS_DEFAULT_REGION
@@ -18,6 +18,12 @@
 
 const fs = require("fs");
 const path = require("path");
+const {
+  AthenaClient,
+  GetQueryExecutionCommand,
+  GetQueryResultsCommand,
+  StartQueryExecutionCommand,
+} = require("@aws-sdk/client-athena");
 
 /** @returns {Record<string, string>} */
 function parseEnvFile(filePath) {
@@ -52,8 +58,6 @@ function loadProjectEnv() {
 
 loadProjectEnv();
 
-const AWS = require("aws-sdk");
-
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -83,7 +87,7 @@ async function main() {
   const database = (process.env.DATA_LAKE_ATHENA_DATABASE || "").trim();
   const sql = (process.env.DATA_LAKE_ATHENA_SMOKE_SQL || "SELECT 1").trim();
 
-  const athena = new AWS.Athena({ region: getRegion() });
+  const athena = new AthenaClient({ region: getRegion() });
 
   const startParams = {
     QueryString: sql,
@@ -100,7 +104,7 @@ async function main() {
   console.log("  output:", output);
   console.log("  sql:", sql);
 
-  const { QueryExecutionId } = await athena.startQueryExecution(startParams).promise();
+  const { QueryExecutionId } = await athena.send(new StartQueryExecutionCommand(startParams));
   console.log("  queryExecutionId:", QueryExecutionId);
 
   const deadline = Date.now() + 120_000;
@@ -108,7 +112,9 @@ async function main() {
   let reason = "";
 
   while (Date.now() < deadline) {
-    const { QueryExecution } = await athena.getQueryExecution({ QueryExecutionId }).promise();
+    const { QueryExecution } = await athena.send(
+      new GetQueryExecutionCommand({ QueryExecutionId }),
+    );
     status = QueryExecution.Status.State;
     reason = QueryExecution.Status.StateChangeReason || "";
     if (status === "SUCCEEDED") break;
@@ -125,7 +131,9 @@ async function main() {
     process.exit(1);
   }
 
-  const results = await athena.getQueryResults({ QueryExecutionId, MaxResults: 10 }).promise();
+  const results = await athena.send(
+    new GetQueryResultsCommand({ QueryExecutionId, MaxResults: 10 }),
+  );
   const rows = results.ResultSet?.Rows || [];
   console.log("OK — first result page row count (includes header row):", rows.length);
   if (rows.length > 0) {

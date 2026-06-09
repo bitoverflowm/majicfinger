@@ -1,5 +1,4 @@
 import type { MDXComponents } from "mdx/types";
-import type { ComponentProps } from "react";
 import Image from "next/image";
 import { TypographyInlineCode, VideoEmbed, YouTube } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -7,7 +6,8 @@ import { ContentImage } from "./content-image";
 import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
 
-function MdxCode({ children, className, ...props }: ComponentProps<"code">) {
+// MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
+function MdxCode({ children, className, ...props }: any) {
   // Fenced blocks get a `language-*` class from the MDX compiler; inline backticks do not.
   if (className) {
     return (

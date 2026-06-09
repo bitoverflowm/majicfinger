@@ -1,7 +1,11 @@
 /**
  * Shared compose-sheet rehydration (Athena → rows) for API routes and public embed hydration.
  */
-import AWS from "aws-sdk";
+import {
+  StartQueryExecutionCommand,
+  StopQueryExecutionCommand,
+  getAthenaClient,
+} from "@/lib/awsClients";
 import { validateAthenaLakeQueryBody } from "@/lib/dataLake/validateAthenaLakeRequest";
 import {
   runAthenaBoundedSelect,
@@ -120,15 +124,15 @@ async function startAthenaSqlExecution({ database, sql }) {
     throw err;
   }
 
-  const athena = new AWS.Athena({ region: getRegion() });
-  const { QueryExecutionId } = await athena
-    .startQueryExecution({
+  const athena = getAthenaClient();
+  const { QueryExecutionId } = await athena.send(
+    new StartQueryExecutionCommand({
       QueryString: sql,
       WorkGroup: workGroup,
       ResultConfiguration: { OutputLocation: output },
       QueryExecutionContext: { Catalog: catalog, Database: db },
-    })
-    .promise();
+    }),
+  );
   return QueryExecutionId;
 }
 
@@ -156,8 +160,9 @@ async function executeAthenaSql({ database, sql, maxWaitMs, rowLimit }) {
 
   if (status !== "SUCCEEDED") {
     try {
-      const athena = new AWS.Athena({ region: getRegion() });
-      await athena.stopQueryExecution({ QueryExecutionId }).promise();
+      await getAthenaClient().send(
+        new StopQueryExecutionCommand({ QueryExecutionId }),
+      );
     } catch {
       /* ignore */
     }

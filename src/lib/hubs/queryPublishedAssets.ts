@@ -91,51 +91,62 @@ function collectRunYourselfChartRefs(lake?: string): Array<{ username: string; s
   return refs;
 }
 
-async function fetchPublishedChart(
-  username: string,
-  slug: string,
+async function fetchPublishedChartsByRefs(
+  refs: Array<{ username: string; slug: string }>,
   models: Pick<PublicModels, "User" | "Chart">,
-): Promise<HubPublishedChart | null> {
-  const u = username.trim();
-  const s = slug.trim();
-  if (!u || !s) return null;
+): Promise<HubPublishedChart[]> {
+  const normalizedRefs = refs
+    .map((ref) => ({ username: ref.username.trim(), slug: ref.slug.trim() }))
+    .filter((ref) => ref.username && ref.slug);
+  if (!normalizedRefs.length) return [];
 
-  const owner = (await models.User.findOne({ user_name: u }).select("_id").lean()) as
-    | { _id?: unknown }
-    | null;
-  if (!owner?._id) return null;
+  const usernames = [...new Set(normalizedRefs.map((ref) => ref.username))];
+  const users = (await models.User.find({ user_name: { $in: usernames } })
+    .select("_id user_name")
+    .lean()) as Array<{ _id?: unknown; user_name?: string }>;
+  const userIdByUsername = new Map(
+    users.map((user) => [String(user.user_name || "").trim(), String(user._id)]),
+  );
 
-  const chart = (await models.Chart.findOne({
-    user_id: owner._id,
-    public_slug: s,
+  const userIds = [...userIdByUsername.values()].filter(Boolean);
+  const slugs = [...new Set(normalizedRefs.map((ref) => ref.slug))];
+  if (!userIds.length || !slugs.length) return [];
+
+  const chartDocs = (await models.Chart.find({
+    user_id: { $in: userIds },
     is_public: true,
+    public_slug: { $in: slugs },
   })
-    .select("public_slug chart_name og_image_data")
-    .lean()) as { public_slug?: string; chart_name?: string; og_image_data?: string } | null;
+    .select("user_id public_slug chart_name og_image_data")
+    .lean()) as Array<{
+    user_id?: unknown;
+    public_slug?: string;
+    chart_name?: string;
+    og_image_data?: string;
+  }>;
 
-  if (!chart?.public_slug) return null;
+  const usernameById = new Map(
+    [...userIdByUsername.entries()].map(([username, id]) => [id, username]),
+  );
+  const chartByKey = new Map<string, HubPublishedChart>();
+  for (const chart of chartDocs) {
+    const username = usernameById.get(String(chart.user_id)) || "";
+    const slug = String(chart.public_slug || "").trim();
+    if (!username || !slug) continue;
+    chartByKey.set(assetKey(username, slug), {
+      username,
+      slug,
+      title: String(chart.chart_name || slug).trim(),
+      hasOgImage: !!chart.og_image_data,
+    });
+  }
 
-  return {
-    username: u,
-    slug: String(chart.public_slug),
-    title: String(chart.chart_name || chart.public_slug).trim(),
-    hasOgImage: !!chart.og_image_data,
-  };
-}
-
-async function addChartRef(
-  charts: HubPublishedChart[],
-  seenCharts: Set<string>,
-  username: string,
-  slug: string,
-  models: Pick<PublicModels, "User" | "Chart">,
-) {
-  const key = assetKey(username, slug);
-  if (seenCharts.has(key)) return;
-  const chart = await fetchPublishedChart(username, slug, models);
-  if (!chart) return;
-  seenCharts.add(key);
-  charts.push(chart);
+  const out: HubPublishedChart[] = [];
+  for (const ref of normalizedRefs) {
+    const chart = chartByKey.get(assetKey(ref.username, ref.slug));
+    if (chart) out.push(chart);
+  }
+  return out;
 }
 
 async function getPublicModels(): Promise<PublicModels> {
@@ -179,11 +190,15 @@ export async function queryHubPublishedAssets(
       ...collectRunYourselfChartRefs(filter.chartLake),
     ];
 
-    for (const ref of explicitRefs) {
-      await addChartRef(charts, seenCharts, ref.username, ref.slug, {
-        User: UserModel,
-        Chart: ChartModel,
-      });
+    const explicitCharts = await fetchPublishedChartsByRefs(explicitRefs, {
+      User: UserModel,
+      Chart: ChartModel,
+    });
+    for (const chart of explicitCharts) {
+      const key = assetKey(chart.username, chart.slug);
+      if (seenCharts.has(key)) continue;
+      seenCharts.add(key);
+      charts.push(chart);
     }
 
     if (filter.chartKeywords?.length) {

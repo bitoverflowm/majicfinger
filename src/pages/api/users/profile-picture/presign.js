@@ -1,4 +1,4 @@
-import AWS from "aws-sdk";
+import { PutObjectCommand, getS3Client, getSignedUrl } from "@/lib/awsClients";
 import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
@@ -81,25 +81,17 @@ export default async function handler(req, res) {
   }
 
   const region = getRegion();
-  const s3 = new AWS.S3({
-    region,
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    signatureVersion: "v4",
-  });
-
   const key = `profile-pictures/${uid}/${Date.now()}-${randomId(10)}.${ext}`;
   const publicUrl = s3PublicUrl({ bucket, region, key });
 
-  const params = {
+  const command = new PutObjectCommand({
     Bucket: bucket,
     Key: key,
     ContentType: String(contentType),
-    Expires: 60,
-  };
+  });
 
   try {
-    const uploadUrl = await s3.getSignedUrlPromise("putObject", params);
+    const uploadUrl = await getSignedUrl(getS3Client(), command, { expiresIn: 60 });
     return res.status(200).json({
       success: true,
       data: {

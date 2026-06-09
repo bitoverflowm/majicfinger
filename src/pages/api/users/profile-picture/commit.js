@@ -1,4 +1,4 @@
-import AWS from "aws-sdk";
+import { DeleteObjectCommand, getS3Client } from "@/lib/awsClients";
 import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
@@ -85,13 +85,8 @@ export default async function handler(req, res) {
   // Best-effort: delete the previous profile picture object (only if it is ours).
   const prevKey = extractKeyFromPublicUrl(existing.profile_pic, bucket);
   if (prevKey && isSafeProfileKey(prevKey, uid) && prevKey !== key) {
-    const s3 = new AWS.S3({
-      region: getRegion(),
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    });
     try {
-      await s3.deleteObject({ Bucket: bucket, Key: prevKey }).promise();
+      await getS3Client().send(new DeleteObjectCommand({ Bucket: bucket, Key: prevKey }));
     } catch {
       // If deletion fails, continue — we still want to let the user update their avatar.
     }

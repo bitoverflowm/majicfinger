@@ -11,7 +11,11 @@
  *   refineFilters?: { and: Array<{ column: string, op: string, value: number }> }
  * }
  */
-import AWS from "aws-sdk";
+import {
+  StartQueryExecutionCommand,
+  StopQueryExecutionCommand,
+  getAthenaClient,
+} from "@/lib/awsClients";
 import { validateAthenaLakeQueryBody, AthenaLakeRequestError } from "../../../lib/dataLake/validateAthenaLakeRequest";
 import { buildComposeAthenaSelectSql } from "../../../lib/dataLake/buildComposeAthenaSql";
 import {
@@ -96,15 +100,15 @@ async function executeAthenaSql({ database, sql, maxWaitMs }) {
     throw err;
   }
 
-  const athena = new AWS.Athena({ region: getRegion() });
-  const { QueryExecutionId } = await athena
-    .startQueryExecution({
+  const athena = getAthenaClient();
+  const { QueryExecutionId } = await athena.send(
+    new StartQueryExecutionCommand({
       QueryString: sql,
       WorkGroup: workGroup,
       ResultConfiguration: { OutputLocation: output },
       QueryExecutionContext: { Catalog: catalog, Database: db },
-    })
-    .promise();
+    }),
+  );
 
   const deadline = Date.now() + maxWaitMs;
   let status = "RUNNING";
@@ -127,7 +131,7 @@ async function executeAthenaSql({ database, sql, maxWaitMs }) {
 
   if (status !== "SUCCEEDED") {
     try {
-      await athena.stopQueryExecution({ QueryExecutionId }).promise();
+      await athena.send(new StopQueryExecutionCommand({ QueryExecutionId }));
     } catch {
       /* ignore */
     }

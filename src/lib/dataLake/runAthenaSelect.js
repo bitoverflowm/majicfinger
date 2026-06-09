@@ -2,7 +2,13 @@
  * Run a bounded SELECT via Athena (server-only credentials).
  * Supports: start-only, single poll, full result fetch, or sync wait (compose).
  */
-import AWS from "aws-sdk";
+import {
+  GetQueryExecutionCommand,
+  GetQueryResultsCommand,
+  StartQueryExecutionCommand,
+  StopQueryExecutionCommand,
+  getAthenaClient,
+} from "@/lib/awsClients";
 import { ATHENA_DEMO_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { isValidColumnIdentifier } from "./athenaTableMap";
 import {
@@ -292,15 +298,15 @@ export async function startAthenaBoundedQuery({
       whereSql,
       kalshiMaterializedVirtuals: kalshiComposeVirtuals,
     });
-    const athena = new AWS.Athena({ region: getRegion() });
-    const { QueryExecutionId } = await athena
-      .startQueryExecution({
+    const athena = getAthenaClient();
+    const { QueryExecutionId } = await athena.send(
+      new StartQueryExecutionCommand({
         QueryString: sql,
         WorkGroup: workGroup,
         ResultConfiguration: { OutputLocation: output },
         QueryExecutionContext: { Catalog: catalog, Database: db },
-      })
-      .promise();
+      }),
+    );
     return { queryExecutionId: QueryExecutionId, sql, rowLimit: sqlLimit ?? null };
   }
 
@@ -311,15 +317,15 @@ export async function startAthenaBoundedQuery({
       ? `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql}`
       : `SELECT ${sqlSelect} FROM ${sqlTable}${whereSql} LIMIT ${selectLimit}`;
 
-  const athena = new AWS.Athena({ region: getRegion() });
-  const { QueryExecutionId } = await athena
-    .startQueryExecution({
+  const athena = getAthenaClient();
+  const { QueryExecutionId } = await athena.send(
+    new StartQueryExecutionCommand({
       QueryString: sql,
       WorkGroup: workGroup,
       ResultConfiguration: { OutputLocation: output },
       QueryExecutionContext: { Catalog: catalog, Database: db },
-    })
-    .promise();
+    }),
+  );
 
   return { queryExecutionId: QueryExecutionId, sql, rowLimit: selectLimit };
 }
@@ -330,8 +336,10 @@ export async function startAthenaBoundedQuery({
  * @returns {Promise<{ state: string; reason: string; dataScannedBytes: number | null }>}
  */
 export async function getAthenaQueryState(queryExecutionId) {
-  const athena = new AWS.Athena({ region: getRegion() });
-  const { QueryExecution } = await athena.getQueryExecution({ QueryExecutionId: queryExecutionId }).promise();
+  const athena = getAthenaClient();
+  const { QueryExecution } = await athena.send(
+    new GetQueryExecutionCommand({ QueryExecutionId: queryExecutionId }),
+  );
   const state = QueryExecution.Status.State;
   const reason = QueryExecution.Status.StateChangeReason || "";
   let dataScannedBytes = null;
@@ -350,7 +358,7 @@ export async function getAthenaQueryState(queryExecutionId) {
 export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
   const unlimited = rowLimit == null;
   const lim = unlimited ? Number.MAX_SAFE_INTEGER : Math.max(1, Math.floor(Number(rowLimit) || 1));
-  const athena = new AWS.Athena({ region: getRegion() });
+  const athena = getAthenaClient();
 
   const columnNames = [];
   const dataRows = [];
@@ -359,13 +367,13 @@ export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
   let truncated = false;
 
   while (dataRows.length < lim) {
-    const page = await athena
-      .getQueryResults({
+    const page = await athena.send(
+      new GetQueryResultsCommand({
         QueryExecutionId: queryExecutionId,
         NextToken: nextToken,
         MaxResults: 1000,
-      })
-      .promise();
+      }),
+    );
 
     const rs = page.ResultSet;
     const meta = rs?.ResultSetMetadata?.ColumnInfo;
@@ -492,8 +500,9 @@ export async function runAthenaBoundedSelect({
 
   if (status !== "SUCCEEDED") {
     try {
-      const athena = new AWS.Athena({ region: getRegion() });
-      await athena.stopQueryExecution({ QueryExecutionId: queryExecutionId }).promise();
+      await getAthenaClient().send(
+        new StopQueryExecutionCommand({ QueryExecutionId: queryExecutionId }),
+      );
     } catch {
       /* ignore */
     }
@@ -546,15 +555,15 @@ export async function runAthenaSqlQuery({ sql, database, maxWaitMs = 15000, rowL
     throw err;
   }
 
-  const athena = new AWS.Athena({ region: getRegion() });
-  const { QueryExecutionId } = await athena
-    .startQueryExecution({
+  const athena = getAthenaClient();
+  const { QueryExecutionId } = await athena.send(
+    new StartQueryExecutionCommand({
       QueryString: trimmed,
       WorkGroup: workGroup,
       ResultConfiguration: { OutputLocation: output },
       QueryExecutionContext: { Catalog: catalog, Database: db },
-    })
-    .promise();
+    }),
+  );
 
   const deadline = Date.now() + maxWaitMs;
   let status = "RUNNING";
@@ -580,7 +589,7 @@ export async function runAthenaSqlQuery({ sql, database, maxWaitMs = 15000, rowL
 
   if (status !== "SUCCEEDED") {
     try {
-      await athena.stopQueryExecution({ QueryExecutionId }).promise();
+      await athena.send(new StopQueryExecutionCommand({ QueryExecutionId }));
     } catch {
       /* ignore */
     }

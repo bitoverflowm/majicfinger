@@ -30,7 +30,11 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
-const AWS = require("aws-sdk");
+const {
+  GetBucketLocationCommand,
+  ListObjectsV2Command,
+  S3Client,
+} = require("@aws-sdk/client-s3");
 const tar = require("tar-stream");
 const { loadRepoEnvForAws, resolveAwsCredentialsOrThrow } = require("./loadRepoEnvForAws");
 
@@ -245,14 +249,19 @@ async function inventoryFromSourceTar({ downloadUrl, destPrefixNormalized, zstdB
   return expected;
 }
 
-async function listS3ParquetSizes({ s3, bucket, destPrefixNormalized }) {
+async function listS3ParquetSizes({ s3Client, bucket, destPrefixNormalized }) {
   const dataPrefix = destPrefixNormalized ? `${destPrefixNormalized}/data/` : `data/`;
   const map = new Map();
   let token;
   while (true) {
-    const res = await s3
-      .listObjectsV2({ Bucket: bucket, Prefix: dataPrefix, ContinuationToken: token, MaxKeys: 1000 })
-      .promise();
+    const res = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: dataPrefix,
+        ContinuationToken: token,
+        MaxKeys: 1000,
+      }),
+    );
     for (const it of res.Contents || []) {
       if (it.Key && it.Key.endsWith(".parquet") && !isAppleDoubleParquetKey(it.Key)) {
         map.set(it.Key, Number(it.Size) || 0);
@@ -293,20 +302,25 @@ async function main() {
 
   const envRegion = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
   const initialRegion = regionArg || envRegion || "us-east-1";
-  const s3Initial = new AWS.S3({
+  const s3ClientConfig = {
     region: initialRegion,
     credentials,
-    s3ForcePathStyle: forcePathStyle || undefined,
-  });
+    ...(forcePathStyle ? { forcePathStyle: true } : {}),
+  };
+  const s3Initial = new S3Client(s3ClientConfig);
 
   let region = regionArg || envRegion;
   if (!region) {
-    const loc = await s3Initial.getBucketLocation({ Bucket: destBucket }).promise();
+    const loc = await s3Initial.send(new GetBucketLocationCommand({ Bucket: destBucket }));
     region = loc.LocationConstraint || "us-east-1";
     if (region === "EU") region = "eu-west-1";
   }
 
-  const s3 = new AWS.S3({ region, credentials, s3ForcePathStyle: forcePathStyle || undefined });
+  const s3Client = new S3Client({
+    region,
+    credentials,
+    ...(forcePathStyle ? { forcePathStyle: true } : {}),
+  });
 
   out("[1/2] Streaming source archive (inventory only)…");
   out(`- download-url: ${downloadUrl}`);
@@ -336,7 +350,7 @@ async function main() {
 
   out(`\n[2/2] Listing S3 objects under data/ …`);
 
-  const s3Map = await listS3ParquetSizes({ s3, bucket: destBucket, destPrefixNormalized });
+  const s3Map = await listS3ParquetSizes({ s3Client, bucket: destBucket, destPrefixNormalized });
 
   const missing = [];
   const sizeMismatches = [];
