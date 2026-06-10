@@ -48,9 +48,9 @@ export const kalshiHistoricalHub: HubPageConfig = {
     username: "misterrpink",
     chartSearchAllUsers: true,
     dashboardSearchAllUsers: true,
-    chartLake: "kalshi",
     dashboardTags: ["kalshi", "historical data", "volume"],
-    chartKeywords: ["kalshi"],
+    maxCharts: 12,
+    maxDashboards: 12,
     chartSlugs: [
       { username: "misterrpink", slug: "kalshi-quaterly-volume" },
       { username: "misterrpink", slug: "kalshi-quaterly-volume-chart" },

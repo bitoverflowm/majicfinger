@@ -121,6 +121,10 @@ export type HubAssetFilter = {
   dashboardSearchAllUsers?: boolean;
   /** Include public charts whose dataset sheets pull from this data lake (e.g. "kalshi"). */
   chartLake?: string;
+  /** Cap charts returned (default 24). */
+  maxCharts?: number;
+  /** Cap dashboards returned (default 24). */
+  maxDashboards?: number;
 };
 
 export type HubPageConfig = {

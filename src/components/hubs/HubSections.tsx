@@ -254,6 +254,9 @@ function HubPublishedCharts({
   const { charts } = assets;
   if (!charts.length) return null;
 
+  // Cap live chart embeds — each mounts a full ChartCanvas client-side.
+  const visibleCharts = charts.slice(0, 8);
+
   return (
     <section
       id={section.anchorId}
@@ -270,7 +273,7 @@ function HubPublishedCharts({
         ) : null}
       </div>
       <div className="mt-12 grid grid-cols-1 gap-6 px-4 sm:px-6 md:grid-cols-2 lg:px-8">
-        {charts.map((chart) => (
+        {visibleCharts.map((chart) => (
           <HubPublishedChartEmbed
             key={`${chart.username}-${chart.slug}`}
             username={chart.username}

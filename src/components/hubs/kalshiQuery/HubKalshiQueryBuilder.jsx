@@ -30,6 +30,11 @@ import { cn } from "@/lib/utils";
 
 const LAKE_CONFIG = getConnectDataLakeConfig("kalshiHistorical");
 
+function getColumnLabel(col) {
+  if (LAKE_CONFIG?.getColumnDisplayLabel) return LAKE_CONFIG.getColumnDisplayLabel(col);
+  return col?.label || col?.name || "";
+}
+
 function genFilterId() {
   return `hub-w-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -258,7 +263,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
           {!sampleId && hoveredSampleId ? (
             <ColumnDefinitionsPanel
               columns={hoverPreviewColumns}
-              getDisplayLabel={LAKE_CONFIG.getColumnDisplayLabel}
+              getDisplayLabel={getColumnLabel}
               showAll
             />
           ) : null}
@@ -329,7 +334,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                             <span className="text-sm font-medium text-foreground">
-                              {LAKE_CONFIG.getColumnDisplayLabel(col)}
+                              {getColumnLabel(col)}
                             </span>
                             <span className="text-[11px] text-muted-foreground">{col.type}</span>
                           </span>
@@ -375,7 +380,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                           <SelectContent>
                             {columns.map((col) => (
                               <SelectItem key={col.name} value={col.name}>
-                                {LAKE_CONFIG.getColumnDisplayLabel(col)}
+                                {getColumnLabel(col)}
                               </SelectItem>
                             ))}
                           </SelectContent>

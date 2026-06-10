@@ -159,10 +159,17 @@ async function getPublicModels(): Promise<PublicModels> {
   };
 }
 
+const QUERY_MAX_TIME_MS = 8000;
+const BROAD_CHART_SCAN_LIMIT = 120;
+const BROAD_DASHBOARD_SCAN_LIMIT = 80;
+
 export async function queryHubPublishedAssets(
   filter?: HubAssetFilter,
 ): Promise<HubPublishedAssets> {
   if (!filter) return { charts: [], dashboards: [] };
+
+  const maxCharts = Math.max(1, Math.min(48, filter.maxCharts ?? 24));
+  const maxDashboards = Math.max(1, Math.min(48, filter.maxDashboards ?? 24));
 
   const charts: HubPublishedChart[] = [];
   const dashboards: HubPublishedDashboard[] = [];
@@ -201,7 +208,7 @@ export async function queryHubPublishedAssets(
       charts.push(chart);
     }
 
-    if (filter.chartKeywords?.length) {
+    if (filter.chartKeywords?.length && charts.length < maxCharts) {
       const query: Record<string, unknown> = {
         is_public: true,
         public_slug: { $type: "string", $gt: "" },
@@ -210,6 +217,9 @@ export async function queryHubPublishedAssets(
 
       const allCharts = (await ChartModel.find(query)
         .select("user_id public_slug chart_name og_image_data labels")
+        .sort({ published_at: -1, last_edited_date: -1 })
+        .limit(BROAD_CHART_SCAN_LIMIT)
+        .maxTimeMS(QUERY_MAX_TIME_MS)
         .lean()) as Array<{
         user_id?: unknown;
         public_slug?: string;
@@ -227,6 +237,7 @@ export async function queryHubPublishedAssets(
       const usernameById = new Map(owners.map((o) => [String(o._id), String(o.user_name || "")]));
 
       for (const chart of allCharts) {
+        if (charts.length >= maxCharts) break;
         const slug = String(chart.public_slug || "").trim();
         const u = usernameById.get(String(chart.user_id)) || "";
         if (!slug || !u) continue;
@@ -249,7 +260,7 @@ export async function queryHubPublishedAssets(
       }
     }
 
-    if (filter.chartLake) {
+    if (filter.chartLake && charts.length < maxCharts) {
       const query: Record<string, unknown> = {
         is_public: true,
         public_slug: { $type: "string", $gt: "" },
@@ -259,6 +270,9 @@ export async function queryHubPublishedAssets(
 
       const allCharts = (await ChartModel.find(query)
         .select("user_id public_slug chart_name og_image_data data_set_id")
+        .sort({ published_at: -1, last_edited_date: -1 })
+        .limit(BROAD_CHART_SCAN_LIMIT)
+        .maxTimeMS(QUERY_MAX_TIME_MS)
         .lean()) as Array<{
         user_id?: unknown;
         public_slug?: string;
@@ -291,6 +305,7 @@ export async function queryHubPublishedAssets(
       const usernameById = new Map(owners.map((o) => [String(o._id), String(o.user_name || "")]));
 
       for (const chart of allCharts) {
+        if (charts.length >= maxCharts) break;
         const slug = String(chart.public_slug || "").trim();
         const u = usernameById.get(String(chart.user_id)) || "";
         const dsId = String(chart.data_set_id || "");
@@ -309,7 +324,7 @@ export async function queryHubPublishedAssets(
       }
     }
 
-    if (filter.dashboardTags?.length) {
+    if (filter.dashboardTags?.length && dashboards.length < maxDashboards) {
       const query: Record<string, unknown> = {
         is_public: true,
         public_slug: { $type: "string", $gt: "" },
@@ -319,6 +334,8 @@ export async function queryHubPublishedAssets(
       const allDashboards = (await DashboardModel.find(query)
         .select("user_id public_slug page_heading page_subheading og_image_data tags")
         .sort({ published_at: -1, last_edited_date: -1 })
+        .limit(BROAD_DASHBOARD_SCAN_LIMIT)
+        .maxTimeMS(QUERY_MAX_TIME_MS)
         .lean()) as Array<{
         user_id?: unknown;
         public_slug?: string;
@@ -339,6 +356,7 @@ export async function queryHubPublishedAssets(
       const normalizedTags = filter.dashboardTags.map(normalize);
 
       for (const dash of allDashboards) {
+        if (dashboards.length >= maxDashboards) break;
         const slug = String(dash.public_slug || "").trim();
         const u = usernameById.get(String(dash.user_id)) || "";
         const title = String(dash.page_heading || "").trim();
@@ -376,5 +394,8 @@ export async function queryHubPublishedAssets(
 
   dashboards.sort((a, b) => b.title.localeCompare(a.title, undefined, { sensitivity: "base" }));
 
-  return { charts, dashboards };
+  return {
+    charts: charts.slice(0, maxCharts),
+    dashboards: dashboards.slice(0, maxDashboards),
+  };
 }
