@@ -185,6 +185,49 @@ export function buildRefineFilterPredicate(input) {
   };
 }
 
+export function genRefineWhereClauseId() {
+  return `rw-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
+/**
+ * @param {string} column
+ * @param {Record<string, string> | null | undefined} dataTypes
+ * @param {object[] | null | undefined} rows
+ */
+export function createRefineWhereClause(column, dataTypes, rows) {
+  const col = String(column || "").trim();
+  const kind = col ? inferRefineColumnKind(col, dataTypes, rows) : "string";
+  return {
+    id: genRefineWhereClauseId(),
+    column: col,
+    op: defaultRefineOpForKind(kind),
+    kind,
+    value: kind === "boolean" ? "true" : "",
+  };
+}
+
+/**
+ * @param {Array<{ column?: string; op?: string; kind?: string; value?: string }>} clauses
+ * @param {Record<string, string> | null | undefined} dataTypes
+ * @param {object[] | null | undefined} rows
+ */
+export function buildRefineFiltersFromClauses(clauses, dataTypes, rows) {
+  const and = [];
+  for (const clause of Array.isArray(clauses) ? clauses : []) {
+    const column = String(clause?.column || "").trim();
+    if (!column) continue;
+    const kind = clause.kind || inferRefineColumnKind(column, dataTypes, rows);
+    const predicate = buildRefineFilterPredicate({
+      column,
+      op: clause.op,
+      kind,
+      rawValue: clause.value,
+    });
+    if (predicate) and.push(predicate);
+  }
+  return { and };
+}
+
 /**
  * @param {object[]} rows
  * @param {{ selectColumns?: string[]; filters?: { and?: object[] } }} spec

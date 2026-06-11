@@ -123,13 +123,12 @@ import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals
 import { temporalToMs } from "@/lib/temporalParse";
 import {
   applyRefineQueryToRows,
-  buildRefineFilterPredicate,
+  buildRefineFiltersFromClauses,
   buildRefineQueryOperation,
-  defaultRefineOpForKind,
-  inferRefineColumnKind,
-  refineOpsForKind,
+  createRefineWhereClause,
   summarizeRefineFilters,
 } from "@/lib/sheetOperations/refineQuery";
+import { RefineWhereClausesEditor } from "@/components/gridView/RefineWhereClausesEditor";
 import { autoSizeAgGridColumnsToContent } from "@/lib/agGridColumnSizing";
 import * as XLSX from 'xlsx';
 
@@ -597,17 +596,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [refineDestination, setRefineDestination] = useState("replace"); // replace | new_sheet
     const [refineNewSheetName, setRefineNewSheetName] = useState("");
     const [refineSelectedCols, setRefineSelectedCols] = useState(() => new Set());
-    const [refineWhereCol, setRefineWhereCol] = useState("");
-    const [refineWhereOp, setRefineWhereOp] = useState("gte");
-    const [refineWhereVal, setRefineWhereVal] = useState("");
+    const [refineWhereClauses, setRefineWhereClauses] = useState([]);
     const [refineBusy, setRefineBusy] = useState(false);
     const [refineProgress, setRefineProgress] = useState(0);
     const [refineProgressLabel, setRefineProgressLabel] = useState("");
-    const refineWhereKind = useMemo(
-      () => inferRefineColumnKind(refineWhereCol, dataTypes, connectedData),
-      [refineWhereCol, dataTypes, connectedData],
-    );
-    const refineWhereOps = useMemo(() => refineOpsForKind(refineWhereKind), [refineWhereKind]);
     const [sheetJsonViewerOpen, setSheetJsonViewerOpen] = useState(false);
     const [sheetJsonVisibleRows, setSheetJsonVisibleRows] = useState(SHEET_JSON_INITIAL_ROWS);
     const [sheetJsonAppending, setSheetJsonAppending] = useState(false);
@@ -2457,23 +2449,25 @@ const GridView = ({ startNew, fillViewport = false }) => {
       if (!refineQueryOpen) return;
       const cols = sheetColumnsForProps;
       setRefineSelectedCols(new Set(cols));
-      const firstCol = cols[0] || "";
-      setRefineWhereCol(firstCol);
       setRefineNewSheetName("");
-      if (firstCol) {
-        const kind = inferRefineColumnKind(firstCol, dataTypes, connectedData);
-        setRefineWhereOp(defaultRefineOpForKind(kind));
-        setRefineWhereVal(kind === "boolean" ? "true" : "");
-      } else {
-        setRefineWhereVal("");
-      }
+      const firstCol = cols[0] || "";
+      setRefineWhereClauses(firstCol ? [createRefineWhereClause(firstCol, dataTypes, connectedData)] : []);
     }, [refineQueryOpen, sheetColumnsForProps, dataTypes, connectedData]);
 
-    useEffect(() => {
-      if (!refineQueryOpen) return;
-      const valid = refineWhereOps.some((op) => op.id === refineWhereOp);
-      if (!valid) setRefineWhereOp(defaultRefineOpForKind(refineWhereKind));
-    }, [refineQueryOpen, refineWhereKind, refineWhereOps, refineWhereOp]);
+    const updateRefineWhereClause = useCallback((id, patch) => {
+      setRefineWhereClauses((prev) => prev.map((clause) => (clause.id === id ? { ...clause, ...patch } : clause)));
+    }, []);
+
+    const removeRefineWhereClause = useCallback((id) => {
+      setRefineWhereClauses((prev) => prev.filter((clause) => clause.id !== id));
+    }, []);
+
+    const addRefineWhereClause = useCallback(
+      (column) => {
+        setRefineWhereClauses((prev) => [...prev, createRefineWhereClause(column, dataTypes, connectedData)]);
+      },
+      [dataTypes, connectedData],
+    );
 
     const commitRefineResult = useCallback(
       ({ projected, scope, filters, cols, elapsedMs }) => {
@@ -2579,16 +2573,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         return;
       }
 
-      const wCol = String(refineWhereCol || "").trim();
-      const predicate = wCol
-        ? buildRefineFilterPredicate({
-            column: wCol,
-            op: refineWhereOp,
-            kind: refineWhereKind,
-            rawValue: refineWhereVal,
-          })
-        : null;
-      const refineFilters = { and: predicate ? [predicate] : [] };
+      const refineFilters = buildRefineFiltersFromClauses(refineWhereClauses, dataTypes, connectedData);
 
       if (refineScope === "preview") {
         const refinePreviewStarted =
@@ -2697,12 +2682,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
       commitRefineResult,
       connectedData,
       dataSheets,
+      dataTypes,
       refineScope,
       refineSelectedCols,
-      refineWhereCol,
-      refineWhereKind,
-      refineWhereOp,
-      refineWhereVal,
+      refineWhereClauses,
     ]);
 
     const dateColumns = useMemo(() => {
@@ -5211,91 +5194,16 @@ const GridView = ({ startNew, fillViewport = false }) => {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Optional filter (WHERE)</Label>
-                        <div className="flex flex-wrap gap-2 items-end">
-                          <div className="space-y-1 min-w-[7rem] flex-1">
-                            <Label className="text-[10px] text-muted-foreground">Column</Label>
-                            <Select
-                              value={refineWhereCol || ""}
-                              onValueChange={(col) => {
-                                setRefineWhereCol(col);
-                                const kind = inferRefineColumnKind(col, dataTypes, connectedData);
-                                setRefineWhereOp(defaultRefineOpForKind(kind));
-                                setRefineWhereVal(kind === "boolean" ? "true" : "");
-                              }}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Column" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {sheetColumnsForProps.map((c) => (
-                                  <SelectItem key={c} value={c} className="text-xs font-mono">
-                                    {c}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1 min-w-[8rem]">
-                            <Label className="text-[10px] text-muted-foreground">Operator</Label>
-                            <Select value={refineWhereOp} onValueChange={setRefineWhereOp}>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {refineWhereOps.map((op) => (
-                                  <SelectItem key={op.id} value={op.id} className="text-xs">
-                                    {op.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1 min-w-[6rem] flex-1">
-                            <Label className="text-[10px] text-muted-foreground">
-                              Value
-                              <span className="ml-1 font-normal text-muted-foreground/80">({refineWhereKind})</span>
-                            </Label>
-                            {refineWhereKind === "boolean" ? (
-                              <Select
-                                value={refineWhereVal || "__skip__"}
-                                onValueChange={(v) => setRefineWhereVal(v === "__skip__" ? "" : v)}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="—" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="__skip__" className="text-xs">
-                                    —
-                                  </SelectItem>
-                                  <SelectItem value="true" className="text-xs">
-                                    true
-                                  </SelectItem>
-                                  <SelectItem value="false" className="text-xs">
-                                    false
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Input
-                                className="h-8 text-xs"
-                                type={refineWhereKind === "number" ? "number" : "text"}
-                                value={refineWhereVal}
-                                onChange={(e) => setRefineWhereVal(e.target.value)}
-                                placeholder={
-                                  refineWhereKind === "number"
-                                    ? "e.g. 100"
-                                    : refineWhereKind === "date"
-                                      ? "e.g. 2024-01-15"
-                                      : 'e.g. "true"'
-                                }
-                                spellCheck={false}
-                              />
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          Leave value empty to skip the WHERE clause (all rows pass).
-                        </p>
+                        <RefineWhereClausesEditor
+                          clauses={refineWhereClauses}
+                          columns={sheetColumnsForProps}
+                          dataTypes={dataTypes}
+                          rows={connectedData}
+                          disabled={refineBusy}
+                          onUpdateClause={updateRefineWhereClause}
+                          onRemoveClause={removeRefineWhereClause}
+                          onAddClause={addRefineWhereClause}
+                        />
                       </div>
                       {refineBusy ? (
                         <ConnectProgressWithLabel label={refineProgressLabel || "Working…"} progress={refineProgress} />
