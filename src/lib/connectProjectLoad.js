@@ -3,6 +3,7 @@ import {
   loadFullProjectFromApi,
 } from "@/lib/hydrateProjectWorkspace";
 import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
+import { resetProjectWorkspaceState } from "@/lib/resetProjectWorkspaceState";
 
 export const PROJECT_LOAD_PROGRESS_MESSAGES = [
   "Loading data sheets…",
@@ -69,18 +70,12 @@ export function createConnectProjectLoadTicker(setConnectProjectLoadState) {
 }
 
 /**
- * Mount Connect home workspace immediately so the user sees loading UI (not a blank hub).
+ * Show loading UI only — workspace navigation happens after load succeeds.
  */
 export function beginConnectProjectLoadShell({
   dataSetId,
   projectName = "",
   setConnectProjectLoadState,
-  setViewing,
-  requestConnectWorkspace,
-  setConnectHomeAnalyzeActive,
-  requestConnectAnalyzeScroll,
-  setRightPanelTab,
-  setRightPanelOpen,
 }) {
   setConnectProjectLoadState({
     loading: true,
@@ -88,15 +83,6 @@ export function beginConnectProjectLoadShell({
     message: "Preparing project load…",
     dataSetId: dataSetId != null ? String(dataSetId) : null,
     projectName: projectName || "",
-  });
-  finishConnectHomeProjectLoad({
-    setViewing,
-    requestConnectWorkspace,
-    setConnectHomeAnalyzeActive,
-    requestConnectAnalyzeScroll,
-    setRightPanelTab,
-    setRightPanelOpen,
-    scroll: true,
   });
 }
 
@@ -110,7 +96,7 @@ export function endConnectProjectLoad(setConnectProjectLoadState, { delayMs = 30
 }
 
 /**
- * Load a saved project with immediate workspace shell + progress, then hydrate sheets/charts.
+ * Load a saved project: reset stale state, fetch + hydrate, then open workspace.
  */
 export async function runConnectProjectLoad({
   dataSetId,
@@ -121,6 +107,8 @@ export async function runConnectProjectLoad({
   setDataSheets,
   setActiveSheetId,
   setConnectedData,
+  setConnectedCols,
+  setDataTypes,
   setLoadedDataMeta,
   setLoadedDataId,
   setSavedCharts,
@@ -135,6 +123,10 @@ export async function runConnectProjectLoad({
   requestConnectAnalyzeScroll,
   setRightPanelTab,
   setRightPanelOpen,
+  setChartDataOverride,
+  setChartDataOverrideMeta,
+  liveStreamActions,
+  liveStreamState,
   onAlreadyLoaded,
 }) {
   const { bump, startTicker, stopTicker } = createConnectProjectLoadTicker(setConnectProjectLoadState);
@@ -143,12 +135,6 @@ export async function runConnectProjectLoad({
     dataSetId,
     projectName,
     setConnectProjectLoadState,
-    setViewing,
-    requestConnectWorkspace,
-    setConnectHomeAnalyzeActive,
-    requestConnectAnalyzeScroll,
-    setRightPanelTab,
-    setRightPanelOpen,
   });
 
   try {
@@ -168,6 +154,26 @@ export async function runConnectProjectLoad({
       return;
     }
 
+    bump(10, "Clearing previous project state…");
+    resetProjectWorkspaceState({
+      setDataSheets,
+      setActiveSheetId,
+      setConnectedData,
+      setConnectedCols,
+      setDataTypes,
+      setChartSheets,
+      setActiveChartSheetId,
+      setLoadedChartMeta,
+      setLoadedChartBuilderSnapshot,
+      setSavedCharts,
+      setLoadedDataMeta,
+      setLoadedDataId,
+      setChartDataOverride,
+      setChartDataOverrideMeta,
+      liveStreamActions,
+      liveStreamState,
+    });
+
     bump(18, "Loading data sheets…");
     startTicker({ min: 18, max: 64 });
 
@@ -185,6 +191,7 @@ export async function runConnectProjectLoad({
       setLoadedChartMeta,
       setLoadedChartBuilderSnapshot,
       setRefetchChartDashboardsTick,
+      onRehydrateProgress: (message) => bump(72, message),
     });
 
     stopTicker();
@@ -204,6 +211,10 @@ export async function runConnectProjectLoad({
         scheduleConnectProjectSheetScroll();
       });
     }
+  } catch (err) {
+    stopTicker();
+    setConnectProjectLoadState(CONNECT_PROJECT_LOAD_IDLE);
+    throw err;
   } finally {
     stopTicker();
     await endConnectProjectLoad(setConnectProjectLoadState);

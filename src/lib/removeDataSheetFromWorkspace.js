@@ -10,6 +10,31 @@ function sortSheetIds(ids) {
   });
 }
 
+function findRefineSourceFromHistory(sheet) {
+  const hist = Array.isArray(sheet?.operationHistory) ? sheet.operationHistory : [];
+  for (const op of hist) {
+    if (op?.type === "refine.query" && op?.sourceSheetId) return String(op.sourceSheetId);
+  }
+  return sheet?.sourceSheetId ? String(sheet.sourceSheetId) : null;
+}
+
+/** Sheets that depend on `rootId` via sourceSheetId (transitive). */
+export function collectDependentSheetIds(dataSheets, rootId) {
+  const dependents = new Set();
+  const visit = (id) => {
+    for (const [sid, sheet] of Object.entries(dataSheets || {})) {
+      if (dependents.has(sid) || sid === rootId) continue;
+      const src = findRefineSourceFromHistory(sheet);
+      if (src === id) {
+        dependents.add(sid);
+        visit(sid);
+      }
+    }
+  };
+  visit(String(rootId || ""));
+  return dependents;
+}
+
 function remapScopedSheetKey(raw, idMap) {
   const v = String(raw || "");
   const idx = v.indexOf("::");
@@ -90,6 +115,7 @@ export function remapChartSheetsForSheetIdMap(prevCharts, idMap) {
  *   connectedData: unknown[],
  *   idMap: Record<string, string> | null,
  *   resetToEmptySheet: boolean,
+ *   deletedSheetIds: string[],
  * } | null}
  */
 export function computeRemoveDataSheetResult(dataSheets, sheetId, activeSheetId) {
@@ -97,46 +123,43 @@ export function computeRemoveDataSheetResult(dataSheets, sheetId, activeSheetId)
   const prev = dataSheets || {};
   if (!prev[sheetId]) return null;
 
+  const toDelete = new Set([String(sheetId)]);
+  for (const dep of collectDependentSheetIds(prev, sheetId)) {
+    toDelete.add(dep);
+  }
+
   const withoutDeleted = { ...prev };
-  delete withoutDeleted[sheetId];
+  for (const id of toDelete) {
+    delete withoutDeleted[id];
+  }
   const remainingKeys = sortSheetIds(Object.keys(withoutDeleted));
 
   if (remainingKeys.length === 0) {
     return {
       dataSheets: {
-        "sheet-1": { name: "Sheet 1", data: [], provenance: null, requestCards: [] },
+        "sheet-1": { name: "Sheet 1", data: [], provenance: null, requestCards: [], operationHistory: [] },
       },
       activeSheetId: "sheet-1",
       connectedData: [],
       idMap: null,
       resetToEmptySheet: true,
+      deletedSheetIds: [...toDelete],
     };
   }
 
-  const idMap = {};
-  const reindexed = {};
-  remainingKeys.forEach((oldId, idx) => {
-    const newId = `sheet-${idx + 1}`;
-    idMap[oldId] = newId;
-    const oldSheet = withoutDeleted[oldId] || {};
-    reindexed[newId] = {
-      ...oldSheet,
-      name: oldSheet?.name || `Sheet ${idx + 1}`,
-    };
-  });
-
-  const mappedActive =
-    activeSheetId === sheetId
-      ? idMap[remainingKeys[0]] || "sheet-1"
-      : idMap[activeSheetId] || idMap[remainingKeys[0]] || "sheet-1";
-  const rows = reindexed?.[mappedActive]?.data;
+  const nextActive =
+    activeSheetId && withoutDeleted[activeSheetId]
+      ? activeSheetId
+      : remainingKeys[0];
+  const rows = withoutDeleted[nextActive]?.data;
 
   return {
-    dataSheets: reindexed,
-    activeSheetId: mappedActive,
+    dataSheets: withoutDeleted,
+    activeSheetId: nextActive,
     connectedData: Array.isArray(rows) ? rows : [],
-    idMap,
+    idMap: null,
     resetToEmptySheet: false,
+    deletedSheetIds: [...toDelete],
   };
 }
 
@@ -166,7 +189,9 @@ export function removeDataSheetFromWorkspace({
   const result = computeRemoveDataSheetResult(dataSheets, sheetId, activeSheetId);
   if (!result || !setDataSheets) return null;
 
-  liveStreamActions?.stop?.(sheetId);
+  for (const id of result.deletedSheetIds || [sheetId]) {
+    liveStreamActions?.stop?.(id);
+  }
   setDataSheets(result.dataSheets);
   setActiveSheetId?.(result.activeSheetId);
   setConnectedData?.(result.connectedData);

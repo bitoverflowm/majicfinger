@@ -405,6 +405,7 @@ export default function ConnectDataStep1({
   const setIntegrationSidebar = context?.setIntegrationSidebar;
   const setConnectedData = context?.setConnectedData;
   const setConnectedCols = context?.setConnectedCols;
+  const setDataTypes = context?.setDataTypes;
   const setRightPanelOpen = context?.setRightPanelOpen;
   const setRightPanelTab = context?.setRightPanelTab;
   const savedDataSets = context?.savedDataSets;
@@ -425,6 +426,10 @@ export default function ConnectDataStep1({
   const setLoadedChartMeta = context?.setLoadedChartMeta;
   const setLoadedChartBuilderSnapshot = context?.setLoadedChartBuilderSnapshot;
   const setRefetchChartDashboardsTick = context?.setRefetchChartDashboardsTick;
+  const setChartDataOverride = context?.setChartDataOverride;
+  const setChartDataOverrideMeta = context?.setChartDataOverrideMeta;
+  const liveStreamActions = context?.liveStreamActions;
+  const liveStreamState = context?.liveStreamState;
   const requestConnectWorkspace = context?.requestConnectWorkspace;
   const setConnectHomeAnalyzeActive = context?.setConnectHomeAnalyzeActive;
   const requestConnectAnalyzeScroll = context?.requestConnectAnalyzeScroll;
@@ -647,6 +652,8 @@ export default function ConnectDataStep1({
         setDataSheets,
         setActiveSheetId,
         setConnectedData,
+        setConnectedCols,
+        setDataTypes,
         setLoadedDataMeta,
         setLoadedDataId,
         setSavedCharts,
@@ -661,6 +668,10 @@ export default function ConnectDataStep1({
         requestConnectAnalyzeScroll,
         setRightPanelTab,
         setRightPanelOpen,
+        setChartDataOverride,
+        setChartDataOverrideMeta,
+        liveStreamActions,
+        liveStreamState,
       });
       toast.success("Project opened");
     } catch (e) {

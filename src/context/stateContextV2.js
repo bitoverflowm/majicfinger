@@ -452,7 +452,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       let newId;
       setDataSheets((prev) => {
         const keys = Object.keys(prev);
-        const nextNum = keys.length + 1;
+        const nextNum =
+          keys.reduce((max, k) => {
+            const n = parseInt(String(k).replace(/\D/g, ""), 10) || 0;
+            return Math.max(max, n);
+          }, 0) + 1;
         newId = `sheet-${nextNum}`;
         return { ...prev, [newId]: { name: `Sheet ${nextNum}`, data: [] } };
       });

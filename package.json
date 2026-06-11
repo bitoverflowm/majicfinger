@@ -12,6 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "athena:smoke": "node scripts/athena-smoke-test.js",
+    "test:workspace": "node --import ./scripts/register-alias.mjs ./scripts/run-workspace-unit-tests.mjs",
     "stripe:reconcile": "node scripts/reconcile-stripe-entitlements.cjs"
   },
   "dependencies": {

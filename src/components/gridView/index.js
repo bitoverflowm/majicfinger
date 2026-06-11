@@ -2492,7 +2492,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
           rowCount: projected.length,
         });
 
-        const writeRefinedSheet = (targetSheetId, { name, provenance, sourceSheetId, resetHistory }) => {
+        const writeRefinedSheet = (targetSheetId, { name, provenance, sourceSheetId, resetHistory, scope: refineScopeLocal }) => {
+          const isDerivedPreview = refineScopeLocal === "preview" && refineDestination === "new_sheet";
           setSheetData?.(targetSheetId, projected);
           setDataSheets?.((prev) => {
             const p = prev || {};
@@ -2510,8 +2511,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 data: projected,
                 rowCount: projected.length,
                 fullRowCount: projected.length,
-                provenance: provenance ?? sh.provenance ?? null,
+                provenance: isDerivedPreview ? null : provenance ?? sh.provenance ?? null,
                 sourceSheetId: sourceSheetId ?? sh.sourceSheetId,
+                storageMode: isDerivedPreview ? "derived" : sh.storageMode || "inline",
+                rehydrationStatus: isDerivedPreview ? "complete" : sh.rehydrationStatus,
                 operationHistory: history,
                 requestCards: resetHistory ? [refineCard] : [...existingCards, refineCard],
               },
@@ -2532,6 +2535,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
               provenance: scope === "athena" ? baseSheet?.provenance ?? null : null,
               sourceSheetId: activeSheetId,
               resetHistory: true,
+              scope,
             });
           });
           toast.success(`Created new sheet (${projected.length} rows).`);
@@ -2542,6 +2546,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
             provenance: baseSheet?.provenance ?? null,
             sourceSheetId: baseSheet?.sourceSheetId || activeSheetId,
             resetHistory: false,
+            scope,
           });
           toast.success(`Updated sheet (${projected.length} rows).`);
         }

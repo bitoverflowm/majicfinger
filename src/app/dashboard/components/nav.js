@@ -357,10 +357,13 @@ const Nav = () => {
   const setChartDataOverrideMeta = contextStateV2?.setChartDataOverrideMeta
 
   const liveStreamState = contextStateV2?.liveStreamState
+  const liveStreamState = contextStateV2?.liveStreamState
   const liveStreamActions = contextStateV2?.liveStreamActions
   const dataSheets = contextStateV2?.dataSheets
   const setDataSheets = contextStateV2?.setDataSheets
   const setActiveSheetId = contextStateV2?.setActiveSheetId
+  const setConnectedCols = contextStateV2?.setConnectedCols
+  const setDataTypes = contextStateV2?.setDataTypes
   const chartSnapshotFlusher = contextStateV2?.chartSnapshotFlusher
   const [selectedStreamSheetId, setSelectedStreamSheetId] = useState(null)
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {}
@@ -970,6 +973,8 @@ const Nav = () => {
         setDataSheets,
         setActiveSheetId,
         setConnectedData,
+        setConnectedCols,
+        setDataTypes,
         setLoadedDataMeta,
         setLoadedDataId,
         setSavedCharts,
@@ -984,6 +989,10 @@ const Nav = () => {
         requestConnectAnalyzeScroll,
         setRightPanelTab,
         setRightPanelOpen,
+        setChartDataOverride,
+        setChartDataOverrideMeta,
+        liveStreamActions,
+        liveStreamState,
       });
       toast.success(`Project: ${dataSet?.data_set_name || loadedDataMeta?.data_set_name || "Untitled"} loaded`, {
         duration: 99999999,

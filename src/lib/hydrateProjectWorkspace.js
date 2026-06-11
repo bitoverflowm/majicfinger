@@ -3,6 +3,10 @@ import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { rehydrateProjectProvenanceSheets } from "@/lib/rehydrateProjectProvenanceSheets";
+import {
+  pickInitialActiveSheetId,
+  replayProjectDerivedSheets,
+} from "@/lib/replayProjectDerivedSheets";
 import { stripProvenanceRowPayloadForLoad } from "@/lib/projectPersistence";
 
 /**
@@ -10,28 +14,24 @@ import { stripProvenanceRowPayloadForLoad } from "@/lib/projectPersistence";
  * Used by the nav (open project / open chart) and dashboard composer (open dashboard).
  */
 
-/**
- * @param {object} ds DataSet document from `/api/dataSets/dataSet/:id`
- * @param {{ setDataSheets?: Function; setActiveSheetId?: Function; setConnectedData?: Function }} setters
- */
-function pickInitialActiveSheetId(sheets) {
-  const entries = Object.entries(sheets || {});
-  const withData = entries.find(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length > 0);
-  if (withData) return withData[0];
-  return entries[0]?.[0] || null;
-}
-
 export function applyDataSetToWorkspace(ds, { setDataSheets, setActiveSheetId, setConnectedData }) {
   const incomingSheets = ds?.data_sheets && typeof ds.data_sheets === "object" ? ds.data_sheets : null;
   if (incomingSheets && Object.keys(incomingSheets).length > 0) {
     const normalizedSheets = Object.entries(incomingSheets).reduce((acc, [sheetId, sheet]) => {
-      const mode = sheet?.storageMode === "provenance" ? "provenance" : "inline";
+      const mode =
+        sheet?.storageMode === "provenance"
+          ? "provenance"
+          : sheet?.storageMode === "derived"
+            ? "derived"
+            : "inline";
       acc[sheetId] = {
         ...sheet,
         data: Array.isArray(sheet?.data) ? sheet.data : [],
         storageMode: mode,
         rehydrationStatus:
-          mode === "provenance" ? (sheet?.rehydrationStatus || "pending") : "complete",
+          mode === "provenance" || mode === "derived"
+            ? sheet?.rehydrationStatus || "pending"
+            : "complete",
       };
       return acc;
     }, {});
@@ -70,17 +70,6 @@ export function firstDashboardLayoutChartId(layout) {
 
 /**
  * Fetch full chart documents for a data set and populate `chartSheets` + active chart.
- * @param {object} opts
- * @param {string} opts.dataSetId
- * @param {string} opts.userId
- * @param {string|null} [opts.preferredChartId]
- * @param {Function} [opts.setSavedCharts]
- * @param {Function} [opts.setChartSheets]
- * @param {Function} [opts.setActiveChartSheetId]
- * @param {Function} [opts.setLoadedChartMeta]
- * @param {Function} [opts.setLoadedChartBuilderSnapshot]
- * @param {Record<string, object>} [opts.dataSheets]
- * @param {unknown[]} [opts.legacyRows]
  */
 export async function hydrateChartSheetsForDataSet({
   dataSetId,
@@ -177,26 +166,23 @@ export async function hydrateChartSheetsForDataSet({
   );
 }
 
-/**
- * Fetch a saved project by id and hydrate sheet + chart workspace (same core path as nav "Open project").
- * @param {object} opts
- * @param {string} opts.dataSetId
- * @param {string} [opts.userId]
- * @param {Function} [opts.setDataSheets]
- * @param {Function} [opts.setActiveSheetId]
- * @param {Function} [opts.setConnectedData]
- * @param {Function} [opts.setLoadedDataMeta]
- * @param {Function} [opts.setLoadedDataId]
- * @param {Function} [opts.setSavedCharts]
- * @param {Function} [opts.setChartSheets]
- * @param {Function} [opts.setActiveChartSheetId]
- * @param {Function} [opts.setLoadedChartMeta]
- * @param {Function} [opts.setLoadedChartBuilderSnapshot]
- * @param {Function} [opts.setRefetchChartDashboardsTick]
- */
 function yieldToPaint() {
   if (typeof window === "undefined") return Promise.resolve();
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
+function applyActiveSheetFromSheets(allSheets, preferredSheetId, setters) {
+  const { setDataSheets, setActiveSheetId, setConnectedData } = setters;
+  if (!allSheets || !setDataSheets) return;
+  setDataSheets({ ...allSheets });
+  const activeKey =
+    (preferredSheetId && Array.isArray(allSheets[preferredSheetId]?.data) && allSheets[preferredSheetId].data.length
+      ? preferredSheetId
+      : null) || pickInitialActiveSheetId(allSheets);
+  if (activeKey) {
+    setActiveSheetId?.(activeKey);
+    setConnectedData?.(Array.isArray(allSheets[activeKey]?.data) ? allSheets[activeKey].data : []);
+  }
 }
 
 export async function loadFullProjectFromApi({
@@ -214,6 +200,7 @@ export async function loadFullProjectFromApi({
   setLoadedChartMeta,
   setLoadedChartBuilderSnapshot,
   setRefetchChartDashboardsTick,
+  onRehydrateProgress,
 }) {
   if (!dataSetId) throw new Error("Missing project id");
   const response = await fetch(`/api/dataSets/dataSet/${dataSetId}`, {
@@ -230,7 +217,6 @@ export async function loadFullProjectFromApi({
   const incomingSheets =
     stripped?.data_sheets && typeof stripped.data_sheets === "object" ? stripped.data_sheets : null;
   const preferredSheetId = incomingSheets ? pickInitialActiveSheetId(incomingSheets) : null;
-  const firstSheetId = preferredSheetId || (incomingSheets ? Object.keys(incomingSheets)[0] : null);
 
   applyDataSetToWorkspace(stripped, { setDataSheets, setActiveSheetId, setConnectedData });
   setLoadedDataMeta?.(stripped);
@@ -240,7 +226,7 @@ export async function loadFullProjectFromApi({
 
   await yieldToPaint();
 
-  const chartsTask = hydrateChartSheetsForDataSet({
+  await hydrateChartSheetsForDataSet({
     dataSetId,
     userId,
     preferredChartId,
@@ -253,39 +239,35 @@ export async function loadFullProjectFromApi({
     legacyRows: stripped?.data,
   });
 
-  await chartsTask;
-
   if (incomingSheets && Object.keys(incomingSheets).length && setDataSheets) {
-    void rehydrateProjectProvenanceSheets(incomingSheets, {
-      onSheetDone: (sheetId, updated, allSheets) => {
-        setDataSheets({ ...allSheets });
-        const activeKey = firstSheetId && allSheets[firstSheetId]?.data?.length
-          ? firstSheetId
-          : pickInitialActiveSheetId(allSheets) || sheetId;
-        if (activeKey && Array.isArray(allSheets[activeKey]?.data) && allSheets[activeKey].data.length) {
-          setActiveSheetId?.(activeKey);
-          setConnectedData?.(allSheets[activeKey].data);
-        } else if (sheetId === firstSheetId || !allSheets[firstSheetId]?.data?.length) {
-          setActiveSheetId?.(sheetId);
-          setConnectedData?.(Array.isArray(updated?.data) ? updated.data : []);
-        }
-      },
-    })
-      .then((rehydrated) => {
-        if (!rehydrated || !setDataSheets) return;
-        setDataSheets(rehydrated);
-        const activeKey =
-          (firstSheetId && Array.isArray(rehydrated[firstSheetId]?.data) && rehydrated[firstSheetId].data.length
-            ? firstSheetId
-            : null) || pickInitialActiveSheetId(rehydrated);
-        if (activeKey) {
-          setActiveSheetId?.(activeKey);
-          setConnectedData?.(Array.isArray(rehydrated[activeKey]?.data) ? rehydrated[activeKey].data : []);
-        }
-      })
-      .catch((e) => {
-        console.warn("[loadFullProjectFromApi] Provenance rehydrate failed:", e?.message || e);
+    onRehydrateProgress?.("Re-running saved Data Lake queries…");
+    let workingSheets = { ...incomingSheets };
+    Object.entries(stripped?.data_sheets || {}).forEach(([id, sheet]) => {
+      workingSheets[id] = { ...sheet, ...(workingSheets[id] || {}) };
+    });
+
+    try {
+      workingSheets = await rehydrateProjectProvenanceSheets(workingSheets, {
+        onSheetDone: (_sheetId, _updated, allSheets) => {
+          workingSheets = allSheets;
+        },
       });
+      onRehydrateProgress?.("Replaying derived sheet filters…");
+      workingSheets = replayProjectDerivedSheets(workingSheets);
+      applyActiveSheetFromSheets(workingSheets, preferredSheetId, {
+        setDataSheets,
+        setActiveSheetId,
+        setConnectedData,
+      });
+    } catch (e) {
+      console.warn("[loadFullProjectFromApi] Sheet replay failed:", e?.message || e);
+      workingSheets = replayProjectDerivedSheets(workingSheets);
+      applyActiveSheetFromSheets(workingSheets, preferredSheetId, {
+        setDataSheets,
+        setActiveSheetId,
+        setConnectedData,
+      });
+    }
   }
 
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
@@ -320,9 +302,6 @@ export function finishConnectHomeProjectLoad({
   setRightPanelOpen?.(true);
 }
 
-/**
- * Fetch project + hydrate workspace, then show it in Connect home.
- */
 export async function openProjectInConnectHome({
   dataSetId,
   userId,

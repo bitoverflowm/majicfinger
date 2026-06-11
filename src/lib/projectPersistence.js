@@ -206,6 +206,109 @@ export function sheetHasComposeProvenance(sheet) {
   );
 }
 
+export function sheetHasRefineRecipe(sheet) {
+  const hist = Array.isArray(sheet?.operationHistory) ? sheet.operationHistory : [];
+  return hist.some((op) => op?.type === "refine.query");
+}
+
+const DEFAULT_SHEET_NAME_RE = /^Sheet \d+$/;
+
+export function isDefaultOrphanSheetName(name) {
+  return DEFAULT_SHEET_NAME_RE.test(String(name || "").trim());
+}
+
+/**
+ * Orphan duplicate: default "Sheet N" tab with full row copy, no ops, no lineage.
+ * @param {object} sheet
+ * @param {Set<number>} provenanceFullCounts
+ */
+export function sheetIsOrphanDefaultDuplicate(sheet, provenanceFullCounts) {
+  if (!sheet || typeof sheet !== "object") return false;
+  if (!isDefaultOrphanSheetName(sheet?.name)) return false;
+  const hist = Array.isArray(sheet?.operationHistory) ? sheet.operationHistory : [];
+  if (hist.length > 0) return false;
+  if (sheetHasComposeProvenance(sheet) || sheet?.sourceSheetId || sheetHasRefineRecipe(sheet)) return false;
+  const rows = Array.isArray(sheet?.data) ? sheet.data.length : 0;
+  if (rows <= 0) return false;
+  const full = Math.floor(Number(sheet?.fullRowCount) || rows);
+  return provenanceFullCounts.has(rows) || provenanceFullCounts.has(full);
+}
+
+/**
+ * Drop stray default tabs that duplicate a provenance parent's row count.
+ * @param {Record<string, object>} dataSheets
+ */
+export function pruneOrphanDuplicateSheetsForPersist(dataSheets) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? { ...dataSheets } : {};
+  const provenanceFullCounts = new Set();
+  for (const sheet of Object.values(sheets)) {
+    if (sheetHasComposeProvenance(sheet)) {
+      const full = resolvePersistedFullRowCount(sheet, 0);
+      if (full > 0) provenanceFullCounts.add(full);
+    }
+  }
+  for (const [id, sheet] of Object.entries(sheets)) {
+    if (sheetIsOrphanDefaultDuplicate(sheet, provenanceFullCounts)) {
+      delete sheets[id];
+    }
+  }
+  return sheets;
+}
+
+/**
+ * Persist refine-derived sheets as recipes (sourceSheetId + operationHistory), not row bulk.
+ * @param {Record<string, object>} dataSheets
+ */
+export function stripRefineRecipeSheetsForPersist(dataSheets) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? { ...dataSheets } : {};
+  return Object.entries(sheets).reduce((acc, [sheetId, sheet]) => {
+    if (!sheet || typeof sheet !== "object") {
+      acc[sheetId] = sheet;
+      return acc;
+    }
+    const isRefineDerived =
+      sheetHasRefineRecipe(sheet) &&
+      !sheetHasComposeProvenance(sheet) &&
+      (sheet?.sourceSheetId || sheet?.storageMode === "derived");
+    if (!isRefineDerived) {
+      acc[sheetId] = sheet;
+      return acc;
+    }
+    const fullRowCount = resolvePersistedFullRowCount(
+      sheet,
+      Array.isArray(sheet?.data) ? sheet.data.length : 0,
+    );
+    acc[sheetId] = {
+      ...sheet,
+      data: [],
+      storageMode: "derived",
+      previewRowCount: 0,
+      rowCount: fullRowCount || sheet.rowCount || 0,
+      fullRowCount: fullRowCount || sheet.fullRowCount || sheet.rowCount || 0,
+      rehydrationStatus: "pending",
+      saveMeta: {
+        ...(sheet.saveMeta && typeof sheet.saveMeta === "object" ? sheet.saveMeta : {}),
+        recipeOnly: true,
+        persistRows: false,
+        fullRowCount,
+      },
+    };
+    return acc;
+  }, {});
+}
+
+/**
+ * Full save hygiene: prune orphans, strip refine + compose row payloads.
+ * @param {Record<string, object>} dataSheets
+ */
+export function sanitizeSheetsForPersist(dataSheets) {
+  let sheets = dataSheets && typeof dataSheets === "object" ? { ...dataSheets } : {};
+  sheets = pruneOrphanDuplicateSheetsForPersist(sheets);
+  sheets = stripRefineRecipeSheetsForPersist(sheets);
+  sheets = stripProvenanceRowPayloadFromSheets(sheets);
+  return sheets;
+}
+
 /**
  * Strip persisted row payloads from compose/provenance sheets (load + save hygiene).
  * @param {Record<string, object>} dataSheets
@@ -248,7 +351,8 @@ export function stripProvenanceRowPayloadFromSheets(dataSheets) {
 export function stripProvenanceRowPayloadForLoad(dataSet) {
   if (!dataSet || typeof dataSet !== "object") return dataSet;
   const dataSheets = dataSet.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
-  const nextSheets = stripProvenanceRowPayloadFromSheets(dataSheets);
+  let nextSheets = stripProvenanceRowPayloadFromSheets(dataSheets);
+  nextSheets = stripRefineRecipeSheetsForPersist(nextSheets);
   const hasInlineRows = Object.values(nextSheets).some((s) => Array.isArray(s?.data) && s.data.length > 0);
   return {
     ...dataSet,
@@ -263,7 +367,7 @@ export function stripProvenanceRowPayloadForLoad(dataSet) {
  * @returns {Record<string, object>}
  */
 export function sanitizeProvenanceSheetsForPersist(dataSheets) {
-  return stripProvenanceRowPayloadFromSheets(dataSheets);
+  return sanitizeSheetsForPersist(dataSheets);
 }
 
 /** Largest `loadedRowCount` recorded on integration request cards for this sheet. */
@@ -311,8 +415,16 @@ export function isPartialProvenanceReload(sheet, loadedRowCount) {
 function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, estimatedFullBytes }) {
   const rowList = Array.isArray(rows) ? rows : [];
   const hasProvenance = sheetHasComposeProvenance(sheet);
-  const effectiveStorageMode = hasProvenance ? "provenance" : storageMode;
-  const recipeOnly = hasProvenance;
+  const isRefineDerived =
+    sheetHasRefineRecipe(sheet) &&
+    !hasProvenance &&
+    (sheet?.sourceSheetId || sheet?.storageMode === "derived");
+  const effectiveStorageMode = hasProvenance
+    ? "provenance"
+    : isRefineDerived
+      ? "derived"
+      : storageMode;
+  const recipeOnly = hasProvenance || isRefineDerived;
   const data = recipeOnly
     ? []
     : effectiveStorageMode === "inline"
@@ -337,6 +449,7 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
     columns,
     dataTypes: sheet?.dataTypes || null,
     provenance: sheet?.provenance ?? null,
+    sourceSheetId: sheet?.sourceSheetId ?? null,
     operationHistory,
     requestCards: Array.isArray(sheet?.requestCards) ? sheet.requestCards : [],
     rehydrationStatus,
@@ -358,7 +471,8 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
 }
 
 function buildSheets(dataSheets, previewLimit, forceProvenance) {
-  const entries = Object.entries(dataSheets || {});
+  const sanitized = sanitizeSheetsForPersist(dataSheets);
+  const entries = Object.entries(sanitized || {});
   return entries.reduce((acc, [sheetId, sheet]) => {
     const rows = Array.isArray(sheet?.data) ? sheet.data : [];
     const name = String(sheet?.name || sheetId);
