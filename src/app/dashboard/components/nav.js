@@ -357,7 +357,6 @@ const Nav = () => {
   const setChartDataOverrideMeta = contextStateV2?.setChartDataOverrideMeta
 
   const liveStreamState = contextStateV2?.liveStreamState
-  const liveStreamState = contextStateV2?.liveStreamState
   const liveStreamActions = contextStateV2?.liveStreamActions
   const dataSheets = contextStateV2?.dataSheets
   const setDataSheets = contextStateV2?.setDataSheets
