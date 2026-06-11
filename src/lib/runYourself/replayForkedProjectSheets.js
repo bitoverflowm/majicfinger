@@ -39,7 +39,12 @@ export async function replayForkedProjectSheets({ dataSheets, sheetOrder, access
       });
       try {
         const json = await runRehydrateSheetCore(body, access);
-        const rows = normalizeLakeBigintFieldsInRows(Array.isArray(json?.rows) ? json.rows : []);
+        let rows = normalizeLakeBigintFieldsInRows(Array.isArray(json?.rows) ? json.rows : []);
+        const history = refreshForkOperationHistory({ ...sheet, provenance });
+        rows = replayOperations({
+          rows,
+          operations: history.filter((op) => op?.type !== "source.compose"),
+        });
         rowsBySheet.set(sheetId, rows);
         sheets[sheetId] = {
           ...sheet,
@@ -49,7 +54,7 @@ export async function replayForkedProjectSheets({ dataSheets, sheetOrder, access
           rowCount: rows.length,
           fullRowCount: json?.rowCount ?? rows.length,
           columns: Array.isArray(json?.columns) ? json.columns : sheet.columns,
-          operationHistory: refreshForkOperationHistory({ ...sheet, provenance }),
+          operationHistory: history,
         };
       } catch (err) {
         throw new Error(`Failed to rehydrate sheet "${sheet.name || sheetId}": ${err?.message || err}`);

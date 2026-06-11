@@ -101,6 +101,11 @@ function operationAnalysisSummary(op) {
   if (op.type === "join.sheet") return "Join sheets";
   if (op.type === "filter.rows") return "Filter rows";
   if (op.type === "select.columns") return "Select columns";
+  if (op.type === "refine.query") {
+    const cols = Array.isArray(op.selectColumns) ? op.selectColumns.join(", ") : "";
+    const scope = String(op.scope || "preview");
+    return cols ? `Refine (${scope}): ${cols}` : `Refine (${scope})`;
+  }
   if (op.type === "sort.rows") return "Sort rows";
   return String(op.type || "analysis").replace(/\./g, " ");
 }

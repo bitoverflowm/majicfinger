@@ -1,0 +1,130 @@
+Cluster: Politics
+
+title: The 90% Trap: Do Prediction Markets Become Overconfident At Extreme Probabilities?
+
+---
+
+Assumption Being Challenged
+
+Prediction market probabilities are well-calibrated across the entire probability spectrum.
+
+Most users implicitly believe:
+
+If a market is trading at 90%, it should resolve YES roughly 90% of the time.
+
+---
+
+Hypothesis
+
+Prediction markets are reasonably calibrated overall but become systematically overconfident at extreme probability levels (80–99%).
+
+In other words:
+
+High-confidence predictions fail more often than traders expect.
+
+
+---
+
+Why Readers Care
+
+This matters because:
+- Traders rely heavily on probability levels when entering positions.
+- Journalists quote market probabilities as confidence estimates.
+- Researchers frequently cite prediction markets as calibration benchmarks.
+- A 95% probability sounds extremely reliable.
+
+If 95% markets only resolve correctly 88–90% of the time, that changes how people should interpret market prices.
+
+Readers immediately understand the question:
+
+"Can I trust a 90% prediction market?"
+
+
+---
+
+Suggested Analytical Methods
+
+Calibration Curves
+
+Compare:
+
+Predicted probability 
+vs
+Actual resolution frequency
+
+---
+
+Brier Score By Probability Bucket
+
+Measure prediction quality across confidence levels.
+
+Determine whether:
+- low-confidence markets
+- medium-confidence markets
+- high-confidence markets
+
+produce different error profiles.
+
+---
+
+Reliability Diagrams
+
+One of the most visually compelling charts available.
+
+Shows:
+
+Expected Probability
+
+vs
+
+Observed Probability
+
+Readers instantly understand it.
+
+---
+
+Confidence Error Distribution
+
+Measure:
+
+Market Probability - Outcome
+
+across all resolved markets.
+
+Identify whether:
+
+- overconfidence dominates
+- underconfidence dominates
+
+---
+
+Temporal Calibration
+
+Compare calibration:
+
+- 30 days before resolution
+- 14 days before resolution
+- 7 days before resolution
+- 1 day before resolution
+
+Possible surprise:
+
+Markets may become less calibrated as certainty appears to increase.
+
+---
+
+Market Category Comparison
+
+Compare:
+
+- Elections
+- Nominations
+- Congress
+- Geopolitics
+
+Potential finding:
+
+Some domains may be calibrated while others are wildly overconfident.
+
+
+

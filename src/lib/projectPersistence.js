@@ -1,6 +1,7 @@
 import { isLakeBigintColumnName } from "@/lib/dataLake/lakeTableColumns";
 import { normalizeLakeBigintCellValue } from "@/lib/dataLake/lakeBigintNormalize";
 import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
+import { applyRefineQueryToRows } from "@/lib/sheetOperations/refineQuery";
 import { compareConditionValues } from "@/lib/ifElseConditionValues";
 
 export const PROJECT_FULL_DATA_SAFE_BYTES = 12 * 1024 * 1024;
@@ -642,6 +643,12 @@ export function applyBrowserOperationToRows(rows, op) {
   }
   if (op.type === "computed.column") {
     return applyComputedColumnOperation(list, op);
+  }
+  if (op.type === "refine.query") {
+    return applyRefineQueryToRows(list, {
+      selectColumns: op.selectColumns,
+      filters: op.filters,
+    });
   }
   return list;
 }

@@ -1,14 +1,14 @@
 /**
  * Run a bounded SELECT over the *full* Athena dataset by wrapping an existing sheet's
  * provenance as a CTE (no LIMIT on the CTE), then applying an outer SELECT + optional
- * numeric WHERE + LIMIT 100 on the final result.
+ * typed WHERE + LIMIT on the final result.
  *
  * POST JSON:
  * {
  *   sheetGraph: { [sheetId]: { name: string, provenance: { kind: "compose", ... } } },
  *   rootSheetId: string,
  *   selectColumns: string[],
- *   refineFilters?: { and: Array<{ column: string, op: string, value: number }> }
+ *   refineFilters?: { and: Array<{ column: string, op: string, kind: string, value: any }> }
  * }
  */
 import {
@@ -24,6 +24,7 @@ import {
 } from "../../../lib/dataLake/composeWherePredicateSql";
 import { getAthenaQueryState, fetchAthenaQueryResultRows } from "../../../lib/dataLake/runAthenaSelect";
 import { getAthenaAccessFromRequest } from "../../../lib/athenaAccess";
+import { buildRefineOuterWhereSql } from "../../../lib/sheetOperations/refineQuery";
 
 function parseBody(req) {
   if (typeof req.body === "string") {
@@ -65,28 +66,6 @@ function assertAthenaConfig() {
     throw err;
   }
   return output;
-}
-
-function buildRefineOuterWhereSql(baseAlias, refineFilters) {
-  const andPreds = Array.isArray(refineFilters?.and) ? refineFilters.and : [];
-  if (!andPreds.length) return "";
-  const parts = [];
-  for (const p of andPreds) {
-    const col = safeColumnName(p.column);
-    if (!col) continue;
-    const v = Number(p.value);
-    if (!Number.isFinite(v)) continue;
-    const csql = `${baseAlias}."${col}"`;
-    const cast = `CAST(${csql} AS DOUBLE)`;
-    const op = String(p.op || "eq").toLowerCase();
-    if (op === "gte" || op === "ge") parts.push(`${cast} >= ${v}`);
-    else if (op === "lte" || op === "le") parts.push(`${cast} <= ${v}`);
-    else if (op === "gt") parts.push(`${cast} > ${v}`);
-    else if (op === "lt") parts.push(`${cast} < ${v}`);
-    else if (op === "eq") parts.push(`${cast} = ${v}`);
-    else if (op === "neq" || op === "ne") parts.push(`${cast} <> ${v}`);
-  }
-  return parts.length ? ` WHERE ${parts.join(" AND ")}` : "";
 }
 
 async function executeAthenaSql({ database, sql, maxWaitMs }) {

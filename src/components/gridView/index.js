@@ -121,6 +121,15 @@ import {
 import { aggregateBucketRows, formatBucketNumber } from "@/lib/sheetOperations/aggregateBucketRows";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
 import { temporalToMs } from "@/lib/temporalParse";
+import {
+  applyRefineQueryToRows,
+  buildRefineFilterPredicate,
+  buildRefineQueryOperation,
+  defaultRefineOpForKind,
+  inferRefineColumnKind,
+  refineOpsForKind,
+  summarizeRefineFilters,
+} from "@/lib/sheetOperations/refineQuery";
 import { autoSizeAgGridColumnsToContent } from "@/lib/agGridColumnSizing";
 import * as XLSX from 'xlsx';
 
@@ -222,6 +231,32 @@ function getColKeys(connectedCols) {
 
 function genRequestCardId() {
   return `req-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
+function buildRefineRequestCard({ baseSheet, sourceSheetId, cols, filters, scope, elapsedMs, rowCount }) {
+  const whereSummary = summarizeRefineFilters(filters);
+  const querySummaryParts = [`SELECT ${cols.join(", ")}`];
+  if (whereSummary.hasWhere) querySummaryParts.push(`WHERE ${whereSummary.text}`);
+  return {
+    id: genRequestCardId(),
+    kind: "refine",
+    createdAt: Date.now(),
+    elapsedMs,
+    table: String(baseSheet?.provenance?.table || ""),
+    lake: String(baseSheet?.provenance?.lake || ""),
+    selectAliases: cols,
+    selectColumns: cols,
+    loadedRowCount: rowCount,
+    hasWhere: whereSummary.hasWhere,
+    whereText: whereSummary.text,
+    querySummary: querySummaryParts.join(" · "),
+    refine: {
+      scope,
+      sourceSheetId,
+      sourceSheetLabel: String(baseSheet?.name || sourceSheetId),
+      filters,
+    },
+  };
 }
 
 /** Collect finite numeric values from a column for statistics (coerces numeric strings). */
@@ -568,6 +603,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [refineBusy, setRefineBusy] = useState(false);
     const [refineProgress, setRefineProgress] = useState(0);
     const [refineProgressLabel, setRefineProgressLabel] = useState("");
+    const refineWhereKind = useMemo(
+      () => inferRefineColumnKind(refineWhereCol, dataTypes, connectedData),
+      [refineWhereCol, dataTypes, connectedData],
+    );
+    const refineWhereOps = useMemo(() => refineOpsForKind(refineWhereKind), [refineWhereKind]);
     const [sheetJsonViewerOpen, setSheetJsonViewerOpen] = useState(false);
     const [sheetJsonVisibleRows, setSheetJsonVisibleRows] = useState(SHEET_JSON_INITIAL_ROWS);
     const [sheetJsonAppending, setSheetJsonAppending] = useState(false);
@@ -2417,10 +2457,115 @@ const GridView = ({ startNew, fillViewport = false }) => {
       if (!refineQueryOpen) return;
       const cols = sheetColumnsForProps;
       setRefineSelectedCols(new Set(cols));
-      setRefineWhereCol(cols[0] || "");
-      setRefineWhereVal("");
+      const firstCol = cols[0] || "";
+      setRefineWhereCol(firstCol);
       setRefineNewSheetName("");
-    }, [refineQueryOpen, sheetColumnsForProps]);
+      if (firstCol) {
+        const kind = inferRefineColumnKind(firstCol, dataTypes, connectedData);
+        setRefineWhereOp(defaultRefineOpForKind(kind));
+        setRefineWhereVal(kind === "boolean" ? "true" : "");
+      } else {
+        setRefineWhereVal("");
+      }
+    }, [refineQueryOpen, sheetColumnsForProps, dataTypes, connectedData]);
+
+    useEffect(() => {
+      if (!refineQueryOpen) return;
+      const valid = refineWhereOps.some((op) => op.id === refineWhereOp);
+      if (!valid) setRefineWhereOp(defaultRefineOpForKind(refineWhereKind));
+    }, [refineQueryOpen, refineWhereKind, refineWhereOps, refineWhereOp]);
+
+    const commitRefineResult = useCallback(
+      ({ projected, scope, filters, cols, elapsedMs }) => {
+        const baseSheet = dataSheets[activeSheetId];
+        const refineOperation = createSheetOperation(
+          "refine.query",
+          buildRefineQueryOperation({
+            scope,
+            sourceSheetId: activeSheetId,
+            selectColumns: cols,
+            filters,
+            destination: refineDestination,
+          }),
+        );
+        const refineCard = buildRefineRequestCard({
+          baseSheet,
+          sourceSheetId: activeSheetId,
+          cols,
+          filters,
+          scope,
+          elapsedMs,
+          rowCount: projected.length,
+        });
+
+        const writeRefinedSheet = (targetSheetId, { name, provenance, sourceSheetId, resetHistory }) => {
+          setSheetData?.(targetSheetId, projected);
+          setDataSheets?.((prev) => {
+            const p = prev || {};
+            const sh = p[targetSheetId];
+            if (!sh) return prev;
+            const history = resetHistory
+              ? [refineOperation]
+              : [...(Array.isArray(sh.operationHistory) ? sh.operationHistory : []), refineOperation];
+            const existingCards = Array.isArray(sh.requestCards) ? sh.requestCards : [];
+            return {
+              ...p,
+              [targetSheetId]: {
+                ...sh,
+                name: name ? name.slice(0, 80) : sh.name,
+                data: projected,
+                rowCount: projected.length,
+                fullRowCount: projected.length,
+                provenance: provenance ?? sh.provenance ?? null,
+                sourceSheetId: sourceSheetId ?? sh.sourceSheetId,
+                operationHistory: history,
+                requestCards: resetHistory ? [refineCard] : [...existingCards, refineCard],
+              },
+            };
+          });
+        };
+
+        if (refineDestination === "new_sheet") {
+          if (!addNewSheetAndActivate || !setSheetData) {
+            toast.error("Sheet actions are unavailable.");
+            return false;
+          }
+          const defaultNm = `Refined · ${String(baseSheet?.name || activeSheetId)}`;
+          const nm = String(refineNewSheetName || "").trim() || defaultNm;
+          addNewSheetAndActivate((newId) => {
+            writeRefinedSheet(newId, {
+              name: nm,
+              provenance: scope === "athena" ? baseSheet?.provenance ?? null : null,
+              sourceSheetId: activeSheetId,
+              resetHistory: true,
+            });
+          });
+          toast.success(`Created new sheet (${projected.length} rows).`);
+        } else {
+          replaceCurrentSheetData?.(projected);
+          setConnectedData?.(projected);
+          writeRefinedSheet(activeSheetId, {
+            provenance: baseSheet?.provenance ?? null,
+            sourceSheetId: baseSheet?.sourceSheetId || activeSheetId,
+            resetHistory: false,
+          });
+          toast.success(`Updated sheet (${projected.length} rows).`);
+        }
+        setRefineQueryOpen(false);
+        return true;
+      },
+      [
+        activeSheetId,
+        addNewSheetAndActivate,
+        dataSheets,
+        refineDestination,
+        refineNewSheetName,
+        replaceCurrentSheetData,
+        setConnectedData,
+        setDataSheets,
+        setSheetData,
+      ],
+    );
 
     const applyRefineQuery = useCallback(async () => {
       const cols = Array.from(refineSelectedCols).filter(Boolean);
@@ -2434,96 +2579,32 @@ const GridView = ({ startNew, fillViewport = false }) => {
         return;
       }
 
+      const wCol = String(refineWhereCol || "").trim();
+      const predicate = wCol
+        ? buildRefineFilterPredicate({
+            column: wCol,
+            op: refineWhereOp,
+            kind: refineWhereKind,
+            rawValue: refineWhereVal,
+          })
+        : null;
+      const refineFilters = { and: predicate ? [predicate] : [] };
+
       if (refineScope === "preview") {
         const refinePreviewStarted =
           typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
-        let out = rows;
-        const wCol = String(refineWhereCol || "").trim();
-        const wVal = Number(refineWhereVal);
-        if (wCol && Number.isFinite(wVal)) {
-          const op = refineWhereOp;
-          out = out.filter((r) => {
-            const raw = r?.[wCol];
-            const n = typeof raw === "number" ? raw : Number(raw);
-            if (!Number.isFinite(n)) return false;
-            if (op === "gte") return n >= wVal;
-            if (op === "lte") return n <= wVal;
-            if (op === "gt") return n > wVal;
-            if (op === "lt") return n < wVal;
-            if (op === "eq") return n === wVal;
-            if (op === "neq") return n !== wVal;
-            return true;
-          });
-        }
-        const projected = out.map((r) => {
-          const o = {};
-          for (const c of cols) {
-            if (r && typeof r === "object" && c in r) o[c] = r[c];
-          }
-          return o;
-        });
-        const baseSheet = dataSheets[activeSheetId];
+        const projected = applyRefineQueryToRows(rows, { selectColumns: cols, filters: refineFilters });
         const refineElapsedMs = Math.max(
           0,
           (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - refinePreviewStarted,
         );
-        const refineCard = {
-          id: genRequestCardId(),
-          kind: "refine",
-          createdAt: Date.now(),
+        commitRefineResult({
+          projected,
+          scope: "preview",
+          filters: refineFilters,
+          cols,
           elapsedMs: refineElapsedMs,
-          table: String(baseSheet?.provenance?.table || ""),
-          lake: String(baseSheet?.provenance?.lake || ""),
-          selectAliases: cols,
-          selectColumns: cols,
-          loadedRowCount: projected.length,
-          refine: {
-            scope: "preview",
-            sourceSheetId: activeSheetId,
-            sourceSheetLabel: String(baseSheet?.name || activeSheetId),
-          },
-        };
-        if (refineDestination === "new_sheet") {
-          if (!addNewSheetAndActivate || !setSheetData) {
-            toast.error("Sheet actions are unavailable.");
-            return;
-          }
-          const defaultNm = `Refined · ${String(baseSheet?.name || activeSheetId)}`;
-          const nm = String(refineNewSheetName || "").trim() || defaultNm;
-          addNewSheetAndActivate((newId) => {
-            setSheetData(newId, projected);
-            setDataSheets?.((prev) => {
-              const p = prev || {};
-              const sh = p[newId];
-              if (!sh) return prev;
-              return {
-                ...p,
-                [newId]: {
-                  ...sh,
-                  name: nm.slice(0, 80),
-                  provenance: baseSheet?.provenance ?? null,
-                  requestCards: [refineCard],
-                },
-              };
-            });
-          });
-          toast.success(`Created new sheet (${projected.length} rows).`);
-        } else {
-          replaceCurrentSheetData?.(projected);
-          setConnectedData?.(projected);
-          setDataSheets?.((prev) => {
-            if (!activeSheetId) return prev;
-            const p = prev || {};
-            const sh = p[activeSheetId] || {};
-            const existing = Array.isArray(sh.requestCards) ? sh.requestCards : [];
-            return {
-              ...p,
-              [activeSheetId]: { ...sh, requestCards: [...existing, refineCard] },
-            };
-          });
-          toast.success(`Updated sheet (${projected.length} rows).`);
-        }
-        setRefineQueryOpen(false);
+        });
         return;
       }
 
@@ -2562,13 +2643,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
         return;
       }
 
-      const refineFilters = { and: [] };
-      const wCol = String(refineWhereCol || "").trim();
-      const wVal = Number(refineWhereVal);
-      if (wCol && Number.isFinite(wVal)) {
-        refineFilters.and.push({ column: wCol, op: refineWhereOp, value: wVal });
-      }
-
       setRefineBusy(true);
       setRefineProgressLabel("Sending query to Athena…");
       setRefineProgress(8);
@@ -2601,65 +2675,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
           0,
           (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - refineAthenaStarted,
         );
-        const baseSheet = dataSheets[activeSheetId];
-        const refineCard = {
-          id: genRequestCardId(),
-          kind: "refine",
-          createdAt: Date.now(),
+        commitRefineResult({
+          projected: outRows,
+          scope: "athena",
+          filters: refineFilters,
+          cols,
           elapsedMs: refineAthenaElapsedMs,
-          table: String(baseSheet?.provenance?.table || ""),
-          lake: String(baseSheet?.provenance?.lake || ""),
-          selectAliases: cols,
-          selectColumns: cols,
-          loadedRowCount: outRows.length,
-          refine: {
-            scope: "athena",
-            sourceSheetId: activeSheetId,
-            sourceSheetLabel: String(baseSheet?.name || activeSheetId),
-          },
-        };
-        if (refineDestination === "new_sheet") {
-          if (!addNewSheetAndActivate || !setSheetData) {
-            throw new Error("Sheet actions are unavailable.");
-          }
-          const defaultNm = `Refined · ${String(baseSheet?.name || activeSheetId)}`;
-          const nm = String(refineNewSheetName || "").trim() || defaultNm;
-          addNewSheetAndActivate((newId) => {
-            setSheetData(newId, outRows);
-            setDataSheets?.((prev) => {
-              const p = prev || {};
-              const sh = p[newId];
-              if (!sh) return prev;
-              return {
-                ...p,
-                [newId]: {
-                  ...sh,
-                  name: nm.slice(0, 80),
-                  provenance: baseSheet?.provenance ?? null,
-                  requestCards: [refineCard],
-                },
-              };
-            });
-          });
-          toast.success(`New sheet: ${outRows.length} rows from Athena.`);
-        } else {
-          replaceCurrentSheetData?.(outRows);
-          setConnectedData?.(outRows);
-          setDataSheets?.((prev) => {
-            if (!activeSheetId) return prev;
-            const p = prev || {};
-            const sh = p[activeSheetId] || {};
-            const existing = Array.isArray(sh.requestCards) ? sh.requestCards : [];
-            return {
-              ...p,
-              [activeSheetId]: { ...sh, requestCards: [...existing, refineCard] },
-            };
-          });
-          toast.success(`Loaded ${outRows.length} rows from Athena.`);
-        }
+        });
         setRefineProgress(100);
         setRefineProgressLabel("Done");
-        setRefineQueryOpen(false);
       } catch (e) {
         toast.error(e?.message || "Refine query failed.");
       } finally {
@@ -2669,21 +2693,16 @@ const GridView = ({ startNew, fillViewport = false }) => {
         setRefineProgressLabel("");
       }
     }, [
-      addNewSheetAndActivate,
-      refineDestination,
-      refineNewSheetName,
-      refineSelectedCols,
+      activeSheetId,
+      commitRefineResult,
       connectedData,
+      dataSheets,
       refineScope,
+      refineSelectedCols,
       refineWhereCol,
+      refineWhereKind,
       refineWhereOp,
       refineWhereVal,
-      activeSheetId,
-      dataSheets,
-      replaceCurrentSheetData,
-      setConnectedData,
-      setDataSheets,
-      setSheetData,
     ]);
 
     const dateColumns = useMemo(() => {
@@ -5098,9 +5117,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
                     <DialogHeader>
                       <DialogTitle>Refine query</DialogTitle>
                       <DialogDescription>
-                        Select columns and an optional numeric filter. Run on loaded rows only, or re-query the full dataset in
-                        Athena using this sheet&apos;s provenance (row cap depends on your plan). Choose
-                        whether to replace the active sheet or open a new one with the result.
+                        Select columns and an optional filter. Run on loaded rows only, or re-query the full dataset in Athena
+                        using this sheet&apos;s provenance (row cap depends on your plan). Choose whether to replace the active
+                        sheet or open a new one with the result.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -5191,11 +5210,19 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs">Optional numeric filter (WHERE)</Label>
+                        <Label className="text-xs">Optional filter (WHERE)</Label>
                         <div className="flex flex-wrap gap-2 items-end">
                           <div className="space-y-1 min-w-[7rem] flex-1">
                             <Label className="text-[10px] text-muted-foreground">Column</Label>
-                            <Select value={refineWhereCol || ""} onValueChange={setRefineWhereCol}>
+                            <Select
+                              value={refineWhereCol || ""}
+                              onValueChange={(col) => {
+                                setRefineWhereCol(col);
+                                const kind = inferRefineColumnKind(col, dataTypes, connectedData);
+                                setRefineWhereOp(defaultRefineOpForKind(kind));
+                                setRefineWhereVal(kind === "boolean" ? "true" : "");
+                              }}
+                            >
                               <SelectTrigger className="h-8 text-xs">
                                 <SelectValue placeholder="Column" />
                               </SelectTrigger>
@@ -5215,36 +5242,55 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="gte" className="text-xs">
-                                  ≥
-                                </SelectItem>
-                                <SelectItem value="lte" className="text-xs">
-                                  ≤
-                                </SelectItem>
-                                <SelectItem value="gt" className="text-xs">
-                                  &gt;
-                                </SelectItem>
-                                <SelectItem value="lt" className="text-xs">
-                                  &lt;
-                                </SelectItem>
-                                <SelectItem value="eq" className="text-xs">
-                                  =
-                                </SelectItem>
-                                <SelectItem value="neq" className="text-xs">
-                                  ≠
-                                </SelectItem>
+                                {refineWhereOps.map((op) => (
+                                  <SelectItem key={op.id} value={op.id} className="text-xs">
+                                    {op.label}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
                           <div className="space-y-1 min-w-[6rem] flex-1">
-                            <Label className="text-[10px] text-muted-foreground">Value</Label>
-                            <Input
-                              className="h-8 text-xs"
-                              type="number"
-                              value={refineWhereVal}
-                              onChange={(e) => setRefineWhereVal(e.target.value)}
-                              placeholder="e.g. 100"
-                            />
+                            <Label className="text-[10px] text-muted-foreground">
+                              Value
+                              <span className="ml-1 font-normal text-muted-foreground/80">({refineWhereKind})</span>
+                            </Label>
+                            {refineWhereKind === "boolean" ? (
+                              <Select
+                                value={refineWhereVal || "__skip__"}
+                                onValueChange={(v) => setRefineWhereVal(v === "__skip__" ? "" : v)}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="—" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__skip__" className="text-xs">
+                                    —
+                                  </SelectItem>
+                                  <SelectItem value="true" className="text-xs">
+                                    true
+                                  </SelectItem>
+                                  <SelectItem value="false" className="text-xs">
+                                    false
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                className="h-8 text-xs"
+                                type={refineWhereKind === "number" ? "number" : "text"}
+                                value={refineWhereVal}
+                                onChange={(e) => setRefineWhereVal(e.target.value)}
+                                placeholder={
+                                  refineWhereKind === "number"
+                                    ? "e.g. 100"
+                                    : refineWhereKind === "date"
+                                      ? "e.g. 2024-01-15"
+                                      : 'e.g. "true"'
+                                }
+                                spellCheck={false}
+                              />
+                            )}
                           </div>
                         </div>
                         <p className="text-[10px] text-muted-foreground">
