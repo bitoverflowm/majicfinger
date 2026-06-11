@@ -113,13 +113,21 @@ test("replayProjectDerivedSheets applies refine.query from parent rows", () => {
   assert.equal(replayed["sheet-2"].data[0].name, "a");
 });
 
-test("pickInitialActiveSheetId prefers named sheets over orphan defaults", () => {
+test("pickInitialActiveSheetId prefers compose provenance parent over derived and orphans", () => {
   const id = pickInitialActiveSheetId({
     "sheet-7": { name: "Sheet 1", data: new Array(100).fill({}) },
     "sheet-2": { name: "A_markets", data: [], storageMode: "derived", operationHistory: [{ type: "refine.query" }] },
     "sheet-1": { name: "all_political_markets", data: [], fullRowCount: 100, provenance: { kind: "compose" } },
   });
-  assert.equal(id, "sheet-2");
+  assert.equal(id, "sheet-1");
+});
+
+test("pickInitialActiveSheetId prefers provenance parent over small inline sheets", () => {
+  const id = pickInitialActiveSheetId({
+    "sheet-1": { name: "all_political_markets", data: [], fullRowCount: 7460, provenance: { kind: "compose" } },
+    "sheet-2": { name: "calibration_analysis", data: new Array(10).fill({ x: 1 }) },
+  });
+  assert.equal(id, "sheet-1");
 });
 
 test("buildProjectDeltaPayload records deleted sheet ids", () => {

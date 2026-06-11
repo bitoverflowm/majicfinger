@@ -92,7 +92,7 @@ async function rehydrateOneSheet(dataSheets, sheetId) {
   return {
     ...sheet,
     data: rows,
-    storageMode: "provenance",
+    storageMode: partial ? "provenance" : "inline",
     rehydrationStatus: partial ? "pending" : "complete",
     rowCount: rows.length,
     fullRowCount,

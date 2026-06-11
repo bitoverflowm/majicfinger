@@ -5,6 +5,7 @@ import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { rehydrateProjectProvenanceSheets } from "@/lib/rehydrateProjectProvenanceSheets";
 import {
   pickInitialActiveSheetId,
+  pickPrimaryProvenanceSheetId,
   replayProjectDerivedSheets,
 } from "@/lib/replayProjectDerivedSheets";
 import { stripProvenanceRowPayloadForLoad } from "@/lib/projectPersistence";
@@ -171,14 +172,11 @@ function yieldToPaint() {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function applyActiveSheetFromSheets(allSheets, preferredSheetId, setters) {
+function applyActiveSheetFromSheets(allSheets, setters) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = setters;
   if (!allSheets || !setDataSheets) return;
   setDataSheets({ ...allSheets });
-  const activeKey =
-    (preferredSheetId && Array.isArray(allSheets[preferredSheetId]?.data) && allSheets[preferredSheetId].data.length
-      ? preferredSheetId
-      : null) || pickInitialActiveSheetId(allSheets);
+  const activeKey = pickInitialActiveSheetId(allSheets);
   if (activeKey) {
     setActiveSheetId?.(activeKey);
     setConnectedData?.(Array.isArray(allSheets[activeKey]?.data) ? allSheets[activeKey].data : []);
@@ -216,7 +214,7 @@ export async function loadFullProjectFromApi({
   const stripped = stripProvenanceRowPayloadForLoad(res.data);
   const incomingSheets =
     stripped?.data_sheets && typeof stripped.data_sheets === "object" ? stripped.data_sheets : null;
-  const preferredSheetId = incomingSheets ? pickInitialActiveSheetId(incomingSheets) : null;
+  const primaryProvenanceSheetId = incomingSheets ? pickPrimaryProvenanceSheetId(incomingSheets) : null;
 
   applyDataSetToWorkspace(stripped, { setDataSheets, setActiveSheetId, setConnectedData });
   setLoadedDataMeta?.(stripped);
@@ -248,13 +246,18 @@ export async function loadFullProjectFromApi({
 
     try {
       workingSheets = await rehydrateProjectProvenanceSheets(workingSheets, {
-        onSheetDone: (_sheetId, _updated, allSheets) => {
+        onSheetDone: (sheetId, updated, allSheets) => {
           workingSheets = allSheets;
+          if (primaryProvenanceSheetId && sheetId === primaryProvenanceSheetId) {
+            setDataSheets?.({ ...allSheets });
+            setActiveSheetId?.(sheetId);
+            setConnectedData?.(Array.isArray(updated?.data) ? updated.data : []);
+          }
         },
       });
       onRehydrateProgress?.("Replaying derived sheet filters…");
       workingSheets = replayProjectDerivedSheets(workingSheets);
-      applyActiveSheetFromSheets(workingSheets, preferredSheetId, {
+      applyActiveSheetFromSheets(workingSheets, {
         setDataSheets,
         setActiveSheetId,
         setConnectedData,
@@ -262,7 +265,7 @@ export async function loadFullProjectFromApi({
     } catch (e) {
       console.warn("[loadFullProjectFromApi] Sheet replay failed:", e?.message || e);
       workingSheets = replayProjectDerivedSheets(workingSheets);
-      applyActiveSheetFromSheets(workingSheets, preferredSheetId, {
+      applyActiveSheetFromSheets(workingSheets, {
         setDataSheets,
         setActiveSheetId,
         setConnectedData,

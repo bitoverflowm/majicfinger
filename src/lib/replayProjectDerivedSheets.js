@@ -111,7 +111,22 @@ export function replayProjectDerivedSheets(dataSheets) {
   return base;
 }
 
+function sheetIdSortKey(id) {
+  return parseInt(String(id).replace(/\D/g, ""), 10) || 0;
+}
+
+/** Primary Athena-backed parent tab (lowest sheet-N compose provenance). */
+export function pickPrimaryProvenanceSheetId(sheets) {
+  const entries = Object.entries(sheets || {}).filter(([, sheet]) => sheetHasComposeProvenance(sheet));
+  if (!entries.length) return null;
+  entries.sort((a, b) => sheetIdSortKey(a[0]) - sheetIdSortKey(b[0]));
+  return entries[0][0];
+}
+
 export function pickInitialActiveSheetId(sheets) {
+  const primaryProvenanceId = pickPrimaryProvenanceSheetId(sheets);
+  if (primaryProvenanceId) return primaryProvenanceId;
+
   const entries = Object.entries(sheets || {});
   if (!entries.length) return null;
 
