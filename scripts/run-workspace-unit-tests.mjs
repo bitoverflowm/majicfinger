@@ -6,6 +6,10 @@ import {
   buildProjectDeltaPayload,
 } from "@/lib/projectPersistence.js";
 import {
+  summarizeSessionWorkspaceUsage,
+  workspaceHasDisplayableData,
+} from "@/lib/workspaceStorageQuota.js";
+import {
   computeRemoveDataSheetResult,
   collectDependentSheetIds,
 } from "@/lib/removeDataSheetFromWorkspace.js";
@@ -128,6 +132,30 @@ test("pickInitialActiveSheetId prefers provenance parent over small inline sheet
     "sheet-2": { name: "calibration_analysis", data: new Array(10).fill({ x: 1 }) },
   });
   assert.equal(id, "sheet-1");
+});
+
+test("workspaceHasDisplayableData is false for empty default workspace", () => {
+  assert.equal(
+    workspaceHasDisplayableData({
+      connectedData: [],
+      dataSheets: { "sheet-1": { name: "Sheet 1", data: [] } },
+      chartDataOverride: null,
+      viewing: "connectDataHome",
+    }),
+    false,
+  );
+});
+
+test("summarizeSessionWorkspaceUsage counts only loaded rows", () => {
+  const summary = summarizeSessionWorkspaceUsage(
+    {
+      "sheet-1": { name: "parent", data: [], fullRowCount: 7460 },
+      "sheet-2": { name: "small", data: [{ a: 1 }, { a: 2 }] },
+    },
+    [],
+  );
+  assert.equal(summary.rowCount, 2);
+  assert.ok(summary.usedBytes > 0);
 });
 
 test("buildProjectDeltaPayload records deleted sheet ids", () => {

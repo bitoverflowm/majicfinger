@@ -42,8 +42,9 @@ import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace"
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport"
 import {
   ELITE_WORKSPACE_CAP_BYTES,
-  WORKSPACE_ASSUMED_BYTES_PER_ROW,
+  summarizeSessionWorkspaceUsage,
   userGetsWorkspaceQuotaMeter,
+  workspaceHasDisplayableData,
   workspaceUsageIndicatorColor,
 } from "@/lib/workspaceStorageQuota"
 import {
@@ -222,7 +223,7 @@ function ProjectDataUsageIndicator({ summary }) {
   );
 }
 
-function EliteWorkspaceUsageIndicator({ quota, isLoading }) {
+function EliteWorkspaceUsageIndicator({ sessionSummary, savedQuota, isLoading }) {
   if (isLoading) {
     return (
       <div className="flex items-center gap-1.5 shrink-0" aria-busy="true">
@@ -232,23 +233,26 @@ function EliteWorkspaceUsageIndicator({ quota, isLoading }) {
     );
   }
 
-  const eligible = quota?.eligible === true;
-  const used = eligible ? Number(quota.usedBytes) || 0 : 0;
-  const cap = eligible ? Number(quota.capBytes) || ELITE_WORKSPACE_CAP_BYTES : ELITE_WORKSPACE_CAP_BYTES;
-  const assumed = eligible ? Number(quota.assumedBytesPerRow) || WORKSPACE_ASSUMED_BYTES_PER_ROW : WORKSPACE_ASSUMED_BYTES_PER_ROW;
+  const used = Math.max(0, Number(sessionSummary?.usedBytes) || 0);
+  const rowCount = Math.max(0, Number(sessionSummary?.rowCount) || 0);
+  const cap = Number(savedQuota?.capBytes) || ELITE_WORKSPACE_CAP_BYTES;
   const pct = cap > 0 ? Math.max(0, Math.min(100, (used / cap) * 100)) : 0;
   const color = workspaceUsageIndicatorColor(pct);
-  const estRows = Math.max(0, Math.round(used / Math.max(1, assumed)));
+  const savedUsed = savedQuota?.eligible === true ? Math.max(0, Number(savedQuota.usedBytes) || 0) : null;
 
   return (
     <div
       className="flex items-center gap-1.5 shrink-0 min-w-0"
-      title={`All saved projects: ${formatBytes(used)} of ${formatBytes(cap)} (${Math.round(pct)}%). ~${estRows.toLocaleString()} rows estimated from storage size.`}
+      title={
+        savedUsed != null
+          ? `Loaded in this session: ${formatBytes(used)} (${rowCount.toLocaleString()} rows). Saved projects in cloud: ${formatBytes(savedUsed)} of ${formatBytes(cap)}.`
+          : `Loaded in this session: ${formatBytes(used)} (${rowCount.toLocaleString()} rows).`
+      }
     >
       <span
         className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
         style={{ background: `conic-gradient(${color} ${pct}%, rgb(226 232 240) ${pct}% 100%)` }}
-        aria-label={`Workspace storage ${Math.round(pct)} percent of included cap`}
+        aria-label={`Session workspace ${Math.round(pct)} percent of included cap`}
       >
         <span className="h-3 w-3 rounded-full bg-background" />
       </span>
@@ -257,7 +261,7 @@ function EliteWorkspaceUsageIndicator({ quota, isLoading }) {
           {formatBytes(used)} / {formatBytes(cap)} · {Math.round(pct)}%
         </span>
         <span className="truncate text-[9px] text-muted-foreground/90">
-          ~{formatCompactNumber(estRows)} rows est.
+          {formatCompactNumber(rowCount)} rows loaded
         </span>
       </div>
     </div>
@@ -452,6 +456,21 @@ const Nav = () => {
           : {});
     return summarizeAdvancedDataStorage(sheetsForSummary);
   }, [connectedData, dataSetName, dataSheets]);
+  const sessionWorkspaceSummary = useMemo(
+    () => summarizeSessionWorkspaceUsage(dataSheets, connectedData),
+    [connectedData, dataSheets],
+  );
+  const showWorkspaceUsageIndicator = useMemo(
+    () =>
+      workspaceHasDisplayableData({
+        connectedData,
+        dataSheets,
+        chartDataOverride,
+        viewing,
+      }),
+    [chartDataOverride, connectedData, dataSheets, viewing],
+  );
+  const showProjectToolbar = showWorkspaceUsageIndicator || !!loadedDataMeta || !!loadedChartMeta;
   const canUseAdvancedDataStorage = useMemo(
     () => userCanUseAdvancedDataStorage(user),
     [user],
@@ -1361,7 +1380,7 @@ const Nav = () => {
                   {showUnsavedFlag && (
                     <span className="text-[7pt] px-2 py-1 rounded-sm bg-rose-100 text-rose-500  dark:text-amber-400 font-bold shrink-0">Viewing Unsaved Data</span>
                   )}
-                  {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
+                  {showProjectToolbar && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1371,17 +1390,18 @@ const Nav = () => {
                         New Project
                       </Button>
                   )}
-                  {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
+                  {showWorkspaceUsageIndicator && (
                     userGetsWorkspaceQuotaMeter(user) && !workspaceQuotaError ? (
                       <EliteWorkspaceUsageIndicator
-                        quota={workspaceQuota}
+                        sessionSummary={sessionWorkspaceSummary}
+                        savedQuota={workspaceQuota}
                         isLoading={!!workspaceQuotaKey && (workspaceQuotaLoading || workspaceQuota === undefined)}
                       />
                     ) : (
                       <ProjectDataUsageIndicator summary={currentProjectSizeSummary} />
                     )
                   )}
-                  {(connectedData || (viewing === 'charts' && chartDataOverride)) && (
+                  {showProjectToolbar && (
                       <Dialog
                         open={saveIsOpen}
                         onOpenChange={(open) => {

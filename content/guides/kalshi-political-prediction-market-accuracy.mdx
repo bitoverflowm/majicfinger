@@ -1,0 +1,1203 @@
+---
+
+title: "Kalshi Historical Data Analysis: Are Political Prediction Markets Accurate at 90%?"
+description: "A deep calibration analysis of Kalshi political prediction markets using historical market data, final prices, resolution outcomes, calibration error, and probability bucket distributions."
+publishedAt: "2026-06-12"
+author: "misterrpink"
+topics: ["kalshi", "prediction markets", "politics", "market calibration", "forecasting", "historical data", "market analysis"]
+integration: ["Kalshi", "Lychee", "Kalshi_Historical"]
+coverImage: "/images/guides/kalshi-political-prediction-market-accuracy/main.png"
+ogImage: "https://lycheedata.com/images/guides/kalshi-political-prediction-market-accuracy/main.png"
+featured: true
+slug: "/kalshi-political-prediction-market-accuracy"
+readingTime: "15 min"
+keywords: [
+"kalshi historical data analysis",
+"kalshi historical data",
+"kalshi historical market data",
+"kalshi political markets",
+"kalshi prediction market data",
+"prediction market accuracy",
+"are prediction markets accurate",
+"how accurate are prediction markets",
+"political prediction market accuracy",
+"prediction market calibration",
+"prediction market reliability",
+"calibration curve",
+"reliability diagram",
+"calibration error",
+"expected calibration error",
+"brier score",
+"political prediction markets",
+"election prediction markets",
+"prediction markets for elections",
+"prediction markets vs polls",
+"kalshi data api",
+"prediction market historical data",
+"prediction market data api"
+]
+canonical: "https://lycheedata.com/guides/kalshi-political-prediction-market-accuracy"
+seoTitle: "Kalshi Historical Data Analysis: Are Political Prediction Markets Accurate at 90%?"
+twitterCard: "summary_large_image"
+----------------------------------
+
+# Kalshi Historical Data Analysis: Are Political Prediction Markets Accurate at 90%?
+
+Prediction markets are often treated as probability machines.
+
+If a political market is trading at **90%**, the intuitive assumption is simple:
+
+> that outcome should happen roughly 90% of the time.
+
+That assumption matters.
+
+Traders use prediction market prices to size positions. Journalists quote them as real-time odds. Researchers use them as signals of collective belief. Political observers compare them against polls, models, and expert forecasts.
+
+But there is a deeper question hiding inside every market price:
+
+> Can we actually trust a 90% political prediction market?
+
+This analysis uses **Kalshi historical data** to test that question directly.
+
+The original hypothesis was simple:
+
+> Political prediction markets may be reasonably accurate overall, but become overconfident at extreme probabilities.
+
+In other words, markets trading at **90%, 95%, or 99%** might fail more often than traders expect.
+
+That would create what we call:
+
+> **The 90% Trap**
+
+But the historical data did not support that story.
+
+Using final traded prices from resolved Kalshi political markets, the result was more interesting:
+
+> The 90% trap did not appear. Instead, political markets showed extreme reliability at the edges and a surprisingly thin middle.
+
+<PublicChart username="misterrpink" slug="probability-calibration-politics" />
+
+---
+
+## Why Prediction Market Accuracy Matters
+
+Prediction markets convert uncertainty into prices.
+
+A YES contract trading at 68 cents implies roughly a **68% probability** that the event will happen. If markets are well-calibrated, then outcomes priced around 68% should happen around 68% of the time.
+
+That is the core promise of prediction markets:
+
+> market prices are not just opinions — they are probabilistic forecasts.
+
+This is why prediction market accuracy matters across:
+
+* election forecasting
+* political risk analysis
+* journalism
+* trading strategy
+* public policy research
+* market microstructure studies
+
+A market does not need to be right every time to be useful.
+
+A 70% probability should still fail about 30% of the time.
+
+The real question is whether the probabilities are **calibrated**.
+
+---
+
+## What Is Prediction Market Calibration?
+
+Prediction market calibration measures whether market probabilities match real-world outcome frequencies.
+
+If a group of markets trade around 70%, then a calibrated market should resolve YES about 70% of the time.
+
+If those 70% markets resolve YES only 50% of the time, the market is overconfident.
+
+If they resolve YES 85% of the time, the market is underconfident.
+
+Calibration answers a subtler question than simple accuracy.
+
+It does not ask:
+
+> Did this one market get the outcome right?
+
+It asks:
+
+> Across many markets, do prices behave like meaningful probabilities?
+
+This is usually analyzed with a **calibration curve** or **reliability diagram**, where predicted probabilities are compared against observed resolution frequencies.
+
+---
+
+## The Research Question
+
+This study focuses on one core question:
+
+> Are Kalshi political prediction markets overconfident at extreme probabilities?
+
+More specifically:
+
+> When a political market finishes in the 90–100% probability range, does it resolve YES about as often as expected, less often than expected, or more often than expected?
+
+Before running the analysis, the suspected failure mode was high-probability overconfidence.
+
+The concern was:
+
+* 90% markets might resolve YES only 85% of the time
+* 95% markets might resolve YES only 88–90% of the time
+* traders might treat near-certainty as stronger than it really is
+
+If true, that would matter for anyone quoting or trading prediction market probabilities.
+
+But the actual Kalshi historical market data pointed in a different direction.
+
+---
+
+## Dataset: Kalshi Political Markets, 2021–2025
+
+For this analysis, we used historical Kalshi political markets from **2021 through December 2025**.
+
+The dataset was filtered to include:
+
+* resolved political markets
+* markets with volume greater than 1,000
+* markets with final traded prices before market completion
+* markets with known YES/NO resolution outcomes
+
+The analysis used the final traded price before market completion as the market-implied probability.
+
+That detail is important.
+
+This is not a long-horizon forecast study. It does not ask whether a market was accurate 30 days before resolution, 14 days before resolution, or 7 days before resolution.
+
+Instead, this study measures:
+
+> terminal market calibration using the final traded price before completion.
+
+That means the analysis is best understood as a study of **final price reliability**, **market convergence**, and **near-resolution calibration**.
+
+For a broader guide to accessing and querying historical prediction market data, see:
+
+[Kalshi Historical Data — Download, Query, and Backtest](/guides/kalshi-historical-data)
+
+---
+
+## Methodology: Building the Calibration Curve
+
+Each market was assigned to a probability bucket based on its final traded price.
+
+The buckets were:
+
+* 0–10%
+* 10–20%
+* 20–30%
+* 30–40%
+* 40–50%
+* 50–60%
+* 60–70%
+* 70–80%
+* 80–90%
+* 90–100%
+
+For each probability bucket, we calculated:
+
+* number of markets
+* number of YES resolutions
+* actual YES resolution frequency
+* total trading volume
+* expected probability using the bucket midpoint
+
+For example:
+
+| Bucket  | Expected Probability |
+| ------- | -------------------- |
+| 0–10%   | 5%                   |
+| 10–20%  | 15%                  |
+| 20–30%  | 25%                  |
+| 90–100% | 95%                  |
+
+Then we compared:
+
+> **Expected probability vs actual YES resolution frequency**
+
+This produces a calibration curve.
+
+If the market is perfectly calibrated, the curve should follow the diagonal identity line:
+
+> predicted probability = actual outcome frequency
+
+<PublicChart username="misterrpink" slug="probability-calibration-politics" />
+
+---
+
+## First Result: The Aggregate Curve Looked Broken in the Middle
+
+The aggregate political calibration curve produced a strange pattern.
+
+At the extremes, market prices looked highly reliable:
+
+* the **0–10% bucket** almost never resolved YES
+* the **90–100% bucket** resolved YES at very high rates
+
+But the middle probability ranges looked unstable.
+
+Buckets between roughly **30% and 80%** showed large deviations from expectation. The observed resolution frequencies did not form a smooth calibration curve.
+
+At first glance, that looked like evidence that political prediction markets break down under uncertainty.
+
+But that interpretation was too simple.
+
+The aggregate curve was mixing very different kinds of political markets into one chart.
+
+A presidential election market, a congressional spending bill market, and a market asking whether a politician will say a specific word during a speech are all “political markets.”
+
+But structurally, they are not the same kind of prediction problem.
+
+---
+
+## Political Markets Are Not One Market Type
+
+The first aggregate chart revealed a problem:
+
+> “Politics” is not a single forecasting category.
+
+Political markets contain multiple uncertainty regimes.
+
+Some markets are driven by elections and voter behavior. Some are driven by formal legislative processes. Others are driven by one-off events, speech acts, meetings, announcements, or discretionary behavior.
+
+Those categories have different information structures.
+
+They also likely have different calibration behavior.
+
+So the next step was to segment the market universe.
+
+---
+
+## Segmenting Kalshi Political Markets
+
+We split political markets into three broad categories:
+
+### A — Electoral / Outcome Markets
+
+These are election and office-holding markets.
+
+They include markets related to:
+
+* elections
+* winners
+* nominees
+* nominations
+* primaries
+* special elections
+* re-elections
+* “out before” office-holding outcomes
+
+These markets tend to have stronger structure because they are tied to elections, institutional calendars, polling, campaigns, party dynamics, and known resolution mechanisms.
+
+<PublicChart username="misterrpink" slug="a-calibration-chart" />
+
+---
+
+### B — Institutional / Policy Markets
+
+These are legislative, budgetary, fiscal, regulatory, and formal government process markets.
+
+They include markets related to:
+
+* bills
+* laws
+* legislative passage
+* joint resolutions
+* reconciliation
+* government shutdowns
+* budgets
+* spending
+* congressional votes
+* Senate or House action
+
+These markets have structure, but they are often path-dependent. Negotiations, deadlines, procedural rules, and political brinkmanship can keep uncertainty alive until late in the process.
+
+<PublicChart username="misterrpink" slug="b-calibration-chart" />
+
+---
+
+### C — Event / High-Entropy Markets
+
+These are discretionary, timing-driven, speech-driven, or one-off political event markets.
+
+They include markets related to:
+
+* speeches
+* mentions
+* meetings
+* visits
+* announcements
+* pardons
+* approval ratings
+* product releases
+* short-term sentiment movement
+* any market not clearly classified as A or B
+
+These markets tend to be higher entropy.
+
+They often depend on individual behavior, semantic wording, scheduling decisions, or short-term noise.
+
+<PublicChart username="misterrpink" slug="c-calibration-chart" />
+
+---
+
+## Why Segmentation Matters
+
+The segmentation was not cosmetic.
+
+It was essential.
+
+If we mix all political markets together, the calibration curve may reflect category aggregation rather than actual market failure.
+
+A noisy mid-range bucket could mean:
+
+* markets are miscalibrated
+* the sample size is too small
+* different market types are being mixed together
+* final prices are being measured too close to resolution
+* high-entropy event markets are distorting the aggregate curve
+
+Segmenting the data lets us ask a better question:
+
+> Does the “90% trap” appear across all political market types, or only in certain uncertainty regimes?
+
+
+---
+
+## Segmented Calibration Results
+
+After splitting the dataset into Electoral, Policy, and Event markets, the story changed.
+
+The apparent middle-range breakdown largely disappeared as a global claim.
+
+Instead, the segmented results showed that most political markets finish at the extremes.
+
+For **Electoral markets**, most final prices clustered in:
+
+* 0–10%
+* 90–100%
+
+The middle buckets were almost empty.
+
+For **Policy markets**, the same pattern appeared:
+
+* heavy concentration at 0–10%
+* heavy concentration at 90–100%
+* very little meaningful middle
+
+For **Event markets**, the middle had more observations than A or B, but still remained sparse and noisy relative to the extreme buckets.
+
+This suggested that the earlier “broken middle” was not necessarily a stable behavioral failure.
+
+It was partly a structural artifact.
+
+Political markets measured at final traded price tend to finish after uncertainty has already collapsed.
+
+---
+
+## Calibration Error by Bucket
+
+To make the analysis more precise, we computed **calibration error** by probability bucket.
+
+Calibration error measures the gap between observed outcome frequency and expected probability.
+
+The formula is:
+
+```text
+Calibration Error = Observed Resolution Frequency - Expected Probability
+```
+
+Interpretation:
+
+* Positive error = the market was underconfident
+* Negative error = the market was overconfident
+* Near zero = the market was well-calibrated
+
+For example, if the 90–100% bucket uses an expected probability of 95%, but 99% of markets resolve YES, then calibration error is:
+
+```text
+99% - 95% = +4%
+```
+
+That would mean the market was not overconfident.
+
+It was slightly underconfident.
+
+<PublicChart username="misterrpink" slug="a-error-calibration" />
+
+<PublicChart username="misterrpink" slug="b-error-calibration" />
+
+<PublicChart username="misterrpink" slug="c-error-calibration" />
+
+
+---
+
+## The 90–100% Bucket Was Not Overconfident
+
+The calibration error results were the clearest part of the study.
+
+Across all three political market segments, the 90–100% bucket was not overconfident.
+
+It was slightly underconfident.
+
+Segmented results:
+
+| Segment   | 90–100% Calibration Error | Interpretation         |
+| --------- | ------------------------- | ---------------------- |
+| Electoral | +0.05                     | Slight underconfidence |
+| Policy    | +0.05                     | Slight underconfidence |
+| Event     | +0.049                    | Slight underconfidence |
+
+This directly challenges the original hypothesis.
+
+If there were a 90% trap, we would expect the high-probability bucket to show negative error.
+
+For example, a 95% expected bucket resolving YES only 88–90% of the time would suggest overconfidence.
+
+That is not what appeared.
+
+Instead, markets in the 90–100% range resolved YES slightly more often than the bucket midpoint implied.
+
+The final-price data does not show high-probability overconfidence.
+
+It shows high-probability reliability.
+
+---
+
+## The 0–10% Bucket Slightly Overpriced Rare YES Outcomes
+
+The opposite pattern appeared at the low end.
+
+Across categories, the 0–10% bucket showed small negative calibration error.
+
+That means rare YES outcomes were slightly overpriced.
+
+In plain English:
+
+> markets priced near-zero events as slightly more likely than they actually were.
+
+This resembles a mild longshot effect.
+
+However, the magnitude was small and consistent.
+
+The important point is not that low-probability markets were wildly wrong. They were still extremely reliable in directional terms.
+
+But compared to the 5% midpoint expectation, they resolved YES slightly less often than expected.
+
+---
+
+## The Middle Was Noisy, Sparse, and Dangerous to Overinterpret
+
+The most unstable calibration error appeared in the middle ranges.
+
+But this is where sample size becomes critical.
+
+For Electoral and Policy markets, the middle probability buckets had very few observations. Some buckets had only one or two markets. Others had zero.
+
+That means large calibration errors in those buckets can be created by tiny counts.
+
+For Event markets, the middle range contained more observations, but still far fewer than the extremes.
+
+The middle was not a clean statistical regime.
+
+It was a thin, heterogeneous uncertainty band.
+
+That means the “broken middle” should be interpreted carefully.
+
+It is not strong evidence of a universal market bias.
+
+It is better understood as a combination of:
+
+* sparse observations
+* heterogeneous market types
+* high-entropy event uncertainty
+* final-price measurement close to resolution
+* political markets collapsing toward extremes before completion
+
+---
+
+## Distribution of Final Probabilities
+
+The next step was to stop asking only whether markets were calibrated.
+
+Instead, we asked:
+
+> Where do political prediction markets actually end up before resolution?
+
+This is the distribution of final probabilities.
+
+For each bucket, we counted the number of markets ending in that probability range.
+
+<PublicChart username="misterrpink" slug="distribution-of-markets" />
+
+The result was one of the strongest findings in the entire analysis.
+
+Political prediction markets were heavily concentrated at the extremes.
+
+| Probability Bucket | Number of Markets |
+| ------------------ | ----------------- |
+| 0–10%              | 4,254             |
+| 10–20%             | 188               |
+| 20–30%             | 82                |
+| 30–40%             | 61                |
+| 40–50%             | 46                |
+| 50–60%             | 41                |
+| 60–70%             | 50                |
+| 70–80%             | 59                |
+| 80–90%             | 84                |
+| 90–100%            | 2,595             |
+
+The 0–10% bucket alone contained **4,254 markets**.
+
+The 90–100% bucket contained **2,595 markets**.
+
+Together, the two extreme buckets dominated the dataset.
+
+By contrast, every intermediate bucket had only a small fraction of that count.
+
+---
+
+## The Missing Middle
+
+This is the structural heart of the study.
+
+Political prediction markets did not distribute smoothly across the probability spectrum.
+
+They were strongly bimodal.
+
+They clustered near:
+
+* near-zero probability
+* near-certain probability
+
+And they avoided the middle.
+
+This is why the aggregate calibration curve initially looked strange.
+
+The middle of the chart was not simply “wrong.”
+
+It was barely populated.
+
+The data suggests that political markets, at least when measured using final traded price before completion, behave like **binary convergence systems**.
+
+They do not end evenly distributed across uncertainty.
+
+They collapse into strong YES or strong NO consensus.
+
+---
+
+## What Kalshi Historical Data Reveals About Political Market Accuracy
+
+The core finding is not that prediction markets are always accurate.
+
+It is more specific:
+
+> Final prices in Kalshi political markets are highly reliable at the extremes.
+
+The 90–100% bucket was not overconfident.
+
+The 0–10% bucket was directionally reliable, though slightly overconfident relative to the 5% midpoint.
+
+The middle was unstable, but also sparse.
+
+So the best interpretation is:
+
+> Political markets become most reliable once uncertainty has collapsed.
+
+This is different from saying markets are perfect forecasting tools at all horizons.
+
+A market trading at 90% one hour before resolution is not the same as a market trading at 90% thirty days before resolution.
+
+This study does not answer every question about long-term prediction market accuracy.
+
+It answers a narrower but important question:
+
+> When Kalshi political markets finish at extreme final prices, are those prices reliable?
+
+The answer from this dataset is yes.
+
+---
+
+## Why Final Price Matters
+
+Using the final traded price before market completion has advantages and limitations.
+
+The advantage is that it measures the market’s last available probability estimate before resolution.
+
+This makes it useful for studying:
+
+* final price reliability
+* convergence behavior
+* terminal calibration
+* how markets behave when uncertainty is nearly resolved
+
+But it also has a limitation.
+
+The final traded price may already reflect information that arrived very close to resolution.
+
+For example:
+
+* election results may be partially known
+* legislative outcomes may be nearly decided
+* negotiations may have reached a public conclusion
+* an event may already be functionally obvious before formal resolution
+
+That means final-price calibration is not the same as long-horizon forecast calibration.
+
+A future study should compare market probabilities at fixed horizons before resolution:
+
+* 30 days before resolution
+* 14 days before resolution
+* 7 days before resolution
+* 1 day before resolution
+
+That would test whether political markets are overconfident before outcomes become obvious.
+
+This study shows something else:
+
+> by the final market state, political prediction markets are extremely good at recognizing certainty.
+
+---
+
+## Are Prediction Markets Accurate?
+
+The honest answer is:
+
+> it depends what you mean by accurate.
+
+If accuracy means:
+
+> do final high-confidence political market prices usually point in the right direction?
+
+Then the answer is yes.
+
+In this Kalshi historical data analysis, political markets ending in the 90–100% bucket resolved YES at extremely high rates.
+
+If accuracy means:
+
+> can a market tell you the true probability weeks or months before resolution?
+
+That requires a different analysis.
+
+You would need time-based snapshots, not just final prices.
+
+That is why calibration must always be tied to time horizon.
+
+A prediction market can be well-calibrated near resolution and less reliable far from resolution.
+
+It can also be accurate in elections but weaker in low-liquidity event markets.
+
+The point is not that political prediction markets are universally accurate.
+
+The point is that their accuracy is conditional.
+
+It depends on:
+
+* market category
+* liquidity
+* information clarity
+* time to resolution
+* final-price vs long-horizon measurement
+* whether the market is electoral, policy-based, or event-driven
+
+---
+
+## Are Prediction Markets Reliable at 90% Probability?
+
+In this dataset, yes — at least when using final traded prices before market completion.
+
+The 90–100% bucket was highly reliable across:
+
+* Electoral markets
+* Policy markets
+* Event markets
+
+And rather than showing overconfidence, the bucket showed slight underconfidence.
+
+That means the event happened more often than the midpoint expectation implied.
+
+The original “90% trap” hypothesis was not supported.
+
+There may still be a 90% trap at earlier forecast horizons.
+
+But using terminal Kalshi political market prices, the pattern was the opposite.
+
+---
+
+## Why Prediction Markets Look Strongest at the Extremes
+
+Prediction markets often look most reliable at the extremes because extreme prices usually appear after substantial information has entered the market.
+
+A market does not usually reach 95% randomly.
+
+It gets there because the available evidence has become one-sided.
+
+For political markets, this can happen when:
+
+* election results become clear
+* polling and fundamentals converge
+* a bill’s passage becomes nearly certain
+* negotiations conclude
+* a candidate drops out
+* a deadline passes
+* an announcement becomes effectively known
+
+This is why high final probabilities can look extremely accurate.
+
+They are not simply bold forecasts.
+
+They are often the market’s recognition that uncertainty has already collapsed.
+
+---
+
+## Why the Middle Looks Weak
+
+The middle probability ranges are where uncertainty is still unresolved.
+
+But by the time markets are near completion, many political markets are no longer in that state.
+
+The middle can contain:
+
+* unresolved event markets
+* weird edge cases
+* ambiguous policy outcomes
+* low-sample buckets
+* markets with unclear information
+* markets where traders disagree until late
+
+This makes the middle look noisy.
+
+But the distribution chart shows why we should be careful:
+
+> the middle has very few observations compared to the extremes.
+
+That means mid-range instability may not represent a universal prediction market failure.
+
+It may reflect the fact that political markets rarely finish in the middle.
+
+---
+
+## Prediction Markets vs Polls
+
+This analysis does not directly compare prediction markets against polls.
+
+But it helps explain why prediction markets and polls are often interpreted differently.
+
+Polls usually measure voter preference or respondent opinion.
+
+Prediction markets measure expected outcomes under financial incentives.
+
+Those are not the same thing.
+
+A poll might ask:
+
+> Who do you support?
+
+A prediction market asks:
+
+> What outcome do traders expect will happen?
+
+Market probabilities can incorporate:
+
+* polls
+* expert forecasts
+* insider information
+* media narratives
+* turnout expectations
+* litigation risk
+* candidate strategy
+* macro conditions
+* liquidity conditions
+* trader positioning
+
+This makes markets useful, but also more complex.
+
+The right interpretation is not:
+
+> markets always beat polls.
+
+The better interpretation is:
+
+> markets and polls measure different signals, and historical market data helps us study how those signals converge or diverge.
+
+---
+
+## What This Means for Traders
+
+For traders, the most important finding is that extreme final prices should not be dismissed as irrational overconfidence.
+
+At least in this dataset, 90–100% political markets were extremely reliable near completion.
+
+However, traders should not generalize this blindly.
+
+A 95% price:
+
+* one hour before resolution
+* one day before resolution
+* one month before resolution
+
+may mean very different things.
+
+The missing variable is time.
+
+Final-price reliability does not automatically imply long-horizon reliability.
+
+So the practical takeaway is:
+
+> high-confidence prices near resolution are often highly informative, but high-confidence prices far from resolution require separate testing.
+
+---
+
+## What This Means for Researchers
+
+For researchers, the biggest lesson is methodological.
+
+Do not treat all political markets as one homogeneous dataset.
+
+Political prediction markets should be segmented by uncertainty type.
+
+At minimum:
+
+* Electoral markets
+* Policy markets
+* Event markets
+
+Without segmentation, calibration curves can become misleading.
+
+The aggregate curve may appear to show broad miscalibration, when it is really mixing multiple market structures.
+
+A better research pipeline is:
+
+1. define the market universe
+2. filter by resolution and volume
+3. bucket by implied probability
+4. compute observed outcome frequency
+5. segment by market type
+6. compute calibration error
+7. inspect probability distribution
+8. separate final-price analysis from fixed-horizon forecast analysis
+
+This turns prediction market analysis from generic commentary into actual quantitative research.
+
+---
+
+## What This Means for Lychee
+
+This is exactly why historical prediction market data matters.
+
+Without historical market prices, resolutions, volume, and category-level filtering, this kind of study is difficult to run.
+
+Kalshi historical data makes it possible to test claims like:
+
+* Are prediction markets accurate?
+* Do political markets become overconfident?
+* Are election markets better calibrated than event markets?
+* Do extreme probabilities resolve correctly?
+* Does volume improve reliability?
+* Are markets better near resolution than months out?
+* Where does prediction market calibration break?
+
+Lychee is built to make this kind of analysis faster:
+
+* query historical Kalshi market data
+* filter by category and volume
+* build calibration curves
+* visualize probability distributions
+* compare market types
+* publish dashboards and charts
+
+<KalshiHistoricalDataQuery
+title="Query Kalshi political market data"
+description="Search historical Kalshi political markets, final prices, resolution outcomes, and market activity to analyze prediction market accuracy and calibration."
+/>
+
+---
+
+## Key Findings
+
+### 1. The 90% trap did not appear in final-price data
+
+The original hypothesis was that political prediction markets might be overconfident at extreme probabilities.
+
+The data did not support that.
+
+Markets ending in the 90–100% bucket resolved YES at extremely high rates.
+
+---
+
+### 2. High-probability political markets were slightly underconfident
+
+Across Electoral, Policy, and Event markets, the 90–100% bucket showed positive calibration error.
+
+That means outcomes happened slightly more often than the bucket midpoint implied.
+
+---
+
+### 3. Near-zero markets slightly overpriced rare YES outcomes
+
+The 0–10% bucket showed small negative calibration error.
+
+That means rare YES outcomes occurred slightly less often than the 5% midpoint implied.
+
+---
+
+### 4. The middle probability range was sparse and unstable
+
+Mid-range buckets had far fewer markets than the extremes.
+
+This makes large deviations in the middle dangerous to overinterpret.
+
+---
+
+### 5. Political markets are structurally bimodal near completion
+
+The final probability distribution was heavily concentrated in the 0–10% and 90–100% buckets.
+
+This suggests political markets behave like convergence systems near resolution.
+
+---
+
+### 6. Segmentation is essential
+
+Electoral, Policy, and Event markets behave differently.
+
+Aggregating them into one political calibration curve can create misleading conclusions.
+
+---
+
+## Limitations
+
+This study has several important limitations.
+
+### Final prices are not long-horizon forecasts
+
+We used the last traded price before market completion.
+
+That measures terminal calibration, not forecast accuracy weeks or months before resolution.
+
+---
+
+### Bucket midpoints are approximations
+
+The 90–100% bucket was assigned a midpoint expectation of 95%.
+
+That is useful for calibration error, but it compresses variation inside the bucket.
+
+A market at 91% and a market at 99% are not identical.
+
+---
+
+### Keyword-based segmentation is imperfect
+
+Markets were classified into Electoral, Policy, and Event categories using conditional keyword rules.
+
+This is scalable and reproducible, but not as nuanced as manual or AI-based classification.
+
+---
+
+### Mid-range buckets have small sample sizes
+
+The middle buckets contain very few markets compared to the extremes.
+
+That means mid-range calibration errors should be interpreted cautiously.
+
+---
+
+### Volume was filtered but not fully modeled
+
+Markets with volume below 1,000 were excluded, but this analysis does not fully model the relationship between volume and calibration.
+
+A future study should examine whether higher-volume markets are more reliable.
+
+---
+
+## Future Research
+
+This study opens several follow-up questions.
+
+### 1. Fixed-horizon calibration
+
+Measure calibration at:
+
+* 30 days before resolution
+* 14 days before resolution
+* 7 days before resolution
+* 1 day before resolution
+
+This would test whether high-confidence markets are reliable before outcomes become obvious.
+
+---
+
+### 2. Brier score by market type
+
+Brier scores can measure overall forecast quality across:
+
+* Electoral markets
+* Policy markets
+* Event markets
+
+This would help compare categories beyond calibration curves.
+
+---
+
+### 3. Volume-weighted calibration
+
+Market count treats every market equally.
+
+A volume-weighted version would ask whether high-dollar markets are more calibrated than low-volume markets.
+
+---
+
+### 4. Kalshi vs Polymarket calibration
+
+A cross-platform study could compare political prediction market calibration across Kalshi and Polymarket.
+
+This would reveal whether calibration patterns are platform-specific or market-wide.
+
+---
+
+### 5. Market category classification with AI
+
+Keyword-based segmentation works as a first pass.
+
+A future version could use natural language classification to identify market type more precisely.
+
+---
+
+## Conclusion
+
+This study began with a suspicion:
+
+> maybe political prediction markets become overconfident at 90% probability.
+
+Using Kalshi historical data, we tested that assumption directly.
+
+The result was surprising.
+
+The 90% trap did not appear in final-price political market data.
+
+Instead, markets ending in the 90–100% bucket were extremely reliable and slightly underconfident. The strongest structural finding was not overconfidence, but convergence.
+
+Political markets near completion do not spread evenly across the probability spectrum.
+
+They cluster near 0 and near 100.
+
+The middle is thin.
+
+That means the real story is not:
+
+> political prediction markets are overconfident at 90%.
+
+The real story is:
+
+> political prediction markets collapse into certainty before resolution.
+
+Final Kalshi political market prices appear highly reliable at the extremes.
+
+But that does not mean every 90% market is safe, or that markets are equally accurate at every time horizon.
+
+The next question is not whether 90% final prices are reliable.
+
+The next question is:
+
+> how early does that reliability appear?
+
+That is where the next layer of prediction market research begins.
+
+---
+
+## FAQ: Kalshi Historical Data and Prediction Market Accuracy
+
+### Are prediction markets accurate?
+
+Prediction markets can be accurate, but accuracy depends on market type, liquidity, time to resolution, and information clarity. In this analysis, final Kalshi political market prices were highly reliable at extreme probabilities.
+
+---
+
+### How accurate are political prediction markets?
+
+Using final traded prices before completion, political markets in the 90–100% bucket resolved YES at extremely high rates. However, this measures near-resolution calibration, not long-term forecast accuracy.
+
+---
+
+### Are 90% prediction markets reliable?
+
+In this Kalshi political market dataset, markets ending in the 90–100% bucket were highly reliable and slightly underconfident. That means they resolved YES slightly more often than the bucket midpoint implied.
+
+---
+
+### What is prediction market calibration?
+
+Prediction market calibration measures whether market-implied probabilities match observed outcome frequencies. If 70% markets resolve YES about 70% of the time, the market is well-calibrated.
+
+---
+
+### What is a calibration curve?
+
+A calibration curve compares predicted probabilities against actual outcome frequencies. In prediction markets, it helps show whether prices behave like statistically meaningful probabilities.
+
+---
+
+### What is calibration error?
+
+Calibration error is the difference between observed outcome frequency and expected probability.
+
+```text
+Calibration Error = Observed Resolution Frequency - Expected Probability
+```
+
+Positive error implies underconfidence. Negative error implies overconfidence.
+
+---
+
+### Did this analysis use Brier scores?
+
+No. This study focused on calibration curves, calibration error, and probability distribution. Brier scores are useful for measuring overall forecast quality and should be added in a future fixed-horizon analysis.
+
+---
+
+### What does Kalshi historical data reveal here?
+
+Kalshi historical data shows that final political market prices cluster heavily at extreme probabilities and are highly reliable at those extremes. The apparent weakness is not the 90–100% range, but the sparse and noisy middle.
+
+---
+
+### Does this prove prediction markets are better than polls?
+
+No. This study does not directly compare markets against polls. It measures the calibration of final Kalshi political market prices. Polls and prediction markets measure different signals.
+
+---
+
+### How can I analyze Kalshi historical market data?
+
+You can analyze Kalshi historical data by querying resolved markets, filtering by volume and category, bucketing prices into probability ranges, and comparing market-implied probabilities against actual outcomes.
+
+---
+
+## Sources and References
+
+* [Kalshi Historical Data API Documentation](https://docs.kalshi.com/getting_started/historical_data)
+* [Kalshi Market Data Quick Start](https://docs.kalshi.com/getting_started/quick_start_market_data)
+* [Kalshi Market Data & Insights](https://kalshi.com/market-data)
+* [Do Prediction Markets Produce Well-Calibrated Probability Forecasts?](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1468-0297.2012.02561.x)
+* [Duke PDF: Do Prediction Markets Produce Well-Calibrated Probability Forecasts?](https://people.duke.edu/~clemen/bio/Published%20Papers/45.PredictionMarkets-Page%26Clemen-EJ-2013.pdf)
+* [Calibration City: Prediction Market Calibration](https://calibration.city/introduction)
+* [Stable Reliability Diagrams for Probabilistic Classifiers](https://pmc.ncbi.nlm.nih.gov/articles/PMC7923594/)
+* [Decomposing Crowd Wisdom: Domain-Specific Calibration Dynamics in Prediction Markets](https://arxiv.org/abs/2602.19520)
+* [Prediction Market Accuracy: Crowd Wisdom or Informed Minority?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6617059)
+
+---
+
+## Related Lychee Guides
+
+* [Kalshi Historical Data — Download, Query, and Backtest](/guides/kalshi-historical-data)
+* [Political Prediction Markets: What Historical Data Reveals About Election Forecasting](/guides/kalshi-political-prediction-markets-analysis)
+* [How to Build a Kalshi Weather Probability Calibration Chart](/guides/kalshi-weather-probability-calibration-chart)
+* [How to Build a Kalshi Probability Convergence Chart](/guides/kalshi-weather-probability-convergence-chart)
+* [Kalshi Historical Weather Data Dashboard](/misterrpink/dashboards/kalshi-historical-weather-data)
