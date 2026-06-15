@@ -467,13 +467,33 @@ export function validateAthenaLakeQueryBody(body, access) {
         throw new AthenaLakeRequestError("Invalid compose.select entry", { statusCode: 400, code: "BAD_REQUEST" });
       }
       const column = String(row.column || "").trim();
-      if (!allowed.has(column)) {
+      const sourceTable = String(row.sourceTable || "").trim().toLowerCase();
+      const selectTable = sourceTable || table;
+      if (sourceTable) {
+        if (sourceTable === String(table).toLowerCase()) {
+          throw new AthenaLakeRequestError(
+            "compose.select.sourceTable cannot match the base table; omit sourceTable instead",
+            { statusCode: 400, code: "BAD_REQUEST" },
+          );
+        }
+        if (!validatedJoins.some((j) => j.table === sourceTable)) {
+          throw new AthenaLakeRequestError(
+            `compose.select.sourceTable must reference a configured join table: ${sourceTable}`,
+            { statusCode: 400, code: "BAD_REQUEST" },
+          );
+        }
+      }
+      const rowAllowed =
+        joinPresetValidated && KALSHI_TRADES_JOIN_PRESETS.has(joinPresetValidated)
+          ? new Set(KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META.map((c) => c.name))
+          : new Set(allowedColumnsForLakeTable(lake, selectTable));
+      if (!rowAllowed.has(column)) {
         throw new AthenaLakeRequestError(`Unknown or disallowed column: ${column}`, { statusCode: 400, code: "BAD_REQUEST" });
       }
       const colType =
         joinPresetValidated && KALSHI_TRADES_JOIN_PRESETS.has(joinPresetValidated)
           ? kalshiResolvedMarketsJoinColumnMeta(column)?.type
-          : columnHiveTypeForLakeTable(lake, table, column);
+          : columnHiveTypeForLakeTable(lake, selectTable, column);
       if (!colType) {
         throw new AthenaLakeRequestError(`Unknown column type: ${column}`, { statusCode: 400, code: "BAD_REQUEST" });
       }
@@ -734,6 +754,7 @@ export function validateAthenaLakeQueryBody(body, access) {
 
       normalizedSelect.push({
         column,
+        ...(sourceTable ? { sourceTable } : {}),
         alias,
         aggregate,
         dateBucket,
@@ -852,6 +873,30 @@ export function validateAthenaLakeQueryBody(body, access) {
       normalizedHaving = normalizedAnd.length > 0 ? { and: normalizedAnd } : null;
     }
 
+    let limitScopeValidated = null;
+    if (raw.limitScope != null && String(raw.limitScope).trim() !== "") {
+      const ls = String(raw.limitScope).toLowerCase().trim();
+      if (ls !== "primary" && ls !== "result") {
+        throw new AthenaLakeRequestError('compose.limitScope must be "primary" or "result"', {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+      if (!validatedJoins.length) {
+        throw new AthenaLakeRequestError("compose.limitScope requires at least one table join", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+      if (ls === "primary" && hasAggInSelect) {
+        throw new AthenaLakeRequestError(
+          'compose.limitScope "primary" is not supported with aggregated compose queries yet',
+          { statusCode: 400, code: "BAD_REQUEST" },
+        );
+      }
+      limitScopeValidated = ls;
+    }
+
     validatedCompose = {
       select: normalizedSelectForOutput,
       groupByAliases,
@@ -860,6 +905,7 @@ export function validateAthenaLakeQueryBody(body, access) {
       ...(validatedJoins.length ? { joins: validatedJoins } : {}),
       ...(validatedCteJoins.length ? { cteJoins: validatedCteJoins } : {}),
       ...(normalizedHaving ? { having: normalizedHaving } : {}),
+      ...(limitScopeValidated ? { limitScope: limitScopeValidated } : {}),
     };
 
     try {

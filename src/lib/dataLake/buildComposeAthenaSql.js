@@ -121,6 +121,21 @@ function buildEquationExprSql(expr, colRef) {
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
 
+/** Resolve SQL table alias for a compose SELECT row (base table or joined Glue table). */
+function resolveSelectBaseAlias(sourceTable, joins, baseAlias) {
+  const st = String(sourceTable || "").trim().toLowerCase();
+  if (!st) return baseAlias;
+  const joinsList = Array.isArray(joins) ? joins : [];
+  for (let i = 0; i < joinsList.length; i++) {
+    if (String(joinsList[i]?.table || "").toLowerCase() === st) {
+      return `j${i + 1}`;
+    }
+  }
+  const err = new Error(`Unknown compose.select.sourceTable: ${st}`);
+  err.code = "BAD_REQUEST";
+  throw err;
+}
+
 /**
  * @param {string | null} baseAlias
  * @param {Set<string> | null} kalshiMaterializedVirtuals
@@ -171,6 +186,8 @@ export function composeUnboundedSelectShouldCapRows(compose) {
   if (groupBy.length > 0) return false;
   return !hasAgg;
 }
+
+export { composeUsesPrimaryTableLimit } from "../composeLimitScope.js";
 
 /**
  * Kalshi: trades restricted to finalized yes/no markets; trade price in cents from taker side;
@@ -708,6 +725,8 @@ export function buildComposeAthenaSelectSql({
 
   let fromClause;
   let baseAlias = "t0";
+  let baseFromClause = `FROM "${safeTable}" ${baseAlias}`;
+  let joinSuffix = "";
   if (
     joinPreset === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET ||
     joinPreset === KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT
@@ -737,7 +756,7 @@ export function buildComposeAthenaSelectSql({
     const joins = Array.isArray(compose?.joins) ? compose.joins : [];
     const cteJoins = Array.isArray(compose?.cteJoins) ? compose.cteJoins : [];
 
-    let innerFrom = `FROM "${safeTable}" ${baseAlias}`;
+    baseFromClause = `FROM "${safeTable}" ${baseAlias}`;
     if (kalshiMat.size > 0) {
       const kb = "kb";
       const hasTax = kalshiMat.has(KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN);
@@ -752,12 +771,12 @@ export function buildComposeAthenaSelectSql({
           outerParts.push(`${kfb}._kf_p AS "${KALSHI_VIRTUAL_CATEGORY}"`);
         }
         outerParts.push(`${taxCase} AS "${KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN}"`);
-        innerFrom = `FROM (SELECT ${kfb}.*, ${outerParts.join(", ")} FROM ${prepped} ${kfb}) ${baseAlias}`;
+        baseFromClause = `FROM (SELECT ${kfb}.*, ${outerParts.join(", ")} FROM ${prepped} ${kfb}) ${baseAlias}`;
       } else if (hasPre) {
-        innerFrom = `FROM (SELECT ${kb}.*, ${kalshiEventTickerCategorySql(`${kb}."event_ticker"`)} AS "${KALSHI_VIRTUAL_CATEGORY}" FROM "${safeTable}" ${kb}) ${baseAlias}`;
+        baseFromClause = `FROM (SELECT ${kb}.*, ${kalshiEventTickerCategorySql(`${kb}."event_ticker"`)} AS "${KALSHI_VIRTUAL_CATEGORY}" FROM "${safeTable}" ${kb}) ${baseAlias}`;
       }
     }
-    fromClause = innerFrom;
+    fromClause = baseFromClause;
 
     if (joins.length > 0 || cteJoins.length > 0) {
       const joinSqlParts = [];
@@ -809,7 +828,8 @@ export function buildComposeAthenaSelectSql({
         );
       }
 
-      fromClause = `${fromClause} ${joinSqlParts.join(" ")}`;
+      joinSuffix = joinSqlParts.join(" ");
+      fromClause = `${baseFromClause} ${joinSuffix}`;
     }
   }
 
@@ -837,6 +857,9 @@ export function buildComposeAthenaSelectSql({
       throw err;
     }
 
+    const rowBaseAlias = resolveSelectBaseAlias(row.sourceTable, compose?.joins, baseAlias);
+    const rowKalshiMat = rowBaseAlias === baseAlias ? kalshiMat : new Set();
+
     const rowExprOpts = {
       column: row.column,
       columnType: row.columnType || null,
@@ -849,8 +872,8 @@ export function buildComposeAthenaSelectSql({
       decimals: row.decimals != null ? Number(row.decimals) : null,
       sumCase: row.sumCase || null,
       equation: row.equation || null,
-      baseAlias,
-      kalshiMaterializedVirtuals: kalshiMat,
+      baseAlias: rowBaseAlias,
+      kalshiMaterializedVirtuals: rowKalshiMat,
     };
 
     const innerSql = buildSelectExpression({
@@ -970,5 +993,25 @@ export function buildComposeAthenaSelectSql({
       : null;
   const limitSql = lim != null ? ` LIMIT ${lim}` : "";
   const w = typeof whereSql === "string" ? whereSql : "";
-  return `SELECT ${selectParts.join(", ")} ${fromClause}${w}${groupSql}${havingSql}${orderSql}${limitSql}`;
+
+  const tableJoins = Array.isArray(compose?.joins) ? compose.joins : [];
+  const limitScope = String(compose?.limitScope || "result").toLowerCase() === "primary" ? "primary" : "result";
+  const usePrimaryLimit =
+    limitScope === "primary" && tableJoins.length > 0 && joinSuffix && lim != null && !groupSql;
+
+  let ctePrefix = "";
+  let finalFrom = fromClause;
+  let finalWhere = w;
+  let finalOrder = orderSql;
+  let finalLimit = limitSql;
+
+  if (usePrimaryLimit) {
+    ctePrefix = `WITH base_limited AS (SELECT ${baseAlias}.* ${baseFromClause}${w}${orderSql} LIMIT ${lim}) `;
+    finalFrom = `FROM base_limited ${baseAlias} ${joinSuffix}`;
+    finalWhere = "";
+    finalOrder = "";
+    finalLimit = "";
+  }
+
+  return `${ctePrefix}SELECT ${selectParts.join(", ")} ${finalFrom}${finalWhere}${groupSql}${havingSql}${finalOrder}${finalLimit}`;
 }

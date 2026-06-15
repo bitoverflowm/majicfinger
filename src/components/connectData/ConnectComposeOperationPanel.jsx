@@ -36,10 +36,13 @@ import { glueTableNamesForDataset } from "@/config/dataLakeParquetSamples";
 import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { pruneConnectComposeBeforePull } from "@/lib/connectComposeSanitize";
+import { hasConfiguredTableJoins } from "@/lib/composeJoinColumns";
 import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
 import { cn } from "@/lib/utils";
+import { ComposeJoinLimitFields } from "@/components/connectData/ComposeJoinLimitFields";
 import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectComposeIfElseSection";
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
+import { ComposeJoinTargetColumnPicker } from "@/components/connectData/ComposeJoinTargetColumnPicker";
 import { ConnectHomeSheetPullFields } from "@/components/connectData/ConnectHomeSheetPullFields";
 import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
 import {
@@ -84,6 +87,8 @@ export function ConnectComposeOperationPanel({ className }) {
     setComposeLimitRuleOpen,
     composeLimitRuleValue,
     setComposeLimitRuleValue,
+    composeLimitScope,
+    setComposeLimitScope,
     composeWhereFilters,
     setComposeWhereFilters,
     composeHavingFilters,
@@ -124,7 +129,17 @@ export function ConnectComposeOperationPanel({ className }) {
     [columnComposeItems],
   );
 
-  const columnsForCompose = pullColumns.length > 0 ? pullColumns : availableColumns;
+  /** Base-table columns only (join keys + WHERE must reference the driving table, not joined tables). */
+  const baseTableColumnNames = useMemo(() => {
+    const fromSelected = (columnComposeItems || [])
+      .filter((i) => !i.sourceTable)
+      .map((i) => String(i.column || "").trim())
+      .filter(Boolean);
+    const unique = [...new Set(fromSelected)];
+    return unique.length > 0 ? unique : availableColumns;
+  }, [columnComposeItems, availableColumns]);
+
+  const columnsForCompose = pullColumns.length > 0 ? [...new Set(pullColumns)] : availableColumns;
 
   const numericColumns = useMemo(
     () => columnsForCompose.filter((c) => kindForColumn(c) === "number"),
@@ -135,6 +150,9 @@ export function ConnectComposeOperationPanel({ className }) {
     () => glueTableNamesForDataset(lakeConfig?.dataset || "kalshi"),
     [lakeConfig],
   );
+
+  const hasTableJoin = useMemo(() => hasConfiguredTableJoins(composeJoins), [composeJoins]);
+  const primaryTableLabel = table || "primary table";
 
   const composeSelectAliasChoices = useMemo(() => {
     const rows = selectRowsForAggregatedCompose(columnComposeItems);
@@ -197,7 +215,7 @@ export function ConnectComposeOperationPanel({ className }) {
   );
 
   const addJoinRule = useCallback(() => {
-    const baseLeft = columnsForCompose[0] || "";
+    const baseLeft = baseTableColumnNames[0] || "";
     const defaultTargetTable = table === "markets" ? "trades" : "markets";
     setComposeJoins?.((prev) => [
       ...(prev || []),
@@ -212,7 +230,7 @@ export function ConnectComposeOperationPanel({ className }) {
         rightColumn: "",
       },
     ]);
-  }, [columnsForCompose, table, setComposeJoins]);
+  }, [baseTableColumnNames, table, setComposeJoins]);
 
   const addSortClause = useCallback(() => {
     const first = composeSelectAliasChoices[0];
@@ -227,6 +245,7 @@ export function ConnectComposeOperationPanel({ className }) {
     setColumnComposeOrderBy?.([]);
     setComposeLimitRuleOpen?.(false);
     setComposeLimitRuleValue?.("");
+    setComposeLimitScope?.("primary");
     setColumnComposeItems?.((prev) =>
       (prev || []).map((row) => ({
         ...row,
@@ -250,6 +269,7 @@ export function ConnectComposeOperationPanel({ className }) {
     setColumnComposeOrderBy,
     setComposeLimitRuleOpen,
     setComposeLimitRuleValue,
+    setComposeLimitScope,
     setColumnComposeItems,
     setConnectActiveComposeOps,
   ]);
@@ -316,7 +336,7 @@ export function ConnectComposeOperationPanel({ className }) {
                     <SelectValue placeholder="Column" />
                   </SelectTrigger>
                   <SelectContent>
-                    {columnsForCompose.map((c) => (
+                    {baseTableColumnNames.map((c) => (
                       <SelectItem key={c} value={c} className="text-[13px]">
                         {composeSourceColumnLabel(c)}
                       </SelectItem>
@@ -378,7 +398,7 @@ export function ConnectComposeOperationPanel({ className }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 max-h-[280px] overflow-y-auto">
-                {columnsForCompose.map((col) => (
+                {baseTableColumnNames.map((col) => (
                   <DropdownMenuItem key={col} onSelect={() => addWhereFilter(col, "eq")}>
                     {composeSourceColumnLabel(col)}
                   </DropdownMenuItem>
@@ -391,11 +411,12 @@ export function ConnectComposeOperationPanel({ className }) {
         {opId === "join" ? (
           <div className="space-y-2">
             {composeJoins.map((jr) => {
-              const rightCols = getColumnMetaForLakeTable("kalshi", jr.targetTable || "markets").map(
+              const rightCols = getColumnMetaForLakeTable(lake, jr.targetTable || "markets").map(
                 (c) => c.name,
               );
               return (
-                <div key={jr.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border/50 p-2">
+                <div key={jr.id} className="space-y-2 rounded-md border border-border/50 p-2">
+                  <div className="flex flex-wrap items-center gap-2">
                   <Select
                     value={jr.targetTable || ""}
                     onValueChange={(v) =>
@@ -447,7 +468,7 @@ export function ConnectComposeOperationPanel({ className }) {
                       <SelectValue placeholder="Left col" />
                     </SelectTrigger>
                     <SelectContent>
-                      {columnsForCompose.map((c) => (
+                      {baseTableColumnNames.map((c) => (
                         <SelectItem key={c} value={c} className="text-xs">
                           {composeSourceColumnLabel(c)}
                         </SelectItem>
@@ -481,6 +502,16 @@ export function ConnectComposeOperationPanel({ className }) {
                   >
                     <Minus className="h-2 w-2" />
                   </button>
+                  </div>
+                {jr.targetTable && jr.leftColumn && jr.rightColumn ? (
+                  <ComposeJoinTargetColumnPicker
+                    lake={lake}
+                    joinTable={jr.targetTable}
+                    columnComposeItems={columnComposeItems}
+                    setColumnComposeItems={setColumnComposeItems}
+                    setColumnComposeOrderBy={setColumnComposeOrderBy}
+                  />
+                ) : null}
                 </div>
               );
             })}
@@ -575,48 +606,16 @@ export function ConnectComposeOperationPanel({ className }) {
         ) : null}
 
         {opId === "row_limit" ? (
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Maximum rows</Label>
-            <motion.div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={1}
-                className="h-8 w-32 text-xs"
-                value={composeLimitRuleValue}
-                onChange={(e) => {
-                  setComposeLimitRuleOpen?.(true);
-                  setComposeLimitRuleValue?.(e.target.value);
-                }}
-                placeholder={`e.g. ${ATHENA_SAMPLE_ROW_LIMIT}`}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 text-[11px]"
-                onClick={() => {
-                  setComposeLimitRuleOpen?.(false);
-                  setComposeLimitRuleValue?.("");
-                }}
-              >
-                Clear limit
-              </Button>
-            </motion.div>
-            {!composeLimitRuleOpen ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => {
-                  setComposeLimitRuleOpen?.(true);
-                  setComposeLimitRuleValue?.(String(ATHENA_SAMPLE_ROW_LIMIT));
-                }}
-              >
-                Set row limit
-              </Button>
-            ) : null}
-          </div>
+          <ComposeJoinLimitFields
+            composeLimitRuleOpen={composeLimitRuleOpen}
+            setComposeLimitRuleOpen={setComposeLimitRuleOpen}
+            composeLimitRuleValue={composeLimitRuleValue}
+            setComposeLimitRuleValue={setComposeLimitRuleValue}
+            composeLimitScope={composeLimitScope}
+            setComposeLimitScope={setComposeLimitScope}
+            hasTableJoin={hasTableJoin}
+            primaryTableLabel={primaryTableLabel}
+          />
         ) : null}
 
         {opId === "summarize" ? (

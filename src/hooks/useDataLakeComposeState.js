@@ -15,6 +15,7 @@ export function useDataLakeComposeState(shareViaContext) {
   const [localColumnComposeOrderBy, setLocalColumnComposeOrderBy] = useState([]);
   const [localComposeLimitRuleOpen, setLocalComposeLimitRuleOpen] = useState(false);
   const [localComposeLimitRuleValue, setLocalComposeLimitRuleValue] = useState("");
+  const [localComposeLimitScope, setLocalComposeLimitScope] = useState("primary");
   const [localComposeWhereFilters, setLocalComposeWhereFilters] = useState([]);
   const [localComposeHavingFilters, setLocalComposeHavingFilters] = useState([]);
   const [localComposeJoins, setLocalComposeJoins] = useState([]);
@@ -29,6 +30,8 @@ export function useDataLakeComposeState(shareViaContext) {
       setComposeLimitRuleOpen: ctx.setDataLakeComposeLimitOpen,
       composeLimitRuleValue: ctx.dataLakeComposeLimitValue ?? "",
       setComposeLimitRuleValue: ctx.setDataLakeComposeLimitValue,
+      composeLimitScope: ctx.dataLakeComposeLimitScope ?? "primary",
+      setComposeLimitScope: ctx.setDataLakeComposeLimitScope,
       composeWhereFilters: ctx.dataLakeComposeWhereFilters ?? [],
       setComposeWhereFilters: ctx.setDataLakeComposeWhereFilters,
       composeHavingFilters: ctx.dataLakeComposeHavingFilters ?? [],
@@ -47,6 +50,8 @@ export function useDataLakeComposeState(shareViaContext) {
     setComposeLimitRuleOpen: setLocalComposeLimitRuleOpen,
     composeLimitRuleValue: localComposeLimitRuleValue,
     setComposeLimitRuleValue: setLocalComposeLimitRuleValue,
+    composeLimitScope: localComposeLimitScope,
+    setComposeLimitScope: setLocalComposeLimitScope,
     composeWhereFilters: localComposeWhereFilters,
     setComposeWhereFilters: setLocalComposeWhereFilters,
     composeHavingFilters: localComposeHavingFilters,

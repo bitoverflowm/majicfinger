@@ -1,3 +1,5 @@
+import { summarizeComposeJoinClauses } from "@/lib/composeJoinColumns";
+
 export function integrationLabelFromLake(lake) {
   const key = String(lake || "").toLowerCase();
   if (key === "kalshi") return "Kalshi Historical";
@@ -85,6 +87,11 @@ export function formatConnectRequestCardQuery(card, sheet) {
     if (where) lines.push(`WHERE ${where}`);
   }
 
+  const joinClauses = summarizeComposeJoinClauses(composeSpec);
+  for (const clause of joinClauses) {
+    lines.push(clause);
+  }
+
   const orderBy = Array.isArray(composeSpec?.orderBy) ? composeSpec.orderBy : [];
   if (orderBy.length) {
     const ord = orderBy
@@ -100,7 +107,13 @@ export function formatConnectRequestCardQuery(card, sheet) {
   }
 
   if (card?.composeRowLimit != null && card.composeRowLimit !== "") {
-    lines.push(`LIMIT ${card.composeRowLimit}`);
+    const scopeLabel =
+      composeSpec?.limitScope === "primary"
+        ? " (primary table, then expand joins)"
+        : composeSpec?.limitScope === "result"
+          ? " (full joined result)"
+          : "";
+    lines.push(`LIMIT ${card.composeRowLimit}${scopeLabel}`);
   }
 
   return lines.join(" · ");

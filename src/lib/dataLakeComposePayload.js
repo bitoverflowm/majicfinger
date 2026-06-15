@@ -20,6 +20,7 @@ export function buildDataLakeServerComposePayload({
   selectedTable,
   kalshiTradesJoinPreset,
   kalshiTradesJoinPresets,
+  composeLimitScope,
 }) {
   const selectItems = selectRowsForAggregatedCompose(columnComposeItems);
   const selectAliasSet = new Set(
@@ -36,6 +37,7 @@ export function buildDataLakeServerComposePayload({
   const payload = {
     select: selectItems.map((i) => ({
       column: i.column,
+      ...(i.sourceTable ? { sourceTable: String(i.sourceTable).trim().toLowerCase() } : {}),
       alias: String(i.alias || i.column).trim(),
       aggregate: i.aggregate || null,
       dateBucket: i.dateBucket || null,
@@ -84,6 +86,11 @@ export function buildDataLakeServerComposePayload({
     }))
     .filter((j) => j.table && j.on.leftColumn && j.on.rightColumn);
   if (tableJoins.length) payload.joins = tableJoins;
+
+  const scopeRaw = String(composeLimitScope || "").toLowerCase().trim();
+  if (tableJoins.length && (scopeRaw === "primary" || scopeRaw === "result")) {
+    payload.limitScope = scopeRaw;
+  }
 
   return payload;
 }

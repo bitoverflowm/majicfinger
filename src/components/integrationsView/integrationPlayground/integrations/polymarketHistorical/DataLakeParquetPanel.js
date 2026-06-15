@@ -65,6 +65,8 @@ import { removeDataSheetFromWorkspace } from "@/lib/removeDataSheetFromWorkspace
 import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
 import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
 import { ComposeColumnFormatFields } from "@/components/connectData/ComposeColumnFormatFields";
+import { ComposeJoinTargetColumnPicker } from "@/components/connectData/ComposeJoinTargetColumnPicker";
+import { ComposeJoinLimitFields } from "@/components/connectData/ComposeJoinLimitFields";
 import { ConnectProgressWithLabel } from "./ConnectProgressWithLabel";
 import { runParquetSheetLoadWithProgress, PARQUET_LOAD_PHASE_MESSAGES } from "./parquetSheetLoadProgress";
 import EquationExprBuilder from "./EquationExprBuilder";
@@ -97,6 +99,13 @@ import {
 } from "@/lib/connectHomePullDestination";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
+import {
+  composeColumnsWithJoinTargets,
+  composeItemRefKey,
+  defaultComposeJoinColumnAlias,
+  appendJoinTargetColumns,
+  hasConfiguredTableJoins,
+} from "@/lib/composeJoinColumns";
 import { buildRequestCardQuerySummary } from "@/lib/connectHomeRequestQuery";
 import {
   hasExplicitComposeGrouping,
@@ -583,6 +592,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setComposeLimitRuleOpen,
     composeLimitRuleValue,
     setComposeLimitRuleValue,
+    composeLimitScope,
+    setComposeLimitScope,
     composeWhereFilters,
     setComposeWhereFilters,
     composeHavingFilters,
@@ -746,6 +757,20 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     return getColumnMetaForTable(dataset, selected.table);
   }, [dataset, selected?.table, kalshiTradesJoinPreset]);
   const availableColumns = useMemo(() => availableColumnMeta.map((c) => c.name), [availableColumnMeta]);
+  const composeColumnRefs = useMemo(
+    () =>
+      composeColumnsWithJoinTargets({
+        lake,
+        baseTable: selected?.table || "",
+        composeJoins,
+      }),
+    [lake, selected?.table, composeJoins],
+  );
+  const joinTargetColumnRefs = useMemo(
+    () => composeColumnRefs.filter((c) => c.sourceTable),
+    [composeColumnRefs],
+  );
+  const hasTableJoin = useMemo(() => hasConfiguredTableJoins(composeJoins), [composeJoins]);
   /** Kalshi markets: surface ticker, event_ticker, prefix, then Category before the rest. */
   const kalshiMarketsSelectOrderedColumns = useMemo(() => {
     if (dataset !== "kalshi" || selected?.table !== "markets") return null;
@@ -1182,6 +1207,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       selectedTable: selected?.table,
       kalshiTradesJoinPreset,
       kalshiTradesJoinPresets: KALSHI_TRADES_JOIN_PRESETS,
+      composeLimitScope,
     });
   }, [
     columnComposeItems,
@@ -1193,6 +1219,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     selected?.table,
     kalshiTradesJoinPreset,
     composeJoins,
+    composeLimitScope,
   ]);
 
   const composeFriendlySummary = useMemo(() => {
@@ -3006,19 +3033,25 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [addNewSheetAndActivate, startNewRequestDraft]);
 
   const addComposeColumn = useCallback(
-    (col) => {
+    (col, sourceTable = null) => {
       setError(null);
-      const t = availableColumnTypesByName[col];
+      const st = sourceTable ? String(sourceTable).trim().toLowerCase() : null;
+      const typeFromJoin = st
+        ? joinTargetColumnRefs.find((c) => c.sourceTable === st && c.name === col)?.type
+        : null;
+      const t = typeFromJoin ?? availableColumnTypesByName[col];
       const typeNorm = String(t || "").toLowerCase();
       const isDate = (typeNorm === "bigint" || typeNorm === "int") && isDateLikeName(col);
+      const refKey = st ? `${st}.${col}` : col;
       setColumnComposeItems((prev) => {
-        if (prev.some((i) => i.column === col)) return prev;
+        if (prev.some((i) => composeItemRefKey(i) === refKey)) return prev;
         return [
           ...prev,
           {
             id: genComposeRowId(),
             column: col,
-            alias: col,
+            ...(st ? { sourceTable: st } : {}),
+            alias: defaultComposeJoinColumnAlias(st, col),
             aggregate: null,
             dateBucket: null,
             dateFormat: null,
@@ -3031,20 +3064,39 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         ];
       });
     },
-    [availableColumnTypesByName, isDateLikeName],
+    [availableColumnTypesByName, isDateLikeName, joinTargetColumnRefs],
   );
 
-  const removeComposeColumnByName = useCallback(
-    (col) => {
+  const addAllComposeColumnsFromJoinTable = useCallback(
+    (joinTable) => {
       setError(null);
-      const victim = columnComposeItems.find((i) => i.column === col);
+      const st = String(joinTable || "").trim().toLowerCase();
+      if (!st) return;
+      setColumnComposeItems((prev) => appendJoinTargetColumns(prev, { lake, joinTable: st }));
+    },
+    [lake],
+  );
+
+  const removeComposeColumnRef = useCallback(
+    (col, sourceTable = null) => {
+      setError(null);
+      const st = sourceTable ? String(sourceTable).trim().toLowerCase() : null;
+      const refKey = st ? `${st}.${col}` : col;
+      const victim = columnComposeItems.find((i) => composeItemRefKey(i) === refKey);
       if (!victim) return;
-      setColumnComposeItems((prev) => prev.filter((i) => i.column !== col));
+      setColumnComposeItems((prev) => prev.filter((i) => composeItemRefKey(i) !== refKey));
       if (victim.alias) {
         setColumnComposeOrderBy((prev) => prev.filter((o) => o.alias !== victim.alias));
       }
     },
     [columnComposeItems],
+  );
+
+  const removeComposeColumnByName = useCallback(
+    (col) => {
+      removeComposeColumnRef(col, null);
+    },
+    [removeComposeColumnRef],
   );
 
   const resetComposeToAllColumns = useCallback(() => {
@@ -3235,7 +3287,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     <DropdownMenuContent className="w-[30rem] p-0 overflow-hidden" align="start">
                       {(() => {
                         const colsForDropdown = kalshiMarketsSelectOrderedColumns ?? availableColumns;
-                        const selectedSet = new Set(columnComposeItems.map((i) => i.column));
+                        const selectedSet = new Set(columnComposeItems.map((i) => composeItemRefKey(i)));
                         const selectedCount = selectedSet.size;
                         const composeCols = colsForDropdown.filter((c) =>
                           Object.prototype.hasOwnProperty.call(KALSHI_VIRTUAL_COMPOSE_LABELS, c),
@@ -3301,6 +3353,42 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                                   {composeSourceColumnLabel(col)}
                                 </DropdownMenuCheckboxItem>
                               ))}
+
+                              {joinTargetColumnRefs.length > 0 ? (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuLabel className="text-[10px] font-thin">Joined tables</DropdownMenuLabel>
+                                  {Array.from(
+                                    new Set(joinTargetColumnRefs.map((ref) => ref.sourceTable).filter(Boolean)),
+                                  ).map((joinTable) => (
+                                    <DropdownMenuItem
+                                      key={`add-all-${joinTable}`}
+                                      className="text-xs font-medium"
+                                      onSelect={(e) => {
+                                        e.preventDefault();
+                                        addAllComposeColumnsFromJoinTable(joinTable);
+                                      }}
+                                    >
+                                      Add all from {joinTable}
+                                    </DropdownMenuItem>
+                                  ))}
+                                  <DropdownMenuSeparator />
+                                  {joinTargetColumnRefs.map((ref) => (
+                                    <DropdownMenuCheckboxItem
+                                      key={ref.key}
+                                      className="text-xs"
+                                      checked={selectedSet.has(ref.key)}
+                                      onSelect={(e) => {
+                                        e.preventDefault();
+                                        if (!selectedSet.has(ref.key)) addComposeColumn(ref.name, ref.sourceTable);
+                                        else removeComposeColumnRef(ref.name, ref.sourceTable);
+                                      }}
+                                    >
+                                      {ref.sourceTable}.{composeSourceColumnLabel(ref.name)}
+                                    </DropdownMenuCheckboxItem>
+                                  ))}
+                                </>
+                              ) : null}
                             </div>
 
                             {selectedCount > 0 && !isDemo ? (
@@ -3838,6 +3926,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                               </p>
                             )}
                             </div>
+                            {!targetIsSheet && jr.targetTable && jr.leftColumn && jr.rightColumn ? (
+                              <ComposeJoinTargetColumnPicker
+                                lake={lake}
+                                joinTable={jr.targetTable}
+                                columnComposeItems={columnComposeItems}
+                                setColumnComposeItems={setColumnComposeItems}
+                                setColumnComposeOrderBy={setColumnComposeOrderBy}
+                              />
+                            ) : null}
                           </div>
                         );
                       })}
@@ -3904,41 +4001,18 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     </div>
                   )}
                   {composeLimitRuleOpen ? (
-                    <div className="space-y-1 min-w-0">
-                      <Label className="text-xs text-muted-foreground">row limit</Label>
-                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                        <Input
-                          type="number"
-                          min={1}
-                          step={1}
-                          className="h-8 w-1/4 min-w-[7rem] text-xs"
-                          value={composeLimitRuleValue}
-                          onChange={(e) => setComposeLimitRuleValue(e.target.value)}
-                          aria-label="Maximum rows returned from Athena (SQL LIMIT)"
-                          placeholder="Max rows"
-                        />
-                        <TooltipProvider delayDuration={250}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                                onClick={() => {
-                                  setComposeLimitRuleOpen(false);
-                                  setComposeLimitRuleValue("");
-                                }}
-                                aria-label="Remove row limit"
-                              >
-                                <Minus className="h-2 w-2" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                              Remove limit (use your tier default cap)
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </div>
+                    <ComposeJoinLimitFields
+                      composeLimitRuleOpen={composeLimitRuleOpen}
+                      setComposeLimitRuleOpen={setComposeLimitRuleOpen}
+                      composeLimitRuleValue={composeLimitRuleValue}
+                      setComposeLimitRuleValue={setComposeLimitRuleValue}
+                      composeLimitScope={composeLimitScope}
+                      setComposeLimitScope={setComposeLimitScope}
+                      hasTableJoin={hasTableJoin}
+                      primaryTableLabel={selected?.table || "primary table"}
+                      showSetLimitButton={false}
+                      inputClassName="w-1/4 min-w-[7rem]"
+                    />
                   ) : null}
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
                     <Button

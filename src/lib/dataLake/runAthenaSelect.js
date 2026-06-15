@@ -16,6 +16,7 @@ import {
   composeUnboundedSelectShouldCapRows,
   COMPOSE_UNCONSTRAINED_ROW_CAP,
 } from "./buildComposeAthenaSql";
+import { composeUsesPrimaryTableLimit } from "../composeLimitScope.js";
 import { buildComposeFiltersWhereSql, collectKalshiMarketsMaterializedVirtuals } from "./composeWherePredicateSql";
 import { sortRowsChronologicallyByDetectedBucketColumn } from "./sortAthenaDateBuckets";
 import {
@@ -307,7 +308,11 @@ export async function startAthenaBoundedQuery({
         QueryExecutionContext: { Catalog: catalog, Database: db },
       }),
     );
-    return { queryExecutionId: QueryExecutionId, sql, rowLimit: sqlLimit ?? null };
+    let fetchRowLimit = sqlLimit;
+    if (composeUsesPrimaryTableLimit(compose, explicitLimit)) {
+      fetchRowLimit = unlimitedComposeRows ? null : capRows;
+    }
+    return { queryExecutionId: QueryExecutionId, sql, rowLimit: fetchRowLimit ?? null };
   }
 
   const selectLimit =

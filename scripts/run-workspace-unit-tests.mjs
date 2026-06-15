@@ -18,6 +18,16 @@ import {
   pickInitialActiveSheetId,
   sheetNeedsDerivedReplay,
 } from "@/lib/replayProjectDerivedSheets.js";
+import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload.js";
+import {
+  summarizeComposeJoinClauses,
+  composeItemRefKey,
+  defaultComposeJoinColumnAlias,
+  appendJoinTargetColumns,
+  removeJoinTargetColumns,
+} from "@/lib/composeJoinColumns.js";
+import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery.js";
+import { composeUsesPrimaryTableLimit } from "@/lib/composeLimitScope.js";
 
 function test(name, fn) {
   try {
@@ -173,6 +183,135 @@ test("buildProjectDeltaPayload records deleted sheet ids", () => {
   const delta = buildProjectDeltaPayload({ baseProject: base, currentPayload: next });
   assert.ok(delta.hasChanges);
   assert.deepEqual(delta.patch.deletedSheetIds, ["sheet-2"]);
+});
+
+test("compose join payload includes joins and joined select columns", () => {
+  const payload = buildDataLakeServerComposePayload({
+    columnComposeItems: [
+      { column: "ticker", alias: "ticker", aggregate: null },
+      { column: "count", alias: "trades_count", sourceTable: "trades", aggregate: null },
+    ],
+    columnComposeOrderBy: [],
+    composeHavingFilters: [],
+    composeJoins: [
+      {
+        id: "j1",
+        targetKind: "table",
+        targetTable: "trades",
+        leftColumn: "ticker",
+        rightColumn: "ticker",
+        joinType: "left",
+      },
+    ],
+    hasComposeAggregates: false,
+    composeDimensionAliases: [],
+    dataset: "kalshi",
+    selectedTable: "markets",
+    kalshiTradesJoinPreset: "",
+    kalshiTradesJoinPresets: new Set(),
+  });
+  assert.equal(payload.joins?.length, 1);
+  assert.equal(payload.joins[0].joinType, "left");
+  assert.equal(payload.select[1].sourceTable, "trades");
+  assert.equal(payload.limitScope, undefined);
+
+  const payloadPrimary = buildDataLakeServerComposePayload({
+    columnComposeItems: [{ column: "ticker", alias: "ticker", aggregate: null }],
+    columnComposeOrderBy: [],
+    composeHavingFilters: [],
+    composeJoins: [
+      {
+        id: "j1",
+        targetKind: "table",
+        targetTable: "trades",
+        leftColumn: "ticker",
+        rightColumn: "ticker",
+        joinType: "left",
+      },
+    ],
+    hasComposeAggregates: false,
+    composeDimensionAliases: [],
+    dataset: "kalshi",
+    selectedTable: "markets",
+    kalshiTradesJoinPreset: "",
+    kalshiTradesJoinPresets: new Set(),
+    composeLimitScope: "primary",
+  });
+  assert.equal(payloadPrimary.limitScope, "primary");
+});
+
+test("request history includes JOIN clauses", () => {
+  const summary = formatConnectRequestCardQuery(
+    {
+      lake: "kalshi",
+      table: "markets",
+      selectAliases: ["ticker", "volume"],
+      hasWhere: true,
+      whereText: 'kalshi_taxonomy_category eq "Politics"',
+      composeRowLimit: 2,
+    },
+    {
+      provenance: {
+        composeSpec: {
+          joins: [
+            {
+              joinType: "left",
+              table: "trades",
+              on: { leftColumn: "ticker", rightColumn: "ticker" },
+            },
+          ],
+          limitScope: "primary",
+        },
+      },
+    },
+  );
+  assert.match(summary, /LEFT JOIN trades ON ticker = ticker/);
+  assert.match(summary, /LIMIT 2 \(primary table, then expand joins\)/);
+});
+
+test("compose join column helpers", () => {
+  assert.equal(defaultComposeJoinColumnAlias("trades", "count"), "trades_count");
+  assert.equal(composeItemRefKey({ column: "ticker", sourceTable: "trades" }), "trades.ticker");
+  assert.deepEqual(summarizeComposeJoinClauses({ joins: [{ joinType: "left", table: "trades", on: { leftColumn: "ticker", rightColumn: "ticker" } }] }), [
+    "LEFT JOIN trades ON ticker = ticker",
+  ]);
+});
+
+test("appendJoinTargetColumns adds every join-table column once", () => {
+  const out = appendJoinTargetColumns([{ column: "ticker", alias: "ticker" }], {
+    lake: "kalshi",
+    joinTable: "trades",
+  });
+  assert.ok(out.length > 1);
+  assert.ok(out.some((i) => i.column === "count" && i.sourceTable === "trades"));
+  const again = appendJoinTargetColumns(out, { lake: "kalshi", joinTable: "trades" });
+  assert.equal(again.length, out.length);
+});
+
+test("removeJoinTargetColumns drops one or all join-table columns", () => {
+  const items = [
+    { column: "ticker", alias: "ticker" },
+    { column: "count", sourceTable: "trades", alias: "trades_count" },
+    { column: "yes_price", sourceTable: "trades", alias: "trades_yes_price" },
+  ];
+  const one = removeJoinTargetColumns(items, { joinTable: "trades", columnNames: ["count"] });
+  assert.equal(one.length, 2);
+  assert.ok(one.some((i) => i.column === "yes_price" && i.sourceTable === "trades"));
+  const none = removeJoinTargetColumns(items, { joinTable: "trades" });
+  assert.equal(none.length, 1);
+  assert.equal(none[0].column, "ticker");
+});
+
+test("composeUsesPrimaryTableLimit detects primary-table join limit", () => {
+  const compose = {
+    limitScope: "primary",
+    joins: [{ joinType: "inner", table: "trades", on: { leftColumn: "ticker", rightColumn: "ticker" } }],
+    select: [{ column: "ticker", alias: "ticker" }],
+  };
+  assert.equal(composeUsesPrimaryTableLimit(compose, 2), true);
+  assert.equal(composeUsesPrimaryTableLimit({ ...compose, limitScope: "result" }, 2), false);
+  assert.equal(composeUsesPrimaryTableLimit({ ...compose, joins: [] }, 2), false);
+  assert.equal(composeUsesPrimaryTableLimit(compose, null), false);
 });
 
 console.log("\nAll workspace unit tests passed.");

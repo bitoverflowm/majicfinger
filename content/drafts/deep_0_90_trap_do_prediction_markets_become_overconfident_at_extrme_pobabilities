@@ -128,3 +128,294 @@ Some domains may be calibrated while others are wildly overconfident.
 
 
 
+
+
+
+
+the wrriteup:
+
+We began by testing the core hypothesis behind The 90% Trap using historical Kalshi political prediction market data (2021–Dec 2025, volume > 1000), constructing a calibration curve by bucketing markets based on final traded prices as proxy probabilities and comparing them against actual resolution frequencies. The initial results showed strong apparent calibration at extreme probabilities (0–10% and 90–100%), but a striking breakdown in the mid-range (30–80%), where observed outcomes became highly unstable and inconsistent across buckets.
+
+However, deeper inspection revealed that this “broken middle” is likely not a simple calibration failure but a structural artifact of the dataset: political markets are highly heterogeneous, mixing fundamentally different types of prediction problems (electoral outcomes, policy/institutional events, and high-entropy one-off event markets). This likely causes the mid-range probabilities to reflect heterogeneous uncertainty regimes rather than a single unified forecasting system.
+
+As a result, the initial calibration curve cannot yet be interpreted as a single global efficiency measure. Instead, it reflects an aggregation of multiple market dynamics with different entropy structures and convergence behaviors.
+
+---
+Next Step in the Analysis
+
+To correctly test whether prediction markets are truly “overconfident at extreme probabilities,” the next step is to decompose the dataset into meaningful market categories (by structure/entropy type) and recompute calibration curves within each segment. This will allow us to determine whether:
+
+Extreme probability accuracy is consistent across all political market types, or
+It is driven primarily by low-entropy (high-certainty) markets such as elections, while high-entropy event markets distort mid-range calibration.
+
+Only after this segmentation can we isolate whether the observed pattern reflects true miscalibration behavior or a mixture-induced artifact in the aggregated curve
+
+---
+Thought processs is as follows:
+Segment A (Elections)
+strong S-shaped calibration curve
+extremes are accurate
+mid-range still noisy but meaningful
+
+👉 likely “efficient-ish”
+
+Segment B (Policy)
+slight overconfidence in high probabilities
+slower convergence
+more drift
+
+👉 partially efficient
+
+Segment C (Event randomness)
+almost flat calibration
+extreme probabilities often unjustified
+heavy miscalibration in 40–80 range
+
+👉 structurally inefficient
+
+---
+Splitting Political markets into segments:
+
+- Electoral/ outcome-driven markets (elections)
+    - High structure, strong fundamentals
+    - methodology:
+        - Title containing: "eleection", "win", "nominee", "Who will be", "primary", "special election", "out before"
+
+- Institutional / policy markets (policy)
+    - Moderate structure, delayed resolution
+    - methodology:
+        - Title conraining: "shut down", "vote for a joint resolution", “becomes law”, “passes", "signed", "enacted”, “reconciliation", "clear legislative process outcome",
+        "legislative", "process", "outcome", "joint resolution", "spending"
+
+- Event / conditional randomness markets (event)
+    - Low structure, high noise
+    - methodology:
+        - Ticker containing: MENTION
+        - Tiitle contianing: "say", "Tech layoffs", "release", "speak", "meet", "visit", "pardon", "approval rating"
+        - those that aren't in A or B will be in C
+
+Market Segmentation Rationale
+
+The initial calibration curve showed strong accuracy at extreme probabilities (0–10% and 90–100%) but significant instability in the mid-range probability buckets. To investigate whether this pattern reflects genuine market miscalibration or the aggregation of fundamentally different prediction problems, we decomposed political markets into three structural categories:
+
+Electoral / Outcome Markets (A): elections, nominations, and office-holding outcomes.
+Institutional / Policy Markets (B): legislative, budgetary, and formal government decision-making processes.
+Event / High-Entropy Markets (C): speeches, meetings, pardons, approvals, announcements, and other discretionary or timing-driven events.
+
+By analyzing calibration curves separately for each category, we can determine whether the observed "broken middle" is a true prediction market weakness or simply the result of mixing markets with very different uncertainty structures and forecasting characteristics. This allows us to test the core hypothesis more rigorously: whether prediction markets become overconfident at extreme probabilities, and whether that behavior differs across types of political uncertainty.
+
+
+
+<calibratin segment charts>
+
+Current Analysis Summary
+
+After building the initial calibration curve, we observed what appeared to be severe miscalibration in the middle probability ranges. To investigate whether this was a genuine prediction market failure or a consequence of mixing fundamentally different market types, we segmented political markets into three categories: Electoral (A), Policy (B), and Event/High-Entropy (C).
+
+The segmentation revealed that the apparent calibration breakdown largely disappeared. Instead, we found that most political markets finish at extreme probabilities (0–10% or 90–100%), with very few markets resolving from the middle probability ranges. Markets reaching extreme probabilities were extraordinarily accurate across all three categories.
+
+Our next step is to quantify this behavior more rigorously by measuring calibration error (observed resolution frequency minus expected probability) and examining the distribution of final probabilities. This will allow us to determine whether markets are actually overconfident, underconfident, or well-calibrated at extreme probability levels, and whether the apparent "broken middle" is primarily a sample-size phenomenon.
+
+
+Calibration Error by Bucket — Introduction & Methodology
+
+To move beyond visual inspection of calibration curves, we now compute calibration error by probability bucket. This directly quantifies how far prediction markets deviate from perfect calibration at each confidence level.
+
+Instead of only comparing predicted vs observed frequencies qualitatively, we measure the numerical gap between them across discrete probability ranges.
+
+Methodology
+Bucket predicted probabilities
+Use existing bins (0–10, 10–20, …, 90–100)
+Treat each bucket midpoint as the expected probability
+(e.g., 80–90 → 85%)
+Compute observed frequency per bucket
+
+Already derived:
+
+actual resolution frequency=
+total markets
+YES outcomes
+	​
+
+
+Calculate calibration error
+For each bucket:
+
+Calibration Error=Observed Frequency−Expected Probability
+Interpretation
+Positive error → underconfidence (outcomes happen more than priced in)
+Negative error → overconfidence (outcomes happen less than priced in)
+Near zero → well-calibrated
+Why this matters
+
+This transforms the analysis from a shape-based curve interpretation into a precise bias measurement, allowing us to answer:
+
+Are extreme probabilities systematically miscalibrated?
+Is the “90% trap” actually real or just visual distortion?
+Which probability regions (if any) show consistent directional bias?
+
+This becomes the quantitative backbone for validating or rejecting the original
+
+---
+
+Summary of Calibration Error Results
+
+Across all three political market segments (A: Electoral, B: Policy, C: Event), the dominant pattern is not systematic overconfidence at high probabilities, but rather:
+
+1. Extreme probabilities are highly reliable (and slightly underconfident)
+90–100% bucket is consistently:
+A: +0.05
+B: +0.05
+C: +0.049
+
+👉 Interpretation:
+
+Markets slightly underestimate certainty at the extreme end, but are extremely well calibrated overall.
+
+2. Low probabilities show mild overconfidence in YES outcomes
+0–10% bucket is consistently around:
+~ -0.05 across all categories
+
+👉 Interpretation:
+
+Markets slightly overprice rare positive outcomes in near-zero regions (but error is small and stable).
+
+3. Mid-range buckets are noisy, inconsistent, and sample-sparse
+Large swings in error (positive and negative)
+Often based on very small sample sizes
+Only event markets (C) show meaningful mid-range structure, and even there variance is high
+
+👉 Interpretation:
+
+The “broken middle” is not a stable behavioral bias — it is a low-data, high-entropy regime.
+
+4. A and B markets barely operate in the middle at all
+Almost all volume and resolution mass is at extremes (0–10 or 90–100)
+Mid-range buckets are effectively empty
+
+👉 Interpretation:
+
+Political markets tend to resolve only once uncertainty collapses, not while it exists.
+
+🔥 Core Insight
+
+The key takeaway is:
+
+There is no evidence of systematic overconfidence at extreme probabilities in political prediction markets. Instead, markets exhibit strong convergence toward near-certainty outcomes, with minimal and stable calibration error at the extremes and high volatility only in sparse mid-range states.
+
+🧠 Implication for your original hypothesis
+
+Your “90% Trap” hypothesis is not supported in this dataset.
+
+What is supported:
+
+Political prediction markets are structurally extreme-heavy systems that compress uncertainty into near-0 or near-100 outcomes before resolution
+
+
+----
+
+Distribution of Final Probabilities — Summary & Methodology
+
+To understand the structural shape of political prediction markets, we measure the distribution of final probabilities across all resolved markets. This shifts the focus from calibration accuracy to how markets actually allocate probability mass at resolution time.
+
+What we are measuring
+
+We are analyzing:
+
+How often political markets end up at each probability level at the moment of resolution.
+
+Specifically, we examine whether markets:
+
+cluster at extreme certainty (0–10%, 90–100%)
+occupy meaningful mass in the middle ranges
+or show a smooth spread across probabilities
+Methodology
+1. Use final market state
+Take last_price before market completion
+Treat it as the final implied probability
+2. Bucket probabilities
+
+Use the same 10-point bins:
+
+0–10
+10–20
+20–30
+…
+90–100
+3. Count market frequency per bucket
+
+For each bucket:
+
+number of markets ending in that probability range
+
+This gives:
+
+Probability mass distribution at resolution time
+
+What this will reveal
+
+This analysis answers a different but crucial question:
+
+Do political markets meaningfully operate in uncertainty?
+Or do they primarily resolve after collapsing into:
+near-0 certainty
+near-100 certainty
+
+----
+(distribution chart)
+
+
+Distribution of Political Prediction Market Final Probabilities
+🔥 1. Strong bimodal structure (core finding)
+
+The distribution of markets is heavily concentrated at the extremes:
+
+0–10% bucket: 4,254 markets (dominant low-probability mass)
+90–100% bucket: 2,595 markets (dominant high-probability mass)
+
+👉 Together, these two buckets contain the overwhelming majority of all observations.
+
+🧠 2. Severe collapse of the “uncertainty middle”
+
+All intermediate probability ranges are sparsely populated:
+
+10–80% buckets collectively account for a small fraction of total markets
+Most mid-range buckets have only tens of observations each
+
+👉 This indicates:
+
+Political prediction markets rarely persist in moderate uncertainty at resolution time.
+
+⚖️ 3. Asymmetric structure: skew toward certainty
+
+The system is not just bimodal — it is certainty-weighted:
+
+Large mass at near-zero outcomes (strong NO certainty)
+Large mass at near-100 outcomes (strong YES certainty)
+
+👉 Interpretation:
+
+Markets tend to resolve uncertainty into near-certain states before completion.
+
+📈 4. Extreme buckets dominate informational content
+0–10% bucket dominates the dataset on the NO side
+90–100% bucket dominates on the YES side
+
+These buckets also show:
+
+strong alignment between predicted and actual outcomes
+very low error in prior calibration analysis
+
+👉 Meaning:
+
+The most “active” part of the market is also the most reliable.
+
+🧩 5. Structural implication (key insight)
+
+This distribution reveals a fundamental property:
+
+Political prediction markets are not evenly distributed probability systems — they behave like binary convergence systems with a thin uncertainty band in the middle.
+
+🧭 One-line takeaway for your report
+
+Political prediction markets overwhelmingly cluster at extreme probabilities, with very little mass in the intermediate range, indicating that uncertainty is typically resolved into near-certainty long before market completion.
