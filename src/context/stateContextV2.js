@@ -750,6 +750,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         label: "",
         progress: 0,
         error: null,
+        largePullView: null,
       });
 
       const streamsBySheetId = liveStreamState?.streamsBySheetId || {};

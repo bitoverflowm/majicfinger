@@ -135,9 +135,16 @@ export function computeRemoveDataSheetResult(dataSheets, sheetId, activeSheetId)
   const remainingKeys = sortSheetIds(Object.keys(withoutDeleted));
 
   if (remainingKeys.length === 0) {
+    const clearedName = String(prev[sheetId]?.name || "").trim() || "Sheet 1";
     return {
       dataSheets: {
-        "sheet-1": { name: "Sheet 1", data: [], provenance: null, requestCards: [], operationHistory: [] },
+        "sheet-1": {
+          name: clearedName,
+          data: [],
+          provenance: null,
+          requestCards: [],
+          operationHistory: [],
+        },
       },
       activeSheetId: "sheet-1",
       connectedData: [],

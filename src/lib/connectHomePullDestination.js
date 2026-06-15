@@ -98,6 +98,20 @@ export function resolveConnectHomeSheetDestination(ctx) {
 export function prepareConnectHomePullSheet(ctx) {
   const destination = resolveConnectHomeSheetDestination(ctx);
   if (destination.action === "new_sheet" && ctx?.addNewSheetAndActivate) {
+    const activeId = ctx?.activeSheetId;
+    const activeSheet = activeId ? ctx?.dataSheets?.[activeId] : null;
+    const activePreparedEmpty =
+      activeId &&
+      Array.isArray(activeSheet?.data) &&
+      activeSheet.data.length === 0 &&
+      !activeSheet?.provenance;
+    if (activePreparedEmpty) {
+      flushSync(() => {
+        applyConnectHomeSheetNameToSheet(ctx, activeId);
+        ctx.setSheetData?.(activeId, []);
+      });
+      return destination;
+    }
     flushSync(() => {
       ctx.addNewSheetAndActivate(
         (newId) => {

@@ -3598,10 +3598,28 @@ export default function DataLakeParquetPanel({
         setConnectedData,
         setChartSheets,
       });
+      setConnectDataLakePullState?.({
+        loading: false,
+        label: "",
+        progress: 0,
+        error: null,
+        largePullView: null,
+      });
+      setError(null);
+      resetLargePullState();
       setExpandedRequestKey(null);
       setShowRequestComposer(true);
     },
-    [setDataSheets, setActiveSheetId, setConnectedData, activeSheetId, dataSheets, setChartSheets],
+    [
+      setDataSheets,
+      setActiveSheetId,
+      setConnectedData,
+      activeSheetId,
+      dataSheets,
+      setChartSheets,
+      setConnectDataLakePullState,
+      resetLargePullState,
+    ],
   );
 
   const openDeleteSheetDialog = useCallback((sheetId) => {

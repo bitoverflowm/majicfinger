@@ -2996,6 +2996,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
         toast('Row deleted!', { duration: 5000 });
     };
 
+    const setConnectDataLakePullState = contextStateV2?.setConnectDataLakePullState;
+
     const handleClearSheet = useCallback(() => {
         if (!activeSheetId) return;
         const result = removeDataSheetFromWorkspace({
@@ -3009,6 +3011,14 @@ const GridView = ({ startNew, fillViewport = false }) => {
             liveStreamActions,
         });
         if (!result) return;
+
+        setConnectDataLakePullState?.({
+            loading: false,
+            label: "",
+            progress: 0,
+            error: null,
+            largePullView: null,
+        });
 
         if (
             fillViewport &&
@@ -3030,6 +3040,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         requestConnectComposeScroll,
         setActiveSheetId,
         setChartSheets,
+        setConnectDataLakePullState,
         setConnectHomeAnalyzeActive,
         setConnectedData,
         setDataSheets,

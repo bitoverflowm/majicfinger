@@ -100,6 +100,29 @@ test("remove sheet deletes dependents without reindexing ids", () => {
   assert.equal(result.idMap, null);
 });
 
+test("remove sheet keeps remaining tabs and switches active sheet", () => {
+  const sheets = {
+    "sheet-1": { name: "test", data: [{ ticker: "A" }] },
+    "sheet-2": { name: "Sheet 1", data: [] },
+  };
+  const result = computeRemoveDataSheetResult(sheets, "sheet-2", "sheet-2");
+  assert.equal(result.resetToEmptySheet, false);
+  assert.deepEqual(Object.keys(result.dataSheets), ["sheet-1"]);
+  assert.equal(result.activeSheetId, "sheet-1");
+  assert.equal(result.dataSheets["sheet-1"].name, "test");
+  assert.equal(result.connectedData.length, 1);
+});
+
+test("clear last sheet preserves its display name", () => {
+  const sheets = {
+    "sheet-1": { name: "test", data: [{ ticker: "A" }] },
+  };
+  const result = computeRemoveDataSheetResult(sheets, "sheet-1", "sheet-1");
+  assert.equal(result.resetToEmptySheet, true);
+  assert.equal(result.dataSheets["sheet-1"].name, "test");
+  assert.equal(result.dataSheets["sheet-1"].data.length, 0);
+});
+
 test("replayProjectDerivedSheets applies refine.query from parent rows", () => {
   const parentRows = [
     { active: true, name: "a" },
