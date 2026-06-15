@@ -45,7 +45,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { queryExecutionId, sql, rowLimit } = await startAthenaBoundedQuery({
+    const started = await startAthenaBoundedQuery({
       physicalTableName: validated.physical,
       database: validated.database,
       columns: validated.columns,
@@ -66,13 +66,16 @@ export default async function handler(req, res) {
     });
 
     return res.status(202).json({
-      queryExecutionId,
-      rowLimit,
-      sql,
+      queryExecutionId: started.queryExecutionId,
+      rowLimit: started.rowLimit,
+      sql: started.sql,
       lake: validated.lake,
       table: validated.table,
       glueTable: validated.physical,
       database: validated.database,
+      ...(started.primaryJoinExpanded
+        ? { primaryJoinExpanded: true, expandedJoinRowCap: started.expandedJoinRowCap }
+        : {}),
     });
   } catch (e) {
     const code = e.code || "INTERNAL";

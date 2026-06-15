@@ -27,7 +27,7 @@ import {
   removeJoinTargetColumns,
 } from "@/lib/composeJoinColumns.js";
 import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery.js";
-import { composeUsesPrimaryTableLimit } from "@/lib/composeLimitScope.js";
+import { composeUsesPrimaryTableLimit, composePrimaryJoinExpandCap, resolveComposeExpandedFetchRowLimit } from "@/lib/composeLimitScope.js";
 
 function test(name, fn) {
   try {
@@ -312,6 +312,20 @@ test("composeUsesPrimaryTableLimit detects primary-table join limit", () => {
   assert.equal(composeUsesPrimaryTableLimit({ ...compose, limitScope: "result" }, 2), false);
   assert.equal(composeUsesPrimaryTableLimit({ ...compose, joins: [] }, 2), false);
   assert.equal(composeUsesPrimaryTableLimit(compose, null), false);
+});
+
+test("primary join expand cap bounds fetch for large trade fan-out", () => {
+  assert.equal(composePrimaryJoinExpandCap(500000), 25000);
+  assert.equal(composePrimaryJoinExpandCap(100), 100);
+  assert.equal(resolveComposeExpandedFetchRowLimit(
+    {
+      limitScope: "primary",
+      joins: [{ joinType: "inner", table: "trades", on: { leftColumn: "ticker", rightColumn: "ticker" } }],
+      select: [{ column: "ticker", alias: "ticker" }],
+    },
+    1,
+    500000,
+  ), 25000);
 });
 
 console.log("\nAll workspace unit tests passed.");

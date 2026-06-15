@@ -97,5 +97,7 @@ export async function fetchAthenaLakeSample(
   return {
     ...result,
     sql: startJson.sql || undefined,
+    primaryJoinExpanded: startJson.primaryJoinExpanded === true,
+    expandedJoinRowCap: startJson.expandedJoinRowCap ?? null,
   };
 }

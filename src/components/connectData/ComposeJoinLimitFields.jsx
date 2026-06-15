@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT } from "@/lib/composeLimitScope";
 import { cn } from "@/lib/utils";
 
 /**
@@ -84,7 +85,7 @@ export function ComposeJoinLimitFields({
               </Select>
               <p className="text-[10px] leading-snug text-muted-foreground">
                 {scope === "primary"
-                  ? `Limits how many ${primaryTableLabel} rows are kept before the join; all matching trades (or other joined rows) are included for each.`
+                  ? `Limits how many ${primaryTableLabel} rows are kept before the join. Joined rows (e.g. trades) are included for each, capped at ${COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT.toLocaleString()} per pull for sheet performance.`
                   : "Limits the final row count after the join (e.g. LIMIT 2 returns only 2 joined rows total)."}
               </p>
             </div>

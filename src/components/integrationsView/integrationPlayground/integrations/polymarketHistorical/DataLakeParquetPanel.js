@@ -99,6 +99,7 @@ import {
 } from "@/lib/connectHomePullDestination";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
+import { COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT } from "@/lib/composeLimitScope";
 import {
   composeColumnsWithJoinTargets,
   composeItemRefKey,
@@ -1373,19 +1374,25 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       const provenance = extras?.provenance ?? null;
       const requestCards = extras?.requestCards;
       const name = extras?.name;
+      const rowCount = Array.isArray(rows) ? rows.length : 0;
+      const patch = (prev) =>
+        applyAthenaPullToSheetPatch(prev, activeSheetId, rows, {
+          provenance,
+          requestCards,
+          name,
+        });
       if (!activeSheetId || !setDataSheets) {
         replaceCurrentSheetData?.(rows);
         setConnectedData?.(rows);
         return;
       }
+      // Large Athena pulls block the main thread if we force a synchronous commit.
+      if (rowCount > 5000) {
+        setDataSheets(patch);
+        return;
+      }
       flushSync(() => {
-        setDataSheets((prev) =>
-          applyAthenaPullToSheetPatch(prev, activeSheetId, rows, {
-            provenance,
-            requestCards,
-            name,
-          }),
-        );
+        setDataSheets(patch);
       });
     },
     [activeSheetId, setDataSheets, replaceCurrentSheetData, setConnectedData],
@@ -1607,7 +1614,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           }
           const sheetJoin = sheetJoinSpec && typeof sheetJoinSpec === "object" ? sheetJoinSpec : null;
 
-          const { columns: resultColumns, rows } = sheetJoin
+          const athenaPull = sheetJoin
             ? await (async () => {
                 if (sheetJoin.error) throw new Error(sheetJoin.error);
 
@@ -1690,6 +1697,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                 { signal, maxWaitMs: 900000 },
               );
 
+          const resultColumns = Array.isArray(athenaPull?.columns) ? athenaPull.columns : [];
+          const rows = Array.isArray(athenaPull?.rows) ? athenaPull.rows : [];
+          const primaryJoinExpanded = athenaPull?.primaryJoinExpanded === true;
+          const expandedJoinRowCap =
+            athenaPull?.expandedJoinRowCap != null
+              ? Math.floor(Number(athenaPull.expandedJoinRowCap))
+              : COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT;
+
           let outRows = rows;
           const kr = kalshiIngestExtras?.taxonomyRollup;
           const snap = kalshiIngestExtras?.composeItemsSnapshot;
@@ -1716,19 +1731,24 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           }
 
           const cappedColumns = Array.isArray(resultColumns) ? resultColumns : [];
-          const ingestFull = subscriberAthenaAccess;
+          const ingestFull = subscriberAthenaAccess && !primaryJoinExpanded;
           const cappedRows =
             ingestFull || !Array.isArray(outRows)
               ? outRows
               : outRows.slice(0, athenaRowLimit);
-          return ingestAthenaResultAsView({
+          const ingested = ingestAthenaResultAsView({
             dataset,
             sampleId: `${sid}-compose`,
             columns: cappedColumns,
             rows: cappedRows,
-            limit: ingestFull ? null : athenaRowLimit,
+            limit: primaryJoinExpanded ? expandedJoinRowCap : ingestFull ? null : athenaRowLimit,
             ingestFullResult: ingestFull,
           });
+          return {
+            ...ingested,
+            primaryJoinExpanded,
+            expandedJoinRowCap,
+          };
         },
       });
     },
@@ -1775,7 +1795,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     });
     if (!connectHomeDataLakeCompose) scrollToLoadProgress();
     try {
-      const { rows, rowCount } = await runIngestWithProgress(
+      const ingestResult = await runIngestWithProgress(
         lk,
         table,
         sid,
@@ -1790,8 +1810,17 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         pendingComposeLimit ?? null,
         signal,
       );
+      const { rows, rowCount, primaryJoinExpanded, expandedJoinRowCap } = ingestResult;
       if (!Array.isArray(rows) || rows.length === 0) {
         throw new Error("Query finished but no rows were loaded into the sheet.");
+      }
+      if (
+        primaryJoinExpanded &&
+        rows.length >= (expandedJoinRowCap ?? COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT)
+      ) {
+        toast(
+          `Loaded ${rows.length.toLocaleString()} joined rows (per-pull cap). Narrow filters or use aggregates for full trade volume.`,
+        );
       }
       syncConnectPullState({ error: null });
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {

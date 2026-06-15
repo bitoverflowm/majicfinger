@@ -704,6 +704,7 @@ export function buildComposeAthenaSelectSql({
   table = null,
   whereSql = "",
   kalshiMaterializedVirtuals = null,
+  expandedJoinResultCap = null,
 }) {
   const safeTable = String(physicalTableName).trim();
   if (!/^[a-zA-Z0-9_]+$/.test(safeTable)) {
@@ -1010,7 +1011,11 @@ export function buildComposeAthenaSelectSql({
     finalFrom = `FROM base_limited ${baseAlias} ${joinSuffix}`;
     finalWhere = "";
     finalOrder = "";
-    finalLimit = "";
+    const expandCap =
+      expandedJoinResultCap != null && Number.isFinite(Number(expandedJoinResultCap))
+        ? Math.min(COMPOSE_SQL_LIMIT_ABSOLUTE_MAX, Math.max(1, Math.floor(Number(expandedJoinResultCap))))
+        : null;
+    finalLimit = expandCap != null ? ` LIMIT ${expandCap}` : "";
   }
 
   return `${ctePrefix}SELECT ${selectParts.join(", ")} ${finalFrom}${finalWhere}${groupSql}${havingSql}${finalOrder}${finalLimit}`;

@@ -16,7 +16,7 @@ import {
   composeUnboundedSelectShouldCapRows,
   COMPOSE_UNCONSTRAINED_ROW_CAP,
 } from "./buildComposeAthenaSql";
-import { composeUsesPrimaryTableLimit } from "../composeLimitScope.js";
+import { resolveComposeExpandedFetchRowLimit } from "../composeLimitScope.js";
 import { buildComposeFiltersWhereSql, collectKalshiMarketsMaterializedVirtuals } from "./composeWherePredicateSql";
 import { sortRowsChronologicallyByDetectedBucketColumn } from "./sortAthenaDateBuckets";
 import {
@@ -290,6 +290,7 @@ export async function startAthenaBoundedQuery({
     } else {
       sqlLimit = capRows;
     }
+    const expandedFetchCap = resolveComposeExpandedFetchRowLimit(compose, explicitLimit, capRows);
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
       limit: sqlLimit,
@@ -298,6 +299,7 @@ export async function startAthenaBoundedQuery({
       table,
       whereSql,
       kalshiMaterializedVirtuals: kalshiComposeVirtuals,
+      expandedJoinResultCap: expandedFetchCap,
     });
     const athena = getAthenaClient();
     const { QueryExecutionId } = await athena.send(
@@ -309,10 +311,16 @@ export async function startAthenaBoundedQuery({
       }),
     );
     let fetchRowLimit = sqlLimit;
-    if (composeUsesPrimaryTableLimit(compose, explicitLimit)) {
-      fetchRowLimit = unlimitedComposeRows ? null : capRows;
+    if (expandedFetchCap != null) {
+      fetchRowLimit = expandedFetchCap;
     }
-    return { queryExecutionId: QueryExecutionId, sql, rowLimit: fetchRowLimit ?? null };
+    return {
+      queryExecutionId: QueryExecutionId,
+      sql,
+      rowLimit: fetchRowLimit ?? null,
+      primaryJoinExpanded: expandedFetchCap != null,
+      expandedJoinRowCap: expandedFetchCap,
+    };
   }
 
   const selectLimit =
