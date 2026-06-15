@@ -2128,7 +2128,7 @@ export default function DataLakeParquetPanel({
             ingestFull || !Array.isArray(outRows)
               ? outRows
               : outRows.slice(0, athenaRowLimit);
-          const ingested = ingestAthenaResultAsView({
+          const ingested = await ingestAthenaResultAsView({
             dataset,
             sampleId: `${sid}-compose`,
             columns: cappedColumns,
