@@ -29,6 +29,8 @@ import {
 import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery.js";
 import { composeUsesPrimaryTableLimit, composePrimaryJoinExpandCap, resolveComposeExpandedFetchRowLimit } from "@/lib/composeLimitScope.js";
 
+import "@/lib/sheetOperations/quant/quantOperations.test.js";
+
 function test(name, fn) {
   try {
     fn();

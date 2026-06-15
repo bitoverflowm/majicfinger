@@ -119,6 +119,7 @@ import {
   getBucketTabValidationErrors,
 } from "@/lib/bucketSheetTabs";
 import { aggregateBucketRows, formatBucketNumber } from "@/lib/sheetOperations/aggregateBucketRows";
+import { QuantOperationsPanel } from "@/components/gridView/QuantOperationsPanel";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
 import { temporalToMs } from "@/lib/temporalParse";
 import {
@@ -391,6 +392,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const setDataSheets = contextStateV2?.setDataSheets
     const setActiveSheetId = contextStateV2?.setActiveSheetId
     const setChartSheets = contextStateV2?.setChartSheets
+    const addNewChartAndActivate = contextStateV2?.addNewChartAndActivate
+    const setLoadedChartBuilderSnapshot = contextStateV2?.setLoadedChartBuilderSnapshot
     const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive
     const requestConnectComposeScroll = contextStateV2?.requestConnectComposeScroll
     const liveStreamActions = contextStateV2?.liveStreamActions
@@ -536,6 +539,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [mathBasicColB, setMathBasicColB] = useState("");
     const [mathDestination, setMathDestination] = useState("current_sheet");
     const [mathDialogTab, setMathDialogTab] = useState("basic");
+    const [quantBusy, setQuantBusy] = useState(false);
+    const [quantCanSubmit, setQuantCanSubmit] = useState(false);
     const [mathFunctionType, setMathFunctionType] = useState("row_operation");
     const [ifElseTabs, setIfElseTabs] = useState([]);
     const [activeIfElseTabId, setActiveIfElseTabId] = useState(null);
@@ -3557,7 +3562,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                     <DialogHeader>
                       <DialogTitle>Mathematics Operations</DialogTitle>
                       <DialogDescription>
-                        Build a row-wise equation for probability momentum and write the result as a new column.
+                        Build row-wise calculations, statistical transforms, and quant workflows on your sheet data.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="min-h-0 space-y-3 overflow-y-auto py-2 pr-1">
@@ -3583,6 +3588,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
                           </TabsTrigger>
                           <TabsTrigger value="stats" className="h-7 px-2 text-xs">
                             Stats
+                          </TabsTrigger>
+                          <TabsTrigger value="quant" className="h-7 px-2 text-xs">
+                            Quant Operations
                           </TabsTrigger>
                         </TabsList>
                         <TabsContent value="basic" className="mt-2 space-y-3">
@@ -4578,8 +4586,29 @@ const GridView = ({ startNew, fillViewport = false }) => {
                             </div>
                           )}
                         </TabsContent>
+                        <TabsContent value="quant" className="mt-2 space-y-3">
+                          <QuantOperationsPanel
+                            rows={connectedData}
+                            columnNames={sheetColumnNamesForMath}
+                            nextFreeColumnName={nextFreeResultColumnName()}
+                            mathDestination={mathDestination}
+                            activeSheetId={activeSheetId}
+                            addNewSheetAndActivate={addNewSheetAndActivate}
+                            setSheetData={setSheetData}
+                            setDataSheets={setDataSheets}
+                            setConnectedData={setConnectedData}
+                            replaceCurrentSheetData={replaceCurrentSheetData}
+                            appendActiveSheetOperation={appendActiveSheetOperation}
+                            setDataTypes={setDataTypes}
+                            addNewChartAndActivate={addNewChartAndActivate}
+                            setLoadedChartBuilderSnapshot={setLoadedChartBuilderSnapshot}
+                            onClose={() => setMathDialogOpen(false)}
+                            onBusyChange={setQuantBusy}
+                            onCanSubmitChange={setQuantCanSubmit}
+                          />
+                        </TabsContent>
                       </Tabs>
-                      {!(mathDialogTab === "stats" && statsBucketActive) ? (
+                      {mathDialogTab !== "quant" && !(mathDialogTab === "stats" && statsBucketActive) ? (
                         <div className="space-y-1">
                           <Label className="text-xs">Apply to</Label>
                           <div className="flex flex-wrap gap-2">
@@ -4621,8 +4650,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         ) : null}
                       </div>
                     ) : null}
-                    <DialogFooter className="gap-2 sm:gap-0">
-                      <Button type="button" variant="outline" onClick={() => setMathDialogOpen(false)} disabled={bucketApplyState.busy}>
+                    <DialogFooter className={cn("gap-2 sm:gap-0", mathDialogTab === "quant" && "hidden")}>
+                      <Button type="button" variant="outline" onClick={() => setMathDialogOpen(false)} disabled={bucketApplyState.busy || quantBusy}>
                         Cancel
                       </Button>
                       <Button
@@ -4636,6 +4665,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         }}
                         disabled={
                           bucketApplyState.busy ||
+                          quantBusy ||
                           (mathDialogTab === "stats" &&
                             ((!statsStdDevActive && !statsCumsumActive && !statsBucketActive) ||
                               (statsStdDevActive && !statsStdCanSubmit) ||
