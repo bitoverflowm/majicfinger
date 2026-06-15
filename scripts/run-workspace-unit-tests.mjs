@@ -28,6 +28,7 @@ import {
 } from "@/lib/composeJoinColumns.js";
 import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery.js";
 import { composeUsesPrimaryTableLimit, composePrimaryJoinExpandCap, resolveComposeExpandedFetchRowLimit } from "@/lib/composeLimitScope.js";
+import { shouldUseLargeAthenaPullPath } from "@/lib/dataLake/largeAthenaPull.js";
 
 import "@/lib/sheetOperations/quant/quantOperations.test.js";
 
@@ -328,6 +329,12 @@ test("primary join expand cap bounds fetch for large trade fan-out", () => {
     1,
     500000,
   ), 25000);
+});
+
+test("shouldUseLargeAthenaPullPath uses 15k threshold", () => {
+  assert.equal(shouldUseLargeAthenaPullPath(15000), false);
+  assert.equal(shouldUseLargeAthenaPullPath(15001), true);
+  assert.equal(shouldUseLargeAthenaPullPath(231961), true);
 });
 
 console.log("\nAll workspace unit tests passed.");

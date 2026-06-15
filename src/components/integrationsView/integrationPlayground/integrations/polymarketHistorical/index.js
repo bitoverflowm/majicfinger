@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 /**
  * Polymarket Historical — archived Becker / Lychee Parquet in S3, queried via DuckDB-WASM in the browser.
  */
-export default function PolymarketHistorical({ setConnectedData }) {
+export default function PolymarketHistorical({ setConnectedData, connectHomePullBridge = false }) {
   const { label, progress, ready, error, retry } = useBeckerParquetBoot();
 
   if (error) {
@@ -33,7 +33,11 @@ export default function PolymarketHistorical({ setConnectedData }) {
 
   return (
     <div className="text-sm space-y-3 min-w-0 max-w-full overflow-hidden">
-      <DataLakeParquetPanel setConnectedData={setConnectedData} dataset="polymarket" />
+      <DataLakeParquetPanel
+        setConnectedData={setConnectedData}
+        dataset="polymarket"
+        connectHomePullBridge={connectHomePullBridge}
+      />
     </div>
   );
 }

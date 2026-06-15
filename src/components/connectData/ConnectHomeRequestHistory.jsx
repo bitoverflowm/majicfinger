@@ -270,8 +270,15 @@ export function ConnectHomeRequestHistory({ className }) {
         </p>
       ) : null}
 
-      {sheetHistory.length === 0 && cardEntries.length === 0 ? (
+      {sheetHistory.length === 0 && cardEntries.length === 0 && !pull.loading ? (
         <p className="text-[11px] text-muted-foreground">Run a pull to build your request history.</p>
+      ) : null}
+
+      {pull.loading && cardEntries.length === 0 && !pull.error ? (
+        <div className="rounded-lg border border-border/60 bg-slate-100 p-3 dark:bg-slate-800/40">
+          <p className="text-sm font-semibold">Pull in progress</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{pull.label || "Loading data…"}</p>
+        </div>
       ) : null}
 
       <div className="space-y-3">
@@ -335,12 +342,20 @@ export function ConnectHomeRequestHistory({ className }) {
                         <p className="mt-0.5 break-words leading-snug text-foreground/90">
                           {queryText || "—"}
                         </p>
-                        <p className="mt-1.5">created in {fmtRequestElapsed(card?.elapsedMs)}</p>
-                        {card?.loadedRowCount != null ? (
-                          <p>
-                            loaded <strong>{card.loadedRowCount}</strong> rows
+                        {card?.status === "in_progress" ? (
+                          <p className="mt-1.5 text-primary">
+                            In progress… {pull.label || "Loading data…"}
                           </p>
-                        ) : null}
+                        ) : (
+                          <>
+                            <p className="mt-1.5">created in {fmtRequestElapsed(card?.elapsedMs)}</p>
+                            {card?.loadedRowCount != null ? (
+                              <p>
+                                loaded <strong>{card.loadedRowCount}</strong> rows
+                              </p>
+                            ) : null}
+                          </>
+                        )}
                       </li>
                     );
                   })}

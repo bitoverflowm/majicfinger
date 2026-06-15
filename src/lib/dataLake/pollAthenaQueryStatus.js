@@ -1,7 +1,9 @@
 /**
  * Poll GET /api/data-lake/athena-query/status until SUCCEEDED (shared by compose pulls + replay).
- * Status-only polls while Athena runs; one bulk row download when complete (server paginates AWS internally).
+ * Status-only polls while Athena runs; paginated row download when complete (stays under API size caps).
  */
+
+import { yieldToUi } from "@/lib/dataLake/largeAthenaPull";
 
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
@@ -19,12 +21,30 @@ function sleep(ms, signal) {
 }
 
 /**
+ * @typedef {"polling" | "athena_succeeded" | "downloading" | "downloading_page" | "parsing_response" | "download_complete"} AthenaPollPhase
+ */
+
+/**
  * @param {string} queryExecutionId
  * @param {number | null} rowLimit — null fetches full result (`limit=all`)
- * @param {{ signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number }} [opts]
+ * @param {{
+ *   signal?: AbortSignal;
+ *   pollIntervalMs?: number;
+ *   maxWaitMs?: number;
+ *   onPhase?: (info: {
+ *     phase: AthenaPollPhase;
+ *     rowLimit?: number | null;
+ *     dataScannedBytes?: number | null;
+ *     rowCount?: number;
+ *     processed?: number;
+ *     total?: number | null;
+ *     columns?: string[];
+ *     accumulatedRows?: string[][];
+ *   }) => void;
+ * }} [opts]
  */
 export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts = {}) {
-  const { signal, pollIntervalMs = 900, maxWaitMs = 600000 } = opts;
+  const { signal, pollIntervalMs = 900, maxWaitMs = 600000, onPhase } = opts;
   const qeid = String(queryExecutionId || "").trim();
   if (!qeid) throw new Error("Missing queryExecutionId");
 
@@ -34,6 +54,8 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
   } else {
     pollQ.set("limit", String(Math.max(1, Math.floor(Number(rowLimit) || 1))));
   }
+
+  onPhase?.({ phase: "polling", rowLimit: rowLimit ?? null });
 
   const deadline = Date.now() + maxWaitMs;
   let dataScannedBytes = null;
@@ -64,6 +86,12 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
 
     if (j.state === "SUCCEEDED") {
       dataScannedBytes = j.dataScannedBytes ?? dataScannedBytes;
+      onPhase?.({
+        phase: "athena_succeeded",
+        rowLimit: rowLimit ?? null,
+        dataScannedBytes,
+      });
+      await yieldToUi();
       break;
     }
 
@@ -79,50 +107,99 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
     throw new Error("Timed out waiting for Athena");
   }
 
-  const fetchQ = new URLSearchParams({ queryExecutionId: qeid, includeRows: "1" });
-  if (rowLimit == null) {
-    fetchQ.set("limit", "all");
-  } else {
-    fetchQ.set("limit", String(Math.max(1, Math.floor(Number(rowLimit) || 1))));
+  onPhase?.({ phase: "downloading", rowLimit: rowLimit ?? null });
+  await yieldToUi();
+
+  const totalCap =
+    rowLimit == null ? null : Math.max(1, Math.floor(Number(rowLimit) || 1));
+  const allRows = [];
+  let columns = [];
+  let athenaPageToken = null;
+  let truncated = false;
+
+  while (true) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
+    const pageQ = new URLSearchParams({
+      queryExecutionId: qeid,
+      includeRows: "page",
+    });
+    if (athenaPageToken) pageQ.set("athenaPageToken", athenaPageToken);
+
+    const pageRes = await fetch(`/api/data-lake/athena-query/status?${pageQ.toString()}`, {
+      method: "GET",
+      credentials: "same-origin",
+      signal,
+    });
+
+    let pageJson = {};
+    try {
+      pageJson = await pageRes.json();
+    } catch (parseErr) {
+      throw new Error(
+        `Failed to read Athena page JSON (${pageRes.status}): ${parseErr?.message || parseErr}`,
+      );
+    }
+
+    if (pageRes.status === 502 && pageJson.code === "ATHENA_FAILED") {
+      throw new Error(pageJson.error || "Athena query failed");
+    }
+    if (!pageRes.ok) {
+      throw new Error(pageJson.error || pageRes.statusText || `Athena page ${pageRes.status}`);
+    }
+
+    if (!columns.length && Array.isArray(pageJson.columns) && pageJson.columns.length) {
+      columns = pageJson.columns;
+    }
+
+    const chunk = Array.isArray(pageJson.rows) ? pageJson.rows : [];
+    if (totalCap != null) {
+      const remaining = totalCap - allRows.length;
+      if (remaining <= 0) {
+        truncated = true;
+        break;
+      }
+      if (chunk.length > remaining) {
+        allRows.push(...chunk.slice(0, remaining));
+        truncated = true;
+        break;
+      }
+    }
+    allRows.push(...chunk);
+
+    const processed = allRows.length;
+    onPhase?.({
+      phase: "downloading_page",
+      rowLimit: rowLimit ?? null,
+      processed,
+      total: totalCap,
+      columns,
+      accumulatedRows: allRows,
+    });
+    await yieldToUi();
+
+    if (!pageJson.hasMore || !pageJson.athenaNextToken) break;
+    if (totalCap != null && allRows.length >= totalCap) {
+      truncated = true;
+      break;
+    }
+
+    athenaPageToken = pageJson.athenaNextToken;
   }
 
-  const fetchRes = await fetch(`/api/data-lake/athena-query/status?${fetchQ.toString()}`, {
-    method: "GET",
-    credentials: "same-origin",
-    signal,
+  onPhase?.({
+    phase: "download_complete",
+    rowLimit: rowLimit ?? null,
+    rowCount: allRows.length,
   });
-
-  let result = {};
-  try {
-    result = await fetchRes.json();
-  } catch (parseErr) {
-    const hint = fetchRes.status === 200 ? " Response may be too large for the browser to parse." : "";
-    throw new Error(
-      `Failed to read Athena result JSON (${fetchRes.status}): ${parseErr?.message || parseErr}${hint}`,
-    );
-  }
-
-  if (fetchRes.status === 502 && result.code === "ATHENA_FAILED") {
-    throw new Error(result.error || "Athena query failed");
-  }
-  if (!fetchRes.ok) {
-    throw new Error(result.error || fetchRes.statusText || `Athena result ${fetchRes.status}`);
-  }
-
-  const rows = Array.isArray(result.rows) ? result.rows : [];
-  const rowCount = result.rowCount ?? rows.length;
-  if (rowCount > 0 && rows.length === 0) {
-    throw new Error(
-      "Athena reported rows but the download was empty (response may be truncated).",
-    );
-  }
+  await yieldToUi();
 
   return {
-    columns: result.columns || [],
-    rows,
-    rowCount,
-    dataScannedBytes: result.dataScannedBytes ?? dataScannedBytes,
+    columns,
+    rows: allRows,
+    rowCount: allRows.length,
+    dataScannedBytes,
     queryExecutionId: qeid,
-    truncated: !!result.truncated,
+    truncated,
   };
 }

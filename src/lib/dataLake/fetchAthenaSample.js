@@ -17,6 +17,9 @@
  * @returns {Promise<{ columns: string[]; rows: string[][]; rowCount: number; dataScannedBytes: number | null; queryExecutionId: string; sql?: string }>}
  */
 import { pollAthenaQueryUntilDone } from "@/lib/dataLake/pollAthenaQueryStatus";
+import {
+  LARGE_ATHENA_PULL_THRESHOLD,
+} from "@/lib/dataLake/largeAthenaPull";
 
 export async function fetchAthenaLakeSample(
   {
@@ -36,7 +39,7 @@ export async function fetchAthenaLakeSample(
   },
   pollOpts = {},
 ) {
-  const { signal, pollIntervalMs = 900, maxWaitMs = 180000 } = pollOpts;
+  const { signal, pollIntervalMs = 900, maxWaitMs = 180000, onPhase: userOnPhase } = pollOpts;
 
   const isCompose = queryType === "compose";
   let lim;
@@ -88,10 +91,23 @@ export async function fetchAthenaLakeSample(
     throw new Error("Athena start response missing queryExecutionId");
   }
 
+  const likelyLarge =
+    startJson.primaryJoinExpanded === true ||
+    (rowLimit != null && rowLimit > LARGE_ATHENA_PULL_THRESHOLD) ||
+    rowLimit == null;
+
   const result = await pollAthenaQueryUntilDone(queryExecutionId, rowLimit, {
     signal,
     pollIntervalMs,
     maxWaitMs,
+    onPhase: (info) => {
+      userOnPhase?.({
+        ...info,
+        likelyLarge,
+        primaryJoinExpanded: startJson.primaryJoinExpanded === true,
+        expandedJoinRowCap: startJson.expandedJoinRowCap ?? null,
+      });
+    },
   });
 
   return {

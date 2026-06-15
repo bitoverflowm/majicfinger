@@ -6,7 +6,7 @@ import { useBeckerParquetBoot } from "../polymarketHistorical/useBeckerParquetBo
 import { Button } from "@/components/ui/button";
 
 /** Kalshi Historical — Becker Parquet under `kalshi/` in the same S3 bucket as Polymarket historical. */
-export default function KalshiHistorical({ setConnectedData }) {
+export default function KalshiHistorical({ setConnectedData, connectHomePullBridge = false }) {
   const { label, progress, ready, error, retry } = useBeckerParquetBoot();
 
   if (error) {
@@ -31,7 +31,11 @@ export default function KalshiHistorical({ setConnectedData }) {
 
   return (
     <div className="text-sm space-y-3 min-w-0 max-w-full overflow-hidden">
-      <DataLakeParquetPanel setConnectedData={setConnectedData} dataset="kalshi" />
+      <DataLakeParquetPanel
+        setConnectedData={setConnectedData}
+        dataset="kalshi"
+        connectHomePullBridge={connectHomePullBridge}
+      />
     </div>
   );
 }

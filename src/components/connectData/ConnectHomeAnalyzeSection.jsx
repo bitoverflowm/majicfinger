@@ -4,6 +4,8 @@ import { useLayoutEffect, useRef } from "react";
 
 import DataView from "@/components/dataView";
 import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWorkspaceNav";
+import { ConnectHomePullProgress } from "@/components/connectData/ConnectHomePullProgress";
+import { LargeAthenaPullPanel } from "@/components/connectData/LargeAthenaPullPanel";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   CONNECT_HOME_WORKSPACE_MIN_H,
@@ -31,7 +33,12 @@ export function ConnectHomeAnalyzeSection({
   const isDemo = !!ctx.isDemo;
   const analyzeScrollTick = ctx.connectAnalyzeScrollTick ?? 0;
   const pull = ctx.connectDataLakePullState ?? {};
+  const largePullView = pull.largePullView;
   const analyzeRef = useRef(null);
+
+  const largePullActive = !!largePullView;
+  const hideGridUntilTableReady =
+    largePullActive && largePullView?.parseStatus !== "ready";
 
   useLayoutEffect(() => {
     if (embeddedInFixedViewport || !analyzeScrollTick) return;
@@ -80,7 +87,30 @@ export function ConnectHomeAnalyzeSection({
         </p>
       ) : null}
 
-      <div className="flex min-h-0 w-full flex-1 flex-col">
+      {largePullActive ? (
+        <LargeAthenaPullPanel
+          columns={largePullView.columns || []}
+          rows={largePullView.rows || []}
+          rowCount={largePullView.rowCount ?? 0}
+          parseStatus={largePullView.parseStatus || "downloading"}
+          parsedProgress={largePullView.parsedProgress}
+          parseError={largePullView.parseError}
+          progressLabel={pull.label}
+          progressPct={pull.progress ?? 0}
+          onViewDataTable={() => ctx.connectLargePullApplyRef?.current?.()}
+          className="mb-4 shrink-0"
+        />
+      ) : pull.loading ? (
+        <ConnectHomePullProgress className="mb-4 shrink-0" />
+      ) : null}
+
+      <div
+        className={cn(
+          "flex min-h-0 w-full flex-1 flex-col",
+          hideGridUntilTableReady && "sr-only",
+        )}
+        aria-hidden={hideGridUntilTableReady || undefined}
+      >
         <DataView user={user} startNew={startNew} setStartNew={setStartNew} fillViewport />
       </div>
     </section>

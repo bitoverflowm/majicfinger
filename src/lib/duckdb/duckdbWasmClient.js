@@ -278,6 +278,23 @@ export async function ingestAthenaResultAsView(opts) {
   return { rows: sheetRows, rowCount: sheetRows.length, logicalKey, viewName };
 }
 
+/**
+ * Register already-parsed row objects as a Becker view (skips string[][] conversion).
+ * @param {{ dataset: "polymarket" | "kalshi"; sampleId: string; columns: string[]; objects: Record<string, unknown>[] }} opts
+ */
+export function ingestParsedObjectsAsView(opts) {
+  const { dataset, sampleId, columns, objects } = opts;
+  const logicalKey = beckerLogicalKey(dataset, sampleId);
+  const viewName = viewNameForLogical(logicalKey);
+  const rows = Array.isArray(objects) ? objects : [];
+
+  void registerAthenaBeckerView({ dataset, sampleId, columns, objects: rows }).catch((viewErr) => {
+    console.warn("[ingestParsedObjectsAsView] Becker view registration failed:", viewErr);
+  });
+
+  return { rows, rowCount: rows.length, logicalKey, viewName };
+}
+
 /** @returns {{ logicalKey: string; viewName: string }[]} */
 export function listBeckerParquetViews() {
   return Array.from(beckerParquetRegistry.entries()).map(([logicalKey, v]) => ({

@@ -437,6 +437,63 @@ export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
 }
 
 /**
+ * Fetch a single Athena GetQueryResults page (≤1000 data rows per AWS call).
+ * Use athenaNextToken from the prior response to continue; omit for the first page.
+ *
+ * @param {string} queryExecutionId
+ * @param {string | null | undefined} athenaNextToken
+ * @returns {Promise<{
+ *   columns: string[];
+ *   rows: string[][];
+ *   athenaNextToken: string | undefined;
+ *   isFirstPage: boolean;
+ * }>}
+ */
+export async function fetchAthenaQueryResultNextPage(queryExecutionId, athenaNextToken) {
+  const athena = getAthenaClient();
+  const isFirstPage = !athenaNextToken;
+
+  const page = await athena.send(
+    new GetQueryResultsCommand({
+      QueryExecutionId: queryExecutionId,
+      NextToken: athenaNextToken || undefined,
+      MaxResults: 1000,
+    }),
+  );
+
+  const rs = page.ResultSet;
+  const meta = rs?.ResultSetMetadata?.ColumnInfo;
+  const rawRows = rs?.Rows || [];
+
+  const columnNames = [];
+  if (meta?.length) {
+    for (const c of meta) {
+      columnNames.push(c.Name || "");
+    }
+  }
+
+  let startIdx = 0;
+  if (isFirstPage && rawRows.length > 0) {
+    if (!columnNames.length) {
+      columnNames.push(...(rawRows[0].Data?.map((d) => d.VarCharValue ?? "") || []));
+    }
+    startIdx = 1;
+  }
+
+  const dataRows = [];
+  for (let i = startIdx; i < rawRows.length; i++) {
+    dataRows.push(rawRows[i].Data?.map((d) => d.VarCharValue ?? "") || []);
+  }
+
+  return {
+    columns: columnNames,
+    rows: dataRows,
+    athenaNextToken: page.NextToken,
+    isFirstPage,
+  };
+}
+
+/**
  * Sync path: start → poll until done or timeout → fetch rows.
  * @param {object} opts
  * @param {string} opts.physicalTableName

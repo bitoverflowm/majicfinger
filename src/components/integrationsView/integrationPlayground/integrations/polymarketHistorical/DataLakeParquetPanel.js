@@ -62,7 +62,13 @@ import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
 import { filterRowsWithoutNullishInColumns, scanNullishColumnsInSheetRows } from "@/lib/dataLake/sheetNullishScan";
 import { removeDataSheetFromWorkspace } from "@/lib/removeDataSheetFromWorkspace";
-import { athenaRowsToObjects, ingestAthenaResultAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
+import { athenaRowsToObjects, ingestAthenaResultAsView, ingestParsedObjectsAsView, listBeckerParquetViews } from "@/lib/duckdb/duckdbWasmClient";
+import { LargeAthenaPullPanel } from "@/components/connectData/LargeAthenaPullPanel";
+import {
+  parseAthenaPullInBackground,
+  shouldUseLargeAthenaPullPath,
+  yieldToUi,
+} from "@/lib/dataLake/largeAthenaPull";
 import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
 import { ComposeColumnFormatFields } from "@/components/connectData/ComposeColumnFormatFields";
 import { ComposeJoinTargetColumnPicker } from "@/components/connectData/ComposeJoinTargetColumnPicker";
@@ -530,7 +536,11 @@ function connectedDataIsEmptyOrMetaPreviewOnly(rows) {
  *
  * @param {{ setConnectedData?: (rows: Record<string, unknown>[]) => void; dataset?: "polymarket" | "kalshi" }} props
  */
-export default function DataLakeParquetPanel({ setConnectedData: setConnectedDataFromProp, dataset = "polymarket" }) {
+export default function DataLakeParquetPanel({
+  setConnectedData: setConnectedDataFromProp,
+  dataset = "polymarket",
+  connectHomePullBridge = false,
+}) {
   const ctx = useMyStateV2();
   const connectedData = ctx?.connectedData ?? [];
   const replaceCurrentSheetData = ctx?.replaceCurrentSheetData;
@@ -552,6 +562,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const connectDataLakeColumnSelections = ctx?.connectDataLakeColumnSelections ?? {};
   const connectDataLakePullTick = ctx?.connectDataLakePullTick ?? 0;
   const setConnectDataLakePullState = ctx?.setConnectDataLakePullState;
+  const connectLargePullApplyRef = ctx?.connectLargePullApplyRef;
+  const connectDataLakePullConsumedTickRef = ctx?.connectDataLakePullConsumedTickRef;
   const requestConnectAnalyzeScroll = ctx?.requestConnectAnalyzeScroll;
   const connectHomeAnalyzeActive = !!ctx?.connectHomeAnalyzeActive;
   const athenaPingBySampleId = ctx?.athenaPingBySampleId ?? {};
@@ -672,21 +684,78 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   const [lastRowCount, setLastRowCount] = useState(null);
   const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
   const [beckerViews, setBeckerViews] = useState(() => listBeckerParquetViews());
+  /** @type {[null | { columns: string[]; rows: string[][]; rowCount: number; parseStatus: string; parsedProgress: { processed: number; total: number }; parsedRows: Record<string, unknown>[] | null; parseError: string | null; pendingApply: { onApply: (rows: Record<string, unknown>[], n: number) => void } | null; sampleId: string; kalshiIngestExtras: object | null; primaryJoinExpanded?: boolean; expandedJoinRowCap?: number }, React.Dispatch<any>]} */
+  const [largePull, setLargePull] = useState(null);
 
   /** @type {React.MutableRefObject<null | { mode: "columns" | "meta"; lake: string; table: string; sampleId: string; composeSpec?: object; composeFilters?: any; composeAthenaRowLimit?: number | null; sheetJoinSpec?: any; sheetProvenance?: any; requestCard?: any; kalshiIngestExtras?: { taxonomyRollup: boolean; composeItemsSnapshot: { column: string; alias: string; aggregate: null | string }[] } | null; metaOpSpecs?: any[]; metaRunDisposition?: string; metaAppendTargetIndex?: number }>} */
   const pendingIngestRef = useRef(null);
   const ingestAbortControllerRef = useRef(null);
   const pullInFlightRef = useRef(false);
   const loadProgressRef = useRef(null);
+  const pullUiRef = useRef(null);
+  const largePullHandoffRef = useRef(false);
+  const pullGenerationRef = useRef(0);
+  const selectionTabRef = useRef(selectionTab);
+
+  const clearConnectLargePullView = useCallback(() => {
+    if (!connectHomeDataLakeCompose || !setConnectDataLakePullState) return;
+    setConnectDataLakePullState((prev) =>
+      prev.largePullView == null ? prev : { ...prev, largePullView: null },
+    );
+  }, [connectHomeDataLakeCompose, setConnectDataLakePullState]);
+
+  const pushConnectLargePullView = useCallback(
+    (view) => {
+      if (!connectHomeDataLakeCompose || !setConnectDataLakePullState || !view) return;
+      setConnectDataLakePullState((prev) => ({ ...prev, largePullView: view }));
+    },
+    [connectHomeDataLakeCompose, setConnectDataLakePullState],
+  );
+
+  const resetLargePullState = useCallback(() => {
+    setLargePull(null);
+    clearConnectLargePullView();
+  }, [clearConnectLargePullView]);
+
+  /** Mirror large-pull JSON state to Connect home Step 2 — never wipe on remount (null only via clearConnectLargePullView). */
+  useEffect(() => {
+    if (!connectHomeDataLakeCompose || !setConnectDataLakePullState || !largePull) return;
+    const view = {
+      columns: largePull.columns || [],
+      rows: largePull.rows || [],
+      rowCount: largePull.rowCount ?? 0,
+      parseStatus: largePull.parseStatus || "downloading",
+      parsedProgress: largePull.parsedProgress || { processed: 0, total: 0 },
+      parseError: largePull.parseError ?? null,
+    };
+    setConnectDataLakePullState((prev) => {
+      const cur = prev.largePullView;
+      if (
+        cur &&
+        cur.parseStatus === view.parseStatus &&
+        cur.rowCount === view.rowCount &&
+        cur.rows?.length === view.rows?.length &&
+        cur.parsedProgress?.processed === view.parsedProgress?.processed
+      ) {
+        return prev;
+      }
+      return { ...prev, largePullView: view };
+    });
+  }, [largePull, connectHomeDataLakeCompose, setConnectDataLakePullState]);
+
+  useEffect(() => {
+    selectionTabRef.current = selectionTab;
+  }, [selectionTab]);
 
   const scrollToLoadProgress = useCallback(() => {
     if (typeof window === "undefined") return;
+    if (connectHomeDataLakeCompose) return;
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         loadProgressRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       });
     });
-  }, []);
+  }, [connectHomeDataLakeCompose]);
 
   const cancelActiveIngest = useCallback(() => {
     ingestAbortControllerRef.current?.abort();
@@ -1413,6 +1482,305 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setNullishAlertOpen(true);
   }, []);
 
+  const applyKalshiTaxonomyRollupIfNeeded = useCallback(
+    (objects, _resultColumns, kalshiIngestExtras, tableName = "markets") => {
+      const kr = kalshiIngestExtras?.taxonomyRollup;
+      const snap = kalshiIngestExtras?.composeItemsSnapshot;
+      if (
+        !kr ||
+        dataset !== "kalshi" ||
+        tableName !== "markets" ||
+        !Array.isArray(snap) ||
+        !Array.isArray(objects) ||
+        objects.length === 0
+      ) {
+        return objects;
+      }
+      const catItem = snap.find((i) => i.column === "kalshi_event_ticker_category");
+      const sumItem = snap.find((i) => i.aggregate === "sum");
+      const cntItem = snap.find((i) => i.aggregate === "count");
+      if (!catItem || !sumItem || !cntItem) return objects;
+      const ca = String(catItem.alias || "").trim();
+      const va = String(sumItem.alias || "").trim();
+      const na = String(cntItem.alias || "").trim();
+      if (!ca || !va || !na) return objects;
+      return rollupKalshiPrefixRowsByTaxonomyGroup(objects, ca, va, na);
+    },
+    [dataset],
+  );
+
+  const beginLargePullIngest = useCallback(
+    async (ingestResult, pendingApply, signal, tableName = "markets") => {
+      const n = ingestResult.rowCount ?? ingestResult.rawRows?.length ?? 0;
+      largePullHandoffRef.current = true;
+      flushSync(() => {
+        setLargePull({
+          columns: ingestResult.rawColumns || [],
+          rows: ingestResult.rawRows || [],
+          rowCount: n,
+          parseStatus: "parsing",
+          parsedProgress: { processed: 0, total: n },
+          parsedRows: null,
+          parseError: null,
+          pendingApply,
+          sampleId: ingestResult.sampleId,
+          kalshiIngestExtras: ingestResult.kalshiIngestExtras ?? null,
+          primaryJoinExpanded: ingestResult.primaryJoinExpanded,
+          expandedJoinRowCap: ingestResult.expandedJoinRowCap,
+        });
+        setLoading(false);
+        setLoadLabel(`${n.toLocaleString()} rows in memory — preparing data table…`);
+        setLoadProgress(28);
+      });
+      syncConnectPullState({
+        loading: true,
+        label: `${n.toLocaleString()} rows in memory — preparing data table…`,
+        progress: 28,
+      });
+      await yieldToUi();
+
+      try {
+        let objects = await parseAthenaPullInBackground({
+          columns: ingestResult.rawColumns,
+          rows: ingestResult.rawRows,
+          signal,
+          onProgress: ({ processed, total }) => {
+            const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+            const label = `Preparing data table… ${processed.toLocaleString()} / ${total.toLocaleString()} rows (${pct}%)`;
+            setLoadLabel(label);
+            setLoadProgress(28 + pct * 0.65);
+            syncConnectPullState({ loading: true, label, progress: 28 + pct * 0.65 });
+            setLargePull((prev) =>
+              prev ? { ...prev, parsedProgress: { processed, total }, parseStatus: "parsing" } : prev,
+            );
+          },
+        });
+
+        objects = applyKalshiTaxonomyRollupIfNeeded(
+          objects,
+          ingestResult.rawColumns,
+          ingestResult.kalshiIngestExtras,
+          tableName,
+        );
+
+        ingestParsedObjectsAsView({
+          dataset,
+          sampleId: ingestResult.sampleId,
+          columns: ingestResult.rawColumns,
+          objects,
+        });
+
+        setLargePull((prev) =>
+          prev
+            ? {
+                ...prev,
+                parseStatus: "ready",
+                parsedRows: objects,
+                parsedProgress: { processed: objects.length, total: objects.length },
+              }
+            : prev,
+        );
+
+        const readyView = {
+          columns: ingestResult.rawColumns || [],
+          rows: ingestResult.rawRows || [],
+          rowCount: objects.length,
+          parseStatus: "ready",
+          parsedProgress: { processed: objects.length, total: objects.length },
+          parseError: null,
+        };
+        pushConnectLargePullView(readyView);
+
+        setLoadLabel(`Data table ready — ${objects.length.toLocaleString()} rows`);
+        setLoadProgress(100);
+
+        if (connectHomeDataLakeCompose && pendingApply) {
+          finalizeIngestSheetRows(objects, objects.length, (finalRows, n) => {
+            pendingApply.onApply?.(finalRows, n);
+          });
+          syncConnectPullState({
+            loading: false,
+            label: `Loaded ${objects.length.toLocaleString()} rows`,
+            progress: 100,
+            error: null,
+          });
+          toast.success(`Loaded ${objects.length.toLocaleString()} rows into your sheet`);
+        } else {
+          syncConnectPullState({
+            loading: false,
+            label: `Data table ready — ${objects.length.toLocaleString()} rows`,
+            progress: 100,
+            error: null,
+          });
+          toast.success(`Data table ready — ${objects.length.toLocaleString()} rows`);
+        }
+      } catch (e) {
+        if (e?.name === "AbortError") throw e;
+        const msg = e?.message || String(e);
+        setLargePull((prev) => (prev ? { ...prev, parseStatus: "error", parseError: msg } : prev));
+        syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
+      } finally {
+        pullInFlightRef.current = false;
+        largePullHandoffRef.current = false;
+      }
+    },
+    [
+      applyKalshiTaxonomyRollupIfNeeded,
+      connectHomeDataLakeCompose,
+      dataset,
+      finalizeIngestSheetRows,
+      pushConnectLargePullView,
+      syncConnectPullState,
+    ],
+  );
+
+  const handleAthenaPullPhase = useCallback(
+    (info) => {
+      if (info?.phase === "polling") {
+        const label = "Querying the lake API (Athena)…";
+        setLoadLabel(label);
+        setLoadProgress(10);
+        syncConnectPullState({ loading: true, label, progress: 10 });
+        return;
+      }
+      if (info?.phase === "athena_succeeded") {
+        const expected = info.rowLimit ?? info.expandedJoinRowCap;
+        const label =
+          expected != null
+            ? `Athena complete — downloading up to ${Number(expected).toLocaleString()} rows…`
+            : "Athena complete — downloading results…";
+        setLoadLabel(label);
+        setLoadProgress(18);
+        syncConnectPullState({ loading: true, label, progress: 18 });
+        if (info.likelyLarge) {
+          largePullHandoffRef.current = true;
+          const downloadingView = {
+            columns: [],
+            rows: [],
+            rowCount: Number(expected) || 0,
+            parseStatus: "downloading",
+            parsedProgress: { processed: 0, total: Number(expected) || 0 },
+            parseError: null,
+          };
+          flushSync(() => {
+            setLargePull({
+              ...downloadingView,
+              parsedRows: null,
+              pendingApply: pullUiRef.current?.pendingApply ?? null,
+              sampleId: pullUiRef.current?.sampleId ?? "",
+              kalshiIngestExtras: pullUiRef.current?.kalshiIngestExtras ?? null,
+              primaryJoinExpanded: info.primaryJoinExpanded,
+              expandedJoinRowCap: info.expandedJoinRowCap,
+            });
+            setLoading(false);
+          });
+          pushConnectLargePullView(downloadingView);
+          scrollToLoadProgress();
+        }
+        return;
+      }
+      if (info?.phase === "downloading") {
+        setLoadProgress(20);
+        syncConnectPullState({ loading: true, progress: 20 });
+        return;
+      }
+      if (info?.phase === "downloading_page") {
+        const processed = info.processed ?? 0;
+        const total = info.total ?? info.rowLimit ?? processed;
+        const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+        const label =
+          total > 0
+            ? `Downloading rows… ${processed.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`
+            : `Downloading rows… ${processed.toLocaleString()}`;
+        const progress = 18 + (total > 0 ? Math.min(6, (processed / total) * 6) : 1);
+        setLoadLabel(label);
+        setLoadProgress(progress);
+        syncConnectPullState({ loading: true, label, progress });
+        const accumulated = info.accumulatedRows;
+        const cols = info.columns;
+        if (Array.isArray(accumulated)) {
+          largePullHandoffRef.current = true;
+          const pageView = {
+            columns: cols?.length ? cols : [],
+            rows: accumulated,
+            rowCount: total > 0 ? total : processed,
+            parseStatus: processed > 0 ? "raw" : "downloading",
+            parsedProgress: { processed, total: total > 0 ? total : processed },
+            parseError: null,
+          };
+          setLargePull((prev) => ({
+            ...pageView,
+            columns: pageView.columns.length ? pageView.columns : prev?.columns || [],
+            rowCount: total > 0 ? total : Math.max(processed, prev?.rowCount ?? 0),
+            parsedRows: null,
+            pendingApply: prev?.pendingApply ?? pullUiRef.current?.pendingApply ?? null,
+            sampleId: prev?.sampleId ?? pullUiRef.current?.sampleId ?? "",
+            kalshiIngestExtras: prev?.kalshiIngestExtras ?? pullUiRef.current?.kalshiIngestExtras ?? null,
+            primaryJoinExpanded: prev?.primaryJoinExpanded,
+            expandedJoinRowCap: prev?.expandedJoinRowCap,
+          }));
+          pushConnectLargePullView({
+            ...pageView,
+            columns: cols?.length ? cols : [],
+            rowCount: total > 0 ? total : processed,
+          });
+        }
+        return;
+      }
+      if (info?.phase === "parsing_response") {
+        const label = "Receiving rows — parsing response in browser…";
+        setLoadLabel(label);
+        setLoadProgress(22);
+        syncConnectPullState({ loading: true, label, progress: 22 });
+        return;
+      }
+      if (info?.phase === "download_complete") {
+        const n = info.rowCount ?? 0;
+        const label = `${Number(n).toLocaleString()} rows received — loading JSON view…`;
+        setLoadLabel(label);
+        setLoadProgress(24);
+        syncConnectPullState({ loading: true, label, progress: 24 });
+      }
+    },
+    [pushConnectLargePullView, scrollToLoadProgress, syncConnectPullState],
+  );
+
+  const handleLargePullViewDataTable = useCallback(() => {
+    if (!largePull || largePull.parseStatus !== "ready" || !Array.isArray(largePull.parsedRows)) return;
+    const rows = largePull.parsedRows;
+    finalizeIngestSheetRows(rows, rows.length, (finalRows, n) => {
+      largePull.pendingApply?.onApply?.(finalRows, n);
+    });
+    resetLargePullState();
+    setLoadLabel("");
+    setLoadProgress(0);
+    syncConnectPullState({ loading: false, label: "", progress: 0, error: null });
+  }, [finalizeIngestSheetRows, largePull, resetLargePullState, syncConnectPullState]);
+
+  useEffect(() => {
+    if (!connectHomeDataLakeCompose || !connectLargePullApplyRef) return;
+    connectLargePullApplyRef.current = handleLargePullViewDataTable;
+    return () => {
+      connectLargePullApplyRef.current = null;
+    };
+  }, [connectHomeDataLakeCompose, connectLargePullApplyRef, handleLargePullViewDataTable]);
+
+  const renderLargePullPanel = () =>
+    largePull ? (
+      <LargeAthenaPullPanel
+        columns={largePull.columns}
+        rows={largePull.rows}
+        rowCount={largePull.rowCount}
+        parseStatus={largePull.parseStatus}
+        parsedProgress={largePull.parsedProgress}
+        parseError={largePull.parseError}
+        progressLabel={loadLabel}
+        progressPct={loadProgress}
+        onViewDataTable={handleLargePullViewDataTable}
+        className="mt-2"
+      />
+    ) : null;
+
   const applyKalshiCategoryVolumePreset = useCallback(() => {
     setError(null);
     setColumnComposeItems([
@@ -1535,6 +1903,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     ) => {
       return runParquetSheetLoadWithProgress({
         signal,
+        minimalProgress: mode === "columns",
         onLabel: (label) => {
           setLoadLabel(label);
           syncConnectPullState({ label });
@@ -1694,7 +2063,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   demo: isDemo,
                   ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                 },
-                { signal, maxWaitMs: 900000 },
+                { signal, maxWaitMs: 900000, onPhase: handleAthenaPullPhase },
               );
 
           const resultColumns = Array.isArray(athenaPull?.columns) ? athenaPull.columns : [];
@@ -1706,6 +2075,30 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
               : COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT;
 
           let outRows = rows;
+          const cappedColumns = Array.isArray(resultColumns) ? resultColumns : [];
+          const rawRowCount = Array.isArray(outRows) ? outRows.length : 0;
+
+          if (!shouldUseLargeAthenaPullPath(rawRowCount)) {
+            resetLargePullState();
+            largePullHandoffRef.current = false;
+          }
+
+          if (shouldUseLargeAthenaPullPath(rawRowCount)) {
+            const payload = {
+              largePull: true,
+              alreadyStarted: true,
+              rawColumns: cappedColumns,
+              rawRows: outRows,
+              rowCount: rawRowCount,
+              sampleId: `${sid}-compose`,
+              primaryJoinExpanded,
+              expandedJoinRowCap,
+              kalshiIngestExtras,
+            };
+            pullUiRef.current?.beginLargePull?.(payload);
+            return payload;
+          }
+
           const kr = kalshiIngestExtras?.taxonomyRollup;
           const snap = kalshiIngestExtras?.composeItemsSnapshot;
           if (
@@ -1730,7 +2123,6 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
             }
           }
 
-          const cappedColumns = Array.isArray(resultColumns) ? resultColumns : [];
           const ingestFull = subscriberAthenaAccess && !primaryJoinExpanded;
           const cappedRows =
             ingestFull || !Array.isArray(outRows)
@@ -1752,7 +2144,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         },
       });
     },
-    [dataset, metaOperationColumn, metaOperationKind, isDemo, athenaRowLimit, subscriberAthenaAccess, syncConnectPullState],
+    [dataset, metaOperationColumn, metaOperationKind, isDemo, athenaRowLimit, subscriberAthenaAccess, syncConnectPullState, handleAthenaPullPhase],
   );
 
   const executeIngestReplace = useCallback(async () => {
@@ -1780,6 +2172,8 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setSheetDialogOpen(false);
     setError(null);
     setLastRowCount(null);
+    ingestAbortControllerRef.current?.abort();
+    const myGeneration = ++pullGenerationRef.current;
     const ingestAbort = new AbortController();
     ingestAbortControllerRef.current = ingestAbort;
     const signal = ingestAbort.signal;
@@ -1793,7 +2187,44 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       label: PARQUET_LOAD_PHASE_MESSAGES[0].text,
       progress: 5,
     });
+    if (connectHomeDataLakeCompose && mode === "columns" && requestCard && activeSheetId && setDataSheets) {
+      setDataSheets((prev) => {
+        const sheet = prev?.[activeSheetId];
+        if (!sheet) return prev;
+        return {
+          ...(prev || {}),
+          [activeSheetId]: {
+            ...sheet,
+            requestCards: [{ ...requestCard, status: "in_progress", elapsedMs: null, loadedRowCount: null }],
+          },
+        };
+      });
+    }
     if (!connectHomeDataLakeCompose) scrollToLoadProgress();
+    largePullHandoffRef.current = false;
+    const pendingApply = {
+      onApply: (finalRows, n) => {
+        let requestCards;
+        if (mode === "columns" && requestCard && activeSheetId) {
+          const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+          const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
+          requestCards = [{ ...requestCard, sheetId: activeSheetId, elapsedMs, loadedRowCount: n }];
+          setExpandedRequestKey(null);
+          setShowRequestComposer(false);
+        }
+        applyRowsToActiveSheet(finalRows, { provenance: sheetProvenance, requestCards });
+        setLastRowCount(n);
+        refreshBeckerViews();
+      },
+    };
+    pullUiRef.current = {
+      sampleId: `${sid}-compose`,
+      kalshiIngestExtras,
+      pendingApply,
+      beginLargePull: (ingestResult) => {
+        void beginLargePullIngest(ingestResult, pendingApply, signal, table);
+      },
+    };
     try {
       const ingestResult = await runIngestWithProgress(
         lk,
@@ -1810,6 +2241,23 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         pendingComposeLimit ?? null,
         signal,
       );
+
+      if (ingestResult?.largePull) {
+        const { primaryJoinExpanded, expandedJoinRowCap } = ingestResult;
+        if (
+          primaryJoinExpanded &&
+          ingestResult.rowCount >= (expandedJoinRowCap ?? COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT)
+        ) {
+          toast(
+            `Loaded ${ingestResult.rowCount.toLocaleString()} joined rows (per-pull cap). Narrow filters or use aggregates for full trade volume.`,
+          );
+        }
+        if (!ingestResult.alreadyStarted) {
+          void beginLargePullIngest(ingestResult, pendingApply, signal, table);
+        }
+        return;
+      }
+
       const { rows, rowCount, primaryJoinExpanded, expandedJoinRowCap } = ingestResult;
       if (!Array.isArray(rows) || rows.length === 0) {
         throw new Error("Query finished but no rows were loaded into the sheet.");
@@ -1839,27 +2287,38 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     } catch (e) {
       if (e?.name === "AbortError") {
         setError(null);
+        resetLargePullState();
         syncConnectPullState({ loading: false, error: null, label: "", progress: 0 });
         toast("Request cancelled");
         return;
       }
       const msg = e?.message || String(e);
       setError(msg);
+      resetLargePullState();
       syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
     } finally {
-      pullInFlightRef.current = false;
+      if (myGeneration !== pullGenerationRef.current) return;
       ingestAbortControllerRef.current = null;
       setLoading(false);
+      if (largePullHandoffRef.current) {
+        return;
+      }
+      pullInFlightRef.current = false;
       setLoadProgress(0);
       syncConnectPullState({ loading: false, label: "", progress: 0 });
     }
   }, [
     applyRowsToActiveSheet,
+    beginLargePullIngest,
+    clearConnectLargePullView,
     connectHomeDataLakeCompose,
+    resetLargePullState,
     finalizeIngestSheetRows,
     refreshBeckerViews,
     runIngestWithProgress,
     scrollToLoadProgress,
+    setDataSheets,
+    activeSheetId,
     syncConnectPullState,
   ]);
 
@@ -1893,8 +2352,39 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
     scrollToLoadProgress();
+    largePullHandoffRef.current = false;
+    const pendingApplyAppend = {
+      onApply: (finalRows, n) => {
+        if (mode === "meta") {
+          const patchRow = finalRows[0];
+          if (patchRow && Number.isInteger(metaAppendTargetIndex)) {
+            setConnectedData?.((prev) => {
+              const list = Array.isArray(prev) ? [...prev] : [];
+              const idx = Math.max(0, Math.min(metaAppendTargetIndex, list.length));
+              if (idx < list.length) list[idx] = patchRow;
+              else list.push(patchRow);
+              return list;
+            });
+          } else {
+            applyRowsToActiveSheet(finalRows);
+          }
+        } else {
+          setConnectedData?.((prev) => [...(Array.isArray(prev) ? prev : []), ...finalRows]);
+        }
+        setLastRowCount(n);
+        refreshBeckerViews();
+      },
+    };
+    pullUiRef.current = {
+      sampleId: `${sid}-compose`,
+      kalshiIngestExtras,
+      pendingApply: pendingApplyAppend,
+      beginLargePull: (ingestResult) => {
+        void beginLargePullIngest(ingestResult, pendingApplyAppend, signal, table);
+      },
+    };
     try {
-      const { rows, rowCount } = await runIngestWithProgress(
+      const ingestResult = await runIngestWithProgress(
         lk,
         table,
         sid,
@@ -1909,6 +2399,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         pendingComposeLimitAppend ?? null,
         signal,
       );
+
+      if (ingestResult?.largePull) {
+        if (!ingestResult.alreadyStarted) {
+          void beginLargePullIngest(ingestResult, pendingApplyAppend, signal, table);
+        }
+        return;
+      }
+
+      const { rows, rowCount } = ingestResult;
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
         if (mode === "meta") {
           const patchRow = finalRows[0];
@@ -1932,6 +2431,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     } catch (e) {
       if (e?.name === "AbortError") {
         setError(null);
+        resetLargePullState();
         toast("Request cancelled");
         return;
       }
@@ -1940,13 +2440,13 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     } finally {
       ingestAbortControllerRef.current = null;
       setLoading(false);
-      setLoadProgress(0);
-      if (connectHomeDataLakeCompose) {
+      if (!largePullHandoffRef.current && connectHomeDataLakeCompose) {
         syncConnectPullState({ loading: false, label: "", progress: 0 });
       }
     }
   }, [
     applyRowsToActiveSheet,
+    beginLargePullIngest,
     connectHomeDataLakeCompose,
     finalizeIngestSheetRows,
     refreshBeckerViews,
@@ -2014,8 +2514,76 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     };
     const preparedSheetId = resolvePreparedConnectHomeSheetId();
 
+    largePullHandoffRef.current = false;
+    const pendingApplyNewSheet = {
+      onApply: (finalRows, n) => {
+        const newCardId = requestCard ? genRequestCardId() : null;
+        const connectHomeSheetName = String(ctx?.connectHomePendingSheetName || "").trim();
+        const applyToPreparedSheet = (targetId) => {
+          const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+          const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
+          const card =
+            requestCard && newCardId
+              ? { ...requestCard, id: newCardId, sheetId: targetId, elapsedMs, loadedRowCount: n }
+              : null;
+          const autoName = `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
+            0,
+            80,
+          );
+          const sheetName =
+            connectHomeDataLakeCompose && connectHomeSheetName
+              ? connectHomeSheetName.slice(0, 80)
+              : autoName;
+          flushSync(() => {
+            setDataSheets?.((prev) =>
+              applyAthenaPullToSheetPatch(prev, targetId, finalRows, {
+                provenance: sheetProvenance,
+                name: sheetName,
+                requestCards: card && mode === "columns" ? [card] : undefined,
+              }),
+            );
+          });
+        };
+        if (preparedSheetId) {
+          flushSync(() => setActiveSheetId?.(preparedSheetId));
+          applyToPreparedSheet(preparedSheetId);
+        } else {
+          addNewSheetAndActivate?.((newId) => {
+            flushSync(() => setActiveSheetId?.(newId));
+            applyToPreparedSheet(newId);
+          });
+        }
+        if (mode === "columns" && requestCard) {
+          setExpandedRequestKey(null);
+          setShowRequestComposer(false);
+        }
+        setLastRowCount(n);
+        refreshBeckerViews();
+        trackAuthEvent("query_submit", {
+          meta: {
+            integration: dataset,
+            lake: lk,
+            table,
+            sampleId: sid,
+            sampleLabel,
+            mode,
+            rowCount: n,
+            status: "success",
+            largePull: true,
+          },
+        });
+      },
+    };
+    pullUiRef.current = {
+      sampleId: `${sid}-compose`,
+      kalshiIngestExtras,
+      pendingApply: pendingApplyNewSheet,
+      beginLargePull: (ingestResult) => {
+        void beginLargePullIngest(ingestResult, pendingApplyNewSheet, signal, table);
+      },
+    };
     try {
-      const { rows, rowCount } = await runIngestWithProgress(
+      const ingestResult = await runIngestWithProgress(
         lk,
         table,
         sid,
@@ -2031,6 +2599,14 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
         signal,
       );
 
+      if (ingestResult?.largePull) {
+        if (!ingestResult.alreadyStarted) {
+          void beginLargePullIngest(ingestResult, pendingApplyNewSheet, signal, table);
+        }
+        return;
+      }
+
+      const { rows, rowCount } = ingestResult;
       if (!Array.isArray(rows) || rows.length === 0) {
         throw new Error("Query finished but no rows were loaded into the sheet.");
       }
@@ -2092,6 +2668,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
     } catch (e) {
       if (e?.name === "AbortError") {
         setError(null);
+        resetLargePullState();
         syncConnectPullState({ loading: false, error: null, label: "", progress: 0 });
         toast("Request cancelled");
         return;
@@ -2120,12 +2697,15 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
       pullInFlightRef.current = false;
       ingestAbortControllerRef.current = null;
       setLoading(false);
-      setLoadProgress(0);
-      syncConnectPullState({ loading: false, label: "", progress: 0 });
+      if (!largePullHandoffRef.current) {
+        setLoadProgress(0);
+        syncConnectPullState({ loading: false, label: "", progress: 0 });
+      }
     }
   }, [
     activeSheetId,
     addNewSheetAndActivate,
+    beginLargePullIngest,
     connectHomeDataLakeCompose,
     ctx,
     dataSheets,
@@ -2471,7 +3051,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   }, [selectionTab, metaPreviewRows, connectedData, applyRowsToActiveSheet]);
 
   const handleLoad = () => {
-    if (pullInFlightRef.current) return;
+    if (pullInFlightRef.current || largePullHandoffRef.current) return;
     setError(null);
     setLastRowCount(null);
     const rejectConnectHomePull = (msg) => {
@@ -2913,16 +3493,27 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
   handleLoadRef.current = handleLoad;
 
   useEffect(() => {
-    if (!connectHomeDataLakeCompose || !connectDataLakePullTick) return;
+    if (!connectHomeDataLakeCompose || !connectHomePullBridge) return;
+    if (!connectDataLakePullTick || !connectDataLakePullConsumedTickRef) return;
+    if (connectDataLakePullConsumedTickRef.current >= connectDataLakePullTick) return;
+    connectDataLakePullConsumedTickRef.current = connectDataLakePullTick;
+
     requestConnectAnalyzeScroll?.();
     const runPull = () => handleLoadRef.current();
-    if (selectionTab !== "columns" && selectionTab !== "recipes") {
+    const tab = selectionTabRef.current;
+    if (tab !== "columns" && tab !== "recipes") {
       setSelectionTab("columns");
       requestAnimationFrame(() => requestAnimationFrame(runPull));
       return;
     }
     runPull();
-  }, [connectHomeDataLakeCompose, connectDataLakePullTick, selectionTab, requestConnectAnalyzeScroll]);
+  }, [
+    connectHomeDataLakeCompose,
+    connectHomePullBridge,
+    connectDataLakePullTick,
+    connectDataLakePullConsumedTickRef,
+    requestConnectAnalyzeScroll,
+  ]);
 
   const activeSheetRequestCards = useMemo(() => {
     if (!activeSheetId) return [];
@@ -4711,11 +5302,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                     )}
                   </div>
                 </div>
-                {loading && (selectionTab === "columns" || selectionTab === "recipes") ? (
+                {(loading || largePull) && (selectionTab === "columns" || selectionTab === "recipes") ? (
                   <div ref={loadProgressRef}>
                     <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pt-1" />
                   </div>
                 ) : null}
+                {renderLargePullPanel()}
               </div>
     </>
   );
@@ -5199,11 +5791,12 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
                   </TabsTrigger>
                 </TabsList>
               </div>
-              {loading ? (
+              {(loading || largePull) ? (
                 <div ref={loadProgressRef}>
                   <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="w-full min-w-0 pb-1" />
                 </div>
               ) : null}
+              {renderLargePullPanel()}
             </div>
             )}
 
@@ -6140,6 +6733,7 @@ export default function DataLakeParquetPanel({ setConnectedData: setConnectedDat
           <div ref={loadProgressRef}>
             <ConnectProgressWithLabel label={loadLabel} progress={loadProgress} className="pt-0.5" />
           </div>
+          {renderLargePullPanel()}
         </div>
       ) : (
         selectionTab === "meta" && (

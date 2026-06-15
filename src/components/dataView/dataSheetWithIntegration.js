@@ -824,7 +824,7 @@ export default function DataSheetWithIntegration({
   /** Step 2 table view — integration pull, upload, or saved project (shared analyze shell + fillViewport grid). */
   const showConnectSheetAnalyzeUi =
     connectHomeMode &&
-    hasConnectSheetData &&
+    (hasConnectSheetData || connectUserPullActive) &&
     !effectiveChartMode &&
     !effectiveDashboardMode &&
     !showComposeBlock &&
@@ -1144,9 +1144,9 @@ export default function DataSheetWithIntegration({
         >
           {connectHomeDataLakePullBridge ? (
             connectWorkspace === "polymarketHistorical" ? (
-              <PolymarketHistorical setConnectedData={setConnectedDataRaw} />
+              <PolymarketHistorical setConnectedData={setConnectedDataRaw} connectHomePullBridge />
             ) : (
-              <KalshiHistorical setConnectedData={setConnectedDataRaw} />
+              <KalshiHistorical setConnectedData={setConnectedDataRaw} connectHomePullBridge />
             )
           ) : null}
           {connectHomeIntegrationPullBridge ? (
