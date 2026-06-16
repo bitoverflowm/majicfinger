@@ -4779,6 +4779,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                             columnNames={sheetColumnNamesForMath}
                             nextFreeColumnName={nextFreeResultColumnName()}
                             mathDestination={mathDestination}
+                            onMathDestinationChange={setMathDestination}
                             activeSheetId={activeSheetId}
                             activeSheet={activeSheet}
                             dataSheets={dataSheets}

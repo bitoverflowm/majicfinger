@@ -82,7 +82,7 @@ const WEIGHTING_OPTIONS = [
   { value: "custom", label: "Custom weight column" },
 ];
 
-function defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn }) {
+function defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn, brierMode }) {
   if (operation === "relative_position") {
     if (athenaCloudPull) return "Lifecycle Snapshots (Athena)";
     if (mode === "snapshot") return "Lifecycle Snapshots";
@@ -90,7 +90,7 @@ function defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketS
     return "Relative Position";
   }
   if (operation === "brier_score") {
-    return bucketScoreColumn ? "Brier Score Summary" : "Brier Scores";
+    return brierMode === "aggregated" ? "Brier Score Summary" : "Brier Scores";
   }
   return "Lifecycle Snapshots";
 }
@@ -155,6 +155,7 @@ export function QuantOperationsPanel({
   columnNames = [],
   nextFreeColumnName,
   mathDestination = "new_sheet",
+  onMathDestinationChange,
   activeSheetId,
   activeSheet = null,
   dataSheets = {},
@@ -203,6 +204,7 @@ export function QuantOperationsPanel({
   const [probabilityColumn, setProbabilityColumn] = useState("");
   const [outcomeColumn, setOutcomeColumn] = useState("");
   const [bucketScoreColumn, setBucketScoreColumn] = useState("");
+  const [brierMode, setBrierMode] = useState("row_level");
   const [brierGroupColumn, setBrierGroupColumn] = useState("");
   const [weighting, setWeighting] = useState("equal_group");
   const [volumeColumn, setVolumeColumn] = useState("");
@@ -240,17 +242,17 @@ export function QuantOperationsPanel({
       return mathDestination === "new_sheet";
     }
     if (operation === "brier_score") {
-      if (bucketScoreColumn) return true;
+      if (brierMode === "aggregated") return true;
       return mathDestination === "new_sheet";
     }
     return false;
-  }, [operation, athenaCloudPull, canUseAthena, mode, mathDestination, bucketScoreColumn]);
+  }, [operation, athenaCloudPull, canUseAthena, mode, mathDestination, brierMode]);
 
   const resolvedOutputSheetName = useMemo(() => {
     const trimmed = String(outputSheetName || "").trim();
     if (trimmed) return trimmed.slice(0, 80);
-    return defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn }).slice(0, 80);
-  }, [outputSheetName, operation, mode, athenaCloudPull, bucketScoreColumn]);
+    return defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn, brierMode }).slice(0, 80);
+  }, [outputSheetName, operation, mode, athenaCloudPull, bucketScoreColumn, brierMode]);
 
   const resolvedAccuracySheetName = useMemo(
     () => defaultQuantAccuracySheetName(resolvedOutputSheetName).slice(0, 80),
@@ -263,8 +265,8 @@ export function QuantOperationsPanel({
 
   useEffect(() => {
     if (outputSheetNameTouched) return;
-    setOutputSheetName(defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn }));
-  }, [operation, mode, athenaCloudPull, bucketScoreColumn, outputSheetNameTouched]);
+    setOutputSheetName(defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn, brierMode }));
+  }, [operation, mode, athenaCloudPull, bucketScoreColumn, brierMode, outputSheetNameTouched]);
 
   const suggestedGroup = useMemo(() => suggestGroupColumn(columnNames), [columnNames]);
   const suggestedProgress = useMemo(() => suggestProgressColumn(columnNames), [columnNames]);
@@ -645,7 +647,8 @@ export function QuantOperationsPanel({
     const result = computeBrierScore(rows, {
       probabilityColumn,
       outcomeColumn,
-      bucketColumn: bucketScoreColumn,
+      mode: brierMode,
+      bucketColumn: brierMode === "aggregated" ? bucketScoreColumn : "",
       groupColumn: brierGroupColumn,
       weighting,
       volumeColumn,
@@ -657,16 +660,30 @@ export function QuantOperationsPanel({
       toast.error(result.blocking[0].message);
       return false;
     }
+    for (const w of result.warnings) {
+      if (w.blocking) toast.error(w.message);
+    }
     const op = createSheetOperation("quant.brier_score", {
       probabilityColumn,
       outcomeColumn,
-      bucketColumn: bucketScoreColumn,
+      mode: brierMode,
+      bucketColumn: brierMode === "aggregated" ? bucketScoreColumn : "",
+      outcomeMapping: mapping,
+      probabilityScale: scale.scale,
     });
-    if (!bucketScoreColumn) {
+    if (brierMode === "row_level") {
       if (mathDestination === "current_sheet") {
         replaceCurrentSheetData?.(result.rowLevelRows);
         setConnectedData?.(result.rowLevelRows);
-        appendActiveSheetOperation?.("quant.brier_score", { config: { rowLevel: true } });
+        appendActiveSheetOperation?.("quant.brier_score", {
+          config: {
+            rowLevel: true,
+            probabilityColumn,
+            outcomeColumn,
+            outcomeMapping: mapping,
+            probabilityScale: scale.scale,
+          },
+        });
       } else {
         await new Promise((resolve) => {
           addNewSheetAndActivate?.((newId) => {
@@ -675,7 +692,11 @@ export function QuantOperationsPanel({
           });
         });
       }
-      toast.success("Added Brier score columns.");
+      toast.success(
+        mathDestination === "current_sheet"
+          ? "Added forecast error columns to the current sheet."
+          : `Created "${resolvedOutputSheetName}" with row-level Brier scores.`,
+      );
       return true;
     }
     await new Promise((resolve) => {
@@ -692,6 +713,7 @@ export function QuantOperationsPanel({
     outcomeMappingManual,
     outcomeMapping,
     probabilityColumn,
+    brierMode,
     bucketScoreColumn,
     brierGroupColumn,
     weighting,
@@ -793,7 +815,11 @@ export function QuantOperationsPanel({
     }
     if (previewBlocking.length) return false;
     if (operation === "relative_position") return Boolean(progressColumn);
-    if (operation === "brier_score") return Boolean(probabilityColumn && outcomeColumn);
+    if (operation === "brier_score") {
+      if (!probabilityColumn || !outcomeColumn) return false;
+      if (brierMode === "aggregated" && !bucketScoreColumn) return false;
+      return true;
+    }
     if (operation === "pm_preset") return pmStep === "confirm" && pmSetup?.progressSupported && pmSetup?.probabilityValid;
     return false;
   }, [
@@ -814,6 +840,8 @@ export function QuantOperationsPanel({
     joinColumns,
     joinValueColumn,
     parseCheckpoints,
+    brierMode,
+    bucketScoreColumn,
   ]);
 
   useEffect(() => {
@@ -1039,8 +1067,37 @@ export function QuantOperationsPanel({
 
   const renderBrierScoreForm = () => (
     <div className="space-y-3">
-      <ColumnSelect label="Which column contains the forecast probability?" value={probabilityColumn} onChange={setProbabilityColumn} columns={columnNames} />
-      <ColumnSelect label="Which column contains the final outcome?" value={outcomeColumn} onChange={setOutcomeColumn} columns={columnNames} />
+      <div className="space-y-1">
+        <Label className="text-xs">Scoring mode</Label>
+        <Select value={brierMode} onValueChange={setBrierMode}>
+          <SelectTrigger className="h-9 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="row_level">Row-level forecast error</SelectItem>
+            <SelectItem value="aggregated">Aggregated by checkpoint / bucket</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-[10px] text-muted-foreground">
+          {brierMode === "row_level"
+            ? "Adds forecast_probability, outcome_numeric, absolute_error, and brier_score to every row without grouping."
+            : "Summarizes forecast error across lifecycle checkpoints or buckets."}
+        </p>
+      </div>
+      <ColumnSelect
+        label="Forecast probability column"
+        value={probabilityColumn}
+        onChange={setProbabilityColumn}
+        columns={columnNames}
+        helper="Lychee auto-detects 0–1 vs 0–100 probability scale."
+      />
+      <ColumnSelect
+        label="Final outcome column"
+        value={outcomeColumn}
+        onChange={setOutcomeColumn}
+        columns={columnNames}
+        helper="Binary outcomes are mapped automatically when possible."
+      />
       {outcomeValues.length > 0 && !inferOutcomeMapping(rows, outcomeColumn).ok ? (
         <div className="space-y-2 rounded-lg border border-border/70 p-2">
           <Label className="text-xs">Map outcome values</Label>
@@ -1067,15 +1124,58 @@ export function QuantOperationsPanel({
           ))}
         </div>
       ) : null}
-      <ColumnSelect
-        label="Measure error across what?"
-        value={bucketScoreColumn}
-        onChange={setBucketScoreColumn}
-        columns={columnNames}
-        helper="Leave empty for row-level scores only"
-      />
-      {bucketScoreColumn ? (
+      {brierMode === "row_level" ? (
+        <div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-3">
+          <Label className="text-xs">Apply to</Label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs"
+              variant={mathDestination === "current_sheet" ? "default" : "outline"}
+              onClick={() => onMathDestinationChange?.("current_sheet")}
+            >
+              Current sheet
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs"
+              variant={mathDestination === "new_sheet" ? "default" : "outline"}
+              onClick={() => onMathDestinationChange?.("new_sheet")}
+            >
+              New sheet
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Output keeps the same row count and appends forecast error columns to each row.
+          </p>
+          {mathDestination === "new_sheet" ? (
+            <div className="space-y-1">
+              <Label className="text-xs">New sheet name</Label>
+              <Input
+                className="h-9 text-xs"
+                value={outputSheetName}
+                onChange={(e) => {
+                  setOutputSheetNameTouched(true);
+                  setOutputSheetName(e.target.value);
+                }}
+                placeholder={resolvedOutputSheetName}
+                spellCheck={false}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : (
         <>
+          <ColumnSelect
+            label="Measure error across what?"
+            value={bucketScoreColumn}
+            onChange={setBucketScoreColumn}
+            columns={columnNames}
+            helper="Usually lifecycle_checkpoint or another bucket column."
+            required
+          />
           <ColumnSelect label="Group column (for equal-weight markets)" value={brierGroupColumn} onChange={setBrierGroupColumn} columns={columnNames} />
           <div className="space-y-1">
             <Label className="text-xs">How should observations be weighted?</Label>
@@ -1099,7 +1199,7 @@ export function QuantOperationsPanel({
             <ColumnSelect label="Weight column" value={weightColumn} onChange={setWeightColumn} columns={columnNames} />
           ) : null}
         </>
-      ) : null}
+      )}
     </div>
   );
 

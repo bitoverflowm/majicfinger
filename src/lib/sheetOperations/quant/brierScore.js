@@ -7,6 +7,13 @@ import {
   toDecimalProbability,
 } from "./columnInference.js";
 
+export const ROW_LEVEL_BRIER_COLUMNS = {
+  forecastProbability: "forecast_probability",
+  outcomeNumeric: "outcome_numeric",
+  absoluteError: "absolute_error",
+  brierScore: "brier_score",
+};
+
 function parseFiniteNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (value == null || value === "") return null;
@@ -27,6 +34,36 @@ function checkpointSortKey(label) {
   return Number.POSITIVE_INFINITY;
 }
 
+function probabilityScaleKind(scale) {
+  return scale === "percent" ? "percent" : "decimal";
+}
+
+/**
+ * Append row-level Brier / forecast-error fields to a single row.
+ * @param {object} row
+ * @param {object} opts
+ */
+export function scoreRowLevelBrier(row, opts) {
+  const probabilityColumn = String(opts?.probabilityColumn || "").trim();
+  const outcomeColumn = String(opts?.outcomeColumn || "").trim();
+  const mapping = opts?.outcomeMapping || {};
+  const probabilityScale = opts?.probabilityScale || "decimal";
+  const cols = ROW_LEVEL_BRIER_COLUMNS;
+
+  const prob = toDecimalProbability(row?.[probabilityColumn], probabilityScaleKind(probabilityScale));
+  const outcome = mapOutcomeValue(row?.[outcomeColumn], mapping);
+  const absoluteError = prob != null && outcome != null ? Math.abs(prob - outcome) : null;
+  const brierScore = prob != null && outcome != null ? (prob - outcome) ** 2 : null;
+
+  return {
+    ...row,
+    [cols.forecastProbability]: prob,
+    [cols.outcomeNumeric]: outcome,
+    [cols.absoluteError]: absoluteError,
+    [cols.brierScore]: brierScore,
+  };
+}
+
 /**
  * @param {object[]} rows
  * @param {object} config
@@ -42,8 +79,9 @@ export function computeBrierScore(rows, config) {
   const weightColumn = String(config?.weightColumn || "").trim();
   const volumeColumn = String(config?.volumeColumn || "").trim();
   const outcomeMapping = config?.outcomeMapping || null;
-  const probabilityScale = config?.probabilityScale || detectProbabilityScale(sourceRows, probabilityColumn).scale;
+  const mode = String(config?.mode || (bucketColumn ? "aggregated" : "row_level")).trim();
   const aggregateWithinGroupFirst = config?.aggregateWithinGroupFirst !== false;
+  const cols = ROW_LEVEL_BRIER_COLUMNS;
 
   const warnings = [];
   const blocking = [];
@@ -58,6 +96,7 @@ export function computeBrierScore(rows, config) {
   }
 
   const scaleInfo = detectProbabilityScale(sourceRows, probabilityColumn);
+  const probabilityScale = config?.probabilityScale || scaleInfo.scale;
   if (!scaleInfo.valid) {
     blocking.push({
       id: "invalid_probability",
@@ -81,34 +120,25 @@ export function computeBrierScore(rows, config) {
     mapping = inferred.mapping;
   }
 
-  const rowLevelRows = [];
-  let missingOutcomes = 0;
+  const scoreOpts = {
+    probabilityColumn,
+    outcomeColumn,
+    outcomeMapping: mapping,
+    probabilityScale,
+  };
 
-  for (const row of sourceRows) {
-    const probRaw = row?.[probabilityColumn];
-    const prob = toDecimalProbability(probRaw, probabilityScale === "percent" ? "percent" : "decimal");
-    const outcome = mapOutcomeValue(row?.[outcomeColumn], mapping);
-    if (outcome == null) {
-      missingOutcomes += 1;
-      continue;
-    }
-    if (prob == null) continue;
-    const absErr = Math.abs(prob - outcome);
-    const brier = (prob - outcome) ** 2;
-    rowLevelRows.push({
-      ...row,
-      predicted_probability: prob,
-      outcome_binary: outcome,
-      absolute_error: absErr,
-      brier_score: brier,
-    });
-  }
+  const allRowLevelRows = sourceRows.map((row) => scoreRowLevelBrier(row, scoreOpts));
+  const scorableRows = allRowLevelRows.filter((row) => row?.[cols.brierScore] != null);
+  let missingOutcomes = sourceRows.length - scorableRows.length;
 
   if (missingOutcomes > 0) {
     warnings.push({
       id: "missing_outcomes",
       blocking: false,
-      message: "Rows with missing outcomes were excluded from scoring.",
+      message:
+        mode === "row_level"
+          ? "Some rows are missing a forecast probability or mappable outcome. Those rows keep null score columns."
+          : "Rows with missing outcomes were excluded from scoring.",
     });
     if (missingOutcomes > sourceRows.length * 0.3) {
       warnings.push({
@@ -119,23 +149,45 @@ export function computeBrierScore(rows, config) {
     }
   }
 
-  if (!rowLevelRows.length) {
+  if (!scorableRows.length) {
+    if (mode === "row_level") {
+      return {
+        rows: [],
+        rowLevelRows: allRowLevelRows,
+        warnings,
+        blocking,
+        meta: { mode: "row_level", probabilityScale: scaleInfo.scale },
+      };
+    }
     blocking.push({ id: "no_scorable_rows", message: "No rows could be scored with the selected columns." });
     return { rows: [], rowLevelRows: [], warnings, blocking, meta: {} };
   }
 
-  if (!bucketColumn) {
+  if (scaleInfo.scale === "percent") {
+    warnings.push({
+      id: "percent_scale",
+      blocking: false,
+      message: "Probability column appears to use 0–100 scale. Lychee will convert it to 0–1 for scoring.",
+    });
+  }
+
+  if (mode === "row_level") {
     return {
       rows: [],
-      rowLevelRows,
+      rowLevelRows: allRowLevelRows,
       warnings,
       blocking,
       meta: { mode: "row_level", probabilityScale: scaleInfo.scale },
     };
   }
 
+  if (!bucketColumn) {
+    blocking.push({ id: "no_bucket", message: "Select a bucket column for aggregated Brier scoring." });
+    return { rows: [], rowLevelRows: allRowLevelRows, warnings, blocking, meta: {} };
+  }
+
   const bucketGroups = new Map();
-  for (const row of rowLevelRows) {
+  for (const row of scorableRows) {
     const bucket = row?.[bucketColumn];
     const bucketKey = bucket == null ? "__null__" : String(bucket);
     if (!bucketGroups.has(bucketKey)) bucketGroups.set(bucketKey, []);
@@ -176,16 +228,16 @@ export function computeBrierScore(rows, config) {
       }
       scoredUnits = [];
       for (const [, groupRows] of byGroup) {
-        const probs = groupRows.map((r) => r.predicted_probability).filter((v) => v != null);
-        const outcomes = groupRows.map((r) => r.outcome_binary).filter((v) => v != null);
-        const absErrs = groupRows.map((r) => r.absolute_error).filter((v) => v != null);
-        const briers = groupRows.map((r) => r.brier_score).filter((v) => v != null);
+        const probs = groupRows.map((r) => r[cols.forecastProbability]).filter((v) => v != null);
+        const outcomes = groupRows.map((r) => r[cols.outcomeNumeric]).filter((v) => v != null);
+        const absErrs = groupRows.map((r) => r[cols.absoluteError]).filter((v) => v != null);
+        const briers = groupRows.map((r) => r[cols.brierScore]).filter((v) => v != null);
         if (!probs.length) continue;
         scoredUnits.push({
-          predicted_probability: probs.reduce((a, b) => a + b, 0) / probs.length,
-          outcome_binary: outcomes.reduce((a, b) => a + b, 0) / outcomes.length,
-          absolute_error: absErrs.reduce((a, b) => a + b, 0) / absErrs.length,
-          brier_score: briers.reduce((a, b) => a + b, 0) / briers.length,
+          [cols.forecastProbability]: probs.reduce((a, b) => a + b, 0) / probs.length,
+          [cols.outcomeNumeric]: outcomes.reduce((a, b) => a + b, 0) / outcomes.length,
+          [cols.absoluteError]: absErrs.reduce((a, b) => a + b, 0) / absErrs.length,
+          [cols.brierScore]: briers.reduce((a, b) => a + b, 0) / briers.length,
           _groupWeight: weighting === "volume" ? groupRows.reduce((s, r) => s + (parseFiniteNumber(r?.[volumeColumn]) || 0), 0) : 1,
           _rowWeight: weighting === "equal_row" ? groupRows.length : 1,
         });
@@ -213,17 +265,17 @@ export function computeBrierScore(rows, config) {
       if (w <= 0 && weighting !== "equal_group" && weighting !== "equal_row") continue;
       const weight = weighting === "equal_group" || weighting === "equal_row" ? 1 : w;
       wSum += weight;
-      probSum += (unit.predicted_probability || 0) * weight;
-      outcomeSum += (unit.outcome_binary || 0) * weight;
-      absSum += (unit.absolute_error || 0) * weight;
-      brierSum += (unit.brier_score || 0) * weight;
+      probSum += (unit[cols.forecastProbability] || 0) * weight;
+      outcomeSum += (unit[cols.outcomeNumeric] || 0) * weight;
+      absSum += (unit[cols.absoluteError] || 0) * weight;
+      brierSum += (unit[cols.brierScore] || 0) * weight;
     }
 
     const divisor = weighting === "equal_group" || weighting === "equal_row"
       ? scoredUnits.length || 1
       : wSum || 1;
 
-    const brierVals = scoredUnits.map((u) => u.brier_score).filter(Number.isFinite);
+    const brierVals = scoredUnits.map((u) => u[cols.brierScore]).filter(Number.isFinite);
     const { min: minBrier, max: maxBrier } = finiteMinMax(brierVals);
 
     aggregated.push({
@@ -235,8 +287,8 @@ export function computeBrierScore(rows, config) {
       avg_absolute_error: absSum / divisor,
       avg_brier_score: brierSum / divisor,
       baseline_brier_50_50: 0.25,
-      median_absolute_error: median(scoredUnits.map((u) => u.absolute_error)),
-      brier_score_std: std(scoredUnits.map((u) => u.brier_score)),
+      median_absolute_error: median(scoredUnits.map((u) => u[cols.absoluteError])),
+      brier_score_std: std(scoredUnits.map((u) => u[cols.brierScore])),
       min_brier_score: minBrier,
       max_brier_score: maxBrier,
       _sortKey: checkpointSortKey(bucketKey),
@@ -255,17 +307,9 @@ export function computeBrierScore(rows, config) {
     });
   }
 
-  if (scaleInfo.scale === "percent") {
-    warnings.push({
-      id: "percent_scale",
-      blocking: false,
-      message: "Probability column appears to use 0–100 scale. Lychee will convert it to 0–1 for scoring.",
-    });
-  }
-
   return {
     rows: out,
-    rowLevelRows,
+    rowLevelRows: allRowLevelRows,
     warnings,
     blocking,
     meta: { mode: "aggregated", probabilityScale: scaleInfo.scale, bucketColumn },
@@ -287,6 +331,6 @@ function std(nums) {
 }
 
 export function addRowLevelBrierColumns(rows, config) {
-  const result = computeBrierScore(rows, { ...config, bucketColumn: "" });
+  const result = computeBrierScore(rows, { ...config, mode: "row_level", bucketColumn: "" });
   return result.rowLevelRows;
 }

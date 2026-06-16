@@ -87,6 +87,7 @@ test("brier score aggregates by checkpoint", () => {
   const scored = computeBrierScore(snapshot, {
     probabilityColumn: "probability",
     outcomeColumn: "outcome",
+    mode: "aggregated",
     bucketColumn: "checkpoint",
     groupColumn: "market_id",
     weighting: "equal_group",
@@ -96,6 +97,29 @@ test("brier score aggregates by checkpoint", () => {
   assert.equal(scored.blocking.length, 0);
   assert.ok(scored.rows.length >= 1);
   assert.ok(scored.rows[0].avg_brier_score >= 0);
+});
+
+test("brier score row-level keeps row count and appends forecast error columns", () => {
+  const rows = [
+    { market_id: "A", probability: 60, outcome: "YES" },
+    { market_id: "B", probability: 40, outcome: "NO" },
+    { market_id: "C", probability: 50, outcome: "" },
+  ];
+  const scored = computeBrierScore(rows, {
+    probabilityColumn: "probability",
+    outcomeColumn: "outcome",
+    mode: "row_level",
+    outcomeMapping: { YES: 1, NO: 0 },
+    probabilityScale: "percent",
+  });
+  assert.equal(scored.blocking.length, 0);
+  assert.equal(scored.rowLevelRows.length, 3);
+  assert.equal(scored.rowLevelRows[0].forecast_probability, 0.6);
+  assert.equal(scored.rowLevelRows[0].outcome_numeric, 1);
+  assert.equal(scored.rowLevelRows[0].absolute_error, 0.4);
+  assert.equal(scored.rowLevelRows[0].brier_score, 0.4 ** 2);
+  assert.equal(scored.rowLevelRows[2].brier_score, null);
+  assert.equal(scored.meta.mode, "row_level");
 });
 
 test("prediction market preset produces snapshot and accuracy tables", () => {
