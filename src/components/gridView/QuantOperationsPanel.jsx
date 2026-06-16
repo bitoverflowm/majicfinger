@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { createSheetOperation, sheetHasComposeProvenance } from "@/lib/projectPersistence";
 import { coerceDataTypes } from "@/lib/coerceDataTypes";
+import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { buildSheetGraphForAthena } from "@/lib/dataLake/buildSheetGraph";
 import { fetchSheetQuantAthena } from "@/lib/dataLake/fetchSheetQuantAthena";
 import { QuantAthenaJoinFields } from "@/components/gridView/QuantAthenaJoinFields";
@@ -219,6 +220,12 @@ export function QuantOperationsPanel({
   const [joinLeftKey, setJoinLeftKey] = useState("");
   const [joinRightKey, setJoinRightKey] = useState("ticker");
   const [joinColumns, setJoinColumns] = useState(["created_time", "yes_price"]);
+  const [joinValueColumn, setJoinValueColumn] = useState("");
+
+  const tradeTableColumns = useMemo(
+    () => getColumnMetaForLakeTable(joinLake, joinTable).map((c) => c.name),
+    [joinLake, joinTable],
+  );
 
   const canUseAthena = useMemo(
     () => sheetHasComposeProvenance(activeSheet) && Boolean(activeSheetId),
@@ -285,6 +292,21 @@ export function QuantOperationsPanel({
   }, [activeSheet?.provenance?.lake]);
 
   useEffect(() => {
+    if (!athenaCloudPull) return;
+    setJoinValueColumn((prev) => {
+      if (prev && tradeTableColumns.includes(prev)) return prev;
+      if (tradeTableColumns.includes("yes_price")) return "yes_price";
+      if (tradeTableColumns.includes("price")) return "price";
+      return prev;
+    });
+  }, [athenaCloudPull, tradeTableColumns]);
+
+  useEffect(() => {
+    if (!joinValueColumn) return;
+    setJoinColumns((prev) => (prev.includes(joinValueColumn) ? prev : [...prev, joinValueColumn]));
+  }, [joinValueColumn]);
+
+  useEffect(() => {
     if (!canUseAthena || operation !== "relative_position") return;
     if (previewBlocking.length > 0) {
       setAthenaCloudPull(true);
@@ -336,6 +358,7 @@ export function QuantOperationsPanel({
       progressColumn,
       mode,
       metricColumns,
+      joinValueColumn: athenaCloudPull ? joinValueColumn : "",
       snapshotRule,
       bucketAggregation: bucketAggregation.toLowerCase(),
       endRule,
@@ -356,6 +379,8 @@ export function QuantOperationsPanel({
       progressColumn,
       mode,
       metricColumns,
+      joinValueColumn,
+      athenaCloudPull,
       snapshotRule,
       bucketAggregation,
       endRule,
@@ -477,6 +502,7 @@ export function QuantOperationsPanel({
     }
     const colsForJoin = [...joinColumns];
     if (progressColumn && !colsForJoin.includes(progressColumn)) colsForJoin.push(progressColumn);
+    if (joinValueColumn && !colsForJoin.includes(joinValueColumn)) colsForJoin.push(joinValueColumn);
 
     setBusy(true);
     setProgress(15);
@@ -500,6 +526,7 @@ export function QuantOperationsPanel({
           endColumn: endRule === "column" ? endColumn : "",
           checkpoints: parseCheckpoints(),
           metricColumns: metricColumns.length ? metricColumns : [progressColumn],
+          joinValueColumn,
           mode: "snapshot",
           snapshotRule,
         },
@@ -527,6 +554,7 @@ export function QuantOperationsPanel({
           endColumn: endRule === "column" ? endColumn : "",
           checkpoints: parseCheckpoints(),
           metricColumns: metricColumns.length ? metricColumns : [progressColumn],
+          joinValueColumn,
           mode: "snapshot",
           snapshotRule,
         },
@@ -558,6 +586,7 @@ export function QuantOperationsPanel({
     endColumn,
     parseCheckpoints,
     metricColumns,
+    joinValueColumn,
     snapshotRule,
     addNewSheetAndActivate,
     writeSheet,
@@ -755,6 +784,7 @@ export function QuantOperationsPanel({
       return Boolean(
         groupColumn &&
           progressColumn &&
+          joinValueColumn &&
           joinLeftKey &&
           joinRightKey &&
           joinColumns.includes(progressColumn) &&
@@ -782,6 +812,7 @@ export function QuantOperationsPanel({
     joinLeftKey,
     joinRightKey,
     joinColumns,
+    joinValueColumn,
     parseCheckpoints,
   ]);
 
@@ -842,6 +873,15 @@ export function QuantOperationsPanel({
           baseColumnNames={columnNames}
         />
       ) : null}
+      {athenaCloudPull && canUseAthena && mode === "snapshot" ? (
+        <ColumnSelect
+          label="Which trades value to measure at each checkpoint?"
+          value={joinValueColumn}
+          onChange={setJoinValueColumn}
+          columns={tradeTableColumns}
+          helper="Last value on or before each checkpoint from the joined trade row (e.g. yes_price for forecast tracking)."
+        />
+      ) : null}
       <ColumnSelect
         label="What are we comparing?"
         value={groupColumn}
@@ -877,7 +917,9 @@ export function QuantOperationsPanel({
       </div>
       {mode !== "create_column" ? (
         <div className="space-y-1">
-          <Label className="text-xs">Which values should Lychee keep or summarize?</Label>
+          <Label className="text-xs">
+            {athenaCloudPull ? "Which market fields to keep at each checkpoint?" : "Which values should Lychee keep or summarize?"}
+          </Label>
           <div className="max-h-28 overflow-y-auto rounded-md border border-border/60 p-2 space-y-1">
             {columnNames.map((c) => (
               <label key={`metric-${c}`} className="flex items-center gap-2 text-xs">

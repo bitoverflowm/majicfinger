@@ -29,9 +29,11 @@ test("quant Athena SQL uses epoch seconds for created_time not bigint timestamp 
       endColumn: "close_time",
       checkpoints: [0, 0.5, 1],
       metricColumns: ["ticker", "title", "yes_price", "close_time", "open_time"],
+      joinValueColumn: "yes_price",
     },
     limit: 1000,
   });
+  assert.ok(sql.includes("r.\"yes_price\" AS \"selected_yes_price\""), "must output trades value at checkpoint");
   assert.ok(sql.includes("1e11"), "expected epoch magnitude scaling");
   assert.ok(!sql.includes("b.*"), "must not use b.* to avoid duplicate join column names");
   assert.ok(!sql.includes("CAST(j.\"created_time\" AS timestamp)"), "must not cast bigint epoch to timestamp");

@@ -98,9 +98,17 @@ export function buildRelativePositionSnapshotAthenaSql({
   }
 
   const joinType = String(join?.joinType || "inner").toLowerCase() === "left" ? "LEFT" : "INNER";
-  const joinCols = (Array.isArray(join?.columns) ? join.columns : [])
+  const joinValueCol = String(quant?.joinValueColumn || "").trim();
+  let joinCols = (Array.isArray(join?.columns) ? join.columns : [])
     .filter((c) => isValidColumnIdentifier(String(c)))
     .filter((c) => isColumnAllowedOnLakeTable(lake, joinTable, c));
+  if (
+    joinValueCol &&
+    isColumnAllowedOnLakeTable(lake, joinTable, joinValueCol) &&
+    !joinCols.includes(joinValueCol)
+  ) {
+    joinCols = [...joinCols, joinValueCol];
+  }
   const metricCols = (Array.isArray(quant?.metricColumns) ? quant.metricColumns : [])
     .map((m) => (typeof m === "string" ? m : m?.column))
     .filter((c) => isValidColumnIdentifier(String(c || "")));
@@ -152,7 +160,7 @@ export function buildRelativePositionSnapshotAthenaSql({
   }
 
   const metricSelects = metricCols
-    .filter((c) => c !== groupCol && c !== progressCol)
+    .filter((c) => c !== groupCol && c !== progressCol && c !== joinValueCol)
     .map((c) => {
       const src = joinCols.includes(c) ? quoteCol(joinOutputAlias(c)) : quoteCol(c);
       const colExpr = `r.${src}`;
@@ -160,6 +168,15 @@ export function buildRelativePositionSnapshotAthenaSql({
       return `${outExpr} AS ${quoteCol(`selected_${c}`)}`;
     })
     .join(", ");
+
+  const joinValueSelect =
+    joinValueCol &&
+    isValidColumnIdentifier(joinValueCol) &&
+    joinCols.includes(joinValueCol)
+      ? `r.${quoteCol(joinOutputAlias(joinValueCol))} AS ${quoteCol(`selected_${joinValueCol}`)}`
+      : "";
+
+  const pickedMetricSql = [metricSelects, joinValueSelect].filter(Boolean).join(", ");
 
   const lim = Math.max(1, Math.floor(limit));
 
@@ -213,7 +230,7 @@ picked AS (
     r.relative_position,
     ROUND(r.relative_position * 10000) / 100 AS relative_position_pct,
     date_format(from_unixtime(r.progress_num), ${ATHENA_ISO_DATETIME}) AS selected_progress_value
-    ${metricSelects ? `, ${metricSelects}` : ""}
+    ${pickedMetricSql ? `, ${pickedMetricSql}` : ""}
   FROM ranked r
   WHERE r.rn = 1
 )

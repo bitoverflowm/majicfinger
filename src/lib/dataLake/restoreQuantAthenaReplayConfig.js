@@ -132,6 +132,12 @@ export function restoreQuantAthenaReplayConfig({ sheet, operation, dataSheets, r
     quant.groupColumn = join.leftKeyColumn || "ticker";
   }
 
+  if (!quant.joinValueColumn) {
+    const priceLike = previewMetrics.find((c) => /^(yes_price|no_price|price|probability)$/i.test(c));
+    if (priceLike) quant.joinValueColumn = priceLike;
+    else if (previewMetrics.includes("yes_price")) quant.joinValueColumn = "yes_price";
+  }
+
   const joinColumns = inferJoinTableColumns(join, quant);
 
   return { join: { ...join, columns: joinColumns }, quant };

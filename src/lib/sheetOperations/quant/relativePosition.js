@@ -323,6 +323,7 @@ export function computeRelativePosition(rows, config) {
   const checkpointCol = config?.checkpointColumn || "lifecycle_checkpoint";
   const bucketCol = config?.bucketColumn || "lifecycle_bucket";
   const metricColumns = Array.isArray(config?.metricColumns) ? config.metricColumns.filter(Boolean) : [];
+  const joinValueColumn = String(config?.joinValueColumn || "").trim();
   const checkpoints = Array.isArray(config?.checkpoints) && config.checkpoints.length
     ? config.checkpoints
     : DEFAULT_SNAPSHOT_CHECKPOINTS;
@@ -400,6 +401,9 @@ export function computeRelativePosition(rows, config) {
         };
         for (const col of metricColumns) {
           record[`selected_${col}`] = picked?.[col] ?? null;
+        }
+        if (joinValueColumn && !metricColumns.includes(joinValueColumn)) {
+          record[`selected_${joinValueColumn}`] = picked?.[joinValueColumn] ?? null;
         }
         if (!metricColumns.includes(progressColumn)) {
           record[`selected_${progressColumn}`] = picked?.[progressColumn] ?? null;
