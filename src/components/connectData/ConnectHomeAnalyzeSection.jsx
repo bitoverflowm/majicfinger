@@ -4,7 +4,6 @@ import { useLayoutEffect, useRef } from "react";
 
 import DataView from "@/components/dataView";
 import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWorkspaceNav";
-import { ConnectHomePullProgress } from "@/components/connectData/ConnectHomePullProgress";
 import { LargeAthenaPullPanel } from "@/components/connectData/LargeAthenaPullPanel";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
@@ -100,8 +99,6 @@ export function ConnectHomeAnalyzeSection({
           onViewDataTable={() => ctx.connectLargePullApplyRef?.current?.()}
           className="mb-4 shrink-0"
         />
-      ) : pull.loading ? (
-        <ConnectHomePullProgress className="mb-4 shrink-0" />
       ) : null}
 
       <div
