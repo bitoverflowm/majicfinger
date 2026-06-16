@@ -10,7 +10,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, ArrowUp, ArrowDown, LogIn, Tag, LayoutGrid, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, LogIn, Tag, LayoutGrid, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,9 +37,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import { useChartBuilder, CHART_X_AXIS_NONE } from "@/components/chartView";
+import { useChartBuilder, CHART_X_AXIS_NONE, CHART_X_AXIS_IDENTITY_LINE, isChartXAxisIdentityLine } from "@/components/chartView";
 import { cn } from "@/lib/utils";
 import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
+import { REFERENCE_EQUATION_PRESETS, validateReferenceEquation } from "@/lib/chartReferenceEquation";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -238,6 +239,8 @@ export default function ChartControls() {
     setLineAliasing,
     lineStrokeWidth,
     setLineStrokeWidth,
+    lineStrokeStyle,
+    setLineStrokeStyle,
     lineHumanReadableTime,
     setLineHumanReadableTime,
     xTimeScale,
@@ -350,6 +353,7 @@ export default function ChartControls() {
   const [lineAddValue, setLineAddValue] = useState("");
   const [linesOpen, setLinesOpen] = useState(true);
   const [lineAdvancedOpen, setLineAdvancedOpen] = useState(false);
+  const [referenceMenuOpen, setReferenceMenuOpen] = useState(false);
   const [yAxisFormatOpen, setYAxisFormatOpen] = useState(true);
   const xAxisSelectValue = selX ?? CHART_X_AXIS_NONE;
   const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
@@ -397,9 +401,10 @@ export default function ChartControls() {
     const sheetLabel = sheetNameById[parsed.sheetId] || parsed.sheetId;
     return `${sheetLabel} • ${parsed.column}`;
   };
-  const hasGroupedLineOptions = groupedLineOptions.length > 0;
+  const hasIdentityLine = (selY || []).some((lineColumn) => isChartXAxisIdentityLine(lineColumn));
+  const canAddLine = Boolean(selX && !hasIdentityLine) || groupedLineOptions.some((group) => group.options.length > 0);
   const lineNonNumericColumns = (selY || []).filter((col) => {
-    if (!col || !Array.isArray(chartData) || !chartData.length) return false;
+    if (!col || isChartXAxisIdentityLine(col) || !Array.isArray(chartData) || !chartData.length) return false;
     for (let i = 0; i < chartData.length; i += 1) {
       const v = chartData[i]?.[col];
       if (v == null || v === "") continue;
@@ -613,24 +618,41 @@ export default function ChartControls() {
     setChartLineFilters((prev) => (Array.isArray(prev) ? prev : []).filter((rule) => rule.id !== id));
   };
   const normalizedReferenceLines = Array.isArray(referenceLines) ? referenceLines : [];
-  const addReferenceLine = () => {
+  const addReferenceLine = (kind = "y", defaults = {}) => {
+    const id = `reference-line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const base = {
+      id,
+      enabled: true,
+      kind,
+      y: "",
+      x: "",
+      x1: "",
+      y1: "",
+      x2: "",
+      y2: "",
+      equation: "",
+      label: "",
+      color: "#ef4444",
+      style: "dashed",
+      strokeWidth: 1,
+    };
+    if (kind === "equation") {
+      const equation = String(defaults.equation || "y = x");
+      setReferenceLines((prev) => [
+        ...(Array.isArray(prev) ? prev : []),
+        {
+          ...base,
+          kind: "equation",
+          equation,
+          label: defaults.label != null ? String(defaults.label) : equation,
+          color: defaults.color || "#64748b",
+        },
+      ]);
+      return;
+    }
     setReferenceLines((prev) => [
       ...(Array.isArray(prev) ? prev : []),
-      {
-        id: `reference-line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        enabled: true,
-        kind: "y",
-        y: "",
-        x: "",
-        x1: "",
-        y1: "",
-        x2: "",
-        y2: "",
-        label: "",
-        color: "#ef4444",
-        style: "dashed",
-        strokeWidth: 1,
-      },
+      { ...base, kind, ...defaults },
     ]);
   };
   const updateReferenceLine = (id, patch) => {
@@ -757,6 +779,9 @@ export default function ChartControls() {
               <Badge variant="secondary" className="min-w-0 max-w-[13rem] gap-1 px-2 py-1 text-[10px] font-normal leading-none">
                 <span className="min-w-0 truncate whitespace-nowrap">
                   {(() => {
+                    if (isChartXAxisIdentityLine(lineColumn)) {
+                      return `Line ${index + 1}: X-axis (y = x)`;
+                    }
                     const parsed = parseScopedLineKey(lineColumn);
                     const sheetLabel = parsed.isScoped
                       ? (lineSheetColumnGroups || []).find((g) => g.sheetId === parsed.sheetId)?.sheetName || parsed.sheetId
@@ -799,11 +824,17 @@ export default function ChartControls() {
           >
             <SelectTrigger
               className="h-8 min-w-[140px] text-xs disabled:opacity-50"
-              disabled={!hasGroupedLineOptions}
+              disabled={!canAddLine}
             >
               <SelectValue placeholder="+ Add Line" className="text-xs" />
             </SelectTrigger>
             <SelectContent className="text-xs">
+              {selX && !hasIdentityLine ? (
+                <SelectItem value={CHART_X_AXIS_IDENTITY_LINE} className="text-xs">
+                  X-axis (y = x)
+                </SelectItem>
+              ) : null}
+              {selX && !hasIdentityLine && groupedLineOptions.length > 0 ? <SelectSeparator /> : null}
               {groupedLineOptions.map((group, groupIdx) => (
                 <SelectGroup key={group.sheetId}>
                   {groupIdx > 0 ? <SelectSeparator /> : null}
@@ -820,9 +851,14 @@ export default function ChartControls() {
             </SelectContent>
           </Select>
 
-          {!hasGroupedLineOptions && (
+          {!canAddLine && !selX && (
             <span className="pl-2 text-[10px] text-muted-foreground">
-              No more columns to plot
+              Choose an X-axis column first
+            </span>
+          )}
+          {!canAddLine && selX && (
+            <span className="pl-2 text-[10px] text-muted-foreground">
+              No more lines to add
             </span>
           )}
         </div>
@@ -851,17 +887,99 @@ export default function ChartControls() {
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-muted-foreground">Reference lines</p>
                 <p className="text-[10px] leading-snug text-muted-foreground">
-                  Add y-axis, x-axis, or segment guides to the chart.
+                  Add horizontal, vertical, segment, or equation curves (y = x, y = x², …).
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 px-2 text-xs" onClick={addReferenceLine}>
-                + Reference
-              </Button>
+              <Popover open={referenceMenuOpen} onOpenChange={setReferenceMenuOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 px-2 text-xs">
+                    + Reference
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="end">
+                  <div className="space-y-1">
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Equation curves
+                    </p>
+                    {REFERENCE_EQUATION_PRESETS.map((preset) => (
+                      <Button
+                        key={preset.equation}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-full justify-start font-mono text-xs"
+                        onClick={() => {
+                          addReferenceLine("equation", preset);
+                          setReferenceMenuOpen(false);
+                        }}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                    <div className="my-1 border-t border-border/70" />
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Guides
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-full justify-start text-xs"
+                      onClick={() => {
+                        addReferenceLine("y");
+                        setReferenceMenuOpen(false);
+                      }}
+                    >
+                      Horizontal (y = …)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-full justify-start text-xs"
+                      onClick={() => {
+                        addReferenceLine("x");
+                        setReferenceMenuOpen(false);
+                      }}
+                    >
+                      Vertical (x = …)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-full justify-start text-xs"
+                      onClick={() => {
+                        addReferenceLine("segment");
+                        setReferenceMenuOpen(false);
+                      }}
+                    >
+                      Segment (two points)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-full justify-start text-xs"
+                      onClick={() => {
+                        addReferenceLine("equation", { equation: "y = x", label: "Custom equation" });
+                        setReferenceMenuOpen(false);
+                      }}
+                    >
+                      Custom equation…
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             {normalizedReferenceLines.length > 0 ? (
               <div className="space-y-2">
                 {normalizedReferenceLines.map((line, refIdx) => {
-                  const kind = ["x", "y", "segment"].includes(line.kind) ? line.kind : "y";
+                  const kind = ["x", "y", "segment", "equation"].includes(line.kind) ? line.kind : "y";
+                  const equationValidation =
+                    kind === "equation" && line.equation
+                      ? validateReferenceEquation(line.equation)
+                      : { ok: true };
                   return (
                     <div key={line.id || refIdx} className="space-y-2 rounded-lg border border-border/70 p-2">
                       <div className="flex items-center justify-between gap-2">
@@ -881,6 +999,7 @@ export default function ChartControls() {
                             <SelectValue placeholder="Type" />
                           </SelectTrigger>
                           <SelectContent className="text-xs">
+                            <SelectItem value="equation" className="text-xs">Equation (y = …)</SelectItem>
                             <SelectItem value="y" className="text-xs">Horizontal y</SelectItem>
                             <SelectItem value="x" className="text-xs">Vertical x</SelectItem>
                             <SelectItem value="segment" className="text-xs">Segment</SelectItem>
@@ -893,7 +1012,51 @@ export default function ChartControls() {
                           className="h-8 text-xs"
                         />
                       </div>
-                      {kind === "segment" ? (
+                      {kind === "equation" ? (
+                        <div className="space-y-2">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Equation</Label>
+                            <Input
+                              value={line.equation ?? ""}
+                              onChange={(e) =>
+                                updateReferenceLine(line.id, {
+                                  equation: e.target.value,
+                                  label: line.label || e.target.value,
+                                })
+                              }
+                              placeholder="y = x^2"
+                              className="h-8 font-mono text-xs"
+                              spellCheck={false}
+                            />
+                            {!equationValidation.ok ? (
+                              <p className="text-[10px] text-destructive">{equationValidation.error}</p>
+                            ) : (
+                              <p className="text-[10px] text-muted-foreground">
+                                Use x as the horizontal axis variable. Supports +, −, ×, ÷, ^, sqrt(), abs().
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {REFERENCE_EQUATION_PRESETS.map((preset) => (
+                              <Button
+                                key={`${line.id}-${preset.equation}`}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-2 font-mono text-[10px]"
+                                onClick={() =>
+                                  updateReferenceLine(line.id, {
+                                    equation: preset.equation,
+                                    label: preset.label,
+                                  })
+                                }
+                              >
+                                {preset.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : kind === "segment" ? (
                         <div className="grid grid-cols-2 gap-1.5">
                           <Input value={line.x1 ?? ""} onChange={(e) => updateReferenceLine(line.id, { x1: e.target.value })} placeholder="x1" className="h-8 text-xs" />
                           <Input value={line.y1 ?? ""} onChange={(e) => updateReferenceLine(line.id, { y1: e.target.value })} placeholder="y1" className="h-8 text-xs" />
@@ -1184,33 +1347,36 @@ export default function ChartControls() {
                           </Select>
                         </div>
                         {selX ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Sort</span>
+                          <div className="flex items-center">
                             {(() => {
                               const xType = getAxisType(selX, dataTypes, chartData);
                               const isCategorical = xType === "string" && !lineIsTemporalX;
-                              const ascendingLabel = isCategorical ? "Alphabetical" : lineIsTemporalX ? "Chronological" : "Ascending";
-                              const descendingLabel = isCategorical ? "Reverse-alphabetical" : lineIsTemporalX ? "Reverse chronological" : "Descending";
+                              const ascendingLabel = isCategorical
+                                ? "Sort alphabetical"
+                                : lineIsTemporalX
+                                  ? "Sort chronological"
+                                  : "Sort ascending";
+                              const descendingLabel = isCategorical
+                                ? "Sort reverse-alphabetical"
+                                : lineIsTemporalX
+                                  ? "Sort reverse chronological"
+                                  : "Sort descending";
+                              const sortLabel = sortXDir === "desc" ? descendingLabel : ascendingLabel;
                               return (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs"
-                              onClick={() => setSortXDir((d) => (d === "desc" ? "asc" : "desc"))}
-                            >
-                              {sortXDir === "desc" ? (
                                 <>
-                                  <ArrowDown className="mr-1 h-3 w-3" />
-                                  {descendingLabel}
+                                  <Switch
+                                    id="chart-line-sort-x-dir"
+                                    checked={sortXDir === "desc"}
+                                    onCheckedChange={(checked) => setSortXDir(checked ? "desc" : "asc")}
+                                    className="scale-75 origin-left"
+                                  />
+                                  <Label
+                                    htmlFor="chart-line-sort-x-dir"
+                                    className="cursor-pointer text-xs font-normal text-muted-foreground"
+                                  >
+                                    {sortLabel}
+                                  </Label>
                                 </>
-                              ) : (
-                                <>
-                                  <ArrowUp className="mr-1 h-3 w-3" />
-                                  {ascendingLabel}
-                                </>
-                              )}
-                            </Button>
                               );
                             })()}
                           </div>
@@ -1799,6 +1965,19 @@ export default function ChartControls() {
                             className="h-8 text-xs"
                           />
                           <p className="text-[10px] leading-snug text-muted-foreground">Stroke width in pixels (1–8).</p>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Stroke pattern</Label>
+                            <Select value={lineStrokeStyle} onValueChange={setLineStrokeStyle}>
+                              <SelectTrigger className="h-8 min-w-0 text-xs">
+                                <SelectValue placeholder="Stroke pattern" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                <SelectItem value="solid" className="text-xs">Solid</SelectItem>
+                                <SelectItem value="dashed" className="text-xs">Dashed</SelectItem>
+                                <SelectItem value="dotted" className="text-xs">Dotted</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       )}
                     </div>

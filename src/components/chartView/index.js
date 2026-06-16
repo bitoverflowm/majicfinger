@@ -27,6 +27,11 @@ import {
 } from "@/lib/chartDataSanitize";
 import { isCategoricalLabelColumn, looksLikeProseLabelValue } from "@/lib/chartCategoricalColumns";
 import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
+import {
+  numericXExtents,
+  sampleReferenceEquationCurve,
+  validateReferenceEquation,
+} from "@/lib/chartReferenceEquation";
 import { temporalToMs } from "@/lib/temporalParse";
 import { downsampleRowsForChart } from "@/lib/chartRenderCap";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
@@ -104,6 +109,13 @@ const BAR_X_AXIS_PADDING = { left: 28, right: 28 };
 
 /** Select sentinel: no X axis chosen yet (must not match a real column name). */
 export const CHART_X_AXIS_NONE = "__chart_x_axis_none__";
+
+/** Line series sentinel: plot X-axis values as Y (y = x / perfect calibration). */
+export const CHART_X_AXIS_IDENTITY_LINE = "__chart_x_axis_identity__";
+
+export function isChartXAxisIdentityLine(value) {
+  return String(value || "") === CHART_X_AXIS_IDENTITY_LINE;
+}
 
 /** Sheet rows store plain column names; axis keys from the builder are often `sheetId::column`. */
 function rowValueForDataKey(row, key) {
@@ -417,7 +429,7 @@ function normalizeReferenceLines(value) {
   return value
     .map((line, idx) => {
       if (!line || typeof line !== "object") return null;
-      const kind = ["x", "y", "segment"].includes(line.kind) ? line.kind : "y";
+      const kind = ["x", "y", "segment", "equation"].includes(line.kind) ? line.kind : "y";
       const color = typeof line.color === "string" && line.color.trim() ? line.color : "#ef4444";
       const style = ["solid", "dashed", "dotted"].includes(line.style) ? line.style : "dashed";
       const strokeWidth = Math.max(1, Math.min(8, Number(line.strokeWidth) || 1));
@@ -429,6 +441,7 @@ function normalizeReferenceLines(value) {
         color,
         style,
         strokeWidth,
+        equation: line.equation == null ? "" : String(line.equation),
         x: line.x == null ? "" : String(line.x),
         y: line.y == null ? "" : String(line.y),
         x1: line.x1 == null ? "" : String(line.x1),
@@ -507,7 +520,7 @@ function chartFilterRuleMatches(row, rule) {
   return true;
 }
 
-function materializeChartSeriesRows(rows, ySeries, filters) {
+function materializeChartSeriesRows(rows, ySeries, filters, xKey) {
   if (!Array.isArray(rows) || !rows.length || !Array.isArray(ySeries) || !ySeries.length) return rows;
   const seriesById = new Map(ySeries.map((series) => [series.id, series]));
   const firstSeriesBySource = new Map();
@@ -530,7 +543,8 @@ function materializeChartSeriesRows(rows, ySeries, filters) {
     for (const series of ySeries) {
       const rules = bySeries.get(series.id);
       const keep = !rules?.length || rules.every((rule) => chartFilterRuleMatches(row, rule));
-      const rawY = keep ? row?.[series.sourceKey] : null;
+      const valueKey = series.usesXAxisValues ? xKey : series.sourceKey;
+      const rawY = keep ? rowValueForDataKey(row, valueKey) : null;
       const coercedY = rawY == null || rawY === "" ? null : coerceChartPlotNumber(rawY);
       next[series.renderKey] = coercedY == null && rawY !== null && rawY !== "" ? rawY : coercedY;
     }
@@ -656,6 +670,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [lineAliasing, setLineAliasing] = useState(false);
   /** Line chart series stroke width (1–8 px). */
   const [lineStrokeWidth, setLineStrokeWidth] = useState(2);
+  const [lineStrokeStyle, setLineStrokeStyle] = useState("solid");
   const [lineHumanReadableTime, setLineHumanReadableTime] = useState(false);
   /** When on, pivot X is coerced to epoch ms and drawn on a numeric time scale (line/area/bar). */
   const [xTimeScale, setXTimeScale] = useState(false);
@@ -808,6 +823,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.lineAliasing !== undefined) setLineAliasing(!!s.lineAliasing);
     if (s.lineStrokeWidth !== undefined && Number.isFinite(Number(s.lineStrokeWidth))) {
       setLineStrokeWidth(Math.max(1, Math.min(8, Math.round(Number(s.lineStrokeWidth)))));
+    }
+    if (["solid", "dashed", "dotted"].includes(s.lineStrokeStyle)) {
+      setLineStrokeStyle(s.lineStrokeStyle);
     }
     if (s.lineHumanReadableTime !== undefined) setLineHumanReadableTime(!!s.lineHumanReadableTime);
     if (s.xTimeScale !== undefined) setXTimeScale(!!s.xTimeScale);
@@ -1406,11 +1424,14 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setSelY((prev) => {
       const curr = Array.isArray(prev) ? prev : [];
       if (index >= 0) return curr.map((v, i) => (i === index ? value : v));
+      if (isChartXAxisIdentityLine(value) && curr.some((v) => isChartXAxisIdentityLine(v))) return curr;
       return [...curr, value];
     });
     setChartConfig((prev) => ({
       ...(prev || {}),
-      [value]: { label: stripSheetScopedColumnKey(value) },
+      [value]: {
+        label: isChartXAxisIdentityLine(value) ? "X-axis (y = x)" : stripSheetScopedColumnKey(value),
+      },
     }));
   };
 
@@ -1426,6 +1447,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     lineStyle,
     lineAliasing,
     lineStrokeWidth,
+    lineStrokeStyle,
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
@@ -1763,6 +1785,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setLineAliasing,
     lineStrokeWidth,
     setLineStrokeWidth,
+    lineStrokeStyle,
+    setLineStrokeStyle,
     lineHumanReadableTime,
     setLineHumanReadableTime,
     xTimeScale,
@@ -1899,6 +1923,7 @@ export function ChartCanvas() {
     lineStyle,
     lineAliasing,
     lineStrokeWidth,
+    lineStrokeStyle,
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
@@ -2056,7 +2081,10 @@ export function ChartCanvas() {
       id: `line:${idx}`,
       sourceKey,
       renderKey: `__chart_line_${idx}`,
-      label: `Line ${idx + 1}: ${stripSheetScopedColumnKey(sourceKey)}`,
+      usesXAxisValues: isChartXAxisIdentityLine(sourceKey),
+      label: isChartXAxisIdentityLine(sourceKey)
+        ? "X-axis (y = x)"
+        : `Line ${idx + 1}: ${stripSheetScopedColumnKey(sourceKey)}`,
     }));
   }, [barSeriesPivot, yKeys]);
 
@@ -2065,8 +2093,8 @@ export function ChartCanvas() {
   const plotRowsForMaterialize = barSeriesPivot?.rows ?? sortedPlotRows;
 
   const filteredPlotRows = useMemo(() => {
-    return materializeChartSeriesRows(plotRowsForMaterialize, ySeries, chartLineFilters);
-  }, [plotRowsForMaterialize, ySeries, chartLineFilters]);
+    return materializeChartSeriesRows(plotRowsForMaterialize, ySeries, chartLineFilters, xKey);
+  }, [plotRowsForMaterialize, ySeries, chartLineFilters, xKey]);
 
   const timeframedPlotRows = useMemo(() => {
     if (!chartUsesTimeframes) return filteredPlotRows;
@@ -2287,7 +2315,7 @@ export function ChartCanvas() {
     const isTemporalX =
       effectiveUseTimeSeriesX || chartUsesTimeframes || lineIsTemporalX || axisType === "date";
     return normalizeReferenceLines(referenceLines)
-      .filter((line) => line.enabled)
+      .filter((line) => line.enabled && line.kind !== "equation")
       .map((line) => {
         const common = {
           key: line.id,
@@ -2337,6 +2365,50 @@ export function ChartCanvas() {
     effectiveUseTimeSeriesX,
     xKey,
   ]);
+
+  const renderedEquationReferenceLines = useMemo(() => {
+    if (rechartsXAxisType !== "number") return [];
+    const extents = numericXExtents(finalRenderedData, xKey);
+    if (!extents) return [];
+
+    return normalizeReferenceLines(referenceLines)
+      .filter((line) => line.enabled && line.kind === "equation" && String(line.equation || "").trim())
+      .map((line) => {
+        const validation = validateReferenceEquation(line.equation);
+        if (!validation.ok) return null;
+        const yKey = `__ref_eq_${line.id}`;
+        const points = sampleReferenceEquationCurve({
+          equation: line.equation,
+          xMin: extents.min,
+          xMax: extents.max,
+          xKey,
+          yKey,
+        });
+        if (points.length < 2) return null;
+        return (
+          <Line
+            key={line.id}
+            data={points}
+            dataKey={yKey}
+            name={line.label || line.equation}
+            type="linear"
+            dot={false}
+            connectNulls
+            stroke={line.color}
+            strokeWidth={line.strokeWidth}
+            strokeDasharray={referenceLineDash(line.style)}
+            isAnimationActive={false}
+            legendType="line"
+          />
+        );
+      })
+      .filter(Boolean);
+  }, [finalRenderedData, referenceLines, rechartsXAxisType, xKey]);
+
+  const renderedCartesianReferenceLines = useMemo(
+    () => [...renderedReferenceLines, ...renderedEquationReferenceLines],
+    [renderedReferenceLines, renderedEquationReferenceLines],
+  );
 
   const xTooltipLabelFormatter = (label) => {
     const forcedPreset =
@@ -2551,7 +2623,7 @@ export function ChartCanvas() {
                             stackId={"a"}
                           />
                         ))}
-                        {renderedReferenceLines}
+                        {renderedCartesianReferenceLines}
                         {legendVisible && (
                           <ChartLegend
                             content={
@@ -2671,7 +2743,7 @@ export function ChartCanvas() {
                             })}
                           </Bar>
                         ))}
-                        {renderedReferenceLines}
+                        {renderedCartesianReferenceLines}
                         {legendVisible &&
                           (rainbowBar ? (
                             <ChartLegend
@@ -2761,7 +2833,7 @@ export function ChartCanvas() {
                             <Cell key={`scatter-cell-${i}`} fill={scatterPointColorFor(row, i)} />
                           ))}
                         </Scatter>
-                        {renderedReferenceLines}
+                        {renderedCartesianReferenceLines}
                         {legendVisible && (
                           <ChartLegend
                             content={
@@ -2841,6 +2913,7 @@ export function ChartCanvas() {
                             connectNulls={lineAliasing || !hasChartLineFilters}
                             stroke={seriesColorFor(series.sourceKey, idx)}
                             strokeWidth={lineStrokeWidth}
+                            strokeDasharray={referenceLineDash(lineStrokeStyle)}
                             dot={dots && finalRenderedData.length <= 40}
                           >
                             {labelLine && (
@@ -2848,7 +2921,7 @@ export function ChartCanvas() {
                             )}
                           </Line>
                         ))}
-                        {renderedReferenceLines}
+                        {renderedCartesianReferenceLines}
                         {legendVisible && (
                           <ChartLegend
                             content={
