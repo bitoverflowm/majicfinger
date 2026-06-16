@@ -456,6 +456,8 @@ export function QuantOperationsPanel({
             rowCount: data.length,
             fullRowCount: data.length,
             sourceSheetId: activeSheetId || sheet.sourceSheetId,
+            storageMode: "inline",
+            rehydrationStatus: "complete",
             operationHistory: [
               ...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []),
               operation,
@@ -509,8 +511,25 @@ export function QuantOperationsPanel({
       setProgress(90);
       setProgressLabel("Writing results…");
       const op = createSheetOperation("quant.relative_position.athena", {
-        join: { lake: joinLake, table: joinTable, leftKeyColumn: joinLeftKey, rightKeyColumn: joinRightKey },
-        quant: { groupColumn, progressColumn, checkpoints: parseCheckpoints() },
+        rootSheetId: activeSheetId,
+        join: {
+          lake: joinLake,
+          table: joinTable,
+          joinType,
+          leftKeyColumn: joinLeftKey || groupColumn,
+          rightKeyColumn: joinRightKey,
+          columns: colsForJoin,
+        },
+        quant: {
+          groupColumn,
+          progressColumn,
+          endRule,
+          endColumn: endRule === "column" ? endColumn : "",
+          checkpoints: parseCheckpoints(),
+          metricColumns: metricColumns.length ? metricColumns : [progressColumn],
+          mode: "snapshot",
+          snapshotRule,
+        },
       });
       await new Promise((resolve) => {
         addNewSheetAndActivate?.((newId) => {

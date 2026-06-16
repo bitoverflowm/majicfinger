@@ -3,6 +3,7 @@ import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { rehydrateProjectProvenanceSheets } from "@/lib/rehydrateProjectProvenanceSheets";
+import { rehydrateProjectQuantAthenaSheets } from "@/lib/rehydrateProjectQuantAthenaSheets";
 import {
   pickInitialActiveSheetId,
   pickPrimaryProvenanceSheetId,
@@ -253,6 +254,12 @@ export async function loadFullProjectFromApi({
             setActiveSheetId?.(sheetId);
             setConnectedData?.(Array.isArray(updated?.data) ? updated.data : []);
           }
+        },
+      });
+      onRehydrateProgress?.("Re-running saved quant operations…");
+      workingSheets = await rehydrateProjectQuantAthenaSheets(workingSheets, {
+        onSheetDone: (_sheetId, _updated, allSheets) => {
+          workingSheets = allSheets;
         },
       });
       onRehydrateProgress?.("Replaying derived sheet filters…");

@@ -102,12 +102,16 @@ import {
 } from "@/lib/connectGridCompact";
 import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
 import { rehydrateSheetAsync } from "@/lib/rehydrateSheetAsync";
+import { rehydrateQuantAthenaSheetAsync } from "@/lib/dataLake/rehydrateQuantAthenaSheet";
 import {
   appendSheetOperation,
   createSheetOperation,
+  findQuantAthenaOperation,
   isPartialProvenanceReload,
   replaceSheetOperation,
   resolvePersistedFullRowCount,
+  sheetHasComposeProvenance,
+  sheetHasQuantAthenaRecipe,
 } from "@/lib/projectPersistence";
 import {
   bucketOperationPayloadFromTab,
@@ -403,7 +407,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const activeSheetId = contextStateV2?.activeSheetId
     const activeSheet = activeSheetId ? dataSheets?.[activeSheetId] : null;
     const isProvenancePreviewSheet =
-      activeSheet?.storageMode === "provenance" && activeSheet?.rehydrationStatus !== "complete";
+      (activeSheet?.storageMode === "provenance" && activeSheet?.rehydrationStatus !== "complete") ||
+      (sheetHasQuantAthenaRecipe(activeSheet) && activeSheet?.rehydrationStatus !== "complete");
     const [rehydrateBusy, setRehydrateBusy] = useState(false);
     const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
     const connectLargePullView = connectDataLakePullState.largePullView;
@@ -447,7 +452,54 @@ const GridView = ({ startNew, fillViewport = false }) => {
     );
 
     const rehydrateActiveSheet = useCallback(async () => {
-      if (!activeSheetId || !activeSheet?.provenance) {
+      if (!activeSheetId || !activeSheet) {
+        toast.error("No active sheet to reload.");
+        return;
+      }
+
+      const quantOp = findQuantAthenaOperation(activeSheet);
+      if (quantOp) {
+        setRehydrateBusy(true);
+        try {
+          const { rows, json } = await rehydrateQuantAthenaSheetAsync({
+            sheet: activeSheet,
+            sheetId: activeSheetId,
+            dataSheets,
+            operation: quantOp,
+          });
+          const fullRowCount = resolvePersistedFullRowCount(activeSheet, json?.rowCount ?? rows.length);
+          setConnectedData?.(rows);
+          setDataSheets?.((prev) => {
+            const p = prev || {};
+            const sheet = p[activeSheetId] || activeSheet;
+            return {
+              ...p,
+              [activeSheetId]: {
+                ...sheet,
+                data: rows,
+                storageMode: "inline",
+                rehydrationStatus: "complete",
+                rowCount: rows.length,
+                fullRowCount,
+                saveMeta: {
+                  ...(sheet.saveMeta || {}),
+                  fullRowCount,
+                  truncated: false,
+                  rehydratedAt: new Date().toISOString(),
+                },
+              },
+            };
+          });
+          toast.success(`Reloaded ${rows.length.toLocaleString()} quant snapshot rows from Athena.`);
+        } catch (e) {
+          toast.error(e?.message || "Failed to reload quant sheet.");
+        } finally {
+          setRehydrateBusy(false);
+        }
+        return;
+      }
+
+      if (!activeSheet?.provenance) {
         toast.error("This sheet does not have saved Data Lake provenance.");
         return;
       }

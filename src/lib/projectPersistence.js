@@ -211,6 +211,32 @@ export function sheetHasRefineRecipe(sheet) {
   return hist.some((op) => op?.type === "refine.query");
 }
 
+export const QUANT_ATHENA_OPERATION_TYPE = "quant.relative_position.athena";
+
+export function sheetHasQuantAthenaRecipe(sheet) {
+  const hist = Array.isArray(sheet?.operationHistory) ? sheet.operationHistory : [];
+  return hist.some((op) => op?.type === QUANT_ATHENA_OPERATION_TYPE);
+}
+
+/** @param {object | null | undefined} sheet */
+export function findQuantAthenaOperation(sheet) {
+  const hist = Array.isArray(sheet?.operationHistory) ? sheet.operationHistory : [];
+  for (let i = hist.length - 1; i >= 0; i -= 1) {
+    if (hist[i]?.type === QUANT_ATHENA_OPERATION_TYPE) return hist[i];
+  }
+  return null;
+}
+
+export function sheetNeedsQuantAthenaReplay(sheet) {
+  if (!sheetHasQuantAthenaRecipe(sheet)) return false;
+  const loaded = Array.isArray(sheet?.data) ? sheet.data.length : 0;
+  if (sheet?.storageMode === "derived" && loaded === 0) return true;
+  if (sheet?.saveMeta?.recipeOnly === true && loaded === 0) return true;
+  if (sheet?.rehydrationStatus === "pending") return true;
+  const full = resolvePersistedFullRowCount(sheet, loaded);
+  return full > 0 && loaded < full;
+}
+
 const DEFAULT_SHEET_NAME_RE = /^Sheet \d+$/;
 
 export function isDefaultOrphanSheetName(name) {
@@ -298,13 +324,56 @@ export function stripRefineRecipeSheetsForPersist(dataSheets) {
 }
 
 /**
- * Full save hygiene: prune orphans, strip refine + compose row payloads.
+ * Persist quant-Athena-derived sheets as recipes (sourceSheetId + operationHistory), not row bulk.
+ * @param {Record<string, object>} dataSheets
+ */
+export function stripQuantRecipeSheetsForPersist(dataSheets) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? { ...dataSheets } : {};
+  return Object.entries(sheets).reduce((acc, [sheetId, sheet]) => {
+    if (!sheet || typeof sheet !== "object") {
+      acc[sheetId] = sheet;
+      return acc;
+    }
+    const isQuantDerived =
+      sheetHasQuantAthenaRecipe(sheet) &&
+      !sheetHasComposeProvenance(sheet) &&
+      (sheet?.sourceSheetId || sheet?.storageMode === "derived");
+    if (!isQuantDerived) {
+      acc[sheetId] = sheet;
+      return acc;
+    }
+    const fullRowCount = resolvePersistedFullRowCount(
+      sheet,
+      Array.isArray(sheet?.data) ? sheet.data.length : 0,
+    );
+    acc[sheetId] = {
+      ...sheet,
+      data: [],
+      storageMode: "derived",
+      previewRowCount: 0,
+      rowCount: fullRowCount || sheet.rowCount || 0,
+      fullRowCount: fullRowCount || sheet.fullRowCount || sheet.rowCount || 0,
+      rehydrationStatus: "pending",
+      saveMeta: {
+        ...(sheet.saveMeta && typeof sheet.saveMeta === "object" ? sheet.saveMeta : {}),
+        recipeOnly: true,
+        persistRows: false,
+        fullRowCount,
+      },
+    };
+    return acc;
+  }, {});
+}
+
+/**
+ * Full save hygiene: prune orphans, strip refine + compose + quant row payloads.
  * @param {Record<string, object>} dataSheets
  */
 export function sanitizeSheetsForPersist(dataSheets) {
   let sheets = dataSheets && typeof dataSheets === "object" ? { ...dataSheets } : {};
   sheets = pruneOrphanDuplicateSheetsForPersist(sheets);
   sheets = stripRefineRecipeSheetsForPersist(sheets);
+  sheets = stripQuantRecipeSheetsForPersist(sheets);
   sheets = stripProvenanceRowPayloadFromSheets(sheets);
   return sheets;
 }
@@ -353,6 +422,7 @@ export function stripProvenanceRowPayloadForLoad(dataSet) {
   const dataSheets = dataSet.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
   let nextSheets = stripProvenanceRowPayloadFromSheets(dataSheets);
   nextSheets = stripRefineRecipeSheetsForPersist(nextSheets);
+  nextSheets = stripQuantRecipeSheetsForPersist(nextSheets);
   const hasInlineRows = Object.values(nextSheets).some((s) => Array.isArray(s?.data) && s.data.length > 0);
   return {
     ...dataSet,
@@ -419,12 +489,16 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
     sheetHasRefineRecipe(sheet) &&
     !hasProvenance &&
     (sheet?.sourceSheetId || sheet?.storageMode === "derived");
+  const isQuantDerived =
+    sheetHasQuantAthenaRecipe(sheet) &&
+    !hasProvenance &&
+    (sheet?.sourceSheetId || sheet?.storageMode === "derived");
   const effectiveStorageMode = hasProvenance
     ? "provenance"
-    : isRefineDerived
+    : isRefineDerived || isQuantDerived
       ? "derived"
       : storageMode;
-  const recipeOnly = hasProvenance || isRefineDerived;
+  const recipeOnly = hasProvenance || isRefineDerived || isQuantDerived;
   const data = recipeOnly
     ? []
     : effectiveStorageMode === "inline"
@@ -482,7 +556,9 @@ function buildSheets(dataSheets, previewLimit, forceProvenance) {
     const estimatedFullBytes = estimateJsonBytes(rows);
     const shouldProvenance =
       sheetHasComposeProvenance(sheet) ||
-      (forceProvenance && (rows.length > previewLimit || estimatedFullBytes > 1024 * 1024));
+      (forceProvenance &&
+        !sheetHasQuantAthenaRecipe(sheet) &&
+        (rows.length > previewLimit || estimatedFullBytes > 1024 * 1024));
     acc[sheetId] = buildSheetRecord(sheetId, sheet, rows, {
       storageMode: shouldProvenance ? "provenance" : "inline",
       previewLimit,
