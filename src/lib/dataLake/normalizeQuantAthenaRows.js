@@ -1,5 +1,6 @@
 import { expandScientificNotationIntegerString } from "@/lib/dataLake/lakeBigintNormalize";
 import { isDateLikeColumnName } from "@/lib/dataLake/lakeTableColumns";
+import { coerceDataTypes } from "@/lib/coerceDataTypes";
 import { parseCheckpointInput } from "@/lib/sheetOperations/quant/columnInference";
 import { temporalToMs } from "@/lib/temporalParse";
 
@@ -43,7 +44,7 @@ export function normalizeQuantAthenaRows(rows) {
   const list = Array.isArray(rows) ? rows : [];
   if (!list.length) return list;
 
-  return list.map((row) => {
+  const normalized = list.map((row) => {
     if (!row || typeof row !== "object" || Array.isArray(row)) return row;
     let out = null;
 
@@ -64,4 +65,7 @@ export function normalizeQuantAthenaRows(rows) {
 
     return out || row;
   });
+
+  // Athena poll values are strings; AG Grid number cells need real JS numbers/dates.
+  return coerceDataTypes(normalized);
 }

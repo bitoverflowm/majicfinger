@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { createSheetOperation, sheetHasComposeProvenance } from "@/lib/projectPersistence";
+import { coerceDataTypes } from "@/lib/coerceDataTypes";
 import { buildSheetGraphForAthena } from "@/lib/dataLake/buildSheetGraph";
 import { fetchSheetQuantAthena } from "@/lib/dataLake/fetchSheetQuantAthena";
 import { QuantAthenaJoinFields } from "@/components/gridView/QuantAthenaJoinFields";
@@ -79,6 +80,26 @@ const WEIGHTING_OPTIONS = [
   { value: "volume", label: "Volume-weighted" },
   { value: "custom", label: "Custom weight column" },
 ];
+
+function defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn }) {
+  if (operation === "relative_position") {
+    if (athenaCloudPull) return "Lifecycle Snapshots (Athena)";
+    if (mode === "snapshot") return "Lifecycle Snapshots";
+    if (mode === "bucket") return "Lifecycle Buckets";
+    return "Relative Position";
+  }
+  if (operation === "brier_score") {
+    return bucketScoreColumn ? "Brier Score Summary" : "Brier Scores";
+  }
+  return "Lifecycle Snapshots";
+}
+
+function defaultQuantAccuracySheetName(snapshotSheetName) {
+  const base = String(snapshotSheetName || "").trim().replace(/\s*\(Athena\)\s*$/i, "").trim();
+  if (!base) return "Lifecycle Accuracy";
+  if (/snapshots?$/i.test(base)) return base.replace(/snapshots?$/i, "Accuracy");
+  return `${base} Accuracy`;
+}
 
 function ColumnSelect({ label, value, onChange, columns, helper, required, error }) {
   return (
@@ -148,6 +169,8 @@ export function QuantOperationsPanel({
   onCanSubmitChange,
 }) {
   const [operation, setOperation] = useState("pm_preset");
+  const [outputSheetName, setOutputSheetName] = useState("Lifecycle Snapshots");
+  const [outputSheetNameTouched, setOutputSheetNameTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
@@ -199,6 +222,40 @@ export function QuantOperationsPanel({
     () => sheetHasComposeProvenance(activeSheet) && Boolean(activeSheetId),
     [activeSheet, activeSheetId],
   );
+
+  const willCreateNewSheet = useMemo(() => {
+    if (operation === "pm_preset") return true;
+    if (operation === "relative_position") {
+      if (athenaCloudPull && canUseAthena) return true;
+      if (mode === "snapshot" || mode === "bucket") return true;
+      return mathDestination === "new_sheet";
+    }
+    if (operation === "brier_score") {
+      if (bucketScoreColumn) return true;
+      return mathDestination === "new_sheet";
+    }
+    return false;
+  }, [operation, athenaCloudPull, canUseAthena, mode, mathDestination, bucketScoreColumn]);
+
+  const resolvedOutputSheetName = useMemo(() => {
+    const trimmed = String(outputSheetName || "").trim();
+    if (trimmed) return trimmed.slice(0, 80);
+    return defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn }).slice(0, 80);
+  }, [outputSheetName, operation, mode, athenaCloudPull, bucketScoreColumn]);
+
+  const resolvedAccuracySheetName = useMemo(
+    () => defaultQuantAccuracySheetName(resolvedOutputSheetName).slice(0, 80),
+    [resolvedOutputSheetName],
+  );
+
+  useEffect(() => {
+    setOutputSheetNameTouched(false);
+  }, [operation]);
+
+  useEffect(() => {
+    if (outputSheetNameTouched) return;
+    setOutputSheetName(defaultQuantOutputSheetName({ operation, mode, athenaCloudPull, bucketScoreColumn }));
+  }, [operation, mode, athenaCloudPull, bucketScoreColumn, outputSheetNameTouched]);
 
   const suggestedGroup = useMemo(() => suggestGroupColumn(columnNames), [columnNames]);
   const suggestedProgress = useMemo(() => suggestProgressColumn(columnNames), [columnNames]);
@@ -369,14 +426,18 @@ export function QuantOperationsPanel({
   };
 
   const writeSheet = useCallback(
-    (sheetId, data, sheetName, operation) => {
+    (sheetId, rawData, sheetName, operation) => {
+      const data = coerceDataTypes(rawData);
       setSheetData?.(sheetId, data);
       setDataTypes?.((prev) => {
         const next = { ...(prev || {}) };
         for (const key of Object.keys(data[0] || {})) {
           if (key === "_origIndex") continue;
           const sample = data.find((r) => r?.[key] != null && r?.[key] !== "")?.[key];
-          next[key] = typeof sample === "number" ? "number" : "string";
+          if (sample instanceof Date) next[key] = "date";
+          else if (typeof sample === "number") next[key] = "number";
+          else if (typeof sample === "boolean") next[key] = "boolean";
+          else next[key] = "string";
         }
         return next;
       });
@@ -451,11 +512,11 @@ export function QuantOperationsPanel({
       });
       await new Promise((resolve) => {
         addNewSheetAndActivate?.((newId) => {
-          writeSheet(newId, outRows, "Lifecycle Snapshots (Athena)", op);
+          writeSheet(newId, outRows, resolvedOutputSheetName, op);
           resolve();
         });
       });
-      toast.success(`Created Athena lifecycle snapshots (${outRows.length.toLocaleString()} rows).`);
+      toast.success(`Created "${resolvedOutputSheetName}" (${outRows.length.toLocaleString()} rows).`);
       return true;
     } catch (e) {
       toast.error(e?.message || "Athena quant operation failed.");
@@ -479,6 +540,7 @@ export function QuantOperationsPanel({
     snapshotRule,
     addNewSheetAndActivate,
     writeSheet,
+    resolvedOutputSheetName,
   ]);
 
   const applyRelativePosition = useCallback(async () => {
@@ -501,14 +563,13 @@ export function QuantOperationsPanel({
       appendActiveSheetOperation?.("quant.relative_position", { config: relativeConfig });
       toast.success("Added relative position columns to current sheet.");
     } else {
-      const sheetName = mode === "snapshot" ? "Lifecycle Snapshots" : mode === "bucket" ? "Lifecycle Buckets" : "Relative Position";
       await new Promise((resolve) => {
         addNewSheetAndActivate?.((newId) => {
-          writeSheet(newId, result.rows, sheetName, op);
+          writeSheet(newId, result.rows, resolvedOutputSheetName, op);
           resolve();
         });
       });
-      toast.success(`Created ${sheetName} with ${result.rows.length.toLocaleString()} rows.`);
+      toast.success(`Created "${resolvedOutputSheetName}" with ${result.rows.length.toLocaleString()} rows.`);
     }
     return true;
   }, [
@@ -524,6 +585,7 @@ export function QuantOperationsPanel({
     appendActiveSheetOperation,
     addNewSheetAndActivate,
     writeSheet,
+    resolvedOutputSheetName,
   ]);
 
   const applyBrierScore = useCallback(async () => {
@@ -558,7 +620,7 @@ export function QuantOperationsPanel({
       } else {
         await new Promise((resolve) => {
           addNewSheetAndActivate?.((newId) => {
-            writeSheet(newId, result.rowLevelRows, "Brier Scores", op);
+            writeSheet(newId, result.rowLevelRows, resolvedOutputSheetName, op);
             resolve();
           });
         });
@@ -568,11 +630,11 @@ export function QuantOperationsPanel({
     }
     await new Promise((resolve) => {
       addNewSheetAndActivate?.((newId) => {
-        writeSheet(newId, result.rows, "Brier Score Summary", op);
+        writeSheet(newId, result.rows, resolvedOutputSheetName, op);
         resolve();
       });
     });
-    toast.success(`Created accuracy summary with ${result.rows.length} checkpoints.`);
+    toast.success(`Created "${resolvedOutputSheetName}" with ${result.rows.length} checkpoints.`);
     return true;
   }, [
     rows,
@@ -591,6 +653,7 @@ export function QuantOperationsPanel({
     appendActiveSheetOperation,
     addNewSheetAndActivate,
     writeSheet,
+    resolvedOutputSheetName,
   ]);
 
   const applyPmPreset = useCallback(async () => {
@@ -606,7 +669,7 @@ export function QuantOperationsPanel({
     const snapOp = createSheetOperation("quant.pm_lifecycle_snapshot", { setup });
     await new Promise((resolve) => {
       addNewSheetAndActivate?.((newId) => {
-        writeSheet(newId, result.snapshotRows, setup.snapshotSheetName || "Lifecycle Snapshots", snapOp);
+        writeSheet(newId, result.snapshotRows, resolvedOutputSheetName, snapOp);
         resolve();
       });
     });
@@ -615,7 +678,7 @@ export function QuantOperationsPanel({
     const accOp = createSheetOperation("quant.pm_lifecycle_accuracy", { setup });
     await new Promise((resolve) => {
       addNewSheetAndActivate?.((newId) => {
-        writeSheet(newId, result.accuracyRows, setup.accuracySheetName || "Lifecycle Accuracy", accOp);
+        writeSheet(newId, result.accuracyRows, resolvedAccuracySheetName, accOp);
         resolve();
       });
     });
@@ -627,9 +690,9 @@ export function QuantOperationsPanel({
       addNewChartAndActivate?.(() => {
         setLoadedChartBuilderSnapshot?.(first.snapshot);
       }, { initialSnapshot: first.snapshot });
-      toast.success(`Created snapshots, accuracy table, and suggested chart: ${first.title}`);
+      toast.success(`Created "${resolvedOutputSheetName}", "${resolvedAccuracySheetName}", and suggested chart: ${first.title}`);
     } else {
-      toast.success("Created lifecycle snapshots and accuracy table.");
+      toast.success(`Created "${resolvedOutputSheetName}" and "${resolvedAccuracySheetName}".`);
     }
     setProgress(100);
     setBusy(false);
@@ -640,6 +703,8 @@ export function QuantOperationsPanel({
     columnNames,
     addNewSheetAndActivate,
     writeSheet,
+    resolvedOutputSheetName,
+    resolvedAccuracySheetName,
     addNewChartAndActivate,
     setLoadedChartBuilderSnapshot,
   ]);
@@ -1039,6 +1104,27 @@ export function QuantOperationsPanel({
           </SelectContent>
         </Select>
       </div>
+
+      {willCreateNewSheet ? (
+        <div className="space-y-1">
+          <Label className="text-xs">New sheet name</Label>
+          <Input
+            className="h-9 text-xs"
+            value={outputSheetName}
+            onChange={(e) => {
+              setOutputSheetNameTouched(true);
+              setOutputSheetName(e.target.value);
+            }}
+            placeholder="Sheet name"
+            spellCheck={false}
+          />
+          {operation === "pm_preset" ? (
+            <p className="text-[10px] text-muted-foreground">
+              Also creates an accuracy sheet named &quot;{resolvedAccuracySheetName}&quot;.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {operation === "relative_position" ? renderRelativePositionForm() : null}
       {operation === "brier_score" ? renderBrierScoreForm() : null}
