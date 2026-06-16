@@ -111,7 +111,9 @@ function ColumnSelect({ label, value, onChange, columns, helper, required, error
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="__">—</SelectItem>
-          {columns.map((c) => (
+          {columns
+            .filter((c) => String(c ?? "").trim() !== "")
+            .map((c) => (
             <SelectItem key={`col-${label}-${c}`} value={c} className="font-mono text-xs">
               {c}
             </SelectItem>
@@ -1008,7 +1010,7 @@ export function QuantOperationsPanel({
         label="Measure error across what?"
         value={bucketScoreColumn}
         onChange={setBucketScoreColumn}
-        columns={["", ...columnNames]}
+        columns={columnNames}
         helper="Leave empty for row-level scores only"
       />
       {bucketScoreColumn ? (
