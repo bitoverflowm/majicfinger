@@ -30,6 +30,7 @@ import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery.js"
 import { composeUsesPrimaryTableLimit, composePrimaryJoinExpandCap, resolveComposeExpandedFetchRowLimit } from "@/lib/composeLimitScope.js";
 import { shouldUseLargeAthenaPullPath } from "@/lib/dataLake/largeAthenaPull.js";
 
+import "@/lib/sheetOperations/aggregateBucketRows.test.js";
 import "@/lib/dataLake/restoreQuantAthenaReplayConfig.test.js";
 import "@/lib/projectPersistence.quant.test.js";
 import "@/lib/dataLake/normalizeQuantAthenaRows.test.js";

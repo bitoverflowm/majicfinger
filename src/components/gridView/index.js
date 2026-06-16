@@ -615,6 +615,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [statsBucketTimeInterval, setStatsBucketTimeInterval] = useState("day");
     const [statsBucketNumericSize, setStatsBucketNumericSize] = useState("");
     const [statsBucketPassthroughCols, setStatsBucketPassthroughCols] = useState(() => new Set());
+    const [statsBucketGroupByCols, setStatsBucketGroupByCols] = useState(() => new Set());
     const [statsBucketAggregations, setStatsBucketAggregations] = useState([
       { id: "bucket-agg-1", type: "count", valueColumn: "", weightColumn: "", denominatorColumn: "", outputColumn: "count", filterEnabled: false, filterColumn: "", filterOperator: "=", filterValue: "" },
     ]);
@@ -1094,6 +1095,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
       });
     }, []);
 
+    const toggleStatsBucketGroupBy = useCallback((column) => {
+      setStatsBucketGroupByCols((prev) => {
+        const next = new Set(prev instanceof Set ? Array.from(prev) : []);
+        if (next.has(column)) next.delete(column);
+        else next.add(column);
+        return next;
+      });
+    }, []);
+
     const normalizedStatsBucketAggregations = useMemo(
       () =>
         (Array.isArray(statsBucketAggregations) ? statsBucketAggregations : []).map((agg, idx) => ({
@@ -1120,6 +1130,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setStatsBucketTimeInterval(tab.timeInterval || "day");
       setStatsBucketNumericSize(tab.numericBucketSize || "");
       setStatsBucketPassthroughCols(new Set(tab.passthroughColumns || []));
+      setStatsBucketGroupByCols(new Set(tab.groupByColumns || []));
       setStatsBucketAggregations(
         (Array.isArray(tab.aggregations) ? tab.aggregations : []).map((agg) => ({ ...agg })),
       );
@@ -1135,6 +1146,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         timeInterval: statsBucketTimeInterval,
         numericBucketSize: statsBucketNumericSize,
         passthroughColumns: Array.from(statsBucketPassthroughCols || []),
+        groupByColumns: Array.from(statsBucketGroupByCols || []),
         aggregations: normalizedStatsBucketAggregations.map((agg) => ({ ...agg })),
       }),
       [
@@ -1144,6 +1156,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         statsBucketNumericSize,
         statsBucketOutputColumn,
         statsBucketPassthroughCols,
+        statsBucketGroupByCols,
         statsBucketSheetName,
         statsBucketTimeInterval,
       ],
@@ -1215,6 +1228,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         bucketMode: statsBucketMode,
         timeInterval: statsBucketTimeInterval,
         numericBucketSize: statsBucketNumericSize || statsBucketColumnProfile.suggestedSize || 1,
+        groupByColumns: Array.from(statsBucketGroupByCols || []),
         passthroughColumns: Array.from(statsBucketPassthroughCols || []),
         aggregations: normalizedStatsBucketAggregations,
       }).slice(0, 3);
@@ -1227,6 +1241,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       statsBucketMode,
       statsBucketNumericSize,
       statsBucketOutputColumn,
+      statsBucketGroupByCols,
       statsBucketPassthroughCols,
       statsBucketTimeInterval,
     ]);
@@ -4300,31 +4315,28 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   </div>
                                 </div>
                               ) : null}
-                              <div className="space-y-1">
-                                <Label className="text-xs">New sheet name</Label>
-                                <Input
-                                  className={cn(
-                                    "h-9 text-xs",
-                                    bucketApplyState.fieldErrors.sheetName && APPLY_FIELD_ERROR_CLASS,
-                                  )}
-                                  value={statsBucketSheetName}
-                                  onChange={(e) => {
-                                    setStatsBucketSheetName(e.target.value);
-                                    if (bucketApplyState.error) setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
-                                  }}
-                                  placeholder="Bucketed sheet"
-                                  spellCheck={false}
-                                />
-                                {bucketApplyState.fieldErrors.sheetName ? (
-                                  <p className="text-[10px] text-destructive">{bucketApplyState.fieldErrors.sheetName}</p>
-                                ) : null}
-                                {activeBucketTab?.savedSheetName &&
-                                String(statsBucketSheetName || "").trim() &&
-                                activeBucketTab.savedSheetName !== String(statsBucketSheetName || "").trim() ? (
-                                  <p className="text-[10px] text-muted-foreground">
-                                    Applying will create a new bucket tab and keep &quot;{activeBucketTab.savedSheetName}&quot; unchanged.
-                                  </p>
-                                ) : null}
+                              <div className="space-y-2">
+                                <Label className="text-xs">Additional group by columns</Label>
+                                <p className="text-[10px] text-muted-foreground">
+                                  Group rows by these columns in addition to the bucket. Each unique combination gets its own output rows and aggregations.
+                                </p>
+                                <div className="grid max-h-32 gap-2 overflow-auto rounded-md border border-border/70 p-2 sm:grid-cols-2">
+                                  {sheetColumnNamesForMath
+                                    .filter(
+                                      (col) =>
+                                        col !== statsBucketColumn &&
+                                        col !== statsBucketOutputColumn,
+                                    )
+                                    .map((col) => (
+                                      <label key={`bucket-group-${col}`} className="flex min-w-0 items-center gap-2 text-xs">
+                                        <Checkbox
+                                          checked={statsBucketGroupByCols.has(col)}
+                                          onCheckedChange={() => toggleStatsBucketGroupBy(col)}
+                                        />
+                                        <span className="truncate font-mono">{col}</span>
+                                      </label>
+                                    ))}
+                                </div>
                               </div>
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between gap-2">
@@ -4364,10 +4376,25 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                                       ? "VWAP_price"
                                                       : v === "average"
                                                         ? "avg"
-                                                        : v;
+                                                        : v === "count_distinct"
+                                                          ? "distinct_count"
+                                                          : v === "conditional_rate"
+                                                            ? "rate"
+                                                            : v === "conditional_count"
+                                                              ? "conditional_count"
+                                                              : v === "std_dev"
+                                                                ? "std_dev"
+                                                                : v;
                                               updateStatsBucketAggregation(agg.id, {
                                                 type: v,
                                                 outputColumn: agg.outputColumn || baseName,
+                                                ...(["conditional_count", "conditional_rate"].includes(v)
+                                                  ? {
+                                                      filterEnabled: true,
+                                                      filterColumn: agg.filterColumn || sheetColumnNamesForMath[0] || "",
+                                                      filterOperator: agg.filterOperator || "=",
+                                                    }
+                                                  : null),
                                               });
                                             }}
                                           >
@@ -4378,12 +4405,19 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                              <SelectItem value="subgroup_by">Sub-group by</SelectItem>
-                                              <SelectItem value="count">Count</SelectItem>
+                                              <SelectItem value="count">Count rows</SelectItem>
+                                              <SelectItem value="count_distinct">Count distinct</SelectItem>
+                                              <SelectItem value="average">Mean</SelectItem>
+                                              <SelectItem value="median">Median</SelectItem>
                                               <SelectItem value="sum">Sum</SelectItem>
-                                              <SelectItem value="average">Average</SelectItem>
+                                              <SelectItem value="min">Min</SelectItem>
+                                              <SelectItem value="max">Max</SelectItem>
+                                              <SelectItem value="std_dev">Standard deviation</SelectItem>
+                                              <SelectItem value="conditional_count">Conditional count</SelectItem>
+                                              <SelectItem value="conditional_rate">Conditional rate</SelectItem>
                                               <SelectItem value="weighted_average">Value weighted avg</SelectItem>
                                               <SelectItem value="product_ratio">SUM(A * B) / aggregation</SelectItem>
+                                              <SelectItem value="subgroup_by">Sub-group by (legacy)</SelectItem>
                                             </SelectContent>
                                           </Select>
                                         </div>
@@ -4393,12 +4427,27 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                               ? "Sub-group column"
                                               : agg.type === "count"
                                                 ? "Count column (optional)"
-                                                : "Value column"}
+                                                : ["conditional_count", "conditional_rate"].includes(agg.type)
+                                                  ? "Condition column"
+                                                  : "Value column"}
                                           </Label>
                                           <Select
-                                            value={agg.type === "count" ? (agg.valueColumn || "__rows__") : (agg.valueColumn || "__")}
+                                            value={
+                                              agg.type === "count"
+                                                ? (agg.valueColumn || "__rows__")
+                                                : ["conditional_count", "conditional_rate"].includes(agg.type)
+                                                  ? (agg.filterColumn || "__")
+                                                  : (agg.valueColumn || "__")
+                                            }
                                             onValueChange={(v) => {
                                               const col = v === "__rows__" || v === "__" ? "" : v;
+                                              if (["conditional_count", "conditional_rate"].includes(agg.type)) {
+                                                updateStatsBucketAggregation(agg.id, {
+                                                  filterColumn: col,
+                                                  filterEnabled: true,
+                                                });
+                                                return;
+                                              }
                                               updateStatsBucketAggregation(agg.id, {
                                                 valueColumn: col,
                                                 ...(agg.type === "subgroup_by"
@@ -4410,13 +4459,19 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                           >
                                             <SelectTrigger className={cn(
                                               "h-8 text-xs",
-                                              bucketApplyState.fieldErrors[`agg.${agg.id}.valueColumn`] && APPLY_FIELD_ERROR_CLASS,
+                                              bucketApplyState.fieldErrors[
+                                                ["conditional_count", "conditional_rate"].includes(agg.type)
+                                                  ? `agg.${agg.id}.filterColumn`
+                                                  : `agg.${agg.id}.valueColumn`
+                                              ] && APPLY_FIELD_ERROR_CLASS,
                                             )}>
                                               <SelectValue placeholder="Column" />
                                             </SelectTrigger>
                                             <SelectContent>
                                               {agg.type === "count" ? <SelectItem value="__rows__">Rows in bucket</SelectItem> : null}
-                                              {agg.type !== "count" ? <SelectItem value="__">—</SelectItem> : null}
+                                              {agg.type !== "count" && !["conditional_count", "conditional_rate"].includes(agg.type) ? (
+                                                <SelectItem value="__">—</SelectItem>
+                                              ) : null}
                                               {sheetColumnNamesForMath.map((c) => (
                                                 <SelectItem key={`bucket-agg-val-${agg.id}-${c}`} value={c} className="font-mono text-xs">
                                                   {c}
@@ -4495,7 +4550,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                           </p>
                                         </div>
                                       ) : null}
-                                      {agg.type !== "subgroup_by" ? (
+                                      {agg.type !== "subgroup_by" && !["conditional_count", "conditional_rate"].includes(agg.type) ? (
                                       <div className="mt-2 space-y-2 rounded-md border border-border/50 bg-muted/10 p-2">
                                         <label className="flex items-center gap-2 text-xs">
                                           <Checkbox
@@ -4562,10 +4617,46 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                           </div>
                                         ) : null}
                                       </div>
-                                      ) : (
+                                      ) : agg.type === "subgroup_by" ? (
                                         <p className="mt-2 text-[10px] text-muted-foreground">
-                                          Nests rows within each bucket by this column. Add another sub-group or a Sum/Count aggregation below.
+                                          Nests rows within each bucket by this column. Prefer &quot;Additional group by columns&quot; above for new workflows.
                                         </p>
+                                      ) : (
+                                        <div className="mt-2 space-y-2 rounded-md border border-border/50 bg-muted/10 p-2">
+                                          <div className="grid gap-2 sm:grid-cols-[0.7fr_1fr]">
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px] text-muted-foreground">Op</Label>
+                                              <Select
+                                                value={agg.filterOperator || "="}
+                                                onValueChange={(v) => updateStatsBucketAggregation(agg.id, { filterOperator: v, filterEnabled: true })}
+                                              >
+                                                <SelectTrigger className="h-8 text-xs">
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {BUCKET_AGG_FILTER_OPERATORS.map((op) => (
+                                                    <SelectItem key={op.value} value={op.value}>
+                                                      {op.label}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px] text-muted-foreground">Value</Label>
+                                              <Input
+                                                className={cn(
+                                                  "h-8 text-xs",
+                                                  bucketApplyState.fieldErrors[`agg.${agg.id}.filterValue`] && APPLY_FIELD_ERROR_CLASS,
+                                                )}
+                                                value={agg.filterValue ?? ""}
+                                                onChange={(e) => updateStatsBucketAggregation(agg.id, { filterValue: e.target.value, filterEnabled: true })}
+                                                placeholder="e.g. yes"
+                                                disabled={["is_empty", "is_not_empty"].includes(agg.filterOperator)}
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
                                       )}
                                     </div>
                                   ))}
@@ -4574,11 +4665,16 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               <div className="space-y-2">
                                 <Label className="text-xs">Transfer columns as-is</Label>
                                 <p className="text-[10px] text-muted-foreground">
-                                  These values are copied from the first row in each bucket. Use this for labels that are stable inside a bucket.
+                                  These values are copied from the first row in each group. Use this for labels that are stable inside a bucket. This is not the same as group by.
                                 </p>
                                 <div className="grid max-h-32 gap-2 overflow-auto rounded-md border border-border/70 p-2 sm:grid-cols-2">
                                   {sheetColumnNamesForMath
-                                    .filter((col) => col !== statsBucketColumn)
+                                    .filter(
+                                      (col) =>
+                                        col !== statsBucketColumn &&
+                                        col !== statsBucketOutputColumn &&
+                                        !statsBucketGroupByCols.has(col),
+                                    )
                                     .map((col) => (
                                       <label key={`bucket-pass-${col}`} className="flex min-w-0 items-center gap-2 text-xs">
                                         <Checkbox
@@ -4589,6 +4685,32 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       </label>
                                     ))}
                                 </div>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">New sheet name</Label>
+                                <Input
+                                  className={cn(
+                                    "h-9 text-xs",
+                                    bucketApplyState.fieldErrors.sheetName && APPLY_FIELD_ERROR_CLASS,
+                                  )}
+                                  value={statsBucketSheetName}
+                                  onChange={(e) => {
+                                    setStatsBucketSheetName(e.target.value);
+                                    if (bucketApplyState.error) setBucketApplyState(EMPTY_MODAL_APPLY_STATE);
+                                  }}
+                                  placeholder="Bucketed sheet"
+                                  spellCheck={false}
+                                />
+                                {bucketApplyState.fieldErrors.sheetName ? (
+                                  <p className="text-[10px] text-destructive">{bucketApplyState.fieldErrors.sheetName}</p>
+                                ) : null}
+                                {activeBucketTab?.savedSheetName &&
+                                String(statsBucketSheetName || "").trim() &&
+                                activeBucketTab.savedSheetName !== String(statsBucketSheetName || "").trim() ? (
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Applying will create a new bucket tab and keep &quot;{activeBucketTab.savedSheetName}&quot; unchanged.
+                                  </p>
+                                ) : null}
                               </div>
                               {statsBucketPreviewRows.length ? (
                                 <div className="space-y-1">

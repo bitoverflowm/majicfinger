@@ -28,6 +28,12 @@ function normalizeAggregations(aggregations) {
   }));
 }
 
+function normalizeGroupByColumns(columns) {
+  return (Array.isArray(columns) ? columns : [])
+    .map((c) => String(c || "").trim())
+    .filter(Boolean);
+}
+
 /** @typedef {ReturnType<typeof bucketTabFromOperation>} BucketSheetTab */
 
 export function bucketTabFromOperation(op, targetSheetId, sheetName) {
@@ -44,6 +50,7 @@ export function bucketTabFromOperation(op, targetSheetId, sheetName) {
     bucketMode: op.bucketMode || "category",
     timeInterval: op.timeInterval || "day",
     numericBucketSize: op.numericBucketSize != null ? String(op.numericBucketSize) : "",
+    groupByColumns: normalizeGroupByColumns(op.groupByColumns),
     passthroughColumns: Array.isArray(op.passthroughColumns) ? [...op.passthroughColumns] : [],
     aggregations: normalizeAggregations(op.aggregations).length
       ? normalizeAggregations(op.aggregations)
@@ -64,6 +71,7 @@ export function createEmptyBucketTab(sheetName = "Bucketed sheet") {
     bucketMode: "category",
     timeInterval: "day",
     numericBucketSize: "",
+    groupByColumns: [],
     passthroughColumns: [],
     aggregations: DEFAULT_AGGREGATIONS.map((agg) => ({ ...agg, id: `bucket-agg-${id}` })),
   };
@@ -92,6 +100,7 @@ export function bucketOperationPayloadFromTab(tab, sourceSheetId) {
     bucketMode: tab.bucketMode,
     timeInterval: tab.timeInterval,
     numericBucketSize: tab.numericBucketSize,
+    groupByColumns: normalizeGroupByColumns(tab.groupByColumns),
     passthroughColumns: Array.isArray(tab.passthroughColumns) ? tab.passthroughColumns : [],
     aggregations: normalizeAggregations(tab.aggregations),
     outputSheetName: tab.sheetName,
@@ -101,6 +110,20 @@ export function bucketOperationPayloadFromTab(tab, sourceSheetId) {
 export function bucketTabCanSubmit(tab, opts = {}) {
   return getBucketTabValidationErrors(tab, opts).ok;
 }
+
+const METRIC_TYPES_REQUIRING_VALUE = new Set([
+  "sum",
+  "average",
+  "weighted_average",
+  "product_ratio",
+  "count_distinct",
+  "min",
+  "max",
+  "median",
+  "std_dev",
+]);
+
+const CONDITIONAL_TYPES = new Set(["conditional_count", "conditional_rate"]);
 
 /** @returns {{ ok: boolean; message: string; fieldErrors: Record<string, string> }} */
 export function getBucketTabValidationErrors(tab, { suggestedNumericSize } = {}) {
@@ -146,7 +169,17 @@ export function getBucketTabValidationErrors(tab, { suggestedNumericSize } = {})
       fieldErrors[`agg.${agg.id}.valueColumn`] = "Choose a sub-group column.";
       if (!message) message = `${label}: choose a sub-group column.`;
     }
-    if (agg.filterEnabled) {
+    if (CONDITIONAL_TYPES.has(agg.type)) {
+      const needsValue = !["is_empty", "is_not_empty"].includes(agg.filterOperator);
+      if (!agg.filterColumn) {
+        fieldErrors[`agg.${agg.id}.filterColumn`] = "Choose a condition column.";
+        if (!message) message = `${label}: choose a condition column.`;
+      }
+      if (needsValue && String(agg.filterValue ?? "").trim() === "") {
+        fieldErrors[`agg.${agg.id}.filterValue`] = "Enter a condition value.";
+        if (!message) message = `${label}: enter a condition value.`;
+      }
+    } else if (agg.filterEnabled) {
       const needsValue = !["is_empty", "is_not_empty"].includes(agg.filterOperator);
       if (!agg.filterColumn) {
         fieldErrors[`agg.${agg.id}.filterColumn`] = "Choose a filter column.";
@@ -157,7 +190,7 @@ export function getBucketTabValidationErrors(tab, { suggestedNumericSize } = {})
         if (!message) message = `${label}: enter a where value.`;
       }
     }
-    if (agg.type !== "subgroup_by" && agg.type !== "count" && !agg.valueColumn) {
+    if (METRIC_TYPES_REQUIRING_VALUE.has(agg.type) && !agg.valueColumn) {
       fieldErrors[`agg.${agg.id}.valueColumn`] = "Choose a value column.";
       if (!message) message = `${label}: choose a value column.`;
     }
@@ -187,6 +220,7 @@ export function bucketRowsConfigFromTab(tab, suggestedNumericSize) {
     bucketMode: tab.bucketMode,
     timeInterval: tab.timeInterval,
     numericBucketSize: tab.numericBucketSize || suggestedNumericSize || 1,
+    groupByColumns: normalizeGroupByColumns(tab.groupByColumns),
     passthroughColumns: Array.isArray(tab.passthroughColumns) ? tab.passthroughColumns : [],
     aggregations: normalizeAggregations(tab.aggregations),
   };

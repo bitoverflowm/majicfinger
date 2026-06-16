@@ -780,6 +780,7 @@ export function applyBrowserOperationToRows(rows, op) {
       bucketMode: op.bucketMode,
       timeInterval: op.timeInterval,
       numericBucketSize: op.numericBucketSize,
+      groupByColumns: op.groupByColumns,
       passthroughColumns: op.passthroughColumns,
       aggregations: op.aggregations,
     });

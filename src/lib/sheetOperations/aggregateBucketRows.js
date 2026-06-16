@@ -123,13 +123,57 @@ function getBucketForRow(row, config) {
 }
 
 function rowMatchesAggregationFilter(row, agg) {
-  if (!agg?.filterEnabled) return true;
+  const type = String(agg?.type || "count");
+  const filterRequired = type === "conditional_count" || type === "conditional_rate";
+  if (!filterRequired && !agg?.filterEnabled) return true;
   const column = String(agg.filterColumn || "").trim();
   const operator = String(agg.filterOperator || "=");
-  if (!column || !operator) return true;
+  if (!column || !operator) return filterRequired ? false : true;
   const valueNeeded = !["is_empty", "is_not_empty"].includes(operator);
-  if (valueNeeded && String(agg.filterValue ?? "").trim() === "") return true;
+  if (valueNeeded && String(agg.filterValue ?? "").trim() === "") return filterRequired ? false : true;
   return compareMathValues(row?.[column], operator, rawMathValue(agg.filterValue));
+}
+
+function subgroupLabelForValue(raw) {
+  if (raw == null || raw === "") return "(empty)";
+  return raw;
+}
+
+function sortValueForDimension(raw) {
+  if (raw == null || raw === "") return "(empty)";
+  const n = Number(raw);
+  if (Number.isFinite(n)) return n;
+  return bucketKeyForValue(raw);
+}
+
+function compareSortValues(left, right) {
+  if (typeof left === "number" && typeof right === "number") return left - right;
+  return String(left ?? "").localeCompare(String(right ?? ""));
+}
+
+function numericValuesForColumn(rows, valueColumn) {
+  const values = [];
+  for (const row of rows) {
+    const value = parseCellFiniteForStat(row, valueColumn);
+    if (value != null) values.push(value);
+  }
+  return values;
+}
+
+function median(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2) return sorted[mid];
+  return (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function stdDev(values) {
+  if (!values.length) return null;
+  if (values.length === 1) return 0;
+  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
 }
 
 /**
@@ -145,6 +189,11 @@ export function aggregateBucketRows(rows, config) {
   const passthroughColumns = Array.isArray(config?.passthroughColumns)
     ? config.passthroughColumns.filter(Boolean)
     : [];
+  const groupByColumns = Array.isArray(config?.groupByColumns)
+    ? config.groupByColumns
+        .map((c) => String(c || "").trim())
+        .filter((c) => c && c !== bucketColumn && c !== bucketOutputColumn)
+    : [];
   const aggregations = Array.isArray(config?.aggregations)
     ? config.aggregations.filter((agg) => agg && typeof agg === "object")
     : [];
@@ -154,41 +203,55 @@ export function aggregateBucketRows(rows, config) {
   for (const row of sourceRows) {
     if (!row || typeof row !== "object") continue;
     const bucket = getBucketForRow(row, config);
-    if (!groups.has(bucket.key)) {
-      groups.set(bucket.key, {
-        key: bucket.key,
-        rawBucket: bucket.label,
-        sortValue: bucket.sortValue,
+    const groupKeyParts = [];
+    for (const col of groupByColumns) {
+      groupKeyParts.push(`${col}:${bucketKeyForValue(row?.[col])}`);
+    }
+    groupKeyParts.push(bucket.key);
+    const compositeKey = groupKeyParts.join("|");
+
+    if (!groups.has(compositeKey)) {
+      const dimensions = {};
+      for (const col of groupByColumns) {
+        dimensions[col] = subgroupLabelForValue(row?.[col]);
+      }
+      dimensions[bucketOutputColumn] = bucket.label;
+      groups.set(compositeKey, {
+        key: compositeKey,
+        sortValues: [
+          ...groupByColumns.map((col) => sortValueForDimension(row?.[col])),
+          bucket.sortValue,
+        ],
+        dimensions,
         firstRow: row,
         rows: [],
       });
     }
-    groups.get(bucket.key).rows.push(row);
+    groups.get(compositeKey).rows.push(row);
   }
 
   return Array.from(groups.values())
     .sort((a, b) => {
-      const av = a.sortValue;
-      const bv = b.sortValue;
-      if (typeof av === "number" && typeof bv === "number") return av - bv;
-      return String(av ?? "").localeCompare(String(bv ?? ""));
+      const av = a.sortValues || [];
+      const bv = b.sortValues || [];
+      for (let i = 0; i < Math.max(av.length, bv.length); i += 1) {
+        const cmp = compareSortValues(av[i], bv[i]);
+        if (cmp !== 0) return cmp;
+      }
+      return 0;
     })
     .flatMap((group) =>
       buildBucketOutputRows({
         bucketOutputColumn,
         bucketColumn,
+        groupByColumns,
         passthroughColumns,
         aggregations,
-        rawBucket: group.rawBucket ?? "",
+        initialDimensions: group.dimensions,
         rows: group.rows,
         firstRow: group.firstRow,
       }),
     );
-}
-
-function subgroupLabelForValue(raw) {
-  if (raw == null || raw === "") return "(empty)";
-  return raw;
 }
 
 function expandGroupsBySubgroup(leafGroups, agg) {
@@ -230,6 +293,34 @@ function computeMetricValue(rowsForAgg, agg, dimensions) {
       : rowsForAgg.length;
   }
 
+  if (type === "count_distinct") {
+    if (!valueColumn) return null;
+    const seen = new Set();
+    for (const row of rowsForAgg) {
+      const v = row?.[valueColumn];
+      if (v == null || v === "") continue;
+      seen.add(bucketKeyForValue(v));
+    }
+    return seen.size;
+  }
+
+  if (type === "conditional_count") {
+    return rowsForAgg.filter((row) => rowMatchesAggregationFilter(row, agg)).length;
+  }
+
+  if (type === "conditional_rate") {
+    if (!rowsForAgg.length) return null;
+    const matches = rowsForAgg.filter((row) => rowMatchesAggregationFilter(row, agg)).length;
+    return matches / rowsForAgg.length;
+  }
+
+  const numericValues = valueColumn ? numericValuesForColumn(rowsForAgg, valueColumn) : [];
+
+  if (type === "min") return numericValues.length ? Math.min(...numericValues) : null;
+  if (type === "max") return numericValues.length ? Math.max(...numericValues) : null;
+  if (type === "median") return median(numericValues);
+  if (type === "std_dev") return stdDev(numericValues);
+
   let sum = 0;
   let count = 0;
   let weightedSum = 0;
@@ -267,19 +358,27 @@ function computeMetricValue(rowsForAgg, agg, dimensions) {
 function buildBucketOutputRows({
   bucketOutputColumn,
   bucketColumn,
+  groupByColumns,
   passthroughColumns,
   aggregations,
-  rawBucket,
+  initialDimensions,
   rows,
   firstRow,
 }) {
   let leafGroups = [{
-    dimensions: { [bucketOutputColumn]: rawBucket },
+    dimensions: { ...initialDimensions },
     rows,
   }];
 
+  const reservedColumns = new Set([
+    bucketColumn,
+    bucketOutputColumn,
+    ...groupByColumns,
+    "_origIndex",
+  ]);
+
   for (const col of passthroughColumns) {
-    if (!col || col === bucketColumn || col === bucketOutputColumn || col === "_origIndex") continue;
+    if (!col || reservedColumns.has(col)) continue;
     leafGroups[0].dimensions[col] = firstRow?.[col] ?? null;
   }
 
@@ -294,7 +393,11 @@ function buildBucketOutputRows({
     if (!outputColumn) continue;
 
     leafGroups = leafGroups.map((group) => {
-      const rowsForAgg = group.rows.filter((row) => rowMatchesAggregationFilter(row, agg));
+      const aggType = String(agg.type || "count");
+      const usesConditionalLogic = aggType === "conditional_count" || aggType === "conditional_rate";
+      const rowsForAgg = usesConditionalLogic
+        ? group.rows
+        : group.rows.filter((row) => rowMatchesAggregationFilter(row, agg));
       return {
         ...group,
         dimensions: {
