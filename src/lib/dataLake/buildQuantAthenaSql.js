@@ -3,7 +3,14 @@
  */
 import { isValidColumnIdentifier, resolveAthenaTableName } from "./athenaTableMap.js";
 import { isDateLikeColumnName } from "./lakeTableColumns.js";
-import { epochBigintToSecondsExpr } from "./epochBigintSql.js";
+import { epochBigintToSecondsExpr, epochBigintToTimestampExpr } from "./epochBigintSql.js";
+
+const ATHENA_ISO_DATETIME = "'%Y-%m-%dT%H:%i:%s'";
+
+function formatLakeDatetimeSql(colExpr, columnName) {
+  if (!isDateLikeColumnName(columnName)) return colExpr;
+  return `date_format(${epochBigintToTimestampExpr(colExpr)}, ${ATHENA_ISO_DATETIME})`;
+}
 
 const SAFE_ALIAS = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -137,7 +144,9 @@ export function buildRelativePositionSnapshotAthenaSql({
     .filter((c) => c !== groupCol && c !== progressCol)
     .map((c) => {
       const src = joinCols.includes(c) ? quoteCol(joinOutputAlias(c)) : quoteCol(c);
-      return `r.${src} AS ${quoteCol(`selected_${c}`)}`;
+      const colExpr = `r.${src}`;
+      const outExpr = isDateLikeColumnName(c) ? formatLakeDatetimeSql(colExpr, c) : colExpr;
+      return `${outExpr} AS ${quoteCol(`selected_${c}`)}`;
     })
     .join(", ");
 
@@ -178,8 +187,7 @@ checkpoints AS (
 ranked AS (
   SELECT
     w.*,
-    c.checkpoint,
-    CONCAT(CAST(ROUND(c.checkpoint * 1000) / 10 AS VARCHAR), '%') AS lifecycle_checkpoint,
+    c.checkpoint AS lifecycle_checkpoint,
     ROW_NUMBER() OVER (
       PARTITION BY w.${bGroup}, c.checkpoint
       ORDER BY w.relative_position DESC
@@ -190,17 +198,16 @@ ranked AS (
 picked AS (
   SELECT
     r.${bGroup},
-    r.checkpoint,
     r.lifecycle_checkpoint,
     r.relative_position,
     ROUND(r.relative_position * 10000) / 100 AS relative_position_pct,
-    r.progress_num AS selected_progress_value
+    date_format(from_unixtime(r.progress_num), ${ATHENA_ISO_DATETIME}) AS selected_progress_value
     ${metricSelects ? `, ${metricSelects}` : ""}
   FROM ranked r
   WHERE r.rn = 1
 )
 SELECT * FROM picked
-ORDER BY ${bGroup}, checkpoint
+ORDER BY ${bGroup}, lifecycle_checkpoint
 LIMIT ${lim}
 `.trim();
 }

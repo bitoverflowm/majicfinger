@@ -59,7 +59,7 @@ test("relative position snapshot emits checkpoints per market", () => {
   });
   assert.equal(result.blocking.length, 0);
   assert.equal(result.rows.length, 6);
-  assert.ok(result.rows.every((r) => r.lifecycle_checkpoint));
+  assert.ok(result.rows.every((r) => r.lifecycle_checkpoint != null));
 });
 
 test("outcome mapping infers YES/NO", () => {

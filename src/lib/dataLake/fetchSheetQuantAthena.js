@@ -1,4 +1,5 @@
 import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
+import { normalizeQuantAthenaRows } from "@/lib/dataLake/normalizeQuantAthenaRows";
 
 /**
  * @param {object} payload
@@ -17,7 +18,7 @@ export async function fetchSheetQuantAthena(payload) {
   const colNames = Array.isArray(json.columns) ? json.columns : [];
   const rawRows = Array.isArray(json.rows) ? json.rows : [];
   return {
-    rows: athenaRowsToObjects(colNames, rawRows),
+    rows: normalizeQuantAthenaRows(athenaRowsToObjects(colNames, rawRows)),
     columns: colNames,
     rowCount: json.rowCount ?? rawRows.length,
     queryExecutionId: json.queryExecutionId,

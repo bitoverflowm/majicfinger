@@ -28,7 +28,7 @@ test("quant Athena SQL uses epoch seconds for created_time not bigint timestamp 
       endRule: "column",
       endColumn: "close_time",
       checkpoints: [0, 0.5, 1],
-      metricColumns: ["ticker", "title", "yes_price"],
+      metricColumns: ["ticker", "title", "yes_price", "close_time", "open_time"],
     },
     limit: 1000,
   });
@@ -36,5 +36,8 @@ test("quant Athena SQL uses epoch seconds for created_time not bigint timestamp 
   assert.ok(!sql.includes("b.*"), "must not use b.* to avoid duplicate join column names");
   assert.ok(!sql.includes("CAST(j.\"created_time\" AS timestamp)"), "must not cast bigint epoch to timestamp");
   assert.ok(sql.includes('PARTITION BY j."ticker"'), "window partitions must qualify group column");
-  assert.ok(sql.includes("r.checkpoint,"), "picked output must include checkpoint for ORDER BY");
+  assert.ok(sql.includes("c.checkpoint AS lifecycle_checkpoint"), "lifecycle_checkpoint must be numeric fraction");
+  assert.ok(!sql.includes("'%')"), "lifecycle_checkpoint must not use percent labels");
+  assert.ok(sql.includes("date_format(from_unixtime(r.progress_num)"), "progress value must be ISO datetime");
+  assert.ok(sql.includes("date_format(") && sql.includes("selected_close_time"), "date metrics must be formatted");
 });

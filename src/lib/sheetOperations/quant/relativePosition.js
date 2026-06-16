@@ -3,7 +3,6 @@ import {
   DEFAULT_SNAPSHOT_CHECKPOINTS,
   finiteMinMax,
   formatBucketLabel,
-  formatCheckpointLabel,
   parseProgressValue,
   uniqueFreeColumnName,
 } from "./columnInference.js";
@@ -395,7 +394,7 @@ export function computeRelativePosition(rows, config) {
         const rp = relativePositionForRow(progress, start, end);
         const record = {
           ...(groupColumn ? { [groupColumn]: groupValue } : {}),
-          [checkpointCol]: formatCheckpointLabel(cp),
+          [checkpointCol]: cp,
           [outputPositionCol]: rp,
           [outputPctCol]: rp == null ? null : Math.round(rp * 10000) / 100,
         };
