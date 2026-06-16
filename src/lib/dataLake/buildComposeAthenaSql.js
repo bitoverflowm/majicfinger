@@ -377,30 +377,7 @@ function divisorForScale(scale) {
   return 1;
 }
 
-/**
- * Bigint epoch seconds/ms/us/ns → Presto timestamp.
- *
- * We infer the unit from magnitude to handle sources that store timestamps in
- * different epochs (e.g. milliseconds: 1617235200000, nanoseconds: 1748638362006115000).
- *
- * Athena/Presto `from_unixtime` expects seconds.
- * @param {string} colExpr SQL expression for a column (e.g. `t0."created_at"`)
- */
-function epochBigintToTimestampExpr(colExpr) {
-  // NOTE: We cast to DOUBLE because Athena doesn't consistently allow integer division on huge bigint epochs.
-  // The thresholds are chosen by typical epoch ranges:
-  // - seconds: ~1e9-1e10
-  // - milliseconds: ~1e12-1e13
-  // - microseconds: ~1e15-1e16
-  // - nanoseconds: ~1e18-1e19
-  return `from_unixtime(CASE
-    WHEN ${colExpr} IS NULL THEN NULL
-    WHEN ABS(CAST(${colExpr} AS DOUBLE)) >= 1e17 THEN CAST(${colExpr} AS DOUBLE) / 1e9
-    WHEN ABS(CAST(${colExpr} AS DOUBLE)) >= 1e14 THEN CAST(${colExpr} AS DOUBLE) / 1e6
-    WHEN ABS(CAST(${colExpr} AS DOUBLE)) >= 1e11 THEN CAST(${colExpr} AS DOUBLE) / 1e3
-    ELSE CAST(${colExpr} AS DOUBLE)
-  END)`;
-}
+import { epochBigintToTimestampExpr } from "./epochBigintSql.js";
 
 /**
  * @param {string | null | undefined} hiveType

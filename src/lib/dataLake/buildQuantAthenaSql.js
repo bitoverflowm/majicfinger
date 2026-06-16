@@ -1,8 +1,9 @@
 /**
  * Validated Athena SQL for quant operations (relative position snapshots, etc.).
  */
-import { isValidColumnIdentifier, resolveAthenaTableName } from "./athenaTableMap";
-import { isDateLikeColumnName } from "./lakeTableColumns";
+import { isValidColumnIdentifier, resolveAthenaTableName } from "./athenaTableMap.js";
+import { isDateLikeColumnName } from "./lakeTableColumns.js";
+import { epochBigintToSecondsExpr } from "./epochBigintSql.js";
 
 const SAFE_ALIAS = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -24,10 +25,11 @@ function quoteTable(physical) {
 function progressNumericExpr(colRef, columnName) {
   const name = String(columnName || "").toLowerCase();
   if (isDateLikeColumnName(name)) {
+    // Kalshi/Polymarket time columns are often bigint epoch — never CAST(bigint AS timestamp).
     return `COALESCE(
-      TRY(CAST(${colRef} AS DOUBLE)),
-      TRY(to_unixtime(CAST(${colRef} AS timestamp))),
-      TRY(to_unixtime(from_iso8601_timestamp(CAST(${colRef} AS varchar))))
+      ${epochBigintToSecondsExpr(colRef)},
+      TRY(to_unixtime(from_iso8601_timestamp(CAST(${colRef} AS varchar)))),
+      TRY(CAST(${colRef} AS DOUBLE))
     )`;
   }
   return `TRY(CAST(${colRef} AS DOUBLE))`;
@@ -100,25 +102,43 @@ export function buildRelativePositionSnapshotAthenaSql({
   const bLeft = quoteCol(leftKey);
   const jRight = quoteCol(rightKey);
 
+  const baseOutputCols = new Set([
+    groupCol,
+    ...(endRule === "column" && endCol ? [endCol] : []),
+    ...metricCols.filter((c) => !joinCols.includes(c) || c === groupCol),
+  ]);
+
+  const joinOutputAlias = (col) => (baseOutputCols.has(col) ? `j_${col}` : col);
+
+  const baseSelectParts = [
+    `b.${bGroup} AS ${bGroup}`,
+    ...(endRule === "column" && endCol && isValidColumnIdentifier(endCol)
+      ? [`b.${quoteCol(endCol)} AS ${quoteCol(endCol)}`]
+      : []),
+    ...metricCols
+      .filter((c) => c !== groupCol && c !== endCol && isValidColumnIdentifier(c))
+      .map((c) => `b.${quoteCol(c)} AS ${quoteCol(c)}`),
+  ];
+
+  const joinSelectParts = joinCols.map((c) => {
+    const alias = joinOutputAlias(c);
+    return `j.${quoteCol(c)} AS ${quoteCol(alias)}`;
+  });
+
   const progressOnJoin = joinCols.includes(progressCol);
-  const progressRef = progressOnJoin ? `j.${quoteCol(progressCol)}` : `b.${quoteCol(progressCol)}`;
+  const progressRef = progressOnJoin
+    ? `j.${quoteCol(progressCol)}`
+    : `b.${quoteCol(progressCol)}`;
   const progressExpr = progressNumericExpr(progressRef, progressCol);
-
-  const endExpr =
-    endRule === "column" && endCol && isValidColumnIdentifier(endCol)
-      ? progressNumericExpr(`b.${quoteCol(endCol)}`, endCol)
-      : `MAX(progress_num)`;
-
-  const joinExtraCols = joinCols
-    .filter((c) => c !== progressCol)
-    .map((c) => `j.${quoteCol(c)}`)
-    .join(", ");
 
   const checkpointValues = checkpoints.map((c) => `(${c})`).join(", ");
 
   const metricSelects = metricCols
     .filter((c) => c !== groupCol && c !== progressCol)
-    .map((c) => `r.${quoteCol(c)} AS ${quoteCol(`selected_${c}`)}`)
+    .map((c) => {
+      const src = joinCols.includes(c) ? quoteCol(joinOutputAlias(c)) : quoteCol(c);
+      return `r.${src} AS ${quoteCol(`selected_${c}`)}`;
+    })
     .join(", ");
 
   const lim = Math.max(1, Math.floor(limit));
@@ -126,9 +146,7 @@ export function buildRelativePositionSnapshotAthenaSql({
   return `
 joined AS (
   SELECT
-    b.*,
-    ${joinExtraCols ? `${joinExtraCols},` : ""}
-    ${progressExpr} AS progress_num
+    ${[...baseSelectParts, ...joinSelectParts, `${progressExpr} AS progress_num`].join(",\n    ")}
   FROM ${base} b
   ${joinType} JOIN ${quoteTable(physical)} j
     ON CAST(b.${bLeft} AS VARCHAR) = CAST(j.${jRight} AS VARCHAR)
@@ -137,11 +155,11 @@ joined AS (
 with_bounds AS (
   SELECT
     j.*,
-    MIN(progress_num) OVER (PARTITION BY ${bGroup}) AS progress_start,
+    MIN(progress_num) OVER (PARTITION BY j.${bGroup}) AS progress_start,
     ${
       endRule === "column" && endCol
-        ? `MAX(${progressNumericExpr(`j.${quoteCol(endCol)}`, endCol)}) OVER (PARTITION BY ${bGroup})`
-        : "MAX(progress_num) OVER (PARTITION BY " + bGroup + ")"
+        ? `MAX(${progressNumericExpr(`j.${quoteCol(endCol)}`, endCol)}) OVER (PARTITION BY j.${bGroup})`
+        : `MAX(progress_num) OVER (PARTITION BY j.${bGroup})`
     } AS progress_end
   FROM joined j
 ),
@@ -172,6 +190,7 @@ ranked AS (
 picked AS (
   SELECT
     r.${bGroup},
+    r.checkpoint,
     r.lifecycle_checkpoint,
     r.relative_position,
     ROUND(r.relative_position * 10000) / 100 AS relative_position_pct,
