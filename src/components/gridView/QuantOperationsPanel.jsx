@@ -20,7 +20,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { createSheetOperation } from "@/lib/projectPersistence";
+import { createSheetOperation, sheetHasComposeProvenance } from "@/lib/projectPersistence";
+import { buildSheetGraphForAthena } from "@/lib/dataLake/buildSheetGraph";
+import { fetchSheetQuantAthena } from "@/lib/dataLake/fetchSheetQuantAthena";
+import { QuantAthenaJoinFields } from "@/components/gridView/QuantAthenaJoinFields";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import {
   DEFAULT_BUCKET_RANGES,
@@ -129,6 +132,8 @@ export function QuantOperationsPanel({
   nextFreeColumnName,
   mathDestination = "new_sheet",
   activeSheetId,
+  activeSheet = null,
+  dataSheets = {},
   addNewSheetAndActivate,
   setSheetData,
   setDataSheets,
@@ -182,6 +187,19 @@ export function QuantOperationsPanel({
   const [pmStep, setPmStep] = useState("confirm");
   const [pmSetup, setPmSetup] = useState(null);
 
+  const [athenaCloudPull, setAthenaCloudPull] = useState(false);
+  const [joinLake, setJoinLake] = useState("kalshi");
+  const [joinTable, setJoinTable] = useState("trades");
+  const [joinType, setJoinType] = useState("inner");
+  const [joinLeftKey, setJoinLeftKey] = useState("");
+  const [joinRightKey, setJoinRightKey] = useState("ticker");
+  const [joinColumns, setJoinColumns] = useState(["created_time", "yes_price"]);
+
+  const canUseAthena = useMemo(
+    () => sheetHasComposeProvenance(activeSheet) && Boolean(activeSheetId),
+    [activeSheet, activeSheetId],
+  );
+
   const suggestedGroup = useMemo(() => suggestGroupColumn(columnNames), [columnNames]);
   const suggestedProgress = useMemo(() => suggestProgressColumn(columnNames), [columnNames]);
   const suggestedEnd = useMemo(() => suggestEndColumn(columnNames), [columnNames]);
@@ -199,7 +217,26 @@ export function QuantOperationsPanel({
     setBrierGroupColumn((prev) => (prev && columnNames.includes(prev) ? prev : suggestedGroup));
     if (isPmData) setMode("snapshot");
     setPmSetup(inferPredictionMarketSetup(rows, columnNames));
+    setJoinLeftKey((prev) => (prev && columnNames.includes(prev) ? prev : suggestedGroup || "ticker"));
   }, [columnNames, rows, suggestedGroup, suggestedProgress, suggestedEnd, isPmData]);
+
+  useEffect(() => {
+    const lake = activeSheet?.provenance?.lake;
+    if (lake === "kalshi" || lake === "polymarket") setJoinLake(lake);
+  }, [activeSheet?.provenance?.lake]);
+
+  useEffect(() => {
+    if (!canUseAthena || operation !== "relative_position") return;
+    if (previewBlocking.length > 0) {
+      setAthenaCloudPull(true);
+      setMode("snapshot");
+      if (joinColumns.includes("created_time")) {
+        setProgressColumn("created_time");
+      } else if (joinColumns.includes("timestamp")) {
+        setProgressColumn("timestamp");
+      }
+    }
+  }, [canUseAthena, operation, previewBlocking.length, joinColumns]);
 
   useEffect(() => {
     onBusyChange?.(busy);
@@ -281,6 +318,18 @@ export function QuantOperationsPanel({
       return;
     }
     if (operation === "relative_position") {
+      if (athenaCloudPull && canUseAthena) {
+        setPreviewBlocking([]);
+        setPreviewWarnings([
+          {
+            id: "athena_mode",
+            blocking: false,
+            message:
+              "Cloud mode joins trades on Athena and returns checkpoint snapshots only (~groups × checkpoints rows), not full trade history.",
+          },
+        ]);
+        return;
+      }
       if (!isProgressColumnSupported(rows, progressColumn)) {
         setPreviewBlocking([
           {
@@ -313,7 +362,7 @@ export function QuantOperationsPanel({
       setPreviewWarnings(result.warnings);
       setPreviewBlocking(result.blocking);
     }
-  }, [operation, rows, progressColumn, relativeConfig, probabilityColumn, outcomeColumn, pmSetup]);
+  }, [operation, rows, progressColumn, relativeConfig, probabilityColumn, outcomeColumn, pmSetup, athenaCloudPull, canUseAthena]);
 
   const toggleMetricColumn = (col) => {
     setMetricColumns((prev) => (prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col]));
@@ -355,7 +404,87 @@ export function QuantOperationsPanel({
     [activeSheetId, setDataSheets, setDataTypes, setSheetData],
   );
 
+  const applyRelativePositionAthena = useCallback(async () => {
+    const sheetGraph = buildSheetGraphForAthena(activeSheetId, dataSheets);
+    if (!sheetGraph) {
+      toast.error("Cloud quant needs a sheet from a Data Lake pull (saved provenance).");
+      return false;
+    }
+    const colsForJoin = [...joinColumns];
+    if (progressColumn && !colsForJoin.includes(progressColumn)) colsForJoin.push(progressColumn);
+
+    setBusy(true);
+    setProgress(15);
+    setProgressLabel("Joining trades on Athena…");
+    try {
+      const { rows: outRows } = await fetchSheetQuantAthena({
+        sheetGraph,
+        rootSheetId: activeSheetId,
+        join: {
+          lake: joinLake,
+          table: joinTable,
+          joinType,
+          leftKeyColumn: joinLeftKey || groupColumn,
+          rightKeyColumn: joinRightKey,
+          columns: colsForJoin,
+        },
+        quant: {
+          groupColumn,
+          progressColumn,
+          endRule,
+          endColumn: endRule === "column" ? endColumn : "",
+          checkpoints: parseCheckpoints(),
+          metricColumns: metricColumns.length ? metricColumns : [progressColumn],
+          mode: "snapshot",
+          snapshotRule,
+        },
+      });
+      if (!outRows.length) {
+        toast.error("Athena returned no snapshot rows. Check join keys and progress column.");
+        return false;
+      }
+      setProgress(90);
+      setProgressLabel("Writing results…");
+      const op = createSheetOperation("quant.relative_position.athena", {
+        join: { lake: joinLake, table: joinTable, leftKeyColumn: joinLeftKey, rightKeyColumn: joinRightKey },
+        quant: { groupColumn, progressColumn, checkpoints: parseCheckpoints() },
+      });
+      await new Promise((resolve) => {
+        addNewSheetAndActivate?.((newId) => {
+          writeSheet(newId, outRows, "Lifecycle Snapshots (Athena)", op);
+          resolve();
+        });
+      });
+      toast.success(`Created Athena lifecycle snapshots (${outRows.length.toLocaleString()} rows).`);
+      return true;
+    } catch (e) {
+      toast.error(e?.message || "Athena quant operation failed.");
+      return false;
+    }
+  }, [
+    activeSheetId,
+    dataSheets,
+    joinColumns,
+    joinLake,
+    joinTable,
+    joinType,
+    joinLeftKey,
+    joinRightKey,
+    groupColumn,
+    progressColumn,
+    endRule,
+    endColumn,
+    parseCheckpoints,
+    metricColumns,
+    snapshotRule,
+    addNewSheetAndActivate,
+    writeSheet,
+  ]);
+
   const applyRelativePosition = useCallback(async () => {
+    if (athenaCloudPull && canUseAthena) {
+      return applyRelativePositionAthena();
+    }
     const result = computeRelativePosition(rows, relativeConfig);
     if (result.blocking.length) {
       toast.error(result.blocking[0].message);
@@ -383,6 +512,9 @@ export function QuantOperationsPanel({
     }
     return true;
   }, [
+    athenaCloudPull,
+    canUseAthena,
+    applyRelativePositionAthena,
     rows,
     relativeConfig,
     mode,
@@ -533,12 +665,39 @@ export function QuantOperationsPanel({
 
   const canSubmit = useMemo(() => {
     if (!rows.length || busy) return false;
+    if (operation === "relative_position" && athenaCloudPull && canUseAthena) {
+      return Boolean(
+        groupColumn &&
+          progressColumn &&
+          joinLeftKey &&
+          joinRightKey &&
+          joinColumns.includes(progressColumn) &&
+          parseCheckpoints().length,
+      );
+    }
     if (previewBlocking.length) return false;
     if (operation === "relative_position") return Boolean(progressColumn);
     if (operation === "brier_score") return Boolean(probabilityColumn && outcomeColumn);
     if (operation === "pm_preset") return pmStep === "confirm" && pmSetup?.progressSupported && pmSetup?.probabilityValid;
     return false;
-  }, [rows, busy, previewBlocking, operation, progressColumn, probabilityColumn, outcomeColumn, pmStep, pmSetup]);
+  }, [
+    rows,
+    busy,
+    previewBlocking,
+    operation,
+    progressColumn,
+    probabilityColumn,
+    outcomeColumn,
+    pmStep,
+    pmSetup,
+    athenaCloudPull,
+    canUseAthena,
+    groupColumn,
+    joinLeftKey,
+    joinRightKey,
+    joinColumns,
+    parseCheckpoints,
+  ]);
 
   useEffect(() => {
     onCanSubmitChange?.(canSubmit);
@@ -549,8 +708,54 @@ export function QuantOperationsPanel({
     [rows, outcomeColumn],
   );
 
-  const renderRelativePositionForm = () => (
+  const renderRelativePositionForm = () => {
+    const progressOptions = athenaCloudPull
+      ? [...new Set([...joinColumns, ...columnNames])]
+      : columnNames;
+
+    return (
     <div className="space-y-3">
+      {canUseAthena ? (
+        <div className="space-y-2 rounded-lg border border-sky-200/80 bg-sky-50/50 p-3 dark:border-sky-900 dark:bg-sky-950/20">
+          <label className="flex items-start gap-2 text-xs cursor-pointer">
+            <Checkbox
+              checked={athenaCloudPull}
+              onCheckedChange={(v) => {
+                setAthenaCloudPull(!!v);
+                if (v) setMode("snapshot");
+              }}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Expand data with direct cloud pull to save compute</span>
+              <span className="mt-0.5 block text-[10px] text-muted-foreground leading-snug">
+                Join trades on Athena, compute relative position snapshots server-side, and pull back only checkpoint rows.
+              </span>
+            </span>
+          </label>
+        </div>
+      ) : null}
+      {athenaCloudPull && canUseAthena ? (
+        <QuantAthenaJoinFields
+          lake={joinLake}
+          joinTable={joinTable}
+          onLakeTableChange={(l, t) => {
+            setJoinLake(l);
+            setJoinTable(t);
+          }}
+          leftKeyColumn={joinLeftKey}
+          onLeftKeyChange={setJoinLeftKey}
+          rightKeyColumn={joinRightKey}
+          onRightKeyChange={setJoinRightKey}
+          joinType={joinType}
+          onJoinTypeChange={setJoinType}
+          selectedJoinColumns={joinColumns}
+          onToggleJoinColumn={(c) => {
+            setJoinColumns((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+          }}
+          baseColumnNames={columnNames}
+        />
+      ) : null}
       <ColumnSelect
         label="What are we comparing?"
         value={groupColumn}
@@ -562,8 +767,14 @@ export function QuantOperationsPanel({
         label="What defines progress?"
         value={progressColumn}
         onChange={setProgressColumn}
-        columns={columnNames}
-        helper={suggestedProgress ? `Suggested progress column: ${suggestedProgress}` : undefined}
+        columns={progressOptions}
+        helper={
+          athenaCloudPull
+            ? "Use a trades column (e.g. created_time) — not the market close_time."
+            : suggestedProgress
+              ? `Suggested progress column: ${suggestedProgress}`
+              : undefined
+        }
       />
       <div className="space-y-1">
         <Label className="text-xs">How should Lychee compare progress?</Label>
@@ -695,7 +906,8 @@ export function QuantOperationsPanel({
         </CollapsibleContent>
       </Collapsible>
     </div>
-  );
+    );
+  };
 
   const renderBrierScoreForm = () => (
     <div className="space-y-3">
@@ -832,7 +1044,10 @@ export function QuantOperationsPanel({
       {operation === "brier_score" ? renderBrierScoreForm() : null}
       {operation === "pm_preset" ? renderPmPreset() : null}
 
-      <WarningsList warnings={previewWarnings} blocking={previewBlocking} />
+      <WarningsList
+        warnings={previewWarnings}
+        blocking={athenaCloudPull && canUseAthena ? [] : previewBlocking}
+      />
 
       {busy ? (
         <ConnectProgressWithLabel label={progressLabel || "Running…"} progress={progress} />
@@ -844,7 +1059,11 @@ export function QuantOperationsPanel({
             Cancel
           </Button>
           <Button type="button" size="sm" onClick={() => void handleApply()} disabled={!canSubmit || busy}>
-            {operation === "pm_preset" ? "Run Analysis" : "Apply to sheet"}
+            {athenaCloudPull && canUseAthena && operation === "relative_position"
+              ? "Run on Athena"
+              : operation === "pm_preset"
+                ? "Run Analysis"
+                : "Apply to sheet"}
           </Button>
         </div>
       ) : (

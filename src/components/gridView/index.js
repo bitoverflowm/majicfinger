@@ -4606,6 +4606,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
                             nextFreeColumnName={nextFreeResultColumnName()}
                             mathDestination={mathDestination}
                             activeSheetId={activeSheetId}
+                            activeSheet={activeSheet}
+                            dataSheets={dataSheets}
                             addNewSheetAndActivate={addNewSheetAndActivate}
                             setSheetData={setSheetData}
                             setDataSheets={setDataSheets}
