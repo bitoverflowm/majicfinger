@@ -2,7 +2,7 @@
  * Validated Athena SQL for quant operations (relative position snapshots, etc.).
  */
 import { isValidColumnIdentifier, resolveAthenaTableName } from "./athenaTableMap.js";
-import { isDateLikeColumnName } from "./lakeTableColumns.js";
+import { isColumnAllowedOnLakeTable, isDateLikeColumnName } from "./lakeTableColumns.js";
 import { epochBigintToSecondsExpr, epochBigintToTimestampExpr } from "./epochBigintSql.js";
 
 const ATHENA_ISO_DATETIME = "'%Y-%m-%dT%H:%i:%s'";
@@ -98,9 +98,9 @@ export function buildRelativePositionSnapshotAthenaSql({
   }
 
   const joinType = String(join?.joinType || "inner").toLowerCase() === "left" ? "LEFT" : "INNER";
-  const joinCols = Array.isArray(join?.columns)
-    ? join.columns.filter((c) => isValidColumnIdentifier(String(c)))
-    : [];
+  const joinCols = (Array.isArray(join?.columns) ? join.columns : [])
+    .filter((c) => isValidColumnIdentifier(String(c)))
+    .filter((c) => isColumnAllowedOnLakeTable(lake, joinTable, c));
   const metricCols = (Array.isArray(quant?.metricColumns) ? quant.metricColumns : [])
     .map((m) => (typeof m === "string" ? m : m?.column))
     .filter((c) => isValidColumnIdentifier(String(c || "")));
@@ -139,6 +139,17 @@ export function buildRelativePositionSnapshotAthenaSql({
   const progressExpr = progressNumericExpr(progressRef, progressCol);
 
   const checkpointValues = checkpoints.map((c) => `(${c})`).join(", ");
+  const snapshotRule = String(quant?.snapshotRule || "latest_before").toLowerCase();
+
+  let checkpointJoinSql = "w.relative_position IS NOT NULL AND w.relative_position <= c.checkpoint";
+  let snapshotOrderSql = "w.relative_position DESC, w.progress_num DESC";
+  if (snapshotRule === "first_after") {
+    checkpointJoinSql = "w.relative_position IS NOT NULL AND w.relative_position >= c.checkpoint";
+    snapshotOrderSql = "w.relative_position ASC, w.progress_num ASC";
+  } else if (snapshotRule === "closest") {
+    checkpointJoinSql = "w.relative_position IS NOT NULL";
+    snapshotOrderSql = "ABS(w.relative_position - c.checkpoint) ASC, w.progress_num DESC";
+  }
 
   const metricSelects = metricCols
     .filter((c) => c !== groupCol && c !== progressCol)
@@ -190,10 +201,10 @@ ranked AS (
     c.checkpoint AS lifecycle_checkpoint,
     ROW_NUMBER() OVER (
       PARTITION BY w.${bGroup}, c.checkpoint
-      ORDER BY w.relative_position DESC
+      ORDER BY ${snapshotOrderSql}
     ) AS rn
   FROM with_position w
-  INNER JOIN checkpoints c ON w.relative_position IS NOT NULL AND w.relative_position <= c.checkpoint
+  INNER JOIN checkpoints c ON ${checkpointJoinSql}
 ),
 picked AS (
   SELECT

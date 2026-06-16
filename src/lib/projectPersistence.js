@@ -346,19 +346,22 @@ export function stripQuantRecipeSheetsForPersist(dataSheets) {
       sheet,
       Array.isArray(sheet?.data) ? sheet.data.length : 0,
     );
+    const rows = Array.isArray(sheet?.data) ? sheet.data : [];
+    const preview = rows.slice(0, PROJECT_MIN_PREVIEW_ROW_LIMIT);
     acc[sheetId] = {
       ...sheet,
-      data: [],
+      data: preview,
       storageMode: "derived",
-      previewRowCount: 0,
+      previewRowCount: preview.length,
       rowCount: fullRowCount || sheet.rowCount || 0,
       fullRowCount: fullRowCount || sheet.fullRowCount || sheet.rowCount || 0,
-      rehydrationStatus: "pending",
+      rehydrationStatus: preview.length ? "preview" : "pending",
       saveMeta: {
         ...(sheet.saveMeta && typeof sheet.saveMeta === "object" ? sheet.saveMeta : {}),
         recipeOnly: true,
         persistRows: false,
         fullRowCount,
+        previewHash: preview.length ? hashJson(preview) : sheet?.saveMeta?.previewHash || null,
       },
     };
     return acc;

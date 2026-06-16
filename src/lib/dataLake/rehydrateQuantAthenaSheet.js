@@ -1,5 +1,6 @@
 import { buildSheetGraphForAthena } from "@/lib/dataLake/buildSheetGraph";
 import { fetchSheetQuantAthena } from "@/lib/dataLake/fetchSheetQuantAthena";
+import { restoreQuantAthenaReplayConfig } from "@/lib/dataLake/restoreQuantAthenaReplayConfig";
 import { findQuantAthenaOperation } from "@/lib/projectPersistence";
 
 /**
@@ -29,23 +30,12 @@ export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheet
     );
   }
 
-  const join = op.join && typeof op.join === "object" ? op.join : {};
-  const quant = { mode: "snapshot", ...(op.quant && typeof op.quant === "object" ? op.quant : {}) };
-  let joinColumns = Array.isArray(join.columns) ? join.columns.filter(Boolean) : [];
-  if (!joinColumns.length) {
-    joinColumns = [
-      ...new Set(
-        [
-          quant.progressColumn,
-          ...(Array.isArray(quant.metricColumns) ? quant.metricColumns : []),
-        ].filter(Boolean),
-      ),
-    ];
-  }
-  if (!joinColumns.length) joinColumns = ["created_time"];
-  const progressColumn = String(quant.progressColumn || "").trim();
-  const colsForJoin = [...joinColumns];
-  if (progressColumn && !colsForJoin.includes(progressColumn)) colsForJoin.push(progressColumn);
+  const { join, quant } = restoreQuantAthenaReplayConfig({
+    sheet,
+    operation: op,
+    dataSheets,
+    rootSheetId,
+  });
 
   const { rows, rowCount } = await fetchSheetQuantAthena({
     sheetGraph,
@@ -56,7 +46,7 @@ export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheet
       joinType: join.joinType || "inner",
       leftKeyColumn: join.leftKeyColumn || quant.groupColumn,
       rightKeyColumn: join.rightKeyColumn || join.leftKeyColumn || quant.groupColumn,
-      columns: colsForJoin,
+      columns: join.columns,
     },
     quant,
   });

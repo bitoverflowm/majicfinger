@@ -40,4 +40,5 @@ test("quant Athena SQL uses epoch seconds for created_time not bigint timestamp 
   assert.ok(!sql.includes("'%')"), "lifecycle_checkpoint must not use percent labels");
   assert.ok(sql.includes("date_format(from_unixtime(r.progress_num)"), "progress value must be ISO datetime");
   assert.ok(sql.includes("date_format(") && sql.includes("selected_close_time"), "date metrics must be formatted");
+  assert.ok(sql.includes("w.progress_num DESC"), "latest_before must break ties on latest progress");
 });
