@@ -3073,7 +3073,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
             activeSheetId,
             setDataSheets,
             setActiveSheetId,
-            setConnectedData,
             setChartSheets,
             liveStreamActions,
         });
@@ -3109,7 +3108,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
         setChartSheets,
         setConnectDataLakePullState,
         setConnectHomeAnalyzeActive,
-        setConnectedData,
         setDataSheets,
         viewing,
     ]);

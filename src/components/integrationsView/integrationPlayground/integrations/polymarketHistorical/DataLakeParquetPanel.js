@@ -3606,7 +3606,6 @@ export default function DataLakeParquetPanel({
         activeSheetId,
         setDataSheets,
         setActiveSheetId,
-        setConnectedData,
         setChartSheets,
       });
       setConnectDataLakePullState?.({
@@ -3624,7 +3623,6 @@ export default function DataLakeParquetPanel({
     [
       setDataSheets,
       setActiveSheetId,
-      setConnectedData,
       activeSheetId,
       dataSheets,
       setChartSheets,

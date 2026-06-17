@@ -2,6 +2,8 @@
  * Remove a data sheet from workspace state (tabs, rows, chart scoped keys).
  */
 
+import { flushSync } from "react-dom";
+
 function sortSheetIds(ids) {
   return [...ids].sort((a, b) => {
     const na = parseInt(String(a).replace(/\D/g, ""), 10) || 0;
@@ -177,7 +179,6 @@ export function computeRemoveDataSheetResult(dataSheets, sheetId, activeSheetId)
  *   activeSheetId?: string | null,
  *   setDataSheets?: (next: Record<string, object> | ((prev: Record<string, object>) => Record<string, object>)) => void,
  *   setActiveSheetId?: (id: string) => void,
- *   setConnectedData?: (rows: unknown[]) => void,
  *   setChartSheets?: (fn: (prev: Record<string, object>) => Record<string, object>) => void,
  *   liveStreamActions?: { stop?: (sheetId: string) => void },
  * }} params
@@ -189,7 +190,6 @@ export function removeDataSheetFromWorkspace({
   activeSheetId,
   setDataSheets,
   setActiveSheetId,
-  setConnectedData,
   setChartSheets,
   liveStreamActions,
 }) {
@@ -199,9 +199,13 @@ export function removeDataSheetFromWorkspace({
   for (const id of result.deletedSheetIds || [sheetId]) {
     liveStreamActions?.stop?.(id);
   }
-  setDataSheets(result.dataSheets);
-  setActiveSheetId?.(result.activeSheetId);
-  setConnectedData?.(result.connectedData);
+  // Apply sheet map + active tab together. Do not call setConnectedData here — connected rows
+  // are derived from dataSheets[activeSheetId], and a stale activeSheetId would resurrect the
+  // deleted tab (often as a duplicate "Sheet 1" filled with the remaining sheet's rows).
+  flushSync(() => {
+    setDataSheets(result.dataSheets);
+    setActiveSheetId?.(result.activeSheetId);
+  });
 
   if (setChartSheets && result.idMap) {
     setChartSheets((prevCharts) => remapChartSheetsForSheetIdMap(prevCharts, result.idMap));
