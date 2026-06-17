@@ -606,6 +606,18 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     void runPullRef.current();
   }, [connectHomeActive, connectIntegrationPullTick]);
 
+  const connectDataLakePullAbortRef = ctx.connectDataLakePullAbortRef;
+  useEffect(() => {
+    if (!connectHomeActive || !connectDataLakePullAbortRef) return;
+    connectDataLakePullAbortRef.current = () => {
+      pullGenerationRef.current += 1;
+      abortRef.current?.abort();
+    };
+    return () => {
+      connectDataLakePullAbortRef.current = null;
+    };
+  }, [connectHomeActive, connectDataLakePullAbortRef]);
+
   useEffect(() => {
     return () => {
       pullGenerationRef.current += 1;

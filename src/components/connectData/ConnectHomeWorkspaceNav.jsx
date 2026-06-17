@@ -19,7 +19,6 @@ import {
 import { AmberCancelButton } from "@/components/primitives/destructive-icon-button";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
-  connectHomeAnySheetHasData,
   isConnectUserDataPullActive,
 } from "@/lib/connectHomePullDestination";
 import { resolvePaletteSeedForNewChart } from "@/lib/chartPaletteSnapshot";
@@ -242,7 +241,6 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const connectDataLakePullState = ctx?.connectDataLakePullState ?? {};
   const cancelConnectDataFeedPull = ctx?.cancelConnectDataFeedPull;
 
-  const connectedData = ctx?.connectedData ?? [];
   const connectHomeAnalyzeActive = !!ctx?.connectHomeAnalyzeActive;
   const sheetPullViewActive =
     connectHomeCenterView !== CONNECT_HOME_CENTER_VIEW.CHARTS &&
@@ -253,7 +251,6 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     isConnectUserDataPullActive(connectDataLakePullState, {
       analyzeActive: connectHomeAnalyzeActive,
     });
-  const cancelPullKeepsDashboard = connectHomeAnySheetHasData(dataSheets, connectedData);
 
   const dataSheetIds = useMemo(() => Object.keys(dataSheets || {}), [dataSheets]);
   const chartSheetIds = useMemo(
@@ -369,7 +366,8 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
 
   const handleCancelDataPull = useCallback(() => {
     cancelConnectDataFeedPull?.();
-  }, [cancelConnectDataFeedPull]);
+    openIntegrationsPanel();
+  }, [cancelConnectDataFeedPull, openIntegrationsPanel]);
 
   const workspaceTabItems = useMemo(() => {
     const items = [];
@@ -431,9 +429,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
                 </span>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
-                {cancelPullKeepsDashboard
-                  ? "Cancel data pull and return to your sheet"
-                  : "Cancel data pull and return to query builder"}
+                Cancel data pull and return to integrations with your selections
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

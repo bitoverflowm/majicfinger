@@ -1765,6 +1765,17 @@ export default function DataLakeParquetPanel({
     };
   }, [connectHomeDataLakeCompose, connectLargePullApplyRef, handleLargePullViewDataTable]);
 
+  const connectDataLakePullAbortRef = ctx?.connectDataLakePullAbortRef;
+  useEffect(() => {
+    if (!connectHomeDataLakeCompose || !connectDataLakePullAbortRef) return;
+    connectDataLakePullAbortRef.current = () => {
+      ingestAbortControllerRef.current?.abort();
+    };
+    return () => {
+      connectDataLakePullAbortRef.current = null;
+    };
+  }, [connectHomeDataLakeCompose, connectDataLakePullAbortRef]);
+
   const renderLargePullPanel = () =>
     largePull ? (
       <LargeAthenaPullPanel

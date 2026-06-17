@@ -1,0 +1,1550 @@
+---
+title: "When Do Prediction Markets Become Accurate? A Kalshi Political Market Lifecycle Analysis"
+description: "Are prediction markets accurate? We analyzed 3,189 resolved Kalshi political prediction markets across 25,552 lifecycle snapshots to measure when market odds become reliable."
+publishedAt: "2026-06-17"
+author: "misterrpink"
+topics: ["kalshi", "prediction markets", "politics", "market accuracy", "forecasting", "brier score", "historical data", "market analysis"]
+integration: ["Kalshi", "Lychee", "Kalshi_Historical"]
+coverImage: "/images/guides/kalshi-historical-political-prediction-market-accuracy-lifecycle/main.png"
+ogImage: "https://lycheedata.com/images/guides/kalshi-historical-political-prediction-market-accuracy-lifecycle/main.png"
+featured: true
+slug: "/kalshi-historical-political-prediction-market-accuracy-lifecycle"
+readingTime: "18 min"
+keywords: [
+"prediction markets",
+"kalshi prediction markets",
+"political prediction markets",
+"are prediction markets accurate",
+"how accurate are prediction markets",
+"prediction market accuracy",
+"kalshi historical data",
+"kalshi historical market data",
+"kalshi political markets",
+"kalshi prediction market data",
+"political prediction market accuracy",
+"prediction market historical data",
+"prediction market data",
+"prediction market forecasting",
+"forecast error",
+"brier score",
+"brier score prediction markets",
+"prediction market reliability",
+"prediction market calibration",
+"political forecasting",
+"election prediction markets",
+"prediction markets vs polls",
+"kalshi data api",
+"prediction market data api"
+]
+canonical: "https://lycheedata.com/guides/kalshi-historical-political-prediction-market-accuracy-lifecycle"
+seoTitle: "When Do Prediction Markets Become Accurate? Kalshi Political Market Lifecycle Analysis"
+twitterCard: "summary_large_image"
+---
+
+# When Do Prediction Markets Become Accurate? A Kalshi Political Market Lifecycle Analysis
+
+Prediction markets are usually discussed as if a market price is a clean probability.
+
+A contract trading at **63 cents** is treated as a **63% chance**.
+
+A contract trading at **92 cents** is treated as near certainty.
+
+A contract trading at **5 cents** is treated as nearly impossible.
+
+That interpretation is useful.
+
+It is also incomplete.
+
+The deeper question is not only:
+
+> Are prediction markets accurate?
+
+The better question is:
+
+> **When do prediction markets become accurate?**
+
+A political market that just opened is not the same as a political market one day before resolution.
+
+A market with two years left to trade is not the same as a market where the final event has mostly played out.
+
+Yet most prediction market analysis treats these prices as if they belong to the same forecasting context.
+
+This analysis uses **Kalshi historical data** to measure how political prediction market accuracy changes across the life of a market.
+
+We studied:
+
+* **3,189 resolved Kalshi political markets**
+* **25,552 lifecycle snapshots**
+* **8 standardized lifecycle checkpoints**
+* **YES prices at each checkpoint**
+* **final resolved YES/NO outcomes**
+* **absolute forecast error**
+* **Brier score**
+
+Instead of asking whether political prediction markets are accurate in one static sense, we normalized every market from open to close and measured forecast quality at:
+
+```text
+0%, 25%, 50%, 75%, 90%, 95%, 99%, 100%
+```
+
+The result is a lifecycle view of prediction market accuracy.
+
+The main finding:
+
+> **Political prediction markets are informative from the start, but they become dramatically more reliable as they mature.**
+
+At market open, Kalshi political markets already beat a naive 50/50 forecast.
+
+But early market prices still carried large forecast error.
+
+As markets moved toward resolution, error collapsed.
+
+Average absolute error fell from:
+
+```text
+34.2 percentage points at market open
+```
+
+to:
+
+```text
+1.8 percentage points near market close
+```
+
+Average Brier score fell from:
+
+```text
+0.1888 at market open
+```
+
+to:
+
+```text
+0.0031 near market close
+```
+
+That means political prediction market accuracy has a timeline.
+
+<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_BRIER_SCORE_CHART" />
+
+---
+
+## The Research Question
+
+This study started with a simple question:
+
+> How long before political prediction markets become reliable?
+
+There are two common ways to misread prediction market prices.
+
+The first is to dismiss early prices entirely because they are volatile, incomplete, or based on limited information.
+
+The second is to take every quoted price literally from the moment the market opens.
+
+Both views are too simple.
+
+Early political markets may contain useful signal.
+
+But useful signal is not the same thing as high reliability.
+
+A market can beat a naive baseline while still being far less accurate than it will become later.
+
+So the real question becomes:
+
+> **How quickly does forecast error decline as political markets move from open to close?**
+
+That is what this lifecycle analysis measures.
+
+---
+
+## Dataset: 3,189 Resolved Kalshi Political Markets
+
+For this analysis, we used historical Kalshi political markets with known final resolutions.
+
+The working dataset contains:
+
+| Metric                           | Value |
+| -------------------------------- | ----: |
+| Resolved political markets       | 3,189 |
+| Lifecycle checkpoints per market | 8 |
+| Total lifecycle snapshot rows    | 25,552 |
+| Market type                      | Kalshi political prediction markets |
+| Outcome type                     | Binary YES/NO markets |
+| Forecast column                  | YES price at checkpoint |
+| Outcome column                   | Final resolved result |
+| Forecast metrics                 | Absolute error, Brier score |
+
+Each market contributes one observation at each lifecycle checkpoint.
+
+For every checkpoint, the analysis selects the latest available YES price at or before that point in the market lifecycle.
+
+That creates a normalized snapshot table.
+
+Conceptually, each market becomes:
+
+| Market | 0% | 25% | 50% | 75% | 90% | 95% | 99% | 100% |
+| ------ | -- | --- | --- | --- | --- | --- | --- | ---- |
+| Market A | price | price | price | price | price | price | price | final price |
+| Market B | price | price | price | price | price | price | price | final price |
+| Market C | price | price | price | price | price | price | price | final price |
+
+That format lets us measure how forecast quality evolves across the lifecycle instead of only measuring final prices.
+
+For a broader guide to accessing and querying historical prediction market data, see:
+
+[Kalshi Historical Data — Download, Query, and Backtest](/guides/kalshi-historical-data)
+
+---
+
+## Why Normalize by Market Lifecycle?
+
+Political prediction markets do not all run on the same clock.
+
+Some markets last years.
+
+Others last weeks.
+
+Some resolve after an election, a vote, a court decision, a resignation, a debate, a poll release, a government deadline, or an official certification.
+
+If we compare every market by raw calendar time, we mix together completely different stages of uncertainty.
+
+For example:
+
+* **100 days before close** may be early for one market and late for another
+* **one week after open** may be meaningful for a short-duration market and meaningless for a multi-year market
+* **election night markets** behave differently from long-running political outcome markets
+* **policy markets** may remain uncertain until a procedural deadline
+* **event-driven markets** may stay noisy until the final moment
+
+So instead of measuring every market by calendar time, we measured by relative lifecycle position.
+
+Each market was normalized from:
+
+```text
+market open = 0%
+market close = 100%
+```
+
+Then we sampled market prices at:
+
+```text
+0%, 25%, 50%, 75%, 90%, 95%, 99%, 100%
+```
+
+This lets us compare markets with very different durations.
+
+A six-day market and a six-month market can both be analyzed at their **50% lifecycle point**.
+
+That creates a cleaner research question:
+
+> At the same relative stage of a market’s life, how accurate are Kalshi political prediction market prices?
+
+---
+
+## Methodology: Lifecycle Forecast Error
+
+For each market and lifecycle checkpoint, we selected the latest available YES price at or before that checkpoint.
+
+The forecast probability is:
+
+```text
+forecast_probability = YES price / 100
+```
+
+The final resolved outcome is converted into a binary value:
+
+```text
+YES outcome = 1
+NO outcome = 0
+```
+
+Then we calculate two forecast error metrics.
+
+First, absolute error:
+
+```text
+absolute_error = abs(forecast_probability - outcome)
+```
+
+Second, Brier score:
+
+```text
+brier_score = (forecast_probability - outcome)^2
+```
+
+These two metrics answer related but different questions.
+
+Absolute error is easy to interpret in percentage-point terms.
+
+If a market says **70%** and resolves YES, the absolute error is:
+
+```text
+30 percentage points
+```
+
+If a market says **70%** and resolves NO, the absolute error is:
+
+```text
+70 percentage points
+```
+
+Brier score penalizes larger mistakes more heavily because the error is squared.
+
+That makes it useful for evaluating probabilistic forecasts.
+
+A perfect forecast has a Brier score of:
+
+```text
+0
+```
+
+A naive 50/50 forecast has a Brier score of:
+
+```text
+0.25
+```
+
+So if the market’s average Brier score is below **0.25**, it is beating a naive coin-flip forecast.
+
+---
+
+## Result 1: Prediction Markets Beat 50/50 From the Start
+
+At market open, the average Brier score across the 3,189 resolved Kalshi political markets was:
+
+```text
+0.1888
+```
+
+That is meaningfully better than the naive 50/50 baseline:
+
+```text
+0.25
+```
+
+This matters.
+
+It means the opening prices were not random noise.
+
+Even at the beginning of the market lifecycle, political prediction markets already contained useful information.
+
+But that does not mean they were highly reliable yet.
+
+At market open, the average absolute error was still:
+
+```text
+34.2 percentage points
+```
+
+That is a large error.
+
+So the correct interpretation is not:
+
+> early prediction markets are useless.
+
+It is:
+
+> **early prediction markets contain signal, but they are still noisy.**
+
+This distinction is the core of the article.
+
+Prediction market accuracy is not binary.
+
+A market can be directionally informative early and still become dramatically more accurate later.
+
+---
+
+## Result 2: Forecast Error Falls Across the Lifecycle
+
+The clearest finding is the steady decline in forecast error as markets mature.
+
+| Lifecycle checkpoint | Avg absolute error | Avg Brier score |
+| -------------------: | -----------------: | --------------: |
+| 0%                   | 34.2%              | 0.1888 |
+| 25%                  | 28.1%              | 0.1482 |
+| 50%                  | 21.6%              | 0.1115 |
+| 75%                  | 15.2%              | 0.0761 |
+| 90%                  | 9.9%               | 0.0477 |
+| 95%                  | 7.6%               | 0.0359 |
+| 99%                  | 3.8%               | 0.0158 |
+| 100%                 | 1.8%               | 0.0031 |
+
+This is the core lifecycle result.
+
+At the beginning of the market lifecycle, average absolute error is roughly:
+
+```text
+34 percentage points
+```
+
+By the halfway point, it falls to roughly:
+
+```text
+22 percentage points
+```
+
+By the 90% lifecycle checkpoint, it falls below:
+
+```text
+10 percentage points
+```
+
+By the final checkpoint, it falls below:
+
+```text
+2 percentage points
+```
+
+The Brier score tells the same story.
+
+Average Brier score falls from:
+
+```text
+0.1888 at market open
+```
+
+to:
+
+```text
+0.0031 near market close
+```
+
+That is not a small improvement.
+
+It is a collapse in forecast error.
+
+<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_ABSOLUTE_ERROR_CHART" />
+
+---
+
+## Chart: Brier Score Across the Political Market Lifecycle
+
+The primary chart for this study is Brier score by lifecycle checkpoint.
+
+This chart should show a clear downward curve from market open to market close.
+
+The visual message is simple:
+
+> political prediction market error declines sharply as markets move toward resolution.
+
+<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_BRIER_SCORE_CHART" />
+
+The most important interpretation is that the market is already better than 50/50 at open, but not yet highly reliable.
+
+The Brier score starts below the naive baseline:
+
+```text
+0.1888 vs 0.25
+```
+
+Then continues falling at every checkpoint.
+
+By the 90% lifecycle checkpoint, Brier score is:
+
+```text
+0.0477
+```
+
+By the 99% checkpoint, it is:
+
+```text
+0.0158
+```
+
+By the final checkpoint, it is:
+
+```text
+0.0031
+```
+
+This is what lifecycle accuracy looks like.
+
+The market does not suddenly become accurate at one magical moment.
+
+It becomes more accurate gradually, then sharply, as uncertainty resolves.
+
+---
+
+## Chart: Average Absolute Error Across the Political Market Lifecycle
+
+Brier score is useful, but average absolute error is easier to explain.
+
+It tells us how far the market’s implied probability was from the final outcome, on average.
+
+<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_ABSOLUTE_ERROR_CHART" />
+
+This is the most reader-friendly version of the finding:
+
+> average forecast error fell from **34.2 percentage points** at market open to **1.8 percentage points** near market close.
+
+That gives us a practical reliability curve:
+
+```text
+Early market: informative but noisy
+Mid-life market: materially better
+Late market: sharply more reliable
+Near-close market: extremely accurate
+```
+
+This is the answer to the search question:
+
+> Are prediction markets accurate?
+
+The answer is:
+
+> **yes, but accuracy depends heavily on where the market is in its lifecycle.**
+
+---
+
+## Result 3: The Biggest Accuracy Gains Happen Late
+
+The lifecycle curve is not flat.
+
+Forecast error falls throughout the market lifecycle, but the late checkpoints are especially important.
+
+By 75% of the market lifecycle, average absolute error had fallen to:
+
+```text
+15.2 percentage points
+```
+
+By 90%, it fell to:
+
+```text
+9.9 percentage points
+```
+
+By 95%, it fell to:
+
+```text
+7.6 percentage points
+```
+
+By 99%, it fell to:
+
+```text
+3.8 percentage points
+```
+
+That means a large amount of reliability appears late.
+
+This makes intuitive sense.
+
+Political markets absorb information unevenly.
+
+Major information often arrives near key deadlines:
+
+* debates
+* candidate announcements
+* polling releases
+* ballot access deadlines
+* legislative votes
+* government funding deadlines
+* court rulings
+* election-night vote counts
+* official certification
+* public concessions
+* market close conditions
+
+A market early in its lifecycle may be forecasting many possible paths.
+
+A market late in its lifecycle is often forecasting a much narrower uncertainty window.
+
+The data reflects that.
+
+---
+
+## The Reliability Timeline
+
+Based on this analysis, Kalshi political prediction market reliability looks roughly like this:
+
+### 0% lifecycle: market open
+
+The market already contains signal, but forecast error is high.
+
+Average Brier score:
+
+```text
+0.1888
+```
+
+Average absolute error:
+
+```text
+34.2 percentage points
+```
+
+The market beats a naive 50/50 forecast, but it is still early and noisy.
+
+---
+
+### 25% lifecycle
+
+The market improves meaningfully.
+
+Average Brier score:
+
+```text
+0.1482
+```
+
+Average absolute error:
+
+```text
+28.1 percentage points
+```
+
+There is still substantial uncertainty, but the market is already better than it was at open.
+
+---
+
+### 50% lifecycle
+
+The market becomes much more informative.
+
+Average Brier score:
+
+```text
+0.1115
+```
+
+Average absolute error:
+
+```text
+21.6 percentage points
+```
+
+By the midpoint of the lifecycle, the market has reduced a large amount of early uncertainty.
+
+---
+
+### 75% lifecycle
+
+The market enters a more reliable forecasting stage.
+
+Average Brier score:
+
+```text
+0.0761
+```
+
+Average absolute error:
+
+```text
+15.2 percentage points
+```
+
+This is where the market starts looking less like early speculation and more like a maturing forecast.
+
+---
+
+### 90% lifecycle
+
+The market becomes substantially reliable.
+
+Average Brier score:
+
+```text
+0.0477
+```
+
+Average absolute error:
+
+```text
+9.9 percentage points
+```
+
+At this point, average error is below 10 percentage points.
+
+---
+
+### 95% lifecycle
+
+The market is now very late-stage.
+
+Average Brier score:
+
+```text
+0.0359
+```
+
+Average absolute error:
+
+```text
+7.6 percentage points
+```
+
+The remaining uncertainty is much narrower.
+
+---
+
+### 99% lifecycle
+
+The market is near resolution.
+
+Average Brier score:
+
+```text
+0.0158
+```
+
+Average absolute error:
+
+```text
+3.8 percentage points
+```
+
+Prices are now highly informative.
+
+---
+
+### 100% lifecycle
+
+Near the final available checkpoint, forecast error is extremely low.
+
+Average Brier score:
+
+```text
+0.0031
+```
+
+Average absolute error:
+
+```text
+1.8 percentage points
+```
+
+At this stage, many markets have already converged close to their final outcome.
+
+---
+
+## Do Prediction Markets Get More Accurate Closer to Election Day?
+
+For political markets, the practical version of the lifecycle question is:
+
+> Do prediction markets get more accurate closer to election day?
+
+This analysis suggests yes, with one important caveat.
+
+The study does not measure only elections.
+
+It measures Kalshi political markets across a broader set of political outcomes.
+
+But the lifecycle pattern is clear:
+
+> as political markets move closer to resolution, forecast error falls dramatically.
+
+That does not mean every individual market becomes smoother or less volatile.
+
+Individual markets can spike, reverse, overreact, underreact, or trade on stale information.
+
+But across 3,189 resolved political markets, the average pattern is strong.
+
+Political prediction markets become more accurate as they mature.
+
+That is the practical takeaway.
+
+---
+
+## Why a 70% Price Means Different Things at Different Times
+
+One of the most important implications is that the same quoted probability can carry different reliability depending on when it is observed.
+
+A **70% price** early in a market lifecycle is not equivalent to a **70% price** late in a market lifecycle.
+
+The number is the same.
+
+The information environment is not.
+
+Early in the lifecycle, the market may still be pricing:
+
+* unknown candidates
+* incomplete polling
+* uncertain turnout
+* unresolved legal challenges
+* incomplete vote counts
+* unclear legislative paths
+* future negotiations
+* ambiguous resolution criteria
+* low liquidity
+* uncertain trader attention
+
+Late in the lifecycle, many of those uncertainty sources may already be resolved.
+
+So the price may be much more reliable.
+
+This is why prediction market accuracy should not be measured only by the quoted probability.
+
+It should be measured by:
+
+```text
+probability + lifecycle position + outcome
+```
+
+A price is not just a probability.
+
+It is a probability at a specific stage of uncertainty.
+
+---
+
+## What Final-Price Calibration Misses
+
+A previous Kalshi political market calibration analysis looked at final traded prices and tested whether high-confidence political markets were overconfident near resolution.
+
+That final-price study found that the expected “90% trap” did not appear.
+
+Final high-confidence political markets were highly reliable at the extremes.
+
+See the related analysis here:
+
+[Kalshi Historical Data Analysis: Are Political Prediction Markets Accurate at 90%?](/guides/kalshi-political-prediction-market-accuracy)
+
+This lifecycle study answers a different question.
+
+Final-price calibration asks:
+
+> Are markets reliable near the end?
+
+Lifecycle analysis asks:
+
+> How early does that reliability appear?
+
+That distinction matters.
+
+A market can be extremely reliable near completion while still carrying large forecast error early in its life.
+
+This study shows exactly that.
+
+Political markets are useful from the beginning.
+
+But they are not equally reliable at every stage.
+
+---
+
+## Forecast Error vs Calibration
+
+This article focuses on forecast error.
+
+Forecast error asks:
+
+> how far was the market price from the final outcome?
+
+Brier score and absolute error both answer that question.
+
+Calibration asks a different question:
+
+> when markets say 70%, do they resolve YES 70% of the time?
+
+A market can have falling forecast error and still be miscalibrated in specific probability ranges.
+
+For example, high-confidence markets may become very accurate late in the lifecycle, while early high-confidence markets may still be overconfident.
+
+That is why lifecycle calibration is the natural next layer of analysis.
+
+<PublicChart username="misterrpink" slug="REPLACE_WITH_OPEN_LIFECYCLE_CALIBRATION_CHART" />
+
+<PublicChart username="misterrpink" slug="REPLACE_WITH_FINAL_LIFECYCLE_CALIBRATION_CHART" />
+
+The key distinction is:
+
+* **Brier score** measures total probabilistic forecast quality
+* **Absolute error** measures average distance from the outcome
+* **Calibration** measures whether probabilities match observed frequencies
+* **Lifecycle analysis** shows how all of those change over time
+
+Together, they give a much deeper picture of prediction market accuracy.
+
+---
+
+## The Open-Market Accuracy Problem
+
+The most surprising part of the study is not that markets become accurate near resolution.
+
+That part is expected.
+
+The more interesting result is that market-open prices were already better than 50/50.
+
+At 0% lifecycle, the market-open Brier score was:
+
+```text
+0.1888
+```
+
+That is substantially below the naive baseline:
+
+```text
+0.25
+```
+
+So opening prices contain signal.
+
+But the absolute error was still:
+
+```text
+34.2 percentage points
+```
+
+That means early political market prices are useful, but rough.
+
+They are not pure noise.
+
+They are not final truth.
+
+They are early probability estimates under large uncertainty.
+
+This is why the right interpretation is:
+
+> early markets are useful inputs, not finished forecasts.
+
+---
+
+## The Near-Close Accuracy Problem
+
+At the other end of the lifecycle, near-close prices become extremely accurate.
+
+At the final checkpoint, average Brier score was:
+
+```text
+0.0031
+```
+
+Average absolute error was:
+
+```text
+1.8 percentage points
+```
+
+That is extremely low.
+
+But it also needs to be interpreted correctly.
+
+Near-close accuracy can be high because the market has already absorbed decisive information.
+
+For political markets, that might mean:
+
+* election results are already mostly known
+* a candidate has conceded
+* vote counts are nearly complete
+* a bill has effectively passed or failed
+* a deadline has expired
+* the relevant public information has already resolved the uncertainty
+
+So near-close accuracy does not prove that prediction markets knew the outcome months in advance.
+
+It proves something narrower:
+
+> by the end of the lifecycle, political prediction markets are extremely good at recognizing resolved or nearly resolved uncertainty.
+
+That is still valuable.
+
+But it is not the same as long-horizon forecasting power.
+
+---
+
+## Probability Distribution by Lifecycle Checkpoint
+
+Forecast error tells us how close prices were to outcomes.
+
+But another useful chart is the distribution of market prices at each lifecycle checkpoint.
+
+This shows whether markets remain spread across the probability spectrum or begin collapsing toward 0 and 100 as resolution approaches.
+
+<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_PROBABILITY_DISTRIBUTION_CHART" />
+
+This chart is useful because political markets often behave like convergence systems.
+
+Early in the lifecycle, prices may be distributed across a wider probability range.
+
+Late in the lifecycle, markets should increasingly concentrate near:
+
+* near-zero probability
+* near-certain probability
+
+That distribution helps explain why late-stage forecast error becomes so low.
+
+The market is not merely becoming “a little better.”
+
+It is often collapsing toward the final outcome.
+
+---
+
+## Market Examples: How Individual Political Markets Converge
+
+Aggregate error curves are powerful, but individual market charts help make the lifecycle intuitive.
+
+A useful companion chart is a single-market or multi-market line chart showing YES price over time for selected political markets.
+
+<PublicChart username="misterrpink" slug="REPLACE_WITH_POLITICAL_MARKET_PRICE_EXAMPLES_CHART" />
+
+The goal is not to cherry-pick one perfect example.
+
+The goal is to show the mechanics behind the aggregate result.
+
+Some markets may converge smoothly.
+
+Others may stay volatile until late.
+
+Others may collapse suddenly after a debate, vote count, announcement, or deadline.
+
+That is exactly why lifecycle-normalized analysis is useful.
+
+It lets us compare these very different market paths in a shared framework.
+
+---
+
+## How This Analysis Was Built in Lychee
+
+This analysis was built by combining historical Kalshi political market data with lifecycle-normalized forecast analysis.
+
+The workflow was:
+
+1. Filter to resolved Kalshi political markets.
+2. Normalize each market from open to close.
+3. Snapshot each market at standard lifecycle checkpoints.
+4. Extract the latest YES price at or before each checkpoint.
+5. Convert YES prices into forecast probabilities.
+6. Convert resolved outcomes into binary values.
+7. Calculate row-level absolute error.
+8. Calculate row-level Brier score.
+9. Aggregate forecast error by lifecycle checkpoint.
+10. Chart error across the market lifecycle.
+
+The key operations were:
+
+```text
+Relative Position Snapshot
+→ Forecast Probability
+→ Row-Level Forecast Error
+→ Lifecycle Brier Score Summary
+→ Lifecycle Error Chart
+```
+
+This makes the research reproducible and extensible.
+
+The same approach can be applied to:
+
+* election markets
+* policy markets
+* sports markets
+* weather markets
+* economic markets
+* crypto prediction markets
+* Polymarket data
+* Kalshi historical data
+
+The broader point is that prediction market accuracy should not only be measured statically.
+
+It should be measured dynamically across the lifecycle of the market.
+
+<KalshiHistoricalDataQuery
+title="Query Kalshi political market data"
+description="Search historical Kalshi political markets, lifecycle snapshots, YES prices, final outcomes, and market activity to analyze prediction market accuracy over time."
+/>
+
+---
+
+## What This Means for Traders
+
+For traders, the main lesson is that the timing of a price matters.
+
+A market trading at 80% early in its lifecycle should not be interpreted the same way as a market trading at 80% near resolution.
+
+The same probability can represent very different forecast quality.
+
+The data suggests:
+
+* early prices contain signal
+* mid-life prices are materially better
+* late-stage prices are much more reliable
+* near-close prices are extremely accurate
+
+But this does not mean traders should blindly chase late high-confidence markets.
+
+Near-close prices may already reflect information everyone can see.
+
+The edge is not simply knowing that late markets are accurate.
+
+The edge is understanding when the market has not yet fully incorporated information.
+
+---
+
+## What This Means for Researchers
+
+For researchers, the biggest lesson is methodological.
+
+Prediction market accuracy should be tied to time.
+
+A static final-price analysis can make markets look extremely accurate because many outcomes are already nearly resolved by the final trade.
+
+That is not wrong.
+
+But it is incomplete.
+
+A stronger research pipeline asks:
+
+1. What was the market price at open?
+2. What was the market price at 25% of lifecycle?
+3. What was the market price at 50% of lifecycle?
+4. What was the market price at 75% of lifecycle?
+5. What was the market price near resolution?
+6. How did forecast error change at each stage?
+7. Did calibration improve at the same rate?
+8. Did different market categories behave differently?
+
+This turns prediction market commentary into actual quantitative research.
+
+Instead of asking:
+
+> are prediction markets accurate?
+
+we can ask:
+
+> when, where, and under what market conditions are prediction markets accurate?
+
+That is the better question.
+
+---
+
+## What This Means for Lychee
+
+This is exactly why historical prediction market data matters.
+
+Without historical prices, trade timestamps, market open times, close times, and final outcomes, this kind of analysis is difficult to run.
+
+Kalshi historical data makes it possible to test claims like:
+
+* Are prediction markets accurate?
+* How accurate are political prediction markets?
+* Do prediction markets get more accurate closer to election day?
+* When can you trust prediction market odds?
+* Does forecast error decline over time?
+* Do high-confidence markets become reliable before resolution?
+* Are election markets more accurate than event markets?
+* Does volume improve prediction market accuracy?
+* Are Kalshi and Polymarket markets calibrated differently?
+
+Lychee is built to make this kind of analysis faster:
+
+* query historical Kalshi market data
+* filter by category and resolution
+* extract lifecycle snapshots
+* calculate forecast error
+* compute Brier scores
+* build lifecycle charts
+* visualize calibration curves
+* publish dashboards and charts
+* fork the analysis into new markets and categories
+
+This is the core workflow:
+
+> turn prediction market history into reproducible market research.
+
+---
+
+## Key Findings
+
+### 1. Prediction markets beat 50/50 from the start
+
+At market open, Kalshi political markets had an average Brier score of:
+
+```text
+0.1888
+```
+
+That beats the naive 50/50 baseline of:
+
+```text
+0.25
+```
+
+Opening prices were not random noise.
+
+---
+
+### 2. Early political markets are informative but noisy
+
+At market open, average absolute error was still:
+
+```text
+34.2 percentage points
+```
+
+So early prices contained signal, but still carried substantial uncertainty.
+
+---
+
+### 3. Forecast error declined at every lifecycle checkpoint
+
+Average absolute error fell from:
+
+```text
+34.2% at 0% lifecycle
+```
+
+to:
+
+```text
+1.8% at 100% lifecycle
+```
+
+The market became progressively more reliable as it matured.
+
+---
+
+### 4. Brier score collapsed across the lifecycle
+
+Average Brier score fell from:
+
+```text
+0.1888 at market open
+```
+
+to:
+
+```text
+0.0031 near market close
+```
+
+That is a major improvement in probabilistic forecast quality.
+
+---
+
+### 5. Political markets become substantially reliable late in the lifecycle
+
+By the 90% lifecycle checkpoint, average absolute error had fallen below:
+
+```text
+10 percentage points
+```
+
+This suggests late-stage political markets are much more reliable than early-stage markets.
+
+---
+
+### 6. Near-close accuracy is extremely high, but should be interpreted carefully
+
+The final checkpoint had extremely low error.
+
+But this likely reflects the fact that many markets have already absorbed decisive information near resolution.
+
+Near-close accuracy is not the same thing as long-horizon forecasting power.
+
+---
+
+### 7. Accuracy should be measured through time
+
+The core finding is methodological:
+
+> prediction market prices should be interpreted through their lifecycle.
+
+A price is not just a probability.
+
+It is a probability at a specific stage of uncertainty.
+
+---
+
+## Limitations
+
+This study has several important limitations.
+
+### Lifecycle position is not the same as calendar time
+
+A market at 50% of its lifecycle could be three days from resolution or three months from resolution.
+
+Lifecycle normalization makes markets comparable, but it does not replace fixed-horizon analysis.
+
+A future study should compare both lifecycle checkpoints and raw time-to-resolution checkpoints.
+
+---
+
+### The 100% checkpoint may reflect near-resolved information
+
+The final checkpoint captures the latest available price near completion.
+
+That price may already reflect information that makes the outcome obvious.
+
+This is useful for studying convergence, but it should not be confused with early forecast skill.
+
+---
+
+### Political markets are heterogeneous
+
+Political markets include elections, policy decisions, speech events, nominations, deadlines, court outcomes, and institutional processes.
+
+Different political market types may have different lifecycle accuracy patterns.
+
+A future version should segment lifecycle Brier score by market type.
+
+---
+
+### This study uses market-count weighting
+
+Each market contributes equally to the aggregate lifecycle score.
+
+That means a small low-volume market and a large high-volume market receive the same weight.
+
+A future study should compare equal-weighted and volume-weighted results.
+
+---
+
+### This study measures forecast error, not every dimension of market quality
+
+Brier score and absolute error measure forecast quality against final outcomes.
+
+They do not directly measure liquidity, spreads, manipulation, market efficiency, trader profitability, or execution quality.
+
+Those require separate analyses.
+
+---
+
+## Future Research
+
+This study opens several follow-up questions.
+
+### 1. Lifecycle calibration
+
+Measure calibration curves at each lifecycle checkpoint:
+
+* 0%
+* 25%
+* 50%
+* 75%
+* 90%
+* 95%
+* 99%
+* 100%
+
+This would show when stated probabilities begin matching observed outcome frequencies.
+
+---
+
+### 2. Fixed-horizon forecast accuracy
+
+Measure forecast error at fixed time windows before resolution:
+
+* 90 days before close
+* 30 days before close
+* 14 days before close
+* 7 days before close
+* 1 day before close
+
+This would complement lifecycle analysis with calendar-time analysis.
+
+---
+
+### 3. Market-type segmentation
+
+Compare lifecycle accuracy across:
+
+* Electoral markets
+* Policy markets
+* Event markets
+
+This would show whether elections become accurate earlier than high-entropy political event markets.
+
+---
+
+### 4. Volume-weighted Brier score
+
+Compare equal-weighted and volume-weighted accuracy.
+
+This would answer whether high-dollar political markets are more reliable than low-volume political markets.
+
+---
+
+### 5. Kalshi vs Polymarket lifecycle accuracy
+
+A cross-platform study could compare lifecycle forecast quality across Kalshi and Polymarket.
+
+That would reveal whether accuracy patterns are platform-specific or general to prediction markets.
+
+---
+
+### 6. Liquidity and forecast error
+
+A deeper study could test whether spread, volume, trade count, or market depth predicts forecast error.
+
+This would connect accuracy research more directly to trading strategy.
+
+---
+
+## Conclusion
+
+This study began with a question:
+
+> When do prediction markets become accurate?
+
+Using Kalshi historical data, we analyzed **3,189 resolved political prediction markets** across **25,552 lifecycle snapshots**.
+
+The result was clear.
+
+Political prediction markets were informative from the start.
+
+At market open, they already beat a naive 50/50 baseline.
+
+But early prices were still noisy.
+
+Average absolute error at open was:
+
+```text
+34.2 percentage points
+```
+
+As markets matured, forecast error declined sharply.
+
+By the 90% lifecycle checkpoint, average absolute error fell below:
+
+```text
+10 percentage points
+```
+
+By the final checkpoint, it fell to:
+
+```text
+1.8 percentage points
+```
+
+Average Brier score followed the same pattern, falling from:
+
+```text
+0.1888 at open
+```
+
+to:
+
+```text
+0.0031 near close
+```
+
+The practical takeaway is simple:
+
+> **Prediction markets become more accurate as they mature.**
+
+But the more useful version is:
+
+> **Political prediction markets are informative early, materially better by the midpoint, and highly reliable late in the lifecycle.**
+
+That changes how we should interpret market prices.
+
+A price is not just a probability.
+
+It is a probability at a specific stage of market maturity.
+
+Instead of asking only:
+
+```text
+Is this prediction market accurate?
+```
+
+we should ask:
+
+```text
+How far through its lifecycle is this market?
+```
+
+That is the lifecycle of prediction market accuracy.
+
+---
+
+## FAQ: Prediction Market Accuracy and Kalshi Political Markets
+
+### Are prediction markets accurate?
+
+Prediction markets can be accurate, but accuracy depends on time horizon, market type, liquidity, and information clarity. In this analysis, Kalshi political prediction markets beat a naive 50/50 forecast from market open, but became much more accurate near resolution.
+
+---
+
+### How accurate are prediction markets?
+
+In this lifecycle analysis, average absolute error in Kalshi political markets fell from **34.2 percentage points** at market open to **1.8 percentage points** near market close. Average Brier score fell from **0.1888** to **0.0031**.
+
+---
+
+### Do prediction markets get more accurate closer to election day?
+
+Across 3,189 resolved Kalshi political markets, forecast error declined sharply as markets moved closer to resolution. While the dataset includes more than just elections, the broader pattern suggests that political prediction markets become more reliable as uncertainty resolves.
+
+---
+
+### How accurate are political prediction markets?
+
+Political prediction market accuracy depends on when the market price is observed. Early prices are informative but noisy. Late-stage prices are much more reliable because they have absorbed more information.
+
+---
+
+### Can Kalshi prediction markets be trusted?
+
+Kalshi prediction markets can contain useful forecasting signal, but individual market prices should be interpreted through context. This study shows that Kalshi political markets were informative from the start and became dramatically more reliable as they matured.
+
+---
+
+### What is Brier score in prediction markets?
+
+Brier score measures the squared difference between a forecast probability and the final outcome.
+
+```text
+brier_score = (forecast_probability - outcome)^2
+```
+
+Lower Brier scores mean better probabilistic forecasts.
+
+---
+
+### Why use Brier score instead of simple accuracy?
+
+Simple accuracy treats forecasts as right or wrong. Brier score evaluates the quality of a probability. A 55% forecast and a 95% forecast should not be treated the same, even if both resolve YES.
+
+---
+
+### What is forecast error?
+
+Forecast error measures how far a market-implied probability was from the final outcome. In this study, absolute forecast error was calculated at each lifecycle checkpoint.
+
+---
+
+### What is lifecycle analysis?
+
+Lifecycle analysis normalizes every market from open to close, then compares prices at the same relative stage of each market’s life. This allows markets with different durations to be compared more cleanly.
+
+---
+
+### Does this prove prediction markets are better than polls?
+
+No. This study does not directly compare prediction markets against polls. It measures forecast error in Kalshi political prediction markets over time. Polls and prediction markets measure different signals.
+
+---
+
+### Why not only use final market prices?
+
+Final prices can be highly accurate because uncertainty may already be resolved near market close. Lifecycle analysis shows how market accuracy evolves before that final state.
+
+---
+
+### What does Kalshi historical data reveal here?
+
+Kalshi historical data shows that political prediction markets are informative from the beginning, but become dramatically more reliable as they mature. Forecast error falls sharply across the market lifecycle.
+
+---
+
+## Sources and References
+
+* [Kalshi Historical Data API Documentation](https://docs.kalshi.com/getting_started/historical_data)
+* [Kalshi Market Data Quick Start](https://docs.kalshi.com/getting_started/quick_start_market_data)
+* [Kalshi Market Data & Insights](https://kalshi.com/market-data)
+* [Do Prediction Markets Produce Well-Calibrated Probability Forecasts?](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1468-0297.2012.02561.x)
+* [Duke PDF: Do Prediction Markets Produce Well-Calibrated Probability Forecasts?](https://people.duke.edu/~clemen/bio/Published%20Papers/45.PredictionMarkets-Page%26Clemen-EJ-2013.pdf)
+* [Calibration City: Prediction Market Calibration](https://calibration.city/introduction)
+* [Stable Reliability Diagrams for Probabilistic Classifiers](https://pmc.ncbi.nlm.nih.gov/articles/PMC7923594/)
+* [Decomposing Crowd Wisdom: Domain-Specific Calibration Dynamics in Prediction Markets](https://arxiv.org/abs/2602.19520)
+* [Prediction Market Accuracy: Crowd Wisdom or Informed Minority?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6617059)
+
+---
+
+## Related Lychee Guides
+
+* [Kalshi Historical Data — Download, Query, and Backtest](/guides/kalshi-historical-data)
+* [Kalshi Historical Data Analysis: Are Political Prediction Markets Accurate at 90%?](/guides/kalshi-political-prediction-market-accuracy)
+* [Political Prediction Markets: What Historical Data Reveals About Election Forecasting](/guides/kalshi-political-prediction-markets-analysis)
+* [How to Build a Kalshi Weather Probability Calibration Chart](/guides/kalshi-weather-probability-calibration-chart)
+* [How to Build a Kalshi Probability Convergence Chart](/guides/kalshi-weather-probability-convergence-chart)
+* [Kalshi Historical Weather Data Dashboard](/misterrpink/dashboards/kalshi-historical-weather-data)
