@@ -43,6 +43,7 @@ import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { REFERENCE_EQUATION_PRESETS, validateReferenceEquation } from "@/lib/chartReferenceEquation";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
+import { defaultChartSeriesLabel } from "@/lib/chartLineLabels";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -209,8 +210,6 @@ export default function ChartControls() {
     setReferenceLines,
     tooltipShowXValue,
     setTooltipShowXValue,
-    tooltipShowYValue,
-    setTooltipShowYValue,
     tooltipExtraColumns,
     setTooltipExtraColumns,
 
@@ -232,6 +231,8 @@ export default function ChartControls() {
     selectedPalette,
     lineColorOverrides,
     setLineColorOverrides,
+    lineLabelOverrides,
+    setLineLabelOverrides,
 
     lineStyle,
     setLineStyle,
@@ -455,6 +456,47 @@ export default function ChartControls() {
       return next;
     });
   };
+  const setSeriesLabelOverride = (index, legacyKey, label) => {
+    const key = seriesInstanceKey(index);
+    const trimmed = String(label ?? "").trim();
+    setLineLabelOverrides?.((prev) => {
+      const next = { ...(prev || {}) };
+      if (!trimmed) {
+        delete next[key];
+        if (legacyKey) delete next[legacyKey];
+      } else {
+        next[key] = trimmed;
+      }
+      return next;
+    });
+  };
+  const getSeriesLabelOverride = (seriesColumn, index) =>
+    lineLabelOverrides?.[seriesInstanceKey(index)] ?? lineLabelOverrides?.[seriesColumn] ?? "";
+  const renderSeriesLabelInputs = (columns) =>
+    (columns || []).length > 0 ? (
+      <div className="space-y-2 border-t pt-2">
+        {(columns || []).map((seriesColumn, index) => {
+          const placeholder = defaultChartSeriesLabel(seriesColumn, index);
+          const inputId = `chart-line-label-${index}`;
+          return (
+            <div key={`line-label-${index}-${seriesColumn}`} className="flex min-w-0 items-center gap-2">
+              <Label htmlFor={inputId} className="w-12 shrink-0 text-[10px] text-muted-foreground">
+                Line {index + 1}
+              </Label>
+              <Input
+                id={inputId}
+                type="text"
+                value={getSeriesLabelOverride(seriesColumn, index)}
+                placeholder={placeholder}
+                className="h-7 min-w-0 flex-1 text-xs"
+                onChange={(e) => setSeriesLabelOverride(index, seriesColumn, e.target.value)}
+                aria-label={`Display name for line ${index + 1}`}
+              />
+            </div>
+          );
+        })}
+      </div>
+    ) : null;
   const setBreakdownSeriesColorOverride = (seriesKey, index, color) => {
     const key = seriesInstanceKey(index);
     setLineColorOverrides((prev) => ({
@@ -812,6 +854,8 @@ export default function ChartControls() {
             </div>
           ))}
         </div>
+
+        {renderSeriesLabelInputs(selY)}
 
         <div>
           <Select
@@ -1453,6 +1497,7 @@ export default function ChartControls() {
                               )}
                             </div>
                           ))}
+                        {renderSeriesLabelInputs(selY)}
                         {selY.length === 0 && (
                           <div className="min-w-0">
                             <Select onValueChange={(val) => handleSelectY(val)}>
@@ -1701,6 +1746,7 @@ export default function ChartControls() {
                               </div>
                             ))}
                           </div>
+                          {renderSeriesLabelInputs(selY)}
                         </div>
                       )}
                       {yAxisFormatControls}
@@ -2446,17 +2492,6 @@ export default function ChartControls() {
                         />
                         <Label htmlFor="chart-tooltip-show-x" className="cursor-pointer text-xs text-muted-foreground">
                           Show X value in tooltip
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          id="chart-tooltip-show-y"
-                          checked={tooltipShowYValue}
-                          onCheckedChange={setTooltipShowYValue}
-                          className="scale-75 origin-left"
-                        />
-                        <Label htmlFor="chart-tooltip-show-y" className="cursor-pointer text-xs text-muted-foreground">
-                          Show Y value in tooltip
                         </Label>
                       </div>
                     </div>

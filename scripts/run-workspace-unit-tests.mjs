@@ -28,6 +28,7 @@ import {
 } from "@/lib/composeJoinColumns.js";
 import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery.js";
 import { composeUsesPrimaryTableLimit, composePrimaryJoinExpandCap, resolveComposeExpandedFetchRowLimit } from "@/lib/composeLimitScope.js";
+import { defaultChartSeriesLabel, resolveChartSeriesLabel } from "@/lib/chartLineLabels.js";
 import { shouldUseLargeAthenaPullPath } from "@/lib/dataLake/largeAthenaPull.js";
 
 import "@/lib/chartReferenceEquation.test.js";
@@ -364,6 +365,15 @@ test("shouldUseLargeAthenaPullPath uses 15k threshold", () => {
   assert.equal(shouldUseLargeAthenaPullPath(15000), false);
   assert.equal(shouldUseLargeAthenaPullPath(15001), true);
   assert.equal(shouldUseLargeAthenaPullPath(231961), true);
+});
+
+test("chart line label overrides are chart-only display names", () => {
+  assert.equal(defaultChartSeriesLabel("yes_price", 0), "Line 1: yes_price");
+  assert.equal(
+    resolveChartSeriesLabel("yes_price", 0, { "line:0": "Political accuracy" }),
+    "Political accuracy",
+  );
+  assert.equal(resolveChartSeriesLabel("yes_price", 0, {}), "Line 1: yes_price");
 });
 
 console.log("\nAll workspace unit tests passed.");

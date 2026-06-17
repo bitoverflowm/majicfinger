@@ -1,6 +1,6 @@
 ---
 title: "When Do Prediction Markets Become Accurate? A Kalshi Political Market Lifecycle Analysis"
-description: "Are prediction markets accurate? We analyzed 3,189 resolved Kalshi political prediction markets across 25,552 lifecycle snapshots to measure when market odds become reliable."
+description: "Are prediction markets accurate? We analyzed 3,195 resolved Kalshi political prediction markets across 25,552 lifecycle snapshots to measure when market odds become reliable."
 publishedAt: "2026-06-17"
 author: "misterrpink"
 topics: ["kalshi", "prediction markets", "politics", "market accuracy", "forecasting", "brier score", "historical data", "market analysis"]
@@ -69,11 +69,11 @@ A market with two years left to trade is not the same as a market where the fina
 
 Yet most prediction market analysis treats these prices as if they belong to the same forecasting context.
 
-This analysis uses **Kalshi historical data** to measure how political prediction market accuracy changes across the life of a market.
+This analysis uses [**Kalshi historical data**](/kalshi-historical-data) to measure how political prediction market accuracy changes across the life of a market.
 
 We studied:
 
-* **3,189 resolved Kalshi political markets**
+* **3,195 resolved Kalshi political markets**
 * **25,552 lifecycle snapshots**
 * **8 standardized lifecycle checkpoints**
 * **YES prices at each checkpoint**
@@ -125,7 +125,7 @@ to:
 
 That means political prediction market accuracy has a timeline.
 
-<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_BRIER_SCORE_CHART" />
+<PublicChart username="misterrpink" slug="lifecycle-brier-score" />
 
 ---
 
@@ -157,7 +157,7 @@ That is what this lifecycle analysis measures.
 
 ---
 
-## Dataset: 3,189 Resolved Kalshi Political Markets
+## Dataset: 3,195 Resolved Kalshi Political Markets
 
 For this analysis, we used historical Kalshi political markets with known final resolutions.
 
@@ -165,7 +165,7 @@ The working dataset contains:
 
 | Metric                           | Value |
 | -------------------------------- | ----: |
-| Resolved political markets       | 3,189 |
+| Resolved political markets       | 3,195 |
 | Lifecycle checkpoints per market | 8 |
 | Total lifecycle snapshot rows    | 25,552 |
 | Market type                      | Kalshi political prediction markets |
@@ -310,7 +310,7 @@ So if the market’s average Brier score is below **0.25**, it is beating a naiv
 
 ## Result 1: Prediction Markets Beat 50/50 From the Start
 
-At market open, the average Brier score across the 3,189 resolved Kalshi political markets was:
+At market open, the average Brier score across the 3,195 resolved Kalshi political markets was:
 
 ```text
 0.1888
@@ -413,7 +413,7 @@ That is not a small improvement.
 
 It is a collapse in forecast error.
 
-<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_ABSOLUTE_ERROR_CHART" />
+<PublicChart username="misterrpink" slug="lifecycle-absolute-error-chart" />
 
 ---
 
@@ -427,7 +427,7 @@ The visual message is simple:
 
 > political prediction market error declines sharply as markets move toward resolution.
 
-<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_BRIER_SCORE_CHART" />
+<PublicChart username="misterrpink" slug="lifecycle-brier-score" />
 
 The most important interpretation is that the market is already better than 50/50 at open, but not yet highly reliable.
 
@@ -471,7 +471,7 @@ Brier score is useful, but average absolute error is easier to explain.
 
 It tells us how far the market’s implied probability was from the final outcome, on average.
 
-<PublicChart username="misterrpink" slug="REPLACE_WITH_LIFECYCLE_ABSOLUTE_ERROR_CHART" />
+<PublicChart username="misterrpink" slug="lifecycle-absolute-error-chart" />
 
 This is the most reader-friendly version of the finding:
 
@@ -738,7 +738,7 @@ That does not mean every individual market becomes smoother or less volatile.
 
 Individual markets can spike, reverse, overreact, underreact, or trade on stale information.
 
-But across 3,189 resolved political markets, the average pattern is strong.
+But across 3,195 resolved political markets, the average pattern is strong.
 
 Political prediction markets become more accurate as they mature.
 
@@ -1374,7 +1374,7 @@ This study began with a question:
 
 > When do prediction markets become accurate?
 
-Using Kalshi historical data, we analyzed **3,189 resolved political prediction markets** across **25,552 lifecycle snapshots**.
+Using Kalshi historical data, we analyzed **3,195 resolved political prediction markets** across **25,552 lifecycle snapshots**.
 
 The result was clear.
 
@@ -1462,7 +1462,7 @@ In this lifecycle analysis, average absolute error in Kalshi political markets f
 
 ### Do prediction markets get more accurate closer to election day?
 
-Across 3,189 resolved Kalshi political markets, forecast error declined sharply as markets moved closer to resolution. While the dataset includes more than just elections, the broader pattern suggests that political prediction markets become more reliable as uncertainty resolves.
+Across 3,195 resolved Kalshi political markets, forecast error declined sharply as markets moved closer to resolution. While the dataset includes more than just elections, the broader pattern suggests that political prediction markets become more reliable as uncertainty resolves.
 
 ---
 

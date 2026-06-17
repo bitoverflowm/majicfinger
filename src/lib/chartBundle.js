@@ -102,6 +102,22 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     s.lineColorOverrides = nextOverrides;
   }
 
+  if (s.lineLabelOverrides && typeof s.lineLabelOverrides === "object") {
+    const nextLabels = {};
+    for (const [rawKey, label] of Object.entries(s.lineLabelOverrides)) {
+      const raw = String(rawKey || "");
+      if (isLineSeriesInstanceOverrideKey(raw) && typeof label === "string" && label.trim()) {
+        nextLabels[raw] = label.trim();
+        continue;
+      }
+      const key = raw.includes("::") ? raw : deScope(raw);
+      if ((raw.includes("::") || keys.includes(key)) && typeof label === "string" && label.trim()) {
+        nextLabels[key] = label.trim();
+      }
+    }
+    s.lineLabelOverrides = nextLabels;
+  }
+
   if (s.chartConfig && typeof s.chartConfig === "object") {
     const nextCfg = {};
     for (const [rawKey, cfg] of Object.entries(s.chartConfig)) {

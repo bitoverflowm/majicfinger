@@ -39,7 +39,10 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
       const { ref: _ref, ...rest } = props || {};
       return (
         <div className="my-6 overflow-x-auto rounded-lg border border-border">
-          <table {...rest} className="w-full border-collapse text-left text-sm">
+          <table
+            {...rest}
+            className="w-full border-collapse text-sm [&_td]:px-4 [&_td]:py-2.5 [&_td]:!text-center [&_th]:px-4 [&_th]:py-2.5 [&_th]:!text-center [&_th]:font-medium"
+          >
             {children}
           </table>
         </div>

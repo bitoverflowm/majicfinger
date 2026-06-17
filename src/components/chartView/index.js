@@ -35,6 +35,7 @@ import {
 import { temporalToMs } from "@/lib/temporalParse";
 import { downsampleRowsForChart } from "@/lib/chartRenderCap";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
+import { resolveChartSeriesLabel } from "@/lib/chartLineLabels";
 
 const ChartBuilderContext = createContext(null);
 
@@ -698,6 +699,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   /** Explicit per-line series colors (decoupled from the global palette ramp). Keyed by Y column name. */
   const [lineColorOverrides, setLineColorOverrides] = useState({});
+  /** Chart-only display names for series (legend / tooltip); keyed by `line:{index}`. */
+  const [lineLabelOverrides, setLineLabelOverrides] = useState({});
 
   const [expanded, setExpanded] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
@@ -772,7 +775,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [referenceLines, setReferenceLines] = useState([]);
   /** Hover tooltip: optional X / Y / extra sheet columns from the hovered data row (not plotted). */
   const [tooltipShowXValue, setTooltipShowXValue] = useState(true);
-  const [tooltipShowYValue, setTooltipShowYValue] = useState(true);
   const [tooltipExtraColumns, setTooltipExtraColumns] = useState([]);
 
   const snapshotAppliedRef = useRef(false);
@@ -798,6 +800,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (Array.isArray(s.selectedPalette) && s.selectedPalette.length) setSelectedPalette(s.selectedPalette);
       if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
         setLineColorOverrides(s.lineColorOverrides);
+      }
+      if (s.lineLabelOverrides && typeof s.lineLabelOverrides === "object") {
+        setLineLabelOverrides(s.lineLabelOverrides);
       }
       if (s.dark !== undefined) setDark(!!s.dark);
       if (s.titleColor !== undefined) setTitleColor(s.titleColor);
@@ -857,6 +862,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.selectedShadBaseId != null) setSelectedShadBaseId(s.selectedShadBaseId);
     if (Array.isArray(s.selectedPalette) && s.selectedPalette.length) setSelectedPalette(s.selectedPalette);
     if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") setLineColorOverrides(s.lineColorOverrides);
+    if (s.lineLabelOverrides && typeof s.lineLabelOverrides === "object") setLineLabelOverrides(s.lineLabelOverrides);
     if (s.expanded !== undefined) setExpanded(!!s.expanded);
     if (s.legendVisible !== undefined) setLegendVisible(!!s.legendVisible);
     if (s.stackedBar !== undefined) setStackedBar(!!s.stackedBar);
@@ -918,8 +924,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (Array.isArray(s.referenceLines)) setReferenceLines(normalizeReferenceLines(s.referenceLines));
     if (s.tooltipShowXValue !== undefined) setTooltipShowXValue(!!s.tooltipShowXValue);
     else if (s.legendShowXValue !== undefined) setTooltipShowXValue(!!s.legendShowXValue);
-    if (s.tooltipShowYValue !== undefined) setTooltipShowYValue(!!s.tooltipShowYValue);
-    else if (s.legendShowYValue !== undefined) setTooltipShowYValue(!!s.legendShowYValue);
     if (Array.isArray(s.tooltipExtraColumns)) setTooltipExtraColumns(s.tooltipExtraColumns);
     else if (Array.isArray(s.legendExtraColumns)) setTooltipExtraColumns(s.legendExtraColumns);
     else if (s.legendLabelColumn) setTooltipExtraColumns([s.legendLabelColumn]);
@@ -1468,6 +1472,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     selectedShadBaseId,
     selectedPalette,
     lineColorOverrides,
+    lineLabelOverrides,
     expanded,
     legendVisible,
     stackedBar,
@@ -1522,7 +1527,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     chartLineFilters,
     referenceLines,
     tooltipShowXValue,
-    tooltipShowYValue,
     tooltipExtraColumns,
   };
 
@@ -1718,8 +1722,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setReferenceLines,
     tooltipShowXValue,
     setTooltipShowXValue,
-    tooltipShowYValue,
-    setTooltipShowYValue,
     tooltipExtraColumns,
     setTooltipExtraColumns,
 
@@ -1776,7 +1778,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     xAxisLabelGapPx,
     setXAxisLabelGapPx,
     lineColorOverrides,
+    lineLabelOverrides,
     setLineColorOverrides,
+    setLineLabelOverrides,
     handleToggleDark,
 
     lineStyle,
@@ -1892,6 +1896,7 @@ export function ChartCanvas() {
     chartRef,
     selectedPalette,
     lineColorOverrides,
+    lineLabelOverrides,
     titleHidden,
     title,
     titleColor,
@@ -1911,7 +1916,6 @@ export function ChartCanvas() {
     livelineBadgeVariant,
     chartConfig,
     tooltipShowXValue,
-    tooltipShowYValue,
     tooltipExtraColumns,
     chartLineFilters,
     referenceLines,
@@ -2074,7 +2078,7 @@ export function ChartCanvas() {
         id: `bar:${idx}`,
         sourceKey: seriesKey,
         renderKey: seriesKey,
-        label: seriesKey,
+        label: resolveChartSeriesLabel(seriesKey, idx, lineLabelOverrides, { barPivot: true }),
       }));
     }
     return yKeys.map((sourceKey, idx) => ({
@@ -2082,11 +2086,9 @@ export function ChartCanvas() {
       sourceKey,
       renderKey: `__chart_line_${idx}`,
       usesXAxisValues: isChartXAxisIdentityLine(sourceKey),
-      label: isChartXAxisIdentityLine(sourceKey)
-        ? "X-axis (y = x)"
-        : `Line ${idx + 1}: ${stripSheetScopedColumnKey(sourceKey)}`,
+      label: resolveChartSeriesLabel(sourceKey, idx, lineLabelOverrides),
     }));
-  }, [barSeriesPivot, yKeys]);
+  }, [barSeriesPivot, yKeys, lineLabelOverrides]);
 
   const renderedYKeys = useMemo(() => ySeries.map((series) => series.renderKey), [ySeries]);
 
@@ -2439,14 +2441,12 @@ export function ChartCanvas() {
   const chartTooltipRowDetails = useMemo(
     () => ({
       rowDetailX: tooltipShowXValue,
-      rowDetailY: tooltipShowYValue,
+      rowDetailY: false,
       rowDetailExtraKeys: tooltipExtraColumns,
       rowDetailXKey: xKey,
-      rowDetailYKeys: renderedYKeys,
       rowDetailFormatX: xTickFormatter,
-      rowDetailFormatY: yAxisFormatter,
     }),
-    [tooltipShowXValue, tooltipShowYValue, tooltipExtraColumns, xKey, renderedYKeys, xTickFormatter, yAxisFormatter],
+    [tooltipShowXValue, tooltipExtraColumns, xKey, xTickFormatter],
   );
 
   const chartBuilderRechartsChromeCss = useMemo(() => {

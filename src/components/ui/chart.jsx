@@ -157,7 +157,7 @@ const ChartTooltipContent = React.forwardRef((
   ])
 
   const pivotHeader = React.useMemo(() => {
-    if (!pivotName || hideLabel) return null
+    if (!pivotName || !rowDetailX || hideLabel) return null
     if (label == null || label === "") return null
     let text
     if (typeof pivotLabelFormatter === "function") {
@@ -180,7 +180,7 @@ const ChartTooltipContent = React.forwardRef((
         </div>
       </div>
     )
-  }, [pivotName, pivotLabelFormatter, hideLabel, label, labelClassName, payload])
+  }, [pivotName, rowDetailX, pivotLabelFormatter, hideLabel, label, labelClassName, payload])
 
   if (!active || !payload?.length) {
     return null
@@ -264,7 +264,7 @@ const ChartTooltipContent = React.forwardRef((
             : null}
         </div>
       ) : null}
-      {!pivotName && !nestLabel ? tooltipLabel : null}
+      {!pivotName && !nestLabel && rowDetailX ? tooltipLabel : null}
       <div className="grid gap-1.5">
         {payload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || "value"}`
