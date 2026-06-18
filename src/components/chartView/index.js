@@ -2393,6 +2393,9 @@ export function ChartCanvas() {
   const hasChartLineFilters = normalizeChartLineFilters(chartLineFilters).some(
     (rule) => rule.seriesKey && rule.column,
   );
+  /** Per-line filters null sibling series on shared rows; bridge those gaps so each line stays connected. */
+  const connectSeriesAcrossFilteredGaps =
+    lineAliasing || !hasChartLineFilters || (hasChartLineFilters && ySeries.length > 1);
 
   const renderedReferenceLines = useMemo(() => {
     const axisType = selX ? getAxisType(xKey, dataTypes, finalRenderedData) : "string";
@@ -2698,7 +2701,7 @@ export function ChartCanvas() {
                             dataKey={series.renderKey}
                             name={series.label}
                             type={lineStyle}
-                            connectNulls={lineAliasing || !hasChartLineFilters}
+                            connectNulls={connectSeriesAcrossFilteredGaps}
                             fill={seriesColorFor(series.sourceKey, idx)}
                             fillOpacity={0.4}
                             stroke={seriesColorFor(series.sourceKey, idx)}
@@ -2994,7 +2997,7 @@ export function ChartCanvas() {
                             dataKey={series.renderKey}
                             name={series.label}
                             type={lineStyle}
-                            connectNulls={lineAliasing || !hasChartLineFilters}
+                            connectNulls={connectSeriesAcrossFilteredGaps}
                             stroke={seriesColorFor(series.sourceKey, idx)}
                             strokeWidth={lineStrokeWidth}
                             strokeDasharray={referenceLineDash(lineStrokeStyle)}

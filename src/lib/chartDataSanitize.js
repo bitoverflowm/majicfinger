@@ -1,6 +1,6 @@
 /**
  * Recharts: `null` / junk numerics are normalized to `null` on plot axes so they are ignored.
- * With `connectNulls` on Line/Area, the stroke bridges across those points (continuous lines).
+ * With `connectNulls` on Line/Area, the stroke bridges across null Y cells left by per-line filters on shared rows.
  */
 
 import { temporalToMs } from "@/lib/temporalParse";
