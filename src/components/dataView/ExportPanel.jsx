@@ -126,6 +126,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const loadedDataMeta = v2?.loadedDataMeta;
   const loadedChartMeta = v2?.loadedChartMeta;
   const setLoadedChartMeta = v2?.setLoadedChartMeta;
+  const setLoadedChartBuilderSnapshot = v2?.setLoadedChartBuilderSnapshot;
   const chartSheets = v2?.chartSheets || {};
   const setChartSheets = v2?.setChartSheets;
   const activeChartSheetId = v2?.activeChartSheetId;
@@ -142,6 +143,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
 
   const syncActiveChartSheet = useCallback((chartMeta, snapshot = null) => {
     if (!activeChartSheetId || !chartMeta) return;
+    if (snapshot) setLoadedChartBuilderSnapshot?.(snapshot);
     setChartSheets?.((prev) => {
       const cur = prev?.[activeChartSheetId] || { name: chartMeta.chart_name || "Chart", snapshot: null, chartMeta: null };
       return {
@@ -154,7 +156,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
         },
       };
     });
-  }, [activeChartSheetId, setChartSheets]);
+  }, [activeChartSheetId, setChartSheets, setLoadedChartBuilderSnapshot]);
 
   const capturePublishSnapshot = useCallback(async () => {
     if (typeof chartSnapshotFlusher === "function") {

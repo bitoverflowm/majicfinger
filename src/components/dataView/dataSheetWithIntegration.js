@@ -1069,7 +1069,9 @@ export default function DataSheetWithIntegration({
           ...cur,
           name: loadedChartMeta?.chart_name || cur.name,
           chartMeta: loadedChartMeta || cur.chartMeta || null,
-          snapshot: loadedChartBuilderSnapshot ?? cur.snapshot ?? null,
+          // Prefer in-memory chartSheets snapshot — it is flushed from the live builder and may include
+          // edits (e.g. chartLineFilters) that loadedChartBuilderSnapshot has not caught up with yet.
+          snapshot: cur.snapshot ?? loadedChartBuilderSnapshot ?? null,
         },
       };
     });

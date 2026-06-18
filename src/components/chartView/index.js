@@ -844,22 +844,31 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const snapshotAppliedRef = useRef(false);
   const paletteAppliedRef = useRef(false);
   const snapshotPayloadRef = useRef(null);
+  const lineFiltersRestoredFromRef = useRef(null);
 
   useEffect(() => {
     snapshotAppliedRef.current = false;
     paletteAppliedRef.current = false;
+    lineFiltersRestoredFromRef.current = null;
     snapshotPayloadRef.current = initialBuilderSnapshot ?? null;
   }, [initialBuilderSnapshot]);
 
   // Restore line filters as soon as the snapshot is available — do not wait for active-sheet rows.
+  // Only apply when the snapshot explicitly carries filter/reference-line arrays so a stale seed without
+  // those keys does not wipe in-progress edits.
   useEffect(() => {
     if (demo) return;
     const snap = initialBuilderSnapshot;
     if (!snap || snap.v !== 1) return;
-    if (Array.isArray(snap.chartLineFilters)) {
+    if (lineFiltersRestoredFromRef.current === snap) return;
+    const hasLineFilters = Array.isArray(snap.chartLineFilters);
+    const hasReferenceLines = Array.isArray(snap.referenceLines);
+    if (!hasLineFilters && !hasReferenceLines) return;
+    lineFiltersRestoredFromRef.current = snap;
+    if (hasLineFilters) {
       setChartLineFilters(normalizeChartLineFilters(snap.chartLineFilters));
     }
-    if (Array.isArray(snap.referenceLines)) {
+    if (hasReferenceLines) {
       setReferenceLines(normalizeReferenceLines(snap.referenceLines));
     }
   }, [demo, initialBuilderSnapshot]);
@@ -1672,6 +1681,24 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (typeof onSnapshotGetterReady !== "function") return;
     onSnapshotGetterReady(getBuilderSnapshot);
   }, [onSnapshotGetterReady, getBuilderSnapshot]);
+
+  // Keep chartSheets.snapshot in sync when line filters change so save/publish paths that read
+  // chartSheets do not drop rules that only exist in React state.
+  useEffect(() => {
+    if (demo || !activeChartSheetId || typeof setChartSheets !== "function") return;
+    const timer = setTimeout(() => {
+      const snap = getBuilderSnapshot();
+      if (!snap) return;
+      setChartSheets((prev) => {
+        const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+        return {
+          ...(prev || {}),
+          [activeChartSheetId]: { ...cur, snapshot: snap },
+        };
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [demo, activeChartSheetId, setChartSheets, getBuilderSnapshot, chartLineFilters, referenceLines]);
 
   const downloadChart = (format) => {
     const el = chartRef.current;
