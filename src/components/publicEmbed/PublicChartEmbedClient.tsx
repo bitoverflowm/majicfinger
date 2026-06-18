@@ -15,14 +15,6 @@ import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
-function DataLoader({ rows }: { rows: unknown[] }) {
-  const { setConnectedData } = useMyStateV2();
-  useEffect(() => {
-    setConnectedData?.(rows);
-  }, [rows, setConnectedData]);
-  return null;
-}
-
 function DataSheetsLoader({
   rows,
   dataSheets,
@@ -79,14 +71,24 @@ export default function PublicChartEmbedClient({
   );
   const rows = payload?.data?.rows ?? [];
   const dataSheets = payload?.data?.dataSheets ?? {};
-  const rb =
-    payload?.data?.chart?.rechartsBuilder && payload.data.chart.rechartsBuilder.v === 1
-      ? payload.data.chart.rechartsBuilder
-      : undefined;
-  const chartSnapshot = useMemo(
-    () => normalizeBuilderSnapshot(rb, rows, dataSheets),
-    [rb, rows, dataSheets],
-  );
+  const chartFromPayload = payload?.data?.chart;
+  const chartProps0: Record<string, unknown> =
+    Array.isArray(chartFromPayload?.chart_properties) &&
+    chartFromPayload.chart_properties[0] &&
+    typeof chartFromPayload.chart_properties[0] === "object"
+      ? (chartFromPayload.chart_properties[0] as Record<string, unknown>)
+      : {};
+  const chartPropsRb = chartProps0.rechartsBuilder as Record<string, unknown> | undefined;
+  const chartSnapshot = useMemo(() => {
+    const fromApi =
+      chartFromPayload?.rechartsBuilder && chartFromPayload.rechartsBuilder.v === 1
+        ? chartFromPayload.rechartsBuilder
+        : chartPropsRb?.v === 1
+          ? chartPropsRb
+          : undefined;
+    if (fromApi) return fromApi as Record<string, unknown>;
+    return normalizeBuilderSnapshot(undefined, rows, dataSheets);
+  }, [chartFromPayload?.rechartsBuilder, chartPropsRb, rows, dataSheets]);
   const chartName = payload?.data?.chart?.chart_name || slug;
   const ownerHandleForTracker = payload?.data?.owner_handle || username;
   const trackerReady =
@@ -167,15 +169,10 @@ export default function PublicChartEmbedClient({
     );
   }
 
-  const chart = payload.data.chart;
+  const chart = chartFromPayload!;
   const ownerHandle = payload.data.owner_handle || username;
   const ownerName = payload.data.owner_name ?? null;
   const ownerProfilePic = payload.data.owner_profile_pic ?? null;
-
-  const cp0 =
-    Array.isArray(chart.chart_properties) && chart.chart_properties[0] && typeof chart.chart_properties[0] === "object"
-      ? (chart.chart_properties[0] as Record<string, unknown>)
-      : {};
 
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
@@ -184,11 +181,10 @@ export default function PublicChartEmbedClient({
           isEmbedded ? "min-h-screen gap-1 px-2 py-2 md:px-3 md:py-3" : "min-h-screen gap-3 px-4 py-5 md:px-6 md:py-6"
         }`}
         style={{
-          backgroundColor: (cp0.bgColor as string) || undefined,
-          color: (cp0.textColor as string) || undefined,
+          backgroundColor: (chartProps0.bgColor as string) || undefined,
+          color: (chartProps0.textColor as string) || undefined,
         }}
       >
-        <DataLoader rows={rows} />
         <DataSheetsLoader rows={rows} dataSheets={dataSheets} chartSnapshot={chartSnapshot} />
         <div className={`relative mt-0 flex flex-1 items-center justify-center ${isEmbedded ? "" : "md:mt-2"}`}>
           <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>

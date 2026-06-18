@@ -33,10 +33,17 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
   const rows = chartPayload?.rows ?? [];
   const dataSheets = chartPayload?.dataSheets ?? {};
   const chart = chartPayload?.chart;
+  const cpRb =
+    Array.isArray(chart?.chart_properties) &&
+    chart.chart_properties[0] &&
+    typeof chart.chart_properties[0] === "object" &&
+    chart.chart_properties[0].rechartsBuilder?.v === 1
+      ? chart.chart_properties[0].rechartsBuilder
+      : null;
   const rb =
     chart?.rechartsBuilder && chart.rechartsBuilder.v === 1
       ? chart.rechartsBuilder
-      : inferDefaultBuilderSnapshot(rows);
+      : cpRb || inferDefaultBuilderSnapshot(rows);
 
   const chartSnapshot = useMemo(
     () => normalizeBuilderSnapshot(rb, rows, dataSheets),

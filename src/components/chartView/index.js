@@ -36,6 +36,10 @@ import { temporalToMs } from "@/lib/temporalParse";
 import { downsampleRowsForChart } from "@/lib/chartRenderCap";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
 import { resolveChartSeriesLabel } from "@/lib/chartLineLabels";
+import {
+  aliasScopedColumnKeysOnRows,
+  resolveChartSheetId,
+} from "@/lib/chartSnapshotDataDeps";
 
 const ChartBuilderContext = createContext(null);
 
@@ -131,6 +135,35 @@ function rowValueForDataKey(row, key) {
     if (col && Object.prototype.hasOwnProperty.call(row, col)) return row[col];
   }
   return undefined;
+}
+
+/** Copy values onto scoped + plain keys so Recharts and filters read the same row shape on embed. */
+function enrichPlotRowKeys(rows, keys) {
+  if (!Array.isArray(rows) || !rows.length) return rows;
+  const keyList = [...new Set((keys || []).map((k) => String(k || "").trim()).filter(Boolean))];
+  if (!keyList.length) return rows;
+  return rows.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+    const next = { ...row };
+    for (const key of keyList) {
+      const value = rowValueForDataKey(row, key);
+      if (value === undefined) continue;
+      next[key] = value;
+      const plain = stripSheetScopedColumnKey(key);
+      if (plain && plain !== key) next[plain] = value;
+    }
+    return next;
+  });
+}
+
+function resolveRowPlotKey(rows, key) {
+  if (!key || !Array.isArray(rows) || !rows.length) return key;
+  const first = rows.find((row) => row && typeof row === "object");
+  if (!first) return key;
+  if (Object.prototype.hasOwnProperty.call(first, key) && first[key] != null && first[key] !== "") return key;
+  const plain = stripSheetScopedColumnKey(String(key));
+  if (plain && plain !== key && first[plain] != null && first[plain] !== "") return plain;
+  return key;
 }
 
 export function getAxisType(key, dataTypes, data) {
@@ -721,13 +754,22 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     [activeChartSheetId, setChartSheets],
   );
 
-  const [selChartType, setSelChartType] = useState('area');
+  const [selChartType, setSelChartType] = useState(() => {
+    const s = initialBuilderSnapshot;
+    return s?.v === 1 && s.selChartType != null ? s.selChartType : "area";
+  });
 
   useEffect(() => {
     setSelChartType((prev) => (prev === "heatmap" ? "treemap" : prev));
   }, []);
-  const [selX, setSelX] = useState(undefined);
-  const [selY, setSelY] = useState([]);
+  const [selX, setSelX] = useState(() => {
+    const s = initialBuilderSnapshot;
+    return s?.v === 1 && s.selX !== undefined ? s.selX : undefined;
+  });
+  const [selY, setSelY] = useState(() => {
+    const s = initialBuilderSnapshot;
+    return s?.v === 1 && Array.isArray(s.selY) ? s.selY : [];
+  });
   const [xOptions, setXOptions] = useState([]);
   const [availableYOptions, setAvailableYOptons] = useState([]);
   const [lineStyle, setLineStyle] = useState("natural");
@@ -835,7 +877,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
-  const [chartLineFilters, setChartLineFilters] = useState([]);
+  const [chartLineFilters, setChartLineFilters] = useState(() => {
+    const s = initialBuilderSnapshot;
+    return s?.v === 1 && Array.isArray(s.chartLineFilters)
+      ? normalizeChartLineFilters(s.chartLineFilters)
+      : [];
+  });
   const [referenceLines, setReferenceLines] = useState([]);
   /** Hover tooltip: optional X / Y / extra sheet columns from the hovered data row (not plotted). */
   const [tooltipShowXValue, setTooltipShowXValue] = useState(true);
@@ -844,27 +891,33 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const snapshotAppliedRef = useRef(false);
   const paletteAppliedRef = useRef(false);
   const snapshotPayloadRef = useRef(null);
-  const lineFiltersRestoredFromRef = useRef(null);
+  const snapshotSeedRestoredFromRef = useRef(null);
 
   useEffect(() => {
     snapshotAppliedRef.current = false;
     paletteAppliedRef.current = false;
-    lineFiltersRestoredFromRef.current = null;
+    snapshotSeedRestoredFromRef.current = null;
     snapshotPayloadRef.current = initialBuilderSnapshot ?? null;
   }, [initialBuilderSnapshot]);
 
-  // Restore line filters as soon as the snapshot is available — do not wait for active-sheet rows.
-  // Only apply when the snapshot explicitly carries filter/reference-line arrays so a stale seed without
-  // those keys does not wipe in-progress edits.
+  // Restore axes + line filters as soon as the snapshot is available — do not wait for active-sheet rows.
+  // Public embeds must plot before sheet columns finish hydrating; only apply when the snapshot explicitly
+  // carries saved keys so a stale seed without them does not wipe in-progress edits.
   useEffect(() => {
     if (demo) return;
     const snap = initialBuilderSnapshot;
     if (!snap || snap.v !== 1) return;
-    if (lineFiltersRestoredFromRef.current === snap) return;
+    if (snapshotSeedRestoredFromRef.current === snap) return;
+    const hasSavedAxes = !!(snap.selX || (Array.isArray(snap.selY) && snap.selY.length));
     const hasLineFilters = Array.isArray(snap.chartLineFilters);
     const hasReferenceLines = Array.isArray(snap.referenceLines);
-    if (!hasLineFilters && !hasReferenceLines) return;
-    lineFiltersRestoredFromRef.current = snap;
+    if (!hasSavedAxes && !hasLineFilters && !hasReferenceLines) return;
+    snapshotSeedRestoredFromRef.current = snap;
+    if (hasSavedAxes) {
+      if (snap.selChartType != null) setSelChartType(snap.selChartType);
+      if (snap.selX !== undefined) setSelX(snap.selX);
+      if (Array.isArray(snap.selY)) setSelY(snap.selY);
+    }
     if (hasLineFilters) {
       setChartLineFilters(normalizeChartLineFilters(snap.chartLineFilters));
     }
@@ -1010,6 +1063,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
     if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
     if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
+    if (Array.isArray(s.chartLineFilters)) {
+      setChartLineFilters(normalizeChartLineFilters(s.chartLineFilters));
+    }
+    if (Array.isArray(s.referenceLines)) {
+      setReferenceLines(normalizeReferenceLines(s.referenceLines));
+    }
     if (s.tooltipShowXValue !== undefined) setTooltipShowXValue(!!s.tooltipShowXValue);
     else if (s.legendShowXValue !== undefined) setTooltipShowXValue(!!s.legendShowXValue);
     if (Array.isArray(s.tooltipExtraColumns)) setTooltipExtraColumns(s.tooltipExtraColumns);
@@ -1150,15 +1209,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setSelX((x) => {
       if (!x) return x;
       const resolved = resolveToExistingKey(x);
-      if (!resolved) return undefined;
-      return resolved;
+      // Keep scoped keys when sheet ids differ between saved snapshot and hydrated embed data.
+      return resolved ?? x;
     });
     setSelY((prev) => {
       const curr = Array.isArray(prev) ? prev : [];
-      const next = curr
-        .map((y) => ({ raw: y, resolved: resolveToExistingKey(y) }))
-        .filter((p) => !!p.resolved)
-        .map((p) => p.resolved);
+      const next = curr.map((y) => resolveToExistingKey(y) ?? y).filter(Boolean);
       const stable =
         next.length === curr.length &&
         next.every((v, i) => v === curr[i]);
@@ -1355,8 +1411,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
             return null;
           }
           if (rule.column && !columnExists(rule.column)) {
-            changed = true;
-            return null;
+            const resolved = resolveColumnKey(rule.column);
+            if (resolved && columnExists(resolved)) {
+              changed = true;
+              return { ...rule, column: resolved };
+            }
+            // Keep saved rule — rowValueForDataKey resolves plain column names on embed rows.
+            return rule;
           }
           const resolvedColumn = resolveColumnKey(rule.column);
           if (resolvedColumn !== rule.column) {
@@ -1473,15 +1534,15 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const neededKeys = new Set([...plotKeyList, ...tooltipKeys, ...filterKeys]);
     if (!neededKeys.size) return chartData?.length ? chartData : (demo ? dfltChartData : []);
     /** Only X/Y (and other plot keys) determine row count. Tooltip-only scoped columns must not truncate the series. */
-    const sheetRowCount = (sheetId) => {
-      const d = dataSheets?.[sheetId]?.data;
+    const sheetRowCount = (resolvedSheetId) => {
+      const d = dataSheets?.[resolvedSheetId]?.data;
       return Array.isArray(d) ? d.length : 0;
     };
     const plotSheetLengths = [];
     const seenPlotSheets = new Set();
     for (const key of plotKeyList) {
       const parsed = parseScopedColumnKey(key, activeSheetId);
-      const sid = parsed.sheetId || activeSheetId;
+      const sid = resolveChartSheetId(parsed.sheetId || activeSheetId, dataSheets, activeSheetId);
       if (!sid || seenPlotSheets.has(sid)) continue;
       seenPlotSheets.add(sid);
       plotSheetLengths.push(sheetRowCount(sid));
@@ -1493,18 +1554,26 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const row = {};
       for (const key of neededKeys) {
         const parsed = parseScopedColumnKey(key, activeSheetId);
-        const sourceRows =
-          parsed.sheetId && Array.isArray(dataSheets?.[parsed.sheetId]?.data)
-            ? dataSheets[parsed.sheetId].data
-            : activeRows;
+        const resolvedSheetId = resolveChartSheetId(parsed.sheetId || activeSheetId, dataSheets, activeSheetId);
+        const sourceRows = Array.isArray(dataSheets?.[resolvedSheetId]?.data)
+          ? dataSheets[resolvedSheetId].data
+          : activeRows;
         row[key] = sourceRows[idx]?.[parsed.column] ?? null;
+        if (parsed.column && parsed.column !== key && row[key] != null) {
+          row[parsed.column] = row[key];
+        }
       }
       if (selX && row[selX] == null && !lineIsTemporalX) {
         row[selX] = idx;
       }
       rows.push(row);
     }
-    return rows.length ? rows : (chartData?.length ? chartData : (demo ? dfltChartData : []));
+    if (rows.length) return rows;
+    const fallback = chartData?.length ? chartData : demo ? dfltChartData : [];
+    if (fallback.length && neededKeys.size) {
+      return aliasScopedColumnKeysOnRows(fallback, [...neededKeys], dataSheets, activeSheetId);
+    }
+    return fallback;
   }, [
     demo,
     chartData,
@@ -2274,9 +2343,17 @@ export function ChartCanvas() {
 
   const plotRowsForMaterialize = barSeriesPivot?.rows ?? sortedPlotRows;
 
+  const materializePlotKeys = useMemo(() => {
+    const filterCols = normalizeChartLineFilters(chartLineFilters)
+      .map((rule) => rule.column)
+      .filter(Boolean);
+    return [...new Set([xKey, ...yKeys, ...filterCols].filter(Boolean))];
+  }, [xKey, yKeys, chartLineFilters]);
+
   const filteredPlotRows = useMemo(() => {
-    return materializeChartSeriesRows(plotRowsForMaterialize, ySeries, chartLineFilters, xKey);
-  }, [plotRowsForMaterialize, ySeries, chartLineFilters, xKey]);
+    const enriched = enrichPlotRowKeys(plotRowsForMaterialize, materializePlotKeys);
+    return materializeChartSeriesRows(enriched, ySeries, chartLineFilters, xKey);
+  }, [plotRowsForMaterialize, ySeries, chartLineFilters, xKey, materializePlotKeys]);
 
   const timeframedPlotRows = useMemo(() => {
     if (!chartUsesTimeframes) return filteredPlotRows;
@@ -2303,6 +2380,11 @@ export function ChartCanvas() {
     });
   }, [cartesianChart, normalizedPlotRows, xKey, renderedYKeys, xAxisType, dataTypes]);
 
+  const plotXKey = useMemo(
+    () => resolveRowPlotKey(finalRenderedData, xKey) || xKey,
+    [finalRenderedData, xKey],
+  );
+
   /** Treemap keeps raw pivot labels (not epoch ms). */
   const treemapRows = useMemo(() => {
     if (!selX || !Array.isArray(rawData) || rawData.length <= 1) return rawData;
@@ -2314,7 +2396,8 @@ export function ChartCanvas() {
     });
   }, [rawData, xAxisType, xKey, selX, effectiveTemporalSort]);
 
-  const firstPlotX = selX && plotRows.length ? plotRows[0]?.[xKey] : null;
+  const firstPlotX =
+    selX && finalRenderedData.length ? rowValueForDataKey(finalRenderedData[0], xKey) : null;
   /** Recharts: numeric scale for unix / epoch ms; Date objects need normalization (see effectiveUseTimeSeriesX). */
   const rechartsXAxisType =
     cartesianChart &&
@@ -2766,7 +2849,7 @@ export function ChartCanvas() {
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
-                          dataKey={xKey}
+                          dataKey={plotXKey}
                           domain={xAxisNumberDomain}
                           ticks={xAxisTicks}
                           tickLine={false}
@@ -2853,7 +2936,7 @@ export function ChartCanvas() {
                             />
                             <YAxis
                               type={rechartsXAxisType}
-                              dataKey={xKey}
+                              dataKey={plotXKey}
                               domain={rechartsXAxisType === "number" ? xAxisNumberDomain : undefined}
                               ticks={rechartsXAxisType === "number" ? xAxisTicks : undefined}
                               tickLine={false}
@@ -2870,7 +2953,7 @@ export function ChartCanvas() {
                           <>
                             <XAxis
                               type={rechartsXAxisType}
-                              dataKey={xKey}
+                              dataKey={plotXKey}
                               domain={rechartsXAxisType === "number" ? xAxisNumberDomain : undefined}
                               ticks={rechartsXAxisType === "number" ? xAxisTicks : undefined}
                               tickLine={false}
@@ -2966,7 +3049,7 @@ export function ChartCanvas() {
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
-                          dataKey={xKey}
+                          dataKey={plotXKey}
                           name={stripSheetScopedColumnKey(xKey)}
                           domain={xAxisNumberDomain}
                           ticks={xAxisTicks}
@@ -3062,7 +3145,7 @@ export function ChartCanvas() {
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
-                          dataKey={xKey}
+                          dataKey={plotXKey}
                           domain={xAxisNumberDomain}
                           ticks={xAxisTicks}
                           tickLine={false}

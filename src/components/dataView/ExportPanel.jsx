@@ -123,6 +123,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const v2 = useMyStateV2();
   const userHandle = v2?.userHandle;
   const connectedData = v2?.connectedData || [];
+  const dataSheets = v2?.dataSheets || {};
   const loadedDataMeta = v2?.loadedDataMeta;
   const loadedChartMeta = v2?.loadedChartMeta;
   const setLoadedChartMeta = v2?.setLoadedChartMeta;
@@ -272,6 +273,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
         const dsPayload = await prepareLargeJsonBody({
           data_set_name: `${chartName} dataset`,
           data: connectedData,
+          ...(Object.keys(dataSheets).length ? { data_sheets: dataSheets } : {}),
           created_date: new Date(),
           last_saved_date: new Date(),
           labels: ["embed"],

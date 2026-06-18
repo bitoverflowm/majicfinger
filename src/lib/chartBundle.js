@@ -78,7 +78,8 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     if (raw.includes("::")) return true;
     return keys.includes(deScope(raw));
   });
-  s.selY = cleanY.length ? [...new Set(cleanY)] : fallback.selY;
+  // Keep duplicate Y entries — same column with per-line filters (line:0, line:1, …).
+  s.selY = cleanY.length ? cleanY : fallback.selY;
 
   if (s.barSeriesColumn !== undefined && s.barSeriesColumn !== null) {
     const rawBar = String(s.barSeriesColumn || "");
@@ -199,9 +200,9 @@ export function buildPublicChartBundle(chartLean, dataSetLean) {
   const cp = Array.isArray(chartLean.chart_properties)
     ? chartLean.chart_properties[0]
     : chartLean.chart_properties;
-  const dataSheets =
+  let dataSheets =
     dataSetLean?.data_sheets && typeof dataSetLean.data_sheets === "object"
-      ? dataSetLean.data_sheets
+      ? { ...dataSetLean.data_sheets }
       : {};
   const fallbackRowsFromSheets =
     Object.values(dataSheets || {}).find((s) => Array.isArray(s?.data) && s.data.length)?.data || [];
@@ -211,10 +212,19 @@ export function buildPublicChartBundle(chartLean, dataSetLean) {
     cp && typeof cp === "object" && cp.rechartsBuilder && cp.rechartsBuilder.v === 1
       ? cp.rechartsBuilder
       : inferDefaultBuilderSnapshot(rowsForFallback);
+  if (!Object.keys(dataSheets).length && rowsForFallback.length) {
+    const sheetId = primarySheetIdForChartSnapshot({}, rechartsBuilderRaw);
+    dataSheets[sheetId] = {
+      name: "Data",
+      data: rowsForFallback,
+      provenance: null,
+    };
+  }
   const primaryId = primarySheetIdForChartSnapshot(dataSheets, rechartsBuilderRaw);
   const scopedSheets = dataSheetsReferencedBySnapshot(dataSheets, rechartsBuilderRaw);
+  const primarySheetExists = Boolean(dataSheets[primaryId]);
   const primaryRows = Array.isArray(dataSheets[primaryId]?.data) ? dataSheets[primaryId].data : [];
-  const rowsForNormalize = primaryRows.length ? primaryRows : rowsForFallback;
+  const rowsForNormalize = primaryRows.length ? primaryRows : primarySheetExists ? [] : rowsForFallback;
   const rechartsBuilder = normalizeBuilderSnapshot(rechartsBuilderRaw, rowsForNormalize, scopedSheets);
 
   const publicChart = {
@@ -223,7 +233,7 @@ export function buildPublicChartBundle(chartLean, dataSetLean) {
     rechartsBuilder,
   };
 
-  const rows = primaryRows.length ? primaryRows : rowsForFallback;
+  const rows = primaryRows.length ? primaryRows : primarySheetExists ? [] : rowsForFallback;
 
   return {
     chart: publicChart,

@@ -5,11 +5,14 @@ import {
   primarySheetIdForChartSnapshot,
   projectRowObjectsToColumnSet,
 } from "@/lib/chartSnapshotDataDeps";
+import { rehydrateQuantAthenaSheetServer } from "@/lib/dataLake/rehydrateQuantAthenaSheet";
 import {
   buildRehydrateSheetRequestBody,
   buildSheetProvenanceGraphForRehydrate,
   runRehydrateSheetCore,
 } from "@/lib/dataLake/rehydrateSheetCore";
+import { sheetNeedsQuantAthenaReplay } from "@/lib/projectPersistence";
+import { collectSheetClosureForCharts } from "@/lib/runYourself/collectSheetClosure";
 
 function cloneLeanDoc(doc) {
   try {
@@ -65,17 +68,22 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
       ? cp.rechartsBuilder
       : inferDefaultBuilderSnapshot(rowsForFallback);
   const primaryId = primarySheetIdForChartSnapshot(dataSheets, rechartsBuilderRaw);
-  const colsBySheet = collectChartSnapshotColumnsBySheetId(rechartsBuilderRaw, primaryId);
+  const colsBySheet = collectChartSnapshotColumnsBySheetId(rechartsBuilderRaw, primaryId, dataSheets);
 
   const access = await getAthenaAccessForUserId(chartLean?.user_id);
-  /** @type {Set<string>} */
-  let candidates = new Set();
-  for (const sid of colsBySheet.keys()) {
-    if (sheetNeedsLakeRehydrate(dataSheets[sid])) candidates.add(sid);
-  }
-  candidates = new Set([...candidates].filter((sid) => !isJoinDependencyOfAnotherCandidate(sid, candidates, dataSheets)));
+  const closureOrder = collectSheetClosureForCharts(dataSheets, [chartLean]);
 
-  for (const sheetId of candidates) {
+  /** @type {Set<string>} */
+  let composeCandidates = new Set();
+  for (const sid of closureOrder) {
+    if (sheetNeedsLakeRehydrate(dataSheets[sid])) composeCandidates.add(sid);
+  }
+  composeCandidates = new Set(
+    [...composeCandidates].filter((sid) => !isJoinDependencyOfAnotherCandidate(sid, composeCandidates, dataSheets)),
+  );
+
+  for (const sheetId of closureOrder) {
+    if (!composeCandidates.has(sheetId)) continue;
     const sheet = dataSheets[sheetId];
     if (!sheet?.provenance || sheet.provenance.kind !== "compose") continue;
     const colSet = colsBySheet.get(sheetId);
@@ -104,8 +112,35 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
     }
   }
 
+  for (const sheetId of closureOrder) {
+    const sheet = dataSheets[sheetId];
+    if (!sheetNeedsQuantAthenaReplay(sheet)) continue;
+    const colSet = colsBySheet.get(sheetId);
+    try {
+      const { rows, json } = await rehydrateQuantAthenaSheetServer({
+        access,
+        sheet,
+        sheetId,
+        dataSheets,
+      });
+      let trimmed = rows;
+      if (colSet && colSet.size > 0) trimmed = projectRowObjectsToColumnSet(rows, colSet);
+      dataSheets[sheetId] = {
+        ...sheet,
+        data: trimmed,
+        storageMode: "derived",
+        rehydrationStatus: "complete",
+        rowCount: trimmed.length,
+        fullRowCount: json?.rowCount ?? trimmed.length,
+        columns: sheet.columns,
+      };
+    } catch {
+      /* keep recipe-only sheet if Athena is unavailable */
+    }
+  }
+
   for (const [sheetId, sheet] of Object.entries(dataSheets)) {
-    if (candidates.has(sheetId)) continue;
+    if (composeCandidates.has(sheetId)) continue;
     const colSet = colsBySheet.get(sheetId);
     if (!colSet || colSet.size === 0 || !Array.isArray(sheet?.data)) continue;
     dataSheets[sheetId] = {
@@ -114,10 +149,17 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
     };
   }
 
-  const primaryRows = dataSheets[primaryId]?.data;
-  if (Array.isArray(primaryRows) && primaryRows.length) {
+  if (!Object.keys(dataSheets).length && Array.isArray(out.data) && out.data.length) {
     const pCols = colsBySheet.get(primaryId);
-    out.data = pCols && pCols.size > 0 ? projectRowObjectsToColumnSet(primaryRows, pCols) : primaryRows;
+    if (pCols && pCols.size > 0) {
+      out.data = projectRowObjectsToColumnSet(out.data, pCols);
+    }
+  } else {
+    const primaryRows = dataSheets[primaryId]?.data;
+    if (Array.isArray(primaryRows) && primaryRows.length) {
+      const pCols = colsBySheet.get(primaryId);
+      out.data = pCols && pCols.size > 0 ? projectRowObjectsToColumnSet(primaryRows, pCols) : primaryRows;
+    }
   }
 
   return out;

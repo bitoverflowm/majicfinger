@@ -1,18 +1,12 @@
+import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
 import { buildSheetGraphForAthena } from "@/lib/dataLake/buildSheetGraph";
 import { fetchSheetQuantAthena } from "@/lib/dataLake/fetchSheetQuantAthena";
+import { normalizeQuantAthenaRows } from "@/lib/dataLake/normalizeQuantAthenaRows";
 import { restoreQuantAthenaReplayConfig } from "@/lib/dataLake/restoreQuantAthenaReplayConfig";
+import { runSheetQuantAthena } from "@/lib/dataLake/sheetQuantAthenaCore";
 import { findQuantAthenaOperation } from "@/lib/projectPersistence";
 
-/**
- * Re-run a saved quant.relative_position.athena operation against the source sheet graph.
- * @param {{
- *   sheet: object;
- *   sheetId?: string;
- *   dataSheets: Record<string, object>;
- *   operation?: object;
- * }} params
- */
-export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheets, operation }) {
+function buildQuantAthenaReplayPayload({ sheet, dataSheets, operation }) {
   const op = operation || findQuantAthenaOperation(sheet);
   if (!op) {
     throw new Error("This sheet has no saved quant Athena operation.");
@@ -37,9 +31,9 @@ export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheet
     rootSheetId,
   });
 
-  const { rows, rowCount } = await fetchSheetQuantAthena({
-    sheetGraph,
+  return {
     rootSheetId,
+    sheetGraph,
     join: {
       lake: join.lake || "kalshi",
       table: join.table || "trades",
@@ -49,12 +43,13 @@ export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheet
       columns: join.columns,
     },
     quant,
-  });
+  };
+}
 
+function finalizeQuantAthenaReplayRows({ rows, rowCount, sheetId }) {
   if (!rows.length) {
     throw new Error("Quant Athena replay returned no rows.");
   }
-
   return {
     rows,
     json: {
@@ -62,4 +57,74 @@ export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheet
       sheetId: sheetId || null,
     },
   };
+}
+
+/**
+ * Re-run a saved quant.relative_position.athena operation against the source sheet graph.
+ * @param {{
+ *   sheet: object;
+ *   sheetId?: string;
+ *   dataSheets: Record<string, object>;
+ *   operation?: object;
+ * }} params
+ */
+export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheets, operation }) {
+  const { sheetGraph, rootSheetId, join, quant } = buildQuantAthenaReplayPayload({
+    sheet,
+    dataSheets,
+    operation,
+  });
+
+  const { rows, rowCount } = await fetchSheetQuantAthena({
+    sheetGraph,
+    rootSheetId,
+    join,
+    quant,
+  });
+
+  return finalizeQuantAthenaReplayRows({ rows, rowCount, sheetId });
+}
+
+/**
+ * Server-side quant Athena replay (public embed / API routes — no browser fetch).
+ * @param {{
+ *   access: object;
+ *   sheet: object;
+ *   sheetId?: string;
+ *   dataSheets: Record<string, object>;
+ *   operation?: object;
+ *   maxWaitMs?: number;
+ * }} params
+ */
+export async function rehydrateQuantAthenaSheetServer({
+  access,
+  sheet,
+  sheetId,
+  dataSheets,
+  operation,
+  maxWaitMs,
+}) {
+  const { sheetGraph, rootSheetId, join, quant } = buildQuantAthenaReplayPayload({
+    sheet,
+    dataSheets,
+    operation,
+  });
+
+  const result = await runSheetQuantAthena({
+    access,
+    sheetGraph,
+    rootSheetId,
+    join,
+    quant,
+    maxWaitMs,
+  });
+  const colNames = Array.isArray(result.columns) ? result.columns : [];
+  const rawRows = Array.isArray(result.rows) ? result.rows : [];
+  const rows = normalizeQuantAthenaRows(athenaRowsToObjects(colNames, rawRows));
+
+  return finalizeQuantAthenaReplayRows({
+    rows,
+    rowCount: result.rowCount ?? rows.length,
+    sheetId,
+  });
 }

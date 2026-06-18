@@ -70,9 +70,60 @@ export function resolveEmbedActiveSheetId(dataSheets, snapshot) {
   const entries = Object.entries(sheets);
   if (!entries.length) return "sheet-1";
   const primaryId = primarySheetIdForChartSnapshot(sheets, snapshot);
-  if (primaryId && sheets[primaryId]) return primaryId;
+  const resolvedPrimary = resolveChartSheetId(primaryId, sheets, null);
+  if (resolvedPrimary && sheets[resolvedPrimary]) return resolvedPrimary;
   const withData = entries.find(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
   return withData?.[0] || entries[0][0];
+}
+
+/**
+ * Saved builder keys often use workspace sheet ids (e.g. `relative_position::col`) while public
+ * datasets persist generic ids (`sheet-1::col`). Map missing ids onto a sheet that has data.
+ *
+ * @param {string | null | undefined} requestedSheetId
+ * @param {Record<string, unknown>} dataSheets
+ * @param {string | null | undefined} activeSheetId
+ * @returns {string}
+ */
+export function resolveChartSheetId(requestedSheetId, dataSheets, activeSheetId) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  const req = String(requestedSheetId || "").trim();
+  if (req && sheets[req]) return req;
+  const active = String(activeSheetId || "").trim();
+  if (active && sheets[active]) return active;
+  const withData = Object.entries(sheets).find(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
+  if (withData) return withData[0];
+  const first = Object.keys(sheets)[0];
+  return first || req || active || "sheet-1";
+}
+
+/**
+ * Recharts reads `row[scopedKey]` directly. Plain sheet rows only store column names — copy values
+ * onto scoped keys when cross-sheet merge falls back to connectedData.
+ *
+ * @param {unknown[]} rows
+ * @param {string[]} keys
+ * @param {Record<string, unknown>} dataSheets
+ * @param {string | null | undefined} activeSheetId
+ * @returns {unknown[]}
+ */
+export function aliasScopedColumnKeysOnRows(rows, keys, dataSheets, activeSheetId) {
+  if (!Array.isArray(rows) || !rows.length) return rows;
+  const keyList = [...new Set((keys || []).map((k) => String(k || "").trim()).filter(Boolean))];
+  if (!keyList.length) return rows;
+  return rows.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+    const next = { ...row };
+    for (const key of keyList) {
+      if (next[key] != null && next[key] !== "") continue;
+      const splitIdx = key.indexOf("::");
+      const column = splitIdx > 0 ? key.slice(splitIdx + 2) : key;
+      if (column && Object.prototype.hasOwnProperty.call(row, column)) {
+        next[key] = row[column];
+      }
+    }
+    return next;
+  });
 }
 
 /**
@@ -99,11 +150,18 @@ export function dataSheetsReferencedBySnapshot(dataSheets, snapshot) {
  * @param {string} defaultSheetId
  * @returns {Map<string, Set<string>>}
  */
-export function collectChartSnapshotColumnsBySheetId(snapshot, defaultSheetId) {
+export function collectChartSnapshotColumnsBySheetId(snapshot, defaultSheetId, dataSheets = null) {
   const s = snapshot && typeof snapshot === "object" ? snapshot : {};
   const def = String(defaultSheetId || "sheet-1").trim() || "sheet-1";
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : null;
   /** @type {Map<string, Set<string>>} */
   const bySheet = new Map();
+
+  const targetSheetId = (sheetId) => {
+    const sid = String(sheetId || "").trim() || def;
+    if (!sheets) return sid;
+    return sheets[sid] ? sid : def;
+  };
 
   const add = (scopedKey) => {
     const raw = String(scopedKey || "").trim();
@@ -115,6 +173,7 @@ export function collectChartSnapshotColumnsBySheetId(snapshot, defaultSheetId) {
       sheetId = raw.slice(0, idx).trim() || def;
       col = raw.slice(idx + 2).trim();
     }
+    sheetId = targetSheetId(sheetId);
     if (!col || col.startsWith("_")) return;
     if (!bySheet.has(sheetId)) bySheet.set(sheetId, new Set());
     bySheet.get(sheetId).add(col);
