@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
@@ -9,7 +9,7 @@ import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfBut
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
-  useEffect(() => {
+  useLayoutEffect(() => {
     const incomingSheets =
       dataSheets && typeof dataSheets === "object" && Object.keys(dataSheets).length
         ? dataSheets

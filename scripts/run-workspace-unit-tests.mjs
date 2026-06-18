@@ -32,6 +32,7 @@ import { defaultChartSeriesLabel, resolveChartSeriesLabel } from "@/lib/chartLin
 import { shouldUseLargeAthenaPullPath } from "@/lib/dataLake/largeAthenaPull.js";
 
 import "@/lib/chartReferenceEquation.test.js";
+import "@/lib/chartBundle.test.js";
 import "@/lib/sheetOperations/aggregateBucketRows.test.js";
 import "@/lib/dataLake/restoreQuantAthenaReplayConfig.test.js";
 import "@/lib/projectPersistence.quant.test.js";

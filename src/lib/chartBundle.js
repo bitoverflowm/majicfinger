@@ -118,6 +118,52 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     s.lineLabelOverrides = nextLabels;
   }
 
+  if (Array.isArray(s.chartLineFilters)) {
+    const yKeys = Array.isArray(s.selY) ? s.selY : [];
+    const allowedSeries = new Set([
+      ...yKeys.map((_, idx) => `line:${idx}`),
+      ...yKeys,
+    ]);
+    const resolveFilterSeriesKey = (seriesKey) => {
+      const raw = String(seriesKey || "");
+      if (!raw) return "";
+      if (/^line:\d+$/.test(raw)) {
+        const idx = Number(raw.slice(5));
+        if (idx >= 0 && idx < yKeys.length) return raw;
+      }
+      const plain = deScope(raw);
+      const idx = yKeys.findIndex((y) => {
+        const yRaw = String(y || "");
+        return yRaw === raw || deScope(yRaw) === plain;
+      });
+      return idx >= 0 ? `line:${idx}` : raw;
+    };
+    const resolveFilterColumn = (column) => {
+      const raw = String(column || "").trim();
+      if (!raw) return "";
+      if (raw.includes("::")) return raw;
+      const plain = deScope(raw);
+      if (keys.includes(plain)) return plain;
+      return raw;
+    };
+    s.chartLineFilters = s.chartLineFilters
+      .map((rule, idx) => {
+        if (!rule || typeof rule !== "object") return null;
+        const seriesKey = resolveFilterSeriesKey(rule.seriesKey);
+        const column = resolveFilterColumn(rule.column);
+        if (!seriesKey || !column) return null;
+        if (!allowedSeries.has(seriesKey) && !/^line:\d+$/.test(seriesKey)) return null;
+        return {
+          id: String(rule.id || `filter-${idx}`),
+          seriesKey,
+          column,
+          operator: String(rule.operator || "="),
+          value: rule.value ?? "",
+        };
+      })
+      .filter(Boolean);
+  }
+
   if (s.chartConfig && typeof s.chartConfig === "object") {
     const nextCfg = {};
     for (const [rawKey, cfg] of Object.entries(s.chartConfig)) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { StateProviderV2 } from "@/context/stateContextV2";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -24,7 +24,7 @@ function DataLoader({ rows }: { rows: unknown[] }) {
 
 function DataSheetsLoader({ rows, dataSheets }: { rows: unknown[]; dataSheets?: Record<string, any> }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
-  useEffect(() => {
+  useLayoutEffect(() => {
     const incomingSheets =
       dataSheets && typeof dataSheets === "object" && Object.keys(dataSheets).length
         ? dataSheets

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { aggregateBucketRows } from "./aggregateBucketRows.js";
+import { aggregateBucketRows, getNumericBucketForValue } from "./aggregateBucketRows.js";
 
 function test(name, fn) {
   try {
@@ -39,28 +39,33 @@ test("bucket groups by additional dimensions and bucket column", () => {
     ],
   });
 
-  assert.equal(out.length, 4);
+  assert.equal(out.length, 3);
 
-  const cp0_0_10 = out.find((r) => r.lifecycle_checkpoint === 0 && r.yes_price_bucket === "0-10");
-  assert.ok(cp0_0_10, "expected checkpoint 0 bucket 0-10");
-  assert.equal(cp0_0_10.market_count, 2);
-  assert.equal(cp0_0_10.avg_probability, 6.5);
-  assert.equal(cp0_0_10.yes_rate, 1);
+  const cp0_3_12 = out.find((r) => r.lifecycle_checkpoint === 0 && r.yes_price_bucket === "3-12");
+  assert.ok(cp0_3_12, "expected checkpoint 0 bucket 3-12");
+  assert.equal(cp0_3_12.market_count, 2);
+  assert.equal(cp0_3_12.avg_probability, 6.5);
+  assert.equal(cp0_3_12.yes_rate, 1);
 
-  const cp0_10_20 = out.find((r) => r.lifecycle_checkpoint === 0 && r.yes_price_bucket === "10-20");
-  assert.ok(cp0_10_20, "expected checkpoint 0 bucket 10-20");
-  assert.equal(cp0_10_20.market_count, 1);
-  assert.equal(cp0_10_20.yes_rate, 0);
+  const cp0_13_15 = out.find((r) => r.lifecycle_checkpoint === 0 && r.yes_price_bucket === "13-15");
+  assert.ok(cp0_13_15, "expected checkpoint 0 bucket 13-15");
+  assert.equal(cp0_13_15.market_count, 1);
+  assert.equal(cp0_13_15.yes_rate, 0);
 
-  const cp25_0_10 = out.find((r) => r.lifecycle_checkpoint === 0.25 && r.yes_price_bucket === "0-10");
-  assert.ok(cp25_0_10, "expected checkpoint 0.25 bucket 0-10");
-  assert.equal(cp25_0_10.market_count, 1);
-  assert.equal(cp25_0_10.yes_rate, 1);
+  const cp25_3_12 = out.find((r) => r.lifecycle_checkpoint === 0.25 && r.yes_price_bucket === "3-12");
+  assert.ok(cp25_3_12, "expected checkpoint 0.25 bucket 3-12");
+  assert.equal(cp25_3_12.market_count, 2);
+  assert.equal(cp25_3_12.yes_rate, 0.5);
+});
 
-  const cp25_10_20 = out.find((r) => r.lifecycle_checkpoint === 0.25 && r.yes_price_bucket === "10-20");
-  assert.ok(cp25_10_20, "expected checkpoint 0.25 bucket 10-20");
-  assert.equal(cp25_10_20.market_count, 1);
-  assert.equal(cp25_10_20.yes_rate, 0);
+test("numeric buckets anchor at column min with non-overlapping inclusive labels", () => {
+  const config = { step: 10, anchorMin: 1, anchorMax: 99 };
+  const label = (n) => getNumericBucketForValue(n, config).label;
+  assert.equal(label(1), "1-10");
+  assert.equal(label(10), "1-10");
+  assert.equal(label(11), "11-20");
+  assert.equal(label(20), "11-20");
+  assert.equal(label(99), "91-99");
 });
 
 test("passthrough copies representative value without creating extra groups", () => {

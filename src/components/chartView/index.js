@@ -1216,22 +1216,61 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   }, [chartFilterColumn, chartData, chartFilterType]);
 
   useEffect(() => {
+    // Sheet columns load async on public embed; stripping filters before they arrive drops saved rules.
+    if (!globalColumnOptions?.length) return;
     const selectedY = Array.isArray(selY) ? selY.filter(Boolean) : [];
     const allowedSeries = new Set([
       ...selectedY.map((_, idx) => `line:${idx}`),
       ...selectedY,
     ]);
-    const allowedColumns = new Set(globalColumnOptions || []);
+    const colSet = new Set(globalColumnOptions);
+    const deScopeColumn = (value) => {
+      const raw = String(value || "");
+      const idx = raw.indexOf("::");
+      return idx > -1 ? raw.slice(idx + 2) : raw;
+    };
+    const columnExists = (column) => {
+      if (!column) return false;
+      if (colSet.has(column)) return true;
+      const plain = deScopeColumn(column);
+      return globalColumnOptions.some((k) => deScopeColumn(k) === plain);
+    };
+    const resolveColumnKey = (column) => {
+      if (!column) return column;
+      if (colSet.has(column)) return column;
+      const plain = deScopeColumn(column);
+      const matches = globalColumnOptions.filter((k) => deScopeColumn(k) === plain);
+      if (matches.length === 1) return matches[0];
+      if (matches.length > 1 && activeSheetId) {
+        const onActive = matches.find((k) => k.startsWith(`${activeSheetId}::`));
+        if (onActive) return onActive;
+      }
+      return matches[0] || column;
+    };
     setChartLineFilters((prev) => {
       const curr = normalizeChartLineFilters(prev);
-      const next = curr.filter((rule) => {
-        if (!allowedSeries.has(rule.seriesKey)) return false;
-        if (rule.column && !allowedColumns.has(rule.column)) return false;
-        return true;
-      });
-      return next.length === curr.length ? prev : next;
+      let changed = false;
+      const next = curr
+        .map((rule) => {
+          if (!allowedSeries.has(rule.seriesKey)) {
+            changed = true;
+            return null;
+          }
+          if (rule.column && !columnExists(rule.column)) {
+            changed = true;
+            return null;
+          }
+          const resolvedColumn = resolveColumnKey(rule.column);
+          if (resolvedColumn !== rule.column) {
+            changed = true;
+            return { ...rule, column: resolvedColumn };
+          }
+          return rule;
+        })
+        .filter(Boolean);
+      return changed ? next : prev;
     });
-  }, [selY, globalColumnOptions]);
+  }, [selY, globalColumnOptions, activeSheetId]);
 
   const livelineData = useMemo(() => {
     if (!chartData?.length || !selX || !selY?.length) return [];

@@ -95,6 +95,40 @@ function compareMathValues(left, operator, right) {
   return false;
 }
 
+function inferNumericColumnRange(rows, colKey) {
+  const values = numericValuesForColumn(rows, colKey);
+  if (!values.length) return { min: 0, max: 0 };
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+/**
+ * Non-overlapping numeric bucket for a single value.
+ * Intervals are half-open [start, start + step) anchored at the column minimum,
+ * with inclusive labels (e.g. min=1, step=10 → 1-10, 11-20; 10 is not in both).
+ */
+export function getNumericBucketForValue(n, { step, anchorMin, anchorMax }) {
+  const size = Number(step);
+  const bucketStep = Number.isFinite(size) && size > 0 ? size : 1;
+  const anchor = Number.isFinite(Number(anchorMin)) ? Number(anchorMin) : 0;
+  const max = Number(anchorMax);
+
+  let start;
+  if (n < anchor) {
+    start = anchor;
+  } else {
+    const bucketIndex = Math.floor((n - anchor) / bucketStep);
+    start = anchor + bucketIndex * bucketStep;
+  }
+
+  const endInclusive = start + bucketStep - 1;
+  const labelEnd = Number.isFinite(max) ? Math.min(endInclusive, max) : endInclusive;
+  return {
+    key: `number:${start}`,
+    label: `${formatBucketNumber(start)}-${formatBucketNumber(labelEnd)}`,
+    sortValue: start,
+  };
+}
+
 function getBucketForRow(row, config) {
   const bucketColumn = String(config?.bucketColumn || "").trim();
   const raw = row?.[bucketColumn];
@@ -108,15 +142,11 @@ function getBucketForRow(row, config) {
   if (mode === "number") {
     const n = Number(raw);
     if (!Number.isFinite(n)) return { key: "number:(empty)", label: "(empty)", sortValue: Number.POSITIVE_INFINITY };
-    const size = Number(config?.numericBucketSize);
-    const step = Number.isFinite(size) && size > 0 ? size : 1;
-    const start = Math.floor(n / step) * step;
-    const end = start + step;
-    return {
-      key: `number:${start}`,
-      label: `${formatBucketNumber(start)}-${formatBucketNumber(end)}`,
-      sortValue: start,
-    };
+    return getNumericBucketForValue(n, {
+      step: config?.numericBucketSize,
+      anchorMin: config?.numericBucketMin,
+      anchorMax: config?.numericBucketMax,
+    });
   }
   const key = bucketKeyForValue(raw);
   return { key: `category:${key}`, label: raw ?? "", sortValue: key };
@@ -199,10 +229,21 @@ export function aggregateBucketRows(rows, config) {
     : [];
   if (!bucketColumn || !bucketOutputColumn) return [];
 
+  const resolvedConfig = { ...config };
+  if (String(config?.bucketMode || "") === "number") {
+    const inferred = inferNumericColumnRange(sourceRows, bucketColumn);
+    if (!Number.isFinite(Number(resolvedConfig.numericBucketMin))) {
+      resolvedConfig.numericBucketMin = inferred.min;
+    }
+    if (!Number.isFinite(Number(resolvedConfig.numericBucketMax))) {
+      resolvedConfig.numericBucketMax = inferred.max;
+    }
+  }
+
   const groups = new Map();
   for (const row of sourceRows) {
     if (!row || typeof row !== "object") continue;
-    const bucket = getBucketForRow(row, config);
+    const bucket = getBucketForRow(row, resolvedConfig);
     const groupKeyParts = [];
     for (const col of groupByColumns) {
       groupKeyParts.push(`${col}:${bucketKeyForValue(row?.[col])}`);
