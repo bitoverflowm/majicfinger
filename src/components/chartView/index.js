@@ -103,6 +103,8 @@ const CHART_CHROME_TEXT_CLASS = "mf-chart-chrome-text";
 
 /** Recharts Y-axis `width` eats left space; `margin.right` must be larger than `margin.left` so the grid isn’t flush to the SVG edge. */
 const CARTESIAN_MARGIN_AREA_LINE = { left: 20, right: 72, top: 0, bottom: 0 };
+/** Extra SVG headroom when curved lines overshoot the numeric Y domain. */
+const CARTESIAN_CURVE_TOP_MARGIN = 14;
 /** Bar only: extra left margin so the first band doesn’t sit on Y-axis tick labels. */
 const CARTESIAN_MARGIN_BAR = { left: 32, right: 76 };
 /** Bar only: Recharts insets the X scale range in px so the first/last bars aren’t flush to the plot edge. */
@@ -519,6 +521,56 @@ function chartFilterRuleMatches(row, rule) {
   if (op === "<" || op === "lt") return comparable ? a < b : String(a).localeCompare(String(b)) < 0;
   if (op === "<=" || op === "lte") return comparable ? a <= b : String(a).localeCompare(String(b)) <= 0;
   return true;
+}
+
+const CURVED_LINE_INTERPOLATIONS = new Set([
+  "natural",
+  "monotone",
+  "basis",
+  "cardinal",
+  "catmullrom",
+  "bump",
+]);
+
+function lineInterpolationNeedsYHeadroom(lineStyle) {
+  const s = String(lineStyle || "natural").trim().toLowerCase();
+  if (!s || s === "linear" || s === "step" || s === "stepbefore" || s === "stepafter") return false;
+  return CURVED_LINE_INTERPOLATIONS.has(s) || s.includes("natural") || s.includes("monotone");
+}
+
+function numericYExtentFromRows(rows, yKeys) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const row of rows || []) {
+    if (!row || typeof row !== "object") continue;
+    for (const yk of yKeys || []) {
+      const v = Number(row[yk]);
+      if (Number.isFinite(v)) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  return { min, max };
+}
+
+/** Extra Y span so natural / monotone splines do not clip above dataMax. */
+function yDomainWithCurveHeadroom(extent) {
+  if (!extent) return undefined;
+  const { min, max } = extent;
+  const span = max - min;
+  const base = span > 0 ? span : Math.max(Math.abs(max), Math.abs(min), 1);
+  const pad = Math.max(base * 0.1, 1);
+  const padBelow = pad * 0.3;
+  const padAbove = pad;
+  let domainMin = min - padBelow;
+  let domainMax = max + padAbove;
+  if (min >= 0 && domainMin < 0) {
+    domainMin = 0;
+    domainMax = max + padAbove + padBelow * 0.5;
+  }
+  return [domainMin, domainMax];
 }
 
 function materializeChartSeriesRows(rows, ySeries, filters, xKey) {
@@ -2059,11 +2111,19 @@ export function ChartCanvas() {
   } = useChartBuilder();
 
   const xAxisTickAngle = xAxisTicksAngled ? -45 : 0;
+  const needsCurveYHeadroom =
+    scaleY !== "log" &&
+    (selChartType === "line" || selChartType === "area") &&
+    lineInterpolationNeedsYHeadroom(lineStyle);
   /** Angled labels need extra bottom space inside the SVG; value tuned for dd-mmm at −45°. */
   const cartesianBottomAngled = hideXAxisLabels ? 12 : xAxisTicksAngled ? 88 : 0;
   const cartesianMarginWithAngledTicks = useMemo(
-    () => ({ ...CARTESIAN_MARGIN_AREA_LINE, bottom: cartesianBottomAngled }),
-    [cartesianBottomAngled],
+    () => ({
+      ...CARTESIAN_MARGIN_AREA_LINE,
+      bottom: cartesianBottomAngled,
+      top: needsCurveYHeadroom ? CARTESIAN_CURVE_TOP_MARGIN : 0,
+    }),
+    [cartesianBottomAngled, needsCurveYHeadroom],
   );
   const cartesianBarMarginWithAngledTicks = useMemo(
     () => ({ ...CARTESIAN_MARGIN_BAR, bottom: cartesianBottomAngled }),
@@ -2397,6 +2457,12 @@ export function ChartCanvas() {
   const connectSeriesAcrossFilteredGaps =
     lineAliasing || !hasChartLineFilters || (hasChartLineFilters && ySeries.length > 1);
 
+  const cartesianYAxisDomain = useMemo(() => {
+    if (!needsCurveYHeadroom) return undefined;
+    const extent = numericYExtentFromRows(finalRenderedData, renderedYKeys);
+    return yDomainWithCurveHeadroom(extent);
+  }, [needsCurveYHeadroom, finalRenderedData, renderedYKeys]);
+
   const renderedReferenceLines = useMemo(() => {
     const axisType = selX ? getAxisType(xKey, dataTypes, finalRenderedData) : "string";
     const isTemporalX =
@@ -2679,7 +2745,7 @@ export function ChartCanvas() {
                           width={72}
                           tickFormatter={yAxisFormatter}
                           scale={scaleY === "log" ? "log" : "auto"}
-                          domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                          domain={scaleY === "log" ? ["auto", "auto"] : cartesianYAxisDomain}
                           tick={{ fill: tickFillY }}
                         />
                         <ChartTooltip
@@ -2975,7 +3041,7 @@ export function ChartCanvas() {
                           width={72}
                           tickFormatter={yAxisFormatter}
                           scale={scaleY === "log" ? "log" : "auto"}
-                          domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                          domain={scaleY === "log" ? ["auto", "auto"] : cartesianYAxisDomain}
                           tick={{ fill: tickFillY }}
                         />
                         <ChartTooltip
