@@ -787,6 +787,19 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     snapshotPayloadRef.current = initialBuilderSnapshot ?? null;
   }, [initialBuilderSnapshot]);
 
+  // Restore line filters as soon as the snapshot is available — do not wait for active-sheet rows.
+  useEffect(() => {
+    if (demo) return;
+    const snap = initialBuilderSnapshot;
+    if (!snap || snap.v !== 1) return;
+    if (Array.isArray(snap.chartLineFilters)) {
+      setChartLineFilters(normalizeChartLineFilters(snap.chartLineFilters));
+    }
+    if (Array.isArray(snap.referenceLines)) {
+      setReferenceLines(normalizeReferenceLines(snap.referenceLines));
+    }
+  }, [demo, initialBuilderSnapshot]);
+
   useEffect(() => {
     if (demo) return;
     const snap = snapshotPayloadRef.current;
@@ -818,7 +831,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
     }
     const rows = Array.isArray(effectiveData) ? effectiveData : [];
-    if (!rows.length) return;
+    const anySheetRows = Object.values(contextStateV2?.dataSheets || {}).some(
+      (sheet) => Array.isArray(sheet?.data) && sheet.data.length > 0,
+    );
+    if (!rows.length && !anySheetRows) return;
     if (snapshotAppliedRef.current) return;
     snapshotAppliedRef.current = true;
     if (s.selChartType != null) setSelChartType(s.selChartType);
@@ -920,14 +936,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
     if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
     if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
-    if (Array.isArray(s.chartLineFilters)) setChartLineFilters(normalizeChartLineFilters(s.chartLineFilters));
-    if (Array.isArray(s.referenceLines)) setReferenceLines(normalizeReferenceLines(s.referenceLines));
     if (s.tooltipShowXValue !== undefined) setTooltipShowXValue(!!s.tooltipShowXValue);
     else if (s.legendShowXValue !== undefined) setTooltipShowXValue(!!s.legendShowXValue);
     if (Array.isArray(s.tooltipExtraColumns)) setTooltipExtraColumns(s.tooltipExtraColumns);
     else if (Array.isArray(s.legendExtraColumns)) setTooltipExtraColumns(s.legendExtraColumns);
     else if (s.legendLabelColumn) setTooltipExtraColumns([s.legendLabelColumn]);
-  }, [demo, effectiveData, initialBuilderSnapshot]);
+  }, [demo, effectiveData, initialBuilderSnapshot, contextStateV2?.dataSheets]);
 
   useEffect(() => {
     if (selectedPalette?.length) return;
@@ -1223,6 +1237,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       ...selectedY.map((_, idx) => `line:${idx}`),
       ...selectedY,
     ]);
+    const seriesAllowed = (seriesKey) => {
+      const raw = String(seriesKey || "");
+      const lineMatch = /^line:(\d+)$/.exec(raw);
+      if (lineMatch) {
+        const idx = Number(lineMatch[1]);
+        if (!selectedY.length) return true;
+        return idx >= 0 && idx < selectedY.length;
+      }
+      return allowedSeries.has(raw);
+    };
     const colSet = new Set(globalColumnOptions);
     const deScopeColumn = (value) => {
       const raw = String(value || "");
@@ -1252,7 +1276,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       let changed = false;
       const next = curr
         .map((rule) => {
-          if (!allowedSeries.has(rule.seriesKey)) {
+          if (!seriesAllowed(rule.seriesKey)) {
             changed = true;
             return null;
           }
@@ -1569,7 +1593,15 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     tooltipExtraColumns,
   };
 
-  const getBuilderSnapshot = useCallback(() => ({ v: 1, ...builderStateRef.current }), []);
+  const getBuilderSnapshot = useCallback(
+    () => ({
+      v: 1,
+      ...builderStateRef.current,
+      chartLineFilters: normalizeChartLineFilters(chartLineFilters),
+      referenceLines: normalizeReferenceLines(referenceLines),
+    }),
+    [chartLineFilters, referenceLines],
+  );
   useEffect(() => {
     if (typeof onSnapshotGetterReady !== "function") return;
     onSnapshotGetterReady(getBuilderSnapshot);

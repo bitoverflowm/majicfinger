@@ -9,10 +9,11 @@ import {
   HubChartEmbedSkeleton,
 } from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
+import { resolveEmbedActiveSheetId } from "@/lib/chartSnapshotDataDeps";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { cn } from "@/lib/utils";
 
-function DataSheetsLoader({ rows, dataSheets }) {
+function DataSheetsLoader({ rows, dataSheets, chartSnapshot }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
   useLayoutEffect(() => {
     const incomingSheets =
@@ -20,11 +21,11 @@ function DataSheetsLoader({ rows, dataSheets }) {
         ? dataSheets
         : { "sheet-1": { name: "Sheet 1", data: Array.isArray(rows) ? rows : [], provenance: null } };
     setDataSheets?.(incomingSheets);
-    const firstId = Object.keys(incomingSheets)[0] || "sheet-1";
-    setActiveSheetId?.(firstId);
-    const firstRows = Array.isArray(incomingSheets?.[firstId]?.data) ? incomingSheets[firstId].data : [];
-    setConnectedData?.(firstRows.length ? firstRows : Array.isArray(rows) ? rows : []);
-  }, [rows, dataSheets, setDataSheets, setActiveSheetId, setConnectedData]);
+    const activeId = resolveEmbedActiveSheetId(incomingSheets, chartSnapshot);
+    setActiveSheetId?.(activeId);
+    const activeRows = Array.isArray(incomingSheets?.[activeId]?.data) ? incomingSheets[activeId].data : [];
+    setConnectedData?.(activeRows.length ? activeRows : Array.isArray(rows) ? rows : []);
+  }, [rows, dataSheets, chartSnapshot, setDataSheets, setActiveSheetId, setConnectedData]);
   return null;
 }
 
@@ -70,7 +71,7 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
           color: cp0.textColor || undefined,
         }}
       >
-        <DataSheetsLoader rows={rows} dataSheets={dataSheets} />
+        <DataSheetsLoader rows={rows} dataSheets={dataSheets} chartSnapshot={chartSnapshot} />
         <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot}>
           <div className="flex h-full min-h-0 w-full flex-col overflow-hidden p-2">
             <ChartCanvas />

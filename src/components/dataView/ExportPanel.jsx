@@ -130,6 +130,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const setChartSheets = v2?.setChartSheets;
   const activeChartSheetId = v2?.activeChartSheetId;
   const setRefetchChart = v2?.setRefetchChart;
+  const chartSnapshotFlusher = v2?.chartSnapshotFlusher;
   const hasShareableChart = useHasShareableChart();
   const { getBuilderSnapshot, getChartOgImageDataUrl } = useChartBuilder();
   const activeChartMeta = activeChartSheetId ? (chartSheets?.[activeChartSheetId]?.chartMeta || loadedChartMeta) : loadedChartMeta;
@@ -154,6 +155,14 @@ function ShareEmbedSection({ runOrRequestPro }) {
       };
     });
   }, [activeChartSheetId, setChartSheets]);
+
+  const capturePublishSnapshot = useCallback(async () => {
+    if (typeof chartSnapshotFlusher === "function") {
+      const flushed = await chartSnapshotFlusher();
+      if (flushed) return flushed;
+    }
+    return getBuilderSnapshot();
+  }, [chartSnapshotFlusher, getBuilderSnapshot]);
 
   const uploadOgImage = useCallback(async (chartId) => {
     if (!chartId || typeof getChartOgImageDataUrl !== "function") return null;
@@ -250,7 +259,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
 
     try {
       setIsSavePublishing(true);
-      const snapshot = getBuilderSnapshot();
+      const snapshot = await capturePublishSnapshot();
 
       let dataSetId = loadedDataMeta?._id;
       if (!dataSetId) {
@@ -336,6 +345,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   }, [
     connectedData,
     getBuilderSnapshot,
+    capturePublishSnapshot,
     isSavePublishing,
     loadedDataMeta?._id,
     pendingChartName,
@@ -382,7 +392,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
       Array.isArray(full.chart_properties) && full.chart_properties[0] && typeof full.chart_properties[0] === "object"
         ? { ...full.chart_properties[0] }
         : {};
-    const snapshot = getBuilderSnapshot();
+    const snapshot = await capturePublishSnapshot();
     const publishChartName = (workbookChartName || full.chart_name || "").trim() || "Chart";
     const chart_properties = [{ ...prev0, title: publishChartName, rechartsBuilder: snapshot }];
     const ogImageUrl = await uploadOgImage(activeChartMeta._id);
@@ -418,6 +428,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
     slugInput,
     setLoadedChartMeta,
     getBuilderSnapshot,
+    capturePublishSnapshot,
     uploadOgImage,
     setRefetchChart,
     syncActiveChartSheet,

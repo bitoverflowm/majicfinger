@@ -59,6 +59,23 @@ export function primarySheetIdForChartSnapshot(dataSheets, snapshot) {
 }
 
 /**
+ * Pick the workspace active sheet for public embeds (prefer chart snapshot primary, then first sheet with rows).
+ *
+ * @param {Record<string, unknown>} dataSheets
+ * @param {Record<string, unknown> | null | undefined} snapshot
+ * @returns {string}
+ */
+export function resolveEmbedActiveSheetId(dataSheets, snapshot) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  const entries = Object.entries(sheets);
+  if (!entries.length) return "sheet-1";
+  const primaryId = primarySheetIdForChartSnapshot(sheets, snapshot);
+  if (primaryId && sheets[primaryId]) return primaryId;
+  const withData = entries.find(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
+  return withData?.[0] || entries[0][0];
+}
+
+/**
  * Trim multi-sheet projects to only sheets referenced by the chart snapshot.
  *
  * @param {Record<string, unknown>} dataSheets

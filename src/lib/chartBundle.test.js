@@ -64,3 +64,24 @@ test("normalizeBuilderSnapshot remaps legacy seriesKey to line index", () => {
   assert.equal(out.chartLineFilters[0].seriesKey, "line:0");
   assert.equal(out.chartLineFilters[0].column, "sheet-2::lifecycle_checkpoint");
 });
+
+test("normalizeBuilderSnapshot keeps saved snapshot when row keys are not loaded yet", () => {
+  const snapshot = {
+    v: 1,
+    selChartType: "line",
+    selX: "title",
+    selY: ["yes_rate"],
+    chartLineFilters: [
+      {
+        id: "f1",
+        seriesKey: "line:0",
+        column: "lifecycle_checkpoint",
+        operator: "=",
+        value: "1",
+      },
+    ],
+  };
+  const out = normalizeBuilderSnapshot(snapshot, [], {});
+  assert.equal(out.selX, "title");
+  assert.equal(out.chartLineFilters?.length, 1);
+});

@@ -49,7 +49,11 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
   const fallback = inferDefaultBuilderSnapshot(rows);
   const s = snapshot && typeof snapshot === "object" ? { ...snapshot } : { ...fallback };
   const keys = collectAllColumnKeys(rows, dataSheets);
-  if (!keys.length) return fallback;
+  if (!keys.length) {
+    const hasSavedAxes = !!(s.selX || (Array.isArray(s.selY) && s.selY.length));
+    if (s.v === 1 && hasSavedAxes) return coerceCategoricalBuilderAxes(s, []);
+    return fallback;
+  }
 
   const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline"]);
   const type = String(s.selChartType || "").trim();

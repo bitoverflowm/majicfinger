@@ -8,6 +8,7 @@ import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { PublicChartPageSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
+import { resolveEmbedActiveSheetId } from "@/lib/chartSnapshotDataDeps";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
@@ -22,7 +23,15 @@ function DataLoader({ rows }: { rows: unknown[] }) {
   return null;
 }
 
-function DataSheetsLoader({ rows, dataSheets }: { rows: unknown[]; dataSheets?: Record<string, any> }) {
+function DataSheetsLoader({
+  rows,
+  dataSheets,
+  chartSnapshot,
+}: {
+  rows: unknown[];
+  dataSheets?: Record<string, any>;
+  chartSnapshot?: Record<string, unknown> | null;
+}) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
   useLayoutEffect(() => {
     const incomingSheets =
@@ -30,11 +39,11 @@ function DataSheetsLoader({ rows, dataSheets }: { rows: unknown[]; dataSheets?: 
         ? dataSheets
         : { "sheet-1": { name: "Sheet 1", data: Array.isArray(rows) ? rows : [], provenance: null } };
     setDataSheets?.(incomingSheets);
-    const firstId = Object.keys(incomingSheets)[0] || "sheet-1";
-    setActiveSheetId?.(firstId);
-    const firstRows = Array.isArray(incomingSheets?.[firstId]?.data) ? incomingSheets[firstId].data : [];
-    setConnectedData?.(firstRows.length ? firstRows : Array.isArray(rows) ? rows : []);
-  }, [rows, dataSheets, setDataSheets, setActiveSheetId, setConnectedData]);
+    const activeId = resolveEmbedActiveSheetId(incomingSheets, chartSnapshot);
+    setActiveSheetId?.(activeId);
+    const activeRows = Array.isArray(incomingSheets?.[activeId]?.data) ? incomingSheets[activeId].data : [];
+    setConnectedData?.(activeRows.length ? activeRows : Array.isArray(rows) ? rows : []);
+  }, [rows, dataSheets, chartSnapshot, setDataSheets, setActiveSheetId, setConnectedData]);
   return null;
 }
 
@@ -180,7 +189,7 @@ export default function PublicChartEmbedClient({
         }}
       >
         <DataLoader rows={rows} />
-        <DataSheetsLoader rows={rows} dataSheets={dataSheets} />
+        <DataSheetsLoader rows={rows} dataSheets={dataSheets} chartSnapshot={chartSnapshot} />
         <div className={`relative mt-0 flex flex-1 items-center justify-center ${isEmbedded ? "" : "md:mt-2"}`}>
           <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
             <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center">
