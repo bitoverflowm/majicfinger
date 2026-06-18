@@ -104,7 +104,7 @@ const CHART_CHROME_TEXT_CLASS = "mf-chart-chrome-text";
 /** Recharts Y-axis `width` eats left space; `margin.right` must be larger than `margin.left` so the grid isn’t flush to the SVG edge. */
 const CARTESIAN_MARGIN_AREA_LINE = { left: 20, right: 72, top: 0, bottom: 0 };
 /** Extra SVG headroom when curved lines overshoot the numeric Y domain. */
-const CARTESIAN_CURVE_TOP_MARGIN = 14;
+const CARTESIAN_CURVE_TOP_MARGIN = 8;
 /** Bar only: extra left margin so the first band doesn’t sit on Y-axis tick labels. */
 const CARTESIAN_MARGIN_BAR = { left: 32, right: 76 };
 /** Bar only: Recharts insets the X scale range in px so the first/last bars aren’t flush to the plot edge. */
@@ -556,20 +556,31 @@ function numericYExtentFromRows(rows, yKeys) {
 }
 
 /** Extra Y span so natural / monotone splines do not clip above dataMax. */
-function yDomainWithCurveHeadroom(extent) {
+function yDomainWithCurveHeadroom(extent, rows, yKeys) {
   if (!extent) return undefined;
   const { min, max } = extent;
   const span = max - min;
-  const base = span > 0 ? span : Math.max(Math.abs(max), Math.abs(min), 1);
-  const pad = Math.max(base * 0.1, 1);
-  const padBelow = pad * 0.3;
-  const padAbove = pad;
+  const magnitude = Math.max(Math.abs(max), Math.abs(min), span, 1e-12);
+
+  let maxStep = 0;
+  for (const yk of yKeys || []) {
+    let prev = null;
+    for (const row of rows || []) {
+      const v = Number(row?.[yk]);
+      if (!Number.isFinite(v)) continue;
+      if (prev != null) maxStep = Math.max(maxStep, Math.abs(v - prev));
+      prev = v;
+    }
+  }
+
+  const padFromSpan = span > 0 ? span * 0.05 : magnitude * 0.04;
+  const padFromStep = maxStep * 0.3;
+  const padAbove = Math.max(padFromSpan, padFromStep, magnitude * 0.015);
+  const padBelow = Math.min(padAbove * 0.35, span > 0 ? span * 0.025 : padAbove * 0.25);
+
   let domainMin = min - padBelow;
   let domainMax = max + padAbove;
-  if (min >= 0 && domainMin < 0) {
-    domainMin = 0;
-    domainMax = max + padAbove + padBelow * 0.5;
-  }
+  if (min >= 0 && domainMin < 0) domainMin = 0;
   return [domainMin, domainMax];
 }
 
@@ -2460,7 +2471,7 @@ export function ChartCanvas() {
   const cartesianYAxisDomain = useMemo(() => {
     if (!needsCurveYHeadroom) return undefined;
     const extent = numericYExtentFromRows(finalRenderedData, renderedYKeys);
-    return yDomainWithCurveHeadroom(extent);
+    return yDomainWithCurveHeadroom(extent, finalRenderedData, renderedYKeys);
   }, [needsCurveYHeadroom, finalRenderedData, renderedYKeys]);
 
   const renderedReferenceLines = useMemo(() => {
