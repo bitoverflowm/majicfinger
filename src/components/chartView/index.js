@@ -704,6 +704,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const [expanded, setExpanded] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
+  const [legendTitle, setLegendTitle] = useState("");
   const [stackedBar, setStackedBar] = useState(false);
   /** When set (bar charts), pivot long rows by this column into stacked/grouped series (e.g. outcome). */
   const [barSeriesColumn, setBarSeriesColumn] = useState(null);
@@ -881,6 +882,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.lineLabelOverrides && typeof s.lineLabelOverrides === "object") setLineLabelOverrides(s.lineLabelOverrides);
     if (s.expanded !== undefined) setExpanded(!!s.expanded);
     if (s.legendVisible !== undefined) setLegendVisible(!!s.legendVisible);
+    if (s.legendTitle != null) setLegendTitle(String(s.legendTitle));
     if (s.stackedBar !== undefined) setStackedBar(!!s.stackedBar);
     if (s.barSeriesColumn !== undefined) setBarSeriesColumn(s.barSeriesColumn || null);
     if (s.barXAxisMode === "date" || s.barXAxisMode === "categorical") setBarXAxisMode(s.barXAxisMode);
@@ -1538,6 +1540,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     lineLabelOverrides,
     expanded,
     legendVisible,
+    legendTitle,
     stackedBar,
     barSeriesColumn,
     barXAxisMode,
@@ -1879,6 +1882,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     handleToggleChange: setExpanded,
     legendVisible,
     handleToggleLegend: setLegendVisible,
+    legendTitle,
+    setLegendTitle,
     stackedBar,
     handleToggleStack: setStackedBar,
     barSeriesColumn,
@@ -2008,6 +2013,7 @@ export function ChartCanvas() {
     chartTimeframesAvailable,
     expanded,
     legendVisible,
+    legendTitle,
     stackedBar,
     barSeriesColumn,
     barXAxisMode,
@@ -2705,6 +2711,7 @@ export function ChartCanvas() {
                             content={
                               <ChartLegendContent
                                 className={CHART_CHROME_TEXT_CLASS}
+                                title={legendTitle}
                               />
                             }
                           />
@@ -2833,13 +2840,14 @@ export function ChartCanvas() {
                                   xTickFormatter={xTickFormatter}
                                   legendLabelColumn={rainbowLegendLabelColumn}
                                   layout={rainbowLegendLayout}
+                                  title={legendTitle}
                                 />
                               )}
                             />
                           ) : (
                             <ChartLegend
                               content={
-                                <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />
+                                <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} title={legendTitle} />
                               }
                             />
                           ))}
@@ -2913,7 +2921,7 @@ export function ChartCanvas() {
                         {legendVisible && (
                           <ChartLegend
                             content={
-                              <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />
+                              <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} title={legendTitle} />
                             }
                           />
                         )}
@@ -3001,7 +3009,7 @@ export function ChartCanvas() {
                         {legendVisible && (
                           <ChartLegend
                             content={
-                              <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} />
+                              <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} title={legendTitle} />
                             }
                           />
                         )}
@@ -3024,7 +3032,7 @@ export function ChartCanvas() {
                         {legendVisible && (
                           <ChartLegend
                             content={
-                              <ChartLegendContent nameKey="value" className={CHART_CHROME_TEXT_CLASS} />
+                              <ChartLegendContent nameKey="value" className={CHART_CHROME_TEXT_CLASS} title={legendTitle} />
                             }
                           />
                         )}

@@ -351,7 +351,7 @@ ChartTooltipContent.displayName = "ChartTooltip"
 const ChartLegend = RechartsPrimitive.Legend
 
 const ChartLegendContent = React.forwardRef((
-  { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },
+  { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey, title },
   ref
 ) => {
   const { config } = useChart()
@@ -360,14 +360,22 @@ const ChartLegendContent = React.forwardRef((
     return null
   }
 
+  const titleText = typeof title === "string" ? title.trim() : ""
+
   return (
     (<div
       ref={ref}
       className={cn(
-        "flex items-center justify-center gap-4",
+        "flex flex-col items-center gap-1.5",
         verticalAlign === "top" ? "pb-3" : "pt-3",
         className
       )}>
+      {titleText ? (
+        <p className="text-center text-[10px] font-medium tracking-wide text-slate-500 dark:text-slate-400">
+          {titleText}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center justify-center gap-4">
       {payload.map((item) => {
         const key = `${nameKey || item.dataKey || "value"}`
         const itemConfig = getPayloadConfigFromPayload(config, item, key)
@@ -394,6 +402,7 @@ const ChartLegendContent = React.forwardRef((
           </div>)
         );
       })}
+      </div>
     </div>)
   );
 })

@@ -19,6 +19,8 @@ export const RainbowBarLegendContent = React.forwardRef(function RainbowBarLegen
     shuffleNonce,
     xTickFormatter,
     legendLabelColumn,
+    /** Optional heading shown above the legend swatches. */
+    title,
     /** `"center"` — wrapped row, centered. `"columns"` — equal-width CSS columns, top-to-bottom fill. */
     layout = "center",
   },
@@ -77,6 +79,7 @@ export const RainbowBarLegendContent = React.forwardRef(function RainbowBarLegen
 
   if (!entries.length) return null;
 
+  const titleText = typeof title === "string" ? title.trim() : "";
   const columnar = layout === "columns";
 
   return (
@@ -88,9 +91,11 @@ export const RainbowBarLegendContent = React.forwardRef(function RainbowBarLegen
         className,
       )}
     >
-      <p className="text-center text-[10px] font-medium tracking-wide text-slate-500 dark:text-slate-400">
-        Legend
-      </p>
+      {titleText ? (
+        <p className="text-center text-[10px] font-medium tracking-wide text-slate-500 dark:text-slate-400">
+          {titleText}
+        </p>
+      ) : null}
       <div
         className={cn(
           "w-full min-w-0",

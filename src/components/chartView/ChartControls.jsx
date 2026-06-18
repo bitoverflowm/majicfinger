@@ -259,6 +259,8 @@ export default function ChartControls() {
     handleToggleChange,
     legendVisible,
     handleToggleLegend,
+    legendTitle,
+    setLegendTitle,
     horizontal,
     handleToggleHorizontal,
     stackedBar,
@@ -2718,6 +2720,21 @@ export default function ChartControls() {
                     <Toggle area-label="Toggle Legend" pressed={legendVisible} onPressedChange={handleToggleLegend}>
                       <IdCardIcon className="h-4 w-4 text-foreground" />
                     </Toggle>
+                    {legendVisible ? (
+                      <div className="min-w-0 flex-1 basis-full space-y-1">
+                        <Label htmlFor="chart-legend-title" className="text-xs text-muted-foreground">
+                          Legend title
+                        </Label>
+                        <Input
+                          id="chart-legend-title"
+                          type="text"
+                          value={legendTitle}
+                          placeholder="e.g. Score range"
+                          className="h-8 text-xs"
+                          onChange={(e) => setLegendTitle(e.target.value)}
+                        />
+                      </div>
+                    ) : null}
                     {selChartType === "bar" && (
                       <>
                         <Toggle area-label="Toggle Horizontal" pressed={horizontal} onPressedChange={handleToggleHorizontal}>
