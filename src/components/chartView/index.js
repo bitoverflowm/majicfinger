@@ -707,7 +707,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [stackedBar, setStackedBar] = useState(false);
   /** When set (bar charts), pivot long rows by this column into stacked/grouped series (e.g. outcome). */
   const [barSeriesColumn, setBarSeriesColumn] = useState(null);
-  /** Bar chart only: "date" = time-scaled X spacing; "categorical" = equidistant date labels. */
+  /** Bar chart only: "date" = value-scaled X (calendar time or numeric position); "categorical" = equidistant bars. */
   const [barXAxisMode, setBarXAxisMode] = useState("date");
   /** Recharts `layout="vertical"` — bars extend horizontally; category axis moves to Y. */
   const [horizontal, setHorizontal] = useState(false);
@@ -2099,6 +2099,11 @@ export function ChartCanvas() {
     (xAxisType === "date" || lineIsTemporalX);
 
   const barUseDateXScale = barXIsTemporalDate && barXAxisMode === "date";
+  const barForceCategoricalX =
+    selChartType === "bar" &&
+    barXAxisMode === "categorical" &&
+    !!selX &&
+    (barXIsTemporalDate || (xAxisType === "number" && !xIsCategoricalLabel));
 
   const effectiveUseTimeSeriesX = selChartType === "bar" ? barUseDateXScale : useTimeSeriesX;
 
@@ -2211,7 +2216,7 @@ export function ChartCanvas() {
     cartesianChart &&
     selX &&
     plotRows.length &&
-    !(selChartType === "bar" && barXIsTemporalDate && barXAxisMode === "categorical") &&
+    !barForceCategoricalX &&
     typeof firstPlotX === "number" &&
     Number.isFinite(firstPlotX)
       ? "number"
@@ -2752,8 +2757,8 @@ export function ChartCanvas() {
                             <XAxis
                               type={rechartsXAxisType}
                               dataKey={xKey}
-                              domain={xAxisNumberDomain}
-                              ticks={xAxisTicks}
+                              domain={rechartsXAxisType === "number" ? xAxisNumberDomain : undefined}
+                              ticks={rechartsXAxisType === "number" ? xAxisTicks : undefined}
                               tickLine={false}
                               axisLine={false}
                               tickMargin={xAxisTickMargin}

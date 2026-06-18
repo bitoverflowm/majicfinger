@@ -359,10 +359,13 @@ export default function ChartControls() {
   const xAxisSelectValue = selX ?? CHART_X_AXIS_NONE;
   const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
   const canUseTimeSeriesX = !!selX && !!lineIsTemporalX;
+  const barXAxisType = selX ? getAxisType(selX, dataTypes, chartData) : "string";
   const barXAxisIsDate =
     selChartType === "bar" &&
     !!selX &&
-    (getAxisType(selX, dataTypes, chartData) === "date" || lineIsTemporalX);
+    (barXAxisType === "date" || lineIsTemporalX);
+  const barXAxisIsNumeric = selChartType === "bar" && !!selX && barXAxisType === "number";
+  const barXAxisSpacingConfigurable = barXAxisIsDate || barXAxisIsNumeric;
 
   const barBreakdownSeriesKeys = useMemo(() => {
     if (selChartType !== "bar" || !barSeriesColumn || !selX || !selY?.[0]) return [];
@@ -1552,12 +1555,13 @@ export default function ChartControls() {
                           </SelectContent>
                         </Select>
                       </div>
-                      {barXAxisIsDate ? (
+                      {barXAxisSpacingConfigurable ? (
                         <div className="min-w-0 space-y-1 border-b border-border/60 pb-3">
                           <Label className="text-xs text-muted-foreground">X-axis spacing</Label>
                           <p className="text-[10px] leading-snug text-muted-foreground">
-                            Date mode spaces bars by calendar time. Categorical mode places each date at equal
-                            intervals.
+                            {barXAxisIsDate
+                              ? "Date mode spaces bars by calendar time. Categorical mode places each date at equal intervals."
+                              : "Numeric mode spaces bars by their X value. Categorical mode places each bar at equal intervals."}
                           </p>
                           <ToggleGroup
                             type="single"
@@ -1568,10 +1572,10 @@ export default function ChartControls() {
                             onValueChange={(v) => {
                               if (v === "date" || v === "categorical") setBarXAxisMode(v);
                             }}
-                            aria-label="Bar chart X-axis date or categorical spacing"
+                            aria-label="Bar chart X-axis scaled or categorical spacing"
                           >
                             <ToggleGroupItem value="date" className="text-xs">
-                              Date
+                              {barXAxisIsDate ? "Date" : "Numeric"}
                             </ToggleGroupItem>
                             <ToggleGroupItem value="categorical" className="text-xs">
                               Categorical
