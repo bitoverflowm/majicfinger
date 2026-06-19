@@ -25,6 +25,12 @@ import { useUser } from "@/lib/hooks";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
+import {
+  createChartPublishProgressTicker,
+  rebuildChartPublishCache,
+} from "@/lib/chartPublishCache";
+import { isPublishedChartBundleStale } from "@/lib/chartPublishStaleness";
+import { Progress } from "@/components/ui/progress";
 
 function getColKeys(connectedCols) {
   return (connectedCols || [])
@@ -187,6 +193,9 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const [showDeleteEmbedDialog, setShowDeleteEmbedDialog] = useState(false);
   const [pendingChartName, setPendingChartName] = useState("");
   const [isSavePublishing, setIsSavePublishing] = useState(false);
+  const [isPublishingCache, setIsPublishingCache] = useState(false);
+  const [publishCacheProgress, setPublishCacheProgress] = useState(0);
+  const [publishCacheMessage, setPublishCacheMessage] = useState("");
   const [isDeletingEmbed, setIsDeletingEmbed] = useState(false);
   const [runtimeOrigin, setRuntimeOrigin] = useState("");
 
@@ -233,6 +242,61 @@ function ShareEmbedSection({ runOrRequestPro }) {
     normalizedSlug &&
     publishedSlug === normalizedSlug
   );
+
+  const publishBundleStale = useMemo(
+    () =>
+      isPublishedForCurrentSlug &&
+      isPublishedChartBundleStale(activeChartMeta, loadedDataMeta),
+    [activeChartMeta, isPublishedForCurrentSlug, loadedDataMeta],
+  );
+
+  const publishLiveLake = useMemo(
+    () => activeChartMeta?.published_bundle_meta?.materialization_mode === "live_lake",
+    [activeChartMeta?.published_bundle_meta?.materialization_mode],
+  );
+
+  const runChartPublishCache = useCallback(async (chartId) => {
+    if (!chartId || isPublishingCache) return { ok: false };
+    setIsPublishingCache(true);
+    setPublishCacheProgress(5);
+    setPublishCacheMessage("Preparing chart snapshot…");
+    const ticker = createChartPublishProgressTicker(
+      (pct, message) => {
+        setPublishCacheProgress(pct);
+        setPublishCacheMessage(message);
+      },
+      () => publishCacheProgress,
+    );
+    ticker.start();
+    try {
+      const result = await rebuildChartPublishCache(chartId, (pct, message) => {
+        setPublishCacheProgress(pct);
+        setPublishCacheMessage(message);
+      });
+      if (!result.ok) {
+        toast.error(result.message || "Failed to build chart snapshot");
+        return result;
+      }
+      if (result.live_lake) {
+        toast.message("Chart published with live data mode (large dataset)");
+      }
+      if (result.warnings?.length) {
+        toast.message(result.warnings[0]);
+      }
+      const refreshRes = await fetch(`/api/charts/chart/${chartId}`, { credentials: "include" });
+      const refreshJson = await refreshRes.json();
+      if (refreshJson?.data) {
+        setLoadedChartMeta?.(refreshJson.data);
+        syncActiveChartSheet(refreshJson.data);
+      }
+      return result;
+    } finally {
+      ticker.stop();
+      setIsPublishingCache(false);
+      setPublishCacheProgress(0);
+      setPublishCacheMessage("");
+    }
+  }, [isPublishingCache, publishCacheProgress, setLoadedChartMeta, syncActiveChartSheet]);
 
   const pendingSlug = useMemo(
     () => normalizeChartEmbedSlug((pendingChartName || "").trim() || "chart") || "chart",
@@ -342,6 +406,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
       syncActiveChartSheet(publishJson?.data, snapshot);
       setRefetchChart?.(1);
       setShowSavePublishDialog(false);
+      await runChartPublishCache(chartId);
       toast.success("Chart saved and embed published");
     } finally {
       setIsSavePublishing(false);
@@ -360,6 +425,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
     setRefetchChart,
     user,
     userHandle,
+    runChartPublishCache,
   ]);
 
   const publishEmbed = useCallback(async () => {
@@ -419,10 +485,11 @@ function ShareEmbedSection({ runOrRequestPro }) {
       toast.error(putJson?.message || "Publish failed");
       return;
     }
-    toast.success("Embed link is live");
     setLoadedChartMeta?.(putJson?.data);
     syncActiveChartSheet(putJson?.data, snapshot);
     setRefetchChart?.(1);
+    await runChartPublishCache(activeChartMeta._id);
+    toast.success("Embed link is live");
   }, [
     user,
     userHandle,
@@ -436,7 +503,14 @@ function ShareEmbedSection({ runOrRequestPro }) {
     uploadOgImage,
     setRefetchChart,
     syncActiveChartSheet,
+    runChartPublishCache,
   ]);
+
+  const republishEmbed = useCallback(async () => {
+    if (!activeChartMeta?._id || isPublishingCache) return;
+    await runChartPublishCache(activeChartMeta._id);
+    toast.success("Chart republished with latest data");
+  }, [activeChartMeta?._id, isPublishingCache, runChartPublishCache]);
 
   const copyText = useCallback(async (text, label) => {
     try {
@@ -497,6 +571,22 @@ function ShareEmbedSection({ runOrRequestPro }) {
       <p className="text-[10px] text-muted-foreground">
         Publish an interactive embed on lycheedata.com. Save the chart first, then pick a URL slug.
       </p>
+      {isPublishingCache ? (
+        <div className="space-y-1 rounded-md border border-border bg-muted/30 p-2">
+          <p className="text-[10px] text-muted-foreground">{publishCacheMessage || "Building chart snapshot…"}</p>
+          <Progress value={publishCacheProgress} className="h-1.5" />
+        </div>
+      ) : null}
+      {isPublishedForCurrentSlug && publishBundleStale ? (
+        <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+          Project data changed since last publish — republish to update the public chart.
+        </p>
+      ) : null}
+      {isPublishedForCurrentSlug && publishLiveLake ? (
+        <p className="text-[10px] text-muted-foreground">
+          This chart uses live lake data on each view (large dataset).
+        </p>
+      ) : null}
       <div className="flex flex-col gap-1">
         <label className="text-[10px] font-medium text-muted-foreground" htmlFor="embed-slug">
           URL slug
@@ -527,12 +617,12 @@ function ShareEmbedSection({ runOrRequestPro }) {
                   variant="outline"
                   size="sm"
                   className="h-8 px-2 text-[10px]"
-                  disabled={!hasShareableChart}
+                  disabled={!hasShareableChart || isPublishingCache}
                   onClick={() =>
                     runOrRequestPro?.(() => publishEmbed(), "publishing embeds")
                   }
                 >
-                  Publish embed
+                  {isPublishingCache ? "Publishing…" : "Publish embed"}
                 </Button>
               </span>
             </TooltipTrigger>
@@ -542,6 +632,31 @@ function ShareEmbedSection({ runOrRequestPro }) {
               </TooltipContent>
             ) : null}
           </Tooltip>
+          {isPublishedForCurrentSlug ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    type="button"
+                    variant={publishBundleStale ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 px-2 text-[10px]"
+                    disabled={isPublishingCache}
+                    onClick={() =>
+                      runOrRequestPro?.(() => republishEmbed(), "republishing embeds")
+                    }
+                  >
+                    {isPublishingCache ? "Republishing…" : "Republish"}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {publishBundleStale
+                  ? "Update public chart with latest project data"
+                  : "Rebuild public chart snapshot"}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
           <Tooltip>
             <TooltipTrigger asChild>
               <span tabIndex={0}>

@@ -13,6 +13,7 @@
     "lint": "next lint",
     "athena:smoke": "node scripts/athena-smoke-test.js",
     "test:workspace": "node --import ./scripts/register-alias.mjs ./scripts/run-workspace-unit-tests.mjs",
+    "backfill:chart-bundles": "node --import ./scripts/register-alias.mjs ./scripts/backfill-published-chart-bundles.mjs",
     "stripe:reconcile": "node scripts/reconcile-stripe-entitlements.cjs"
   },
   "dependencies": {

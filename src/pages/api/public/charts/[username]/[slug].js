@@ -3,7 +3,12 @@ import Chart from "@/models/Charts";
 import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
 import { buildPublicChartBundle } from "@/lib/chartBundle";
+import { chartHasPublishedSnapshot } from "@/lib/chartPublishStaleness";
 import { hydrateDataSetForPublicChartViewer } from "@/lib/server/hydratePublicChartDataset";
+import {
+  publicChartCacheControl,
+  publicPayloadFromPublishedBundle,
+} from "@/lib/server/materializeChartBundle";
 
 export default async function handler(req, res) {
   const { username, slug } = req.query;
@@ -32,6 +37,22 @@ export default async function handler(req, res) {
       return res.status(404).json({ success: false, message: "Chart not found" });
     }
 
+    const cached = publicPayloadFromPublishedBundle(chart);
+    if (cached) {
+      res.setHeader("Cache-Control", publicChartCacheControl(true));
+      return res.status(200).json({
+        success: true,
+        data: {
+          chart: cached.chart,
+          rows: cached.rows,
+          dataSheets: cached.dataSheets,
+          owner_handle: user.user_name ? String(user.user_name) : String(username || "").trim(),
+          owner_name: user.name ? String(user.name) : null,
+          owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
+        },
+      });
+    }
+
     const dataSetRaw = await DataSet.findById(chart.data_set_id).lean();
     if (!dataSetRaw) {
       return res.status(404).json({ success: false, message: "Dataset not found" });
@@ -40,6 +61,7 @@ export default async function handler(req, res) {
     const dataSet = await hydrateDataSetForPublicChartViewer(chart, dataSetRaw);
     const { chart: publicChart, rows, dataSheets } = buildPublicChartBundle(chart, dataSet);
 
+    res.setHeader("Cache-Control", publicChartCacheControl(chartHasPublishedSnapshot(chart)));
     return res.status(200).json({
       success: true,
       data: {

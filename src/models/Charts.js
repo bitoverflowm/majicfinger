@@ -54,6 +54,20 @@ const ChartSchema = new mongoose.Schema({
     og_image_updated_at: {
         type: Date,
     },
+    /** Precomputed chart payload for fast public embed loads (snapshot mode). */
+    published_bundle: {
+        type: Schema.Types.Mixed,
+        default: null,
+    },
+    /** Staleness fingerprints, lineage, materialization mode. */
+    published_bundle_meta: {
+        type: Schema.Types.Mixed,
+        default: null,
+    },
+    /** When published_bundle was last built. */
+    published_bundle_built_at: {
+        type: Date,
+    },
 })
 
 // Same as ChartDashboard: sparse+unique still indexes null slug once per user.

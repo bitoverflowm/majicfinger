@@ -33,6 +33,7 @@ import { shouldUseLargeAthenaPullPath } from "@/lib/dataLake/largeAthenaPull.js"
 
 import "@/lib/chartReferenceEquation.test.js";
 import "@/lib/chartBundle.test.js";
+import "@/lib/chartLineFilters.test.js";
 import "@/lib/chartSnapshotDataDeps.test.js";
 import "@/lib/sheetOperations/aggregateBucketRows.test.js";
 import "@/lib/dataLake/restoreQuantAthenaReplayConfig.test.js";

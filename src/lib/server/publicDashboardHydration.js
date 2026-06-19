@@ -1,8 +1,9 @@
 import Chart from "@/models/Charts";
 import DataSet from "@/models/DataSets";
 import mongoose from "mongoose";
-import { buildPublicChartBundle } from "@/lib/chartBundle";
 import { dataSheetsReferencedBySnapshot } from "@/lib/chartSnapshotDataDeps";
+import { chartHasPublishedSnapshot } from "@/lib/chartPublishStaleness";
+import { materializeChartBundle } from "@/lib/server/materializeChartBundle";
 import { hydrateDataSetForPublicChartViewer } from "@/lib/server/hydratePublicChartDataset";
 import {
   attachCardGridSheetRows,
@@ -151,27 +152,56 @@ export async function buildChartBundlesParallel(chartIds, userId) {
   const dataSetRawById = new Map(dataSetRaws.map((d) => [String(d._id), d]));
 
   /** @type {Map<string, Promise<any>>} */
-  const baseHydrationByDataSetId = new Map();
+  const hydratedByDataSetId = new Map();
 
   const bundles = await Promise.all(
     ids.map(async (cid) => {
       const chart = chartById.get(cid);
       if (!chart) return null;
+
+      if (chartHasPublishedSnapshot(chart)) {
+        const bundle = chart.published_bundle;
+        return {
+          cid,
+          bundle: trimChartBundleForStorage({
+            chart: bundle.chart,
+            rows: Array.isArray(bundle.rows) ? bundle.rows : [],
+            dataSheets: bundle.dataSheets || {},
+            rechartsBuilder: bundle.rechartsBuilder,
+            meta: {
+              ...(chart.published_bundle_meta || {}),
+              public_slug: chart.public_slug,
+              is_public: !!chart.is_public,
+            },
+          }),
+        };
+      }
+
       const dsId = String(chart.data_set_id || "");
       const dataSetRaw = dataSetRawById.get(dsId);
       if (!dataSetRaw) return null;
 
-      if (!baseHydrationByDataSetId.has(dsId)) {
-        baseHydrationByDataSetId.set(dsId, hydrateDataSetForPublicChartViewer(null, cloneJson(dataSetRaw)));
+      if (!hydratedByDataSetId.has(dsId)) {
+        hydratedByDataSetId.set(
+          dsId,
+          hydrateDataSetForPublicChartViewer(null, cloneJson(dataSetRaw)),
+        );
       }
-      const baseHydrated = await baseHydrationByDataSetId.get(dsId);
-      const dataSet = await hydrateDataSetForPublicChartViewer(chart, cloneJson(baseHydrated));
-      const bundle = buildPublicChartBundle(chart, dataSet);
+      const baseHydrated = await hydratedByDataSetId.get(dsId);
+
+      const { bundle, meta } = await materializeChartBundle({
+        chartLean: chart,
+        dataSetLean: dataSetRaw,
+        userId,
+        prehydratedDataSet: baseHydrated,
+      });
+
       return {
         cid,
         bundle: trimChartBundleForStorage({
           ...bundle,
           meta: {
+            ...meta,
             public_slug: chart.public_slug,
             is_public: !!chart.is_public,
           },
@@ -273,6 +303,27 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
   const chartIds = collectChartIdsFromLayout(dash.layout);
   if (!chartIds.has(cid)) {
     return { success: false, message: "Chart not on this dashboard" };
+  }
+
+  const chartDoc = await Chart.findById(cid).lean();
+  if (chartHasPublishedSnapshot(chartDoc)) {
+    const bundle = chartDoc.published_bundle;
+    return {
+      success: true,
+      data: {
+        chart_id: cid,
+        chartPayload: {
+          chart: bundle.chart,
+          rows: Array.isArray(bundle.rows) ? bundle.rows : [],
+          dataSheets: bundle.dataSheets && typeof bundle.dataSheets === "object" ? bundle.dataSheets : {},
+        },
+        chartLink:
+          chartDoc.is_public && chartDoc.public_slug
+            ? { mode: "chart_public", slug: chartDoc.public_slug }
+            : null,
+        _cacheHit: true,
+      },
+    };
   }
 
   const cached = dash.published_chart_bundles?.[cid];
