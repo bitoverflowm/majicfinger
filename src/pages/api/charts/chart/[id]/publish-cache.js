@@ -55,11 +55,25 @@ export default async function handler(req, res) {
       }
 
       const chartLean = chart.toObject ? chart.toObject() : chart;
+      const workspaceDataSheets =
+        req.body?.workspaceDataSheets && typeof req.body.workspaceDataSheets === "object"
+          ? req.body.workspaceDataSheets
+          : null;
       const result = await materializeChartBundle({
         chartLean,
         dataSetLean: dataSetRaw,
         userId: chart.user_id,
+        workspaceDataSheets,
       });
+
+      if (result.empty_snapshot) {
+        return res.status(422).json({
+          success: false,
+          message:
+            "Chart snapshot has no plottable rows. Check chart line filters and that lake data is available.",
+          warnings: result.warnings,
+        });
+      }
 
       chart.published_bundle = result.bundle;
       chart.published_bundle_meta = result.meta;

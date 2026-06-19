@@ -27,6 +27,7 @@ import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import {
   createChartPublishProgressTicker,
+  pickWorkspaceDataSheetsForPublish,
   rebuildChartPublishCache,
 } from "@/lib/chartPublishCache";
 import { isPublishedChartBundleStale } from "@/lib/chartPublishStaleness";
@@ -269,10 +270,15 @@ function ShareEmbedSection({ runOrRequestPro }) {
     );
     ticker.start();
     try {
-      const result = await rebuildChartPublishCache(chartId, (pct, message) => {
+      const workspaceDataSheets = pickWorkspaceDataSheetsForPublish(dataSheets);
+      const result = await rebuildChartPublishCache(
+        chartId,
+        (pct, message) => {
         setPublishCacheProgress(pct);
         setPublishCacheMessage(message);
-      });
+      },
+        workspaceDataSheets,
+      );
       if (!result.ok) {
         toast.error(result.message || "Failed to build chart snapshot");
         return result;
@@ -296,7 +302,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
       setPublishCacheProgress(0);
       setPublishCacheMessage("");
     }
-  }, [isPublishingCache, publishCacheProgress, setLoadedChartMeta, syncActiveChartSheet]);
+  }, [dataSheets, isPublishingCache, publishCacheProgress, setLoadedChartMeta, syncActiveChartSheet]);
 
   const pendingSlug = useMemo(
     () => normalizeChartEmbedSlug((pendingChartName || "").trim() || "chart") || "chart",

@@ -1,4 +1,5 @@
 import { getAthenaAccessForUserId } from "@/lib/athenaAccess";
+import { extractChartLineFilterGroupValues } from "@/lib/chartLineFilters";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import {
   collectChartSnapshotColumnsBySheetId,
@@ -11,7 +12,7 @@ import {
   buildSheetProvenanceGraphForRehydrate,
   runRehydrateSheetCore,
 } from "@/lib/dataLake/rehydrateSheetCore";
-import { sheetNeedsQuantAthenaReplay } from "@/lib/projectPersistence";
+import { sheetNeedsQuantAthenaReplay, findQuantAthenaOperation } from "@/lib/projectPersistence";
 import { collectSheetClosureForCharts } from "@/lib/runYourself/collectSheetClosure";
 
 function cloneLeanDoc(doc) {
@@ -69,6 +70,7 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
       : inferDefaultBuilderSnapshot(rowsForFallback);
   const primaryId = primarySheetIdForChartSnapshot(dataSheets, rechartsBuilderRaw);
   const colsBySheet = collectChartSnapshotColumnsBySheetId(rechartsBuilderRaw, primaryId, dataSheets);
+  const chartLineFilters = rechartsBuilderRaw?.chartLineFilters;
 
   const access = await getAthenaAccessForUserId(chartLean?.user_id);
   const closureOrder = collectSheetClosureForCharts(dataSheets, [chartLean]);
@@ -115,13 +117,20 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
   for (const sheetId of closureOrder) {
     const sheet = dataSheets[sheetId];
     if (!sheetNeedsQuantAthenaReplay(sheet)) continue;
+    if (Array.isArray(sheet?.data) && sheet.data.length > 0 && sheet.rehydrationStatus === "complete") {
+      continue;
+    }
     const colSet = colsBySheet.get(sheetId);
+    const op = findQuantAthenaOperation(sheet);
+    const groupCol = String(op?.quant?.groupColumn || op?.join?.leftKeyColumn || "ticker").trim();
+    const groupColumnFilterValues = extractChartLineFilterGroupValues(chartLineFilters, groupCol);
     try {
       const { rows, json } = await rehydrateQuantAthenaSheetServer({
         access,
         sheet,
         sheetId,
         dataSheets,
+        groupColumnFilterValues: groupColumnFilterValues || undefined,
       });
       let trimmed = rows;
       if (colSet && colSet.size > 0) trimmed = projectRowObjectsToColumnSet(rows, colSet);

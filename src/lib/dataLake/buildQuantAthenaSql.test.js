@@ -44,3 +44,29 @@ test("quant Athena SQL uses epoch seconds for created_time not bigint timestamp 
   assert.ok(sql.includes("date_format(") && sql.includes("selected_close_time"), "date metrics must be formatted");
   assert.ok(sql.includes("w.progress_num DESC"), "latest_before must break ties on latest progress");
 });
+
+test("quant Athena SQL pushes chart line filter tickers into joined WHERE", () => {
+  const sql = buildRelativePositionSnapshotAthenaSql({
+    baseCteName: "relevant_markets",
+    join: {
+      lake: "kalshi",
+      table: "trades",
+      joinType: "inner",
+      leftKeyColumn: "ticker",
+      rightKeyColumn: "ticker",
+      columns: ["created_time", "yes_price"],
+    },
+    quant: {
+      groupColumn: "ticker",
+      progressColumn: "created_time",
+      endRule: "column",
+      endColumn: "close_time",
+      checkpoints: [0, 0.5, 1],
+      metricColumns: ["ticker", "yes_price", "close_time"],
+      joinValueColumn: "yes_price",
+      groupColumnFilterValues: ["RECNC-22DEC25", "RECSS-22DEC25"],
+    },
+    limit: 1000,
+  });
+  assert.ok(sql.includes("CAST(b.\"ticker\" AS VARCHAR) IN ('RECNC-22DEC25', 'RECSS-22DEC25')"));
+});

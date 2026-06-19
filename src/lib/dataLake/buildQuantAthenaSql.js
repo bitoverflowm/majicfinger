@@ -180,6 +180,16 @@ export function buildRelativePositionSnapshotAthenaSql({
 
   const lim = Math.max(1, Math.floor(limit));
 
+  const groupFilterValues = Array.isArray(quant?.groupColumnFilterValues)
+    ? quant.groupColumnFilterValues.map((v) => String(v ?? "").trim()).filter(Boolean)
+    : [];
+  const groupInSql =
+    groupFilterValues.length > 0
+      ? ` AND CAST(b.${bGroup} AS VARCHAR) IN (${groupFilterValues
+          .map((v) => `'${String(v).replace(/'/g, "''")}'`)
+          .join(", ")})`
+      : "";
+
   return `
 joined AS (
   SELECT
@@ -187,7 +197,7 @@ joined AS (
   FROM ${base} b
   ${joinType} JOIN ${quoteTable(physical)} j
     ON CAST(b.${bLeft} AS VARCHAR) = CAST(j.${jRight} AS VARCHAR)
-  WHERE ${progressExpr} IS NOT NULL
+  WHERE ${progressExpr} IS NOT NULL${groupInSql}
 ),
 with_bounds AS (
   SELECT

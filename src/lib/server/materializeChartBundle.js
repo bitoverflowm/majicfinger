@@ -2,9 +2,8 @@ import { buildPublicChartBundle, normalizeBuilderSnapshot } from "@/lib/chartBun
 import { reduceRowsForChartLineFilters } from "@/lib/chartLineFilters";
 import { chartSnapshotHash } from "@/lib/chartPublishStaleness";
 import {
-  collectChartSnapshotColumnsBySheetId,
-  dataSheetsReferencedBySnapshot,
   primarySheetIdForChartSnapshot,
+  dataSheetsReferencedBySnapshot,
 } from "@/lib/chartSnapshotDataDeps";
 import {
   MATERIALIZATION_MODE_LIVE_LAKE,
@@ -28,50 +27,56 @@ function cloneJson(value) {
 }
 
 /**
- * Apply chart-line-filter row reduction to referenced sheets in a hydrated dataset.
+ * Apply chart-line-filter row reduction on the primary chart sheet only.
  * @param {Record<string, object>} dataSheets
  * @param {object} snapshot
  * @param {string} primaryId
  */
 function applyChartFilterRowReduction(dataSheets, snapshot, primaryId) {
   const filters = snapshot?.chartLineFilters;
-  if (!Array.isArray(filters) || !filters.length) return dataSheets;
+  if (!Array.isArray(filters) || !filters.length || !primaryId) return dataSheets;
 
-  const colsBySheet = collectChartSnapshotColumnsBySheetId(snapshot, primaryId, dataSheets);
-  const next = { ...dataSheets };
-
-  for (const sheetId of colsBySheet.keys()) {
-    const sheet = next[sheetId];
-    if (!sheet || !Array.isArray(sheet.data) || !sheet.data.length) continue;
-    const reduced = reduceRowsForChartLineFilters(sheet.data, filters, {
-      cap: PUBLISHED_BUNDLE_FILTER_ROW_CAP,
-    });
-    if (reduced.length < sheet.data.length) {
-      next[sheetId] = {
-        ...sheet,
-        data: reduced,
-        rowCount: reduced.length,
-        previewRowCount: reduced.length,
-      };
-    }
+  const primarySheet = dataSheets[primaryId];
+  if (!primarySheet || !Array.isArray(primarySheet.data) || !primarySheet.data.length) {
+    return dataSheets;
   }
 
-  const primarySheet = next[primaryId];
-  if (primarySheet && Array.isArray(primarySheet.data)) {
-    const reducedPrimary = reduceRowsForChartLineFilters(primarySheet.data, filters, {
-      cap: PUBLISHED_BUNDLE_FILTER_ROW_CAP,
-    });
-    if (reducedPrimary.length < primarySheet.data.length) {
-      next[primaryId] = {
-        ...primarySheet,
-        data: reducedPrimary,
-        rowCount: reducedPrimary.length,
-        previewRowCount: reducedPrimary.length,
-      };
-    }
-  }
+  const reduced = reduceRowsForChartLineFilters(primarySheet.data, filters, {
+    cap: PUBLISHED_BUNDLE_FILTER_ROW_CAP,
+  });
 
-  return next;
+  return {
+    ...dataSheets,
+    [primaryId]: {
+      ...primarySheet,
+      data: reduced,
+      rowCount: reduced.length,
+      previewRowCount: reduced.length,
+    },
+  };
+}
+
+function mergeWorkspaceDataSheets(dataSetLean, workspaceDataSheets) {
+  if (!workspaceDataSheets || typeof workspaceDataSheets !== "object") {
+    return dataSetLean;
+  }
+  const out = cloneJson(dataSetLean);
+  const sheets =
+    out?.data_sheets && typeof out.data_sheets === "object" ? { ...out.data_sheets } : {};
+  for (const [sheetId, ws] of Object.entries(workspaceDataSheets)) {
+    if (!ws || typeof ws !== "object" || !Array.isArray(ws.data) || !ws.data.length) continue;
+    sheets[sheetId] = {
+      ...(sheets[sheetId] || {}),
+      ...ws,
+      data: ws.data,
+      storageMode: ws.storageMode || sheets[sheetId]?.storageMode || "derived",
+      rehydrationStatus: "complete",
+      rowCount: ws.data.length,
+      fullRowCount: ws.fullRowCount ?? ws.data.length,
+    };
+  }
+  out.data_sheets = sheets;
+  return out;
 }
 
 function countBundleRows(bundle) {
@@ -94,6 +99,7 @@ function countBundleRows(bundle) {
  *   userId?: unknown;
  *   prehydratedDataSet?: object | null;
  *   skipHydration?: boolean;
+ *   workspaceDataSheets?: Record<string, object> | null;
  * }} params
  */
 export async function materializeChartBundle({
@@ -102,6 +108,7 @@ export async function materializeChartBundle({
   userId,
   prehydratedDataSet = null,
   skipHydration = false,
+  workspaceDataSheets = null,
 }) {
   const started = Date.now();
   /** @type {string[]} */
@@ -113,12 +120,13 @@ export async function materializeChartBundle({
   }
 
   let hydrated;
+  const baseDataSet = mergeWorkspaceDataSheets(cloneJson(dataSetLean), workspaceDataSheets);
   if (skipHydration && prehydratedDataSet) {
     hydrated = cloneJson(prehydratedDataSet);
   } else if (prehydratedDataSet) {
     hydrated = await hydrateDataSetForPublicChartViewer(chart, cloneJson(prehydratedDataSet));
   } else {
-    hydrated = await hydrateDataSetForPublicChartViewer(chart, cloneJson(dataSetLean));
+    hydrated = await hydrateDataSetForPublicChartViewer(chart, baseDataSet);
   }
 
   const cp = Array.isArray(chart.chart_properties) ? chart.chart_properties[0] : chart.chart_properties;
@@ -141,6 +149,15 @@ export async function materializeChartBundle({
   const rowCount = countBundleRows(bundle);
   const byteEstimate = estimateJsonBytes(bundle);
   let materialization_mode = MATERIALIZATION_MODE_SNAPSHOT;
+
+  const primaryRows = reducedSheets[primaryId]?.data;
+  if (!Array.isArray(primaryRows) || !primaryRows.length) {
+    warnings.push(`Primary chart sheet (${primaryId || "unknown"}) has no rows after hydration`);
+  }
+
+  if (rowCount === 0 && Array.isArray(snapshotRaw?.chartLineFilters) && snapshotRaw.chartLineFilters.length) {
+    warnings.push("Chart line filters produced no matching rows in the publish snapshot");
+  }
 
   if (rowCount > PUBLISHED_BUNDLE_MAX_ROWS || byteEstimate > PUBLISHED_BUNDLE_MAX_BYTES) {
     materialization_mode = MATERIALIZATION_MODE_LIVE_LAKE;
@@ -186,6 +203,7 @@ export async function materializeChartBundle({
     meta,
     warnings,
     materialization_mode,
+    empty_snapshot: materialization_mode === MATERIALIZATION_MODE_SNAPSHOT && rowCount === 0,
   };
 }
 

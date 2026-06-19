@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   chartFilterRuleMatches,
+  extractChartLineFilterGroupValues,
   normalizeChartLineFilters,
   reduceRowsForChartLineFilters,
 } from "./chartLineFilters.js";
@@ -32,6 +33,39 @@ test("reduceRowsForChartLineFilters keeps union of per-series matches", () => {
   const out = reduceRowsForChartLineFilters(rows, filters);
   assert.equal(out.length, 4);
   assert.ok(out.every((r) => r.ticker === "A" || r.ticker === "B"));
+});
+
+test("extractChartLineFilterGroupValues collects ticker equals for Athena push-down", () => {
+  const filters = normalizeChartLineFilters([
+    { id: "f0", seriesKey: "line:0", column: "sheet-2::ticker", operator: "=", value: "RECNC-22DEC25" },
+    { id: "f1", seriesKey: "line:1", column: "sheet-2::ticker", operator: "=", value: "RECSS-22DEC25" },
+    { id: "f2", seriesKey: "line:2", column: "sheet-2::ticker", operator: "=", value: "RECNH-22DEC25" },
+  ]);
+  const tickers = extractChartLineFilterGroupValues(filters, "ticker");
+  assert.deepEqual(tickers?.sort(), ["RECNC-22DEC25", "RECNH-22DEC25", "RECSS-22DEC25"]);
+});
+
+test("political convergence style filters reduce to ~24 rows (3 tickers x 8 checkpoints)", () => {
+  const checkpoints = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
+  const tickers = ["RECNC-22DEC25", "RECSS-22DEC25", "RECNH-22DEC25"];
+  const rows = [];
+  for (const ticker of tickers) {
+    for (const lifecycle_checkpoint of checkpoints) {
+      rows.push({ ticker, lifecycle_checkpoint, selected_yes_price: 50 });
+    }
+  }
+  assert.equal(rows.length, 24);
+  const filters = normalizeChartLineFilters(
+    tickers.map((ticker, i) => ({
+      id: `f${i}`,
+      seriesKey: `line:${i}`,
+      column: "ticker",
+      operator: "=",
+      value: ticker,
+    })),
+  );
+  const out = reduceRowsForChartLineFilters(rows, filters);
+  assert.equal(out.length, 24);
 });
 
 test("chartFilterRuleMatches resolves scoped column keys", () => {

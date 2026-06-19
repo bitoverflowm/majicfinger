@@ -3,18 +3,17 @@
  * Backfill published_bundle on all public charts (additive $set only — never deletes data).
  *
  * Usage:
- *   node --import ./scripts/register-alias.mjs ./scripts/backfill-published-chart-bundles.mjs --dry-run
- *   node --import ./scripts/register-alias.mjs ./scripts/backfill-published-chart-bundles.mjs --execute --limit 5
- *   node --import ./scripts/register-alias.mjs ./scripts/backfill-published-chart-bundles.mjs --execute --batch-size 10 --delay-ms 2000
+ *   npm run backfill:chart-bundles -- --dry-run --prod-db
+ *   npm run backfill:chart-bundles -- --execute --prod-db --limit 5
+ *   npm run backfill:chart-bundles -- --execute --prod-db --batch-size 10 --delay-ms 2000
  *
- * Env: MONGODB_URI (required for --execute)
+ * Flags:
+ *   --prod-db     Use MONGODB_URI (production). Default without flag uses MONGODB_URI_DEV.
+ *   --dry-run     List charts only (default)
+ *   --execute     Write published_bundle via $set
  */
 
 import dotenv from "dotenv";
-import mongoose from "mongoose";
-import Chart from "@/models/Charts.js";
-import DataSet from "@/models/DataSets.js";
-import { materializeChartBundle } from "@/lib/server/materializeChartBundle.js";
 
 dotenv.config();
 dotenv.config({ path: ".env.local", override: true });
@@ -22,6 +21,7 @@ dotenv.config({ path: ".env.local", override: true });
 function parseArgs(argv) {
   const args = {
     dryRun: true,
+    prodDb: false,
     limit: 0,
     delayMs: 1500,
     resumeFrom: "",
@@ -31,6 +31,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--execute") args.dryRun = false;
     else if (a === "--dry-run") args.dryRun = true;
+    else if (a === "--prod-db" || a === "--prod") args.prodDb = true;
     else if (a === "--limit") args.limit = Math.max(0, parseInt(argv[++i], 10) || 0);
     else if (a === "--delay-ms") args.delayMs = Math.max(0, parseInt(argv[++i], 10) || 0);
     else if (a === "--resume-from") args.resumeFrom = String(argv[++i] || "").trim();
@@ -41,10 +42,24 @@ function parseArgs(argv) {
 
 async function main() {
   const args = parseArgs(process.argv);
-  const uri = process.env.MONGODB_URI;
-  if (!args.dryRun && !uri) {
-    throw new Error("MONGODB_URI is required for --execute");
+  if (args.prodDb) {
+    process.env.USE_PRODUCTION_DB = "1";
   }
+
+  const { resolveAppMongoUri, mongoDatabaseTarget } = await import("@/lib/resolveMongoUri.js");
+  const uri = resolveAppMongoUri();
+  if (!uri) {
+    throw new Error(
+      args.prodDb
+        ? "MONGODB_URI is required for --prod-db"
+        : "MONGODB_URI_DEV is required (or pass --prod-db for MONGODB_URI)",
+    );
+  }
+
+  const mongoose = (await import("mongoose")).default;
+  const Chart = (await import("@/models/Charts.js")).default;
+  const DataSet = (await import("@/models/DataSets.js")).default;
+  const { materializeChartBundle } = await import("@/lib/server/materializeChartBundle.js");
 
   const query = {
     is_public: true,
@@ -54,21 +69,11 @@ async function main() {
     query.user_id = new mongoose.Types.ObjectId(args.ownerId);
   }
 
-  if (!args.dryRun) {
-    await mongoose.connect(uri);
-  }
+  console.log(`[backfill] target=${mongoDatabaseTarget()} dryRun=${args.dryRun}`);
 
-  let charts = [];
-  if (args.dryRun) {
-    if (!uri) {
-      console.log("DRY RUN (no MONGODB_URI): would query public charts and materialize bundles.");
-      console.log("Set MONGODB_URI and re-run without --dry-run only after reviewing this script.");
-      return;
-    }
-    await mongoose.connect(uri);
-  }
+  await mongoose.connect(uri);
 
-  charts = await Chart.find(query).sort({ _id: 1 }).lean();
+  let charts = await Chart.find(query).sort({ _id: 1 }).lean();
   if (args.resumeFrom) {
     charts = charts.filter((c) => String(c._id) >= args.resumeFrom);
   }
@@ -76,9 +81,7 @@ async function main() {
     charts = charts.slice(0, args.limit);
   }
 
-  console.log(
-    `${args.dryRun ? "[DRY RUN] " : ""}Processing ${charts.length} public chart(s)…`,
-  );
+  console.log(`${args.dryRun ? "[DRY RUN] " : ""}Processing ${charts.length} public chart(s)…`);
 
   let ok = 0;
   let skipped = 0;
@@ -111,6 +114,12 @@ async function main() {
         userId: chart.user_id,
       });
 
+      if (meta.row_count === 0 && meta.materialization_mode === "snapshot") {
+        console.warn(`  SKIP ${cid}: empty snapshot (${warnings?.join("; ") || "no rows"})`);
+        skipped += 1;
+        continue;
+      }
+
       await Chart.updateOne(
         { _id: chart._id },
         {
@@ -138,7 +147,7 @@ async function main() {
   }
 
   console.log(`Done. ok=${ok} skipped=${skipped} failed=${failed}`);
-  if (!args.dryRun) await mongoose.disconnect();
+  await mongoose.disconnect();
 }
 
 main().catch((err) => {

@@ -1,4 +1,5 @@
 import { temporalToMs } from "@/lib/temporalParse";
+import { deScopeChartColumnKey } from "@/lib/chartSnapshotDataDeps";
 import { PUBLISHED_BUNDLE_FILTER_ROW_CAP } from "@/lib/publishedChartBundleConfig";
 
 /**
@@ -121,4 +122,31 @@ export function reduceRowsForChartLineFilters(rows, chartLineFilters, options = 
 
   const cap = Math.max(1, Number(options.cap) || PUBLISHED_BUNDLE_FILTER_ROW_CAP);
   return reduced.length > cap ? reduced.slice(0, cap) : reduced;
+}
+
+/**
+ * When every chart line filter is `=` on the same column as the quant group column (e.g. ticker),
+ * return distinct values so Athena can restrict the query (3 tickers × 8 checkpoints ≈ 24 rows).
+ *
+ * @param {unknown} chartLineFilters
+ * @param {string} groupColumn
+ * @returns {string[] | null}
+ */
+export function extractChartLineFilterGroupValues(chartLineFilters, groupColumn) {
+  const group = String(groupColumn || "").trim();
+  if (!group) return null;
+  const filters = normalizeChartLineFilters(chartLineFilters);
+  if (!filters.length) return null;
+
+  const values = new Set();
+  for (const rule of filters) {
+    const col = deScopeChartColumnKey(rule.column);
+    const op = String(rule.operator || "=").toLowerCase();
+    if (col !== group) return null;
+    if (op !== "=" && op !== "eq") return null;
+    const v = rule.value;
+    if (v == null || v === "") return null;
+    values.add(String(v));
+  }
+  return values.size ? [...values] : null;
 }

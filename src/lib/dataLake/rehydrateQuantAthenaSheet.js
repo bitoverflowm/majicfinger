@@ -68,12 +68,16 @@ function finalizeQuantAthenaReplayRows({ rows, rowCount, sheetId }) {
  *   operation?: object;
  * }} params
  */
-export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheets, operation }) {
+export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheets, operation, groupColumnFilterValues }) {
   const { sheetGraph, rootSheetId, join, quant } = buildQuantAthenaReplayPayload({
     sheet,
     dataSheets,
     operation,
   });
+
+  if (Array.isArray(groupColumnFilterValues) && groupColumnFilterValues.length) {
+    quant.groupColumnFilterValues = groupColumnFilterValues;
+  }
 
   const { rows, rowCount } = await fetchSheetQuantAthena({
     sheetGraph,
@@ -94,6 +98,7 @@ export async function rehydrateQuantAthenaSheetAsync({ sheet, sheetId, dataSheet
  *   dataSheets: Record<string, object>;
  *   operation?: object;
  *   maxWaitMs?: number;
+ *   groupColumnFilterValues?: string[];
  * }} params
  */
 export async function rehydrateQuantAthenaSheetServer({
@@ -103,12 +108,17 @@ export async function rehydrateQuantAthenaSheetServer({
   dataSheets,
   operation,
   maxWaitMs,
+  groupColumnFilterValues,
 }) {
   const { sheetGraph, rootSheetId, join, quant } = buildQuantAthenaReplayPayload({
     sheet,
     dataSheets,
     operation,
   });
+
+  if (Array.isArray(groupColumnFilterValues) && groupColumnFilterValues.length) {
+    quant.groupColumnFilterValues = groupColumnFilterValues;
+  }
 
   const result = await runSheetQuantAthena({
     access,

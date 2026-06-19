@@ -8,12 +8,31 @@ export const CHART_PUBLISH_CACHE_MESSAGES = [
   "Almost there — finishing public preview…",
 ];
 
+/** Send in-memory sheet rows from the editor so publish can skip Athena when data is already loaded. */
+export function pickWorkspaceDataSheetsForPublish(dataSheets) {
+  if (!dataSheets || typeof dataSheets !== "object") return null;
+  const out = {};
+  for (const [sheetId, sheet] of Object.entries(dataSheets)) {
+    if (!sheet || typeof sheet !== "object" || !Array.isArray(sheet.data) || !sheet.data.length) continue;
+    out[sheetId] = {
+      data: sheet.data,
+      columns: sheet.columns,
+      name: sheet.name,
+      storageMode: sheet.storageMode,
+      fullRowCount: sheet.fullRowCount ?? sheet.data.length,
+      rowCount: sheet.data.length,
+    };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /**
  * Build and persist published_bundle on a chart document.
  * @param {string} chartId
  * @param {(pct: number, message: string) => void} [onProgress]
+ * @param {Record<string, object> | null} [workspaceDataSheets]
  */
-export async function rebuildChartPublishCache(chartId, onProgress) {
+export async function rebuildChartPublishCache(chartId, onProgress, workspaceDataSheets = null) {
   if (!chartId) return { ok: false, message: "Missing chart id" };
 
   onProgress?.(10, "Checking chart…");
@@ -36,7 +55,10 @@ export async function rebuildChartPublishCache(chartId, onProgress) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ step: "materialize" }),
+    body: JSON.stringify({
+      step: "materialize",
+      workspaceDataSheets: workspaceDataSheets || undefined,
+    }),
   });
   const materializeJson = await materializeRes.json().catch(() => null);
   if (!materializeRes.ok || !materializeJson?.success) {
