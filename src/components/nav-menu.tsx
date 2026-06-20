@@ -2,6 +2,8 @@
 
 import { siteConfig } from "@/lib/config";
 import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
+import type { ProductsNavData } from "@/lib/nav/products-nav";
+import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import React, { useRef, useState } from "react";
@@ -12,7 +14,11 @@ interface NavItem {
   href: string;
 }
 
-export function NavMenu() {
+type NavMenuProps = {
+  productsNav: ProductsNavData;
+};
+
+export function NavMenu({ productsNav }: NavMenuProps) {
   const ref = useRef<HTMLUListElement>(null);
   const pathname = usePathname();
   const navs = React.useMemo(() => getNavLinksForPathname(pathname), [pathname]);
@@ -118,11 +124,12 @@ export function NavMenu() {
   };
 
   return (
-    <div className="w-full hidden md:block">
+    <div className="w-full hidden md:block overflow-visible">
       <ul
-        className="relative mx-auto flex w-fit rounded-full h-11 px-2 items-center justify-center"
+        className="relative mx-auto flex w-fit rounded-full h-11 px-2 items-center justify-center overflow-visible"
         ref={ref}
       >
+        <ProductsNavDropdown data={productsNav} />
         {navs.map((item) => (
           <li
             key={item.name}

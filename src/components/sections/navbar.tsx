@@ -8,10 +8,12 @@ import { Menu, X } from "lucide-react";
 import { AnimatePresence, motion, useScroll } from "framer-motion";
 
 import { NavMenu } from "@/components/nav-menu";
+import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
 import { DemoScrollLink } from "@/components/sections/demo-scroll-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/lib/config";
 import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
+import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
 import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient";
@@ -55,7 +57,7 @@ const drawerMenuVariants = {
   visible: { opacity: 1 },
 };
 
-export function Navbar() {
+export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   const { scrollY } = useScroll();
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -152,7 +154,7 @@ export function Navbar() {
               </span>
             </Link>
 
-            <NavMenu />
+            <NavMenu productsNav={productsNav} />
 
             <div className="flex flex-row items-center gap-1 md:gap-3 shrink-0">
               <div className="flex items-center space-x-6">
@@ -253,6 +255,7 @@ export function Navbar() {
                   className="flex flex-col text-sm mb-4 border border-border rounded-md"
                   variants={drawerMenuContainerVariants}
                 >
+                  <ProductsNavDropdown data={productsNav} variant="mobile" />
                   <AnimatePresence>
                     {getNavLinksForPathname(pathname).map((item) => (
                       <motion.li

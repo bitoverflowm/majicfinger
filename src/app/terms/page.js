@@ -1,4 +1,4 @@
-import { Navbar } from "@/components/sections/navbar";
+import { MarketingNavbar } from "@/components/sections/marketing-navbar";
 import { FooterSection } from "@/components/sections/footer-section";
 import Link from "next/link";
 
@@ -10,7 +10,7 @@ export const metadata = {
 export default function TermsPage() {
   return (
     <main className="min-h-screen bg-background">
-      <Navbar />
+      <MarketingNavbar />
       <article className="max-w-3xl mx-auto px-4 py-16">
         <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
         <p className="text-muted-foreground mb-6">
