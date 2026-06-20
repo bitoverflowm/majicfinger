@@ -1,19 +1,15 @@
-"use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import type { LycheeContentNavData } from "@/lib/content/lychee-content-nav";
+import {
+  isLycheeContentNavLinkActive,
+  type LycheeContentNavData,
+} from "@/lib/content/lychee-content-nav";
 
 type LycheeContentSidebarProps = {
   data: LycheeContentNavData;
+  /** Current pathname for server-rendered active state (e.g. `/guides/my-slug`). */
+  currentPath: string;
 };
-
-function isNavLinkActive(href: string, pathname: string): boolean {
-  if (href.startsWith("/#")) return false;
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
 
 function NavItem({
   href,
@@ -28,6 +24,7 @@ function NavItem({
     <li>
       <Link
         href={href}
+        aria-current={active ? "page" : undefined}
         className={cn(
           "block leading-snug transition-colors hover:text-secondary",
           active ? "text-secondary" : "text-foreground",
@@ -39,9 +36,14 @@ function NavItem({
   );
 }
 
-export function LycheeContentSidebar({ data }: LycheeContentSidebarProps) {
-  const pathname = usePathname();
-
+/**
+ * Server-rendered lychee_content sidebar.
+ * All links are present in the initial HTML for crawlers and internal linking.
+ */
+export function LycheeContentSidebar({
+  data,
+  currentPath,
+}: LycheeContentSidebarProps) {
   return (
     <nav
       aria-label="Lychee content"
@@ -67,7 +69,7 @@ export function LycheeContentSidebar({ data }: LycheeContentSidebarProps) {
                 key={item.href}
                 href={item.href}
                 label={item.label}
-                active={isNavLinkActive(item.href, pathname)}
+                active={isLycheeContentNavLinkActive(item.href, currentPath)}
               />
             ))}
           </ul>
@@ -84,7 +86,7 @@ export function LycheeContentSidebar({ data }: LycheeContentSidebarProps) {
                   key={`${section.id}-${item.slug ?? item.href}`}
                   href={item.href}
                   label={item.label}
-                  active={isNavLinkActive(item.href, pathname)}
+                  active={isLycheeContentNavLinkActive(item.href, currentPath)}
                 />
               ))}
             </ul>

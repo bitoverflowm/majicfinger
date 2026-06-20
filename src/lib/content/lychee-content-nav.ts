@@ -23,6 +23,16 @@ export type LycheeContentNavData = {
   };
 };
 
+/** Match active sidebar link on the server (no client pathname required). */
+export function isLycheeContentNavLinkActive(
+  href: string,
+  currentPath: string,
+): boolean {
+  if (href.startsWith("/#")) return false;
+  if (href === "/") return currentPath === "/";
+  return currentPath === href || currentPath.startsWith(`${href}/`);
+}
+
 const LYCHEE_CONTENT_TYPES: ContentType[] = [
   "guides",
   "blog",
