@@ -46,27 +46,27 @@ export function ContentTocNav({ items }: ContentTocNavProps) {
   return (
     <nav
       aria-label="On this page"
-      className="fixed left-[calc(50%+400px)] top-20 z-40 hidden max-h-[70vh] w-56 overflow-y-auto rounded-xl bg-background/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:block"
+      className="sticky top-20 z-10 hidden max-h-[calc(100dvh-6rem)] w-full overflow-y-auto py-2 pl-2 font-serif text-xs lg:block"
     >
-        <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Table of Contents
+        <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
+          On this page
         </div>
-        <ul className="space-y-0.5">
+        <ul className="space-y-2">
           {items.map(({ id, text, depth }) => {
             const padClass =
               depth >= 4
-                ? "pl-6 text-[13px]"
+                ? "pl-6"
                 : depth === 3
-                  ? "pl-5 text-[13px]"
+                  ? "pl-4"
                   : depth === 2
-                    ? "pl-3 text-[13px]"
-                    : "pl-1 text-[13px]";
+                    ? "pl-2"
+                    : "pl-0";
             return (
             <li key={id}>
               <a
                 href={`#${id}`}
-                className={`block rounded-md py-1.5 leading-snug text-muted-foreground/90 transition-colors hover:text-foreground ${padClass} ${
-                  activeId === id ? "font-medium text-foreground" : ""
+                className={`block leading-snug transition-colors hover:text-secondary ${padClass} ${
+                  activeId === id ? "text-secondary" : "text-foreground"
                 }`}
                 onClick={(e) => {
                   e.preventDefault();

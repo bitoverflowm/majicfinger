@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import {
-  Container,
   ContentWrapper,
   Section,
   Breadcrumb,
@@ -55,9 +54,8 @@ export function GuideLayout({
   ];
 
   return (
-    <>
-    <Container>
-      <ContentTocNav items={tocItems} />
+    <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(180px,220px)] lg:gap-x-12 xl:max-w-7xl">
+      <div className="min-w-0">
       <ContentWrapper>
         <Breadcrumb items={breadcrumbItems} />
         {showKalshiHubBackLink && (
@@ -153,7 +151,9 @@ export function GuideLayout({
           </Section>
         )}
       </ContentWrapper>
-    </Container>
-    </>
+      </div>
+
+      <ContentTocNav items={tocItems} />
+    </div>
   );
 }
