@@ -1,10 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import {
   ContentWrapper,
   Section,
-  Breadcrumb,
   H1,
   P,
   Muted,
@@ -47,17 +45,10 @@ export function GuideLayout({
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
   const showKalshiHubBackLink = isKalshiHistoricalHubGuide(slug);
 
-  const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Guides", href: "/guides" },
-    { label: frontmatter.title },
-  ];
-
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(180px,220px)] lg:gap-x-12 xl:max-w-7xl">
       <div className="min-w-0">
       <ContentWrapper>
-        <Breadcrumb items={breadcrumbItems} />
         {showKalshiHubBackLink && (
           <Link
             href={KALSHI_HISTORICAL_DATA_HUB_PATH}
@@ -81,22 +72,6 @@ export function GuideLayout({
             <Muted>By {frontmatter.author}</Muted>
           </div>
         </Section>
-
-        {frontmatter.coverImage && (
-          <Section>
-            <div className="px-6">
-              <div className="relative w-full aspect-video overflow-hidden rounded-xl border border-border">
-                <Image
-                  src={frontmatter.coverImage}
-                  alt={frontmatter.title}
-                  fill
-                  className="object-cover"
-                  priority
-                />
-              </div>
-            </div>
-          </Section>
-        )}
 
         <Section>
           <div
