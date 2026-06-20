@@ -16,6 +16,9 @@ export function getNavLinksForPathname(pathname: string | null | undefined) {
   if (p === "/polymarket-metadata") {
     return [{ id: "guides", name: "Learn more", href: "#guides" }] satisfies NavMenuLink[];
   }
+  if (p === "/") {
+    return siteConfig.nav.links.filter((link) => link.id !== "hero");
+  }
   return siteConfig.nav.links;
 }
 

@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 
 const FORK_PROMO_TITLE = "Fork this analysis";
 const FORK_PROMO_DESCRIPTION =
-  "Run this same analysis on any another Kalshi/ Polymarket market, category, or time period.";
+  "Fork the workflow to rerun this analysis on any Kalshi or Polymarket market, category, or time window.";
 
 /**
  * @param {{
@@ -200,21 +200,11 @@ export function RunForYourselfButton({
   const goButton = (
     <Button
       type="button"
-      variant={presentation === "promo" && promoVariant === "subtle" ? "outline" : "default"}
-      size={
-        presentation === "promo"
-          ? promoVariant === "subtle"
-            ? "sm"
-            : "sm"
-          : variant === "dashboard"
-            ? "sm"
-            : "default"
-      }
+      variant="default"
+      size={presentation === "promo" ? "sm" : variant === "dashboard" ? "sm" : "default"}
       className={
         presentation === "promo"
-          ? promoVariant === "subtle"
-            ? cn("h-7 shrink-0 px-3 text-xs font-medium", className)
-            : cn("shrink-0 px-5 font-semibold", className)
+          ? cn("shrink-0 text-xs", className)
           : className ||
             (variant === "chart"
               ? "shadow-lg gap-1.5 rounded-full px-4 font-semibold"
@@ -224,7 +214,7 @@ export function RunForYourselfButton({
       disabled={disabled}
     >
       {presentation === "promo" ? (
-        "Fork Now"
+        "Fork this analysis →"
       ) : (
         <>
           <Play className="h-4 w-4 fill-current" aria-hidden />
