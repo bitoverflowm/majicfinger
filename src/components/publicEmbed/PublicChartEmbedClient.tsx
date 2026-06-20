@@ -193,7 +193,7 @@ export default function PublicChartEmbedClient({
         <DataSheetsLoader rows={rows} dataSheets={dataSheets} chartSnapshot={chartSnapshot} />
         <div
           className={`relative mt-0 flex flex-1 ${
-            isEmbedded ? "min-h-0 items-stretch" : "items-center justify-center md:mt-2"
+            isEmbedded ? "min-h-0 items-center justify-center" : "items-center justify-center md:mt-2"
           }`}
         >
           <ChartBuilderProvider
@@ -204,13 +204,13 @@ export default function PublicChartEmbedClient({
           >
             <div
               className={`flex min-h-0 w-full flex-1 ${
-                isEmbedded ? "items-stretch" : "h-full items-center justify-center"
+                isEmbedded ? "items-center justify-center" : "h-full items-center justify-center"
               }`}
             >
               <div className={`w-full ${isEmbedded ? "max-w-full" : "max-w-[1040px]"}`}>
                 <div
                   className={`flex w-full min-w-0 flex-col ${
-                    isEmbedded ? "h-[580px] min-h-0" : "h-[420px] min-h-[320px] md:h-[750px]"
+                    isEmbedded ? "min-h-0 flex-1" : "h-[420px] min-h-[320px] md:h-[750px]"
                   }`}
                 >
                   <ChartCanvas />

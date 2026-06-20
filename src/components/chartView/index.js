@@ -697,6 +697,9 @@ function parseScopedColumnKey(value, fallbackSheetId) {
   };
 }
 
+/** Recharts plot height inside lychee_content article embeds (container/iframe stays taller for padding). */
+const ARTICLE_EMBED_PLOT_HEIGHT_PX = 360;
+
 export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, embedCompact = false, embedInArticle = false, onSnapshotGetterReady = null }) {
   const contextStateV2 = useMyStateV2();
   const chartRef = useRef(null);
@@ -2758,18 +2761,23 @@ export function ChartCanvas() {
         </div>
       )}
 
-      <div className={cn("flex min-h-0 flex-1 flex-col", embedInArticle ? "px-0 py-0" : "px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2")}>
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          embedInArticle ? "px-3 py-3 sm:px-4 sm:py-4" : "px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2",
+        )}
+      >
         <div
           className={cn(
             "relative flex min-h-0 w-full max-w-[min(100%,100rem)] flex-1 flex-col",
-            embedInArticle ? "rounded-none" : "rounded-xl",
+            embedInArticle ? "rounded-lg" : "rounded-xl",
           )}
           ref={chartRef}
         >
             <Card
               className={cn(
                 "flex min-h-0 flex-1 flex-col gap-0 border-0",
-                embedInArticle ? "rounded-none py-0 shadow-none" : "py-4 shadow-xl",
+                embedInArticle ? "rounded-lg py-4 shadow-none" : "py-4 shadow-xl",
               )}
               style={{
                 backgroundColor:
@@ -2787,7 +2795,9 @@ export function ChartCanvas() {
               <CardContent
                 className={cn(
                   "relative flex min-h-0 flex-1 flex-col overflow-hidden pt-0",
-                  embedInArticle ? "px-0 pb-1" : "px-1.5 pb-2 sm:px-2",
+                  embedInArticle
+                    ? "items-center justify-center px-5 pb-2"
+                    : "px-1.5 pb-2 sm:px-2",
                 )}
               >
                 {!axesConfigured ? (
@@ -2845,8 +2855,10 @@ export function ChartCanvas() {
                     config={chartConfig || dfltChartConfig}
                     className={cn(
                       // `max-w` only applies when the card is wider than this cap; narrow layouts are widened via CardContent `px-*` above.
-                      "flex flex-col items-center justify-start aspect-auto mx-auto h-full w-full flex-1 transition-[min-height,padding] duration-300 ease-out",
-                      embedInArticle ? "max-w-full py-0" : "max-w-[min(100%,67.2rem)]",
+                      "flex flex-col items-center justify-start aspect-auto mx-auto w-full transition-[min-height,padding] duration-300 ease-out",
+                      embedInArticle
+                        ? "h-[var(--article-embed-plot-height)] max-w-full flex-none py-0"
+                        : "h-full max-w-[min(100%,67.2rem)] flex-1",
                       embedCompact ? "min-h-0" : "min-h-[200px] md:min-h-[220px]",
                       !embedInArticle &&
                         (xAxisTicksAngled
@@ -2858,7 +2870,12 @@ export function ChartCanvas() {
                             : "py-12"),
                       dark && !chartTextColor && "text-slate-200",
                     )}
-                    style={chartTextColor ? { color: chartTextColor } : undefined}
+                    style={{
+                      ...(chartTextColor ? { color: chartTextColor } : {}),
+                      ...(embedInArticle
+                        ? { "--article-embed-plot-height": `${ARTICLE_EMBED_PLOT_HEIGHT_PX}px` }
+                        : {}),
+                    }}
                   >
                     {selChartType === "area" && (
                       <AreaChart accessibilityLayer data={finalRenderedData} margin={cartesianMarginWithAngledTicks} stackOffset={expanded ? "expand" : false}>
