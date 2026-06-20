@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Section, Muted, KnowledgeCard } from "@/components/ui";
+import { GuideArticleThemeToggle } from "./GuideArticleThemeToggle";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
 import { ArticleMetaBar } from "./ArticleMetaBar";
 import {
@@ -49,6 +50,9 @@ export function GuideLayout({
       <ContentTocNav items={tocItems} />
       <div className="w-full justify-self-center pt-8 lg:pt-20">
         <div className="mx-auto w-full max-w-[762px]">
+          <div className="mb-3 flex justify-end lg:mb-4">
+            <GuideArticleThemeToggle />
+          </div>
           <article id="main-article" className={ARTICLE_SURFACE_CLASS}>
             <header className="not-prose mb-8 w-full">
               <ArticleMetaBar

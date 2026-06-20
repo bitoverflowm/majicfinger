@@ -23,7 +23,7 @@ export function LycheeContentShell({
   return (
     <div
       className={cn(
-        "relative grid min-h-screen grid-cols-1 gap-x-10 bg-[#F5F5F5]/20 md:mx-8 xl:mx-0",
+        "relative grid min-h-screen grid-cols-1 gap-x-10 bg-[#F5F5F5]/20 dark:bg-background md:mx-8 xl:mx-0",
         "lg:grid-cols-5",
         className,
       )}
