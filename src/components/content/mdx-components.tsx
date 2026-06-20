@@ -3,6 +3,7 @@ import Image from "next/image";
 import { TypographyInlineCode, VideoEmbed, YouTube } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ContentImage } from "./content-image";
+import { LYCHEE_CONTENT_TYPE } from "./article-prose";
 import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
 
@@ -42,12 +43,7 @@ function MdxHeading({
  */
 function MdxH1({ children, id, ...props }: any) {
   return (
-    <MdxHeading
-      as="h2"
-      id={id}
-      className="mt-14 scroll-mt-28 font-article text-[1.5rem] font-normal leading-snug tracking-tight text-foreground"
-      {...props}
-    >
+    <MdxHeading as="h2" id={id} className={LYCHEE_CONTENT_TYPE.sectionH2} {...props}>
       {children}
     </MdxHeading>
   );

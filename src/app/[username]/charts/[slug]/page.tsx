@@ -64,10 +64,14 @@ export async function generateMetadata({
 
 export default async function PublicChartPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ username: string; slug: string }>;
+  searchParams: Promise<{ embed?: string }>;
 }) {
   const { username, slug } = await params;
+  const { embed } = await searchParams;
+  const isArticleEmbed = embed === "1";
   const meta = await getPublicChartMeta(username, slug);
   const path = `/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`;
   const canonical = `${SITE}${path}`;
@@ -99,12 +103,12 @@ export default async function PublicChartPage({
     },
   };
   return (
-    <div className="min-h-screen bg-background">
+    <div className={isArticleEmbed ? "min-h-0 bg-white" : "min-h-screen bg-background"}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(chartJsonLd) }}
       />
-      <PublicChartEmbedClient username={username} slug={slug} />
+      <PublicChartEmbedClient username={username} slug={slug} articleEmbed={isArticleEmbed} />
     </div>
   );
 }

@@ -59,15 +59,18 @@ type PublicPayload = {
 export default function PublicChartEmbedClient({
   username,
   slug,
+  articleEmbed = false,
 }: {
   username: string;
   slug: string;
+  /** Loaded inside lychee_content MDX iframe (`?embed=1`). */
+  articleEmbed?: boolean;
 }) {
   const [payload, setPayload] = useState<PublicPayload | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEmbedded, setIsEmbedded] = useState(
-    () => typeof window !== "undefined" && window.self !== window.top,
+    () => articleEmbed || (typeof window !== "undefined" && window.self !== window.top),
   );
   const rows = payload?.data?.rows ?? [];
   const dataSheets = payload?.data?.dataSheets ?? {};
@@ -109,8 +112,8 @@ export default function PublicChartEmbedClient({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setIsEmbedded(window.self !== window.top);
-  }, []);
+    setIsEmbedded(articleEmbed || window.self !== window.top);
+  }, [articleEmbed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,21 +181,36 @@ export default function PublicChartEmbedClient({
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
         className={`mx-auto flex w-full max-w-[1200px] flex-col ${
-          isEmbedded ? "min-h-screen gap-1 px-2 py-2 md:px-3 md:py-3" : "min-h-screen gap-3 px-4 py-5 md:px-6 md:py-6"
+          isEmbedded
+            ? "h-full min-h-0 gap-0 bg-white px-0 py-0"
+            : "min-h-screen gap-3 px-4 py-5 md:px-6 md:py-6"
         }`}
         style={{
-          backgroundColor: (chartProps0.bgColor as string) || undefined,
+          backgroundColor: isEmbedded ? "#ffffff" : (chartProps0.bgColor as string) || undefined,
           color: (chartProps0.textColor as string) || undefined,
         }}
       >
         <DataSheetsLoader rows={rows} dataSheets={dataSheets} chartSnapshot={chartSnapshot} />
-        <div className={`relative mt-0 flex flex-1 items-center justify-center ${isEmbedded ? "" : "md:mt-2"}`}>
-          <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot as never}>
-            <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center">
-              <div className={`w-full ${isEmbedded ? "max-w-[980px]" : "max-w-[1040px]"}`}>
+        <div
+          className={`relative mt-0 flex flex-1 ${
+            isEmbedded ? "min-h-0 items-stretch" : "items-center justify-center md:mt-2"
+          }`}
+        >
+          <ChartBuilderProvider
+            demo={false}
+            embedCompact
+            embedInArticle={isEmbedded}
+            initialBuilderSnapshot={chartSnapshot as never}
+          >
+            <div
+              className={`flex min-h-0 w-full flex-1 ${
+                isEmbedded ? "items-stretch" : "h-full items-center justify-center"
+              }`}
+            >
+              <div className={`w-full ${isEmbedded ? "max-w-full" : "max-w-[1040px]"}`}>
                 <div
                   className={`flex w-full min-w-0 flex-col ${
-                    isEmbedded ? "h-[calc(100dvh-96px)] min-h-[420px]" : "h-[420px] min-h-[320px] md:h-[750px]"
+                    isEmbedded ? "h-[580px] min-h-0" : "h-[420px] min-h-[320px] md:h-[750px]"
                   }`}
                 >
                   <ChartCanvas />
@@ -209,7 +227,11 @@ export default function PublicChartEmbedClient({
             />
           </div>
         </div>
-        <footer className={`w-full border-t border-border/60 text-center text-xs text-muted-foreground ${isEmbedded ? "pt-2" : "mt-auto pt-3"}`}>
+        <footer
+          className={`w-full text-center text-xs text-muted-foreground ${
+            isEmbedded ? "border-0 bg-transparent pt-1" : "mt-auto border-t border-border/60 pt-3"
+          }`}
+        >
           <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2">
             <UserAvatar
               src={ownerProfilePic || undefined}

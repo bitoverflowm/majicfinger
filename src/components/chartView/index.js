@@ -697,7 +697,7 @@ function parseScopedColumnKey(value, fallbackSheetId) {
   };
 }
 
-export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, embedCompact = false, onSnapshotGetterReady = null }) {
+export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, embedCompact = false, embedInArticle = false, onSnapshotGetterReady = null }) {
   const contextStateV2 = useMyStateV2();
   const chartRef = useRef(null);
 
@@ -1879,6 +1879,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const value = {
     demo,
     embedCompact,
+    embedInArticle,
     effectiveData,
     usingSampleFallback,
     setViewing,
@@ -2122,6 +2123,7 @@ export function ChartCanvas() {
   const {
     demo,
     embedCompact,
+    embedInArticle,
     usingSampleFallback,
     dark,
     showWsFeedControl,
@@ -2756,15 +2758,22 @@ export function ChartCanvas() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2">
+      <div className={cn("flex min-h-0 flex-1 flex-col", embedInArticle ? "px-0 py-0" : "px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2")}>
         <div
-          className="relative flex min-h-0 w-full max-w-[min(100%,100rem)] flex-1 flex-col rounded-xl"
+          className={cn(
+            "relative flex min-h-0 w-full max-w-[min(100%,100rem)] flex-1 flex-col",
+            embedInArticle ? "rounded-none" : "rounded-xl",
+          )}
           ref={chartRef}
         >
             <Card
-              className="flex min-h-0 flex-1 flex-col gap-0 border-0 py-4 shadow-xl"
+              className={cn(
+                "flex min-h-0 flex-1 flex-col gap-0 border-0",
+                embedInArticle ? "rounded-none py-0 shadow-none" : "py-4 shadow-xl",
+              )}
               style={{
-                backgroundColor: innerBoxColor || activePalette?.[2] || (dark ? "#000000" : "#ffffff"),
+                backgroundColor:
+                  innerBoxColor || activePalette?.[2] || (dark ? "#000000" : "#ffffff"),
               }}
             >
               {!titleHidden || !subTitleHidden ? (
@@ -2775,7 +2784,12 @@ export function ChartCanvas() {
                   ) : null}
                 </CardHeader>
               ) : null}
-              <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-1.5 pb-2 pt-0 sm:px-2">
+              <CardContent
+                className={cn(
+                  "relative flex min-h-0 flex-1 flex-col overflow-hidden pt-0",
+                  embedInArticle ? "px-0 pb-1" : "px-1.5 pb-2 sm:px-2",
+                )}
+              >
                 {!axesConfigured ? (
                   <div className="flex min-h-[200px] w-full flex-1 flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
                     Select an X axis and at least one Y column under Data to plot your sheet.
@@ -2831,15 +2845,17 @@ export function ChartCanvas() {
                     config={chartConfig || dfltChartConfig}
                     className={cn(
                       // `max-w` only applies when the card is wider than this cap; narrow layouts are widened via CardContent `px-*` above.
-                      "flex flex-col items-center justify-start aspect-auto mx-auto h-full w-full max-w-[min(100%,67.2rem)] flex-1 transition-[min-height,padding] duration-300 ease-out",
+                      "flex flex-col items-center justify-start aspect-auto mx-auto h-full w-full flex-1 transition-[min-height,padding] duration-300 ease-out",
+                      embedInArticle ? "max-w-full py-0" : "max-w-[min(100%,67.2rem)]",
                       embedCompact ? "min-h-0" : "min-h-[200px] md:min-h-[220px]",
-                      xAxisTicksAngled
-                        ? embedCompact
-                          ? "py-3 sm:py-4"
-                          : "py-4 sm:py-5 md:min-h-[240px]"
-                        : embedCompact
-                          ? "py-3 sm:py-4"
-                          : "py-12",
+                      !embedInArticle &&
+                        (xAxisTicksAngled
+                          ? embedCompact
+                            ? "py-3 sm:py-4"
+                            : "py-4 sm:py-5 md:min-h-[240px]"
+                          : embedCompact
+                            ? "py-3 sm:py-4"
+                            : "py-12"),
                       dark && !chartTextColor && "text-slate-200",
                     )}
                     style={chartTextColor ? { color: chartTextColor } : undefined}

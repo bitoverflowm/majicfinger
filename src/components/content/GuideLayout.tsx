@@ -6,6 +6,7 @@ import { ArticleMetaBar } from "./ArticleMetaBar";
 import {
   ARTICLE_SURFACE_CLASS,
   ArticleLead,
+  ArticleHeaderRule,
   ArticleProse,
   ArticleTitle,
 } from "./article-prose";
@@ -60,7 +61,7 @@ export function GuideLayout({
           )}
 
           <article id="main-article" className={ARTICLE_SURFACE_CLASS}>
-            <header className="mb-10 w-full">
+            <header className="not-prose mb-8 w-full">
               <ArticleMetaBar
                 author={frontmatter.author}
                 publishedAt={frontmatter.publishedAt}
@@ -72,6 +73,7 @@ export function GuideLayout({
               {frontmatter.description && (
                 <ArticleLead>{frontmatter.description}</ArticleLead>
               )}
+              <ArticleHeaderRule />
             </header>
 
             <ArticleProse>{children}</ArticleProse>
@@ -82,7 +84,7 @@ export function GuideLayout({
 
             {related.length > 0 && (
               <Section className="mt-14 w-full font-sans">
-                <h2 className="mb-6 font-article text-2xl font-normal tracking-tight">
+                <h2 className="mb-5 font-article text-[1.25rem] font-normal leading-snug tracking-tight">
                   Related content
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2">
