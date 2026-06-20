@@ -2742,7 +2742,12 @@ export function ChartCanvas() {
   }, [tickFillX, tickFillY, chartTextColor]);
 
   return (
-    <div className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-out">
+    <div
+      className={cn(
+        "relative flex w-full min-w-0 flex-col transition-[padding] duration-300 ease-out",
+        embedInArticle ? "flex-none" : "min-h-0 flex-1",
+      )}
+    >
       {showWsFeedControl && (
         <div className={`absolute top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-lg border px-3 py-2 ${dark ? "border-slate-600 bg-slate-800/90" : "border-slate-200 bg-white/95"} shadow-lg`}>
           <span className="text-xs font-medium">{wsRunning ? "Live feed" : "Feed paused"}</span>
@@ -2763,21 +2768,21 @@ export function ChartCanvas() {
 
       <div
         className={cn(
-          "flex min-h-0 flex-1 flex-col",
-          embedInArticle ? "px-3 py-3 sm:px-4 sm:py-4" : "px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2",
+          "flex flex-col",
+          embedInArticle ? "flex-none px-3 py-3 sm:px-4 sm:py-4" : "min-h-0 flex-1 px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2",
         )}
       >
         <div
           className={cn(
-            "relative flex min-h-0 w-full max-w-[min(100%,100rem)] flex-1 flex-col",
-            embedInArticle ? "rounded-lg" : "rounded-xl",
+            "relative flex w-full max-w-[min(100%,100rem)] flex-col",
+            embedInArticle ? "flex-none rounded-lg" : "min-h-0 flex-1 rounded-xl",
           )}
           ref={chartRef}
         >
             <Card
               className={cn(
-                "flex min-h-0 flex-1 flex-col gap-0 border-0",
-                embedInArticle ? "rounded-lg py-4 shadow-none" : "py-4 shadow-xl",
+                "flex flex-col gap-0 border-0",
+                embedInArticle ? "flex-none rounded-lg py-4 shadow-none" : "min-h-0 flex-1 py-4 shadow-xl",
               )}
               style={{
                 backgroundColor:
@@ -2794,10 +2799,10 @@ export function ChartCanvas() {
               ) : null}
               <CardContent
                 className={cn(
-                  "relative flex min-h-0 flex-1 flex-col overflow-hidden pt-0",
+                  "relative flex flex-col pt-0",
                   embedInArticle
-                    ? "items-center justify-center px-5 pb-2"
-                    : "px-1.5 pb-2 sm:px-2",
+                    ? "flex-none items-center justify-center overflow-visible px-5 pb-3"
+                    : "min-h-0 flex-1 overflow-hidden px-1.5 pb-2 sm:px-2",
                 )}
               >
                 {!axesConfigured ? (

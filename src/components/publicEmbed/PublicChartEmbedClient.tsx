@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { StateProviderV2 } from "@/context/stateContextV2";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -12,6 +12,7 @@ import { resolveEmbedActiveSheetId } from "@/lib/chartSnapshotDataDeps";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
+import { LYCHEE_CHART_EMBED_RESIZE } from "@/lib/content/chart-embed-resize";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -72,6 +73,7 @@ export default function PublicChartEmbedClient({
   const [isEmbedded, setIsEmbedded] = useState(
     () => articleEmbed || (typeof window !== "undefined" && window.self !== window.top),
   );
+  const rootRef = useRef<HTMLDivElement>(null);
   const rows = payload?.data?.rows ?? [];
   const dataSheets = payload?.data?.dataSheets ?? {};
   const chartFromPayload = payload?.data?.chart;
@@ -114,6 +116,24 @@ export default function PublicChartEmbedClient({
     if (typeof window === "undefined") return;
     setIsEmbedded(articleEmbed || window.self !== window.top);
   }, [articleEmbed]);
+
+  useEffect(() => {
+    if (!articleEmbed || !rootRef.current) return;
+    const el = rootRef.current;
+    const reportHeight = () => {
+      const height = Math.ceil(el.getBoundingClientRect().height);
+      if (height > 0) {
+        window.parent.postMessage(
+          { type: LYCHEE_CHART_EMBED_RESIZE, height },
+          window.location.origin,
+        );
+      }
+    };
+    reportHeight();
+    const observer = new ResizeObserver(reportHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [articleEmbed, loading, payload, err]);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,9 +200,10 @@ export default function PublicChartEmbedClient({
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
+        ref={rootRef}
         className={`mx-auto flex w-full max-w-[1200px] flex-col ${
           isEmbedded
-            ? "h-full min-h-0 gap-0 bg-white px-0 py-0"
+            ? "h-auto min-h-0 gap-0 bg-white px-0 py-0"
             : "min-h-screen gap-3 px-4 py-5 md:px-6 md:py-6"
         }`}
         style={{
@@ -192,8 +213,8 @@ export default function PublicChartEmbedClient({
       >
         <DataSheetsLoader rows={rows} dataSheets={dataSheets} chartSnapshot={chartSnapshot} />
         <div
-          className={`relative mt-0 flex flex-1 ${
-            isEmbedded ? "min-h-0 items-center justify-center" : "items-center justify-center md:mt-2"
+          className={`relative mt-0 shrink-0 ${
+            isEmbedded ? "" : "flex flex-1 items-center justify-center md:mt-2"
           }`}
         >
           <ChartBuilderProvider
@@ -202,15 +223,11 @@ export default function PublicChartEmbedClient({
             embedInArticle={isEmbedded}
             initialBuilderSnapshot={chartSnapshot as never}
           >
-            <div
-              className={`flex min-h-0 w-full flex-1 ${
-                isEmbedded ? "items-center justify-center" : "h-full items-center justify-center"
-              }`}
-            >
+            <div className={isEmbedded ? "w-full" : "flex h-full min-h-0 w-full flex-1 items-center justify-center"}>
               <div className={`w-full ${isEmbedded ? "max-w-full" : "max-w-[1040px]"}`}>
                 <div
                   className={`flex w-full min-w-0 flex-col ${
-                    isEmbedded ? "min-h-0 flex-1" : "h-[420px] min-h-[320px] md:h-[750px]"
+                    isEmbedded ? "" : "h-[420px] min-h-[320px] md:h-[750px]"
                   }`}
                 >
                   <ChartCanvas />
@@ -228,8 +245,8 @@ export default function PublicChartEmbedClient({
           </div>
         </div>
         <footer
-          className={`w-full text-center text-xs text-muted-foreground ${
-            isEmbedded ? "border-0 bg-transparent pt-1" : "mt-auto border-t border-border/60 pt-3"
+          className={`w-full shrink-0 text-center text-xs text-muted-foreground ${
+            isEmbedded ? "border-0 bg-transparent pb-2 pt-1" : "mt-auto border-t border-border/60 pt-3"
           }`}
         >
           <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2">
