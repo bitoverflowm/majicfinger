@@ -3,7 +3,7 @@ import Image from "next/image";
 import { TypographyInlineCode, VideoEmbed, YouTube } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ContentImage } from "./content-image";
-import { LYCHEE_CONTENT_TYPE } from "./article-prose";
+import { LYCHEE_CONTENT_TYPE, ArticleDivider } from "./article-prose";
 import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
 
@@ -49,6 +49,19 @@ function MdxH1({ children, id, ...props }: any) {
   );
 }
 
+function MdxH2({ children, id, ...props }: any) {
+  return (
+    <MdxHeading as="h2" id={id} className={LYCHEE_CONTENT_TYPE.sectionH2} {...props}>
+      {children}
+    </MdxHeading>
+  );
+}
+
+/** Markdown `---` → Making Software–style mono dash divider. */
+function MdxHr() {
+  return <ArticleDivider className="my-10 !mb-0" />;
+}
+
 /**
  * MDX components for blog/guide content.
  * - img: Standard markdown images get styled and optimized via Next.js Image
@@ -63,6 +76,8 @@ function MdxH1({ children, id, ...props }: any) {
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     h1: MdxH1,
+    h2: MdxH2,
+    hr: MdxHr,
     code: MdxCode,
     TypographyInlineCode,
     table: ({ children, ...props }: any) => {
@@ -72,7 +87,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
         <div className="my-6 overflow-x-auto rounded-lg border border-border">
           <table
             {...rest}
-            className="w-full border-collapse text-sm text-gray-700 [&_td]:px-4 [&_td]:py-2.5 [&_td]:!text-center [&_th]:px-4 [&_th]:py-2.5 [&_th]:!text-center [&_th]:font-medium"
+            className="w-full border-collapse text-sm [&_td]:px-4 [&_td]:py-2.5 [&_td]:!text-center [&_th]:px-4 [&_th]:py-2.5 [&_th]:!text-center [&_th]:font-medium"
           >
             {children}
           </table>
