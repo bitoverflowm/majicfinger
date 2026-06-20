@@ -245,13 +245,6 @@ export default function PublicDashboardEmbedClient({
   return (
     <div className="relative w-full px-6 py-10 sm:px-10">
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-        <RunForYourselfButton
-          ownerHandle={username}
-          dashboardSlug={slug}
-          kind="dashboard"
-          variant="dashboard"
-          displayName={dashboardName}
-        />
         <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
       </div>
       <div
@@ -344,6 +337,15 @@ export default function PublicDashboardEmbedClient({
                     </Link>
                   </span>
                 </div>
+
+                <RunForYourselfButton
+                  ownerHandle={username}
+                  dashboardSlug={slug}
+                  kind="dashboard"
+                  variant="dashboard"
+                  presentation="promo"
+                  displayName={dashboardName}
+                />
 
                 {tags.length ? (
                   <div className="flex flex-wrap items-center gap-2">

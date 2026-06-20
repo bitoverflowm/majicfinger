@@ -84,15 +84,6 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
             <ChartCanvas />
           </div>
         </ChartBuilderProvider>
-        <div className="pointer-events-auto absolute bottom-3 right-3 z-20">
-          <RunForYourselfButton
-            ownerHandle={username}
-            chartSlug={slug}
-            kind="chart"
-            displayName={chart?.chart_name || slug}
-            className="shadow-lg gap-1.5 rounded-full px-4 font-semibold"
-          />
-        </div>
       </div>
     </StateProviderV2>
   );
@@ -143,7 +134,18 @@ export function HubPublishedChartEmbed({ username, slug }) {
         </div>
       ) : null}
       {!loading && payload ? (
-        <HubChartEmbedBody chartPayload={payload} username={username} slug={slug} />
+        <>
+          <HubChartEmbedBody chartPayload={payload} username={username} slug={slug} />
+          <div className="border-t border-border px-4 py-3">
+            <RunForYourselfButton
+              ownerHandle={username}
+              chartSlug={slug}
+              kind="chart"
+              presentation="promo"
+              displayName={payload?.chart?.chart_name || slug}
+            />
+          </div>
+        </>
       ) : null}
     </article>
   );

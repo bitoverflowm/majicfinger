@@ -20,6 +20,11 @@ import {
 import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
 import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
 import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
+import { cn } from "@/lib/utils";
+
+const FORK_PROMO_TITLE = "Fork this analysis";
+const FORK_PROMO_DESCRIPTION =
+  "Run this same analysis on another Kalshi/ Polymarket market, category, or time period.";
 
 /**
  * @param {{
@@ -32,6 +37,7 @@ import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
  *   label?: string;
  *   className?: string;
  *   variant?: "chart" | "dashboard";
+ *   presentation?: "button" | "promo";
  *   forceRunnable?: boolean;
  *   displayName?: string;
  * }} props
@@ -46,6 +52,7 @@ export function RunForYourselfButton({
   label,
   className,
   variant = "chart",
+  presentation = "button",
   forceRunnable = false,
   displayName,
 }) {
@@ -182,41 +189,63 @@ export function RunForYourselfButton({
   const disabled =
     !!user && quotaExceeded && !userHasPaidAccess(user);
 
-  const button = (
+  const disabledTooltip = useGenericAnalysisFallback
+    ? "This legacy chart can't be forked directly yet, but you can run one of the supported analyses."
+    : notRunnable
+      ? "This chart uses data that cannot be replayed yet"
+      : "Upgrade to Pro to run more analyses";
+
+  const goButton = (
     <Button
       type="button"
-      size={variant === "dashboard" ? "sm" : "default"}
+      size={presentation === "promo" ? "sm" : variant === "dashboard" ? "sm" : "default"}
       className={
-        className ||
-        (variant === "chart"
-          ? "shadow-lg gap-1.5 rounded-full px-4 font-semibold"
-          : "gap-1.5 font-semibold")
+        presentation === "promo"
+          ? cn("shrink-0 px-5 font-semibold", className)
+          : className ||
+            (variant === "chart"
+              ? "shadow-lg gap-1.5 rounded-full px-4 font-semibold"
+              : "gap-1.5 font-semibold")
       }
       onClick={handleClick}
       disabled={disabled}
     >
-      <Play className="h-4 w-4 fill-current" aria-hidden />
-      {displayLabel}
+      {presentation === "promo" ? (
+        "Go"
+      ) : (
+        <>
+          <Play className="h-4 w-4 fill-current" aria-hidden />
+          {displayLabel}
+        </>
+      )}
     </Button>
+  );
+
+  const trigger = disabled ? (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{goButton}</TooltipTrigger>
+        <TooltipContent>{disabledTooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  ) : (
+    goButton
   );
 
   return (
     <>
-      {disabled ? (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>{button}</TooltipTrigger>
-            <TooltipContent>
-              {useGenericAnalysisFallback
-                ? "This legacy chart can't be forked directly yet, but you can run one of the supported analyses."
-                : notRunnable
-                ? "This chart uses data that cannot be replayed yet"
-                : "Upgrade to Pro to run more analyses"}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      {presentation === "promo" ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="min-w-0 text-left">
+            <p className="text-sm font-medium text-foreground">{FORK_PROMO_TITLE}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+              {FORK_PROMO_DESCRIPTION}
+            </p>
+          </div>
+          {trigger}
+        </div>
       ) : (
-        button
+        trigger
       )}
       <RunForYourselfAuthModal
         open={authOpen}

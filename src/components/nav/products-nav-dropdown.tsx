@@ -28,56 +28,62 @@ function HubFlyout({ hub }: { hub: ProductsNavHub }) {
         <span className="ml-1 text-muted-foreground">→</span>
       </Link>
 
-      <div className="max-h-[min(60vh,28rem)] space-y-4 overflow-y-auto pr-1">
-        {hub.topics.map((topic) => (
-          <div key={topic.id}>
-            <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              {topic.label}
-            </p>
-            <div className="space-y-2">
-              {topic.buckets.map((bucket) => (
-                <div key={bucket.id}>
-                  <p className="mb-0.5 text-[11px] font-medium text-foreground/80">
-                    {bucket.label}
-                  </p>
-                  <ul className="space-y-0.5">
-                    {bucket.items.map((item) => (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          className="block rounded-sm py-0.5 text-sm text-foreground/90 transition-colors hover:text-secondary"
-                        >
-                          {item.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+      {hub.topics.length === 0 ? (
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {hub.description}
+        </p>
+      ) : (
+        <div className="max-h-[min(60vh,28rem)] space-y-4 overflow-y-auto pr-1">
+          {hub.topics.map((topic) => (
+            <div key={topic.id}>
+              <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {topic.label}
+              </p>
+              <div className="space-y-2">
+                {topic.buckets.map((bucket) => (
+                  <div key={bucket.id}>
+                    <p className="mb-0.5 text-[11px] font-medium text-foreground/80">
+                      {bucket.label}
+                    </p>
+                    <ul className="space-y-0.5">
+                      {bucket.items.map((item) => (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            className="block rounded-sm py-0.5 text-sm text-foreground/90 transition-colors hover:text-secondary"
+                          >
+                            {item.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {hub.charts.length > 0 ? (
-          <div>
-            <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              Charts
-            </p>
-            <ul className="space-y-0.5">
-              {hub.charts.map((chart) => (
-                <li key={chart.href}>
-                  <Link
-                    href={chart.href}
-                    className="block rounded-sm py-0.5 text-sm text-foreground/90 transition-colors hover:text-secondary"
-                  >
-                    {chart.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </div>
+          {hub.charts.length > 0 ? (
+            <div>
+              <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Charts
+              </p>
+              <ul className="space-y-0.5">
+                {hub.charts.map((chart) => (
+                  <li key={chart.href}>
+                    <Link
+                      href={chart.href}
+                      className="block rounded-sm py-0.5 text-sm text-foreground/90 transition-colors hover:text-secondary"
+                    >
+                      {chart.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -95,7 +101,7 @@ function DesktopProductsPanel({ data }: { data: ProductsNavData }) {
           <p className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Integrations
           </p>
-          <ul className="space-y-0.5">
+          <ul className="max-h-[min(70vh,24rem)] space-y-0.5 overflow-y-auto pr-1">
             {data.integrations.map((hub) => (
               <li key={hub.id} className="group/hub relative">
                 <Link
@@ -156,39 +162,45 @@ function MobileProductsSection({ data }: { data: ProductsNavData }) {
               >
                 {hub.label}
               </Link>
-              <ul className="mt-1.5 space-y-2 border-l border-border pl-3">
-                {hub.topics.map((topic) => (
-                  <li key={topic.id}>
-                    <p className="text-[11px] font-medium text-muted-foreground">
-                      {topic.label}
-                    </p>
-                    {topic.buckets.map((bucket) => (
-                      <ul key={bucket.id} className="mt-0.5 space-y-0.5">
-                        {bucket.items.map((item) => (
-                          <li key={item.href}>
-                            <Link
-                              href={item.href}
-                              className="text-sm text-foreground/80 hover:text-secondary"
-                            >
-                              {item.label}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    ))}
-                  </li>
-                ))}
-                {hub.charts.map((chart) => (
-                  <li key={chart.href}>
-                    <Link
-                      href={chart.href}
-                      className="text-sm text-foreground/80 hover:text-secondary"
-                    >
-                      {chart.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              {hub.topics.length > 0 ? (
+                <ul className="mt-1.5 space-y-2 border-l border-border pl-3">
+                  {hub.topics.map((topic) => (
+                    <li key={topic.id}>
+                      <p className="text-[11px] font-medium text-muted-foreground">
+                        {topic.label}
+                      </p>
+                      {topic.buckets.map((bucket) => (
+                        <ul key={bucket.id} className="mt-0.5 space-y-0.5">
+                          {bucket.items.map((item) => (
+                            <li key={item.href}>
+                              <Link
+                                href={item.href}
+                                className="text-sm text-foreground/80 hover:text-secondary"
+                              >
+                                {item.label}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      ))}
+                    </li>
+                  ))}
+                  {hub.charts.map((chart) => (
+                    <li key={chart.href}>
+                      <Link
+                        href={chart.href}
+                        className="text-sm text-foreground/80 hover:text-secondary"
+                      >
+                        {chart.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                  {hub.description}
+                </p>
+              )}
             </li>
           ))}
         </ul>

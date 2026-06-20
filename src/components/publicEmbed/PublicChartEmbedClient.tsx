@@ -240,14 +240,6 @@ export default function PublicChartEmbedClient({
               </div>
             </div>
           </ChartBuilderProvider>
-          <div className="pointer-events-auto absolute bottom-3 right-3 z-20">
-            <RunForYourselfButton
-              ownerHandle={username}
-              chartSlug={slug}
-              kind="chart"
-              displayName={chart.chart_name || slug}
-            />
-          </div>
         </div>
         <footer
           className={`w-full shrink-0 text-center text-xs text-muted-foreground ${
@@ -263,7 +255,7 @@ export default function PublicChartEmbedClient({
               className="shrink-0 ring-1 ring-border/60"
             />
             <span className="min-w-0 text-center">
-              <span>{`Made by @${ownerHandle} with `}</span>
+              <span>{`Created by @${ownerHandle} with `}</span>
               <Link
                 href={SITE}
                 className="font-medium text-foreground underline"
@@ -283,6 +275,17 @@ export default function PublicChartEmbedClient({
               </>
             </span>
           </div>
+          {!isEmbedded ? (
+            <div className="mx-auto mt-3 max-w-lg text-left">
+              <RunForYourselfButton
+                ownerHandle={username}
+                chartSlug={slug}
+                kind="chart"
+                presentation="promo"
+                displayName={chart.chart_name || slug}
+              />
+            </div>
+          ) : null}
           {chart.chart_name ? <span className="block pt-1 opacity-80">{chart.chart_name}</span> : null}
         </footer>
       </div>
