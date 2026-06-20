@@ -19,6 +19,10 @@ import {
 import type { TocItem } from "@/lib/content/extract-mdx-headings";
 import type { BaseContent, ContentType } from "@/lib/content/types";
 import { ContentTocNav } from "./ContentTocNav";
+import {
+  ArticleChartLoadProvider,
+  type ArticleChartLoadPlanEntry,
+} from "./ArticleChartLoadProvider";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -32,6 +36,7 @@ interface GuideLayoutProps {
   frontmatter: BaseContent;
   contentType?: ContentType;
   tocItems?: TocItem[];
+  chartLoadPlan?: ArticleChartLoadPlanEntry[];
   children: React.ReactNode;
 }
 
@@ -40,6 +45,7 @@ export function GuideLayout({
   frontmatter,
   contentType = "guides",
   tocItems = [],
+  chartLoadPlan = [],
   children,
 }: GuideLayoutProps) {
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
@@ -76,7 +82,9 @@ export function GuideLayout({
               <ArticleHeaderRule />
             </header>
 
-            <ArticleProse>{children}</ArticleProse>
+            <ArticleChartLoadProvider plan={chartLoadPlan}>
+              <ArticleProse>{children}</ArticleProse>
+            </ArticleChartLoadProvider>
 
             <div className="mt-14 w-full font-sans">
               <GuideTakeawayCta />

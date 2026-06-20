@@ -9,15 +9,15 @@ export const LYCHEE_CONTENT_TYPE = {
   title:
     "mt-36 font-article text-balance text-center text-[1.625rem] font-normal leading-[1.2] tracking-[-0.015em] text-foreground lg:text-[1.875rem]",
   /** Subtitle / description below H1 */
-  lead: "mx-auto mt-4 max-w-2xl text-balance text-center font-article text-sm leading-relaxed text-muted-foreground md:text-[0.9375rem]",
-  /** Body paragraphs */
-  body: "text-[0.9375rem] leading-[1.65] tracking-normal",
+  lead: "mx-auto mt-4 max-w-2xl text-balance text-center font-article text-[0.4375rem] leading-relaxed text-muted-foreground md:text-[0.46875rem]",
+  /** Body paragraphs — ~50% of prior 0.9375rem scale */
+  body: "text-[0.46875rem] leading-[1.65] tracking-normal",
   /** MDX section headings (demoted # lines → h2) */
   sectionH2:
-    "mt-10 scroll-mt-28 font-article text-[1.25rem] font-normal leading-snug tracking-tight text-foreground",
-  proseH2: "text-[1.25rem] leading-snug",
-  proseH3: "text-[1.0625rem] leading-snug",
-  proseH4: "text-[0.9375rem] leading-snug",
+    "mt-10 scroll-mt-28 font-article text-[0.625rem] font-normal leading-snug tracking-tight text-foreground",
+  proseH2: "text-[0.625rem] leading-snug",
+  proseH3: "text-[0.53125rem] leading-snug",
+  proseH4: "text-[0.46875rem] leading-snug",
 } as const;
 
 /** White reading surface — Making Software–style card with inset shadow. */
@@ -33,7 +33,7 @@ export const ARTICLE_SURFACE_CLASS = cn(
 export const ARTICLE_PROSE_CLASS = cn(
   "prose prose-neutral dark:prose-invert max-w-none w-full font-article prose-sm",
   "prose-headings:font-article prose-headings:font-normal prose-headings:tracking-tight prose-headings:scroll-mt-28",
-  "prose-h1:text-[1.25rem] prose-h1:leading-snug prose-h1:mt-12 prose-h1:mb-4",
+  "prose-h1:text-[0.625rem] prose-h1:leading-snug prose-h1:mt-12 prose-h1:mb-4",
   "prose-h2:mt-10 prose-h2:mb-4",
   LYCHEE_CONTENT_TYPE.proseH2,
   "prose-h3:mt-8 prose-h3:mb-3",
@@ -48,7 +48,7 @@ export const ARTICLE_PROSE_CLASS = cn(
   "prose-strong:font-semibold",
   "prose-blockquote:border-l-border prose-blockquote:font-normal prose-blockquote:not-italic prose-blockquote:text-muted-foreground",
   "prose-hr:my-10 prose-hr:border-border",
-  "prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-lg prose-pre:font-mono prose-pre:text-[0.8125rem]",
+  "prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-lg prose-pre:font-mono prose-pre:text-[0.40625rem]",
   "prose-pre:code:bg-transparent prose-pre:code:p-0 prose-pre:code:font-normal",
   "prose-code:before:content-none prose-code:after:content-none",
   "prose-img:my-8 prose-img:rounded-lg",

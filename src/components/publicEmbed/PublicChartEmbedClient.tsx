@@ -12,7 +12,7 @@ import { resolveEmbedActiveSheetId } from "@/lib/chartSnapshotDataDeps";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
-import { LYCHEE_CHART_EMBED_RESIZE } from "@/lib/content/chart-embed-resize";
+import { LYCHEE_CHART_EMBED_READY, LYCHEE_CHART_EMBED_RESIZE } from "@/lib/content/chart-embed-resize";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -134,6 +134,11 @@ export default function PublicChartEmbedClient({
     observer.observe(el);
     return () => observer.disconnect();
   }, [articleEmbed, loading, payload, err]);
+
+  useEffect(() => {
+    if (!articleEmbed || loading || err || !payload?.success || !payload.data) return;
+    window.parent.postMessage({ type: LYCHEE_CHART_EMBED_READY }, window.location.origin);
+  }, [articleEmbed, loading, err, payload]);
 
   useEffect(() => {
     let cancelled = false;

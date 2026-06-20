@@ -5,6 +5,8 @@ import { MDXContent } from "@/lib/content/mdx";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
 import { extractMdxHeadingsForToc } from "@/lib/content/extract-mdx-headings";
 import { stripDuplicateMdxTitleHeading } from "@/lib/content/strip-duplicate-mdx-title";
+import { extractMdxPublicCharts } from "@/lib/content/extract-mdx-public-charts";
+import { resolvePublicChartLoadPlan } from "@/lib/server/publicChartLoadTier";
 import {
   buildContentMetadata,
   buildArticleJsonLd,
@@ -50,6 +52,8 @@ export default async function GuidePage({
   const { frontmatter, content } = data;
   const bodyContent = stripDuplicateMdxTitleHeading(content, frontmatter.title);
   const tocItems = extractMdxHeadingsForToc(bodyContent);
+  const chartRefs = extractMdxPublicCharts(bodyContent);
+  const chartLoadPlan = chartRefs.length ? await resolvePublicChartLoadPlan(chartRefs) : [];
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
   const publicPath = `/guides/${slug}`;
 
@@ -92,6 +96,7 @@ export default async function GuidePage({
         frontmatter={frontmatter}
         contentType={contentType}
         tocItems={tocItems}
+        chartLoadPlan={chartLoadPlan}
       >
         <MDXContent source={bodyContent} />
       </GuideLayout>
