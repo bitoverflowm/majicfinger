@@ -1,12 +1,18 @@
 
 import Script from 'next/script'
+import { siteConfig } from '@/lib/site'
 import EasyCharts from './easyCharts';
+
+const canonical = `${siteConfig.url}/charts`
 
 export const metadata = {
   title: 'Lychee: Your Quant in a Box',
   description: 'Stop juggling CSVs, Python scripts, and messy charts. Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser. Zero coding. Zero friction. Real results.',
+  alternates: {
+    canonical,
+  },
   openGraph: {
-    url: 'https://lycheedata.com',
+    url: canonical,
     type: 'website',
     title: 'Lychee: Your Quant in a Box',
     description: 'One operator. Full pipeline. Real edge. Stop juggling CSVs, Python scripts, and messy charts. Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser. Zero coding. Zero friction. Real results.',
@@ -23,7 +29,7 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     domain: 'lycheedata.com',
-    url: 'https://lycheedata.com',
+    url: canonical,
     title: 'Lychee: Your Quant in a Box',
     description: 'One operator. Full pipeline. Real edge. Stop juggling CSVs, Python scripts, and messy charts. Connect data from Polymarket, manipulate it instantly, generate beautiful dashboards, and act on alpha—all in one browser. Zero coding. Zero friction. Real results.',
     images: ['https://lycheedata.com/ogImage2.png']
