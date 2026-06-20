@@ -59,12 +59,110 @@ export function isLycheeContentNavLinkActive(
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
+export function isLycheeContentNavLinkTreeActive(
+  items: LycheeContentNavLink[],
+  currentPath: string,
+): boolean {
+  return items.some((item) =>
+    isLycheeContentNavLinkActive(item.href, currentPath),
+  );
+}
+
+export function isLycheeContentNavBucketActive(
+  bucket: LycheeContentNavBucket,
+  currentPath: string,
+): boolean {
+  return isLycheeContentNavLinkTreeActive(bucket.items, currentPath);
+}
+
+export function isLycheeContentNavTopicActive(
+  topic: LycheeContentNavTopic,
+  currentPath: string,
+): boolean {
+  return topic.buckets.some((bucket) =>
+    isLycheeContentNavBucketActive(bucket, currentPath),
+  );
+}
+
+export function isLycheeContentNavSectionActive(
+  section: LycheeContentNavSection,
+  currentPath: string,
+): boolean {
+  if (
+    section.hubHref &&
+    isLycheeContentNavLinkActive(section.hubHref, currentPath)
+  ) {
+    return true;
+  }
+  if (section.items) {
+    return isLycheeContentNavLinkTreeActive(section.items, currentPath);
+  }
+  return (
+    section.topics?.some((topic) =>
+      isLycheeContentNavTopicActive(topic, currentPath),
+    ) ?? false
+  );
+}
+
 function toNavLink(entry: ResolvedRegistryEntry): LycheeContentNavLink {
   return {
     label: entry.label,
     href: entry.href,
     ...(entry.slug && { slug: entry.slug }),
   };
+}
+
+function registryEntryKey(entry: ResolvedRegistryEntry): string {
+  return entry.slug ?? entry.href;
+}
+
+function buildTopicBuckets(
+  topicEntries: ResolvedRegistryEntry[],
+): LycheeContentNavBucket[] {
+  const buckets: LycheeContentNavBucket[] = [];
+
+  for (const contentClass of CONTENT_CLASS_ORDER) {
+    const bucketEntries = topicEntries.filter(
+      (entry) => entry.contentClass === contentClass,
+    );
+    if (bucketEntries.length === 0) continue;
+
+    buckets.push({
+      id: contentClass,
+      label: CONTENT_CLASS_LABELS[contentClass],
+      items: bucketEntries.map(toNavLink),
+    });
+  }
+
+  return buckets;
+}
+
+/** All navigable links under a hub section (for compact collapsed sidebar lists). */
+export function flattenLycheeContentNavSectionLinks(
+  section: LycheeContentNavSection,
+): LycheeContentNavLink[] {
+  const links: LycheeContentNavLink[] = [];
+  const seen = new Set<string>();
+
+  const add = (items: LycheeContentNavLink[]) => {
+    for (const item of items) {
+      if (seen.has(item.href)) continue;
+      seen.add(item.href);
+      links.push(item);
+    }
+  };
+
+  if (section.items) {
+    add(section.items);
+  }
+
+  for (const topic of section.topics ?? []) {
+    for (const bucket of topic.buckets) {
+      add(bucket.items);
+    }
+  }
+
+  return links;
 }
 
 function buildIntegrationSections(
@@ -81,6 +179,7 @@ function buildIntegrationSections(
 
     const hubMeta = INTEGRATION_HUBS[hubId];
     const topics: LycheeContentNavTopic[] = [];
+    const assignedKeys = new Set<string>();
 
     for (const topicId of hubMeta.topicOrder) {
       const topicEntries = hubEntries.filter(
@@ -88,26 +187,32 @@ function buildIntegrationSections(
       );
       if (topicEntries.length === 0) continue;
 
-      const buckets: LycheeContentNavBucket[] = [];
-
-      for (const contentClass of CONTENT_CLASS_ORDER) {
-        const bucketEntries = topicEntries.filter(
-          (entry) => entry.contentClass === contentClass,
-        );
-        if (bucketEntries.length === 0) continue;
-
-        buckets.push({
-          id: contentClass,
-          label: CONTENT_CLASS_LABELS[contentClass],
-          items: bucketEntries.map(toNavLink),
-        });
+      for (const entry of topicEntries) {
+        assignedKeys.add(registryEntryKey(entry));
       }
+
+      const buckets = buildTopicBuckets(topicEntries);
+      if (buckets.length === 0) continue;
 
       topics.push({
         id: topicId,
         label: integrationTopicLabel(hubId, topicId),
         buckets,
       });
+    }
+
+    const unassignedEntries = hubEntries.filter(
+      (entry) => !assignedKeys.has(registryEntryKey(entry)),
+    );
+    if (unassignedEntries.length > 0) {
+      const buckets = buildTopicBuckets(unassignedEntries);
+      if (buckets.length > 0) {
+        topics.push({
+          id: "general",
+          label: "More",
+          buckets,
+        });
+      }
     }
 
     sections.push({

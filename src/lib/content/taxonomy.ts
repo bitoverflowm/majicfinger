@@ -80,9 +80,10 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
   "polymarket-live": {
     label: "Polymarket Live",
     href: "/polymarket-live-data",
-    topicOrder: ["overview"],
+    topicOrder: ["overview", "markets"],
     topicLabels: {
       overview: "Overview",
+      markets: "Markets",
     },
   },
   platform: {
