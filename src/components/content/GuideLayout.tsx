@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { Section, Muted, KnowledgeCard } from "@/components/ui";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
 import { ArticleMetaBar } from "./ArticleMetaBar";
@@ -11,11 +10,6 @@ import {
   ArticleTitle,
 } from "./article-prose";
 import { getRelatedContent } from "@/lib/content/related";
-import {
-  isKalshiHistoricalHubGuide,
-  KALSHI_HISTORICAL_DATA_HUB_PATH,
-  KALSHI_HUB_GUIDE_BACK_LINK,
-} from "@/lib/hubs/kalshiHubGuides";
 import type { TocItem } from "@/lib/content/extract-mdx-headings";
 import type { BaseContent, ContentType } from "@/lib/content/types";
 import { ContentTocNav } from "./ContentTocNav";
@@ -49,23 +43,12 @@ export function GuideLayout({
   children,
 }: GuideLayoutProps) {
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
-  const showKalshiHubBackLink = isKalshiHistoricalHubGuide(slug);
 
   return (
     <>
       <ContentTocNav items={tocItems} />
       <div className="w-full justify-self-center pt-8 lg:pt-20">
         <div className="mx-auto w-full max-w-[762px]">
-          {showKalshiHubBackLink && (
-            <Link
-              href={KALSHI_HISTORICAL_DATA_HUB_PATH}
-              className="mb-6 inline-flex items-center gap-2 font-sans text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-              {KALSHI_HUB_GUIDE_BACK_LINK}
-            </Link>
-          )}
-
           <article id="main-article" className={ARTICLE_SURFACE_CLASS}>
             <header className="not-prose mb-8 w-full">
               <ArticleMetaBar
