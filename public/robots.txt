@@ -1,7 +1,9 @@
 User-agent: *
 Allow: /
 
-# Block Next.js internals / build artifacts
+# Block Next.js internals / build artifacts (RSC payloads, etc.)
+# Static assets (fonts, JS, CSS) under /_next/static/ are public and crawlable.
+Allow: /_next/static/
 Disallow: /_next/
 
 # Block API routes
