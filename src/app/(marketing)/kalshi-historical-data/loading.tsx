@@ -1,4 +1,4 @@
-export default function KalshiHistoricalDataLoading() {
+export default function IntegrationHubLoading() {
   return (
     <main className="flex min-h-screen w-full flex-col items-stretch bg-background font-sans antialiased">
       <div className="flex w-full flex-col items-center px-6 pb-20 pt-36 md:pb-28 md:pt-44">

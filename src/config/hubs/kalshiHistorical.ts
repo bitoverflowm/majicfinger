@@ -142,64 +142,9 @@ export const kalshiHistoricalHub: HubPageConfig = {
 
     {
       type: "link_group",
+      anchorId: "guides",
       title: "Kalshi Historical Data Guides",
-      groups: [
-        {
-          label: "Overview",
-          links: [
-            {
-              title: "Kalshi Historical Data",
-              href: "/guides/kalshi-historical-data",
-              description:
-                "Overview of Kalshi historical data, market structure, and dataset usage.",
-            },
-          ],
-        },
-        {
-          label: "Volume Analysis",
-          links: [
-            {
-              title: "Kalshi Volume Dashboard",
-              href: "/misterrpink/dashboards/kalshi-volume-dashboard",
-            },
-            {
-              title: "Kalshi Volume Meaning",
-              href: "/guides/kalshi-volume",
-            },
-            {
-              title: "Kalshi Volume Chart Guide",
-              href: "/guides/kalshi-volume-chart-guide",
-            },
-          ],
-        },
-        {
-          label: "Weather Markets",
-          links: [
-            {
-              title: "kalshi Historical Weather Data, Prices, Volume & Markets Dashboard",
-              href: "/misterrpink/dashboards/kalshi-historical-weather-datas",
-            },
-            {
-              title: "Kalshi Weather Prediction Markets Analysis",
-              href: "/guides/kalshi-weather-prediction-markets-analysis",
-            },
-            {
-              title: "Kalshi Weather Probability Convergence Chart",
-              href: "/guides/kalshi-weather-probability-convergence-chart",
-            },
-            {
-              title: "Kalshi Weather Probability Calibration Chart",
-              href: "/guides/kalshi-weather-probability-calibration-chart",
-            },
-            {
-              title: "Kalshi Weather Volatility Chart",
-              href: "/guides/kalshi-weather-volatility-chart",
-              description:
-                "Calculate and visualize rolling volatility in Kalshi weather markets using historical trades.",
-            },
-          ],
-        },
-      ],
+      groups: [],
     },
 
     {

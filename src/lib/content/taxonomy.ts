@@ -61,7 +61,7 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
   },
   "kalshi-live": {
     label: "Kalshi Live",
-    href: "/guides",
+    href: "/kalshi-live-data",
     topicOrder: ["overview", "markets"],
     topicLabels: {
       overview: "Overview",
@@ -70,7 +70,7 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
   },
   "polymarket-historical": {
     label: "Polymarket Historical",
-    href: "/polymarket-metadata",
+    href: "/polymarket-historical-data",
     topicOrder: ["overview", "markets"],
     topicLabels: {
       overview: "Overview",
@@ -79,7 +79,7 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
   },
   "polymarket-live": {
     label: "Polymarket Live",
-    href: "/guides/polymarket-live-prices",
+    href: "/polymarket-live-data",
     topicOrder: ["overview"],
     topicLabels: {
       overview: "Overview",
