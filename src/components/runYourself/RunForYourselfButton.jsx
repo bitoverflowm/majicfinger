@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 
 const FORK_PROMO_TITLE = "Fork this analysis";
 const FORK_PROMO_DESCRIPTION =
-  "Run this same analysis on another Kalshi/ Polymarket market, category, or time period.";
+  "Run this same analysis on any another Kalshi/ Polymarket market, category, or time period.";
 
 /**
  * @param {{
@@ -38,6 +38,7 @@ const FORK_PROMO_DESCRIPTION =
  *   className?: string;
  *   variant?: "chart" | "dashboard";
  *   presentation?: "button" | "promo";
+ *   promoVariant?: "card" | "subtle";
  *   forceRunnable?: boolean;
  *   displayName?: string;
  * }} props
@@ -53,6 +54,7 @@ export function RunForYourselfButton({
   className,
   variant = "chart",
   presentation = "button",
+  promoVariant = "subtle",
   forceRunnable = false,
   displayName,
 }) {
@@ -198,10 +200,21 @@ export function RunForYourselfButton({
   const goButton = (
     <Button
       type="button"
-      size={presentation === "promo" ? "sm" : variant === "dashboard" ? "sm" : "default"}
+      variant={presentation === "promo" && promoVariant === "subtle" ? "outline" : "default"}
+      size={
+        presentation === "promo"
+          ? promoVariant === "subtle"
+            ? "sm"
+            : "sm"
+          : variant === "dashboard"
+            ? "sm"
+            : "default"
+      }
       className={
         presentation === "promo"
-          ? cn("shrink-0 px-5 font-semibold", className)
+          ? promoVariant === "subtle"
+            ? cn("h-7 shrink-0 px-3 text-xs font-medium", className)
+            : cn("shrink-0 px-5 font-semibold", className)
           : className ||
             (variant === "chart"
               ? "shadow-lg gap-1.5 rounded-full px-4 font-semibold"
@@ -211,7 +224,7 @@ export function RunForYourselfButton({
       disabled={disabled}
     >
       {presentation === "promo" ? (
-        "Go"
+        "Fork Now"
       ) : (
         <>
           <Play className="h-4 w-4 fill-current" aria-hidden />
@@ -235,15 +248,12 @@ export function RunForYourselfButton({
   return (
     <>
       {presentation === "promo" ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="min-w-0 text-left">
-            <p className="text-sm font-medium text-foreground">{FORK_PROMO_TITLE}</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              {FORK_PROMO_DESCRIPTION}
+          <div className="flex w-full flex-col items-center gap-2 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-2 sm:gap-y-1">
+            <p className="min-w-0 text-center leading-relaxed sm:text-left">
+              <span>{`${FORK_PROMO_DESCRIPTION}`}</span>
             </p>
+            {trigger}
           </div>
-          {trigger}
-        </div>
       ) : (
         trigger
       )}

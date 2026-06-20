@@ -263,30 +263,16 @@ export default function PublicChartEmbedClient({
               >
                 Lychee
               </Link>
-              <>
-                <span> · </span>
-                <Link
-                  href={`${SITE}/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}`}
-                  className="underline"
-                  {...publicEmbedOutboundLinkProps(isEmbedded)}
-                >
-                  {isEmbedded ? "Open chart in new tab" : "Open chart"}
-                </Link>
-              </>
             </span>
           </div>
-          {!isEmbedded ? (
-            <div className="mx-auto mt-3 max-w-lg text-left">
-              <RunForYourselfButton
-                ownerHandle={username}
-                chartSlug={slug}
-                kind="chart"
-                presentation="promo"
-                displayName={chart.chart_name || slug}
-              />
-            </div>
-          ) : null}
-          {chart.chart_name ? <span className="block pt-1 opacity-80">{chart.chart_name}</span> : null}
+          <RunForYourselfButton
+            ownerHandle={username}
+            chartSlug={slug}
+            kind="chart"
+            presentation="promo"
+            promoVariant="subtle"
+            displayName={chart.chart_name || slug}
+          />
         </footer>
       </div>
     </StateProviderV2>

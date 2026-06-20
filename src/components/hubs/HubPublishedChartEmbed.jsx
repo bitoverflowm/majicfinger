@@ -142,6 +142,7 @@ export function HubPublishedChartEmbed({ username, slug }) {
               chartSlug={slug}
               kind="chart"
               presentation="promo"
+              promoVariant="subtle"
               displayName={payload?.chart?.chart_name || slug}
             />
           </div>

@@ -344,6 +344,7 @@ export default function PublicDashboardEmbedClient({
                   kind="dashboard"
                   variant="dashboard"
                   presentation="promo"
+                  promoVariant="subtle"
                   displayName={dashboardName}
                 />
 
