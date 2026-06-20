@@ -19,6 +19,40 @@ function MdxCode({ children, className, ...props }: any) {
   return <TypographyInlineCode {...props}>{children}</TypographyInlineCode>;
 }
 
+function MdxHeading({
+  as: Tag,
+  className,
+  children,
+  ...props
+}: {
+  as: "h1" | "h2" | "h3" | "h4";
+  className: string;
+  children: React.ReactNode;
+  id?: string;
+}) {
+  return (
+    <Tag className={className} {...props}>
+      {children}
+    </Tag>
+  );
+}
+
+/**
+ * MDX `#` lines render as h2+ so layout `ArticleTitle` is the only page H1.
+ */
+function MdxH1({ children, id, ...props }: any) {
+  return (
+    <MdxHeading
+      as="h2"
+      id={id}
+      className="mt-14 scroll-mt-28 font-article text-[1.5rem] font-normal leading-snug tracking-tight text-foreground"
+      {...props}
+    >
+      {children}
+    </MdxHeading>
+  );
+}
+
 /**
  * MDX components for blog/guide content.
  * - img: Standard markdown images get styled and optimized via Next.js Image
@@ -32,6 +66,7 @@ function MdxCode({ children, className, ...props }: any) {
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
   return {
+    h1: MdxH1,
     code: MdxCode,
     TypographyInlineCode,
     table: ({ children, ...props }: any) => {

@@ -4,6 +4,7 @@ import { ArticleViewTracker } from "@/components/analytics/ArticleViewTracker";
 import { MDXContent } from "@/lib/content/mdx";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
 import { extractMdxHeadingsForToc } from "@/lib/content/extract-mdx-headings";
+import { stripDuplicateMdxTitleHeading } from "@/lib/content/strip-duplicate-mdx-title";
 import {
   buildContentMetadata,
   buildArticleJsonLd,
@@ -47,7 +48,8 @@ export default async function GuidePage({
   if (!data) notFound();
 
   const { frontmatter, content } = data;
-  const tocItems = extractMdxHeadingsForToc(content);
+  const bodyContent = stripDuplicateMdxTitleHeading(content, frontmatter.title);
+  const tocItems = extractMdxHeadingsForToc(bodyContent);
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
   const publicPath = `/guides/${slug}`;
 
@@ -91,7 +93,7 @@ export default async function GuidePage({
         contentType={contentType}
         tocItems={tocItems}
       >
-        <MDXContent source={content} />
+        <MDXContent source={bodyContent} />
       </GuideLayout>
     </>
   );

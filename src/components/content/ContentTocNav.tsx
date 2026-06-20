@@ -46,7 +46,7 @@ export function ContentTocNav({ items }: ContentTocNavProps) {
   return (
     <nav
       aria-label="On this page"
-      className="sticky top-20 z-10 hidden max-h-[calc(100dvh-6rem)] w-full overflow-y-auto py-2 pl-2 font-serif text-xs lg:block"
+      className="fixed right-6 top-20 z-10 hidden w-[200px] max-h-[calc(100dvh-5rem)] overflow-y-auto py-2 pl-1 font-serif text-xs lg:block xl:right-10"
     >
         <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
           On this page

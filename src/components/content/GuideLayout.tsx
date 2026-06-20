@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import {
-  ContentWrapper,
-  Section,
-  H1,
-  P,
-  Muted,
-  KnowledgeCard,
-} from "@/components/ui";
+import { Section, Muted, KnowledgeCard } from "@/components/ui";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
 import { ArticleMetaBar } from "./ArticleMetaBar";
+import {
+  ARTICLE_SURFACE_CLASS,
+  ArticleLead,
+  ArticleProse,
+  ArticleTitle,
+} from "./article-prose";
 import { getRelatedContent } from "@/lib/content/related";
 import {
   isKalshiHistoricalHubGuide,
@@ -46,89 +45,72 @@ export function GuideLayout({
   const showKalshiHubBackLink = isKalshiHistoricalHubGuide(slug);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(180px,220px)] lg:gap-x-12 xl:max-w-7xl">
-      <div className="min-w-0">
-      <ContentWrapper>
-        {showKalshiHubBackLink && (
-          <Link
-            href={KALSHI_HISTORICAL_DATA_HUB_PATH}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-            {KALSHI_HUB_GUIDE_BACK_LINK}
-          </Link>
-        )}
-
-        <Section>
-          <ArticleMetaBar
-            author={frontmatter.author}
-            publishedAt={frontmatter.publishedAt}
-            readingTime={frontmatter.readingTime}
-            title={frontmatter.title}
-            shareUrl={resolveShareUrl(slug, frontmatter)}
-          />
-          <H1>{frontmatter.title}</H1>
-          {frontmatter.description && (
-            <P className="text-muted-foreground">{frontmatter.description}</P>
-          )}
-        </Section>
-
-        <Section>
-          <div
-            className="prose prose-neutral dark:prose-invert prose-lg max-w-none
-              prose-headings:scroll-mt-24
-              prose-headings:font-semibold
-              prose-headings:tracking-tight
-              prose-h1:text-4xl prose-h1:font-bold
-              prose-h2:mt-12 prose-h2:text-2xl
-              prose-h3:mt-8 prose-h3:text-xl
-              prose-p:leading-8 prose-p:text-base
-              prose-a:font-medium prose-a:text-primary
-              prose-a:no-underline
-              hover:prose-a:underline
-              prose-blockquote:border-l-primary
-              prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-xl prose-pre:px-4 prose-pre:py-3
-              prose-pre:code:bg-transparent prose-pre:code:p-0 prose-pre:code:font-normal
-              prose-code:before:content-none prose-code:after:content-none"
-          >
-            {children}
-          </div>
-        </Section>
-
-        <Section>
-          <GuideTakeawayCta />
-        </Section>
-
-        {related.length > 0 && (
-          <Section>
-            <h2 className="text-2xl font-medium mb-6">Related content</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {related.map((item) => (
-                <Link
-                  key={`${item.contentType}-${item.slug}`}
-                  href={`/guides/${item.slug}`}
-                  className="group block"
-                >
-                  <KnowledgeCard>
-                    <h3 className="font-semibold group-hover:underline underline-offset-4">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                      {item.description}
-                    </p>
-                    <Muted className="mt-2 block capitalize">
-                      {item.contentType}
-                    </Muted>
-                  </KnowledgeCard>
-                </Link>
-              ))}
-            </div>
-          </Section>
-        )}
-      </ContentWrapper>
-      </div>
-
+    <>
       <ContentTocNav items={tocItems} />
-    </div>
+      <div className="w-full justify-self-center pt-8 lg:pt-20">
+        <div className="mx-auto w-full max-w-[762px]">
+          {showKalshiHubBackLink && (
+            <Link
+              href={KALSHI_HISTORICAL_DATA_HUB_PATH}
+              className="mb-6 inline-flex items-center gap-2 font-sans text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+              {KALSHI_HUB_GUIDE_BACK_LINK}
+            </Link>
+          )}
+
+          <article id="main-article" className={ARTICLE_SURFACE_CLASS}>
+            <header className="mb-10 w-full">
+              <ArticleMetaBar
+                author={frontmatter.author}
+                publishedAt={frontmatter.publishedAt}
+                readingTime={frontmatter.readingTime}
+                title={frontmatter.title}
+                shareUrl={resolveShareUrl(slug, frontmatter)}
+              />
+              <ArticleTitle>{frontmatter.title}</ArticleTitle>
+              {frontmatter.description && (
+                <ArticleLead>{frontmatter.description}</ArticleLead>
+              )}
+            </header>
+
+            <ArticleProse>{children}</ArticleProse>
+
+            <div className="mt-14 w-full font-sans">
+              <GuideTakeawayCta />
+            </div>
+
+            {related.length > 0 && (
+              <Section className="mt-14 w-full font-sans">
+                <h2 className="mb-6 font-article text-2xl font-normal tracking-tight">
+                  Related content
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {related.map((item) => (
+                    <Link
+                      key={`${item.contentType}-${item.slug}`}
+                      href={`/guides/${item.slug}`}
+                      className="group block"
+                    >
+                      <KnowledgeCard>
+                        <h3 className="font-semibold group-hover:underline underline-offset-4">
+                          {item.title}
+                        </h3>
+                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                          {item.description}
+                        </p>
+                        <Muted className="mt-2 block capitalize">
+                          {item.contentType}
+                        </Muted>
+                      </KnowledgeCard>
+                    </Link>
+                  ))}
+                </div>
+              </Section>
+            )}
+          </article>
+        </div>
+      </div>
+    </>
   );
 }

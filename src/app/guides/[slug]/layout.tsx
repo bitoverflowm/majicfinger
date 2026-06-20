@@ -1,6 +1,7 @@
 import { FooterSection } from "@/components/sections/footer-section";
 import { LycheeContentShell } from "@/components/content/LycheeContentShell";
 import { getLycheeContentNavData } from "@/lib/content/lychee-content-nav";
+import { articleSerif } from "@/lib/fonts/article-serif";
 
 /**
  * lychee_content article routes at `/guides/[slug]` (guides + blog MDX).
@@ -17,7 +18,11 @@ export default async function LycheeContentArticleLayout({
   const navData = getLycheeContentNavData();
 
   return (
-    <LycheeContentShell navData={navData} currentPath={`/guides/${slug}`}>
+    <LycheeContentShell
+      navData={navData}
+      currentPath={`/guides/${slug}`}
+      className={articleSerif.variable}
+    >
       {children}
       <FooterSection />
     </LycheeContentShell>

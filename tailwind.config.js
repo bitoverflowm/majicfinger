@@ -91,6 +91,14 @@ module.exports = {
   			mono: [
   				'var(--font-mono)',
   				'monospace'
+  			],
+  			article: [
+  				'var(--font-article-serif)',
+  				'ui-serif',
+  				'Georgia',
+  				'Cambria',
+  				'Times New Roman',
+  				'serif'
   			]
   		},
   		borderRadius: {
