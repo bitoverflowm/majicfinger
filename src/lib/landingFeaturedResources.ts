@@ -29,6 +29,7 @@ export const LANDING_FEATURED_RESOURCE_LINKS: LandingFeaturedResourceRef[] = [
       "Quarterly volume trends, category activity, and shareable Kalshi market insights—built entirely in Lychee.",
     image: "/images/guides/kalshi-volume/main.png",
   },
+  { kind: "guide", slug: "kalshi-political-prediction-market-accuracy" },
   { kind: "guide", slug: "kalshi-weather-probability-convergence-chart" },
   { kind: "guide", slug: "kalshi-weather-prediction-markets-analysis" },
   { kind: "guide", slug: "kalshi-volume-chart-guide" },

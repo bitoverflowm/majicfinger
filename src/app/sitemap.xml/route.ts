@@ -3,7 +3,7 @@ import dbConnect from "@/lib/dbConnect";
 import ChartDashboard from "@/models/ChartDashboards";
 import Chart from "@/models/Charts";
 import User from "@/models/Users";
-import { getAllSlugs } from "@/lib/content";
+import { getAllContent, getAllSlugs } from "@/lib/content";
 import { getAllHubSlugs } from "@/config/hubs";
 
 export const runtime = "nodejs";
@@ -76,10 +76,14 @@ export async function GET() {
   // Content-driven pages (auto-updates when new MDX is added).
   const addContentType = (contentType: Parameters<typeof getAllSlugs>[0], prefix: string, opts?: { priority?: string; changefreq?: string }) => {
     try {
-      const slugs = getAllSlugs(contentType);
-      for (const slug of slugs) {
+      const items = getAllContent(contentType);
+      for (const item of items) {
+        const lastmod = toIsoDate(
+          item.frontmatter.updatedAt || item.frontmatter.publishedAt,
+        );
         urls.push({
-          loc: `${SITE}${prefix}/${encodeURIComponent(slug)}`,
+          loc: `${SITE}${prefix}/${encodeURIComponent(item.slug)}`,
+          lastmod: lastmod || undefined,
           priority: opts?.priority,
           changefreq: opts?.changefreq,
         });

@@ -194,9 +194,39 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
+      type: "text_block",
+      title: "Kalshi Political Market Research",
+      content:
+        "Beyond volume and weather, Kalshi historical data supports deep political market research — calibration curves, forecast error by probability bucket, and lifecycle accuracy across thousands of resolved elections and policy markets. Explore the political research guides below for calibration analysis, lifecycle forecasting, and election market behavior.",
+    },
+
+    {
       type: "link_group",
       title: "Kalshi Resources",
       groups: [
+        {
+          label: "Political Market Research",
+          links: [
+            {
+              title: "Are Political Prediction Markets Accurate at 90%?",
+              href: "/guides/kalshi-political-prediction-market-accuracy",
+              description:
+                "Calibration analysis of 3,000+ resolved Kalshi political markets — probability buckets, forecast error, and reliability diagrams.",
+            },
+            {
+              title: "When Do Prediction Markets Become Accurate?",
+              href: "/guides/kalshi-historical-political-prediction-market-accuracy-lifecycle",
+              description:
+                "Lifecycle analysis across 25,552 market snapshots — when political odds become reliable.",
+            },
+            {
+              title: "Political Prediction Markets & Election Forecasting",
+              href: "/guides/kalshi-political-prediction-markets-analysis",
+              description:
+                "How political markets compare to polls and what historical pricing reveals.",
+            },
+          ],
+        },
         {
           label: "Volume & Market Analysis",
           links: [
