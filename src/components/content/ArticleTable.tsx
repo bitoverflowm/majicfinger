@@ -3,16 +3,14 @@ import { cn } from "@/lib/utils";
 
 /** Making Software–inspired table chrome for lychee_content MDX tables. */
 export const ARTICLE_TABLE_WRAPPER_CLASS =
-  "table-wrapper my-8 w-full overflow-x-auto border-2 border-[#7eb3d4] bg-white";
+  "table-wrapper my-8 w-full overflow-x-auto bg-white";
 
 export const ARTICLE_TABLE_CLASS = cn(
   "w-full border-collapse font-sans text-sm text-gray-600",
   "[&_th]:border [&_th]:border-[#d4e3ed] [&_th]:bg-[#e3eef5] [&_th]:px-4 [&_th]:py-2.5",
-  "[&_th]:text-left [&_th]:font-bold [&_th]:text-[#4d6575]",
-  "[&_th:not(:first-child)]:text-right",
+  "[&_th]:text-center [&_th]:font-bold [&_th]:text-[#4d6575]",
   "[&_td]:border [&_td]:border-[#d4e3ed] [&_td]:px-4 [&_td]:py-2.5",
-  "[&_td]:text-left",
-  "[&_td:not(:first-child)]:text-right",
+  "[&_td]:text-center",
   "[&_tbody_tr:nth-child(odd)]:bg-white",
   "[&_tbody_tr:nth-child(even)]:bg-[#eef4f8]",
 );

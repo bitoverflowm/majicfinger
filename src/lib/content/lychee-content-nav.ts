@@ -1,6 +1,16 @@
-import { getAllContent } from "@/lib/content";
 import { siteConfig } from "@/lib/config";
-import type { ContentItem, ContentType } from "@/lib/content/types";
+import { getLycheeContentRegistry } from "@/lib/content/lychee-content-registry";
+import type { ResolvedRegistryEntry } from "@/lib/content/lychee-content-registry";
+import {
+  CONTENT_CLASS_LABELS,
+  CONTENT_CLASS_ORDER,
+  INTEGRATION_HUB_ORDER,
+  INTEGRATION_HUBS,
+  integrationTopicLabel,
+  type ContentClass,
+  type IntegrationHub,
+  type IntegrationTopic,
+} from "@/lib/content/taxonomy";
 
 export type LycheeContentNavLink = {
   label: string;
@@ -8,10 +18,26 @@ export type LycheeContentNavLink = {
   slug?: string;
 };
 
+export type LycheeContentNavBucket = {
+  id: ContentClass;
+  label: string;
+  items: LycheeContentNavLink[];
+};
+
+export type LycheeContentNavTopic = {
+  id: IntegrationTopic;
+  label: string;
+  buckets: LycheeContentNavBucket[];
+};
+
 export type LycheeContentNavSection = {
   id: string;
   label: string;
-  items: LycheeContentNavLink[];
+  /** Hub landing page — integration sections only. */
+  hubHref?: string;
+  topics?: LycheeContentNavTopic[];
+  /** Flat list — Build in public changelogs. */
+  items?: LycheeContentNavLink[];
 };
 
 export type LycheeContentNavData = {
@@ -33,56 +59,94 @@ export function isLycheeContentNavLinkActive(
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
-const LYCHEE_CONTENT_TYPES: ContentType[] = [
-  "guides",
-  "blog",
-  "concepts",
-  "playbooks",
-  "integrations",
-];
-
-const SECTION_LABELS: Record<ContentType, string> = {
-  guides: "Guides",
-  blog: "Blog",
-  concepts: "Concepts",
-  playbooks: "Playbooks",
-  integrations: "Integrations",
-};
-
-function sortByPublishedAt(items: ContentItem[]): ContentItem[] {
-  return [...items].sort((a, b) =>
-    (b.frontmatter.publishedAt || "").localeCompare(
-      a.frontmatter.publishedAt || "",
-    ),
-  );
+function toNavLink(entry: ResolvedRegistryEntry): LycheeContentNavLink {
+  return {
+    label: entry.label,
+    href: entry.href,
+    ...(entry.slug && { slug: entry.slug }),
+  };
 }
 
-function toNavLink(item: ContentItem): LycheeContentNavLink {
-  const href =
-    item.contentType === "guides" || item.contentType === "blog"
-      ? `/guides/${item.slug}`
-      : `/${item.contentType}/${item.slug}`;
+function buildIntegrationSections(
+  entries: ResolvedRegistryEntry[],
+): LycheeContentNavSection[] {
+  const sections: LycheeContentNavSection[] = [];
+
+  for (const hubId of INTEGRATION_HUB_ORDER) {
+    const hubEntries = entries.filter(
+      (entry) =>
+        entry.integrationHub === hubId && entry.contentClass !== "changelog",
+    );
+    if (hubEntries.length === 0) continue;
+
+    const hubMeta = INTEGRATION_HUBS[hubId];
+    const topics: LycheeContentNavTopic[] = [];
+
+    for (const topicId of hubMeta.topicOrder) {
+      const topicEntries = hubEntries.filter(
+        (entry) => entry.integrationTopic === topicId,
+      );
+      if (topicEntries.length === 0) continue;
+
+      const buckets: LycheeContentNavBucket[] = [];
+
+      for (const contentClass of CONTENT_CLASS_ORDER) {
+        const bucketEntries = topicEntries.filter(
+          (entry) => entry.contentClass === contentClass,
+        );
+        if (bucketEntries.length === 0) continue;
+
+        buckets.push({
+          id: contentClass,
+          label: CONTENT_CLASS_LABELS[contentClass],
+          items: bucketEntries.map(toNavLink),
+        });
+      }
+
+      topics.push({
+        id: topicId,
+        label: integrationTopicLabel(hubId, topicId),
+        buckets,
+      });
+    }
+
+    sections.push({
+      id: hubId,
+      label: hubMeta.label,
+      hubHref: hubMeta.href,
+      topics,
+    });
+  }
+
+  return sections;
+}
+
+function buildBuildInPublicSection(
+  entries: ResolvedRegistryEntry[],
+): LycheeContentNavSection | null {
+  const changelogs = entries
+    .filter((entry) => entry.contentClass === "changelog")
+    .sort((a, b) =>
+      (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""),
+    );
+
+  if (changelogs.length === 0) return null;
 
   return {
-    label: item.frontmatter.title,
-    href,
-    slug: item.slug,
+    id: "build-in-public",
+    label: "Build in public",
+    items: changelogs.map(toNavLink),
   };
 }
 
 /** Server-side nav tree for lychee_content reading chrome (sidebar). */
 export function getLycheeContentNavData(): LycheeContentNavData {
-  const sections: LycheeContentNavSection[] = [];
+  const registry = getLycheeContentRegistry();
+  const sections = buildIntegrationSections(registry);
+  const buildInPublic = buildBuildInPublicSection(registry);
 
-  for (const contentType of LYCHEE_CONTENT_TYPES) {
-    const items = sortByPublishedAt(getAllContent(contentType));
-    if (items.length === 0) continue;
-
-    sections.push({
-      id: contentType,
-      label: SECTION_LABELS[contentType],
-      items: items.map(toNavLink),
-    });
+  if (buildInPublic) {
+    sections.push(buildInPublic);
   }
 
   return {

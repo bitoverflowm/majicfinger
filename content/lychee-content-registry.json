@@ -1,0 +1,116 @@
+{
+  "$comment": "Designation-only registry for lychee_content nav. URLs never change — edit contentClass, integrationHub, and integrationTopic here. slug = MDX filename; href required for dashboards.",
+  "entries": [
+    {
+      "slug": "kalshi-historical-data",
+      "contentClass": "guide",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "overview"
+    },
+    {
+      "href": "/misterrpink/dashboards/kalshi-volume-dashboard",
+      "title": "Kalshi Volume Dashboard",
+      "contentClass": "dashboard",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "volume"
+    },
+    {
+      "slug": "kalshi-volume",
+      "contentClass": "guide",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "volume"
+    },
+    {
+      "slug": "kalshi-volume-chart-guide",
+      "contentClass": "guide",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "volume"
+    },
+    {
+      "slug": "kalshi-political-prediction-market-accuracy",
+      "contentClass": "research",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "politics"
+    },
+    {
+      "slug": "kalshi-political-prediction-markets-analysis",
+      "contentClass": "research",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "politics"
+    },
+    {
+      "slug": "kalshi-historical-political-prediction-market-accuracy-lifecycle",
+      "contentClass": "research",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "politics"
+    },
+    {
+      "href": "/misterrpink/dashboards/kalshi-historical-weather-datas",
+      "title": "Kalshi Historical Weather Dashboard",
+      "contentClass": "dashboard",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "weather"
+    },
+    {
+      "slug": "kalshi-weather-prediction-markets-analysis",
+      "contentClass": "research",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "weather"
+    },
+    {
+      "slug": "kalshi-weather-probability-convergence-chart",
+      "contentClass": "guide",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "weather"
+    },
+    {
+      "slug": "kalshi-weather-probability-calibration-chart",
+      "contentClass": "guide",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "weather"
+    },
+    {
+      "slug": "kalshi-weather-volatility-chart",
+      "contentClass": "guide",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "weather"
+    },
+    {
+      "slug": "polymarket-market-id",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-live",
+      "integrationTopic": "overview"
+    },
+    {
+      "slug": "polymarket-events-endpoint-no-code",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-live",
+      "integrationTopic": "overview"
+    },
+    {
+      "slug": "polymarket-odds-over-time",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-live",
+      "integrationTopic": "overview"
+    },
+    {
+      "slug": "polymarket-live-prices",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-live",
+      "integrationTopic": "overview"
+    },
+    {
+      "slug": "every-sql-query-you-ever-need",
+      "contentClass": "guide",
+      "integrationHub": "platform",
+      "integrationTopic": "general"
+    },
+    {
+      "slug": "embed-interactive-charts",
+      "contentClass": "changelog",
+      "integrationHub": "platform",
+      "integrationTopic": "chainlink",
+      "publishedAt": "2026-04-15"
+    }
+  ]
+}

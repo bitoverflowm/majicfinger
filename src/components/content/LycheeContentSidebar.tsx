@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   isLycheeContentNavLinkActive,
   type LycheeContentNavData,
+  type LycheeContentNavLink,
 } from "@/lib/content/lychee-content-nav";
 
 type LycheeContentSidebarProps = {
@@ -15,10 +16,12 @@ function NavItem({
   href,
   label,
   active,
+  className,
 }: {
   href: string;
   label: string;
   active: boolean;
+  className?: string;
 }) {
   return (
     <li>
@@ -28,11 +31,35 @@ function NavItem({
         className={cn(
           "block leading-snug transition-colors hover:text-secondary",
           active ? "text-secondary" : "text-foreground",
+          className,
         )}
       >
         {label}
       </Link>
     </li>
+  );
+}
+
+function NavLinkList({
+  items,
+  currentPath,
+  className,
+}: {
+  items: LycheeContentNavLink[];
+  currentPath: string;
+  className?: string;
+}) {
+  return (
+    <ul className={cn("space-y-2", className)}>
+      {items.map((item) => (
+        <NavItem
+          key={item.href}
+          href={item.href}
+          label={item.label}
+          active={isLycheeContentNavLinkActive(item.href, currentPath)}
+        />
+      ))}
+    </ul>
   );
 }
 
@@ -63,33 +90,59 @@ export function LycheeContentSidebar({
           <h2 className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
             Platform
           </h2>
-          <ul className="space-y-2.5">
-            {data.platform.map((item) => (
-              <NavItem
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                active={isLycheeContentNavLinkActive(item.href, currentPath)}
-              />
-            ))}
-          </ul>
+          <NavLinkList items={data.platform} currentPath={currentPath} />
         </section>
 
         {data.sections.map((section) => (
           <section key={section.id} className="mb-8">
-            <h2 className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
-              {section.label}
-            </h2>
-            <ul className="space-y-2.5">
-              {section.items.map((item) => (
-                <NavItem
-                  key={`${section.id}-${item.slug ?? item.href}`}
-                  href={item.href}
-                  label={item.label}
-                  active={isLycheeContentNavLinkActive(item.href, currentPath)}
-                />
-              ))}
-            </ul>
+            {section.hubHref ? (
+              <Link
+                href={section.hubHref}
+                className={cn(
+                  "mb-3 block font-mono text-[10px] font-medium uppercase tracking-[0.14em] transition-colors hover:text-secondary",
+                  isLycheeContentNavLinkActive(section.hubHref, currentPath)
+                    ? "text-secondary"
+                    : "text-foreground",
+                )}
+              >
+                {section.label}
+              </Link>
+            ) : (
+              <h2 className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
+                {section.label}
+              </h2>
+            )}
+
+            {section.topics?.map((topic) => (
+              <div key={`${section.id}-${topic.id}`} className="mb-4 pl-2">
+                <h3 className="mb-2 font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  {topic.label}
+                </h3>
+                {topic.buckets.map((bucket) => (
+                  <div
+                    key={`${section.id}-${topic.id}-${bucket.id}`}
+                    className="mb-3 pl-2"
+                  >
+                    <h4 className="mb-1.5 text-[10px] font-medium text-muted-foreground/80">
+                      {bucket.label}
+                    </h4>
+                    <NavLinkList
+                      items={bucket.items}
+                      currentPath={currentPath}
+                      className="space-y-1.5"
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {section.items ? (
+              <NavLinkList
+                items={section.items}
+                currentPath={currentPath}
+                className="pl-2"
+              />
+            ) : null}
           </section>
         ))}
       </div>
