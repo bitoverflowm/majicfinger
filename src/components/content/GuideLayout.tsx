@@ -9,6 +9,7 @@ import {
   KnowledgeCard,
 } from "@/components/ui";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
+import { ArticleMetaBar } from "./ArticleMetaBar";
 import { getRelatedContent } from "@/lib/content/related";
 import {
   isKalshiHistoricalHubGuide,
@@ -19,12 +20,11 @@ import type { TocItem } from "@/lib/content/extract-mdx-headings";
 import type { BaseContent, ContentType } from "@/lib/content/types";
 import { ContentTocNav } from "./ContentTocNav";
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
+
+function resolveShareUrl(slug: string, frontmatter: BaseContent) {
+  if (frontmatter.canonicalUrl?.trim()) return frontmatter.canonicalUrl.trim();
+  return `${SITE_URL.replace(/\/$/, "")}/guides/${slug}`;
 }
 
 interface GuideLayoutProps {
@@ -60,17 +60,17 @@ export function GuideLayout({
         )}
 
         <Section>
+          <ArticleMetaBar
+            author={frontmatter.author}
+            publishedAt={frontmatter.publishedAt}
+            readingTime={frontmatter.readingTime}
+            title={frontmatter.title}
+            shareUrl={resolveShareUrl(slug, frontmatter)}
+          />
           <H1>{frontmatter.title}</H1>
           {frontmatter.description && (
             <P className="text-muted-foreground">{frontmatter.description}</P>
           )}
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            <Muted>{formatDate(frontmatter.publishedAt)}</Muted>
-            {frontmatter.readingTime?.trim() && (
-              <Muted>{frontmatter.readingTime.trim()} read</Muted>
-            )}
-            <Muted>By {frontmatter.author}</Muted>
-          </div>
         </Section>
 
         <Section>
