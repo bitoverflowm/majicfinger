@@ -4,6 +4,7 @@ import { TypographyInlineCode, VideoEmbed, YouTube } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ContentImage } from "./content-image";
 import { LYCHEE_CONTENT_TYPE, ArticleDivider } from "./article-prose";
+import { ArticleTable } from "./ArticleTable";
 import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
 
@@ -81,18 +82,8 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     code: MdxCode,
     TypographyInlineCode,
     table: ({ children, ...props }: any) => {
-      // MDX may pass legacy `ref` (string refs) which are invalid for <table> in React 19 types.
       const { ref: _ref, ...rest } = props || {};
-      return (
-        <div className="my-6 overflow-x-auto rounded-lg border border-border">
-          <table
-            {...rest}
-            className="w-full border-collapse text-sm [&_td]:px-4 [&_td]:py-2.5 [&_td]:!text-center [&_th]:px-4 [&_th]:py-2.5 [&_th]:!text-center [&_th]:font-medium"
-          >
-            {children}
-          </table>
-        </div>
-      );
+      return <ArticleTable {...rest}>{children}</ArticleTable>;
     },
     img: ({ src, alt }) => {
       if (!src) return null;
