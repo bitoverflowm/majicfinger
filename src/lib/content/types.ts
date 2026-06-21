@@ -37,6 +37,11 @@ export type BaseContent = {
   integration?: string[];
   topics?: string[];
   featured?: boolean;
+  /** Editorial taxonomy — optional MDX frontmatter (content organization UI). */
+  contentType?: string;
+  cluster?: string;
+  intent?: string;
+  difficulty?: string;
 };
 
 export type ContentType = "guides" | "integrations" | "concepts" | "playbooks" | "blog";

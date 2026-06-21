@@ -4,6 +4,11 @@
  */
 export const CONNECT_HOME_GUIDES = [
   {
+    slug: "what-does-volume-mean-on-kalshi",
+    title: "What Does Volume Mean on Kalshi? Trading Volume Explained",
+    publishedAt: "2026-06-21",
+  },
+  {
     slug: "kalshi-weather-prediction-markets-analysis",
     title: "Kalshi Weather Prediction Markets Explained: How They Work, How Prices Are Set, and What Historical Data Reveals",
     publishedAt: "2026-05-10",

@@ -231,6 +231,12 @@ export const kalshiHistoricalHub: HubPageConfig = {
           label: "Volume & Market Analysis",
           links: [
             {
+              title: "What Does Volume Mean on Kalshi?",
+              href: "/guides/what-does-volume-mean-on-kalshi",
+              description:
+                "Trading volume, liquidity, and market activity explained for beginners.",
+            },
+            {
               title: "Kalshi Volume Dashboard",
               href: "/misterrpink/dashboards/kalshi-volume-dashboard",
               description:

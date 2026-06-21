@@ -1,4 +1,9 @@
-export type ContentClass = "research" | "guide" | "changelog" | "dashboard";
+export type ContentClass =
+  | "research"
+  | "explainer"
+  | "guide"
+  | "changelog"
+  | "dashboard";
 
 export type IntegrationHub =
   | "kalshi-historical"
@@ -21,6 +26,7 @@ export type IntegrationTopic =
 export const CONTENT_CLASS_LABELS: Record<ContentClass, string> = {
   dashboard: "Dashboards",
   research: "Research",
+  explainer: "Explainers",
   guide: "Guides",
   changelog: "Changelog",
 };
@@ -29,6 +35,7 @@ export const CONTENT_CLASS_LABELS: Record<ContentClass, string> = {
 export const CONTENT_CLASS_ORDER: ContentClass[] = [
   "dashboard",
   "research",
+  "explainer",
   "guide",
 ];
 

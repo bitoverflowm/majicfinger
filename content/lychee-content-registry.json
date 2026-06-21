@@ -15,6 +15,12 @@
       "integrationTopic": "volume"
     },
     {
+      "slug": "what-does-volume-mean-on-kalshi",
+      "contentClass": "explainer",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "volume"
+    },
+    {
       "slug": "kalshi-volume",
       "contentClass": "guide",
       "integrationHub": "kalshi-historical",
