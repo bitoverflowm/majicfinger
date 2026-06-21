@@ -3,7 +3,15 @@ import Link from 'next/link';
 
 import { IoIosArrowRoundBack } from "react-icons/io";
 import { AffiliateCard } from './affiliateCard';
+import { canonicalUrl } from "@/lib/site";
 
+export const metadata = {
+  title: "Affiliate Program | Lychee",
+  description: "Join the Lychee affiliate program and earn when others subscribe.",
+  alternates: {
+    canonical: canonicalUrl("/affiliates"),
+  },
+};
 
 const Affiliates = () => {
     return (

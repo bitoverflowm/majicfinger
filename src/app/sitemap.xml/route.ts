@@ -5,12 +5,13 @@ import Chart from "@/models/Charts";
 import User from "@/models/Users";
 import { getAllContent, getAllSlugs } from "@/lib/content";
 import { getAllHubSlugs } from "@/config/hubs";
+import { getSiteUrl } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
+const SITE = getSiteUrl();
 
 function xmlEscape(s: string) {
   return s

@@ -2,6 +2,15 @@ import React from 'react';
 import Link from 'next/link';
 
 import { IoIosArrowRoundBack } from "react-icons/io";
+import { canonicalUrl } from "@/lib/site";
+
+export const metadata = {
+  title: "Data Use Policy | Lychee",
+  description: "How Lychee collects, stores, and uses your data.",
+  alternates: {
+    canonical: canonicalUrl("/dataUse"),
+  },
+};
 
 const DataUse = () => {
     return (

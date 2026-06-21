@@ -2,12 +2,16 @@ import GuidesSection from "@/components/sections/guides-section";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { getAllContent } from "@/lib/content";
+import { canonicalUrl } from "@/lib/site";
 import type { ContentItem } from "@/lib/content/types";
 
 export const metadata = {
   title: "Guides | Lychee",
   description:
     "Tutorials and articles for prediction markets, Kalshi, Polymarket, and Lychee data workflows.",
+  alternates: {
+    canonical: canonicalUrl("/guides"),
+  },
 };
 
 export default function GuidesIndexPage() {

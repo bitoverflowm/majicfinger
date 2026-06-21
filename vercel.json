@@ -1,4 +1,12 @@
 {
   "installCommand": "npm install --legacy-peer-deps",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.lycheedata.com" }],
+      "destination": "https://lycheedata.com/:path*",
+      "permanent": true
+    }
+  ]
 }

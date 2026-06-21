@@ -1,10 +1,14 @@
 import { MarketingNavbar } from "@/components/sections/marketing-navbar";
 import { FooterSection } from "@/components/sections/footer-section";
+import { canonicalUrl } from "@/lib/site";
 import Link from "next/link";
 
 export const metadata = {
   title: "Privacy Policy | Lychee",
   description: "Privacy Policy for Lychee - Your Quant in a Box",
+  alternates: {
+    canonical: canonicalUrl("/privacy"),
+  },
 };
 
 export default function PrivacyPage() {

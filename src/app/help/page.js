@@ -2,11 +2,17 @@ import Link from 'next/link'
 
 import Nav from "@/components/nav";
 import { StateProvider } from '@/context/stateContext'
+import { canonicalUrl } from "@/lib/site";
 
-
+export const metadata = {
+  title: "Help | Lychee",
+  description: "Contact MisterrPink, creator of Lychee, for support and questions.",
+  alternates: {
+    canonical: canonicalUrl("/help"),
+  },
+};
 
 const Help = () => {
-
     return (
         <StateProvider>
             <div className="h-screen">

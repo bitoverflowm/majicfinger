@@ -1,10 +1,14 @@
 import { MarketingNavbar } from "@/components/sections/marketing-navbar";
 import { FooterSection } from "@/components/sections/footer-section";
+import { canonicalUrl } from "@/lib/site";
 import Link from "next/link";
 
 export const metadata = {
   title: "Terms of Service | Lychee",
   description: "Terms of Service for Lychee - Your Quant in a Box",
+  alternates: {
+    canonical: canonicalUrl("/terms"),
+  },
 };
 
 export default function TermsPage() {
