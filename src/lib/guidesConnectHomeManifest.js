@@ -9,6 +9,16 @@ export const CONNECT_HOME_GUIDES = [
     publishedAt: "2026-06-21",
   },
   {
+    slug: "kalshi-historical-political-prediction-market-accuracy-lifecycle",
+    title: "When Do Prediction Markets Become Accurate? A Kalshi Political Market Lifecycle Analysis",
+    publishedAt: "2026-06-17",
+  },
+  {
+    slug: "kalshi-political-prediction-market-accuracy",
+    title: "Are 90% Prediction Markets Reliable? A Kalshi Political Calibration Study",
+    publishedAt: "2026-06-12",
+  },
+  {
     slug: "kalshi-weather-prediction-markets-analysis",
     title: "Kalshi Weather Prediction Markets Explained: How They Work, How Prices Are Set, and What Historical Data Reveals",
     publishedAt: "2026-05-10",

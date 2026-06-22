@@ -208,10 +208,10 @@ export const kalshiHistoricalHub: HubPageConfig = {
           label: "Political Market Research",
           links: [
             {
-              title: "Are Political Prediction Markets Accurate at 90%?",
+              title: "Are 90% Prediction Markets Reliable?",
               href: "/guides/kalshi-political-prediction-market-accuracy",
               description:
-                "Calibration analysis of 3,000+ resolved Kalshi political markets — probability buckets, forecast error, and reliability diagrams.",
+                "Kalshi political market calibration study — final-price reliability at 90–100% and the 90% trap in prediction markets.",
             },
             {
               title: "When Do Prediction Markets Become Accurate?",
