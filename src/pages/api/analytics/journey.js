@@ -1,5 +1,4 @@
 import dbConnect from "@/lib/dbConnect";
-import VisitorSession from "@/models/VisitorSession";
 import VisitorEvent from "@/models/VisitorEvent";
 import { sendTelegramMessage } from "@/lib/telegram/notify";
 import { incrementTelegramEventCounter } from "@/lib/telegram/trackEvent";
@@ -11,6 +10,8 @@ import {
   buildSessionEndTelegramMessage,
   buildSessionStartTelegramMessage,
 } from "@/lib/analytics/formatJourneySummary";
+import { buildDataPullTelegramMessage } from "@/lib/analytics/formatDataPullTelegram";
+import VisitorSession from "@/models/VisitorSession";
 
 function isAuthSession(sessionKind) {
   return sessionKind === "auth";
@@ -289,6 +290,27 @@ async function recordSessionError(sessionId, meta = {}) {
   return { ok: true };
 }
 
+async function recordDataPullNotify(sessionId, meta = {}) {
+  await dbConnect();
+
+  const phase = meta.phase;
+  if (!phase || !["started", "completed", "error"].includes(phase)) {
+    return { ok: false, message: "Invalid data pull phase" };
+  }
+
+  const session = await VisitorSession.findOne({ session_id: sessionId }).lean();
+  const { phase: _phase, ...pullMeta } = meta;
+
+  const text = buildDataPullTelegramMessage({
+    phase,
+    meta: pullMeta,
+    sessionEmail: session?.email,
+  });
+
+  await sendTelegramMessage(text);
+  return { ok: true };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, message: "Method not allowed" });
@@ -341,6 +363,10 @@ export default async function handler(req, res) {
       }
       case "session_error": {
         const result = await recordSessionError(sessionId, meta);
+        return res.status(200).json(result);
+      }
+      case "data_pull_notify": {
+        const result = await recordDataPullNotify(sessionId, meta);
         return res.status(200).json(result);
       }
       default:

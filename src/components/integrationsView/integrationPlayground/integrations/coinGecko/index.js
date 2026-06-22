@@ -25,6 +25,7 @@ import {
 import { DateRange } from "react-day-picker"
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
+import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
 const CoinGecko = ({ setConnectedData, requestSheetDestination }) => {
     const contextStateV2 = useMyStateV2();
@@ -41,6 +42,12 @@ const CoinGecko = ({ setConnectedData, requestSheetDestination }) => {
     const fetchHandler = async (query, args) => {
         const destination = await requestSheetDestination?.();
         if (!destination) return;
+        const pullStartMs =
+            typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+            integration: "coinGecko",
+            endpoint: query,
+        });
         let queryString = `query=${query}`;
         if (args) {
             args.forEach((arg) => {
@@ -76,10 +83,24 @@ const CoinGecko = ({ setConnectedData, requestSheetDestination }) => {
                 addNewSheetAndActivate,
                 setSheetData,
             });
+            trackDataPullComplete({
+                integration: "coinGecko",
+                endpoint: query,
+                rowCount: rows.length,
+                elapsedMs:
+                    (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+                    pullStartMs,
+            });
         } else {
             setArgs()
             setQuery()
             setInputValues({})
+            trackDataPullError({
+                message: `CoinGecko pull failed (${res.status})`,
+                integration: "coinGecko",
+                source: "coinGecko.fetchHandler",
+                meta: { endpoint: query },
+            });
             console.error(res.error);
         }        
     }

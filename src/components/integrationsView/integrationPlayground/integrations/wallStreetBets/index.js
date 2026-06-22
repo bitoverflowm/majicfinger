@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/popover"
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
+import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
 const WallStreetBets = ({ setConnectedData, requestSheetDestination }) => {
     const contextStateV2 = useMyStateV2();
@@ -32,6 +33,13 @@ const WallStreetBets = ({ setConnectedData, requestSheetDestination }) => {
     const fetchHandler = async (date) => {
         const destination = await requestSheetDestination?.();
         if (!destination) return;
+        const pullStartMs =
+            typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        const endpoint = date ? "reddit-by-date" : "sentiment";
+        trackDataPullStart({
+            integration: "wallStreetBets",
+            endpoint,
+        });
         if(date){
             let res = await fetch(`https://tradestie.com/api/v1/apps/reddit?date=${date}`, {
                 method: 'GET',
@@ -49,7 +57,21 @@ const WallStreetBets = ({ setConnectedData, requestSheetDestination }) => {
                     addNewSheetAndActivate,
                     setSheetData,
                 });
+                trackDataPullComplete({
+                    integration: "wallStreetBets",
+                    endpoint,
+                    rowCount: rows.length,
+                    elapsedMs:
+                        (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+                        pullStartMs,
+                });
             } else {
+                trackDataPullError({
+                    message: "WallStreetBets data pull failed",
+                    integration: "wallStreetBets",
+                    source: "wallStreetBets.fetchHandler",
+                    meta: { endpoint },
+                });
                 console.error("WallStreetBets User Data pull failed");
             }           
         }
@@ -70,7 +92,21 @@ const WallStreetBets = ({ setConnectedData, requestSheetDestination }) => {
                     addNewSheetAndActivate,
                     setSheetData,
                 });
+                trackDataPullComplete({
+                    integration: "wallStreetBets",
+                    endpoint,
+                    rowCount: rows.length,
+                    elapsedMs:
+                        (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+                        pullStartMs,
+                });
             } else {
+                trackDataPullError({
+                    message: "WallStreetBets sentiment pull failed",
+                    integration: "wallStreetBets",
+                    source: "wallStreetBets.fetchHandler",
+                    meta: { endpoint },
+                });
                 console.error("WallStreetBets User Data pull failed");
             }
         }

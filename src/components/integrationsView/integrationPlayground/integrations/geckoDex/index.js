@@ -12,6 +12,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applySheetIntegrationDecision } from "@/lib/integrations/applyIntegrationDestination";
+import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
 
 const GeckoDex = ({ setConnectedData, requestSheetDestination }) => {
@@ -26,6 +27,12 @@ const GeckoDex = ({ setConnectedData, requestSheetDestination }) => {
     const fetchHandler = async (query, args) => {
         const destination = await requestSheetDestination?.();
         if (!destination) return;
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "geckoDex",
+          endpoint: query,
+        });
         let queryString = `query=${query}`;
         if (args) {
           args.forEach((arg) => {
@@ -52,10 +59,24 @@ const GeckoDex = ({ setConnectedData, requestSheetDestination }) => {
                 addNewSheetAndActivate,
                 setSheetData,
             });
+            trackDataPullComplete({
+              integration: "geckoDex",
+              endpoint: query,
+              rowCount: rows.length,
+              elapsedMs:
+                (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+                pullStartMs,
+            });
         } else {
             setArgs()
             setQuery()
             setInputValues({})
+            trackDataPullError({
+              message: `GeckoTerminal pull failed (${res.status})`,
+              integration: "geckoDex",
+              source: "geckoDex.fetchHandler",
+              meta: { endpoint: query },
+            });
             console.error(res.error);
         }
       };

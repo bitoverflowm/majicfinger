@@ -59,6 +59,7 @@ import {
 } from "@/lib/connectHomePullDestination";
 import { cn } from "@/lib/utils";
 import { ENDPOINTS, POLYMARKET_GROUPS, TRADES_RESPONSE_FIELDS } from "./config";
+import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
 const COOLDOWN_MS = 1500;
 // Fallback when no endpoint responseFields and no prior pull – use Trade schema (docs: get-trades-for-a-user-or-markets)
@@ -266,6 +267,16 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     async (query, values) => {
       const ctx = contextRef.current;
       let destination;
+      const pullStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+      const endpointMeta = ENDPOINTS.find((e) => e.query === query);
+
+      trackDataPullStart({
+        integration: "polymarket",
+        endpoint: query,
+        sampleLabel: endpointMeta?.name || query,
+      });
+
       if (connectHomeActive) {
         destination = resolveConnectHomeSheetDestination(ctx);
         if (!destination) return;
@@ -297,7 +308,14 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
           headers: { "Content-Type": "application/json" },
         });
       } catch (e) {
-        setError(e?.message || "Request failed");
+        const msg = e?.message || "Request failed";
+        trackDataPullError({
+          message: msg,
+          integration: "polymarket",
+          source: "polymarket.runRequest",
+          meta: { endpoint: query },
+        });
+        setError(msg);
         setLoading(false);
         setProgress(0);
         setStageIndex(0);
@@ -320,7 +338,14 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       setStageIndex(3);
       setProgress(100);
       if (!res.ok) {
-        setError(data?.message || "Request failed");
+        const msg = data?.message || "Request failed";
+        trackDataPullError({
+          message: msg,
+          integration: "polymarket",
+          source: "polymarket.runRequest",
+          meta: { endpoint: query },
+        });
+        setError(msg);
         setLoading(false);
         setStageIndex(0);
         return;
@@ -363,6 +388,17 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         progress: 100,
         error: null,
       }));
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+        pullStartMs;
+      trackDataPullComplete({
+        integration: "polymarket",
+        endpoint: query,
+        sampleLabel: endpointMeta?.name || query,
+        rowCount: arr.length,
+        elapsedMs,
+      });
     },
     [
       addNewSheetAndActivate,

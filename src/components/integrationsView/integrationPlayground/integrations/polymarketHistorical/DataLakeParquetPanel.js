@@ -126,7 +126,8 @@ import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_META,
 } from "@/lib/dataLake/lakeTableColumns";
 import { toast } from "sonner";
-import { trackAuthEvent, trackAuthError } from "@/lib/analytics/authJourneyClient";
+import { trackAuthEvent } from "@/lib/analytics/authJourneyClient";
+import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
 /** Shown in the column picker / compose cards for server-computed Kalshi fields. */
 const KALSHI_VIRTUAL_COMPOSE_LABELS = {
@@ -2570,18 +2571,17 @@ export default function DataLakeParquetPanel({
         }
         setLastRowCount(n);
         refreshBeckerViews();
-        trackAuthEvent("query_submit", {
-          meta: {
-            integration: dataset,
-            lake: lk,
-            table,
-            sampleId: sid,
-            sampleLabel,
-            mode,
-            rowCount: n,
-            status: "success",
-            largePull: true,
-          },
+        const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullComplete({
+          integration: dataset,
+          lake: lk,
+          table,
+          sampleId: sid,
+          sampleLabel,
+          mode,
+          rowCount: n,
+          largePull: true,
+          elapsedMs: Math.max(0, Number(endMs) - Number(requestStartMs || endMs)),
         });
       },
     };
@@ -2663,17 +2663,16 @@ export default function DataLakeParquetPanel({
         }
         setLastRowCount(n);
         refreshBeckerViews();
-        trackAuthEvent("query_submit", {
-          meta: {
-            integration: dataset,
-            lake: lk,
-            table,
-            sampleId: sid,
-            sampleLabel,
-            mode,
-            rowCount: n,
-            status: "success",
-          },
+        const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullComplete({
+          integration: dataset,
+          lake: lk,
+          table,
+          sampleId: sid,
+          sampleLabel,
+          mode,
+          rowCount: n,
+          elapsedMs: Math.max(0, Number(endMs) - Number(requestStartMs || endMs)),
         });
       });
     } catch (e) {
@@ -2687,22 +2686,17 @@ export default function DataLakeParquetPanel({
       const msg = e?.message || String(e);
       setError(msg);
       syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
-      trackAuthEvent("query_error", {
-        label: msg,
+      trackDataPullError({
+        message: msg,
+        integration: dataset,
+        source: "DataLakeParquetPanel.executeIngestNewSheet",
         meta: {
-          integration: dataset,
           lake: lk,
           table,
           sampleId: sid,
           sampleLabel,
           mode,
-          message: msg,
         },
-      });
-      trackAuthError({
-        message: msg,
-        source: "DataLakeParquetPanel.executeIngestNewSheet",
-        integration: dataset,
       });
     } finally {
       pullInFlightRef.current = false;
@@ -3377,17 +3371,14 @@ export default function DataLakeParquetPanel({
     };
 
     const sampleLabel = sampleOptions.find((s) => s.id === selected.id)?.label || selected.id;
-    trackAuthEvent("query_submit", {
-      meta: {
-        integration: dataset,
-        lake,
-        table: selected.table,
-        sampleId: selected.id,
-        sampleLabel,
-        mode: effectiveIngestMode,
-        selectionTab,
-        status: "started",
-      },
+    trackDataPullStart({
+      integration: dataset,
+      lake,
+      table: selected.table,
+      sampleId: selected.id,
+      sampleLabel,
+      mode: effectiveIngestMode,
+      selectionTab,
     });
 
     if (disposition === "new_sheet") {

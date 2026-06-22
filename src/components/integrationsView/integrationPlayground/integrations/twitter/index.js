@@ -10,6 +10,7 @@ import {
 import Search from './helpers/search';
 import { useMyStateV2 } from '@/context/stateContextV2';
 import { applySheetIntegrationDecision } from '@/lib/integrations/applyIntegrationDestination';
+import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from '@/lib/analytics/trackDataPull';
 
 const Twitter = ({ setConnectedData, requestSheetDestination }) => {
   const contextStateV2 = useMyStateV2();
@@ -21,6 +22,12 @@ const Twitter = ({ setConnectedData, requestSheetDestination }) => {
   const fetchHandler = async (query, params) => {
     const destination = await requestSheetDestination?.();
     if (!destination) return;
+    const pullStartMs =
+      typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+    trackDataPullStart({
+      integration: "twitter",
+      endpoint: query,
+    });
     try {
       const res = await fetch(`/api/integrations/twitter?query=${query}`, {
         method: 'POST',
@@ -39,12 +46,32 @@ const Twitter = ({ setConnectedData, requestSheetDestination }) => {
           addNewSheetAndActivate,
           setSheetData,
         });
+        trackDataPullComplete({
+          integration: "twitter",
+          endpoint: query,
+          rowCount: rows.length,
+          elapsedMs:
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs,
+        });
       } else {
         const errorData = await res.json();
         setError(errorData.error);
+        trackDataPullError({
+          message: errorData.error || `Twitter pull failed (${res.status})`,
+          integration: "twitter",
+          source: "twitter.fetchHandler",
+          meta: { endpoint: query },
+        });
       }
     } catch (err) {
       setError('Failed to fetch data');
+      trackDataPullError({
+        message: err?.message || "Failed to fetch data",
+        integration: "twitter",
+        source: "twitter.fetchHandler",
+        meta: { endpoint: query },
+      });
       console.error(err);
     }
   };

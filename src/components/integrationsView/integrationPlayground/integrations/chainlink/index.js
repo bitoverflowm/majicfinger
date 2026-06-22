@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { runConnectHomeLiveStreamPull } from "@/lib/connectHomePullDestination";
+import { trackDataPullComplete, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 import { ReplaceOrNewSheetDialog } from "@/components/dataView/replaceOrNewSheetDialog";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Play, Square, RotateCw, Pause, X, Plus } from "lucide-react";
@@ -113,6 +114,12 @@ const Chainlink = ({ connectHomePullBridge = false }) => {
 
   const doConnect = (sheetId, symbol) => {
     setError(null);
+    trackDataPullComplete({
+      integration: "chainlink",
+      endpoint: symbol,
+      liveStream: true,
+      rowCount: 0,
+    });
     liveStreamActions?.start?.(sheetId, "chainlink", { symbol });
   };
 
@@ -146,6 +153,11 @@ const Chainlink = ({ connectHomePullBridge = false }) => {
       progress: 100,
       error: null,
     }));
+    trackDataPullStart({
+      integration: "chainlink",
+      endpoint: symbol,
+      liveStream: true,
+    });
     runConnectHomeLiveStreamPull(
       {
         dataSheets,

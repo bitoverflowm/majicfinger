@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { runConnectHomeLiveStreamPull } from "@/lib/connectHomePullDestination";
+import { trackDataPullComplete, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
 const RTDS_WS_URL = "wss://ws-live-data.polymarket.com";
 const PING_INTERVAL_MS = 5000;
@@ -90,6 +91,12 @@ const Binance = ({ setConnectedData, connectHomePullBridge = false }) => {
 
     ws.onopen = () => {
       setIsConnected(true);
+      trackDataPullComplete({
+        integration: "binance",
+        endpoint: symbol,
+        liveStream: true,
+        rowCount: 0,
+      });
       ws.send(JSON.stringify(subscriptionMsg));
       pingIntervalRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send("PING");
@@ -173,6 +180,11 @@ const Binance = ({ setConnectedData, connectHomePullBridge = false }) => {
       progress: 100,
       error: null,
     }));
+    trackDataPullStart({
+      integration: "binance",
+      endpoint: sym,
+      liveStream: true,
+    });
     runConnectHomeLiveStreamPull(
       {
         dataSheets,
