@@ -18,6 +18,7 @@ export type IntegrationTopic =
   | "politics"
   | "weather"
   | "markets"
+  | "api"
   | "general"
   | "chainlink"
   | "sports"
@@ -87,9 +88,10 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
   "polymarket-live": {
     label: "Polymarket Live",
     href: "/polymarket-live-data",
-    topicOrder: ["overview", "markets"],
+    topicOrder: ["overview", "api", "markets"],
     topicLabels: {
       overview: "Overview",
+      api: "API & Metadata",
       markets: "Markets",
     },
   },

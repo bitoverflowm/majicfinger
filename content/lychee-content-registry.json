@@ -82,16 +82,22 @@
       "integrationTopic": "weather"
     },
     {
+      "slug": "polymarket-gamma-api-events-slug",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-live",
+      "integrationTopic": "api"
+    },
+    {
       "slug": "polymarket-market-id",
       "contentClass": "guide",
       "integrationHub": "polymarket-live",
-      "integrationTopic": "overview"
+      "integrationTopic": "api"
     },
     {
       "slug": "polymarket-events-endpoint-no-code",
       "contentClass": "guide",
       "integrationHub": "polymarket-live",
-      "integrationTopic": "overview"
+      "integrationTopic": "api"
     },
     {
       "slug": "polymarket-odds-over-time",

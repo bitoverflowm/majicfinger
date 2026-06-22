@@ -71,8 +71,14 @@ export const polymarketHistoricalHub: HubPageConfig = {
       title: "Polymarket Historical Tools",
       groups: [
         {
-          label: "Metadata & Lookup",
+          label: "API & Metadata",
           links: [
+            {
+              title: "Polymarket Gamma API Events Slug",
+              href: "/guides/polymarket-gamma-api-events-slug",
+              description:
+                "Query Polymarket events by slug and extract market IDs, condition IDs, and clobTokenIds.",
+            },
             {
               title: "Polymarket Metadata Lookup",
               href: "/polymarket-metadata",

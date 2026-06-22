@@ -4,6 +4,11 @@
  */
 export const CONNECT_HOME_GUIDES = [
   {
+    slug: "polymarket-gamma-api-events-slug",
+    title: "Polymarket Gamma API Events Slug: How to Query Events by Slug",
+    publishedAt: "2026-06-22",
+  },
+  {
     slug: "what-does-volume-mean-on-kalshi",
     title: "What Does Volume Mean on Kalshi? Trading Volume Explained",
     publishedAt: "2026-06-21",

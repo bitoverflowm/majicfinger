@@ -1,0 +1,573 @@
+---
+title: "Polymarket Gamma API Events Slug: How to Query Events by Slug"
+description: "Learn how to use the Polymarket Gamma API events slug endpoint, query an event by slug, inspect markets, and extract market IDs, condition IDs, clobTokenIds, outcomes, and slugs."
+publishedAt: "2026-06-22"
+author: "misterrpink"
+topics: ["polymarket", "gamma api", "api", "events", "slug", "market data", "metadata", "clobtokenids", "condition id"]
+integration: ["Polymarket", "Lychee"]
+contentType: "Guide"
+cluster: "Polymarket API"
+intent: "Developer"
+difficulty: "Intermediate"
+coverImage: "/images/guides/polymarket-gamma-api-events-slug/main.png"
+ogImage: "https://lycheedata.com/images/guides/polymarket-gamma-api-events-slug/main.png"
+featured: false
+slug: "/polymarket-gamma-api-events-slug"
+readingTime: "8 min"
+keywords: [
+  "polymarket gamma api events slug",
+  "gamma-api.polymarket.com events slug",
+  "gamma-api.polymarket.com/events/slug/world-cup-winner",
+  "polymarket events slug endpoint",
+  "polymarket gamma api events slug endpoint",
+  "polymarket gamma api events slug clobtokenids",
+  "polymarket gamma api markets slug clobtokenids",
+  "polymarket event slug",
+  "polymarket slug api",
+  "polymarket api event by slug",
+  "polymarket market slug",
+  "polymarket clobtokenids",
+  "polymarket condition id",
+  "polymarket market id",
+  "polymarket metadata",
+  "polymarket api"
+]
+canonical: "https://lycheedata.com/guides/polymarket-gamma-api-events-slug"
+seoTitle: "Polymarket Gamma API Events Slug: Query Events by Slug"
+twitterCard: "summary_large_image"
+---
+
+# Polymarket Gamma API Events Slug: How to Query Events by Slug
+
+If you have a Polymarket event URL and want to pull the underlying market metadata, the **event slug** is usually the easiest place to start.
+
+For example, a Polymarket event URL may look like this:
+
+```text
+https://polymarket.com/event/world-cup-winner
+```
+
+The event slug is:
+
+```text
+world-cup-winner
+```
+
+You can use that slug with the Polymarket Gamma API event-slug endpoint:
+
+```text
+https://gamma-api.polymarket.com/events/slug/world-cup-winner
+```
+
+That response can contain the event metadata and the markets inside that event.
+
+From there, you can inspect each market and extract the identifiers needed for downstream analysis:
+
+* market ID
+* market slug
+* condition ID
+* CLOB token IDs
+* outcomes
+* outcome prices
+* tags
+* volume and liquidity fields
+* start and end dates
+
+This matters because Polymarket analysis usually does not stop at the event page.
+
+If you want to query prices, trades, orderbooks, live data, or probability history, you need the correct market-level identifiers.
+
+The event slug is often the first step.
+
+---
+
+## Short Answer
+
+To query a Polymarket event by slug, use the Gamma API endpoint:
+
+```text
+GET https://gamma-api.polymarket.com/events/slug/{slug}
+```
+
+For example:
+
+```text
+GET https://gamma-api.polymarket.com/events/slug/world-cup-winner
+```
+
+The event response can include one or more markets.
+
+Each market may include fields like:
+
+* `id`
+* `question`
+* `slug`
+* `conditionId`
+* `clobTokenIds`
+* `outcomes`
+* `outcomePrices`
+
+The important detail is that **an event is not always the same thing as a single market**.
+
+Many Polymarket event pages contain multiple markets.
+
+So the workflow is:
+
+```text
+event slug → event metadata → markets[] → market IDs / condition IDs / clobTokenIds
+```
+
+---
+
+## What Is a Polymarket Event Slug?
+
+A Polymarket event slug is the human-readable part of a Polymarket event URL.
+
+For example:
+
+```text
+https://polymarket.com/event/world-cup-winner
+```
+
+The slug is:
+
+```text
+world-cup-winner
+```
+
+Slugs are useful because they are easier to copy from a URL than raw IDs.
+
+Instead of starting with an unknown event ID or market ID, you can start with the slug visible in the browser.
+
+This is especially useful when you are doing research or building analysis workflows from public Polymarket pages.
+
+---
+
+## Event Slug vs Market Slug
+
+Polymarket can have both event slugs and market slugs.
+
+That is where the confusion starts.
+
+| Identifier | What it usually refers to |
+| --- | --- |
+| Event slug | The URL-friendly identifier for an event page |
+| Market slug | The URL-friendly identifier for a specific market |
+| Market ID | Numeric or string identifier for a market |
+| Condition ID | Settlement-related identifier |
+| CLOB token IDs | Outcome token IDs used for trading, prices, and orderbooks |
+
+An event can contain one market.
+
+But many events contain multiple markets.
+
+For example, an event like:
+
+```text
+world-cup-winner
+```
+
+may include many individual winner markets.
+
+That means querying the event slug may return a list of markets, not one single market.
+
+You then need to choose the market you want.
+
+---
+
+## How to Query the Gamma API Event Slug Endpoint
+
+The basic request is:
+
+```python
+import requests
+
+slug = "world-cup-winner"
+url = f"https://gamma-api.polymarket.com/events/slug/{slug}"
+
+response = requests.get(url, timeout=20)
+response.raise_for_status()
+
+event = response.json()
+
+print("event_id:", event.get("id"))
+print("event_slug:", event.get("slug"))
+print("event_title:", event.get("title") or event.get("ticker"))
+print("markets:", len(event.get("markets", [])))
+```
+
+The most important field is usually:
+
+```python
+event.get("markets", [])
+```
+
+That is where the individual market objects may live.
+
+---
+
+## Extract Markets From the Event Response
+
+Once you have the event response, inspect the markets.
+
+```python
+markets = event.get("markets", [])
+
+for market in markets:
+    print("market_id:", market.get("id"))
+    print("question:", market.get("question"))
+    print("slug:", market.get("slug"))
+    print("condition_id:", market.get("conditionId"))
+    print("clob_token_ids:", market.get("clobTokenIds"))
+    print("outcomes:", market.get("outcomes"))
+    print("outcome_prices:", market.get("outcomePrices"))
+    print("---")
+```
+
+This is the step most people miss.
+
+They query the event slug, see a large JSON response, and still do not know which ID they need.
+
+The event is only the container.
+
+The markets inside the event are what you usually need for price and trading analysis.
+
+---
+
+## How to Extract clobTokenIds
+
+The field most Polymarket builders eventually need is:
+
+```text
+clobTokenIds
+```
+
+These are the outcome token IDs used by the CLOB.
+
+For a binary market, you usually see two token IDs:
+
+```text
+["YES_TOKEN_ID", "NO_TOKEN_ID"]
+```
+
+Those token IDs are also commonly called:
+
+* token IDs
+* asset IDs
+* CLOB token IDs
+* `clobTokenIds`
+
+These IDs are used for workflows like:
+
+* price history
+* orderbook queries
+* live market-channel subscriptions
+* liquidity analysis
+* trade analysis
+* probability charts
+
+Example:
+
+```python
+for market in event.get("markets", []):
+    question = market.get("question")
+    token_ids = market.get("clobTokenIds")
+
+    print(question)
+    print(token_ids)
+```
+
+If you are trying to chart probability over time, you probably need the token ID or asset ID for the outcome you care about.
+
+---
+
+## Example: world-cup-winner
+
+A common query pattern looks like this:
+
+```text
+gamma-api.polymarket.com events slug world-cup-winner
+```
+
+That usually means the user is trying to access:
+
+```text
+https://gamma-api.polymarket.com/events/slug/world-cup-winner
+```
+
+The important thing is that `world-cup-winner` is likely an event-level slug.
+
+So the response may include many markets, such as markets for different possible winners.
+
+The workflow is:
+
+```text
+1. Query /events/slug/world-cup-winner
+2. Inspect event.markets
+3. Find the market/question you care about
+4. Extract market.id
+5. Extract market.conditionId
+6. Extract market.clobTokenIds
+7. Use the relevant token ID for price/orderbook/live-data queries
+```
+
+That is the core dependency chain.
+
+---
+
+## Full Python Example
+
+Here is a slightly more complete script.
+
+```python
+import requests
+from typing import Any
+
+def get_event_by_slug(slug: str) -> dict[str, Any]:
+    url = f"https://gamma-api.polymarket.com/events/slug/{slug}"
+    response = requests.get(url, timeout=20)
+    response.raise_for_status()
+    return response.json()
+
+def print_event_markets(slug: str) -> None:
+    event = get_event_by_slug(slug)
+    markets = event.get("markets", [])
+
+    print(f"Event slug: {event.get('slug')}")
+    print(f"Event title: {event.get('title') or event.get('ticker')}")
+    print(f"Markets found: {len(markets)}")
+    print()
+
+    for i, market in enumerate(markets, start=1):
+        print(f"{i}. {market.get('question')}")
+        print("   market_id:", market.get("id"))
+        print("   market_slug:", market.get("slug"))
+        print("   condition_id:", market.get("conditionId"))
+        print("   outcomes:", market.get("outcomes"))
+        print("   clob_token_ids:", market.get("clobTokenIds"))
+        print("   outcome_prices:", market.get("outcomePrices"))
+        print()
+
+print_event_markets("world-cup-winner")
+```
+
+This gives you the event-level structure and the market-level identifiers.
+
+---
+
+## Common Mistake: Using the Event Slug as the Market Slug
+
+A common mistake is assuming the event slug is always the market slug.
+
+Sometimes that works.
+
+Often it does not.
+
+An event can group multiple markets together.
+
+For example:
+
+```text
+world-cup-winner
+```
+
+may be the event slug, while each individual market inside that event has its own market slug and its own token IDs.
+
+So if you are trying to get price history for one outcome, do not stop at the event slug.
+
+You still need the correct market object and the correct CLOB token ID.
+
+---
+
+## Common Mistake: Using Market ID Instead of Token ID
+
+Another common mistake is using a market ID where the API expects a token ID or asset ID.
+
+These are not interchangeable.
+
+| You have | Usually used for |
+| --- | --- |
+| Event slug | Finding the event container |
+| Market ID | Metadata lookup |
+| Condition ID | Settlement / condition reference |
+| CLOB token ID / asset ID | Price, orderbook, live market data |
+
+If you are querying metadata, a market ID may be enough.
+
+If you are querying prices or subscribing to CLOB market-channel updates, you usually need the token ID / asset ID.
+
+For a broader explanation, see:
+
+[How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID](/guides/polymarket-market-id)
+
+---
+
+## Use Lychee to Find Polymarket Metadata Faster
+
+Manually querying the Gamma API works.
+
+But for analysis, it can get annoying fast.
+
+You usually need to:
+
+1. find the event slug
+2. call the event endpoint
+3. parse the markets array
+4. identify the correct market
+5. extract condition IDs
+6. extract CLOB token IDs
+7. use those IDs in downstream queries
+
+Lychee’s Polymarket metadata tool lets you search for markets and inspect these identifiers without manually digging through JSON.
+
+Use it here:
+
+[Open the Polymarket Metadata Tool](/polymarket-metadata)
+
+This is especially useful for multi-market events where the event slug returns many markets.
+
+---
+
+## When to Use `/events/slug/{slug}`
+
+Use the event-slug endpoint when:
+
+* you have a Polymarket event URL
+* you want all markets inside an event
+* you need to inspect multi-market events
+* you need condition IDs and clobTokenIds from event markets
+* you are building dashboards from event-level pages
+* you are trying to map a public Polymarket URL to API metadata
+
+This endpoint is especially useful for event pages with many outcomes.
+
+---
+
+## When Not to Use the Event Slug Endpoint
+
+The event-slug endpoint may not be the best choice when:
+
+* you already know the exact market ID
+* you already know the exact CLOB token ID
+* you only need live orderbook data
+* you are subscribing to the WebSocket market channel
+* you need historical price data for a specific outcome token
+
+In those cases, you usually want the more specific identifier.
+
+The event slug is a discovery step.
+
+It helps you find the market and token IDs needed for deeper analysis.
+
+---
+
+## How This Fits Into Polymarket Analysis
+
+Once you have the correct identifiers, you can build much deeper workflows.
+
+For example:
+
+* chart odds over time
+* compare outcomes in the same event
+* monitor live price changes
+* analyze market liquidity
+* pull orderbook data
+* backtest price movement
+* build dashboards
+* compare Polymarket against Kalshi
+
+This is why metadata matters.
+
+The event slug is the front door.
+
+The market IDs, condition IDs, and CLOB token IDs are what unlock the actual analysis.
+
+---
+
+## Related Polymarket API Workflows
+
+If you are working with Polymarket identifiers, these guides connect together:
+
+* [How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID](/guides/polymarket-market-id)
+* [Polymarket Events Endpoint: Query Markets Without Code](/guides/polymarket-events-endpoint-no-code)
+* [Polymarket Odds Over Time: Chart Historical Probability Movement](/guides/polymarket-odds-over-time)
+* [Polymarket Live Prices: Real-Time Odds and Market Data](/guides/polymarket-live-prices)
+* [Open the Polymarket Metadata Tool](/polymarket-metadata)
+
+---
+
+## FAQ: Polymarket Gamma API Events Slug
+
+### What is the Polymarket Gamma API events slug endpoint?
+
+The Polymarket Gamma API events slug endpoint lets you query an event by its slug. The request format is:
+
+```text
+https://gamma-api.polymarket.com/events/slug/{slug}
+```
+
+---
+
+### How do I get a Polymarket event by slug?
+
+Copy the event slug from the Polymarket URL and call:
+
+```text
+https://gamma-api.polymarket.com/events/slug/YOUR_SLUG
+```
+
+For example:
+
+```text
+https://gamma-api.polymarket.com/events/slug/world-cup-winner
+```
+
+---
+
+### Is the event slug the same as the market ID?
+
+No. The event slug identifies an event page. The market ID identifies a specific market. One event can contain many markets.
+
+---
+
+### How do I get clobTokenIds from a Polymarket event slug?
+
+Query the event by slug, inspect the `markets` array, choose the market you care about, and extract the `clobTokenIds` field from that market object.
+
+---
+
+### What is the difference between condition ID and clobTokenIds?
+
+The condition ID relates to the market’s settlement condition. CLOB token IDs identify the tradable outcome tokens used for price, orderbook, and live-market data queries.
+
+---
+
+### Why does `world-cup-winner` return multiple markets?
+
+Because it is an event-level slug. Events can contain multiple markets or outcomes. You need to inspect the returned markets and choose the specific one you want to analyze.
+
+---
+
+### Can I use the event slug to get price history?
+
+The event slug helps you find the market and token IDs. For price history, orderbook data, or live data, you usually need the relevant token ID or asset ID.
+
+---
+
+## Sources and References
+
+* [Polymarket Get Event by Slug Documentation](https://docs.polymarket.com/api-reference/events/get-event-by-slug)
+* [Polymarket Fetching Markets Documentation](https://docs.polymarket.com/market-data/fetching-markets)
+* [Polymarket Markets and Events Concepts](https://docs.polymarket.com/concepts/markets-events)
+* [Polymarket Market Channel Documentation](https://docs.polymarket.com/market-data/websocket/market-channel)
+* [Polymarket Gamma API Overview](https://docs.polymarket.com/market-data/overview)
+
+---
+
+## Related Lychee Guides
+
+* [How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID](/guides/polymarket-market-id)
+* [Polymarket Events Endpoint: Query Markets Without Code](/guides/polymarket-events-endpoint-no-code)
+* [Polymarket Odds Over Time: Chart Historical Probability Movement](/guides/polymarket-odds-over-time)
+* [Polymarket Live Prices: Real-Time Odds and Market Data](/guides/polymarket-live-prices)
+* [Open the Polymarket Metadata Tool](/polymarket-metadata)
