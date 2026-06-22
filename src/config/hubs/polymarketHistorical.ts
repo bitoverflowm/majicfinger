@@ -74,6 +74,12 @@ export const polymarketHistoricalHub: HubPageConfig = {
           label: "API & Metadata",
           links: [
             {
+              title: "Polymarket CLOB WebSocket Market Channel",
+              href: "/guides/polymarket-clob-websocket-market-channel",
+              description:
+                "Subscribe with asset IDs for live orderbooks, price changes, and market events.",
+            },
+            {
               title: "Polymarket Gamma API Events Slug",
               href: "/guides/polymarket-gamma-api-events-slug",
               description:

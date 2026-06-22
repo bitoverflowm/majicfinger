@@ -1,0 +1,849 @@
+---
+title: "Polymarket CLOB WebSocket Market Channel: Asset IDs, Prices & Trades"
+description: "Learn how the Polymarket CLOB WebSocket market channel works, how to subscribe with asset IDs, and how to read real-time orderbook, price_change, last_trade_price, and market events."
+publishedAt: "2026-06-22"
+author: "misterrpink"
+topics: ["polymarket", "clob", "websocket", "market channel", "asset ids", "token ids", "price data", "orderbook", "live prices", "market data"]
+integration: ["Polymarket", "Lychee"]
+contentType: "Guide"
+cluster: "Polymarket API"
+intent: "Developer"
+difficulty: "Intermediate"
+coverImage: "/images/guides/polymarket-clob-websocket-market-channel/main.png"
+ogImage: "https://lycheedata.com/images/guides/polymarket-clob-websocket-market-channel/main.png"
+featured: false
+slug: "/polymarket-clob-websocket-market-channel"
+readingTime: "8 min"
+keywords: [
+  "polymarket clob websocket market channel",
+  "polymarket websocket market channel",
+  "polymarket clob websocket market channel asset_ids",
+  "polymarket clob websocket market channel assets_ids",
+  "polymarket websocket asset ids",
+  "polymarket asset_ids condition_id",
+  "polymarket user channel condition_id",
+  "polymarket market channel price_change",
+  "polymarket websocket last_trade_price",
+  "polymarket price_change event",
+  "polymarket best_bid_ask",
+  "polymarket orderbook websocket",
+  "polymarket live prices websocket",
+  "polymarket clob market data",
+  "polymarket token id websocket",
+  "polymarket market channel events"
+]
+canonical: "https://lycheedata.com/guides/polymarket-clob-websocket-market-channel"
+seoTitle: "Polymarket CLOB WebSocket Market Channel: Asset IDs & Live Prices"
+twitterCard: "summary_large_image"
+---
+
+# Polymarket CLOB WebSocket Market Channel
+
+The **Polymarket CLOB WebSocket market channel** streams real-time market data.
+
+It is used for live updates such as:
+
+* orderbook snapshots
+* orderbook changes
+* price changes
+* last trade prices
+* best bid and ask updates
+* new market events
+* market resolution events
+
+The key detail is this:
+
+> You subscribe to the market channel with **asset IDs**, also called **token IDs** or **CLOB token IDs**.
+
+You usually do **not** subscribe with a normal market ID.
+
+That is where most confusion starts.
+
+A Polymarket market can have a market ID, condition ID, slug, and CLOB token IDs. The WebSocket market channel cares about the tradable outcome token IDs.
+
+For a binary YES/NO market, that usually means two asset IDs:
+
+```text
+["YES_TOKEN_ID", "NO_TOKEN_ID"]
+```
+
+Those are the IDs you pass into the market-channel subscription.
+
+---
+
+## Short Answer
+
+To subscribe to Polymarket’s CLOB WebSocket market channel, connect to:
+
+```text
+wss://ws-subscriptions-clob.polymarket.com/ws/market
+```
+
+Then subscribe with asset IDs:
+
+```json
+{
+  "assets_ids": ["<token_id_1>", "<token_id_2>"],
+  "type": "market",
+  "custom_feature_enabled": true
+}
+```
+
+The official docs use the field name:
+
+```text
+assets_ids
+```
+
+A lot of people search for:
+
+```text
+asset_ids
+```
+
+But in the subscription payload, follow the docs and use:
+
+```text
+assets_ids
+```
+
+Once subscribed, the market channel can send events like:
+
+* `book`
+* `price_change`
+* `last_trade_price`
+* `best_bid_ask`
+* `new_market`
+* `market_resolved`
+
+---
+
+## Market Channel vs User Channel
+
+Polymarket has multiple WebSocket channels.
+
+The two most commonly confused ones are:
+
+| Channel | Used for | Authentication |
+| --- | --- | --- |
+| Market channel | Public market data, orderbooks, prices, trades, market lifecycle events | No auth |
+| User channel | Personal order and trade activity | Auth required |
+
+The market channel is for public market data.
+
+The user channel is for account-specific activity.
+
+If you are trying to watch live Polymarket prices, orderbook changes, or public trade updates, you usually want the **market channel**.
+
+If you are trying to watch your own orders, fills, and order status updates, you want the **user channel**.
+
+This guide focuses on the public market channel.
+
+---
+
+## What Are Asset IDs?
+
+In Polymarket, asset IDs are the tradable outcome token IDs.
+
+They are also often called:
+
+* token IDs
+* CLOB token IDs
+* `clobTokenIds`
+* asset IDs
+
+For a binary market, the metadata usually includes two token IDs:
+
+```text
+["YES_TOKEN_ID", "NO_TOKEN_ID"]
+```
+
+One token ID corresponds to the YES outcome.
+
+The other token ID corresponds to the NO outcome.
+
+These are the IDs used for:
+
+* live market-channel subscriptions
+* orderbook queries
+* price history queries
+* last trade price data
+* market price requests
+
+This is why the first step is usually metadata discovery.
+
+Before you can subscribe to the WebSocket market channel, you need the relevant CLOB token IDs.
+
+---
+
+## How to Get Asset IDs for a Polymarket Market
+
+You can get asset IDs from Polymarket market metadata.
+
+A typical workflow looks like this:
+
+```text
+Polymarket URL → slug → market metadata → clobTokenIds → WebSocket subscription
+```
+
+For example, if you start with a Polymarket event or market URL, you can:
+
+1. extract the slug
+2. query the Gamma API
+3. inspect the returned markets
+4. find `clobTokenIds`
+5. subscribe to the market channel with those token IDs
+
+If you need the full identifier workflow, start here:
+
+[How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID](/guides/polymarket-market-id)
+
+If you are starting from an event slug, use this:
+
+[Polymarket Gamma API Events Slug: How to Query Events by Slug](/guides/polymarket-gamma-api-events-slug)
+
+---
+
+## Basic Market Channel Subscription
+
+The market-channel endpoint is:
+
+```text
+wss://ws-subscriptions-clob.polymarket.com/ws/market
+```
+
+The subscription payload looks like this:
+
+```json
+{
+  "assets_ids": ["<token_id_1>", "<token_id_2>"],
+  "type": "market",
+  "custom_feature_enabled": true
+}
+```
+
+The important fields:
+
+| Field | Meaning |
+| --- | --- |
+| `assets_ids` | The CLOB token IDs / asset IDs you want to subscribe to |
+| `type` | The channel type, usually `market` |
+| `custom_feature_enabled` | Enables extra events like `best_bid_ask`, `new_market`, and `market_resolved` |
+
+If you only have a market ID or condition ID, you still need to map that market to its CLOB token IDs first.
+
+---
+
+## Example JavaScript WebSocket Client
+
+Here is a minimal JavaScript example.
+
+```js
+const WebSocket = require("ws");
+
+const ws = new WebSocket("wss://ws-subscriptions-clob.polymarket.com/ws/market");
+
+const assetIds = [
+  "YES_TOKEN_ID",
+  "NO_TOKEN_ID"
+];
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    assets_ids: assetIds,
+    type: "market",
+    custom_feature_enabled: true
+  }));
+});
+
+ws.on("message", (data) => {
+  const message = JSON.parse(data.toString());
+
+  console.log("event_type:", message.event_type);
+  console.log(message);
+});
+
+ws.on("error", (error) => {
+  console.error("WebSocket error:", error);
+});
+
+ws.on("close", () => {
+  console.log("WebSocket closed");
+});
+```
+
+Replace `YES_TOKEN_ID` and `NO_TOKEN_ID` with real CLOB token IDs from market metadata.
+
+---
+
+## Example Python WebSocket Client
+
+Here is a simple Python example using `websocket-client`.
+
+```python
+import json
+import websocket
+
+ASSET_IDS = [
+    "YES_TOKEN_ID",
+    "NO_TOKEN_ID",
+]
+
+def on_open(ws):
+    subscription = {
+        "assets_ids": ASSET_IDS,
+        "type": "market",
+        "custom_feature_enabled": True,
+    }
+
+    ws.send(json.dumps(subscription))
+    print("Subscribed to Polymarket market channel")
+
+def on_message(ws, message):
+    data = json.loads(message)
+    print("event_type:", data.get("event_type"))
+    print(data)
+
+def on_error(ws, error):
+    print("WebSocket error:", error)
+
+def on_close(ws, close_status_code, close_msg):
+    print("WebSocket closed", close_status_code, close_msg)
+
+ws = websocket.WebSocketApp(
+    "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+    on_open=on_open,
+    on_message=on_message,
+    on_error=on_error,
+    on_close=on_close,
+)
+
+ws.run_forever()
+```
+
+Install the dependency with:
+
+```bash
+pip install websocket-client
+```
+
+This is only a starting point.
+
+For production usage, you would also want:
+
+* reconnect logic
+* heartbeat handling
+* logging
+* event normalization
+* duplicate handling
+* persistence
+* retry/backoff behavior
+
+---
+
+## Market Channel Event Types
+
+Each market-channel message includes an `event_type`.
+
+Common event types include:
+
+| Event type | Meaning |
+| --- | --- |
+| `book` | Orderbook snapshot or book update |
+| `price_change` | A price level changed because an order was placed or cancelled |
+| `last_trade_price` | A maker and taker matched, creating a trade |
+| `best_bid_ask` | Best bid or ask changed |
+| `new_market` | A new market was created |
+| `market_resolved` | A market resolved |
+
+These are not all the same kind of signal.
+
+Some events update the orderbook.
+
+Some events indicate trades.
+
+Some events describe market lifecycle changes.
+
+If you are building live charts, alerts, dashboards, or trading infrastructure, you need to handle each event type differently.
+
+---
+
+## Understanding `book` Events
+
+A `book` event gives orderbook data.
+
+It can include fields like:
+
+* `asset_id`
+* `market`
+* `bids`
+* `asks`
+* `timestamp`
+* `hash`
+
+Conceptually, this tells you the state of the orderbook for an asset ID.
+
+Example shape:
+
+```json
+{
+  "event_type": "book",
+  "asset_id": "TOKEN_ID",
+  "market": "0x...",
+  "bids": [
+    { "price": ".48", "size": "30" }
+  ],
+  "asks": [
+    { "price": ".52", "size": "25" }
+  ],
+  "timestamp": "123456789000",
+  "hash": "0x..."
+}
+```
+
+Use this when you care about:
+
+* bid depth
+* ask depth
+* spread
+* orderbook imbalance
+* live liquidity
+* best bid and ask reconstruction
+
+---
+
+## Understanding `price_change` Events
+
+A `price_change` event is emitted when the orderbook changes.
+
+This can happen when:
+
+* a new order is placed
+* an order is cancelled
+* a price level changes
+* a price level is removed
+
+Example shape:
+
+```json
+{
+  "event_type": "price_change",
+  "market": "0x...",
+  "price_changes": [
+    {
+      "asset_id": "TOKEN_ID",
+      "price": "0.5",
+      "size": "200",
+      "side": "BUY",
+      "best_bid": "0.5",
+      "best_ask": "1"
+    }
+  ],
+  "timestamp": "1757908892351"
+}
+```
+
+A `price_change` event does not necessarily mean a trade happened.
+
+It can simply mean the visible orderbook changed.
+
+That distinction matters.
+
+For trade execution, look for `last_trade_price`.
+
+---
+
+## Understanding `last_trade_price` Events
+
+A `last_trade_price` event is emitted when a maker and taker order match, creating a trade.
+
+Example shape:
+
+```json
+{
+  "event_type": "last_trade_price",
+  "asset_id": "TOKEN_ID",
+  "market": "0x...",
+  "price": "0.456",
+  "side": "BUY",
+  "size": "219.217767",
+  "timestamp": "1750428146322"
+}
+```
+
+This is usually the event you care about when you want to track executed trades or recent trade prices.
+
+Use `last_trade_price` when building:
+
+* live trade feeds
+* last price tickers
+* executed trade charts
+* momentum alerts
+* trade-based signals
+
+Use `price_change` when building:
+
+* orderbook state
+* best bid/ask tracking
+* liquidity monitoring
+* quote-change alerts
+
+---
+
+## Understanding `best_bid_ask` Events
+
+If you set:
+
+```json
+{
+  "custom_feature_enabled": true
+}
+```
+
+you can receive `best_bid_ask` events.
+
+These show the best bid, best ask, and spread for a market asset.
+
+Example shape:
+
+```json
+{
+  "event_type": "best_bid_ask",
+  "market": "0x...",
+  "asset_id": "TOKEN_ID",
+  "best_bid": "0.73",
+  "best_ask": "0.77",
+  "spread": "0.04",
+  "timestamp": "1766789469958"
+}
+```
+
+This is one of the most useful event types for live dashboards.
+
+It lets you track:
+
+* best bid
+* best ask
+* bid-ask spread
+* changes in market liquidity
+* quote movement
+
+For trading or market-making workflows, this is often more useful than a raw chart of last trade prices.
+
+---
+
+## Understanding `new_market` and `market_resolved`
+
+The market channel can also emit lifecycle events.
+
+With `custom_feature_enabled: true`, you may receive:
+
+* `new_market`
+* `market_resolved`
+
+A `new_market` event can include metadata such as:
+
+* market ID
+* question
+* slug
+* condition ID
+* CLOB token IDs
+* outcomes
+* tags
+* fees
+* event metadata
+
+A `market_resolved` event can include:
+
+* market ID
+* winning asset ID
+* winning outcome
+* event metadata
+* resolution timestamp
+
+These are useful if you are building:
+
+* new market alerts
+* resolution monitors
+* market discovery tools
+* automated watchlists
+* real-time research pipelines
+
+---
+
+## Asset ID vs Market ID vs Condition ID
+
+The most important conceptual mistake is mixing up identifiers.
+
+| Identifier | What it means | Used for |
+| --- | --- | --- |
+| Market ID | Identifies a market in metadata | Metadata lookup |
+| Condition ID | Settlement-related condition | Resolution / settlement reference |
+| Asset ID / Token ID | Tradable outcome token | WebSocket, price, orderbook, trades |
+| Slug | Human-readable URL identifier | Discovery / lookup |
+
+For the CLOB WebSocket market channel, the key identifier is usually:
+
+```text
+Asset ID / Token ID / CLOB token ID
+```
+
+Not the ordinary market ID.
+
+So if your subscription is not working, ask:
+
+> Am I passing token IDs from `clobTokenIds`, or am I accidentally passing a market ID?
+
+That one mistake explains a lot of broken WebSocket attempts.
+
+---
+
+## Why `condition_id` Shows Up in WebSocket Searches
+
+A lot of developers search for combinations like:
+
+```text
+polymarket clob websocket market channel asset_ids user channel condition_id
+```
+
+This usually means they are trying to understand how Polymarket identifiers fit together.
+
+The relationship is:
+
+```text
+event / market metadata → conditionId + clobTokenIds → market channel subscription
+```
+
+The condition ID may appear in market metadata and lifecycle events.
+
+But for market-channel subscriptions, you usually subscribe with asset IDs.
+
+So the condition ID helps identify or reason about the market, while the asset IDs are what you use to stream prices and orderbook updates.
+
+---
+
+## How to Build a Live Price Feed
+
+A simple live price pipeline looks like this:
+
+```text
+1. Start with a Polymarket URL or slug
+2. Query metadata
+3. Extract clobTokenIds
+4. Subscribe to the market channel with assets_ids
+5. Listen for last_trade_price and price_change events
+6. Normalize events into a table
+7. Store or chart the stream
+```
+
+For a dashboard, you may want to store:
+
+| Field | Why it matters |
+| --- | --- |
+| timestamp | time of update |
+| event_type | book, price_change, last_trade_price, etc. |
+| asset_id | token/outcome being updated |
+| market | market reference |
+| price | price level or trade price |
+| size | order size or trade size |
+| side | buy/sell side |
+| best_bid | best bid if available |
+| best_ask | best ask if available |
+| spread | bid-ask spread if available |
+
+Once normalized, the stream becomes useful for:
+
+* live price charts
+* spread charts
+* liquidity monitors
+* alert systems
+* trading bots
+* research dashboards
+
+---
+
+## Use Lychee for Polymarket Metadata
+
+Before you subscribe to the WebSocket, you need the right IDs.
+
+Lychee’s Polymarket metadata tool helps you search for a market and inspect:
+
+* market ID
+* event ID
+* slug
+* condition ID
+* CLOB token IDs
+* outcomes
+* outcome prices
+* metadata fields
+
+Open it here:
+
+[Open the Polymarket Metadata Tool](/polymarket-metadata)
+
+This is useful because the hardest part is often not opening the WebSocket.
+
+The hard part is finding the right asset IDs to subscribe to.
+
+---
+
+## Common Mistakes
+
+### Passing market IDs instead of asset IDs
+
+The market channel subscription expects asset IDs / token IDs.
+
+If you pass a market ID, you may not get the data you expect.
+
+---
+
+### Confusing `asset_ids` and `assets_ids`
+
+Many developers search for `asset_ids`.
+
+The official subscription payload uses:
+
+```text
+assets_ids
+```
+
+Use the field name expected by the API.
+
+---
+
+### Treating `price_change` as a trade
+
+A `price_change` event can happen when an order is placed or cancelled.
+
+That does not necessarily mean a trade happened.
+
+For executed trades, look for `last_trade_price`.
+
+---
+
+### Ignoring YES vs NO tokens
+
+Binary markets usually have separate YES and NO token IDs.
+
+Make sure you know which token ID corresponds to which outcome.
+
+---
+
+### Forgetting reconnect logic
+
+WebSocket connections can close.
+
+For production dashboards or bots, add reconnect logic and backoff.
+
+---
+
+## When to Use the Market Channel
+
+Use the market channel when you want:
+
+* live orderbook updates
+* live price changes
+* last trade prices
+* bid-ask spread updates
+* market lifecycle events
+* real-time dashboard data
+* trading or market-making infrastructure
+* alerts based on live Polymarket movement
+
+If you only need historical prices, use price history endpoints instead.
+
+If you only need static metadata, use Gamma API metadata endpoints instead.
+
+---
+
+## Related Polymarket API Workflows
+
+If you are working with live Polymarket data, these guides connect together:
+
+* [How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID](/guides/polymarket-market-id)
+* [Polymarket Gamma API Events Slug: How to Query Events by Slug](/guides/polymarket-gamma-api-events-slug)
+* [Polymarket Events Endpoint: Query Markets Without Code](/guides/polymarket-events-endpoint-no-code)
+* [Polymarket Live Prices: Real-Time Odds and Market Data](/guides/polymarket-live-prices)
+* [Polymarket Odds Over Time: Chart Historical Probability Movement](/guides/polymarket-odds-over-time)
+* [Open the Polymarket Metadata Tool](/polymarket-metadata)
+
+---
+
+## FAQ: Polymarket CLOB WebSocket Market Channel
+
+### What is the Polymarket CLOB WebSocket market channel?
+
+The market channel is Polymarket’s public WebSocket channel for real-time market data, including orderbook snapshots, price changes, trades, and market lifecycle events.
+
+---
+
+### What endpoint does the Polymarket market channel use?
+
+The market channel endpoint is:
+
+```text
+wss://ws-subscriptions-clob.polymarket.com/ws/market
+```
+
+---
+
+### Do I subscribe with market IDs or asset IDs?
+
+You usually subscribe with asset IDs, also called token IDs or CLOB token IDs. These come from the `clobTokenIds` field in market metadata.
+
+---
+
+### What is the difference between `asset_ids` and `assets_ids`?
+
+Many people search for `asset_ids`, but the Polymarket market-channel subscription payload uses `assets_ids` in the official docs.
+
+---
+
+### What is a `price_change` event?
+
+A `price_change` event indicates that a price level changed in the orderbook, often because an order was placed or cancelled. It does not always mean a trade happened.
+
+---
+
+### What is a `last_trade_price` event?
+
+A `last_trade_price` event is emitted when a maker and taker order are matched, creating a trade.
+
+---
+
+### What is `best_bid_ask`?
+
+`best_bid_ask` is an event type that can show the current best bid, best ask, and spread for an asset. It requires `custom_feature_enabled: true`.
+
+---
+
+### Where do I get Polymarket asset IDs?
+
+You can get asset IDs from market metadata, usually in the `clobTokenIds` field. Lychee’s Polymarket metadata tool can help you find them quickly.
+
+---
+
+### Is the market channel authenticated?
+
+The public market channel does not require authentication. The user channel is different and is used for account-specific activity.
+
+---
+
+## Sources and References
+
+* [Polymarket Market Channel Documentation](https://docs.polymarket.com/market-data/websocket/market-channel)
+* [Polymarket WebSocket Overview](https://docs.polymarket.com/market-data/websocket/overview)
+* [Polymarket Orderbook Documentation](https://docs.polymarket.com/trading/orderbook)
+* [Polymarket User Channel Documentation](https://docs.polymarket.com/market-data/websocket/user-channel)
+* [Polymarket Fetching Markets Documentation](https://docs.polymarket.com/market-data/fetching-markets)
+
+---
+
+## Related Lychee Guides
+
+* [How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID](/guides/polymarket-market-id)
+* [Polymarket Gamma API Events Slug: How to Query Events by Slug](/guides/polymarket-gamma-api-events-slug)
+* [Polymarket Events Endpoint: Query Markets Without Code](/guides/polymarket-events-endpoint-no-code)
+* [Polymarket Live Prices: Real-Time Odds and Market Data](/guides/polymarket-live-prices)
+* [Polymarket Odds Over Time: Chart Historical Probability Movement](/guides/polymarket-odds-over-time)
+* [Open the Polymarket Metadata Tool](/polymarket-metadata)

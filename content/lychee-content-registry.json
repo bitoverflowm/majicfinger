@@ -82,6 +82,12 @@
       "integrationTopic": "weather"
     },
     {
+      "slug": "polymarket-clob-websocket-market-channel",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-live",
+      "integrationTopic": "api"
+    },
+    {
       "slug": "polymarket-gamma-api-events-slug",
       "contentClass": "guide",
       "integrationHub": "polymarket-live",
