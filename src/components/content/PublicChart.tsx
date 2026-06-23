@@ -48,7 +48,7 @@ export function PublicChart({
   const src = IS_DEV ? path : `${SITE.replace(/\/$/, "")}${path}`;
 
   return (
-    <figure className="not-prose my-6">
+    <figure className="not-prose my-4 w-full max-w-full overflow-hidden sm:my-6">
       {allowed ? (
         <PublicChartIframe
           src={src}

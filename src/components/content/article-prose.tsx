@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils";
  * Single source of truth — adjust sizes here for all articles.
  */
 export const LYCHEE_CONTENT_TYPE = {
-  /** Page H1 — mt-12 = space above title (below meta bar) */
+  /** Page H1 — space below meta bar */
   title:
-    "mt-36 font-article text-balance text-center text-[1.625rem] font-normal leading-[1.2] tracking-[-0.015em] text-foreground lg:text-[1.875rem]",
+    "mt-4 font-article text-balance text-center text-[1.25rem] font-normal leading-[1.25] tracking-[-0.015em] text-foreground sm:mt-5 sm:text-[1.5rem] lg:mt-6 lg:text-[1.875rem] lg:leading-[1.2]",
   /** Subtitle / description below H1 */
-  lead: "mx-auto mt-4 max-w-2xl text-balance text-center font-article text-sm leading-relaxed text-muted-foreground text-pretty",
+  lead: "mx-auto mt-3 max-w-2xl text-balance text-center font-article text-xs leading-relaxed text-muted-foreground text-pretty sm:mt-4 sm:text-sm",
   /** Body paragraphs — 14px, default prose color */
   body: "text-sm leading-[1.65] tracking-normal",
   /** MDX section headings (h2) */
@@ -23,8 +23,8 @@ export const LYCHEE_CONTENT_TYPE = {
 
 /** White reading surface — Making Software–style card with inset shadow. */
 export const ARTICLE_SURFACE_CLASS = cn(
-  "relative grid w-full justify-items-center rounded-sm p-8 transition-all duration-150",
-  "md:bg-white",
+  "relative grid w-full max-w-full justify-items-center overflow-x-clip rounded-sm p-4 transition-all duration-150",
+  "sm:p-6 md:bg-white md:p-8",
   "md:shadow-[0px_1px_4px_1px_rgba(0,0,0,0.05),0px_1px_1px_0px_rgba(0,0,0,0.5),0px_-1px_1px_1px_#FFF_inset]",
   "dark:md:border dark:md:border-border dark:md:bg-card dark:md:shadow-none",
   "lg:px-16 lg:py-20",
@@ -32,9 +32,9 @@ export const ARTICLE_SURFACE_CLASS = cn(
 
 /** Centralized MDX body typography for all lychee_content. */
 export const ARTICLE_PROSE_CLASS = cn(
-  "prose prose-neutral dark:prose-invert max-w-none w-full font-article prose-sm",
+  "prose prose-neutral dark:prose-invert max-w-none w-full min-w-0 overflow-x-clip font-article prose-sm",
   "prose-headings:font-article prose-headings:tracking-normal prose-headings:scroll-mt-28",
-  "prose-h1:text-[1.25rem] prose-h1:font-normal prose-h1:leading-snug prose-h1:mt-12 prose-h1:mb-4",
+  "prose-h1:text-[1.125rem] prose-h1:font-normal prose-h1:leading-snug prose-h1:mt-8 prose-h1:mb-3 sm:prose-h1:text-[1.25rem] sm:prose-h1:mt-12 sm:prose-h1:mb-4",
   "prose-h2:mt-10 prose-h2:mb-4",
   LYCHEE_CONTENT_TYPE.proseH2,
   "[&_h2_a.anchor]:font-bold [&_h2_a.anchor]:text-gray-700 [&_h2_a.anchor]:no-underline [&_h2_a.anchor]:decoration-transparent",
@@ -42,8 +42,8 @@ export const ARTICLE_PROSE_CLASS = cn(
   LYCHEE_CONTENT_TYPE.proseH3,
   "prose-h4:mt-6 prose-h4:font-normal",
   LYCHEE_CONTENT_TYPE.proseH4,
-  "prose-p:mb-4 prose-p:text-sm prose-p:leading-[1.65] prose-p:tracking-normal",
-  "prose-li:my-0.5 prose-li:text-sm prose-li:leading-[1.65]",
+  "prose-p:mb-4 prose-p:break-words prose-p:text-sm prose-p:leading-[1.65] prose-p:tracking-normal",
+  "prose-li:my-0.5 prose-li:break-words prose-li:text-sm prose-li:leading-[1.65]",
   "prose-a:font-normal prose-a:text-secondary prose-a:underline prose-a:underline-offset-2 prose-a:decoration-secondary/40 hover:prose-a:decoration-secondary",
   "prose-strong:font-semibold",
   "prose-blockquote:border-l-border prose-blockquote:font-normal prose-blockquote:not-italic prose-blockquote:text-muted-foreground",

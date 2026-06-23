@@ -48,13 +48,13 @@ export function GuideLayout({
   return (
     <>
       <ContentTocNav items={tocItems} />
-      <div className="w-full justify-self-center pt-8 lg:pt-20">
-        <div className="mx-auto w-full max-w-[762px]">
-          <div className="mb-3 flex justify-end lg:mb-4">
+      <div className="w-full max-w-full justify-self-center overflow-x-clip pt-6 sm:pt-8 lg:pt-20">
+        <div className="mx-auto w-full min-w-0 max-w-[762px]">
+          <div className="mb-2 flex justify-end sm:mb-3 lg:mb-4">
             <GuideArticleThemeToggle />
           </div>
           <article id="main-article" className={ARTICLE_SURFACE_CLASS}>
-            <header className="not-prose mb-8 w-full">
+            <header className="not-prose mb-6 w-full max-w-full overflow-hidden sm:mb-8">
               <ArticleMetaBar
                 author={frontmatter.author}
                 publishedAt={frontmatter.publishedAt}
@@ -73,13 +73,13 @@ export function GuideLayout({
               <ArticleProse>{children}</ArticleProse>
             </ArticleChartLoadProvider>
 
-            <div className="mt-14 w-full font-sans">
+            <div className="mt-10 w-full min-w-0 font-sans sm:mt-14">
               <GuideTakeawayCta />
             </div>
 
             {related.length > 0 && (
-              <Section className="mt-14 w-full font-sans">
-                <h2 className="mb-5 font-article text-[1.25rem] font-normal leading-snug tracking-tight">
+              <Section className="mt-10 w-full min-w-0 font-sans sm:mt-14">
+                <h2 className="mb-4 font-article text-[1.0625rem] font-normal leading-snug tracking-tight sm:mb-5 sm:text-[1.25rem]">
                   Related content
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2">

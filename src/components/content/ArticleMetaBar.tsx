@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Link2, Linkedin, Twitter } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { resolveArticleAuthor } from "@/lib/content/article-authors";
+import { cn } from "@/lib/utils";
 
 type ArticleMetaBarProps = {
   author: string;
@@ -33,7 +34,7 @@ function ShareIconButton({
   children: React.ReactNode;
 }) {
   const className =
-    "inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+    "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-6 sm:w-6";
 
   if (href) {
     return (
@@ -83,34 +84,38 @@ export function ArticleMetaBar({
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex min-w-0 items-center gap-2">
+    <div className="flex w-full max-w-full items-center gap-2 overflow-hidden sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
         <Image
           src={profile.avatarSrc}
           alt={profile.displayName}
           width={30}
           height={30}
-          className="h-[30px] w-[30px] shrink-0 rounded-full object-cover"
+          className="h-6 w-6 shrink-0 rounded-full object-cover sm:h-[30px] sm:w-[30px]"
         />
-        <div className="min-w-0">
-          <p className="truncate text-[10.5px] font-medium leading-tight text-foreground">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[9px] font-medium leading-tight text-foreground sm:text-[10.5px]">
             {profile.displayName}
           </p>
-          <p className="text-[9px] leading-tight text-muted-foreground">
+          <p
+            className={cn(
+              "truncate text-[8px] leading-tight text-muted-foreground sm:text-[9px]",
+            )}
+          >
             {metaParts.join(" · ")}
           </p>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-px sm:gap-0.5">
         <ShareIconButton label="Copy link" onClick={handleCopyLink}>
-          <Link2 className="h-3 w-3" strokeWidth={1.75} />
+          <Link2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" strokeWidth={1.75} />
         </ShareIconButton>
         <ShareIconButton label="Share on X" href={twitterShareUrl}>
-          <Twitter className="h-3 w-3" strokeWidth={1.75} />
+          <Twitter className="h-2.5 w-2.5 sm:h-3 sm:w-3" strokeWidth={1.75} />
         </ShareIconButton>
         <ShareIconButton label="Share on LinkedIn" href={linkedInShareUrl}>
-          <Linkedin className="h-3 w-3" strokeWidth={1.75} />
+          <Linkedin className="h-2.5 w-2.5 sm:h-3 sm:w-3" strokeWidth={1.75} />
         </ShareIconButton>
       </div>
     </div>
