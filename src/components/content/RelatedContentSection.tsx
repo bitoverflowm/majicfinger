@@ -22,7 +22,7 @@ type RelatedContentSectionProps = {
  */
 export function RelatedContentSection({
   items,
-  title = "Related content",
+  title = "More reading",
 }: RelatedContentSectionProps) {
   if (items.length === 0) return null;
 
