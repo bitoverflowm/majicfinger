@@ -70,7 +70,7 @@ export function GuideLayout({
           </div>
           <article id="main-article" className={ARTICLE_SURFACE_CLASS}>
             <div className={ARTICLE_TEXT_COLUMN_CLASS}>
-              <header className="not-prose mb-6 w-full max-w-full overflow-hidden sm:mb-8">
+              <header className="not-prose mb-6 w-full max-w-full overflow-hidden pt-4 sm:mb-8 sm:pt-6 md:pt-8">
                 <ArticleMetaBar
                   author={frontmatter.author}
                   publishedAt={frontmatter.publishedAt}

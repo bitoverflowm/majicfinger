@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
  */
 export const LYCHEE_CONTENT_TYPE = {
   title:
-    "mt-4 font-article text-balance text-center text-[1.2rem] font-normal leading-[1.25] tracking-[-0.015em] text-foreground sm:mt-5 sm:text-[1.375rem] md:text-[1.5rem] lg:text-[1.75rem] lg:leading-[1.2] xl:text-[1.875rem]",
+    "mt-16 font-article text-balance text-center text-[1.2rem] font-normal leading-[1.25] tracking-[-0.015em] text-foreground sm:mt-[4.5rem] sm:text-[1.375rem] md:mt-20 md:text-[1.5rem] lg:text-[1.75rem] lg:leading-[1.2] xl:text-[1.875rem]",
   lead: "mx-auto mt-3 max-w-2xl text-balance text-center font-article text-xs leading-relaxed text-muted-foreground text-pretty sm:mt-4 sm:text-sm",
   body: "text-[13px] leading-[1.65] tracking-normal sm:text-sm",
   sectionH2:
@@ -88,7 +88,7 @@ export function ArticleDivider({ className }: { className?: string }) {
 
 /** Mono dash rule below title + lead. */
 export function ArticleHeaderRule({ className }: { className?: string }) {
-  return <ArticleDivider className={cn("mt-6", className)} />;
+  return <ArticleDivider className={cn("mt-12 sm:mt-14 md:mt-16", className)} />;
 }
 
 type ArticleProseProps = {
