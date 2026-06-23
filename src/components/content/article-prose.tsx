@@ -17,12 +17,15 @@ export const LYCHEE_CONTENT_TYPE = {
   proseH4: "prose-h4:text-[0.9rem] prose-h4:leading-snug sm:prose-h4:text-[0.9375rem]",
 } as const;
 
+/** Fixed reading measure — card grows; text column never widens. */
+export const ARTICLE_TEXT_COLUMN_CLASS = "mx-auto w-full max-w-[42.5rem]";
+
 /** White reading surface */
 export const ARTICLE_SURFACE_CLASS = cn(
-  "relative grid w-full max-w-full justify-items-center overflow-x-clip rounded-sm bg-white p-5 transition-all duration-150",
+  "relative w-full overflow-x-clip rounded-sm bg-white transition-all duration-150",
   "dark:bg-card dark:border dark:border-border",
-  "sm:p-6 md:p-8",
-  "md:shadow-[0px_1px_4px_1px_rgba(0,0,0,0.05),0px_1px_1px_0px_rgba(0,0,0,0.5),0px_-1px_1px_1px_#FFF_inset]",
+  "p-5 sm:p-6",
+  "md:p-8 md:shadow-[0px_1px_4px_1px_rgba(0,0,0,0.05),0px_1px_1px_0px_rgba(0,0,0,0.5),0px_-1px_1px_1px_#FFF_inset]",
   "dark:md:shadow-none",
   "lg:p-10 xl:p-12",
 );
