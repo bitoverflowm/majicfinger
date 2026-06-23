@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import type { TocItem } from "@/lib/content/extract-mdx-headings";
 
 type ContentTocNavProps = {
@@ -31,7 +32,7 @@ export function ContentTocNav({ items }: ContentTocNavProps) {
       {
         rootMargin: "-64px 0px -55% 0px",
         threshold: [0, 1],
-      }
+      },
     );
 
     for (const el of elements) {
@@ -46,28 +47,31 @@ export function ContentTocNav({ items }: ContentTocNavProps) {
   return (
     <nav
       aria-label="On this page"
-      className="fixed right-6 top-20 z-10 hidden w-[200px] max-h-[calc(100dvh-5rem)] overflow-y-auto py-2 pl-1 font-serif text-xs lg:block xl:right-10"
+      className="sticky top-20 max-h-[calc(100dvh-5rem)] w-full overflow-y-auto py-2 font-serif text-[10px] leading-snug 2xl:text-xs"
     >
-        <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
-          On this page
-        </div>
-        <ul className="space-y-2">
-          {items.map(({ id, text, depth }) => {
-            const padClass =
-              depth >= 4
-                ? "pl-6"
-                : depth === 3
-                  ? "pl-4"
-                  : depth === 2
-                    ? "pl-2"
-                    : "pl-0";
-            return (
+      <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
+        On this page
+      </div>
+      <ul className="space-y-1.5">
+        {items.map(({ id, text, depth }) => {
+          const padClass =
+            depth >= 4
+              ? "pl-5"
+              : depth === 3
+                ? "pl-3"
+                : depth === 2
+                  ? "pl-1.5"
+                  : "pl-0";
+
+          return (
             <li key={id}>
               <a
                 href={`#${id}`}
-                className={`block leading-snug transition-colors hover:text-secondary ${padClass} ${
-                  activeId === id ? "text-secondary" : "text-foreground"
-                }`}
+                className={cn(
+                  "block break-words leading-snug transition-colors hover:text-secondary",
+                  padClass,
+                  activeId === id ? "text-secondary" : "text-foreground",
+                )}
                 onClick={(e) => {
                   e.preventDefault();
                   document.getElementById(id)?.scrollIntoView({
@@ -80,9 +84,9 @@ export function ContentTocNav({ items }: ContentTocNavProps) {
                 {text}
               </a>
             </li>
-            );
-          })}
-        </ul>
-      </nav>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { Section, Muted, KnowledgeCard } from "@/components/ui";
 import { GuideArticleThemeToggle } from "./GuideArticleThemeToggle";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
@@ -46,9 +47,13 @@ export function GuideLayout({
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
 
   return (
-    <>
-      <ContentTocNav items={tocItems} />
-      <div className="w-full max-w-full justify-self-center overflow-x-clip pt-6 sm:pt-8 lg:pt-20">
+    <div
+      className={cn(
+        "grid w-full grid-cols-1 gap-x-6",
+        tocItems.length > 0 && "xl:grid-cols-[minmax(0,1fr)_10.5rem] 2xl:grid-cols-[minmax(0,1fr)_12.5rem]",
+      )}
+    >
+      <div className="min-w-0 w-full max-w-full overflow-x-clip pt-6 sm:pt-8 lg:pt-12 xl:pt-16">
         <div className="mx-auto w-full min-w-0 max-w-[762px]">
           <div className="mb-2 flex justify-end sm:mb-3 lg:mb-4">
             <GuideArticleThemeToggle />
@@ -108,6 +113,15 @@ export function GuideLayout({
           </article>
         </div>
       </div>
-    </>
+
+      {tocItems.length > 0 ? (
+        <aside
+          aria-label="On this page"
+          className="hidden min-w-0 xl:block"
+        >
+          <ContentTocNav items={tocItems} />
+        </aside>
+      ) : null}
+    </div>
   );
 }

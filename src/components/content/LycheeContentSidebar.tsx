@@ -80,9 +80,9 @@ export function LycheeContentSidebar({
   return (
     <nav
       aria-label="Lychee content"
-      className="sticky top-0 grid h-full max-h-dvh w-full grid-rows-[auto_1fr_auto] overflow-y-auto pl-8 font-serif text-xs"
+      className="sticky top-0 grid h-full max-h-dvh w-full grid-rows-[auto_1fr_auto] overflow-y-auto px-3 py-8 font-serif text-[11px] lg:px-4 xl:px-5 xl:text-xs"
     >
-      <div className="pb-6 pt-8">
+      <div className="pb-5 pt-0 xl:pb-6 xl:pt-2">
         <Link
           href="/"
           className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-secondary"
@@ -91,7 +91,7 @@ export function LycheeContentSidebar({
         </Link>
       </div>
 
-      <div className="min-h-0 overflow-y-auto pb-8 pr-4">
+      <div className="min-h-0 overflow-y-auto pb-6 pr-1 xl:pb-8 xl:pr-2">
         <section className="mb-5">
           <h2 className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
             Platform
@@ -141,7 +141,7 @@ export function LycheeContentSidebar({
                       <details
                         key={`${section.id}-${topic.id}`}
                         open={topicActive}
-                        className="group/topic mb-0.5 pl-2 open:mb-2"
+                        className="group/topic mb-0.5 pl-1.5 open:mb-2 xl:pl-2"
                       >
                         <summary
                           className={cn(
@@ -165,7 +165,7 @@ export function LycheeContentSidebar({
                               <details
                                 key={`${section.id}-${topic.id}-${bucket.id}`}
                                 open={bucketActive}
-                                className="group/bucket mb-0 pl-2 open:mb-1.5"
+                                className="group/bucket mb-0 pl-1.5 open:mb-1.5 xl:pl-2"
                               >
                                 <summary
                                   className={cn(
@@ -210,7 +210,7 @@ export function LycheeContentSidebar({
         })}
       </div>
 
-      <div className="space-y-3 pb-8 pr-4">
+      <div className="space-y-3 pb-6 pr-1 xl:pb-8 xl:pr-2">
         <p className="text-[11px] leading-snug text-muted-foreground">
           Explore prediction market data with no setup.
         </p>
