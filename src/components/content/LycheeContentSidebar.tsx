@@ -35,10 +35,11 @@ function NavItem({
         href={href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "block leading-snug transition-colors hover:text-secondary",
+          "block line-clamp-2 leading-snug transition-colors hover:text-secondary",
           active ? "text-secondary" : "text-foreground",
           className,
         )}
+        title={label}
       >
         {label}
       </Link>
@@ -80,7 +81,7 @@ export function LycheeContentSidebar({
   return (
     <nav
       aria-label="Lychee content"
-      className="sticky top-0 grid h-full max-h-dvh w-full grid-rows-[auto_1fr_auto] overflow-y-auto px-3 py-8 font-serif text-[11px] lg:px-4 xl:px-5 xl:text-xs"
+      className="sticky top-0 grid h-full max-h-dvh w-full grid-rows-[auto_1fr_auto] overflow-y-auto py-6 pl-5 pr-3 font-serif text-[11px] leading-snug xl:text-xs"
     >
       <div className="pb-5 pt-0 xl:pb-6 xl:pt-2">
         <Link
