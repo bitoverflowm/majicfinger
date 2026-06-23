@@ -44,12 +44,19 @@ export function GuideLayout({
   children,
 }: GuideLayoutProps) {
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
+  const hasToc = tocItems.length > 0;
 
   return (
-    <div className="flex w-full min-w-0 items-start">
-      {/* Article — horizontal padding is the priority at every breakpoint */}
-      <div className="min-w-0 flex-1 px-5 py-6 sm:px-8 sm:py-8 md:px-10 lg:px-12 lg:py-10 xl:px-14 2xl:px-16">
-        <div className="mx-auto w-full min-w-0 max-w-[762px]">
+    <div className="min-w-0 flex-1 px-5 py-6 sm:px-8 sm:py-8 md:px-10 lg:px-12 lg:py-10 xl:px-10 2xl:px-12">
+      {/* Article + TOC travel together — TOC hugs the article, not the viewport edge */}
+      <div
+        className={
+          hasToc
+            ? "mx-auto flex w-full max-w-[68rem] items-start gap-6 xl:gap-8"
+            : "mx-auto w-full max-w-[762px]"
+        }
+      >
+        <div className="min-w-0 w-full max-w-[762px] flex-1">
           <div className="mb-2 flex justify-end sm:mb-3">
             <GuideArticleThemeToggle />
           </div>
@@ -107,17 +114,13 @@ export function GuideLayout({
             )}
           </article>
         </div>
-      </div>
 
-      {/* TOC — only when there is room (2xl+) */}
-      {tocItems.length > 0 ? (
-        <aside
-          aria-label="On this page"
-          className="sticky top-20 hidden w-[11rem] max-w-[11rem] shrink-0 2xl:block"
-        >
-          <ContentTocNav items={tocItems} />
-        </aside>
-      ) : null}
+        {hasToc ? (
+          <aside className="sticky top-20 hidden min-w-0 shrink-0 xl:block xl:w-[13rem]">
+            <ContentTocNav items={tocItems} />
+          </aside>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -47,30 +47,25 @@ export function ContentTocNav({ items }: ContentTocNavProps) {
   return (
     <nav
       aria-label="On this page"
-      className="sticky top-20 max-h-[calc(100dvh-5rem)] w-full overflow-y-auto py-2 font-serif text-[10px] leading-snug 2xl:text-xs"
+      className="max-h-[calc(100dvh-5rem)] w-full overflow-y-auto border-l border-black/10 py-1 pl-4 font-sans text-xs leading-normal"
     >
       <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
         On this page
       </div>
-      <ul className="space-y-1.5">
+      <ul className="space-y-2">
         {items.map(({ id, text, depth }) => {
           const padClass =
-            depth >= 4
-              ? "pl-5"
-              : depth === 3
-                ? "pl-3"
-                : depth === 2
-                  ? "pl-1.5"
-                  : "pl-0";
+            depth >= 4 ? "pl-4" : depth === 3 ? "pl-3" : depth === 2 ? "pl-1.5" : "pl-0";
 
           return (
             <li key={id}>
               <a
                 href={`#${id}`}
+                title={text}
                 className={cn(
-                  "block break-words leading-snug transition-colors hover:text-secondary",
+                  "block line-clamp-3 leading-normal transition-colors hover:text-secondary",
                   padClass,
-                  activeId === id ? "text-secondary" : "text-foreground",
+                  activeId === id ? "text-secondary" : "text-muted-foreground",
                 )}
                 onClick={(e) => {
                   e.preventDefault();
