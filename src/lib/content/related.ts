@@ -10,6 +10,7 @@ export type RelatedItem = {
   contentType: ContentType;
   title: string;
   description: string;
+  publishedAt?: string;
   relevanceScore: number;
 };
 
@@ -73,6 +74,7 @@ export function getRelatedContent(
     contentType: item.contentType,
     title: item.frontmatter.title,
     description: item.frontmatter.description,
+    publishedAt: item.frontmatter.publishedAt,
     relevanceScore: item.relevanceScore,
   }));
 }

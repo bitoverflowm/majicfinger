@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Section, Muted, KnowledgeCard } from "@/components/ui";
 import { GuideArticleThemeToggle } from "./GuideArticleThemeToggle";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
 import { ArticleMetaBar } from "./ArticleMetaBar";
+import { RelatedContentSection } from "./RelatedContentSection";
 import {
   ARTICLE_SURFACE_CLASS,
   ARTICLE_TEXT_COLUMN_CLASS,
@@ -93,34 +92,7 @@ export function GuideLayout({
                 <GuideTakeawayCta />
               </div>
 
-              {related.length > 0 && (
-                <Section className="mt-10 w-full min-w-0 font-sans sm:mt-14">
-                  <h2 className="mb-4 font-article text-lg font-normal leading-snug tracking-tight sm:mb-5 sm:text-[1.25rem]">
-                    Related content
-                  </h2>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {related.map((item) => (
-                      <Link
-                        key={`${item.contentType}-${item.slug}`}
-                        href={`/guides/${item.slug}`}
-                        className="group block"
-                      >
-                        <KnowledgeCard>
-                          <h3 className="font-semibold group-hover:underline underline-offset-4">
-                            {item.title}
-                          </h3>
-                          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                            {item.description}
-                          </p>
-                          <Muted className="mt-2 block capitalize">
-                            {item.contentType}
-                          </Muted>
-                        </KnowledgeCard>
-                      </Link>
-                    ))}
-                  </div>
-                </Section>
-              )}
+              <RelatedContentSection items={related} />
             </div>
           </article>
         </div>
