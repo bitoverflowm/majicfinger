@@ -6,6 +6,7 @@ import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
+import { ResearchQuestionRotator } from "./research-question-rotator";
 
 export function HeroSection() {
   const { hero } = siteConfig;
@@ -77,6 +78,8 @@ export function HeroSection() {
             {hero.cta.secondary.text}
           </Link>
         </div>
+
+        <ResearchQuestionRotator />
       </div>
 
       <DashboardDemoSectionLazy />
