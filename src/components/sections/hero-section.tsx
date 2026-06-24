@@ -1,6 +1,7 @@
 import { siteConfig } from "@/lib/config";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
+import Link from "next/link";
 import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
@@ -42,6 +43,7 @@ export function HeroSection() {
           >
             {badgeIcon}
             <span className="leading-tight">{hero.badge}</span>
+            <ArrowRightIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
           </Link>
         ) : (
           <p className={cn(badgeClassName, "text-foreground")}>
