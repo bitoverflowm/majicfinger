@@ -1,6 +1,7 @@
 "use client";
 
 import { MorphingText } from "@/components/magicui/morphing-text";
+import { ResearchQuestionBadge } from "./research-question-badge";
 import {
   getResearchQuestionCta,
   researchQuestions,
@@ -9,9 +10,6 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-
-const badgeClassName =
-  "inline-flex items-center rounded-full border border-primary/15 bg-white/35 px-3 py-1 text-xs font-normal text-primary dark:border-white/15 dark:bg-white/[0.06] dark:text-foreground";
 
 const badgeContainerVariants = {
   hidden: {},
@@ -88,35 +86,36 @@ export function ResearchQuestionRotator() {
       </p>
 
       <div className="flex flex-col items-center gap-4" aria-live="polite">
-        <MorphingText
-          texts={questions}
-          morphTime={1.2}
-          cooldownTime={3.8}
-          paused={paused}
-          onIndexChange={setIndex}
-          className="min-h-[3.25rem] text-balance text-lg font-semibold tracking-tight text-primary sm:min-h-[3.5rem] sm:text-xl"
-        />
+        <div className="flex w-full flex-col items-center gap-2">
+          <MorphingText
+            texts={questions}
+            morphTime={1.2}
+            cooldownTime={3.8}
+            paused={paused}
+            onIndexChange={setIndex}
+            className="min-h-[3.25rem] text-balance text-lg font-semibold tracking-tight text-primary sm:min-h-[3.5rem] sm:text-xl"
+          />
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={index}
-            className="flex flex-wrap items-center justify-center gap-2"
-            variants={badgeContainerVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-          >
-            {item.badges.map((badge) => (
-              <motion.span
-                key={`${index}-${badge}`}
-                variants={badgeVariants}
-                className={badgeClassName}
-              >
-                {badge}
-              </motion.span>
-            ))}
-          </motion.div>
-        </AnimatePresence>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={index}
+              className="flex flex-wrap items-center justify-center gap-2.5"
+              variants={badgeContainerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              {item.badges.map((badge) => (
+                <motion.div
+                  key={`${index}-${badge}`}
+                  variants={badgeVariants}
+                >
+                  <ResearchQuestionBadge label={badge} />
+                </motion.div>
+              ))}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         <Link
           href={item.href}
