@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: "Lychee",
   url: "https://lycheedata.com",
-  description: "Lychee: Your Quant in a Box",
+  description: "Prediction Market Data Platform for Kalshi & Polymarket | Lychee",
   links: {
     twitter: "https://x.com/misterrpink1",
     github: "https://github.com/misterrpink1",

@@ -3,11 +3,10 @@ import type { Metadata } from "next";
 import { siteConfig } from "@/lib/site";
 
 /** Primary SEO title (also used as `openGraph.title` / `twitter.title` unless a route overrides). */
-export const defaultTitle = `${siteConfig.name}: Your Quant in a Box`;
+export const defaultTitle = `Prediction Market Data Platform for Kalshi & Polymarket | Lychee`;
 
 /** Long-form marketing description for search + social cards. */
-export const defaultDescription =
-  "No more CSVs, coding, and ugly charts. Connect data directly to Polymarket, manipulate it instantly, generate beautiful dashboards, gain the ultimate edge. Zero coding. Zero friction. Real results.";
+export const defaultDescription = "Analyze live and historical prediction market data from Kalshi and Polymarket. Build charts, dashboards, exports, and backtests without code or setup."
 
 const ogImagePath = "/ogImage2.png";
 
