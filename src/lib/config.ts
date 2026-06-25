@@ -120,8 +120,8 @@ export const siteConfig = {
     badge: "Every Kalshi + Polymarket trade, market, and order book since launch",
     /** Guides / blog post (MDX slug) */
     badgeHref: "/kalshi-historical-data",
-    title: `Analyze live and historical prediction market data.
-    No code. No setup.`,
+    title: "Analyze live and historical prediction market data.",
+    subtitle: "No code. No setup.",
     description:
       "Access all the data from your favorite prediction markets. Turn any question into a query, chart, backtest, export, or live dashboard in seconds. For traders, quants, researchers, and analysts.",
     cta: {

@@ -10,7 +10,6 @@ import { ResearchQuestionRotator } from "./research-question-rotator";
 
 export function HeroSection() {
   const { hero } = siteConfig;
-  const heroTitleLines = hero.title.trim().split(/\n+/);
   const badgeIcon =
     hero.badgeIcon === "dot" ? (
       <span className="relative flex h-2.5 w-2.5">
@@ -53,13 +52,16 @@ export function HeroSection() {
           </p>
         )}
         <div className="flex w-full max-w-[65rem] flex-col items-center justify-center gap-5 px-1 sm:px-0">
-          <h1 className="flex w-full max-w-full flex-col gap-2 text-center text-[clamp(1.125rem,2.15vw+0.625rem,2.625rem)] font-medium leading-[1.1] tracking-tighter text-primary sm:gap-2.5">
-            {heroTitleLines.map((line, i) => (
-              <span key={i} className="block max-w-full md:whitespace-nowrap">
-                {line}
-              </span>
-            ))}
-          </h1>
+          <div className="flex w-full flex-col items-center gap-2 text-center sm:gap-2.5">
+            <h1 className="w-full max-w-full text-balance text-[clamp(1.125rem,2.15vw+0.625rem,2.625rem)] font-medium leading-[1.1] tracking-tighter text-primary md:whitespace-nowrap">
+              {hero.title}
+            </h1>
+            {hero.subtitle ? (
+              <p className="w-full max-w-full text-balance text-[clamp(1.125rem,2.15vw+0.625rem,2.625rem)] font-medium leading-[1.1] tracking-tighter text-primary md:whitespace-nowrap">
+                {hero.subtitle}
+              </p>
+            ) : null}
+          </div>
           <p className="text-balance text-center text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg">
             {hero.description}
           </p>
