@@ -1,11 +1,11 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+"use client";
+
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+import { ChevronDown } from "lucide-react";
+
 import { SectionHeader } from "@/components/section-header";
 import { siteConfig } from "@/lib/config";
+import { cn } from "@/lib/utils";
 
 export function FAQSection() {
   const { faqSection } = siteConfig;
@@ -25,28 +25,38 @@ export function FAQSection() {
       </SectionHeader>
 
       <div className="max-w-3xl w-full mx-auto px-10">
-        <Accordion
+        <AccordionPrimitive.Root
           type="single"
           collapsible
           className="w-full border-b-0 grid gap-2"
         >
           {faqSection.faQitems.map((faq) => (
-            <AccordionItem
+            <AccordionPrimitive.Item
               key={faq.id}
               value={String(faq.id)}
               className="border-0 grid gap-2"
             >
-              <AccordionTrigger className="border bg-accent border-border rounded-lg px-4 py-3.5 cursor-pointer no-underline hover:no-underline data-[state=open]:ring data-[state=open]:ring-primary/20">
+              <AccordionPrimitive.Trigger
+                className={cn(
+                  "flex flex-1 w-full items-center justify-between gap-2 border bg-accent border-border rounded-lg px-4 py-3.5 cursor-pointer font-medium transition-all no-underline hover:no-underline data-[state=open]:ring data-[state=open]:ring-primary/20 [&[data-state=open]>svg]:rotate-180",
+                )}
+              >
                 {faq.question}
-              </AccordionTrigger>
-              <AccordionContent className="p-3 border text-primary rounded-lg bg-accent">
-                <p className="text-primary font-medium leading-relaxed">
-                  {faq.answer}
-                </p>
-              </AccordionContent>
-            </AccordionItem>
+                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+              </AccordionPrimitive.Trigger>
+              <AccordionPrimitive.Content
+                forceMount
+                className="overflow-hidden text-sm transition-all data-[state=closed]:hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up"
+              >
+                <div className="p-3 border text-primary rounded-lg bg-accent">
+                  <p className="text-primary font-medium leading-relaxed">
+                    {faq.answer}
+                  </p>
+                </div>
+              </AccordionPrimitive.Content>
+            </AccordionPrimitive.Item>
           ))}
-        </Accordion>
+        </AccordionPrimitive.Root>
       </div>
     </section>
   );
