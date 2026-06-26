@@ -1,13 +1,11 @@
 "use client";
 
-import { siteConfig } from "@/lib/config";
 import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import React, { useRef, useState } from "react";
-import { TwitterLogoIcon } from "@radix-ui/react-icons";
 
 interface NavItem {
   name: string;
@@ -148,17 +146,6 @@ export function NavMenu({ productsNav }: NavMenuProps) {
             </a>
           </li>
         ))}
-        <li className="z-10 h-full flex items-center justify-center px-3 py-2">
-          <a
-            href={siteConfig.links.twitter}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary/60 hover:text-primary transition-colors duration-200"
-            aria-label="Twitter"
-          >
-            <TwitterLogoIcon />
-          </a>
-        </li>
         {isReady && (
           <motion.li
             animate={{ left, width }}

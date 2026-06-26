@@ -4,7 +4,7 @@ import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { siteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
-import { ChevronRightIcon } from "@radix-ui/react-icons";
+import { ChevronRightIcon, TwitterLogoIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -55,6 +55,21 @@ export function FooterSection() {
                 ))}
               </ul>
             ))}
+            <ul className="flex flex-col gap-y-2 min-w-[140px]">
+              <li className="mb-2 text-sm font-semibold text-primary">Social</li>
+              <li>
+                <a
+                  href={siteConfig.links.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Follow Lychee on X (Twitter)"
+                  className="inline-flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <TwitterLogoIcon className="size-5" />
+                  <span className="text-[15px]/snug">X (Twitter)</span>
+                </a>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

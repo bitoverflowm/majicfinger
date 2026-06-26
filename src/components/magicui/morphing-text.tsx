@@ -4,12 +4,15 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
+const TRAILING_ARROW = " →";
+
 type UseMorphingTextOptions = {
   texts: string[];
   morphTime?: number;
   cooldownTime?: number;
   paused?: boolean;
   onIndexChange?: (index: number) => void;
+  trailingArrow?: boolean;
 };
 
 const useMorphingText = ({
@@ -18,6 +21,7 @@ const useMorphingText = ({
   cooldownTime = 0.5,
   paused = false,
   onIndexChange,
+  trailingArrow = false,
 }: UseMorphingTextOptions) => {
   const textIndexRef = useRef(0);
   const morphRef = useRef(0);
@@ -29,6 +33,14 @@ const useMorphingText = ({
   const text2Ref = useRef<HTMLSpanElement>(null);
 
   pausedRef.current = paused;
+
+  const formatText = useCallback(
+    (index: number) => {
+      const text = texts[index % texts.length] ?? "";
+      return trailingArrow ? `${text}${TRAILING_ARROW}` : text;
+    },
+    [texts, trailingArrow],
+  );
 
   const setStyles = useCallback(
     (fraction: number) => {
@@ -45,11 +57,10 @@ const useMorphingText = ({
       )}px)`;
       current1.style.opacity = `${Math.pow(invertedFraction, 0.4) * 100}%`;
 
-      current1.textContent = texts[textIndexRef.current % texts.length];
-      current2.textContent =
-        texts[(textIndexRef.current + 1) % texts.length];
+      current1.textContent = formatText(textIndexRef.current);
+      current2.textContent = formatText(textIndexRef.current + 1);
     },
-    [texts],
+    [formatText, texts.length],
   );
 
   const doMorph = useCallback(() => {
@@ -119,6 +130,7 @@ export type MorphingTextProps = {
   cooldownTime?: number;
   paused?: boolean;
   onIndexChange?: (index: number) => void;
+  trailingArrow?: boolean;
 };
 
 function Texts({
@@ -127,6 +139,7 @@ function Texts({
   cooldownTime,
   paused,
   onIndexChange,
+  trailingArrow,
 }: MorphingTextProps) {
   const { text1Ref, text2Ref } = useMorphingText({
     texts,
@@ -134,6 +147,7 @@ function Texts({
     cooldownTime,
     paused,
     onIndexChange,
+    trailingArrow,
   });
 
   return (
@@ -180,6 +194,7 @@ export function MorphingText({
   cooldownTime,
   paused,
   onIndexChange,
+  trailingArrow,
 }: MorphingTextProps) {
   if (texts.length === 0) return null;
 
@@ -196,6 +211,7 @@ export function MorphingText({
         cooldownTime={cooldownTime}
         paused={paused}
         onIndexChange={onIndexChange}
+        trailingArrow={trailingArrow}
       />
       <SvgFilters />
     </div>

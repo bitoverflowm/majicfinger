@@ -1,11 +1,9 @@
 "use client";
 
 import { MorphingText } from "@/components/magicui/morphing-text";
+import { DemoScrollLink } from "./demo-scroll-link";
 import { ResearchQuestionBadge } from "./research-question-badge";
-import {
-  getResearchQuestionCta,
-  researchQuestions,
-} from "@/lib/research-questions";
+import { researchQuestions } from "@/lib/research-questions";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -68,6 +66,7 @@ export function ResearchQuestionRotator() {
   );
 
   const item = researchQuestions[index];
+  const RotatorLink = item.status === "coming_soon" ? DemoScrollLink : Link;
 
   return (
     <div
@@ -85,7 +84,15 @@ export function ResearchQuestionRotator() {
         Find Signal In The Noise
       </p>
 
-      <div className="flex flex-col items-center gap-4" aria-live="polite">
+      <RotatorLink
+        href={item.href}
+        aria-label={item.question}
+        className={cn(
+          "group flex w-full flex-col items-center rounded-sm",
+          "transition-colors hover:text-primary/90",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        )}
+      >
         <div className="flex w-full flex-col items-center gap-1">
           <MorphingText
             texts={questions}
@@ -93,6 +100,7 @@ export function ResearchQuestionRotator() {
             cooldownTime={3.8}
             paused={paused}
             onIndexChange={setIndex}
+            trailingArrow
             className="min-h-[2.5rem] text-balance text-lg font-semibold tracking-tight text-primary sm:min-h-[2.625rem]"
           />
 
@@ -104,30 +112,17 @@ export function ResearchQuestionRotator() {
               initial="hidden"
               animate="visible"
               exit="exit"
+              aria-live="polite"
             >
               {item.badges.map((badge) => (
-                <motion.div
-                  key={`${index}-${badge}`}
-                  variants={badgeVariants}
-                >
+                <motion.div key={`${index}-${badge}`} variants={badgeVariants}>
                   <ResearchQuestionBadge label={badge} />
                 </motion.div>
               ))}
             </motion.div>
           </AnimatePresence>
         </div>
-
-        <Link
-          href={item.href}
-          className={cn(
-            "text-sm font-medium text-primary transition-colors",
-            "hover:text-primary/75",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:rounded-sm",
-          )}
-        >
-          {getResearchQuestionCta(item)}
-        </Link>
-      </div>
+      </RotatorLink>
     </div>
   );
 }
