@@ -93,7 +93,7 @@ export function ResearchQuestionRotator() {
             cooldownTime={3.8}
             paused={paused}
             onIndexChange={setIndex}
-            className="min-h-[3.25rem] text-balance text-lg font-semibold tracking-tight text-primary sm:min-h-[3.5rem]"
+            className="min-h-[2.5rem] text-balance text-lg font-semibold tracking-tight text-primary sm:min-h-[2.625rem]"
           />
 
           <AnimatePresence mode="wait">
