@@ -71,7 +71,7 @@ export function ResearchQuestionRotator() {
 
   return (
     <div
-      className="mx-auto w-full max-w-3xl px-2 pt-2 sm:px-4"
+      className="mx-auto w-full max-w-3xl px-2 pt-4 sm:px-4"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
@@ -81,19 +81,19 @@ export function ResearchQuestionRotator() {
         }
       }}
     >
-      <p className="mb-5 text-center text-[9px] font-normal tracking-[0.2em] text-muted-foreground sm:text-xs">
+      <p className="mb-2 text-center text-[9px] font-normal tracking-[0.2em] text-muted-foreground sm:text-xs">
         Find Signal In The Noise
       </p>
 
       <div className="flex flex-col items-center gap-4" aria-live="polite">
-        <div className="flex w-full flex-col items-center gap-2">
+        <div className="flex w-full flex-col items-center gap-1">
           <MorphingText
             texts={questions}
             morphTime={1.2}
             cooldownTime={3.8}
             paused={paused}
             onIndexChange={setIndex}
-            className="min-h-[3.25rem] text-balance text-lg font-semibold tracking-tight text-primary sm:min-h-[3.5rem] sm:text-xl"
+            className="min-h-[3.25rem] text-balance text-lg font-semibold tracking-tight text-primary sm:min-h-[3.5rem]"
           />
 
           <AnimatePresence mode="wait">
