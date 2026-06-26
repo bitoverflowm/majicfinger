@@ -76,6 +76,15 @@ const PREDICTION_TEMPLATE_LABEL = "Fork Templates Coming Soon";
 
 const PREDICTION_TEMPLATES = [{ id: "fork-templates" }];
 
+const DEMO_CONNECT_HEADING = "Pick a data source. Start exploring in seconds.";
+const DEMO_CONNECT_SUBTEXT =
+  "Start with one source, then layer in more data as your question evolves.";
+const DEMO_CONNECT_EXAMPLE_CHIPS = [
+  "Compare Kalshi vs. Polymarket",
+  "Blend Kalshi Historical + Kalshi Live",
+  "Test if Twitter sentiment predicts Polymarket odds",
+];
+
 /** Solid icon-tile backgrounds on Connect home (match Kalshi / Chainlink pill style). */
 const CONNECT_INTEGRATION_ICON_BG = {
   kalshiHistorical: "bg-[#28CC95]",
@@ -844,16 +853,46 @@ export default function ConnectDataStep1({
               showLatestWork && !embeddedInShell ? "md:row-start-2" : !embeddedInShell ? "md:row-start-1" : null,
             )}
           >
-            <h1
+            {embeddedDemo ? (
+              <div className="text-left">
+                <h2 className="text-balance font-semibold tracking-tight text-foreground text-xl">
+                  {DEMO_CONNECT_HEADING}
+                </h2>
+                <p className="mt-1.5 max-w-2xl text-pretty text-sm leading-snug text-muted-foreground">
+                  {DEMO_CONNECT_SUBTEXT}
+                </p>
+                <div
+                  className="mt-2.5 hidden flex-wrap gap-1.5 sm:flex md:flex-nowrap md:gap-2"
+                  aria-hidden="true"
+                >
+                  {DEMO_CONNECT_EXAMPLE_CHIPS.map((label) => (
+                    <span
+                      key={label}
+                      className="inline-flex max-w-full shrink-0 items-center rounded-full border border-border/30 bg-muted/15 px-2 py-0.5 text-[10px] leading-tight text-muted-foreground/65 md:whitespace-nowrap"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <h1
+                className={cn(
+                  "text-balance text-left font-semibold tracking-tight text-foreground",
+                  "text-base sm:text-lg md:text-xl xl:text-2xl",
+                )}
+              >
+                Hi, what do you want to discover?
+              </h1>
+            )}
+
+            <div
               className={cn(
-                "text-balance text-left font-semibold tracking-tight text-foreground",
-                embeddedDemo ? "text-xl" : "text-base sm:text-lg md:text-xl xl:text-2xl",
+                "w-full",
+                embeddedDemo ? "mt-8 sm:mt-9 md:mt-10" : "mt-12 sm:mt-14 md:mt-16",
+                columnGridClass,
               )}
             >
-              Hi, what do you want to discover?
-            </h1>
-
-            <div className={cn("mt-12 w-full sm:mt-14 md:mt-16", columnGridClass)}>
           <section className="min-w-0 overflow-hidden">
             <SectionTitle className={embeddedDemo ? undefined : connectHubSectionTitleClass}>Import</SectionTitle>
             <div className={integrationsColClass}>
