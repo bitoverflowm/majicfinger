@@ -29,10 +29,10 @@ export function HeroSection() {
       {/* Background only — must stay below copy (z-10) and demo (z-30). */}
       <div
         aria-hidden
-        className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-[38rem] w-full max-w-[min(100%,84rem)] rounded-b-2xl md:h-[42rem] lg:h-[44rem]"
+        className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-[46rem] w-full max-w-[min(100%,84rem)] rounded-b-2xl sm:h-[50rem] md:h-[54rem] lg:h-[58rem]"
       />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[65rem] flex-col items-center gap-10 px-6 pb-12 pt-32 md:pb-16 md:pt-32 lg:pb-20">
+      <div className="relative z-10 mx-auto flex w-full max-w-[65rem] flex-col items-center gap-10 px-6 pb-4 pt-32 md:pb-6 md:pt-32 lg:pb-8">
         {hero.badgeHref ? (
           <Link
             href={hero.badgeHref}

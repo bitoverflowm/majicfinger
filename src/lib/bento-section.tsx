@@ -18,9 +18,9 @@ export type BentoSectionConfig = {
 };
 
 export const bentoSection: BentoSectionConfig = {
-  title: "Turn Data Into Action — No Code Required",
+  title: "Connect Kalshi, Polymarket, and market data in one workspace",
   description:
-    "Lychee makes it effortless to connect data, visualize insights, and automate workflows — all from one simple platform, no coding needed.",
+    "Query live and historical prediction market data, build charts, create dashboards, export results, and test ideas without code or API setup.",
   items: [
     {
       id: "1",

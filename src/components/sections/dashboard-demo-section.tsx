@@ -11,7 +11,7 @@ export function DashboardDemoSection() {
   return (
     <section
       id="demo"
-      className="relative z-30 mx-auto mb-0 w-full max-w-[min(100%,84rem)] mt-4 px-6 pb-6 pt-0 sm:mt-6 sm:px-8 md:mt-8 lg:px-10"
+      className="relative z-30 mx-auto mb-0 w-full max-w-[min(100%,84rem)] mt-14 px-6 pb-6 pt-0 sm:mt-12 sm:px-8 md:mt-8 lg:mt-6 lg:px-10"
     >
       <div
         id="demo-mockup"

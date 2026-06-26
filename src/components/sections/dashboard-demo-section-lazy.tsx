@@ -23,7 +23,7 @@ function DashboardDemoSkeleton() {
     <section
       id="demo"
       aria-hidden
-      className="relative z-30 mx-auto mb-0 w-full max-w-[min(100%,84rem)] mt-4 px-6 pb-6 pt-0 sm:mt-6 sm:px-8 md:mt-8 lg:px-10"
+      className="relative z-30 mx-auto mb-0 w-full max-w-[min(100%,84rem)] mt-14 px-6 pb-6 pt-0 sm:mt-12 sm:px-8 md:mt-8 lg:mt-6 lg:px-10"
     >
       <div className="relative isolate size-full overflow-hidden rounded-2xl border border-border bg-background shadow-xl ring-1 ring-border/60">
         <div className="flex h-[min(90vh,920px)] min-h-[720px] w-full animate-pulse flex-col gap-4 p-6">
