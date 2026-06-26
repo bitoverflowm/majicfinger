@@ -157,7 +157,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
             <NavMenu productsNav={productsNav} />
 
             <div className="flex flex-row items-center gap-1 md:gap-3 shrink-0">
-              <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-3">
                 {!user ? (
                   <>
                     <DemoScrollLink
