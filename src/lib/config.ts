@@ -27,9 +27,11 @@ export const siteConfig = {
   },
   bentoSection,
   pricingSection: {
-    title: "Pricing that scales with you",
+    title: "Choose the scale of prediction market research you need",
     description:
-      "Start weekly, switch anytime. Pay annually when you’re ready to commit.",
+      "Start weekly, upgrade anytime, or save with annual billing. Every paid plan includes Kalshi and Polymarket historical and live data.",
+    trustNote:
+      "All paid plans include Kalshi Historical, Kalshi Live, Polymarket Historical, Polymarket Live, no-code charts, dashboards, saved projects, and CSV/XLSX/JSON exports. Plans differ by row limits, live streams, alerts, storage, and research scale.",
     pricingItems: (landingPageV2Config.pricing as any[]).map((plan: any) => ({
       name: plan.name,
       description: plan.description,

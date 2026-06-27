@@ -2,9 +2,9 @@ import { GrowthDnaHelixArt } from "@/components/growth-dna-helix-art";
 import { GrowthDnaRnaHelixArt } from "@/components/growth-dna-rna-helix-art";
 
 export const growthSection = {
-  title: "Turn Data Into Action",
+  title: "Test prediction market ideas before you trade",
   description:
-    "Lychee isn’t just about seeing numbers — it’s about making decisions, testing ideas, and discovering insights faster than ever.",
+    "Compare Kalshi, Polymarket, historical prices, live feeds, and external signals to backtest hypotheses and find patterns without code.",
   items: [
     {
       id: 1,
@@ -22,4 +22,3 @@ export const growthSection = {
     },
   ],
 } as const;
-

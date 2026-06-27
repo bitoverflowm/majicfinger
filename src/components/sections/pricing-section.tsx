@@ -107,8 +107,9 @@ type DemoTier = {
 };
 
 export function PricingSection() {
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("annual");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("weekly");
   const { title, description, pricingItems } = siteConfig.pricingSection;
+  const trustNote = (siteConfig.pricingSection as { trustNote?: string }).trustNote;
   const lifetimeAccess = (siteConfig.pricingSection as { lifetimeAccess?: LifetimeAccess }).lifetimeAccess;
   const demoTier = (siteConfig.pricingSection as { demoTier?: DemoTier }).demoTier;
 
@@ -193,6 +194,12 @@ export function PricingSection() {
           />
         </div>
 
+        {trustNote ? (
+          <p className="mx-auto mb-6 max-w-3xl rounded-lg border border-border/50 bg-muted/15 px-4 py-2.5 text-center text-xs leading-relaxed text-muted-foreground sm:text-sm">
+            {trustNote}
+          </p>
+        ) : null}
+
         <div className="grid min-[650px]:grid-cols-2 min-[1100px]:grid-cols-4 gap-4 w-full max-w-7xl mx-auto px-6">
           {demoTier ? (
             <div
@@ -218,7 +225,7 @@ export function PricingSection() {
               <div className="flex min-h-0 flex-col justify-start">
                 <hr className="border-border dark:border-white/20" />
                 <div className="p-4">
-                <ul className="space-y-3">
+                <ul className="space-y-2.5">
                   {demoTier.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
                       <div className="size-5 rounded-full border border-primary/20 flex items-center justify-center shrink-0">
@@ -238,7 +245,7 @@ export function PricingSection() {
               className={cn(
                 "rounded-xl grid grid-rows-[180px_auto_1fr] relative h-fit min-[650px]:h-full min-[900px]:h-fit",
                 tier.isPopular
-                  ? "md:shadow-[0px_61px_24px_-10px_rgba(0,0,0,0.01),0px_34px_20px_-8px_rgba(0,0,0,0.05),0px_15px_15px_-6px_rgba(0,0,0,0.09),0px_4px_8px_-2px_rgba(0,0,0,0.10),0px_0px_0px_1px_rgba(0,0,0,0.08)] bg-accent"
+                  ? "md:shadow-[0px_61px_24px_-10px_rgba(0,0,0,0.01),0px_34px_20px_-8px_rgba(0,0,0,0.05),0px_15px_15px_-6px_rgba(0,0,0,0.09),0px_4px_8px_-2px_rgba(0,0,0,0.10),0px_0px_0px_1px_rgba(0,0,0,0.08)] bg-accent ring-1 ring-secondary/25 md:-translate-y-0.5"
                   : "bg-[#F3F4F6] dark:bg-[#F9FAFB]/[0.02] border border-border",
               )}
             >
@@ -284,7 +291,7 @@ export function PricingSection() {
                 <hr className="border-border dark:border-white/20" />
 
                 <div className="p-4">
-                <ul className="space-y-3">
+                <ul className="space-y-2.5">
                   {tier.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
                       <div
