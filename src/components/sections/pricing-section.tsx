@@ -204,15 +204,18 @@ export function PricingSection() {
           {demoTier ? (
             <div
               key={demoTier.name}
-              className="rounded-xl grid grid-rows-[180px_auto_1fr] relative h-fit min-[650px]:h-full min-[900px]:h-fit border border-dashed border-border bg-background/60"
+              className="rounded-xl grid grid-rows-[auto_auto_1fr] relative h-fit min-[650px]:h-full min-[900px]:h-fit border border-dashed border-border bg-background/60"
             >
-              <div className="flex flex-col gap-4 p-4">
+              <div className="flex flex-col gap-2 p-4">
                 <p className="text-sm">{demoTier.name}</p>
-                <div className="flex items-baseline mt-2">
+                <div className="flex items-baseline">
                   <span className="text-4xl font-semibold">{demoTier.priceLabel}</span>
                   <span className="ml-2 text-sm text-muted-foreground">/{demoTier.suffix}</span>
                 </div>
-                <p className="text-sm mt-2 text-muted-foreground">{demoTier.description}</p>
+                <p className="text-xs invisible" aria-hidden="true">
+                  billed monthly
+                </p>
+                <p className="text-sm leading-snug text-muted-foreground">{demoTier.description}</p>
               </div>
               <div className="flex flex-col gap-2 p-4">
                 <a
@@ -243,13 +246,13 @@ export function PricingSection() {
             <div
               key={tier.name}
               className={cn(
-                "rounded-xl grid grid-rows-[180px_auto_1fr] relative h-fit min-[650px]:h-full min-[900px]:h-fit",
+                "rounded-xl grid grid-rows-[auto_auto_1fr] relative h-fit min-[650px]:h-full min-[900px]:h-fit",
                 tier.isPopular
                   ? "md:shadow-[0px_61px_24px_-10px_rgba(0,0,0,0.01),0px_34px_20px_-8px_rgba(0,0,0,0.05),0px_15px_15px_-6px_rgba(0,0,0,0.09),0px_4px_8px_-2px_rgba(0,0,0,0.10),0px_0px_0px_1px_rgba(0,0,0,0.08)] bg-accent ring-1 ring-secondary/25 md:-translate-y-0.5"
                   : "bg-[#F3F4F6] dark:bg-[#F9FAFB]/[0.02] border border-border",
               )}
             >
-              <div className="flex flex-col gap-4 p-4">
+              <div className="flex flex-col gap-2 p-4">
                 <p className="text-sm">
                   {tier.name}
                   {tier.isPopular && (
@@ -259,16 +262,22 @@ export function PricingSection() {
                   )}
                 </p>
 
-                <div className="flex items-baseline mt-2">
+                <div className="flex items-baseline">
                   <PriceDisplay price={tier.display.price} />
                   <span className="ml-2">/{tier.display.suffix}</span>
                 </div>
 
-                {tier.display.note && (
-                  <p className="text-xs text-muted-foreground">{tier.display.note}</p>
-                )}
+                <p
+                  className={cn(
+                    "text-xs text-muted-foreground",
+                    !tier.display.note && "invisible",
+                  )}
+                  aria-hidden={!tier.display.note}
+                >
+                  {tier.display.note ?? "billed monthly"}
+                </p>
 
-                <p className="text-sm mt-2">{tier.description}</p>
+                <p className="text-sm leading-snug">{tier.description}</p>
               </div>
 
               <div className="flex flex-col gap-2 p-4">

@@ -20,7 +20,7 @@ export const landingPageV2Config = {
     suffix: "forever",
     description: "Try Lychee before you subscribe — no credit card required.",
     buttonText: "Try the demo",
-    href: "/#hero",
+    href: "/#demo",
     features: [
       "Run sample Kalshi and Polymarket pulls",
       "Explore charts and data sheets",
