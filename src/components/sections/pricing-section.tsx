@@ -109,7 +109,11 @@ type DemoTier = {
 export function PricingSection() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("weekly");
   const { title, description, pricingItems } = siteConfig.pricingSection;
-  const trustNote = (siteConfig.pricingSection as { trustNote?: string }).trustNote;
+  const includedInPaidPlans = (
+    siteConfig.pricingSection as {
+      includedInPaidPlans?: { label: string; items: readonly string[] };
+    }
+  ).includedInPaidPlans;
   const lifetimeAccess = (siteConfig.pricingSection as { lifetimeAccess?: LifetimeAccess }).lifetimeAccess;
   const demoTier = (siteConfig.pricingSection as { demoTier?: DemoTier }).demoTier;
 
@@ -194,10 +198,22 @@ export function PricingSection() {
           />
         </div>
 
-        {trustNote ? (
-          <p className="mx-auto mb-6 max-w-3xl rounded-lg border border-border/50 bg-muted/15 px-4 py-2.5 text-center text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            {trustNote}
-          </p>
+        {includedInPaidPlans ? (
+          <div className="mx-auto mb-4 flex w-full max-w-3xl flex-col items-center gap-2 rounded-lg border border-border/40 bg-muted/10 px-3 py-2 sm:px-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80 sm:text-xs">
+              {includedInPaidPlans.label}
+            </p>
+            <ul className="flex flex-wrap items-center justify-center gap-1.5">
+              {includedInPaidPlans.items.map((item) => (
+                <li
+                  key={item}
+                  className="inline-flex items-center rounded-full border border-border/35 bg-background/50 px-2 py-0.5 text-[10px] leading-tight text-muted-foreground/75 sm:px-2.5 sm:text-[11px]"
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         <div className="grid min-[650px]:grid-cols-2 min-[1100px]:grid-cols-4 gap-4 w-full max-w-7xl mx-auto px-6">

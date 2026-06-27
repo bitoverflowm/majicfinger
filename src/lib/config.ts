@@ -30,8 +30,16 @@ export const siteConfig = {
     title: "Choose the scale of prediction market research you need",
     description:
       "Start weekly, upgrade anytime, or save with annual billing. Every paid plan includes Kalshi and Polymarket historical and live data.",
-    trustNote:
-      "All paid plans include Kalshi Historical, Kalshi Live, Polymarket Historical, Polymarket Live, no-code charts, dashboards, saved projects, and CSV/XLSX/JSON exports. Plans differ by row limits, live streams, alerts, storage, and research scale.",
+    includedInPaidPlans: {
+      label: "Included in every paid plan",
+      items: [
+        "Kalshi + Polymarket data",
+        "Live + historical access",
+        "No-code charts",
+        "Dashboards",
+        "CSV/XLSX/JSON exports",
+      ],
+    },
     pricingItems: (landingPageV2Config.pricing as any[]).map((plan: any) => ({
       name: plan.name,
       description: plan.description,
