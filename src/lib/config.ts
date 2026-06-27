@@ -101,7 +101,7 @@ export const siteConfig = {
   faqSection: {
     title: "Frequently Asked Questions",
     description:
-      "Answers to common questions about Lychee and its features. If you have any other questions, please don't hesitate to contact us.",
+      "Answers to the questions traders, researchers, and analysts usually ask before using Lychee.",
     faQitems: landingPageV2Config.faqs.map((faq, index) => ({
       id: index + 1,
       question: faq.question,

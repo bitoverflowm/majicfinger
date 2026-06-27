@@ -129,37 +129,47 @@ export const landingPageV2Config = {
     {
       question: "What is Lychee?",
       answer:
-        "Lychee is a no-code data analysis platform built for prediction markets, traders, and researchers. Connect live and historical data from sources like Polymarket, Kalshi, and on-chain feeds, then visualize trends and build dashboards in seconds. No Python, no CSV wrangling — just fast insights from real data.",
+        "Lychee is a no-code prediction market data platform for analyzing live and historical market data. You can query Kalshi, Polymarket, Chainlink, crypto, social, and uploaded datasets, then turn them into charts, dashboards, exports, alerts, and research workflows without writing Python or stitching APIs together.",
     },
     {
-      question: "Who is Lychee for?",
+      question: "What data sources does Lychee include?",
       answer:
-        "Lychee is designed for traders, analysts, researchers, and data enthusiasts who want to explore prediction market and financial data quickly. Whether you're backtesting strategies, tracking market sentiment, or building dashboards, Lychee helps you work with data without writing code.",
+        "Lychee supports Kalshi Historical, Kalshi Live, Polymarket Historical, Polymarket Live, Chainlink, Binance, CSV/XLSX uploads, and additional API sources. Every paid plan includes Kalshi and Polymarket historical and live data. Plans differ by row limits, live streams, alerts, storage, and research scale.",
     },
     {
-      question: "How do I get started?",
+      question: "Does Lychee include Kalshi and Polymarket historical data?",
       answer:
-        "Try the free demo we have above, no credit card required no sign up required. Remember this is a demo so it has nowhere near the capabilities of the full platform. Then sign up and start exploring immediately. Choose a data source, create a chart, and build your first dashboard in minutes. No installation, no setup.",
+        "Yes. Lychee includes historical Kalshi and Polymarket market data so you can analyze past markets, trades, price movement, volume, outcomes, and category-level behavior. Historical data is useful for research, backtesting, calibration analysis, volatility studies, and finding patterns across resolved markets.",
     },
     {
-      question: "What data sources does Lychee support?",
+      question: "Does Lychee support live Kalshi and Polymarket data?",
       answer:
-        "Lychee provides access to prediction market, crypto, financial, and social data sources. This includes Polymarket, Kalshi, Chainlink feeds, CoinGecko, Twitter, Reddit, Product Hunt, SEC Edgar and additional APIs. You can also upload CSV or Excel files to combine your own data with live feeds.",
+        "Yes. Lychee supports live Kalshi and Polymarket data for current market analysis, live dashboards, alerts, and monitoring workflows. You can combine live data with historical data to compare current odds against past market behavior.",
+    },
+    {
+      question: "Can I download or export Kalshi and Polymarket data?",
+      answer:
+        "Yes. Lychee supports CSV, XLSX, and JSON exports. Export access depends on your plan limits, so Basic is useful for smaller pulls, Pro supports larger research exports, and Elite is designed for high-volume workflows and bulk datasets.",
     },
     {
       question: "Do I need to know how to code?",
       answer:
-        "No. Lychee is fully no-code. You can connect data, create charts, and analyze trends using a visual interface — no SQL, Python, or manual data processing required.",
-    },
-    {
-      question: "What makes Lychee different from other data tools?",
-      answer:
-        "Lychee focuses on prediction market and alternative data in one place. Instead of stitching together APIs, spreadsheets, and scripts, you can explore real-time and historical datasets, visualize trends, and export insights from a single workspace.",
+        "No. Lychee is built for no-code analysis. You can connect data sources, filter markets, build charts, create dashboards, run pulls, fork published workflows, and export results through a visual interface — no SQL, Python, or API setup required.",
     },
     {
       question: "Can I use Lychee for backtesting and research?",
       answer:
-        "Yes. Lychee includes historical datasets and visual exploration tools that make it easy to analyze trends, compare markets, and test ideas without building custom pipelines.",
+        "Yes. Lychee includes historical Kalshi and Polymarket datasets so you can test ideas against past markets, compare live and historical behavior, analyze volume, price movement, calibration, volatility, and other research signals. Advanced backtesting workflows scale with your plan.",
+    },
+    {
+      question: "What is included in the free demo?",
+      answer:
+        "The free demo lets you try Lychee on the homepage before subscribing. You can run sample Kalshi and Polymarket pulls, explore charts and data sheets, fork one published workflow, and test limited historical requests without a credit card.",
+    },
+    {
+      question: "Why use Lychee instead of APIs, CSVs, or Python scripts?",
+      answer:
+        "Lychee saves you from stitching together prediction market APIs, downloading messy CSVs, maintaining scripts, and rebuilding the same charts over and over. You get live and historical data, no-code analysis, dashboards, exports, and reusable workflows in one workspace.",
     },
   ],
   footer: [
