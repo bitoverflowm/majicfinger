@@ -304,7 +304,7 @@ async function recordDataPullNotify(sessionId, meta = {}) {
   const text = buildDataPullTelegramMessage({
     phase,
     meta: pullMeta,
-    sessionEmail: session?.email,
+    sessionEmail: pullMeta.email || session?.email,
   });
 
   await sendTelegramMessage(text);

@@ -630,6 +630,38 @@ export default function DataLakeParquetPanel({
   const { sampleOptions, lake } = useMemo(() => getDataLakeDatasetConfig(dataset), [dataset]);
   const glueJoinTableOptions = useMemo(() => glueTableNamesForDataset(dataset), [dataset]);
 
+  const reportDataPullComplete = useCallback(
+    ({ lake: pullLake, table, sampleId, mode, rowCount, requestStartMs, largePull }) => {
+      const sampleLabel = sampleOptions.find((s) => s.id === sampleId)?.label || sampleId;
+      const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+      trackDataPullComplete({
+        integration: dataset,
+        lake: pullLake,
+        table,
+        sampleId,
+        sampleLabel,
+        mode,
+        rowCount,
+        largePull,
+        elapsedMs: Math.max(0, Number(endMs) - Number(requestStartMs || endMs)),
+      });
+    },
+    [dataset, sampleOptions],
+  );
+
+  const reportDataPullError = useCallback(
+    ({ lake: pullLake, table, sampleId, mode, message, source }) => {
+      const sampleLabel = sampleOptions.find((s) => s.id === sampleId)?.label || sampleId;
+      trackDataPullError({
+        message,
+        integration: dataset,
+        source: source || "DataLakeParquetPanel",
+        meta: { lake: pullLake, table, sampleId, sampleLabel, mode },
+      });
+    },
+    [dataset, sampleOptions],
+  );
+
   const canUseSamples = true;
   const [sampleId, setSampleId] = useState("");
   const [selectColumnsMenuOpen, setSelectColumnsMenuOpen] = useState(false);
@@ -2227,6 +2259,7 @@ export default function DataLakeParquetPanel({
         applyRowsToActiveSheet(finalRows, { provenance: sheetProvenance, requestCards });
         setLastRowCount(n);
         refreshBeckerViews();
+        reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: n, requestStartMs });
       },
     };
     pullUiRef.current = {
@@ -2295,6 +2328,7 @@ export default function DataLakeParquetPanel({
         applyRowsToActiveSheet(finalRows, { provenance: sheetProvenance, requestCards });
         setLastRowCount(n);
         refreshBeckerViews();
+        reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: n, requestStartMs });
       });
     } catch (e) {
       if (e?.name === "AbortError") {
@@ -2308,6 +2342,14 @@ export default function DataLakeParquetPanel({
       setError(msg);
       resetLargePullState();
       syncConnectPullState({ loading: false, error: msg, label: "", progress: 0 });
+      reportDataPullError({
+        message: msg,
+        source: "DataLakeParquetPanel.executeIngestReplace",
+        lake: lk,
+        table,
+        sampleId: sid,
+        mode,
+      });
     } finally {
       if (myGeneration !== pullGenerationRef.current) return;
       ingestAbortControllerRef.current = null;
@@ -2332,6 +2374,8 @@ export default function DataLakeParquetPanel({
     setDataSheets,
     activeSheetId,
     syncConnectPullState,
+    reportDataPullComplete,
+    reportDataPullError,
   ]);
 
   const executeIngestAppend = useCallback(async () => {
@@ -2351,6 +2395,7 @@ export default function DataLakeParquetPanel({
       kalshiIngestExtras,
       sheetJoinSpec,
       composeAthenaRowLimit: pendingComposeLimitAppend,
+      requestStartMs,
     } = pending;
     pendingIngestRef.current = null;
     setSheetDialogOpen(false);
@@ -2385,6 +2430,7 @@ export default function DataLakeParquetPanel({
         }
         setLastRowCount(n);
         refreshBeckerViews();
+        reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: n, requestStartMs });
       },
     };
     pullUiRef.current = {
@@ -2439,6 +2485,7 @@ export default function DataLakeParquetPanel({
         }
         setLastRowCount(n);
         refreshBeckerViews();
+        reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: n, requestStartMs });
       });
     } catch (e) {
       if (e?.name === "AbortError") {
@@ -2449,6 +2496,14 @@ export default function DataLakeParquetPanel({
       }
       const msg = e?.message || String(e);
       setError(msg);
+      reportDataPullError({
+        message: msg,
+        source: "DataLakeParquetPanel.executeIngestAppend",
+        lake: lk,
+        table,
+        sampleId: sid,
+        mode,
+      });
     } finally {
       ingestAbortControllerRef.current = null;
       setLoading(false);
@@ -2466,6 +2521,8 @@ export default function DataLakeParquetPanel({
     scrollToLoadProgress,
     setConnectedData,
     syncConnectPullState,
+    reportDataPullComplete,
+    reportDataPullError,
   ]);
 
   const executeIngestNewSheet = useCallback(async () => {

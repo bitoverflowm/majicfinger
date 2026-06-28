@@ -9,6 +9,7 @@ import {
   trackAuthError,
   updateAuthSessionIdentity,
 } from "@/lib/analytics/authJourneyClient";
+import { setDataPullNotifyIdentity } from "@/lib/analytics/trackDataPull";
 import { useAuthWorkspaceDwell } from "@/hooks/useAuthWorkspaceDwell";
 
 /**
@@ -24,6 +25,7 @@ export function AuthenticatedJourneyInit({ user }) {
       userId: user?._id || user?.userId,
     };
     updateAuthSessionIdentity(identityRef.current);
+    setDataPullNotifyIdentity(identityRef.current);
   }, [user]);
 
   useEffect(() => {
