@@ -136,7 +136,7 @@ export function PricingSection() {
           ? {
               price: tier.priceWeekly ?? tier.priceMonthly ?? "",
               suffix: "week",
-              note: null,
+              note: "billed weekly",
               href: tier.hrefWeekly,
             }
           : billingCycle === "monthly"
@@ -149,7 +149,9 @@ export function PricingSection() {
             : {
                 price: annualPriceAsMonthlyDisplay(tier.priceAnnual ?? ""),
                 suffix: "month",
-                note: tier.yearlyNote ?? "billed annually",
+                note: tier.priceAnnual
+                  ? `billed annually at ${tier.priceAnnual}/year`
+                  : "billed annually",
                 href: tier.hrefAnnual,
               };
 
@@ -228,9 +230,6 @@ export function PricingSection() {
                   <span className="text-4xl font-semibold">{demoTier.priceLabel}</span>
                   <span className="ml-2 text-sm text-muted-foreground">/{demoTier.suffix}</span>
                 </div>
-                <p className="text-xs invisible" aria-hidden="true">
-                  billed monthly
-                </p>
                 <p className="text-sm leading-snug text-muted-foreground">{demoTier.description}</p>
               </div>
               <div className="flex flex-col gap-2 p-4">
@@ -283,15 +282,7 @@ export function PricingSection() {
                   <span className="ml-2">/{tier.display.suffix}</span>
                 </div>
 
-                <p
-                  className={cn(
-                    "text-xs text-muted-foreground",
-                    !tier.display.note && "invisible",
-                  )}
-                  aria-hidden={!tier.display.note}
-                >
-                  {tier.display.note ?? "billed monthly"}
-                </p>
+                <p className="text-xs text-muted-foreground">{tier.display.note}</p>
 
                 <p className="text-sm leading-snug">{tier.description}</p>
               </div>
