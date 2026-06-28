@@ -294,7 +294,7 @@ async function recordDataPullNotify(sessionId, meta = {}) {
   await dbConnect();
 
   const phase = meta.phase;
-  if (!phase || !["started", "completed", "error"].includes(phase)) {
+  if (!phase || !["started", "completed", "zero_rows", "error"].includes(phase)) {
     return { ok: false, message: "Invalid data pull phase" };
   }
 

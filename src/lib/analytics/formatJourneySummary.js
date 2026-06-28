@@ -46,6 +46,11 @@ export function formatJourneyStep(event, index) {
         meta.integration ? ` (${meta.integration})` : ""
       }`;
     case "query_submit":
+      if (meta.status === "zero_rows") {
+        return `${index}. Query returned 0 rows on ${meta.table || meta.integration || "table"}${
+          meta.mode ? ` (${meta.mode})` : ""
+        }`;
+      }
       return `${index}. Ran query on ${meta.table || "table"}${meta.mode ? ` (${meta.mode})` : ""}${
         meta.rowCount != null ? ` → ${meta.rowCount} rows` : ""
       }`;
@@ -80,6 +85,10 @@ export function inferSessionOutcome(events) {
 export function inferAuthSessionOutcome(events) {
   const types = events.map((e) => e.type);
   if (types.includes("query_error") || types.includes("error")) return "Hit an error";
+  const zeroRowQuery = events.some(
+    (e) => e.type === "query_submit" && e.meta?.status === "zero_rows",
+  );
+  if (zeroRowQuery) return "Query returned zero rows";
   if (types.includes("query_submit")) return "Ran data queries";
   if (types.includes("data_source_select")) return "Explored data sources";
   if (types.includes("integration_select")) return "Browsed integrations";

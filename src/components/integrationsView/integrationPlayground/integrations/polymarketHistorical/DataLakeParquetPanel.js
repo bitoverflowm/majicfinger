@@ -2305,7 +2305,12 @@ export default function DataLakeParquetPanel({
 
       const { rows, rowCount, primaryJoinExpanded, expandedJoinRowCap } = ingestResult;
       if (!Array.isArray(rows) || rows.length === 0) {
-        throw new Error("Query finished but no rows were loaded into the sheet.");
+        reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: 0, requestStartMs });
+        const emptyMsg = "Query returned no rows. Try broadening filters or choosing a different table.";
+        setError(emptyMsg);
+        resetLargePullState();
+        syncConnectPullState({ loading: false, error: emptyMsg, label: "", progress: 0 });
+        return;
       }
       if (
         primaryJoinExpanded &&
@@ -2676,7 +2681,12 @@ export default function DataLakeParquetPanel({
 
       const { rows, rowCount } = ingestResult;
       if (!Array.isArray(rows) || rows.length === 0) {
-        throw new Error("Query finished but no rows were loaded into the sheet.");
+        reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: 0, requestStartMs });
+        const emptyMsg = "Query returned no rows. Try broadening filters or choosing a different table.";
+        setError(emptyMsg);
+        resetLargePullState();
+        syncConnectPullState({ loading: false, error: emptyMsg, label: "", progress: 0 });
+        return;
       }
 
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {

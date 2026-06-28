@@ -17,6 +17,20 @@ export function setDataPullNotifyIdentity(identity = {}) {
   };
 }
 
+/** @param {Record<string, unknown>} meta */
+function resolveDataPullRowCount(meta) {
+  if (meta.rowCount != null) return Number(meta.rowCount);
+  if (meta.loadedRowCount != null) return Number(meta.loadedRowCount);
+  return null;
+}
+
+/** @param {Record<string, unknown>} meta */
+function isZeroRowDataPull(meta) {
+  if (meta.liveStream) return false;
+  const count = resolveDataPullRowCount(meta);
+  return count != null && count === 0;
+}
+
 function postDataPullNotify(phase, meta) {
   if (typeof window === "undefined") return;
 
@@ -39,7 +53,7 @@ function postDataPullNotify(phase, meta) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    keepalive: phase === "completed" || phase === "error",
+    keepalive: phase === "completed" || phase === "zero_rows" || phase === "error",
   }).catch(() => {});
 }
 
@@ -54,11 +68,18 @@ export function trackDataPullStart(meta) {
 
 /**
  * Fire-and-forget: journey event + immediate Telegram when rows are returned.
+ * Sends a distinct 📡 alert when the query succeeds but returns 0 rows (non-live pulls).
  * @param {Record<string, unknown>} meta
  */
 export function trackDataPullComplete(meta) {
-  trackAuthEvent("query_submit", { meta: { ...meta, status: "success" } });
-  postDataPullNotify("completed", meta);
+  const rowCount = resolveDataPullRowCount(meta);
+  const zeroRows = isZeroRowDataPull(meta);
+  const status = zeroRows ? "zero_rows" : "success";
+  const phase = zeroRows ? "zero_rows" : "completed";
+  const enriched = rowCount != null ? { ...meta, rowCount } : meta;
+
+  trackAuthEvent("query_submit", { meta: { ...enriched, status } });
+  postDataPullNotify(phase, { ...enriched, status });
 }
 
 /**

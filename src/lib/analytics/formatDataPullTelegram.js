@@ -3,7 +3,7 @@ import { formatDuration } from "@/lib/analytics/formatJourneySummary";
 
 /**
  * @param {{
- *   phase: 'started' | 'completed' | 'error';
+ *   phase: 'started' | 'completed' | 'zero_rows' | 'error';
  *   meta?: Record<string, unknown>;
  *   sessionEmail?: string;
  * }} opts
@@ -14,7 +14,16 @@ export function buildDataPullTelegramMessage({ phase, meta = {}, sessionEmail })
       ? "📥 Data pull started"
       : phase === "completed"
         ? "✅ Data pull complete"
-        : "❌ Data pull failed";
+        : phase === "zero_rows"
+          ? "📡 Zero rows returned"
+          : "❌ Data pull failed";
+
+  const rowCount =
+    meta.rowCount != null
+      ? Number(meta.rowCount)
+      : meta.loadedRowCount != null
+        ? Number(meta.loadedRowCount)
+        : undefined;
 
   /** @type {Record<string, string | number | boolean | null | undefined>} */
   const fields = {
@@ -22,12 +31,7 @@ export function buildDataPullTelegramMessage({ phase, meta = {}, sessionEmail })
     Endpoint: meta.endpoint || meta.sampleLabel || meta.sampleId || meta.table,
     Mode: meta.mode || meta.selectionTab,
     Query: meta.querySummary,
-    Rows:
-      meta.rowCount != null
-        ? Number(meta.rowCount)
-        : meta.loadedRowCount != null
-          ? Number(meta.loadedRowCount)
-          : undefined,
+    Rows: rowCount,
     Duration:
       meta.elapsedMs != null
         ? formatDuration(Number(meta.elapsedMs))
@@ -36,6 +40,10 @@ export function buildDataPullTelegramMessage({ phase, meta = {}, sessionEmail })
     "Live stream": meta.liveStream ? "yes" : undefined,
     Lake: meta.lake,
     Table: meta.table,
+    Note:
+      phase === "zero_rows"
+        ? "Query ran successfully but returned no data — check filters, table, or UX clarity"
+        : undefined,
     Error: phase === "error" ? meta.message : undefined,
   };
 
