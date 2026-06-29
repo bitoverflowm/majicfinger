@@ -66,7 +66,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
   sections: [
     {
       type: "hero",
-      eyebrow: "Complete Kalshi historical archive",
+      eyebrow: "The Complete Kalshi Historical Archive",
       title: "Kalshi Historical Data",
       subtitle: "The most complete productized Kalshi historical dataset available.",
       microtext:
