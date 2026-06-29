@@ -6,7 +6,9 @@ import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import {
   HUB_CHART_EMBED_HEIGHT,
+  HUB_HERO_CHART_EMBED_HEIGHT,
   HubChartEmbedSkeleton,
+  HubHeroChartEmbedSkeleton,
 } from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
 import { resolveEmbedActiveSheetId } from "@/lib/chartSnapshotDataDeps";
@@ -29,7 +31,8 @@ function DataSheetsLoader({ rows, dataSheets, chartSnapshot }) {
   return null;
 }
 
-function HubChartEmbedBody({ chartPayload, username, slug }) {
+function HubChartEmbedBody({ chartPayload, username, slug, variant = "default" }) {
+  const heightClass = variant === "hero" ? HUB_HERO_CHART_EMBED_HEIGHT : HUB_CHART_EMBED_HEIGHT;
   const rows = chartPayload?.rows ?? [];
   const dataSheets = chartPayload?.dataSheets ?? {};
   const chart = chartPayload?.chart;
@@ -56,7 +59,7 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
 
   if (!rows.length && !hasRowsInAnySheet) {
     return (
-      <div className={cn("flex items-center justify-center text-sm text-muted-foreground", HUB_CHART_EMBED_HEIGHT)}>
+      <div className={cn("flex items-center justify-center text-sm text-muted-foreground", heightClass)}>
         Chart unavailable
       </div>
     );
@@ -72,7 +75,7 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
-        className={cn("relative", HUB_CHART_EMBED_HEIGHT)}
+        className={cn("relative", heightClass, variant === "hero" && "rounded-xl overflow-hidden")}
         style={{
           backgroundColor: cp0.bgColor || undefined,
           color: cp0.textColor || undefined,
@@ -80,7 +83,12 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
       >
         <DataSheetsLoader rows={rows} dataSheets={dataSheets} chartSnapshot={chartSnapshot} />
         <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot}>
-          <div className="flex h-full min-h-0 w-full flex-col overflow-hidden p-2">
+          <div
+            className={cn(
+              "flex h-full min-h-0 w-full flex-col overflow-hidden",
+              variant === "hero" ? "p-0" : "p-2",
+            )}
+          >
             <ChartCanvas />
           </div>
         </ChartBuilderProvider>
@@ -90,14 +98,33 @@ function HubChartEmbedBody({ chartPayload, username, slug }) {
 }
 
 /**
- * @param {{ username: string; slug: string }} props
+ * @param {{
+ *   username: string;
+ *   slug: string;
+ *   initialPayload?: object | null;
+ *   variant?: "default" | "hero";
+ * }} props
  */
-export function HubPublishedChartEmbed({ username, slug }) {
-  const [payload, setPayload] = useState(null);
+export function HubPublishedChartEmbed({
+  username,
+  slug,
+  initialPayload = null,
+  variant = "default",
+}) {
+  const [payload, setPayload] = useState(initialPayload);
   const [err, setErr] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialPayload);
+  const heightClass = variant === "hero" ? HUB_HERO_CHART_EMBED_HEIGHT : HUB_CHART_EMBED_HEIGHT;
+  const Skeleton = variant === "hero" ? HubHeroChartEmbedSkeleton : HubChartEmbedSkeleton;
 
   useEffect(() => {
+    if (initialPayload) {
+      setPayload(initialPayload);
+      setErr(null);
+      setLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
     setLoading(true);
     setErr(null);
@@ -123,31 +150,44 @@ export function HubPublishedChartEmbed({ username, slug }) {
     return () => {
       cancelled = true;
     };
-  }, [username, slug]);
+  }, [username, slug, initialPayload]);
+
+  const Wrapper = variant === "hero" ? "div" : "article";
+  const wrapperClass =
+    variant === "hero"
+      ? "w-full overflow-visible"
+      : "overflow-hidden rounded-xl border border-border bg-card/40";
 
   return (
-    <article className="overflow-hidden rounded-xl border border-border bg-card/40">
-      {loading ? <HubChartEmbedSkeleton /> : null}
+    <Wrapper className={wrapperClass}>
+      {loading ? <Skeleton /> : null}
       {!loading && err ? (
-        <div className={cn("flex items-center justify-center px-6 text-center text-sm text-muted-foreground", HUB_CHART_EMBED_HEIGHT)}>
+        <div className={cn("flex items-center justify-center px-6 text-center text-sm text-muted-foreground", heightClass)}>
           {err}
         </div>
       ) : null}
       {!loading && payload ? (
         <>
-          <HubChartEmbedBody chartPayload={payload} username={username} slug={slug} />
-          <div className="border-t border-border px-4 py-3">
-            <RunForYourselfButton
-              ownerHandle={username}
-              chartSlug={slug}
-              kind="chart"
-              presentation="promo"
-              promoVariant="subtle"
-              displayName={payload?.chart?.chart_name || slug}
-            />
-          </div>
+          <HubChartEmbedBody
+            chartPayload={payload}
+            username={username}
+            slug={slug}
+            variant={variant}
+          />
+          {variant === "default" ? (
+            <div className="border-t border-border px-4 py-3">
+              <RunForYourselfButton
+                ownerHandle={username}
+                chartSlug={slug}
+                kind="chart"
+                presentation="promo"
+                promoVariant="subtle"
+                displayName={payload?.chart?.chart_name || slug}
+              />
+            </div>
+          ) : null}
         </>
       ) : null}
-    </article>
+    </Wrapper>
   );
 }

@@ -16,9 +16,11 @@ import type {
   HubSection,
   HubStatsSection,
   HubTextBlockSection,
+  HubPublicChartPayload,
   HubVideoCarouselSection,
 } from "@/types/hub";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
+import { HubPublishedChartEmbed } from "@/components/hubs/HubPublishedChartEmbed";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
 import { HubChartEmbedSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
 
@@ -30,7 +32,7 @@ const HubKalshiQueryBuilder = dynamic(
   { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
 );
 
-const HubPublishedChartEmbed = dynamic(
+const HubPublishedChartEmbedLazy = dynamic(
   () =>
     import("@/components/hubs/HubPublishedChartEmbed").then((m) => m.HubPublishedChartEmbed),
   {
@@ -56,19 +58,25 @@ function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "pr
   );
 }
 
-function HubHero({ section }: { section: HubHeroSection }) {
+function HubHero({
+  section,
+  heroChartPayload,
+}: {
+  section: HubHeroSection;
+  heroChartPayload?: HubPublicChartPayload | null;
+}) {
   const isPremium = section.variant === "premium";
 
   if (isPremium) {
     return (
-      <section className="relative w-full overflow-hidden">
+      <section className="relative w-full overflow-visible">
         <div
           aria-hidden
-          className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 h-[44rem] w-full md:h-[48rem]"
+          className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 h-[52rem] w-full md:h-[56rem]"
         />
-        <div className="relative z-10 w-full px-6 pb-8 pt-32 md:pb-10 md:pt-40">
-          <div className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
-            <div className="flex flex-col items-start gap-5 text-left md:gap-6">
+        <div className="relative z-10 w-full px-6 pb-12 pt-[6.8rem] md:pb-16 md:pt-[8.5rem]">
+          <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-2 lg:gap-14">
+            <div className="flex flex-col items-start gap-5 text-left md:gap-6 lg:pt-2">
               {section.eyebrow ? (
                 <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
                   {section.eyebrow}
@@ -100,10 +108,21 @@ function HubHero({ section }: { section: HubHeroSection }) {
               </div>
             </div>
 
-            <div
-              aria-hidden
-              className="min-h-[280px] w-full rounded-2xl border border-border/60 bg-background shadow-sm sm:min-h-[320px] lg:min-h-[380px]"
-            />
+            {section.heroChart ? (
+              <div className="w-full lg:-mr-2 lg:-mt-12 lg:self-start">
+                <HubPublishedChartEmbed
+                  username={section.heroChart.username}
+                  slug={section.heroChart.slug}
+                  initialPayload={heroChartPayload ?? null}
+                  variant="hero"
+                />
+              </div>
+            ) : (
+              <div
+                aria-hidden
+                className="min-h-[280px] w-full rounded-2xl border border-border/60 bg-background shadow-sm sm:min-h-[320px] lg:min-h-[380px]"
+              />
+            )}
           </div>
         </div>
       </section>
@@ -112,7 +131,7 @@ function HubHero({ section }: { section: HubHeroSection }) {
 
   return (
     <section className="relative w-full overflow-hidden">
-      <div className="flex w-full flex-col items-center px-6 pb-20 pt-36 md:pb-28 md:pt-44">
+      <div className="flex w-full flex-col items-center px-6 pb-20 pt-[7.65rem] md:pb-28 md:pt-[9.35rem]">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
           {section.eyebrow ? (
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
@@ -461,7 +480,7 @@ function HubPublishedCharts({
       </div>
       <div className="mt-12 grid grid-cols-1 gap-6 px-4 sm:px-6 md:grid-cols-2 lg:px-8">
         {visibleCharts.map((chart) => (
-          <HubPublishedChartEmbed
+          <HubPublishedChartEmbedLazy
             key={`${chart.username}-${chart.slug}`}
             username={chart.username}
             slug={chart.slug}
@@ -522,10 +541,12 @@ export function HubSectionRenderer({
   section,
   assets,
   index,
+  heroChartPayload = null,
 }: {
   section: HubSection;
   assets: HubPublishedAssets;
   index: number;
+  heroChartPayload?: HubPublicChartPayload | null;
 }) {
   const isAlternate = index % 2 === 1;
 
@@ -535,7 +556,7 @@ export function HubSectionRenderer({
 
   switch (section.type) {
     case "hero":
-      return wrapper(<HubHero section={section} />);
+      return wrapper(<HubHero section={section} heroChartPayload={heroChartPayload} />);
     case "stats":
       return wrapper(<HubStats section={section} />);
     case "proof_metrics":

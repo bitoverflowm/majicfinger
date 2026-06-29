@@ -28,8 +28,19 @@ export type HubHeroSection = {
   microtext?: string;
   supportingText?: string;
   variant?: "default" | "premium";
+  /** Featured chart shown in the premium split-layout hero (right column). */
+  heroChart?: { username: string; slug: string };
   primaryCTAs: HubCta[];
   secondaryCTAs?: HubCta[];
+};
+
+export type HubPublicChartPayload = {
+  chart: Record<string, unknown>;
+  rows: unknown[];
+  dataSheets: Record<string, unknown>;
+  owner_handle?: string;
+  owner_name?: string | null;
+  owner_profile_pic?: string | null;
 };
 
 export type HubProofMetric = {

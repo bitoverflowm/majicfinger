@@ -1,14 +1,15 @@
 import { FooterSection } from "@/components/sections/footer-section";
 import { HubSectionRenderer } from "@/components/hubs/HubSections";
 import { buildHubJsonLd } from "@/lib/hubs/metadata";
-import type { HubPageConfig, HubPublishedAssets } from "@/types/hub";
+import type { HubPageConfig, HubPublishedAssets, HubPublicChartPayload } from "@/types/hub";
 
 type HubPageProps = {
   config: HubPageConfig;
   assets: HubPublishedAssets;
+  heroChartPayload?: HubPublicChartPayload | null;
 };
 
-export function HubPage({ config, assets }: HubPageProps) {
+export function HubPage({ config, assets, heroChartPayload = null }: HubPageProps) {
   const { collectionPage, breadcrumb, faqPage } = buildHubJsonLd(config);
 
   return (
@@ -35,6 +36,7 @@ export function HubPage({ config, assets }: HubPageProps) {
             section={section}
             assets={assets}
             index={index}
+            heroChartPayload={heroChartPayload}
           />
         ))}
         <FooterSection />

@@ -4,6 +4,10 @@ import { cn } from "@/lib/utils";
 /** Default height class for hub-published chart embeds. */
 export const HUB_CHART_EMBED_HEIGHT = "h-[570px] md:h-[630px]";
 
+/** Taller hero chart — extends below the left-column copy block. */
+export const HUB_HERO_CHART_EMBED_HEIGHT =
+  "h-[380px] sm:h-[440px] md:h-[500px] lg:h-[560px]";
+
 /** Default height class for standalone public chart pages. */
 export const PUBLIC_CHART_EMBED_HEIGHT =
   "h-[420px] min-h-[320px] md:h-[750px] w-full max-w-[1040px]";
@@ -41,6 +45,15 @@ export function HubChartEmbedSkeleton() {
   return (
     <ChartEmbedSkeleton
       className={cn("border-0 bg-transparent", HUB_CHART_EMBED_HEIGHT)}
+    />
+  );
+}
+
+export function HubHeroChartEmbedSkeleton() {
+  return (
+    <ChartEmbedSkeleton
+      className={cn("border-0 bg-transparent", HUB_HERO_CHART_EMBED_HEIGHT)}
+      showTitle={false}
     />
   );
 }

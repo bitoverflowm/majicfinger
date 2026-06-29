@@ -70,6 +70,10 @@ export const kalshiHistoricalHub: HubPageConfig = {
       eyebrow: "The complete Kalshi historical archive",
       title: "Kalshi Historical Data",
       subtitle: "The most complete productized Kalshi historical dataset available.",
+      heroChart: {
+        username: "misterrpink",
+        slug: "nyc-weather-market-intraday-volatility-clustering",
+      },
       microtext:
         "Query Kalshi markets, trades, prices, volume, outcomes, and orderbook history since launch — without building your own data pipeline.",
       supportingText:
