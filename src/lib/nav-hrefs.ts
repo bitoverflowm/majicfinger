@@ -7,17 +7,14 @@ export type NavMenuLink = {
 };
 
 /**
- * Marketing navbar links.
- * Polymarket metadata page only: slim nav + "Learn more" → #guides.
- * All other routes (including `/` landing): the **exact** `siteConfig.nav.links` tuple — same reference, labels, and hrefs as before.
+ * Marketing navbar links (after Products dropdown).
+ * Home is omitted — the Lychee logo links to `/`.
+ * Polymarket metadata uses a slim single-link nav.
  */
 export function getNavLinksForPathname(pathname: string | null | undefined) {
   const p = (pathname ?? "").replace(/\/$/, "") || "/";
   if (p === "/polymarket-metadata") {
     return [{ id: "guides", name: "Learn more", href: "#guides" }] satisfies NavMenuLink[];
-  }
-  if (p === "/") {
-    return siteConfig.nav.links.filter((link) => link.id !== "hero");
   }
   return siteConfig.nav.links;
 }

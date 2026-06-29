@@ -8,9 +8,8 @@ export const siteConfig = {
   ...coreSiteConfig,
   nav: {
     links: [
-      { id: "hero", name: "Home", href: "/#hero" },
-      { id: "pricing", name: "Pricing", href: "/#pricing" },
       { id: "guides", name: "Research", href: "/#guides" },
+      { id: "pricing", name: "Pricing", href: "/#pricing" },
     ],
   },
   companyShowcase: {
