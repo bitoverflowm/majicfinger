@@ -2,8 +2,11 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import type {
+  HubBulletsSection,
+  HubCardsSection,
   HubCta,
   HubCtaSection,
+  HubFaqSection,
   HubHeroSection,
   HubLinkGroupSection,
   HubPublishedAssets,
@@ -57,6 +60,11 @@ function HubHero({ section }: { section: HubHeroSection }) {
     <section className="relative w-full">
       <div className="flex w-full flex-col items-center px-6 pb-20 pt-36 md:pb-28 md:pt-44">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
+          {section.eyebrow ? (
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              {section.eyebrow}
+            </p>
+          ) : null}
           <h1 className="text-3xl font-medium tracking-tighter text-primary md:text-4xl lg:text-5xl text-balance">
             {section.title}
           </h1>
@@ -66,6 +74,11 @@ function HubHero({ section }: { section: HubHeroSection }) {
           {section.microtext ? (
             <p className="max-w-xl text-sm leading-relaxed text-muted-foreground/80 md:text-base text-pretty">
               {section.microtext}
+            </p>
+          ) : null}
+          {section.supportingText ? (
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
+              {section.supportingText}
             </p>
           ) : null}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -83,12 +96,38 @@ function HubHero({ section }: { section: HubHeroSection }) {
 }
 
 function HubStats({ section }: { section: HubStatsSection }) {
+  if (section.variant === "proof_strip") {
+    return (
+      <section className="w-full border-y border-border/60 bg-muted/20 px-6 py-10 md:py-12">
+        <ul className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-center gap-3">
+          {section.stats.map((stat) => (
+            <li
+              key={stat.label}
+              className="rounded-full border border-border/60 bg-background px-4 py-2 text-sm text-foreground"
+            >
+              {stat.value ? (
+                <>
+                  <span className="font-medium">{stat.label}</span>
+                  <span className="text-muted-foreground"> · {stat.value}</span>
+                </>
+              ) : (
+                stat.label
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
   return (
     <section className="w-full px-6 py-20 md:py-28">
       <div className="mx-auto w-full max-w-4xl space-y-12">
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-          {section.title}
-        </h2>
+        {section.title ? (
+          <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            {section.title}
+          </h2>
+        ) : null}
         <dl className="mx-auto w-full max-w-xl space-y-2 text-left">
           {section.stats.map((stat) => (
             <div key={stat.label} className="flex flex-wrap gap-x-2 text-base leading-relaxed">
@@ -150,6 +189,100 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
         <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
           {section.content}
         </p>
+      </div>
+    </section>
+  );
+}
+
+function HubCards({ section }: { section: HubCardsSection }) {
+  return (
+    <section
+      id={section.anchorId}
+      className={cn("w-full px-6 py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+    >
+      <div className="mx-auto w-full max-w-4xl space-y-10">
+        <div className="mx-auto max-w-2xl space-y-4 text-center">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            {section.title}
+          </h2>
+          {section.intro ? (
+            <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+              {section.intro}
+            </p>
+          ) : null}
+        </div>
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {section.cards.map((card) => (
+            <li
+              key={card.title}
+              className="rounded-xl border border-border bg-background p-5 shadow-sm"
+            >
+              <h3 className="font-semibold text-foreground">{card.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground text-pretty">
+                {card.description}
+              </p>
+            </li>
+          ))}
+        </ul>
+        {section.note ? (
+          <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed text-muted-foreground text-pretty">
+            {section.note}
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function HubBullets({ section }: { section: HubBulletsSection }) {
+  return (
+    <section className="w-full px-6 py-16 md:py-24">
+      <div className="mx-auto w-full max-w-2xl space-y-8">
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            {section.title}
+          </h2>
+          {section.intro ? (
+            <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+              {section.intro}
+            </p>
+          ) : null}
+        </div>
+        <ul className="space-y-3">
+          {section.bullets.map((bullet) => (
+            <li
+              key={bullet}
+              className="flex gap-3 rounded-lg border border-border/50 bg-muted/20 px-4 py-3 text-base leading-relaxed text-foreground"
+            >
+              <span className="text-muted-foreground" aria-hidden>
+                •
+              </span>
+              <span>{bullet}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function HubFaq({ section }: { section: HubFaqSection }) {
+  return (
+    <section className="w-full px-6 py-16 md:py-24">
+      <div className="mx-auto w-full max-w-2xl space-y-10">
+        <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+          {section.title}
+        </h2>
+        <dl className="space-y-6">
+          {section.items.map((item) => (
+            <div key={item.question} className="space-y-2 border-b border-border/60 pb-6 last:border-0">
+              <dt className="text-base font-semibold text-foreground md:text-lg">{item.question}</dt>
+              <dd className="text-base leading-relaxed text-muted-foreground text-pretty">
+                {item.answer}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </section>
   );
@@ -355,6 +488,12 @@ export function HubSectionRenderer({
       return wrapper(<HubQuery section={section} />);
     case "text_block":
       return wrapper(<HubTextBlock section={section} />);
+    case "cards":
+      return wrapper(<HubCards section={section} />);
+    case "bullets":
+      return wrapper(<HubBullets section={section} />);
+    case "faq":
+      return wrapper(<HubFaq section={section} />);
     case "link_group":
       return wrapper(<HubLinkGroup section={section} />);
     case "published_charts":

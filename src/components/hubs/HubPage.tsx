@@ -9,7 +9,7 @@ type HubPageProps = {
 };
 
 export function HubPage({ config, assets }: HubPageProps) {
-  const { collectionPage, breadcrumb } = buildHubJsonLd(config);
+  const { collectionPage, breadcrumb, faqPage } = buildHubJsonLd(config);
 
   return (
     <>
@@ -21,6 +21,12 @@ export function HubPage({ config, assets }: HubPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
       />
+      {faqPage ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqPage) }}
+        />
+      ) : null}
 
       <main className="flex min-h-screen w-full flex-col items-stretch overflow-x-visible bg-background font-sans antialiased theme-landing scroll-smooth">
         {config.sections.map((section, index) => (

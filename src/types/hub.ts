@@ -22,17 +22,20 @@ export type HubStat = {
 
 export type HubHeroSection = {
   type: "hero";
+  eyebrow?: string;
   title: string;
   subtitle: string;
   microtext?: string;
+  supportingText?: string;
   primaryCTAs: HubCta[];
   secondaryCTAs?: HubCta[];
 };
 
 export type HubStatsSection = {
   type: "stats";
-  title: string;
+  title?: string;
   stats: HubStat[];
+  variant?: "default" | "proof_strip";
 };
 
 export type HubQuerySection = {
@@ -49,6 +52,38 @@ export type HubTextBlockSection = {
   type: "text_block";
   title: string;
   content: string;
+};
+
+export type HubCard = {
+  title: string;
+  description: string;
+};
+
+export type HubCardsSection = {
+  type: "cards";
+  anchorId?: string;
+  title: string;
+  intro?: string;
+  note?: string;
+  cards: HubCard[];
+};
+
+export type HubBulletsSection = {
+  type: "bullets";
+  title: string;
+  intro?: string;
+  bullets: string[];
+};
+
+export type HubFaqItem = {
+  question: string;
+  answer: string;
+};
+
+export type HubFaqSection = {
+  type: "faq";
+  title: string;
+  items: HubFaqItem[];
 };
 
 export type HubLinkGroupSection = {
@@ -100,6 +135,9 @@ export type HubSection =
   | HubStatsSection
   | HubQuerySection
   | HubTextBlockSection
+  | HubCardsSection
+  | HubBulletsSection
+  | HubFaqSection
   | HubLinkGroupSection
   | HubCtaSection
   | HubPublishedChartsSection

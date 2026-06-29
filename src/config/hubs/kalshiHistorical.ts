@@ -66,20 +66,22 @@ export const kalshiHistoricalHub: HubPageConfig = {
   sections: [
     {
       type: "hero",
+      eyebrow: "Complete Kalshi historical archive",
       title: "Kalshi Historical Data",
-      subtitle:
-        "36GB+ of Kalshi historical data including market data, trade history, and full orderbook data across all markets. Access Kalshi historical data API, download datasets, and perform backtesting on prediction markets.",
+      subtitle: "The most complete productized Kalshi historical dataset available.",
       microtext:
-        "Search Kalshi historical data, analyze market behavior, and download historical trade and orderbook data for backtesting strategies.",
+        "Query Kalshi markets, trades, prices, volume, outcomes, and orderbook history since launch — without building your own data pipeline.",
+      supportingText:
+        "Search historical Kalshi data, build charts, export CSV/XLSX/JSON, and backtest prediction market ideas in Lychee's no-code research workspace.",
       primaryCTAs: [
         {
-          label: "Take me to the data",
+          label: "Start a free Kalshi query",
           href: "#explore-data",
         },
       ],
       secondaryCTAs: [
         {
-          label: "Get Inspired",
+          label: "Explore example workflows",
           href: "#get-inspired",
         },
       ],
@@ -87,64 +89,189 @@ export const kalshiHistoricalHub: HubPageConfig = {
 
     {
       type: "stats",
-      title: "Kalshi Historical Dataset",
+      variant: "proof_strip",
       stats: [
-        { label: "Dataset Size", value: "36GB+" },
-        { label: "Kalshi Historical Markets", value: "All markets" },
-        { label: "Historical Trade Data", value: "Full trade history" },
-        { label: "API Access", value: "Kalshi historical data API supported" },
-        { label: "Download Formats", value: "JSON, CSV, XLSX" },
-        { label: "In-Browser Access", value: "Query, explore, and export without code" },
-        { label: "Backtesting Support", value: "Yes" },
+        { label: "36GB+ compressed archive", value: "" },
+        { label: "Since Kalshi launch", value: "" },
+        { label: "All Kalshi markets", value: "" },
+        { label: "Full trade history", value: "" },
+        { label: "Orderbook history", value: "" },
+        { label: "CSV/XLSX/JSON exports", value: "" },
+        { label: "No-code querying", value: "" },
+        { label: "Backtesting-ready", value: "" },
+      ],
+    },
+
+    {
+      type: "cards",
+      title: "What's inside the Kalshi historical dataset?",
+      intro:
+        "Lychee gives you browser-based access to historical Kalshi markets, trades, prices, volume, outcomes, categories, and orderbook history. Use it to search past markets, inspect trade behavior, compare categories, export datasets, and build research workflows without managing files or API pipelines.",
+      cards: [
+        {
+          title: "Markets",
+          description:
+            "Tickers, titles, categories, open and close times, market status, outcomes, volume, and event metadata.",
+        },
+        {
+          title: "Trades",
+          description:
+            "Historical trade executions, prices, quantities, timestamps, market identifiers, and outcome-side information.",
+        },
+        {
+          title: "Orderbook history",
+          description:
+            "Historical bid/ask behavior, liquidity, spreads, and market depth where available.",
+        },
+        {
+          title: "Categories and events",
+          description:
+            "Weather, politics, sports, finance, crypto, economics, culture, and other Kalshi market categories.",
+        },
+        {
+          title: "Outcomes and resolution data",
+          description:
+            "Resolved market outcomes for calibration, accuracy analysis, backtesting, and market-behavior research.",
+        },
+        {
+          title: "Export-ready datasets",
+          description:
+            "Download query results as CSV, XLSX, or JSON within your plan limits.",
+        },
+      ],
+    },
+
+    {
+      type: "bullets",
+      title: "Why Kalshi historical data is hard to use without Lychee",
+      intro:
+        "Raw historical prediction market analysis usually requires collecting data, storing large files, stitching markets to trades, handling live vs historical endpoints, cleaning fields, and building your own charts. Lychee turns the archive into a hosted no-code workspace.",
+      bullets: [
+        "No data pipeline to build",
+        "No local 36GB+ archive to manage",
+        "No Python required",
+        "No manual CSV wrangling",
+        "No stitching markets, trades, and outcomes by hand",
+        "Query, chart, export, and backtest from one workspace",
       ],
     },
 
     {
       type: "text_block",
-      title: "What is Included in Kalshi Historical Data",
+      title: "Looking for a Kalshi historical data API?",
       content:
-        "Kalshi historical data includes full market data, trade history and historical price movements across all Kalshi prediction markets. This dataset supports Kalshi backtesting, trade analysis, and prediction market research. Users can access Kalshi historical market data via Lychee's browser based tools or download formats for offline analysis.",
+        "Lychee is not a public API product yet. It is a no-code workspace for people who want to use Kalshi historical data without building and maintaining their own API pipeline. You can search markets, inspect trades, chart results, export CSV/XLSX/JSON, and build research workflows directly in the browser.",
     },
 
     {
-      type: "text_block",
-      title: "Download & Export Formats",
-      content:
-        "Kalshi historical data can be exported for analysis and backtesting. Common formats include CSV, JSON, and structured dataset exports. Users often use this data for offline analysis, research, and machine learning workflows. GitHub-style dataset usage and reproducible research workflows are supported through structured exports.",
+      type: "cards",
+      title: "What you can do with Kalshi historical data",
+      cards: [
+        {
+          title: "Find high-volume markets",
+          description:
+            "Sort historical Kalshi markets by volume to find the contracts that attracted the most trading activity.",
+        },
+        {
+          title: "Analyze category behavior",
+          description:
+            "Compare weather, politics, sports, crypto, economics, and other categories across volume, outcomes, and price behavior.",
+        },
+        {
+          title: "Study trades and price movement",
+          description:
+            "Inspect historical trades, price changes, liquidity, and market behavior around major events.",
+        },
+        {
+          title: "Build charts and dashboards",
+          description:
+            "Turn historical queries into charts, dashboards, calibration curves, convergence views, and volume breakdowns.",
+        },
+        {
+          title: "Export data",
+          description:
+            "Download CSV, XLSX, or JSON samples and larger plan-based exports for your own research stack.",
+        },
+        {
+          title: "Backtest ideas",
+          description:
+            "Test market hypotheses against resolved historical markets, trade behavior, outcomes, volume, and pricing patterns.",
+        },
+      ],
     },
 
     {
       type: "query",
       anchorId: "explore-data",
-      title: "Kalshi Historical Data API & Search",
+      title: "Search Kalshi historical data",
       description:
-        "Run queries on Kalshi historical data, including trade history, orderbook data, and market-level datasets. Supports backtesting and analysis workflows.",
+        "Run no-code queries on historical Kalshi markets, trades, prices, volume, outcomes, and Kalshi orderbook history. Export results as CSV, XLSX, or JSON within your plan limits.",
       examples: [
         "Kalshi historical data download",
-        "Kalshi historical orderbook data",
+        "Kalshi historical order book data",
         "Kalshi trade history CSV export",
         "Kalshi backtesting historical data",
         "Kalshi market data analysis",
         "Find markets with highest volume",
-        "Show Kalshi historical data by category",
+        "Show Kalshi past markets by category",
         "Analyze Kalshi trading volume trends",
       ],
       examplesTitle: "Example queries you can build",
     },
 
     {
-      type: "published_charts",
-      anchorId: "get-inspired",
-      title: "Kalshi Historical Data Charts",
-      description:
-        "Every published chart built on Kalshi historical data — volume trends, probability convergence, calibration curves, and more. Run any chart for yourself with your own parameters.",
+      type: "cards",
+      anchorId: "example-workflows",
+      title: "Example Kalshi historical workflows",
+      intro: "Start with simple workflows, then scale into deeper research.",
+      note: "Guided query recipes are coming soon. For now, start with a free Kalshi query or explore the example research below.",
+      cards: [
+        {
+          title: "Top Kalshi markets by volume",
+          description:
+            "Find the highest-volume historical Kalshi markets since launch.",
+        },
+        {
+          title: "Resolved politics markets",
+          description:
+            "Filter finalized political markets and study probability, volume, and outcome behavior.",
+        },
+        {
+          title: "Weather market history",
+          description:
+            "Pull historical weather markets by location, contract type, or time window.",
+        },
+        {
+          title: "Trade history export",
+          description:
+            "Select trades, choose fields, and export a clean CSV/XLSX/JSON sample.",
+        },
+        {
+          title: "Volume by category",
+          description:
+            "Group markets by category to see where Kalshi trading activity concentrates.",
+        },
+        {
+          title: "Backtesting dataset",
+          description:
+            "Use resolved markets, prices, volume, and outcomes to test prediction market strategies.",
+        },
+      ],
     },
 
     {
       type: "link_group",
       anchorId: "guides",
-      title: "Kalshi Historical Data Guides",
+      title: "Start here",
       groups: [],
+    },
+
+    {
+      type: "published_charts",
+      anchorId: "get-inspired",
+      title: "Charts",
+      description:
+        "Every published chart built on Kalshi historical data — volume trends, probability convergence, calibration curves, and more. Run any chart for yourself with your own parameters.",
     },
 
     {
@@ -179,33 +306,85 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
-      type: "text_block",
-      title: "Kalshi Backtesting with Historical Data",
-      content:
-        "Kalshi historical data is commonly used for backtesting trading strategies on prediction markets. Users analyze historical trade data, orderbook movements, and market outcomes to evaluate strategy performance. The dataset supports Kalshi backtesting workflows including trade simulation, probability analysis, and market efficiency research.",
-    },
-
-    {
       type: "published_dashboards",
       anchorId: "published-dashboards",
-      title: "Kalshi Dashboards",
+      title: "Dashboards",
       description:
         "Live, shareable Kalshi dashboards — volume trends, market analysis, and weather prediction market insights built on historical data.",
     },
 
     {
-      type: "text_block",
-      title: "Kalshi Political Market Research",
-      content:
-        "Beyond volume and weather, Kalshi historical data supports deep political market research — calibration curves, forecast error by probability bucket, and lifecycle accuracy across thousands of resolved elections and policy markets. Explore the political research guides below for calibration analysis, lifecycle forecasting, and election market behavior.",
-    },
-
-    {
       type: "link_group",
-      title: "Kalshi Resources",
+      title: "Kalshi historical research & resources",
       groups: [
         {
-          label: "Political Market Research",
+          label: "Volume analysis",
+          links: [
+            {
+              title: "What Does Volume Mean on Kalshi?",
+              href: "/guides/what-does-volume-mean-on-kalshi",
+              description:
+                "Trading volume, liquidity, and market activity explained for beginners.",
+            },
+            {
+              title: "Kalshi Volume Guide",
+              href: "/guides/kalshi-volume",
+              description:
+                "How to analyze Kalshi trading volume trends and category activity.",
+            },
+            {
+              title: "Kalshi Volume Chart Guide",
+              href: "/guides/kalshi-volume-chart-guide",
+              description:
+                "Build volume charts and breakdowns from historical Kalshi market data.",
+            },
+            {
+              title: "Kalshi Volume Dashboard",
+              href: "/misterrpink/dashboards/kalshi-volume-dashboard",
+              description:
+                "Quarterly volume trends, category activity, and shareable Kalshi market insights.",
+            },
+          ],
+        },
+        {
+          label: "Weather analysis",
+          links: [
+            {
+              title: "Kalshi Weather Prediction Markets Analysis",
+              href: "/guides/kalshi-weather-prediction-markets-analysis",
+              description:
+                "Research on weather market behavior, pricing, and historical patterns.",
+            },
+            {
+              title: "Kalshi Historical Weather Dashboard",
+              href: "/misterrpink/dashboards/kalshi-historical-weather-datas",
+              description:
+                "Shareable dashboard for historical Kalshi weather market data.",
+            },
+            {
+              title: "Weather Probability Convergence Chart",
+              href: "/misterrpink/charts/kalshi-weather-probability-convergence-jan-2025-2",
+            },
+            {
+              title: "Weather Market Calibration Curve",
+              href: "/misterrpink/charts/weather-market-calibration-curve",
+            },
+            {
+              title: "Build a Probability Convergence Chart",
+              href: "/guides/kalshi-weather-probability-convergence-chart",
+            },
+            {
+              title: "Build a Weather Calibration Chart",
+              href: "/guides/kalshi-weather-probability-calibration-chart",
+            },
+            {
+              title: "Build a Weather Volatility Chart",
+              href: "/guides/kalshi-weather-volatility-chart",
+            },
+          ],
+        },
+        {
+          label: "Political market research",
           links: [
             {
               title: "Are 90% Prediction Markets Reliable?",
@@ -227,58 +406,58 @@ export const kalshiHistoricalHub: HubPageConfig = {
             },
           ],
         },
+      ],
+    },
+
+    {
+      type: "faq",
+      title: "Kalshi Historical FAQ",
+      items: [
         {
-          label: "Volume & Market Analysis",
-          links: [
-            {
-              title: "What Does Volume Mean on Kalshi?",
-              href: "/guides/what-does-volume-mean-on-kalshi",
-              description:
-                "Trading volume, liquidity, and market activity explained for beginners.",
-            },
-            {
-              title: "Kalshi Volume Dashboard",
-              href: "/misterrpink/dashboards/kalshi-volume-dashboard",
-              description:
-                "Quarterly volume trends, category activity, and shareable Kalshi market insights.",
-            },
-          ],
+          question: "Does Lychee include all Kalshi historical markets?",
+          answer:
+            "Lychee is built around a complete Kalshi historical archive covering markets, trades, prices, volume, outcomes, and orderbook history since Kalshi launched. It is designed for users who want to search, analyze, chart, export, and backtest Kalshi data without building their own data pipeline.",
         },
         {
-          label: "Probability Analysis",
-          links: [
-            {
-              title: "Weather Probability Convergence Chart",
-              href: "/misterrpink/charts/kalshi-weather-probability-convergence-jan-2025-2",
-            },
-            {
-              title: "Weather Market Calibration Curve",
-              href: "/misterrpink/charts/weather-market-calibration-curve",
-            },
-          ],
+          question: "Can I download Kalshi historical data?",
+          answer:
+            "Yes. Lychee supports CSV, XLSX, and JSON exports from query results. Export size depends on your plan limits, so you can start with small samples and upgrade for larger historical pulls.",
+        },
+        {
+          question: "Does Lychee provide a Kalshi historical data API?",
+          answer:
+            "Not yet. Lychee currently provides no-code browser access, query tools, charts, dashboards, exports, and research workflows. The point is to let you use Kalshi historical data without writing API scripts or maintaining your own pipeline.",
+        },
+        {
+          question: "Can I use Lychee for Kalshi backtesting?",
+          answer:
+            "Yes. Lychee's historical Kalshi data can be used for backtesting and research workflows involving historical trades, market outcomes, price movement, volume, category behavior, and orderbook history.",
+        },
+        {
+          question: "What is the difference between Kalshi Historical and Kalshi Live?",
+          answer:
+            "Kalshi Historical is for analyzing past markets, trades, outcomes, and historical market behavior. Kalshi Live is for current and recent market monitoring. Lychee lets users combine historical and live Kalshi workflows inside the same platform.",
+        },
+        {
+          question: "Do I need Python or SQL?",
+          answer:
+            "No. You can search, filter, sort, chart, dashboard, and export Kalshi historical data through Lychee's visual workspace. Developers can still export data for their own stack, but code is not required to start.",
         },
       ],
     },
 
     {
-      type: "text_block",
-      title: "Use Cases for Kalshi Historical Data",
-      content:
-        "Kalshi historical data is used for trade analysis, backtesting trading strategies, building prediction market dashboards, analyzing market efficiency, studying Kalshi trading volume, and exporting historical trade data for research. It is commonly used by analysts, researchers, and developers working with prediction market data.",
-    },
-
-    {
       type: "cta",
-      title: "Start Analyzing Kalshi Historical Data",
+      title: "Start analyzing Kalshi historical data",
       description:
-        "Search Kalshi historical data, analyze trade history, and run backtests on real prediction market data.",
+        "Run a free sample query, inspect historical markets and trades, then unlock larger pulls, exports, dashboards, and backtesting workflows.",
       cta: {
-        label: "Start Free Query",
+        label: "Start free Kalshi query",
         href: "#explore-data",
         requiresAuth: false,
       },
       secondaryCta: {
-        label: "Get Full Access",
+        label: "View pricing",
         href: "/#pricing",
         requiresAuth: false,
       },

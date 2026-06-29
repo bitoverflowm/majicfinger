@@ -84,6 +84,23 @@ export function buildHubJsonLd(config: HubPageConfig) {
   const keywords =
     config.keywords?.length ? config.keywords.join(", ") : undefined;
 
+  const faqSection = config.sections.find((section) => section.type === "faq");
+  const faqPage =
+    faqSection?.type === "faq" && faqSection.items.length
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: faqSection.items.map((item) => ({
+            "@type": "Question",
+            name: item.question,
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: item.answer,
+            },
+          })),
+        }
+      : undefined;
+
   const collectionPage = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -122,5 +139,5 @@ export function buildHubJsonLd(config: HubPageConfig) {
     ],
   };
 
-  return { collectionPage, breadcrumb };
+  return { collectionPage, breadcrumb, faqPage };
 }
