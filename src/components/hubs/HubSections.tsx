@@ -59,81 +59,83 @@ function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "pr
 function HubHero({ section }: { section: HubHeroSection }) {
   const isPremium = section.variant === "premium";
 
-  return (
-    <section className="relative w-full overflow-hidden">
-      {isPremium ? (
+  if (isPremium) {
+    return (
+      <section className="relative w-full overflow-hidden">
         <div
           aria-hidden
-          className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 h-[38rem] w-full md:h-[42rem]"
+          className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 h-[44rem] w-full md:h-[48rem]"
         />
-      ) : null}
-      <div
-        className={cn(
-          "relative z-10 flex w-full flex-col items-center px-6",
-          isPremium ? "pb-6 pt-32 md:pb-8 md:pt-40" : "pb-20 pt-36 md:pb-28 md:pt-44",
-        )}
-      >
-        <div
-          className={cn(
-            "mx-auto flex w-full max-w-3xl flex-col items-center text-center",
-            isPremium ? "gap-5 md:gap-6" : "gap-8",
-          )}
-        >
+        <div className="relative z-10 w-full px-6 pb-8 pt-32 md:pb-10 md:pt-40">
+          <div className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
+            <div className="flex flex-col items-start gap-5 text-left md:gap-6">
+              {section.eyebrow ? (
+                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
+                  {section.eyebrow}
+                </p>
+              ) : null}
+              <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-primary md:text-5xl lg:text-[3.25rem]">
+                {section.title}
+              </h1>
+              <p className="max-w-xl text-balance text-2xl font-semibold leading-snug tracking-tight text-foreground md:text-[1.65rem]">
+                {section.subtitle}
+              </p>
+              {section.microtext ? (
+                <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                  {section.microtext}
+                </p>
+              ) : null}
+              {section.supportingText ? (
+                <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                  {section.supportingText}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                {section.primaryCTAs.map((cta) => (
+                  <HubCtaButton key={cta.href} cta={cta} variant="primary" />
+                ))}
+                {section.secondaryCTAs?.map((cta) => (
+                  <HubCtaButton key={cta.href} cta={cta} variant="secondary" />
+                ))}
+              </div>
+            </div>
+
+            <div
+              aria-hidden
+              className="min-h-[280px] w-full rounded-2xl border border-border/60 bg-background shadow-sm sm:min-h-[320px] lg:min-h-[380px]"
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="relative w-full overflow-hidden">
+      <div className="flex w-full flex-col items-center px-6 pb-20 pt-36 md:pb-28 md:pt-44">
+        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
           {section.eyebrow ? (
-            <p
-              className={cn(
-                "font-medium uppercase text-muted-foreground",
-                isPremium ? "text-[0.7rem] tracking-[0.2em]" : "text-xs tracking-widest",
-              )}
-            >
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               {section.eyebrow}
             </p>
           ) : null}
-          <h1
-            className={cn(
-              "text-balance font-medium tracking-tighter text-primary",
-              isPremium
-                ? "text-4xl md:text-5xl lg:text-[3.25rem] lg:leading-[1.05]"
-                : "text-3xl md:text-4xl lg:text-5xl",
-            )}
-          >
+          <h1 className="text-3xl font-medium tracking-tighter text-primary md:text-4xl lg:text-5xl text-balance">
             {section.title}
           </h1>
-          <p
-            className={cn(
-              "max-w-2xl text-balance leading-snug tracking-tight",
-              isPremium
-                ? "text-lg font-semibold text-foreground md:text-xl"
-                : "text-base font-medium text-muted-foreground md:text-lg",
-            )}
-          >
+          <p className="max-w-2xl text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg text-balance">
             {section.subtitle}
           </p>
           {section.microtext ? (
-            <p
-              className={cn(
-                "max-w-xl text-pretty leading-relaxed",
-                isPremium
-                  ? "text-sm text-foreground/85 md:text-base"
-                  : "text-sm text-muted-foreground/80 md:text-base",
-              )}
-            >
+            <p className="max-w-xl text-sm leading-relaxed text-muted-foreground/80 md:text-base text-pretty">
               {section.microtext}
             </p>
           ) : null}
           {section.supportingText ? (
-            <p
-              className={cn(
-                "max-w-2xl text-pretty leading-relaxed",
-                isPremium
-                  ? "text-sm text-muted-foreground md:text-[0.95rem]"
-                  : "text-sm text-muted-foreground md:text-base",
-              )}
-            >
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
               {section.supportingText}
             </p>
           ) : null}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             {section.primaryCTAs.map((cta) => (
               <HubCtaButton key={cta.href} cta={cta} variant="primary" />
             ))}
