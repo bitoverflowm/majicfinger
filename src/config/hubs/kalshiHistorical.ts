@@ -91,10 +91,10 @@ export const kalshiHistoricalHub: HubPageConfig = {
       type: "stats",
       variant: "proof_strip",
       stats: [
+        { label: "7.68M+ unique markets", value: "" },
+        { label: "72.1M+ historical trades", value: "" },
         { label: "36GB+ compressed archive", value: "" },
         { label: "Since Kalshi launch", value: "" },
-        { label: "All Kalshi markets", value: "" },
-        { label: "Full trade history", value: "" },
         { label: "Orderbook history", value: "" },
         { label: "CSV/XLSX/JSON exports", value: "" },
         { label: "No-code querying", value: "" },
@@ -106,7 +106,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       type: "cards",
       title: "What's inside the Kalshi historical dataset?",
       intro:
-        "Lychee gives you browser-based access to historical Kalshi markets, trades, prices, volume, outcomes, categories, and orderbook history. Use it to search past markets, inspect trade behavior, compare categories, export datasets, and build research workflows without managing files or API pipelines.",
+        "Lychee gives you browser-based access to historical Kalshi markets, trades, prices, volume, outcomes, categories, and orderbook history. Use it to search past markets, inspect trade behavior, compare categories, export datasets, and build research workflows without managing files or API pipelines. Lychee's Kalshi Historical archive currently includes 7.68M+ unique markets and 72.1M+ historical trades, compressed into a 36GB+ hosted dataset you can query without code.",
       cards: [
         {
           title: "Markets",
