@@ -18,6 +18,7 @@ import type {
   HubTextBlockSection,
   HubVideoCarouselSection,
 } from "@/types/hub";
+import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
 import { HubChartEmbedSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
 
@@ -56,32 +57,83 @@ function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "pr
 }
 
 function HubHero({ section }: { section: HubHeroSection }) {
+  const isPremium = section.variant === "premium";
+
   return (
-    <section className="relative w-full">
-      <div className="flex w-full flex-col items-center px-6 pb-20 pt-36 md:pb-28 md:pt-44">
-        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
+    <section className="relative w-full overflow-hidden">
+      {isPremium ? (
+        <div
+          aria-hidden
+          className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 h-[38rem] w-full md:h-[42rem]"
+        />
+      ) : null}
+      <div
+        className={cn(
+          "relative z-10 flex w-full flex-col items-center px-6",
+          isPremium ? "pb-6 pt-32 md:pb-8 md:pt-40" : "pb-20 pt-36 md:pb-28 md:pt-44",
+        )}
+      >
+        <div
+          className={cn(
+            "mx-auto flex w-full max-w-3xl flex-col items-center text-center",
+            isPremium ? "gap-5 md:gap-6" : "gap-8",
+          )}
+        >
           {section.eyebrow ? (
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            <p
+              className={cn(
+                "font-medium uppercase text-muted-foreground",
+                isPremium ? "text-[0.7rem] tracking-[0.2em]" : "text-xs tracking-widest",
+              )}
+            >
               {section.eyebrow}
             </p>
           ) : null}
-          <h1 className="text-3xl font-medium tracking-tighter text-primary md:text-4xl lg:text-5xl text-balance">
+          <h1
+            className={cn(
+              "text-balance font-medium tracking-tighter text-primary",
+              isPremium
+                ? "text-4xl md:text-5xl lg:text-[3.25rem] lg:leading-[1.05]"
+                : "text-3xl md:text-4xl lg:text-5xl",
+            )}
+          >
             {section.title}
           </h1>
-          <p className="max-w-2xl text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg text-balance">
+          <p
+            className={cn(
+              "max-w-2xl text-balance leading-snug tracking-tight",
+              isPremium
+                ? "text-lg font-semibold text-foreground md:text-xl"
+                : "text-base font-medium text-muted-foreground md:text-lg",
+            )}
+          >
             {section.subtitle}
           </p>
           {section.microtext ? (
-            <p className="max-w-xl text-sm leading-relaxed text-muted-foreground/80 md:text-base text-pretty">
+            <p
+              className={cn(
+                "max-w-xl text-pretty leading-relaxed",
+                isPremium
+                  ? "text-sm text-foreground/85 md:text-base"
+                  : "text-sm text-muted-foreground/80 md:text-base",
+              )}
+            >
               {section.microtext}
             </p>
           ) : null}
           {section.supportingText ? (
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
+            <p
+              className={cn(
+                "max-w-2xl text-pretty leading-relaxed",
+                isPremium
+                  ? "text-sm text-muted-foreground md:text-[0.95rem]"
+                  : "text-sm text-muted-foreground md:text-base",
+              )}
+            >
               {section.supportingText}
             </p>
           ) : null}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
             {section.primaryCTAs.map((cta) => (
               <HubCtaButton key={cta.href} cta={cta} variant="primary" />
             ))}
@@ -484,6 +536,8 @@ export function HubSectionRenderer({
       return wrapper(<HubHero section={section} />);
     case "stats":
       return wrapper(<HubStats section={section} />);
+    case "proof_metrics":
+      return <HubProofMetrics section={section} />;
     case "query":
       return wrapper(<HubQuery section={section} />);
     case "text_block":

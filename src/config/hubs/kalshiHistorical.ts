@@ -66,7 +66,8 @@ export const kalshiHistoricalHub: HubPageConfig = {
   sections: [
     {
       type: "hero",
-      eyebrow: "The Complete Kalshi Historical Archive",
+      variant: "premium",
+      eyebrow: "The complete Kalshi historical archive",
       title: "Kalshi Historical Data",
       subtitle: "The most complete productized Kalshi historical dataset available.",
       microtext:
@@ -88,17 +89,56 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
-      type: "stats",
-      variant: "proof_strip",
-      stats: [
-        { label: "7.68M+ unique markets", value: "" },
-        { label: "72.1M+ historical trades", value: "" },
-        { label: "36GB+ compressed archive", value: "" },
-        { label: "Since Kalshi launch", value: "" },
-        { label: "Orderbook history", value: "" },
-        { label: "CSV/XLSX/JSON exports", value: "" },
-        { label: "No-code querying", value: "" },
-        { label: "Backtesting-ready", value: "" },
+      type: "proof_metrics",
+      primaryMetrics: [
+        {
+          value: "7.68M+",
+          label: "unique markets",
+          tickerValue: 7.68,
+          decimalPlaces: 2,
+          suffix: "M+",
+        },
+        {
+          value: "72.1M+",
+          label: "historical trades",
+          tickerValue: 72.1,
+          decimalPlaces: 1,
+          suffix: "M+",
+        },
+        {
+          value: "36GB+",
+          label: "compressed archive",
+          tickerValue: 36,
+          decimalPlaces: 0,
+          suffix: "GB+",
+        },
+        {
+          value: "Since July 2021",
+          label: "Kalshi public launch",
+          static: true,
+        },
+      ],
+      trustMetrics: [
+        {
+          value: "43.4M+",
+          label: "S3 data requests this month",
+          tickerValue: 43.4,
+          decimalPlaces: 1,
+          suffix: "M+",
+        },
+        {
+          value: "10K+",
+          label: "free and paid users",
+          tickerValue: 10,
+          decimalPlaces: 0,
+          suffix: "K+",
+        },
+      ],
+      capabilityPills: [
+        "Orderbook history",
+        "CSV/XLSX/JSON exports",
+        "No-code querying",
+        "Backtesting-ready",
       ],
     },
 

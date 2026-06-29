@@ -27,8 +27,25 @@ export type HubHeroSection = {
   subtitle: string;
   microtext?: string;
   supportingText?: string;
+  variant?: "default" | "premium";
   primaryCTAs: HubCta[];
   secondaryCTAs?: HubCta[];
+};
+
+export type HubProofMetric = {
+  value: string;
+  label: string;
+  static?: boolean;
+  tickerValue?: number;
+  decimalPlaces?: number;
+  suffix?: string;
+};
+
+export type HubProofMetricsSection = {
+  type: "proof_metrics";
+  primaryMetrics: HubProofMetric[];
+  trustMetrics: HubProofMetric[];
+  capabilityPills: string[];
 };
 
 export type HubStatsSection = {
@@ -133,6 +150,7 @@ export type HubVideoCarouselSection = {
 export type HubSection =
   | HubHeroSection
   | HubStatsSection
+  | HubProofMetricsSection
   | HubQuerySection
   | HubTextBlockSection
   | HubCardsSection
