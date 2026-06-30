@@ -69,15 +69,24 @@ export const kalshiHistoricalHub: HubPageConfig = {
       variant: "premium",
       eyebrow: "The complete Kalshi historical archive",
       title: "Kalshi Historical Data",
-      subtitle: "The most complete productized Kalshi historical dataset available.",
+      subtitle: "Every Kalshi market and trade — ready to query, chart, export, and backtest.",
       heroChart: {
         username: "misterrpink",
         slug: "nyc-weather-market-intraday-volatility-clustering",
       },
-      microtext:
-        "Query Kalshi markets, trades, prices, volume, outcomes, and orderbook history since launch — without building your own data pipeline.",
-      supportingText:
-        "Search historical Kalshi data, build charts, export CSV/XLSX/JSON, and backtest prediction market ideas in Lychee's no-code research workspace.",
+      heroBody: {
+        parts: [
+          { type: "text", value: "Access " },
+          { type: "metric", value: "7.68M+" },
+          { type: "text", value: " unique markets and " },
+          { type: "metric", value: "72.1M+" },
+          {
+            type: "text",
+            value:
+              " historical trades since July 2021, including prices, volume, outcomes, and orderbook history — no code or data pipeline required.",
+          },
+        ],
+      },
       primaryCTAs: [
         {
           label: "Start a free Kalshi query",

@@ -19,6 +19,7 @@ import type {
   HubPublicChartPayload,
   HubVideoCarouselSection,
 } from "@/types/hub";
+import { HubHeroBody } from "@/components/hubs/HubHeroBody";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubPublishedChartEmbed } from "@/components/hubs/HubPublishedChartEmbed";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
@@ -88,16 +89,22 @@ function HubHero({
               <p className="max-w-xl text-balance text-2xl font-semibold leading-snug tracking-tight text-foreground md:text-[1.65rem]">
                 {section.subtitle}
               </p>
-              {section.microtext ? (
-                <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
-                  {section.microtext}
-                </p>
-              ) : null}
-              {section.supportingText ? (
-                <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
-                  {section.supportingText}
-                </p>
-              ) : null}
+              {section.heroBody ? (
+                <HubHeroBody parts={section.heroBody.parts} />
+              ) : (
+                <>
+                  {section.microtext ? (
+                    <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                      {section.microtext}
+                    </p>
+                  ) : null}
+                  {section.supportingText ? (
+                    <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                      {section.supportingText}
+                    </p>
+                  ) : null}
+                </>
+              )}
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 {section.primaryCTAs.map((cta) => (
                   <HubCtaButton key={cta.href} cta={cta} variant="primary" />

@@ -30,10 +30,19 @@ export function NumberTicker({
   });
   const isInView = useInView(ref, { once: true, margin: "0px" });
 
+  const formatNumber = (n: number) =>
+    Intl.NumberFormat("en-US", {
+      minimumFractionDigits: decimalPlaces,
+      maximumFractionDigits: decimalPlaces,
+    }).format(Number(n.toFixed(decimalPlaces)));
+
+  const targetFormatted = formatNumber(value);
+
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     if (isInView) {
+      motionValue.set(direction === "down" ? value : startValue);
       timer = setTimeout(() => {
         motionValue.set(direction === "down" ? startValue : value);
       }, delay * 1000);
@@ -50,10 +59,7 @@ export function NumberTicker({
     () =>
       springValue.on("change", (latest) => {
         if (ref.current) {
-          ref.current.textContent = Intl.NumberFormat("en-US", {
-            minimumFractionDigits: decimalPlaces,
-            maximumFractionDigits: decimalPlaces,
-          }).format(Number(latest.toFixed(decimalPlaces)));
+          ref.current.textContent = formatNumber(latest);
         }
       }),
     [springValue, decimalPlaces],
@@ -63,9 +69,10 @@ export function NumberTicker({
     <span
       ref={ref}
       className={cn("inline-block tabular-nums tracking-tight", className)}
+      suppressHydrationWarning
       {...props}
     >
-      {startValue}
+      {targetFormatted}
     </span>
   );
 }

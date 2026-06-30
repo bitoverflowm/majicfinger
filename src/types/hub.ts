@@ -20,6 +20,10 @@ export type HubStat = {
   value: string;
 };
 
+export type HubHeroBodyPart =
+  | { type: "text"; value: string }
+  | { type: "metric"; value: string };
+
 export type HubHeroSection = {
   type: "hero";
   eyebrow?: string;
@@ -27,6 +31,8 @@ export type HubHeroSection = {
   subtitle: string;
   microtext?: string;
   supportingText?: string;
+  /** Inline body copy with optional emphasized metrics (replaces microtext + supportingText when set). */
+  heroBody?: { parts: HubHeroBodyPart[] };
   variant?: "default" | "premium";
   /** Featured chart shown in the premium split-layout hero (right column). */
   heroChart?: { username: string; slug: string };
