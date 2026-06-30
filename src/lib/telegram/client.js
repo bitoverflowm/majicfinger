@@ -2,7 +2,7 @@
 
 /**
  * Fire-and-forget client event for Telegram analytics.
- * @param {'fork_click' | 'content_view' | 'content_leave' | 'page_view' | 'page_click'} event
+ * @param {'fork_click' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click'} event
  * @param {Record<string, unknown>} payload
  * @param {{ sessionId?: string; keepalive?: boolean }} [opts]
  */

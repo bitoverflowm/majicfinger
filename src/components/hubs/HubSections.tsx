@@ -1,10 +1,10 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { cn } from "@/lib/utils";
 import type {
   HubBulletsSection,
   HubCardsSection,
-  HubCta,
   HubCtaSection,
   HubFaqSection,
   HubHeroSection,
@@ -46,19 +46,6 @@ const HubPublishedChartEmbedLazy = dynamic(
   },
 );
 
-function HubCtaButton({ cta, variant = "primary" }: { cta: HubCta; variant?: "primary" | "secondary" }) {
-  const className =
-    variant === "primary"
-      ? "inline-flex h-10 items-center justify-center rounded-full border border-white/[0.12] bg-secondary px-6 text-sm font-medium tracking-wide text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] transition-all ease-out hover:bg-secondary/80 active:scale-[0.98] dark:text-secondary-foreground"
-      : "inline-flex h-10 items-center justify-center rounded-full border border-border bg-background px-6 text-sm font-medium tracking-wide text-foreground transition-all ease-out hover:bg-muted active:scale-[0.98]";
-
-  return (
-    <Link href={cta.href} className={className} prefetch={false}>
-      {cta.label}
-    </Link>
-  );
-}
-
 function HubHero({
   section,
   heroChartPayload,
@@ -77,7 +64,7 @@ function HubHero({
         />
         <div className="relative z-10 w-full px-6 pb-12 pt-[6.8rem] md:pb-16 md:pt-[8.5rem]">
           <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-2 lg:gap-14">
-            <div className="flex flex-col items-start gap-5 text-left md:gap-6 lg:pt-2">
+            <div className="flex flex-col items-start gap-5 px-4 text-left sm:px-6 md:gap-6 lg:px-0 lg:pt-2">
               {section.eyebrow ? (
                 <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
                   {section.eyebrow}

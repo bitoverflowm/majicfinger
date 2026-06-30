@@ -3,7 +3,7 @@ import TelegramEventCounter from "@/models/TelegramEventCounter";
 import { sendTelegramMessage } from "@/lib/telegram/notify";
 import { escapeHtml, formatFieldLines, ordinal } from "@/lib/telegram/format";
 
-/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'visitor_session' | 'visitor_session_end' | 'test_ping'} TelegramEventKey */
+/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click' | 'visitor_session' | 'visitor_session_end' | 'test_ping'} TelegramEventKey */
 
 const COUNTER_TIMEOUT_MS = 5000;
 
@@ -258,6 +258,41 @@ export async function notifyContentLeave(payload) {
       Path: payload.path,
       Owner: payload.ownerHandle ? `@${payload.ownerHandle}` : undefined,
       "Time on page (sec)": payload.durationSeconds,
+    },
+  });
+}
+
+/**
+ * @param {{
+ *   eventLabel: string;
+ *   buttonText: string;
+ *   href?: string;
+ *   page?: string;
+ *   pagePath?: string;
+ *   destination?: string;
+ *   userState?: string;
+ *   sessionId?: string;
+ *   referrer?: string;
+ *   userEmail?: string;
+ *   isLoggedIn?: boolean;
+ * }} payload
+ */
+export async function notifyHeroCtaClick(payload) {
+  const headlineLabel = payload.eventLabel || payload.buttonText || "hero CTA";
+  return trackAndNotifyTelegramEvent({
+    eventKey: "hero_cta_click",
+    headline: `{rank} hero CTA — ${headlineLabel}`,
+    fields: {
+      Page: payload.pagePath || payload.page,
+      Button: payload.buttonText,
+      "Event label": payload.eventLabel,
+      Destination: payload.destination,
+      Link: payload.href,
+      "User state": payload.userState,
+      "Session id": payload.sessionId,
+      Referrer: payload.referrer,
+      Email: payload.userEmail,
+      "Logged in": payload.isLoggedIn ? "yes" : "no",
     },
   });
 }

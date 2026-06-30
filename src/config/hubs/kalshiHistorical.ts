@@ -91,12 +91,24 @@ export const kalshiHistoricalHub: HubPageConfig = {
         {
           label: "Access Now",
           href: "/#pricing",
+          ariaLabel: "Access Kalshi Historical Data now",
+          eventLabel: "kalshi_historical_access_now",
+          tracking: {
+            page: "/kalshi-historical-data",
+            destination: "pricing / signup / full access",
+          },
         },
       ],
       secondaryCTAs: [
         {
           label: "Explore for free",
           href: "#explore-data",
+          ariaLabel: "Explore Kalshi Historical Data for free",
+          eventLabel: "kalshi_historical_explore_free",
+          tracking: {
+            page: "/kalshi-historical-data",
+            destination: "free demo / templates (#explore-data)",
+          },
         },
       ],
     },

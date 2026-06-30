@@ -2,6 +2,7 @@ import {
   notifyContentLeave,
   notifyContentView,
   notifyForkClick,
+  notifyHeroCtaClick,
   notifyPageClick,
   notifyPageView,
 } from "@/lib/telegram/trackEvent";
@@ -12,6 +13,7 @@ const ALLOWED_EVENTS = new Set([
   "content_leave",
   "page_view",
   "page_click",
+  "hero_cta_click",
 ]);
 
 export default async function handler(req, res) {
@@ -73,6 +75,26 @@ export default async function handler(req, res) {
         targetType: payload.targetType,
         href: payload.href,
         section: payload.section,
+      });
+      return res.status(200).json(result);
+    }
+
+    if (event === "hero_cta_click") {
+      if (!payload?.eventLabel || !payload?.buttonText) {
+        return res.status(400).json({ ok: false, message: "Missing eventLabel or buttonText" });
+      }
+      const result = await notifyHeroCtaClick({
+        eventLabel: payload.eventLabel,
+        buttonText: payload.buttonText,
+        href: payload.href,
+        page: payload.page,
+        pagePath: payload.pagePath,
+        destination: payload.destination,
+        userState: payload.userState,
+        sessionId: payload.sessionId || sessionId,
+        referrer: payload.referrer,
+        userEmail: payload.userEmail,
+        isLoggedIn: !!payload.isLoggedIn,
       });
       return res.status(200).json(result);
     }

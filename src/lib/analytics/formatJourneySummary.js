@@ -35,6 +35,10 @@ export function formatJourneyStep(event, index) {
       }`;
     case "fork_click":
       return `${index}. Clicked Run for yourself on ${meta.displayName || meta.kind || "chart"}`;
+    case "hero_cta_click":
+      return `${index}. Hero CTA "${meta.buttonText || event.label || "button"}" → ${
+        meta.destination || meta.href || ""
+      } (${meta.eventLabel || "unlabeled"})`;
     case "signup":
       return `${index}. Signed up (${meta.method || "unknown"}) — ${meta.email || "email unknown"}`;
     case "identity_linked":
@@ -73,6 +77,7 @@ export function formatJourneyStep(event, index) {
 export function inferSessionOutcome(events) {
   const types = events.map((e) => e.type);
   if (types.includes("signup")) return "Signed up";
+  if (types.includes("hero_cta_click")) return "Clicked hero CTA";
   if (types.includes("fork_click")) return "Clicked Run for yourself";
   if (types.includes("content_view")) return "Browsed content";
   if (types.includes("page_click")) return "Explored marketing pages";

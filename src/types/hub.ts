@@ -8,6 +8,13 @@ export type HubCta = {
   label: string;
   href: string;
   requiresAuth?: boolean;
+  ariaLabel?: string;
+  /** Distinct analytics label, e.g. kalshi_historical_access_now */
+  eventLabel?: string;
+  tracking?: {
+    page?: string;
+    destination?: string;
+  };
 };
 
 export type HubLinkGroup = {
