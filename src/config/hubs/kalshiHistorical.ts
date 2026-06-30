@@ -89,14 +89,14 @@ export const kalshiHistoricalHub: HubPageConfig = {
       },
       primaryCTAs: [
         {
-          label: "Start a free Kalshi query",
-          href: "#explore-data",
+          label: "Access Now",
+          href: "/#pricing",
         },
       ],
       secondaryCTAs: [
         {
-          label: "Explore example workflows",
-          href: "#get-inspired",
+          label: "Explore for free",
+          href: "#explore-data",
         },
       ],
     },
