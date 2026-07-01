@@ -418,7 +418,7 @@ export function mergeRunConfig(curated, inferred) {
     tickerFilterColumns: curated.tickerFilterColumns || inferred.tickerFilterColumns,
     categoryFilterColumns: curated.categoryFilterColumns || inferred.categoryFilterColumns,
     defaultCategory: curated.defaultCategory || inferred.defaultCategory,
-    runnable: inferred.runnable,
+    runnable: inferred.runnable || Boolean(curated),
     lake: curated.lake || inferred.lake,
     table: curated.table || inferred.table,
   };

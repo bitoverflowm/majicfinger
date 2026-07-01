@@ -1,7 +1,7 @@
 import Chart from "@/models/Charts";
 import ChartDashboard from "@/models/ChartDashboards";
-import DataSet from "@/models/DataSets";
 import User from "@/models/Users";
+import { loadDataSetForRunYourself } from "@/lib/runYourself/loadDataSetForRunYourself";
 
 /**
  * @param {string} ownerHandle
@@ -53,7 +53,7 @@ export async function resolvePublicRunSource(ownerHandle, source) {
       err.statusCode = 404;
       throw err;
     }
-    const dataSet = await DataSet.findById(chart.data_set_id).lean();
+    const dataSet = await loadDataSetForRunYourself(chart.data_set_id);
     if (!dataSet) {
       const err = new Error("Project not found");
       err.statusCode = 404;
@@ -96,7 +96,12 @@ export async function resolvePublicRunSource(ownerHandle, source) {
       err.statusCode = 400;
       throw err;
     }
-    const dataSet = await DataSet.findById(dataSetIds[0]).lean();
+    const dataSet = await loadDataSetForRunYourself(dataSetIds[0]);
+    if (!dataSet) {
+      const err = new Error("Project not found");
+      err.statusCode = 404;
+      throw err;
+    }
     return {
       owner,
       charts,
@@ -117,7 +122,7 @@ export async function resolvePublicRunSource(ownerHandle, source) {
     err.statusCode = 404;
     throw err;
   }
-  const dataSet = await DataSet.findById(chart.data_set_id).lean();
+  const dataSet = await loadDataSetForRunYourself(chart.data_set_id);
   if (!dataSet) {
     const err = new Error("Project not found");
     err.statusCode = 404;

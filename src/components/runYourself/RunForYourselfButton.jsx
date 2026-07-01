@@ -77,13 +77,16 @@ export function RunForYourselfButton({
     if (kind === "dashboard") params.set("replicateDashboard", "1");
 
     if (!forceRunnable) {
-      fetch(`/api/run-yourself/resolve?${params}`)
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+      fetch(`/api/run-yourself/resolve?${params}`, { signal: controller.signal })
         .then((r) => r.json())
         .then((j) => {
           if (cancelled) return;
           if (j?.data?.runnable === false) setNotRunnable(true);
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => window.clearTimeout(timeoutId));
     }
 
     fetch(`/api/run-yourself/eligibility?${params}`)

@@ -88,7 +88,9 @@ export default function RunYourselfWizard() {
         layoutColumnKey:
           parsed.layoutColumnKey ||
           col ||
-          (stored?.chartId === parsed.chartId ? stored.layoutColumnKey : undefined),
+          (stored?.chartId != null && stored.chartId === parsed.chartId
+            ? stored.layoutColumnKey
+            : undefined),
       };
       return merged;
     }
@@ -191,7 +193,7 @@ export default function RunYourselfWizard() {
     if (isDashboardChartFork && source?.chartId) {
       const target =
         manifestRes.charts.find((c) => c.chartId === source.chartId) ||
-        (source.layoutColumnKey
+        (source?.layoutColumnKey
           ? manifestRes.charts.find((c) => c.key === source.layoutColumnKey)
           : null);
       if (target) {
