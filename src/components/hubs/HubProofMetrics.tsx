@@ -5,8 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { HubProofMetric, HubProofMetricsSection } from "@/types/hub";
 
+const METRIC_GRID_CLASS =
+  "grid w-full grid-cols-2 items-center justify-center border border-border divide-x divide-y divide-border md:grid-cols-4 md:divide-y-0";
+
 const METRIC_CELL_CLASS =
-  "group relative flex min-h-28 w-full flex-col items-center justify-center border-border p-4 text-center before:absolute before:-left-1 before:top-0 before:z-10 before:h-screen before:w-px before:bg-border before:content-[''] max-md:[&:nth-child(n+3)]:border-t";
+  "group relative flex min-h-28 w-full flex-col items-center justify-center p-4 text-center";
 
 function ProofMetricValue({
   metric,
@@ -72,14 +75,14 @@ export function HubProofMetrics({ section }: { section: HubProofMetricsSection }
   return (
     <section className="relative z-20 w-full bg-background px-6 pb-12 pt-10 md:pb-16 md:pt-12">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-6 md:gap-7">
-        <div className="grid w-full grid-cols-2 items-center justify-center overflow-hidden border-y border-border md:grid-cols-4">
+        <div className={METRIC_GRID_CLASS}>
           {section.primaryMetrics.map((metric) => (
             <ProofMetricCell key={`${metric.value}-${metric.label}`} metric={metric} size="primary" />
           ))}
         </div>
 
         {section.trustMetrics.length > 0 ? (
-          <div className="grid w-full max-w-2xl grid-cols-2 items-center justify-center overflow-hidden border-y border-border sm:max-w-3xl">
+          <div className="grid w-full max-w-2xl grid-cols-2 items-center justify-center border border-border divide-x divide-border sm:max-w-3xl">
             {section.trustMetrics.map((metric) => (
               <ProofMetricCell key={`${metric.value}-${metric.label}`} metric={metric} size="trust" />
             ))}
