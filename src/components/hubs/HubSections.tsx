@@ -20,6 +20,7 @@ import type {
   HubVideoCarouselSection,
 } from "@/types/hub";
 import { HubHeroBody } from "@/components/hubs/HubHeroBody";
+import { HubHeroCapabilityPills } from "@/components/hubs/HubHeroCapabilityPills";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubPublishedChartEmbed } from "@/components/hubs/HubPublishedChartEmbed";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
@@ -62,7 +63,7 @@ function HubHero({
           aria-hidden
           className="hero-aura-gradient pointer-events-none absolute inset-0 z-0 w-full"
         />
-        <div className="relative z-10 w-full px-6 pb-12 pt-[6.8rem] md:pb-16 md:pt-[8.5rem]">
+        <div className="relative z-10 w-full px-6 pb-16 pt-[6.8rem] md:pb-20 md:pt-[8.5rem]">
           <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-2 lg:gap-14">
             <div className="flex flex-col items-start gap-5 px-4 text-left sm:px-6 md:gap-6 lg:px-0 lg:pt-2">
               {section.eyebrow ? (
@@ -118,6 +119,13 @@ function HubHero({
               />
             )}
           </div>
+
+          {section.capabilityPills?.length ? (
+            <HubHeroCapabilityPills
+              pills={section.capabilityPills}
+              className="mx-auto mt-10 max-w-6xl px-2 sm:mt-12 sm:px-4 lg:mt-14"
+            />
+          ) : null}
         </div>
       </section>
     );

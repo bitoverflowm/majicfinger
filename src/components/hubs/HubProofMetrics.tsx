@@ -1,7 +1,6 @@
 "use client";
 
 import { NumberTicker } from "@/components/magicui/number-ticker";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { HubProofMetric, HubProofMetricsSection } from "@/types/hub";
 
@@ -112,18 +111,6 @@ export function HubProofMetrics({ section }: { section: HubProofMetricsSection }
             ))}
           </div>
         ) : null}
-
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-          {section.capabilityPills.map((pill) => (
-            <Badge
-              key={pill}
-              variant="outline"
-              className="border-border/60 bg-background/70 px-3 py-1 text-xs font-normal text-muted-foreground shadow-none"
-            >
-              {pill}
-            </Badge>
-          ))}
-        </div>
       </div>
     </section>
   );

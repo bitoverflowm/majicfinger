@@ -111,6 +111,13 @@ export const kalshiHistoricalHub: HubPageConfig = {
           },
         },
       ],
+      capabilityPills: [
+        "Trade history",
+        "Orderbook history",
+        "CSV/XLSX/JSON exports",
+        "No-code querying",
+        "Backtesting-ready",
+      ],
     },
 
     {
@@ -147,12 +154,6 @@ export const kalshiHistoricalHub: HubPageConfig = {
         },
       ],
       trustMetrics: [],
-      capabilityPills: [
-        "Orderbook history",
-        "CSV/XLSX/JSON exports",
-        "No-code querying",
-        "Backtesting-ready",
-      ],
     },
 
     {

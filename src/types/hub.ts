@@ -43,6 +43,7 @@ export type HubHeroSection = {
   variant?: "default" | "premium";
   /** Featured chart shown in the premium split-layout hero (right column). */
   heroChart?: { username: string; slug: string };
+  capabilityPills?: string[];
   primaryCTAs: HubCta[];
   secondaryCTAs?: HubCta[];
 };
@@ -71,7 +72,6 @@ export type HubProofMetricsSection = {
   subheading?: string;
   primaryMetrics: HubProofMetric[];
   trustMetrics: HubProofMetric[];
-  capabilityPills: string[];
 };
 
 export type HubStatsSection = {
