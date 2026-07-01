@@ -564,7 +564,7 @@ export default function RunYourselfWizard() {
                     <div className="space-y-2">
                       <Button
                         type="button"
-                        variant="secondary"
+                        variant="default"
                         className="w-full justify-center font-medium"
                         disabled={running}
                         onClick={handleRunSameSource}
