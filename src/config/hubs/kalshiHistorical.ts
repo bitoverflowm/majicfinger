@@ -115,6 +115,8 @@ export const kalshiHistoricalHub: HubPageConfig = {
 
     {
       type: "proof_metrics",
+      heading: "Trusted by +10,000 researchers, traders, quants and analysts",
+      subheading: "+43,400,000 data queries processed in June 2026 alone",
       primaryMetrics: [
         {
           value: "7.68M+",
@@ -143,22 +145,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
           static: true,
         },
       ],
-      trustMetrics: [
-        {
-          value: "43.4M+",
-          label: "S3 data requests this month",
-          tickerValue: 43.4,
-          decimalPlaces: 1,
-          suffix: "M+",
-        },
-        {
-          value: "10K+",
-          label: "free and paid users",
-          tickerValue: 10,
-          decimalPlaces: 0,
-          suffix: "K+",
-        },
-      ],
+      trustMetrics: [],
       capabilityPills: [
         "Orderbook history",
         "CSV/XLSX/JSON exports",

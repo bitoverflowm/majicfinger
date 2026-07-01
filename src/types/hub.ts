@@ -67,6 +67,8 @@ export type HubProofMetric = {
 
 export type HubProofMetricsSection = {
   type: "proof_metrics";
+  heading?: string;
+  subheading?: string;
   primaryMetrics: HubProofMetric[];
   trustMetrics: HubProofMetric[];
   capabilityPills: string[];
