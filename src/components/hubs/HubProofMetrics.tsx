@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { HubProofMetric, HubProofMetricsSection } from "@/types/hub";
 
 const METRIC_CELL_CLASS =
-  "group relative flex min-h-28 w-full flex-col items-center justify-center p-4 text-center before:absolute before:-left-1 before:top-0 before:z-10 before:h-screen before:w-px before:bg-border before:content-[''] after:absolute after:-top-1 after:left-0 after:z-10 after:h-px after:w-screen after:bg-border after:content-['']";
+  "group relative flex min-h-28 w-full flex-col items-center justify-center border-border p-4 text-center before:absolute before:-left-1 before:top-0 before:z-10 before:h-screen before:w-px before:bg-border before:content-[''] max-md:[&:nth-child(n+3)]:border-t";
 
 function ProofMetricValue({
   metric,
@@ -70,7 +70,7 @@ function ProofMetricCell({
 
 export function HubProofMetrics({ section }: { section: HubProofMetricsSection }) {
   return (
-    <section className="relative z-10 w-full px-6 pb-12 md:pb-16">
+    <section className="relative z-20 w-full bg-background px-6 pb-12 pt-10 md:pb-16 md:pt-12">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-6 md:gap-7">
         <div className="grid w-full grid-cols-2 items-center justify-center overflow-hidden border-y border-border md:grid-cols-4">
           {section.primaryMetrics.map((metric) => (
