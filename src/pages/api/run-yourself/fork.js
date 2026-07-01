@@ -147,8 +147,14 @@ export default async function handler(req, res) {
       !shouldReplicateDashboard &&
       !isDashboardChartFork &&
       !paramIsDashboardPlaceholder &&
+      parameter.mode !== "source" &&
       runConfig.parameterMode !== "category_optional" &&
       runConfig.parameterMode !== "none";
+
+    const useSourceFilters =
+      !shouldReplicateDashboard &&
+      !isDashboardChartFork &&
+      (parameter.mode === "source" || paramValue === "same");
 
     if (needsParam && !paramValue) {
       return res.status(400).json({ success: false, message: "Missing analysis parameter" });
@@ -192,8 +198,9 @@ export default async function handler(req, res) {
         parameterMode,
       );
     } else if (
-      runConfig.parameterMode === "category_optional" &&
-      (paramValue === RUN_YOURSELF_ALL_CATEGORIES || !paramValue)
+      useSourceFilters ||
+      (runConfig.parameterMode === "category_optional" &&
+        (paramValue === RUN_YOURSELF_ALL_CATEGORIES || !paramValue))
     ) {
       patchedSheets = subsetSheets;
     } else {

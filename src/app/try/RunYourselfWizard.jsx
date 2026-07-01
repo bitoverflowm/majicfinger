@@ -70,6 +70,90 @@ function buildDefaultChartParameters(charts) {
   return out;
 }
 
+function resolveSameSourceValues({
+  parameterMode,
+  runConfig,
+  isDashboardFullFork,
+  isDashboardChartFork,
+  selectedDashboardChart,
+  dashboardCharts,
+}) {
+  if (isDashboardFullFork) {
+    return { chartParameters: buildDefaultChartParameters(dashboardCharts) };
+  }
+  if (isDashboardChartFork && selectedDashboardChart) {
+    return {
+      chartParameters: {
+        [selectedDashboardChart.key]:
+          selectedDashboardChart.defaults ||
+          defaultChartParameterValues(selectedDashboardChart.parameterMode),
+      },
+    };
+  }
+  if (parameterMode === "category_optional" || parameterMode === "category_dropdown") {
+    return {
+      parameterValue: runConfig?.defaultCategory || RUN_YOURSELF_ALL_CATEGORIES,
+    };
+  }
+  if (parameterMode === "dual_category_optional") {
+    return { useSourceFilters: true };
+  }
+  if (parameterMode === "trade_search" || parameterMode === "market_search") {
+    if (runConfig?.defaultTicker) {
+      return { parameterValue: runConfig.defaultTicker };
+    }
+    return { useSourceFilters: true };
+  }
+  return null;
+}
+
+function getSameSourceRunLabel({
+  parameterMode,
+  runConfig,
+  isDashboardChartFork,
+  isDashboardFullFork,
+  selectedDashboardChart,
+}) {
+  if (isDashboardFullFork) return "Run with original dashboard parameters";
+  if (isDashboardChartFork && selectedDashboardChart) {
+    const mode = selectedDashboardChart.parameterMode;
+    const defaults = selectedDashboardChart.defaults || {};
+    if (mode === "trade_search" || mode === "market_search") {
+      return defaults.ticker
+        ? `Run on same market (${defaults.ticker})`
+        : "Run with original market filters";
+    }
+    if (mode === "dual_category_optional") return "Run with original category filters";
+    if (defaults.kalshiCategory && defaults.kalshiCategory !== RUN_YOURSELF_ALL_CATEGORIES) {
+      return `Run on same category (${defaults.kalshiCategory})`;
+    }
+    return "Run on same scope (all categories)";
+  }
+  if (parameterMode === "trade_search" || parameterMode === "market_search") {
+    const ticker = runConfig?.defaultTicker;
+    return ticker ? `Run on same market (${ticker})` : "Run with original market filters";
+  }
+  if (parameterMode === "dual_category_optional") {
+    return "Run with original category filters";
+  }
+  if (parameterMode === "category_optional" || parameterMode === "category_dropdown") {
+    const category = runConfig?.defaultCategory;
+    return category ? `Run on same category (${category})` : "Run on same scope (all categories)";
+  }
+  return null;
+}
+
+function supportsSameSourceShortcut(parameterMode, isDashboardFullFork, isDashboardChartFork) {
+  if (isDashboardFullFork || isDashboardChartFork) return true;
+  return (
+    parameterMode === "trade_search" ||
+    parameterMode === "market_search" ||
+    parameterMode === "category_optional" ||
+    parameterMode === "category_dropdown" ||
+    parameterMode === "dual_category_optional"
+  );
+}
+
 export default function RunYourselfWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -223,20 +307,26 @@ export default function RunYourselfWizard() {
     setChartParameters((prev) => ({ ...prev, [key]: values }));
   }, []);
 
-  const handleRun = useCallback(async () => {
+  const handleRun = useCallback(async (overrides = {}) => {
     if (!effectiveSource || running || !runConfig?.runnable) return;
 
+    const activeParameterValue = overrides.parameterValue ?? parameterValue;
+    const activeChartParameters = overrides.chartParameters ?? chartParameters;
+    const useSourceFilters = !!overrides.useSourceFilters;
+
     const needsTicker =
+      !useSourceFilters &&
       !isDashboardFullFork &&
       !isDashboardChartFork &&
       (parameterMode === "trade_search" || parameterMode === "market_search");
     const needsCategory =
+      !useSourceFilters &&
       !isDashboardFullFork &&
       !isDashboardChartFork &&
       parameterMode !== "category_optional" &&
       parameterMode !== "none";
-    if (needsTicker && !parameterValue.trim()) return;
-    if (needsCategory && !parameterValue.trim()) return;
+    if (needsTicker && !activeParameterValue.trim()) return;
+    if (needsCategory && !activeParameterValue.trim()) return;
 
     setRunning(true);
     setError(null);
@@ -281,9 +371,11 @@ export default function RunYourselfWizard() {
           parameter:
             isDashboardFullFork || isDashboardChartFork
               ? { mode: "category", value: "dashboard" }
-              : { mode: parameterModeFork, value: parameterValue.trim() },
+              : useSourceFilters
+                ? { mode: "source", value: "same" }
+                : { mode: parameterModeFork, value: activeParameterValue.trim() },
           chartParameters:
-            isDashboardFullFork || isDashboardChartFork ? chartParameters : undefined,
+            isDashboardFullFork || isDashboardChartFork ? activeChartParameters : undefined,
           replicateDashboard: isDashboardFullFork,
         }),
       });
@@ -323,6 +415,48 @@ export default function RunYourselfWizard() {
     selectedDashboardChart,
     selectedAnalysis,
     router,
+  ]);
+
+  const sameSourceRunLabel = useMemo(() => {
+    if (!runConfig?.runnable || !supportsSameSourceShortcut(parameterMode, isDashboardFullFork, isDashboardChartFork)) {
+      return null;
+    }
+    return getSameSourceRunLabel({
+      parameterMode,
+      runConfig,
+      isDashboardChartFork,
+      isDashboardFullFork,
+      selectedDashboardChart,
+    });
+  }, [
+    parameterMode,
+    runConfig,
+    isDashboardChartFork,
+    isDashboardFullFork,
+    selectedDashboardChart,
+  ]);
+
+  const handleRunSameSource = useCallback(() => {
+    const same = resolveSameSourceValues({
+      parameterMode,
+      runConfig,
+      isDashboardFullFork,
+      isDashboardChartFork,
+      selectedDashboardChart,
+      dashboardCharts,
+    });
+    if (!same) return;
+    if (same.parameterValue != null) setParameterValue(same.parameterValue);
+    if (same.chartParameters) setChartParameters(same.chartParameters);
+    void handleRun(same);
+  }, [
+    parameterMode,
+    runConfig,
+    isDashboardFullFork,
+    isDashboardChartFork,
+    selectedDashboardChart,
+    dashboardCharts,
+    handleRun,
   ]);
 
   const canRun = isDashboardChartFork
@@ -424,7 +558,25 @@ export default function RunYourselfWizard() {
                 <p className="text-sm text-destructive">
                   {resolveError?.message || runConfig?.reason || "This analysis cannot be run yet."}
                 </p>
-              ) : isDashboardChartFork ? (
+              ) : (
+                <div className="space-y-4">
+                  {sameSourceRunLabel ? (
+                    <div className="space-y-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full justify-center font-medium"
+                        disabled={running}
+                        onClick={handleRunSameSource}
+                      >
+                        {sameSourceRunLabel}
+                      </Button>
+                      <p className="text-center text-xs text-muted-foreground">
+                        Or choose a different market or category below
+                      </p>
+                    </div>
+                  ) : null}
+                  {isDashboardChartFork ? (
                 selectedDashboardChart ? (
                   <RunYourselfDashboardChartParamRow
                     chart={selectedDashboardChart}
@@ -492,6 +644,8 @@ export default function RunYourselfWizard() {
                   ) : null}
                 </>
               )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -510,13 +664,15 @@ export default function RunYourselfWizard() {
 
           {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
 
-          <p className="text-center text-xs text-muted-foreground">
-            Free accounts get one run.{" "}
-            <Link href="/#pricing" className="underline">
-              Upgrade to Pro
-            </Link>{" "}
-            for unlimited analyses.
-          </p>
+          {!userHasPaidAccess(user) ? (
+            <p className="text-center text-xs text-muted-foreground">
+              Free accounts get one run.{" "}
+              <Link href="/#pricing" className="underline">
+                Upgrade to Pro
+              </Link>{" "}
+              for unlimited analyses.
+            </p>
+          ) : null}
         </div>
       )}
     </div>

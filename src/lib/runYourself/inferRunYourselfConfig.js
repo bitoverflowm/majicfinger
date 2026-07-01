@@ -61,7 +61,7 @@ function collectProvenanceFilters(provenance) {
   const out = [];
   const cf = provenance?.composeFilters;
   if (cf && typeof cf === "object") {
-    for (const key of ["and", "or"]) {
+    for (const key of ["and", "or", "mergeAnd", "mergeOrBranch"]) {
       const arr = Array.isArray(cf[key]) ? cf[key] : [];
       out.push(...arr);
     }
@@ -105,10 +105,10 @@ function collectLakePullContexts(dataSheets, sheetId) {
 function findEqStringFilter(filters, predicate) {
   for (const f of filters) {
     const col = String(f?.column ?? f?.field ?? "").trim();
-    const op = String(f?.op || "").trim();
-    if (!col || op !== "eq") continue;
+    const op = String(f?.op || "").trim().toLowerCase();
+    if (!col || (op !== "eq" && op !== "equals")) continue;
     if (!predicate(col)) continue;
-    const v = f?.value;
+    const v = f?.value ?? f?.rightValue;
     if (v == null || String(v).trim() === "") continue;
     return { column: col, value: String(v).trim() };
   }

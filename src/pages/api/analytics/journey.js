@@ -25,33 +25,36 @@ async function recordSessionStart(sessionId, meta = {}, sessionKind = "visitor")
   const now = new Date();
   const auth = isAuthSession(sessionKind);
 
-  const existing = await VisitorSession.findOne({ session_id: sessionId });
-  if (existing?.started_at) {
-    await VisitorSession.updateOne(
-      { session_id: sessionId },
-      {
-        $set: {
-          last_seen_at: now,
-          ...(meta.email ? { email: meta.email } : {}),
-          ...(meta.userId ? { user_id: String(meta.userId) } : {}),
-          is_logged_in: auth || !!meta.isLoggedIn,
-        },
+  const updateResult = await VisitorSession.updateOne(
+    { session_id: sessionId },
+    {
+      $set: {
+        last_seen_at: now,
+        ...(meta.email ? { email: meta.email } : {}),
+        ...(meta.userId ? { user_id: String(meta.userId) } : {}),
+        is_logged_in: auth || !!meta.isLoggedIn,
       },
-    );
-    return existing;
-  }
+      $setOnInsert: {
+        session_id: sessionId,
+        session_kind: auth ? "auth" : "visitor",
+        started_at: now,
+        entry_path: meta.entryPath || (auth ? "/dashboard" : "/"),
+        referrer: auth ? "" : meta.referrer || "",
+        ...(meta.email ? { email: meta.email } : {}),
+        ...(meta.userId ? { user_id: String(meta.userId) } : {}),
+        is_logged_in: auth || !!meta.isLoggedIn,
+      },
+    },
+    { upsert: true },
+  );
 
-  const doc = await VisitorSession.create({
-    session_id: sessionId,
-    session_kind: auth ? "auth" : "visitor",
-    started_at: now,
-    last_seen_at: now,
-    entry_path: meta.entryPath || (auth ? "/dashboard" : "/"),
-    referrer: auth ? "" : meta.referrer || "",
-    ...(meta.email ? { email: meta.email } : {}),
-    ...(meta.userId ? { user_id: String(meta.userId) } : {}),
-    is_logged_in: auth || !!meta.isLoggedIn,
-  });
+  const doc = await VisitorSession.findOne({ session_id: sessionId });
+  if (!doc) return null;
+
+  const isNewSession = (updateResult.upsertedCount ?? 0) > 0;
+  if (!isNewSession) {
+    return doc;
+  }
 
   const counterKey = auth ? "auth_session" : "visitor_session";
   const { count } = await incrementTelegramEventCounter(counterKey);

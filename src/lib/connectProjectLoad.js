@@ -4,6 +4,7 @@ import {
 } from "@/lib/hydrateProjectWorkspace";
 import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 import { resetProjectWorkspaceState } from "@/lib/resetProjectWorkspaceState";
+import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 
 export const PROJECT_LOAD_PROGRESS_MESSAGES = [
   "Loading data sheets…",
@@ -76,6 +77,9 @@ export function beginConnectProjectLoadShell({
   dataSetId,
   projectName = "",
   setConnectProjectLoadState,
+  requestConnectWorkspace,
+  setConnectHomeAnalyzeActive,
+  requestConnectAnalyzeScroll,
 }) {
   setConnectProjectLoadState({
     loading: true,
@@ -84,6 +88,9 @@ export function beginConnectProjectLoadShell({
     dataSetId: dataSetId != null ? String(dataSetId) : null,
     projectName: projectName || "",
   });
+  requestConnectWorkspace?.(CONNECT_WORKSPACE.PROJECT);
+  setConnectHomeAnalyzeActive?.(true);
+  requestConnectAnalyzeScroll?.();
 }
 
 export function endConnectProjectLoad(setConnectProjectLoadState, { delayMs = 300 } = {}) {
@@ -102,6 +109,9 @@ export async function runConnectProjectLoad({
   dataSetId,
   userId,
   projectName = "",
+  preferredChartId = null,
+  rightPanelTab = null,
+  connectHomeCenterView = null,
   loadedDataMeta,
   setConnectProjectLoadState,
   setDataSheets,
@@ -121,6 +131,7 @@ export async function runConnectProjectLoad({
   requestConnectWorkspace,
   setConnectHomeAnalyzeActive,
   requestConnectAnalyzeScroll,
+  setConnectHomeCenterView,
   setRightPanelTab,
   setRightPanelOpen,
   setChartDataOverride,
@@ -135,6 +146,9 @@ export async function runConnectProjectLoad({
     dataSetId,
     projectName,
     setConnectProjectLoadState,
+    requestConnectWorkspace,
+    setConnectHomeAnalyzeActive,
+    requestConnectAnalyzeScroll,
   });
 
   try {
@@ -150,7 +164,9 @@ export async function runConnectProjectLoad({
         requestConnectAnalyzeScroll,
         setRightPanelTab,
         setRightPanelOpen,
+        rightPanelTab: rightPanelTab || undefined,
       });
+      if (connectHomeCenterView) setConnectHomeCenterView?.(connectHomeCenterView);
       return;
     }
 
@@ -180,6 +196,7 @@ export async function runConnectProjectLoad({
     await loadFullProjectFromApi({
       dataSetId,
       userId,
+      preferredChartId: preferredChartId || null,
       setDataSheets,
       setActiveSheetId,
       setConnectedData,
@@ -204,7 +221,9 @@ export async function runConnectProjectLoad({
       requestConnectAnalyzeScroll,
       setRightPanelTab,
       setRightPanelOpen,
+      rightPanelTab: rightPanelTab || undefined,
     });
+    if (connectHomeCenterView) setConnectHomeCenterView?.(connectHomeCenterView);
 
     if (typeof window !== "undefined") {
       window.requestAnimationFrame(() => {

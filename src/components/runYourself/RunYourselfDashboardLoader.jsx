@@ -3,10 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import {
-  loadFullProjectFromApi,
-  finishConnectHomeProjectLoad,
-} from "@/lib/hydrateProjectWorkspace";
+import { runConnectProjectLoad } from "@/lib/connectProjectLoad";
 
 /**
  * Loads forked project from ?project=&chart=&runYourselfSession=1 query params.
@@ -34,13 +31,20 @@ export function RunYourselfDashboardLoader({ userId }) {
 
     (async () => {
       try {
-        await loadFullProjectFromApi({
+        await runConnectProjectLoad({
           dataSetId: projectId,
           userId,
+          projectName: "Forked analysis",
           preferredChartId: chartId || null,
+          rightPanelTab: "charts",
+          connectHomeCenterView: "chart",
+          loadedDataMeta: ctx.loadedDataMeta,
+          setConnectProjectLoadState: ctx.setConnectProjectLoadState,
           setDataSheets: ctx.setDataSheets,
           setActiveSheetId: ctx.setActiveSheetId,
           setConnectedData: ctx.setConnectedData,
+          setConnectedCols: ctx.setConnectedCols,
+          setDataTypes: ctx.setDataTypes,
           setLoadedDataMeta: ctx.setLoadedDataMeta,
           setLoadedDataId: ctx.setLoadedDataId,
           setSavedCharts: ctx.setSavedCharts,
@@ -49,22 +53,23 @@ export function RunYourselfDashboardLoader({ userId }) {
           setLoadedChartMeta: ctx.setLoadedChartMeta,
           setLoadedChartBuilderSnapshot: ctx.setLoadedChartBuilderSnapshot,
           setRefetchChartDashboardsTick: ctx.setRefetchChartDashboardsTick,
-        });
-
-        finishConnectHomeProjectLoad({
           setViewing: ctx.setViewing,
           requestConnectWorkspace: ctx.requestConnectWorkspace,
           setConnectHomeAnalyzeActive: ctx.setConnectHomeAnalyzeActive,
           requestConnectAnalyzeScroll: ctx.requestConnectAnalyzeScroll,
+          setConnectHomeCenterView: ctx.setConnectHomeCenterView,
           setRightPanelTab: ctx.setRightPanelTab,
           setRightPanelOpen: ctx.setRightPanelOpen,
-          rightPanelTab: "charts",
+          setChartDataOverride: ctx.setChartDataOverride,
+          setChartDataOverrideMeta: ctx.setChartDataOverrideMeta,
+          liveStreamActions: ctx.liveStreamActions,
+          liveStreamState: ctx.liveStreamState,
         });
-        ctx.setConnectHomeCenterView?.("chart");
 
         router.replace("/dashboard", { scroll: false });
       } catch (e) {
         console.error("[RunYourselfDashboardLoader]", e);
+        loadedRef.current = false;
       }
     })();
   }, [searchParams, userId, ctx, router]);
