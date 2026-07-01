@@ -5,6 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { HubProofMetric, HubProofMetricsSection } from "@/types/hub";
 
+const METRIC_CELL_CLASS =
+  "group relative flex min-h-28 w-full flex-col items-center justify-center p-4 text-center before:absolute before:-left-1 before:top-0 before:z-10 before:h-screen before:w-px before:bg-border before:content-[''] after:absolute after:-top-1 after:left-0 after:z-10 after:h-px after:w-screen after:bg-border after:content-['']";
+
 function ProofMetricValue({
   metric,
   size,
@@ -15,11 +18,13 @@ function ProofMetricValue({
   const valueClass =
     size === "primary"
       ? "text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
-      : "text-lg font-semibold tracking-tight text-foreground/90 sm:text-xl";
+      : "text-xl font-semibold tracking-tight text-foreground/90 sm:text-2xl";
 
   if (metric.static) {
     return (
-      <p className={cn(valueClass, "tabular-nums leading-none text-balance")}>{metric.value}</p>
+      <p className={cn(valueClass, "max-w-[12rem] text-balance leading-tight tabular-nums")}>
+        {metric.value}
+      </p>
     );
   }
 
@@ -37,7 +42,7 @@ function ProofMetricValue({
   );
 }
 
-function ProofMetricCard({
+function ProofMetricCell({
   metric,
   size,
 }: {
@@ -47,27 +52,18 @@ function ProofMetricCard({
   const isPrimary = size === "primary";
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border shadow-none",
-        isPrimary
-          ? "border-border/70 bg-background/85 backdrop-blur-sm"
-          : "border-border/50 bg-muted/30",
-      )}
-    >
-      <div className={cn(isPrimary ? "p-4 sm:p-5" : "p-3.5 sm:p-4")}>
-        <ProofMetricValue metric={metric} size={size} />
-        <p
-          className={cn(
-            "mt-2 leading-snug",
-            isPrimary
-              ? "text-sm text-muted-foreground"
-              : "text-xs text-muted-foreground/90 sm:text-sm",
-          )}
-        >
-          {metric.label}
-        </p>
-      </div>
+    <div className={METRIC_CELL_CLASS}>
+      <ProofMetricValue metric={metric} size={size} />
+      <p
+        className={cn(
+          "mt-2 max-w-[11rem] text-balance leading-snug",
+          isPrimary
+            ? "text-sm text-muted-foreground"
+            : "text-xs text-muted-foreground/90 sm:text-sm",
+        )}
+      >
+        {metric.label}
+      </p>
     </div>
   );
 }
@@ -75,18 +71,20 @@ function ProofMetricCard({
 export function HubProofMetrics({ section }: { section: HubProofMetricsSection }) {
   return (
     <section className="relative z-10 w-full px-6 pb-12 md:pb-16">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 md:gap-7">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-6 md:gap-7">
+        <div className="grid w-full grid-cols-2 items-center justify-center overflow-hidden border-y border-border md:grid-cols-4">
           {section.primaryMetrics.map((metric) => (
-            <ProofMetricCard key={`${metric.value}-${metric.label}`} metric={metric} size="primary" />
+            <ProofMetricCell key={`${metric.value}-${metric.label}`} metric={metric} size="primary" />
           ))}
         </div>
 
-        <div className="mx-auto grid w-full max-w-lg grid-cols-2 gap-3 sm:max-w-xl md:max-w-2xl">
-          {section.trustMetrics.map((metric) => (
-            <ProofMetricCard key={`${metric.value}-${metric.label}`} metric={metric} size="trust" />
-          ))}
-        </div>
+        {section.trustMetrics.length > 0 ? (
+          <div className="grid w-full max-w-2xl grid-cols-2 items-center justify-center overflow-hidden border-y border-border sm:max-w-3xl">
+            {section.trustMetrics.map((metric) => (
+              <ProofMetricCell key={`${metric.value}-${metric.label}`} metric={metric} size="trust" />
+            ))}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
           {section.capabilityPills.map((pill) => (
