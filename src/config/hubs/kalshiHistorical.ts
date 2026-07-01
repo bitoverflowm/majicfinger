@@ -115,8 +115,9 @@ export const kalshiHistoricalHub: HubPageConfig = {
 
     {
       type: "proof_metrics",
-      heading: "Trusted by +10,000 researchers, traders, quants and analysts",
-      subheading: "+43,400,000 data queries processed in June 2026 alone",
+      heading: "10,000+ researchers, traders, quants, and analysts use Lychee.",
+      subheading:
+        "43,400,000+ historical data requests were served from the archive in June 2026 alone.",
       primaryMetrics: [
         {
           value: "7.68M+",
@@ -141,7 +142,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
         },
         {
           value: "Since July 2021",
-          label: "Kalshi public launch",
+          label: "Every Kalshi market and trade since launch",
           static: true,
         },
       ],

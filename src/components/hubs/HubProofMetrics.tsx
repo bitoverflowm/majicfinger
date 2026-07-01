@@ -24,8 +24,13 @@ function ProofMetricValue({
       : "text-xl font-semibold tracking-tight text-foreground/90 sm:text-2xl";
 
   if (metric.static) {
+    const staticValueClass =
+      size === "primary"
+        ? "text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+        : "text-base font-semibold tracking-tight text-foreground/90 sm:text-lg";
+
     return (
-      <p className={cn(valueClass, "max-w-[12rem] text-balance leading-tight tabular-nums")}>
+      <p className={cn(staticValueClass, "max-w-[12rem] text-balance leading-tight")}>
         {metric.value}
       </p>
     );
@@ -59,7 +64,7 @@ function ProofMetricCell({
       <ProofMetricValue metric={metric} size={size} />
       <p
         className={cn(
-          "mt-2 max-w-[11rem] text-balance leading-snug",
+          "mt-2 max-w-[13rem] text-balance leading-snug",
           isPrimary
             ? "text-sm text-muted-foreground"
             : "text-xs text-muted-foreground/90 sm:text-sm",
