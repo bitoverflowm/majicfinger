@@ -1,0 +1,2994 @@
+Lychee Zora Telegram bot — reconstructed history from MongoDB
+Database target: production
+UTC range: 2026-07-01 00:00:00 through 2026-07-02 23:59:59 (inclusive days)
+Generated: 2026-07-02T06:13:26.507Z
+
+IMPORTANT:
+- Telegram does not store outbound message text in MongoDB.
+- This file rebuilds notifications from VisitorSession + VisitorEvent records.
+- Missing: immediate fork/page alerts sent via /api/analytics/telegram-event only.
+- Missing: data_pull_notify messages if the journey batch had not flushed before export.
+
+Sessions touched: 142
+Events in range: 546
+Reconstructed messages: 232
+
+Counter snapshot (TelegramEventCounter):
+  content_view: count=425 last=2026-06-04 18:43:43 UTC
+  content_leave: count=348 last=2026-06-04 18:43:43 UTC
+  fork_click: count=46 last=2026-07-01 10:37:57 UTC
+  signup: count=67 last=2026-07-01 23:09:58 UTC
+  page_view: count=1 last=2026-05-31 14:25:51 UTC
+  page_click: count=3 last=2026-05-31 14:26:20 UTC
+  visitor_session: count=2423 last=2026-07-01 10:42:12 UTC
+  visitor_session_end: count=1643 last=2026-07-02 05:38:27 UTC
+  auth_session: count=719 last=2026-07-01 10:12:50 UTC
+  auth_session_end: count=696 last=2026-07-01 23:17:34 UTC
+  hero_cta_click: count=4 last=2026-07-01 16:03:46 UTC
+
+========================================================================
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:11:31 UTC] visitor_session_end · session a38da58f
+
+📋 Session summary
+
+Session: a38da58f
+Duration: 4h 9m
+Entry: /guides/kalshi-weather-probability-calibration-chart
+Logged in: no
+
+Journey:
+1. Opened article: How to Build a Probability Calibration Chart Using Kalshi Weather Markets (Accuracy Analysis Guide)
+2. Opened chart: probability_calibration
+3. Left chart: probability_calibration (14s)
+4. Left article: How to Build a Probability Calibration Chart Using Kalshi Weather Markets (Accuracy Analysis Guide) (19s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:11:31 UTC] visitor_session_end · session d3397fbb
+
+📋 Session summary
+
+Session: d3397fbb
+Duration: 4h 14m
+Entry: /guides/kalshi-volume-chart-guide
+Logged in: no
+
+Journey:
+1. Opened article: How to Build Kalshi Volume Charts Using Historical Data (Step-by-Step Guide)
+2. Opened chart: kalshi-quaterly-volume-chart
+3. Left article: How to Build Kalshi Volume Charts Using Historical Data (Step-by-Step Guide) (26s)
+4. Left chart: kalshi-quaterly-volume-chart (22s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:27:34 UTC] visitor_session_start · session afadefd2
+
+🟢 New visitor session
+
+Session: afadefd2
+Entry: /guides/kalshi-weather-prediction-markets-analysis
+Logged in: no
+Referrer: https://search.brave.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:28:03 UTC] visitor_session_end · session afadefd2
+
+📋 Session summary
+
+Session: afadefd2
+Duration: 30s
+Entry: /guides/kalshi-weather-prediction-markets-analysis
+Logged in: no
+
+Journey:
+1. Opened article: Kalshi Weather Prediction Markets Explained: How They Work, How Prices Are Set, and What Historical Data Reveals
+2. Opened chart: kalshi-weather-probability-convergence-jan-2025-2
+3. Opened chart: weather-market-calibration-curve
+4. Opened chart: Chart 3
+5. Clicked Run for yourself on kalshi-weather-probability-convergence-jan-2025-2
+
+Outcome: Clicked Run for yourself
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:28:28 UTC] visitor_session_start · session dae40731
+
+🟢 New visitor session
+
+Session: dae40731
+Entry: /guides/kalshi-historical-data
+Logged in: no
+Referrer: https://search.yahoo.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:29:11 UTC] visitor_session_end · session dae40731
+
+📋 Session summary
+
+Session: dae40731
+Duration: 43s
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+2. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (1s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:32:30 UTC] visitor_session_start · session d516e1b0
+
+🟢 New visitor session
+
+Session: d516e1b0
+Entry: /
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:35:45 UTC] visitor_session_end · session d516e1b0
+
+📋 Session summary
+
+Session: d516e1b0
+Duration: 3m 14s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Pricing"
+3. Clicked "Try the demo" (pricing)
+4. Clicked "CSV / XLSX" (connect-home-scroll)
+5. Clicked "Kalshi Historical" (connect-home-scroll)
+6. Clicked "TradesEach row represents a single trade execution." (connect-home-workspace)
+7. Clicked "Select all" (connect-home-workspace)
+8. Clicked "SummarizeSum or count values. Use Bucket → Unique values on a column to group rows, or leave one metric for a grand tota" (connect-home-workspace)
+9. Clicked "WhereFilter your data before pulling. (eg: category = Weather; volume > 10000)." (connect-home-workspace)
+10. Clicked "JoinCombine data pull with another table using a pivot (join markets and trades on ticker: combines markets and trades w" (connect-home-workspace)
+11. Clicked "limitTruncate how many rows of data do you want (e.g. 1000 rows)." (connect-home-workspace)
+12. Clicked "Run pull" (connect-home-workspace)
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:47:20 UTC] visitor_session_start · session 2934b416
+
+🟢 New visitor session
+
+Session: 2934b416
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 00:47:20 UTC] visitor_session_end · session 2934b416
+
+📋 Session summary
+
+Session: 2934b416
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 01:01:11 UTC] visitor_session_start · session 92af197c
+
+🟢 New visitor session
+
+Session: 92af197c
+Entry: /guides/polymarket-market-id
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 01:15:28 UTC] visitor_session_start · session f784857e
+
+🟢 New visitor session
+
+Session: f784857e
+Entry: /guides/polymarket-events-endpoint-no-code
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 01:21:30 UTC] visitor_session_end · session f784857e
+
+📋 Session summary
+
+Session: f784857e
+Duration: 6m 2s
+Entry: /guides/polymarket-events-endpoint-no-code
+Logged in: no
+
+Journey:
+1. Opened article: How to Pull and Analyze Polymarket Event Data (No-Code)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 01:33:11 UTC] visitor_session_start · session 53565bd1
+
+🟢 New visitor session
+
+Session: 53565bd1
+Entry: /guides/polymarket-market-id
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 01:36:25 UTC] visitor_session_start · session c0f599e9
+
+🟢 New visitor session
+
+Session: c0f599e9
+Entry: /guides/polymarket-market-id
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 01:46:51 UTC] visitor_session_start · session 323fa0b6
+
+🟢 New visitor session
+
+Session: 323fa0b6
+Entry: /guides/kalshi-volume
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 01:52:55 UTC] visitor_session_start · session 541e4721
+
+🟢 New visitor session
+
+Session: 541e4721
+Entry: /guides/polymarket-market-id
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 01:56:17 UTC] visitor_session_start · session 262841a2
+
+🟢 New visitor session
+
+Session: 262841a2
+Entry: /guides/kalshi-historical-data
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 02:17:17 UTC] visitor_session_end · session 262841a2
+
+📋 Session summary
+
+Session: 262841a2
+Duration: 21m
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+2. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (88s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 02:25:44 UTC] visitor_session_start · session 7b7b2184
+
+🟢 New visitor session
+
+Session: 7b7b2184
+Entry: /
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 02:40:55 UTC] visitor_session_start · session 9b226216
+
+🟢 New visitor session
+
+Session: 9b226216
+Entry: /kalshi-historical-data
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 02:50:39 UTC] visitor_session_start · session 180ce8a0
+
+🟢 New visitor session
+
+Session: 180ce8a0
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 02:50:39 UTC] visitor_session_end · session 180ce8a0
+
+📋 Session summary
+
+Session: 180ce8a0
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Polymarket Metadata Lookup
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:07:02 UTC] visitor_session_start · session 8ef41b53
+
+🟢 New visitor session
+
+Session: 8ef41b53
+Entry: /kalshi-historical-data
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:07:34 UTC] visitor_session_start · session ca4608f8
+
+🟢 New visitor session
+
+Session: ca4608f8
+Entry: /
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:09:33 UTC] visitor_session_start · session 9e6e966e
+
+🟢 New visitor session
+
+Session: 9e6e966e
+Entry: /
+Logged in: yes
+Email: godkarma@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:09:34 UTC] visitor_session_end · session 9e6e966e
+
+📋 Session summary
+
+Session: 9e6e966e
+Duration: 1s
+Entry: /
+Logged in: yes
+Email: godkarma@gmail.com
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Log in"
+3. Identified as godkarma@gmail.com
+4. Identified as godkarma@gmail.com
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:09:35 UTC] auth_session_start · session 241de14b
+
+🔐 Authenticated session started
+
+Session: 241de14b
+Entry: /dashboard
+Email: godkarma@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:10:29 UTC] auth_session_start · session 58436ad0
+
+🔐 Authenticated session started
+
+Session: 58436ad0
+Entry: /dashboard
+Email: godkarma@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:10:29 UTC] auth_session_end · session 241de14b
+
+📋 Auth session summary
+
+Session: 241de14b
+Duration: 55s
+Entry: /dashboard
+Email: godkarma@gmail.com
+
+Activity:
+No tracked activity recorded.
+
+Outcome: Active session
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:10:55 UTC] auth_session_end · session 58436ad0
+
+📋 Auth session summary
+
+Session: 58436ad0
+Duration: 25s
+Entry: /dashboard
+Email: godkarma@gmail.com
+
+Activity:
+1. Opened integration: kalshiHistorical
+
+Outcome: Browsed integrations
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:18:54 UTC] visitor_session_end · session 3b8917e5
+
+📋 Session summary
+
+Session: 3b8917e5
+Duration: 222h 2m
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+2. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (18s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:27:27 UTC] visitor_session_start · session ddd28bd8
+
+🟢 New visitor session
+
+Session: ddd28bd8
+Entry: /guides/polymarket-clob-websocket-market-channel
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:34:10 UTC] visitor_session_start · session a682b494
+
+🟢 New visitor session
+
+Session: a682b494
+Entry: /guides/kalshi-volume
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:54:17 UTC] visitor_session_start · session 2c2f90a9
+
+🟢 New visitor session
+
+Session: 2c2f90a9
+Entry: /guides/kalshi-volume
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:55:04 UTC] visitor_session_end · session 2c2f90a9
+
+📋 Session summary
+
+Session: 2c2f90a9
+Duration: 47s
+Entry: /guides/kalshi-volume
+Logged in: no
+
+Journey:
+1. Opened article: Kalshi Volume Explained: Quarterly Trends, Historical Growth, and Market Activity Data
+2. Opened chart: Chart 1
+3. Opened chart: kalshi-volume-by-category
+4. Opened chart: Chart 1
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:56:53 UTC] visitor_session_start · session 2504ab33
+
+🟢 New visitor session
+
+Session: 2504ab33
+Entry: /polymarket-metadata
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:57:58 UTC] visitor_session_end · session 2504ab33
+
+📋 Session summary
+
+Session: 2504ab33
+Duration: 1m 5s
+Entry: /polymarket-metadata
+Logged in: no
+
+Journey:
+1. Landed on Polymarket Metadata Lookup
+2. Clicked "Go"
+3. Clicked "Go"
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:59:38 UTC] visitor_session_start · session 6daf3dc0
+
+🟢 New visitor session
+
+Session: 6daf3dc0
+Entry: /guides/kalshi-historical-data
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 03:59:58 UTC] visitor_session_end · session 6daf3dc0
+
+📋 Session summary
+
+Session: 6daf3dc0
+Duration: 20s
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 04:08:10 UTC] visitor_session_start · session ebeed378
+
+🟢 New visitor session
+
+Session: ebeed378
+Entry: /polymarket-metadata
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 04:31:37 UTC] visitor_session_start · session 63440362
+
+🟢 New visitor session
+
+Session: 63440362
+Entry: /kalshi-historical-data
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 04:38:48 UTC] visitor_session_start · session 53d4ac15
+
+🟢 New visitor session
+
+Session: 53d4ac15
+Entry: /guides/kalshi-historical-data
+Logged in: no
+Referrer: https://lycheedata.com/guides/kalshi-historical-data
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 04:39:06 UTC] visitor_session_end · session 53d4ac15
+
+📋 Session summary
+
+Session: 53d4ac15
+Duration: 18s
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 04:39:17 UTC] visitor_session_start · session a113f0c8
+
+🟢 New visitor session
+
+Session: a113f0c8
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 04:41:04 UTC] visitor_session_start · session 8d25c473
+
+🟢 New visitor session
+
+Session: 8d25c473
+Entry: /guides/kalshi-historical-data
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 04:42:21 UTC] visitor_session_start · session e9d45948
+
+🟢 New visitor session
+
+Session: e9d45948
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 04:54:00 UTC] visitor_session_start · session 38ada686
+
+🟢 New visitor session
+
+Session: 38ada686
+Entry: /
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 05:20:53 UTC] visitor_session_start · session e2f15bd1
+
+🟢 New visitor session
+
+Session: e2f15bd1
+Entry: /
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 05:33:29 UTC] visitor_session_start · session ad3f18ac
+
+🟢 New visitor session
+
+Session: ad3f18ac
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 05:33:32 UTC] visitor_session_end · session ad3f18ac
+
+📋 Session summary
+
+Session: ad3f18ac
+Duration: 3s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 05:41:31 UTC] visitor_session_start · session 6160fed4
+
+🟢 New visitor session
+
+Session: 6160fed4
+Entry: /guides/polymarket-clob-websocket-market-channel
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 05:41:32 UTC] visitor_session_end · session 6160fed4
+
+📋 Session summary
+
+Session: 6160fed4
+Duration: 1s
+Entry: /guides/polymarket-clob-websocket-market-channel
+Logged in: no
+
+Journey:
+1. Opened article: Polymarket CLOB WebSocket Market Channel: Asset IDs, Prices & Trades
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 05:44:26 UTC] visitor_session_start · session bff5fdc7
+
+🟢 New visitor session
+
+Session: bff5fdc7
+Entry: /guides/polymarket-clob-websocket-market-channel
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 05:44:43 UTC] visitor_session_end · session bff5fdc7
+
+📋 Session summary
+
+Session: bff5fdc7
+Duration: 17s
+Entry: /guides/polymarket-clob-websocket-market-channel
+Logged in: no
+
+Journey:
+1. Opened article: Polymarket CLOB WebSocket Market Channel: Asset IDs, Prices & Trades
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 06:20:36 UTC] visitor_session_start · session 6df4ba86
+
+🟢 New visitor session
+
+Session: 6df4ba86
+Entry: /guides/polymarket-market-id
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 06:26:15 UTC] visitor_session_start · session 11eb2033
+
+🟢 New visitor session
+
+Session: 11eb2033
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 06:26:22 UTC] visitor_session_start · session 9cb53271
+
+🟢 New visitor session
+
+Session: 9cb53271
+Entry: /guides/polymarket-market-id
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 06:29:46 UTC] visitor_session_start · session 9ba21990
+
+🟢 New visitor session
+
+Session: 9ba21990
+Entry: /guides/kalshi-political-prediction-market-accuracy
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 06:41:46 UTC] visitor_session_start · session e9dca135
+
+🟢 New visitor session
+
+Session: e9dca135
+Entry: /guides/kalshi-political-prediction-market-accuracy
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:03:13 UTC] visitor_session_start · session 2030fd4e
+
+🟢 New visitor session
+
+Session: 2030fd4e
+Entry: /
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:18:00 UTC] visitor_session_start · session cccab53a
+
+🟢 New visitor session
+
+Session: cccab53a
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:18:00 UTC] visitor_session_end · session cccab53a
+
+📋 Session summary
+
+Session: cccab53a
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+2. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+3. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+4. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (33s)
+5. Landed on Lychee homepage
+6. Clicked "Pricing"
+7. Clicked "Try the demo" (pricing)
+8. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:19:21 UTC] visitor_session_start · session 36a939a5
+
+🟢 New visitor session
+
+Session: 36a939a5
+Entry: /
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:26:47 UTC] visitor_session_start · session e5204871
+
+🟢 New visitor session
+
+Session: e5204871
+Entry: /guides/polymarket-gamma-api-events-slug
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:28:12 UTC] visitor_session_start · session 9b06c33c
+
+🟢 New visitor session
+
+Session: 9b06c33c
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:28:12 UTC] visitor_session_end · session 9b06c33c
+
+📋 Session summary
+
+Session: 9b06c33c
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Kalshi Historical
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:44:22 UTC] visitor_session_start · session 5524d755
+
+🟢 New visitor session
+
+Session: 5524d755
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 07:44:23 UTC] visitor_session_end · session 5524d755
+
+📋 Session summary
+
+Session: 5524d755
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Kalshi Historical
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 08:11:03 UTC] visitor_session_start · session e3970a64
+
+🟢 New visitor session
+
+Session: e3970a64
+Entry: /guides/kalshi-historical-political-prediction-market-accuracy-lifecycle
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 08:11:20 UTC] visitor_session_end · session 36a939a5
+
+📋 Session summary
+
+Session: 36a939a5
+Duration: 51m 59s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Try For Free" (hero)
+3. Clicked "Pricing"
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 08:11:21 UTC] visitor_session_end · session e3970a64
+
+📋 Session summary
+
+Session: e3970a64
+Duration: 19s
+Entry: /guides/kalshi-historical-political-prediction-market-accuracy-lifecycle
+Logged in: no
+
+Journey:
+1. Opened article: When Do Prediction Markets Become Accurate? A Kalshi Political Market Lifecycle Analysis
+2. Opened chart: lifecycle_brier
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 08:51:02 UTC] visitor_session_start · session 6d481137
+
+🟢 New visitor session
+
+Session: 6d481137
+Entry: /polymarket-metadata
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 08:51:09 UTC] visitor_session_end · session 6d481137
+
+📋 Session summary
+
+Session: 6d481137
+Duration: 7s
+Entry: /polymarket-metadata
+Logged in: no
+
+Journey:
+1. Landed on Polymarket Metadata Lookup
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 09:15:12 UTC] auth_session_start · session 42137150
+
+🔐 Authenticated session started
+
+Session: 42137150
+Entry: /kalshi-historical-data
+Email: rikesh@bitoverflow.org
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 09:20:40 UTC] auth_session_start · session 269a3bd1
+
+🔐 Authenticated session started
+
+Session: 269a3bd1
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 09:20:42 UTC] auth_session_end · session 42137150
+
+📋 Auth session summary
+
+Session: 42137150
+Duration: 5m 30s
+Entry: /kalshi-historical-data
+Email: rikesh@bitoverflow.org
+
+Activity:
+No tracked activity recorded.
+
+Outcome: Active session
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 09:25:56 UTC] visitor_session_start · session 6ae8536e
+
+🟢 New visitor session
+
+Session: 6ae8536e
+Entry: /guides/kalshi-volume
+Logged in: no
+Referrer: https://claude.ai/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 09:33:08 UTC] visitor_session_end · session 6ae8536e
+
+📋 Session summary
+
+Session: 6ae8536e
+Duration: 7m 12s
+Entry: /guides/kalshi-volume
+Logged in: no
+
+Journey:
+1. Opened article: Kalshi Volume Explained: Quarterly Trends, Historical Growth, and Market Activity Data
+2. Opened chart: Chart 1
+3. Opened chart: kalshi-volume-by-category
+4. Opened chart: Chart 1
+5. Left chart: kalshi-volume-by-category (423s)
+6. Left chart: Chart 1 (420s)
+7. Left chart: Chart 1 (429s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 09:33:10 UTC] visitor_session_start · session 66b011d7
+
+🟢 New visitor session
+
+Session: 66b011d7
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 09:33:10 UTC] visitor_session_end · session 66b011d7
+
+📋 Session summary
+
+Session: 66b011d7
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 09:55:54 UTC] auth_session_end · session 269a3bd1
+
+📋 Auth session summary
+
+Session: 269a3bd1
+Duration: 35m 14s
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+Chain updates: 6
+
+Activity:
+1. Spent 3023s in project
+
+Outcome: Active session
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:11:41 UTC] auth_session_start · session 3b10618d
+
+🔐 Authenticated session started
+
+Session: 3b10618d
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:12:43 UTC] auth_session_start · session 2b4f91b3
+
+🔐 Authenticated session started
+
+Session: 2b4f91b3
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:12:45 UTC] auth_session_end · session 3b10618d
+
+📋 Auth session summary
+
+Session: 3b10618d
+Duration: 1m 5s
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+
+Activity:
+No tracked activity recorded.
+
+Outcome: Active session
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:12:46 UTC] auth_session_start · session 1ea76af4
+
+🔐 Authenticated session started
+
+Session: 1ea76af4
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:12:47 UTC] auth_session_end · session 2b4f91b3
+
+📋 Auth session summary
+
+Session: 2b4f91b3
+Duration: 4s
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+
+Activity:
+1. Spent 85s in project
+
+Outcome: Active session
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:12:49 UTC] auth_session_start · session bd534e9d
+
+🔐 Authenticated session started
+
+Session: bd534e9d
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:12:55 UTC] auth_session_end · session 1ea76af4
+
+📋 Auth session summary
+
+Session: 1ea76af4
+Duration: 9s
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+
+Activity:
+No tracked activity recorded.
+
+Outcome: Active session
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:18:52 UTC] visitor_session_start · session 31b59cb1
+
+🟢 New visitor session
+
+Session: 31b59cb1
+Entry: /guides/kalshi-volume
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:18:57 UTC] visitor_session_start · session 638ae211
+
+🟢 New visitor session
+
+Session: 638ae211
+Entry: /kalshi-historical-data
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:19:04 UTC] visitor_session_start · session 34e02aea
+
+🟢 New visitor session
+
+Session: 34e02aea
+Entry: /guides/kalshi-volume-chart-guide
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:19:08 UTC] visitor_session_end · session 34e02aea
+
+📋 Session summary
+
+Session: 34e02aea
+Duration: 4s
+Entry: /guides/kalshi-volume-chart-guide
+Logged in: no
+
+Journey:
+1. Opened article: How to Build Kalshi Volume Charts Using Historical Data (Step-by-Step Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:25:52 UTC] visitor_session_start · session 0b86bb3a
+
+🟢 New visitor session
+
+Session: 0b86bb3a
+Entry: /
+Logged in: no
+Referrer: https://www.google.com/
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:33:14 UTC] visitor_session_start · session 8edfcba6
+
+🟢 New visitor session
+
+Session: 8edfcba6
+Entry: /
+Logged in: yes
+Email: rikesh@bitoverflow.org
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:36:47 UTC] visitor_session_end · session 8edfcba6
+
+📋 Session summary
+
+Session: 8edfcba6
+Duration: 3m 32s
+Entry: /
+Logged in: yes
+Email: rikesh@bitoverflow.org
+
+Journey:
+1. Landed on Kalshi Historical
+2. Identified as rikesh@bitoverflow.org
+3. Landed on Kalshi Historical
+4. Identified as rikesh@bitoverflow.org
+5. Identified as rikesh@bitoverflow.org
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:42:09 UTC] visitor_session_start · session 733fccc9
+
+🟢 New visitor session
+
+Session: 733fccc9
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:42:10 UTC] visitor_session_start · session b3fbb104
+
+🟢 New visitor session
+
+Session: b3fbb104
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:42:10 UTC] visitor_session_start · session 259b3b2d
+
+🟢 New visitor session
+
+Session: 259b3b2d
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:42:11 UTC] visitor_session_start · session c8ca7561
+
+🟢 New visitor session
+
+Session: c8ca7561
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:42:50 UTC] auth_session_end · session bd534e9d
+
+📋 Auth session summary
+
+Session: bd534e9d
+Duration: 30m 2s
+Entry: /dashboard
+Email: rikesh@bitoverflow.org
+Chain updates: 5
+
+Activity:
+No tracked activity recorded.
+
+Outcome: Active session
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 10:55:50 UTC] visitor_session_start · session 4bd7bc63
+
+🟢 New visitor session
+
+Session: 4bd7bc63
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 11:00:14 UTC] visitor_session_end · session 4bd7bc63
+
+📋 Session summary
+
+Session: 4bd7bc63
+Duration: 4m 25s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID
+2. Opened chart: will-the-virginia-redistricting-referendum-pass-probability-momentum
+3. Left chart: will-the-virginia-redistricting-referendum-pass-probability-momentum (1s)
+4. Left article: How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID (13s)
+5. Opened chart: 2026-nba-champion
+6. Left chart: 2026-nba-champion (52s)
+7. Opened article: How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID
+8. Left article: How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID (3s)
+9. Landed on Lychee homepage
+10. Clicked "Pricing"
+11. Clicked "Products"
+12. Clicked "Polymarket Live"
+13. Clicked "DashboardsBrowse published dashboards and narrative data stories."
+14. Clicked "Data guides"
+15. Clicked "April 16, 2026How to Track Polymarket Odds Over Time (Visualize Probability Changes)Learn how to track Polymarket odds o" (guides)
+16. Opened article: How to Track Polymarket Odds Over Time (Visualize Probability Changes)
+17. Opened chart: will-bryan-johnson-have-sex-again-this-month
+18. Opened chart: polymarket-btc-70k-probability-momentum
+19. Opened chart: peruvian-election-momentum
+20. Left article: How to Track Polymarket Odds Over Time (Visualize Probability Changes) (1890s)
+21. Left chart: will-bryan-johnson-have-sex-again-this-month (1881s)
+22. Left chart: polymarket-btc-70k-probability-momentum (1872s)
+23. Left chart: peruvian-election-momentum (1861s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 11:59:19 UTC] visitor_session_start · session 7573cbce
+
+🟢 New visitor session
+
+Session: 7573cbce
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 12:17:32 UTC] visitor_session_start · session e344431a
+
+🟢 New visitor session
+
+Session: e344431a
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 12:43:56 UTC] visitor_session_end · session 7573cbce
+
+📋 Session summary
+
+Session: 7573cbce
+Duration: 44m 37s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Track Polymarket Odds Over Time (Visualize Probability Changes)
+2. Opened chart: will-bryan-johnson-have-sex-again-this-month
+3. Opened chart: polymarket-btc-70k-probability-momentum
+4. Opened chart: peruvian-election-momentum
+5. Left chart: will-bryan-johnson-have-sex-again-this-month (2148s)
+6. Left article: How to Track Polymarket Odds Over Time (Visualize Probability Changes) (2153s)
+7. Left chart: polymarket-btc-70k-probability-momentum (2140s)
+8. Left chart: peruvian-election-momentum (2129s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 12:44:02 UTC] visitor_session_start · session 4ce14005
+
+🟢 New visitor session
+
+Session: 4ce14005
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 12:53:15 UTC] visitor_session_start · session 15468855
+
+🟢 New visitor session
+
+Session: 15468855
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 13:09:10 UTC] visitor_session_start · session aaf6153a
+
+🟢 New visitor session
+
+Session: aaf6153a
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 13:09:57 UTC] visitor_session_end · session aaf6153a
+
+📋 Session summary
+
+Session: aaf6153a
+Duration: 47s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Stream Live Polymarket Prices and Build Real-Time Charts (No-Code)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 13:20:43 UTC] visitor_session_start · session 22fd5cc3
+
+🟢 New visitor session
+
+Session: 22fd5cc3
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 13:24:16 UTC] visitor_session_start · session ff8e0ef1
+
+🟢 New visitor session
+
+Session: ff8e0ef1
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 13:33:48 UTC] visitor_session_end · session 22fd5cc3
+
+📋 Session summary
+
+Session: 22fd5cc3
+Duration: 13m 5s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Pull and Analyze Polymarket Event Data (No-Code)
+2. Left article: How to Pull and Analyze Polymarket Event Data (No-Code) (29s)
+3. Landed on Lychee homepage
+4. Clicked "Try For Free" (hero)
+5. Clicked "Polymarket Historical" (connect-home-scroll)
+6. Clicked "MarketsEach row is a Polymarket prediction market." (connect-home-workspace)
+7. Clicked "button" (connect-home-workspace)
+8. Clicked "WhereFilter your data before pulling. (eg: category = Weather; volume > 10000)." (connect-home-workspace)
+9. Clicked "Run pull" (connect-home-workspace)
+10. Clicked "Lychee"
+11. Clicked "Try For Free" (hero)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 13:39:52 UTC] visitor_session_end · session 4ce14005
+
+📋 Session summary
+
+Session: 4ce14005
+Duration: 55m 50s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "What data sources does Lychee include?" (faq)
+3. Clicked "What is Lychee?" (faq)
+4. Clicked "Does Lychee include Kalshi and Polymarket historical data?" (faq)
+5. Clicked "Monthly-10%" (pricing)
+6. Clicked "Weekly" (pricing)
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 13:40:26 UTC] visitor_session_start · session 32c4e073
+
+🟢 New visitor session
+
+Session: 32c4e073
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 13:54:49 UTC] visitor_session_end · session 32c4e073
+
+📋 Session summary
+
+Session: 32c4e073
+Duration: 14m 23s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Pricing"
+3. Clicked "Monthly-10%" (pricing)
+4. Clicked "Weekly" (pricing)
+5. Clicked "Annual-25%" (pricing)
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:02:50 UTC] visitor_session_start · session 9273669b
+
+🟢 New visitor session
+
+Session: 9273669b
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:07:00 UTC] visitor_session_start · session 2e21c9db
+
+🟢 New visitor session
+
+Session: 2e21c9db
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:07:45 UTC] visitor_session_start · session 08d47784
+
+🟢 New visitor session
+
+Session: 08d47784
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:11:14 UTC] visitor_session_start · session 4cfeb2f2
+
+🟢 New visitor session
+
+Session: 4cfeb2f2
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:22:39 UTC] visitor_session_start · session d6333f9f
+
+🟢 New visitor session
+
+Session: d6333f9f
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:25:41 UTC] visitor_session_start · session 98ebd239
+
+🟢 New visitor session
+
+Session: 98ebd239
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:26:33 UTC] visitor_session_end · session 98ebd239
+
+📋 Session summary
+
+Session: 98ebd239
+Duration: 51s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:30:28 UTC] visitor_session_start · session 2bf0e4de
+
+🟢 New visitor session
+
+Session: 2bf0e4de
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:39:36 UTC] visitor_session_start · session c73a4255
+
+🟢 New visitor session
+
+Session: c73a4255
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:39:36 UTC] visitor_session_end · session c73a4255
+
+📋 Session summary
+
+Session: c73a4255
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:40:40 UTC] visitor_session_end · session 11eb2033
+
+📋 Session summary
+
+Session: 11eb2033
+Duration: 8h 14m
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "DashboardsBrowse published dashboards and narrative data stories."
+3. Landed on Dashboards Gallery
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 14:48:13 UTC] visitor_session_start · session 2aee1e12
+
+🟢 New visitor session
+
+Session: 2aee1e12
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 15:15:02 UTC] visitor_session_start · session e9bf99b3
+
+🟢 New visitor session
+
+Session: e9bf99b3
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 15:31:32 UTC] visitor_session_start · session 223ee6cc
+
+🟢 New visitor session
+
+Session: 223ee6cc
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 15:55:52 UTC] visitor_session_start · session a513f392
+
+🟢 New visitor session
+
+Session: a513f392
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 15:55:52 UTC] visitor_session_end · session a513f392
+
+📋 Session summary
+
+Session: a513f392
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: Polymarket CLOB WebSocket Market Channel: Asset IDs, Prices & Trades
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 15:57:07 UTC] visitor_session_start · session 7d02ee0a
+
+🟢 New visitor session
+
+Session: 7d02ee0a
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:07:37 UTC] visitor_session_start · session 91cdaae1
+
+🟢 New visitor session
+
+Session: 91cdaae1
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:07:37 UTC] visitor_session_end · session 91cdaae1
+
+📋 Session summary
+
+Session: 91cdaae1
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Stream Live Polymarket Prices and Build Real-Time Charts (No-Code)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:13:16 UTC] visitor_session_start · session 7aca8d96
+
+🟢 New visitor session
+
+Session: 7aca8d96
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:13:16 UTC] visitor_session_end · session 7aca8d96
+
+📋 Session summary
+
+Session: 7aca8d96
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Pull and Analyze Polymarket Event Data (No-Code)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:32:41 UTC] visitor_session_end · session ff8e0ef1
+
+📋 Session summary
+
+Session: ff8e0ef1
+Duration: 3h 8m
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: Polymarket CLOB WebSocket Market Channel: Asset IDs, Prices & Trades
+2. Left article: Polymarket CLOB WebSocket Market Channel: Asset IDs, Prices & Trades (8606s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:33:15 UTC] visitor_session_start · session 6cabb5d2
+
+🟢 New visitor session
+
+Session: 6cabb5d2
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:33:54 UTC] visitor_session_end · session 6cabb5d2
+
+📋 Session summary
+
+Session: 6cabb5d2
+Duration: 39s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID
+2. Opened chart: will-the-virginia-redistricting-referendum-pass-probability-momentum
+3. Opened chart: 2026-nba-champion
+4. Opened article: How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:42:54 UTC] visitor_session_start · session ee82fb29
+
+🟢 New visitor session
+
+Session: ee82fb29
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:55:38 UTC] visitor_session_start · session 97b13f2f
+
+🟢 New visitor session
+
+Session: 97b13f2f
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:55:38 UTC] visitor_session_end · session 97b13f2f
+
+📋 Session summary
+
+Session: 97b13f2f
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:59:40 UTC] visitor_session_end · session 92af197c
+
+📋 Session summary
+
+Session: 92af197c
+Duration: 15h 58m
+Entry: /guides/polymarket-market-id
+Logged in: no
+
+Journey:
+1. Opened article: How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID
+2. Left article: How to Find a Polymarket Market ID, Token ID, Asset ID & Condition ID (2s)
+3. Opened chart: will-the-virginia-redistricting-referendum-pass-probability-momentum
+4. Opened chart: 2026-nba-champion
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 16:59:56 UTC] visitor_session_end · session 7d02ee0a
+
+📋 Session summary
+
+Session: 7d02ee0a
+Duration: 1h 2m
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "What is Lychee?" (faq)
+3. Clicked "What data sources does Lychee include?" (faq)
+4. Clicked "What data sources does Lychee include?" (faq)
+5. Clicked "Kalshi Historical Data"
+6. Clicked "Lychee"
+7. Clicked "Every Kalshi + Polymarket trade, market, and order book since launch" (hero)
+8. Hero CTA "Explore for free" → free demo / templates (#explore-data) (kalshi_historical_explore_free)
+9. Clicked "Explore Kalshi Historical Data for free"
+10. Hero CTA "Explore for free" → free demo / templates (#explore-data) (kalshi_historical_explore_free)
+11. Hero CTA "Explore for free" → free demo / templates (#explore-data) (kalshi_historical_explore_free)
+12. Clicked "Explore Kalshi Historical Data for free"
+
+Outcome: Clicked hero CTA
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 17:00:13 UTC] visitor_session_end · session ee82fb29
+
+📋 Session summary
+
+Session: ee82fb29
+Duration: 17m 19s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Polymarket Metadata Lookup
+2. Clicked "Go"
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 17:05:49 UTC] visitor_session_start · session bb536798
+
+🟢 New visitor session
+
+Session: bb536798
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 17:06:03 UTC] visitor_session_end · session bb536798
+
+📋 Session summary
+
+Session: bb536798
+Duration: 14s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: Kalshi Volume Explained: Quarterly Trends, Historical Growth, and Market Activity Data
+2. Opened chart: Chart 1
+3. Opened chart: kalshi-volume-by-category
+4. Opened chart: Chart 1
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 17:17:27 UTC] visitor_session_start · session c9d9c9f3
+
+🟢 New visitor session
+
+Session: c9d9c9f3
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 17:17:56 UTC] visitor_session_end · session c9d9c9f3
+
+📋 Session summary
+
+Session: c9d9c9f3
+Duration: 29s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: Kalshi Weather Prediction Markets Explained: How They Work, How Prices Are Set, and What Historical Data Reveals
+2. Opened chart: kalshi-weather-probability-convergence-jan-2025-2
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 17:50:44 UTC] visitor_session_start · session fb18968a
+
+🟢 New visitor session
+
+Session: fb18968a
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 17:55:33 UTC] visitor_session_start · session f90a53a1
+
+🟢 New visitor session
+
+Session: f90a53a1
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:03:24 UTC] visitor_session_start · session db00e8ff
+
+🟢 New visitor session
+
+Session: db00e8ff
+Entry: /
+Logged in: yes
+Email: godkarma@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:03:25 UTC] visitor_session_end · session db00e8ff
+
+📋 Session summary
+
+Session: db00e8ff
+Duration: 1s
+Entry: /
+Logged in: yes
+Email: godkarma@gmail.com
+
+Journey:
+1. Identified as godkarma@gmail.com
+2. Identified as godkarma@gmail.com
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:08:39 UTC] visitor_session_start · session f9c5b7d5
+
+🟢 New visitor session
+
+Session: f9c5b7d5
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:08:50 UTC] visitor_session_end · session f9c5b7d5
+
+📋 Session summary
+
+Session: f9c5b7d5
+Duration: 11s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Track Polymarket Odds Over Time (Visualize Probability Changes)
+2. Opened chart: will-bryan-johnson-have-sex-again-this-month
+3. Opened chart: polymarket-btc-70k-probability-momentum
+4. Left chart: polymarket-btc-70k-probability-momentum (2s)
+5. Left chart: will-bryan-johnson-have-sex-again-this-month (10s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:10:50 UTC] visitor_session_start · session 5aeff502
+
+🟢 New visitor session
+
+Session: 5aeff502
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:10:50 UTC] visitor_session_end · session 5aeff502
+
+📋 Session summary
+
+Session: 5aeff502
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Kalshi Historical
+2. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+3. Landed on Lychee homepage
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:29:05 UTC] visitor_session_start · session 0782d51d
+
+🟢 New visitor session
+
+Session: 0782d51d
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:37:32 UTC] visitor_session_start · session 815f2c21
+
+🟢 New visitor session
+
+Session: 815f2c21
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:47:11 UTC] visitor_session_start · session da629648
+
+🟢 New visitor session
+
+Session: da629648
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:47:12 UTC] visitor_session_end · session da629648
+
+📋 Session summary
+
+Session: da629648
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Kalshi Historical
+2. Landed on Kalshi Historical
+3. Clicked "Try For Free"
+4. Clicked "Pricing"
+5. Landed on Lychee homepage
+6. Clicked "Does Lychee support live Kalshi and Polymarket data?" (faq)
+7. Clicked "What is Lychee?" (faq)
+8. Clicked "Research"
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 18:54:46 UTC] visitor_session_start · session 5432fab0
+
+🟢 New visitor session
+
+Session: 5432fab0
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 19:19:22 UTC] visitor_session_start · session 3bbb14c1
+
+🟢 New visitor session
+
+Session: 3bbb14c1
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 19:20:36 UTC] visitor_session_start · session f66583ce
+
+🟢 New visitor session
+
+Session: f66583ce
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 19:21:25 UTC] visitor_session_end · session 3bbb14c1
+
+📋 Session summary
+
+Session: 3bbb14c1
+Duration: 2m 3s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "When do political prediction markets become accurate?" (hero)
+3. Opened article: When Do Prediction Markets Become Accurate? A Kalshi Political Market Lifecycle Analysis
+4. Left article: When Do Prediction Markets Become Accurate? A Kalshi Political Market Lifecycle Analysis (2s)
+5. Landed on Lychee homepage
+6. Clicked "Kalshi Historical" (connect-home-scroll)
+7. Clicked "MarketsEach row represents a prediction market contract." (connect-home-workspace)
+8. Clicked "Select all" (connect-home-workspace)
+9. Clicked "WhereFilter your data before pulling. (eg: category = Weather; volume > 10000)." (connect-home-workspace)
+10. Clicked "Run pull" (connect-home-workspace)
+11. Clicked "Next Page" (connect-home-analyze)
+12. Clicked "Lychee"
+13. Clicked "View pricing" (hero)
+14. Clicked "Why use Lychee instead of APIs, CSVs, or Python scripts?" (faq)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 19:45:28 UTC] visitor_session_start · session bfcc0783
+
+🟢 New visitor session
+
+Session: bfcc0783
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 19:45:31 UTC] visitor_session_end · session bfcc0783
+
+📋 Session summary
+
+Session: bfcc0783
+Duration: 3s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Pull and Analyze Polymarket Event Data (No-Code)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 19:46:57 UTC] visitor_session_end · session b12e31ac
+
+📋 Session summary
+
+Session: b12e31ac
+Duration: 20h 23m
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+2. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (146s)
+3. Landed on Lychee homepage
+4. Landed on Lychee homepage
+5. Clicked "Try For Free"
+6. Clicked "Kalshi Historical" (connect-home-scroll)
+7. Clicked "MarketsEach row represents a prediction market contract." (connect-home-workspace)
+8. Clicked "Select all" (connect-home-workspace)
+9. Clicked "WhereFilter your data before pulling. (eg: category = Weather; volume > 10000)." (connect-home-workspace)
+10. Clicked "Go back" (connect-home-workspace)
+11. Clicked "Kalshi Historical" (connect-home-scroll)
+12. Clicked "Start from blank" (connect-home-scroll)
+13. Clicked "Try For Free"
+14. Clicked "Try For Free" (hero)
+15. Clicked "Try For Free" (hero)
+16. Clicked "Try For Free" (hero)
+17. Clicked "Mathematics Operations" (connect-home-analyze)
+18. Clicked "Close"
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:08:07 UTC] visitor_session_start · session 4387c5ad
+
+🟢 New visitor session
+
+Session: 4387c5ad
+Entry: /
+Logged in: yes
+Email: justinwfu@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:08:29 UTC] visitor_session_end · session 4387c5ad
+
+📋 Session summary
+
+Session: 4387c5ad
+Duration: 22s
+Entry: /
+Logged in: yes
+Email: justinwfu@gmail.com
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Log in"
+3. Identified as justinwfu@gmail.com
+4. Identified as justinwfu@gmail.com
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:13:52 UTC] visitor_session_end · session f90a53a1
+
+📋 Session summary
+
+Session: f90a53a1
+Duration: 2h 18m
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Polymarket Historical" (connect-home-scroll)
+3. Clicked "MarketsEach row is a Polymarket prediction market." (connect-home-workspace)
+4. Clicked "Select all" (connect-home-workspace)
+5. Clicked "Go back" (connect-home-workspace)
+6. Clicked "Polymarket Historical" (connect-home-scroll)
+7. Clicked "TradesEach row is an OrderFilled event from the Polygon blockchain (CTF Exchange or Neg Risk)." (connect-home-workspace)
+8. Clicked "Select all" (connect-home-workspace)
+9. Clicked "Cancel" (connect-home-workspace)
+10. Clicked "MarketsEach row is a Polymarket prediction market." (connect-home-workspace)
+11. Clicked "Go back" (connect-home-workspace)
+12. Clicked "Polymarket Historical" (connect-home-scroll)
+13. Clicked "BlocksPolygon block numbers mapped to ISO 8601 timestamps." (connect-home-workspace)
+14. Clicked "Go back" (connect-home-workspace)
+15. Clicked "Kalshi Historical" (connect-home-scroll)
+16. Clicked "MarketsEach row represents a prediction market contract." (connect-home-workspace)
+17. Clicked "WhereFilter your data before pulling. (eg: category = Weather; volume > 10000)." (connect-home-workspace)
+18. Clicked "SortOrder results. Numerical: ascending or descending; text: alphabetical or reverse alphabetical" (connect-home-workspace)
+19. Clicked "Add sort" (connect-home-workspace)
+20. Clicked "limitTruncate how many rows of data do you want (e.g. 1000 rows)." (connect-home-workspace)
+21. Clicked "Run pull" (connect-home-workspace)
+22. Clicked "Try For Free" (hero)
+23. Landed on Lychee homepage
+24. Clicked "Try For Free" (hero)
+25. Clicked "Kalshi Historical" (connect-home-scroll)
+… and 75 more steps
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:23:55 UTC] visitor_session_start · session c31a0403
+
+🟢 New visitor session
+
+Session: c31a0403
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:24:14 UTC] visitor_session_end · session c31a0403
+
+📋 Session summary
+
+Session: c31a0403
+Duration: 20s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: Kalshi Volume Explained: Quarterly Trends, Historical Growth, and Market Activity Data
+2. Opened chart: Chart 1
+3. Opened chart: kalshi-volume-by-category
+4. Opened chart: Chart 1
+5. Left article: Kalshi Volume Explained: Quarterly Trends, Historical Growth, and Market Activity Data (28s)
+6. Left chart: Chart 1 (25s)
+7. Left chart: kalshi-volume-by-category (23s)
+8. Left chart: Chart 1 (21s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:34:46 UTC] visitor_session_start · session 389b9a0f
+
+🟢 New visitor session
+
+Session: 389b9a0f
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:34:48 UTC] visitor_session_end · session 389b9a0f
+
+📋 Session summary
+
+Session: 389b9a0f
+Duration: 2s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: Polymarket Gamma API Events Slug: How to Query Events by Slug
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:37:03 UTC] visitor_session_end · session e9d45948
+
+📋 Session summary
+
+Session: e9d45948
+Duration: 15h 54m
+Entry: /guides/kalshi-historical-data
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+2. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (9s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 20:46:00 UTC] visitor_session_start · session fe667f08
+
+🟢 New visitor session
+
+Session: fe667f08
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:08:42 UTC] visitor_session_end · session fe667f08
+
+📋 Session summary
+
+Session: fe667f08
+Duration: 22m 42s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Polymarket Metadata Lookup
+2. Clicked "Go"
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:15:38 UTC] visitor_session_start · session f29c5001
+
+🟢 New visitor session
+
+Session: f29c5001
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:15:39 UTC] visitor_session_end · session f29c5001
+
+📋 Session summary
+
+Session: f29c5001
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: What Does Volume Mean on Kalshi? Trading Volume Explained
+2. Opened chart: Chart 1
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:43:56 UTC] visitor_session_start · session c90f1c1c
+
+🟢 New visitor session
+
+Session: c90f1c1c
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:48:54 UTC] visitor_session_start · session a9b45b11
+
+🟢 New visitor session
+
+Session: a9b45b11
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:58:36 UTC] visitor_session_start · session 19463298
+
+🟢 New visitor session
+
+Session: 19463298
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:58:37 UTC] visitor_session_end · session 19463298
+
+📋 Session summary
+
+Session: 19463298
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:59:24 UTC] visitor_session_start · session 1d7a9a97
+
+🟢 New visitor session
+
+Session: 1d7a9a97
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 21:59:50 UTC] visitor_session_end · session 1d7a9a97
+
+📋 Session summary
+
+Session: 1d7a9a97
+Duration: 26s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "View pricing" (hero)
+3. Clicked "Pricing"
+4. Clicked "Toggle theme"
+5. Clicked "May 20, 2026How to Build a Probability Convergence Chart Using Kalshi Historical Weather Data (VWPA Guide)Step-by-step g" (guides)
+6. Opened article: How to Build a Probability Convergence Chart Using Kalshi Historical Weather Data (VWPA Guide)
+7. Left article: How to Build a Probability Convergence Chart Using Kalshi Historical Weather Data (VWPA Guide) (4s)
+8. Landed on Lychee homepage
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 22:05:05 UTC] visitor_session_start · session d12dcb86
+
+🟢 New visitor session
+
+Session: d12dcb86
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 22:22:43 UTC] visitor_session_start · session 104078cf
+
+🟢 New visitor session
+
+Session: 104078cf
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 22:59:14 UTC] visitor_session_start · session e10f4682
+
+🟢 New visitor session
+
+Session: e10f4682
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 22:59:14 UTC] visitor_session_end · session e10f4682
+
+📋 Session summary
+
+Session: e10f4682
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:09:27 UTC] visitor_session_start · session cb846b36
+
+🟢 New visitor session
+
+Session: cb846b36
+Entry: /
+Logged in: yes
+Email: toviasalfinger@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:09:58 UTC] visitor_session_end · session cb846b36
+
+📋 Session summary
+
+Session: cb846b36
+Duration: 31s
+Entry: /
+Logged in: yes
+Email: toviasalfinger@gmail.com
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Log in"
+3. Identified as toviasalfinger@gmail.com
+4. Signed up (magic link) — toviasalfinger@gmail.com
+5. Identified as toviasalfinger@gmail.com
+
+Outcome: Signed up
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:10:52 UTC] auth_session_start · session 7ab98ead
+
+🔐 Authenticated session started
+
+Session: 7ab98ead
+Entry: /dashboard
+Email: toviasalfinger@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:12:58 UTC] data_pull_started · session 7ab98ead
+
+📥 Data pull started
+Integration: kalshi
+Endpoint: Markets
+Mode: columns
+Status: started
+Lake: kalshi
+Table: markets
+
+User: toviasalfinger@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:13:02 UTC] data_pull_zero_rows · session 7ab98ead
+
+📡 Zero rows returned
+Integration: kalshi
+Endpoint: Markets
+Mode: columns
+Rows: 0
+Duration: 5s
+Status: zero_rows
+Lake: kalshi
+Table: markets
+Note: Query ran successfully but returned no data — check filters, table, or UX clarity
+
+User: toviasalfinger@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:14:06 UTC] data_pull_started · session 7ab98ead
+
+📥 Data pull started
+Integration: kalshi
+Endpoint: Markets
+Mode: columns
+Status: started
+Lake: kalshi
+Table: markets
+
+User: toviasalfinger@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:14:23 UTC] data_pull_zero_rows · session 7ab98ead
+
+📡 Zero rows returned
+Integration: kalshi
+Endpoint: Markets
+Mode: columns
+Rows: 0
+Duration: 18s
+Status: zero_rows
+Lake: kalshi
+Table: markets
+Note: Query ran successfully but returned no data — check filters, table, or UX clarity
+
+User: toviasalfinger@gmail.com
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:17:34 UTC] auth_session_end · session 7ab98ead
+
+📋 Auth session summary
+
+Session: 7ab98ead
+Duration: 6m 42s
+Entry: /dashboard
+Email: toviasalfinger@gmail.com
+
+Activity:
+1. Opened integration: kalshiHistorical
+2. Ran query on markets (columns)
+3. Query returned 0 rows on markets (columns)
+4. Opened integration: kalshiHistorical
+5. Ran query on markets (columns)
+6. Query returned 0 rows on markets (columns)
+
+Outcome: Query returned zero rows
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:35:44 UTC] visitor_session_start · session a885f5bd
+
+🟢 New visitor session
+
+Session: a885f5bd
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-01 23:35:55 UTC] visitor_session_end · session a885f5bd
+
+📋 Session summary
+
+Session: a885f5bd
+Duration: 10s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Track Polymarket Odds Over Time (Visualize Probability Changes)
+2. Opened chart: will-bryan-johnson-have-sex-again-this-month
+3. Opened chart: polymarket-btc-70k-probability-momentum
+4. Opened chart: peruvian-election-momentum
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 00:08:37 UTC] visitor_session_start · session dd534131
+
+🟢 New visitor session
+
+Session: dd534131
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 00:15:23 UTC] visitor_session_start · session c912fe28
+
+🟢 New visitor session
+
+Session: c912fe28
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 00:16:05 UTC] visitor_session_end · session c912fe28
+
+📋 Session summary
+
+Session: c912fe28
+Duration: 41s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 00:30:56 UTC] visitor_session_start · session 6a4a7fba
+
+🟢 New visitor session
+
+Session: 6a4a7fba
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 00:51:12 UTC] visitor_session_end · session 6a4a7fba
+
+📋 Session summary
+
+Session: 6a4a7fba
+Duration: 20m 16s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+2. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (4s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 01:01:37 UTC] visitor_session_start · session e6712b71
+
+🟢 New visitor session
+
+Session: e6712b71
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 01:01:43 UTC] visitor_session_end · session e6712b71
+
+📋 Session summary
+
+Session: e6712b71
+Duration: 6s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Kalshi Historical"
+3. Clicked "CSV exportsDownload historical and live data as CSV."
+4. Clicked "Pricing"
+5. Landed on Lychee homepage
+6. Clicked "Kalshi Historical"
+7. Clicked "CSV exportsDownload historical and live data as CSV."
+8. Clicked "Start free query"
+9. Clicked "CSV / XLSX" (connect-home-scroll)
+10. Landed on Lychee homepage
+11. Clicked "Kalshi Historical" (connect-home-scroll)
+12. Clicked "MarketsEach row represents a prediction market contract." (connect-home-workspace)
+13. Clicked "yes_bidint (nullable)Best bid price for Yes contracts (cents, 1-99)" (connect-home-workspace)
+14. Clicked "last_priceint (nullable)Last traded price (cents, 1-99)" (connect-home-workspace)
+15. Clicked "tickerstringUnique market identifier (e.g., PRES-2024-DJT)" (connect-home-workspace)
+16. Clicked "event_tickerstringParent event identifier, used for categorization" (connect-home-workspace)
+17. Clicked "limitTruncate how many rows of data do you want (e.g. 1000 rows)." (connect-home-workspace)
+18. Clicked "Set row limit" (connect-home-workspace)
+19. Clicked "Run pull" (connect-home-workspace)
+20. Clicked "Kalshi Historical"
+21. Clicked "CSV exportsDownload historical and live data as CSV."
+22. Clicked "Start free query"
+23. Clicked "Kalshi Historical" (connect-home-scroll)
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 01:10:15 UTC] visitor_session_start · session cec3081d
+
+🟢 New visitor session
+
+Session: cec3081d
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 01:31:41 UTC] visitor_session_end · session dd534131
+
+📋 Session summary
+
+Session: dd534131
+Duration: 1h 23m
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)
+2. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (54s)
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 01:52:17 UTC] visitor_session_start · session b152647c
+
+🟢 New visitor session
+
+Session: b152647c
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 02:01:48 UTC] visitor_session_start · session 8eca4aa0
+
+🟢 New visitor session
+
+Session: 8eca4aa0
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 02:08:09 UTC] visitor_session_end · session cec3081d
+
+📋 Session summary
+
+Session: cec3081d
+Duration: 57m 54s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Clicked "Pricing"
+3. Clicked "Try the demo" (pricing)
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 02:09:51 UTC] visitor_session_end · session 8eca4aa0
+
+📋 Session summary
+
+Session: 8eca4aa0
+Duration: 8m 3s
+Entry: /
+Logged in: no
+
+Journey:
+1. Left article: How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide) (76837s)
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 02:36:21 UTC] visitor_session_start · session f9e62d70
+
+🟢 New visitor session
+
+Session: f9e62d70
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 02:36:21 UTC] visitor_session_end · session f9e62d70
+
+📋 Session summary
+
+Session: f9e62d70
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 03:01:54 UTC] visitor_session_start · session 49f9492b
+
+🟢 New visitor session
+
+Session: 49f9492b
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 03:18:39 UTC] visitor_session_start · session a6057613
+
+🟢 New visitor session
+
+Session: a6057613
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 03:18:41 UTC] visitor_session_end · session a6057613
+
+📋 Session summary
+
+Session: a6057613
+Duration: 3s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: When Do Prediction Markets Become Accurate? A Kalshi Political Market Lifecycle Analysis
+2. Opened chart: lifecycle_brier
+3. Opened chart: lifecycle_absolute_error_chart
+4. Opened chart: lifecycle_brier
+5. Opened chart: lifecycle_absolute_error_chart
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 03:42:43 UTC] visitor_session_end · session c90f1c1c
+
+📋 Session summary
+
+Session: c90f1c1c
+Duration: 5h 58m
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Lychee homepage
+2. Identified as godkarma@gmail.com
+3. Landed on Lychee homepage
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 03:53:41 UTC] visitor_session_start · session 40356292
+
+🟢 New visitor session
+
+Session: 40356292
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 04:01:51 UTC] visitor_session_end · session 49f9492b
+
+📋 Session summary
+
+Session: 49f9492b
+Duration: 59m 57s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Kalshi Historical
+2. Clicked "Try For Free"
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 04:17:20 UTC] visitor_session_start · session 2de42bcb
+
+🟢 New visitor session
+
+Session: 2de42bcb
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 04:17:20 UTC] visitor_session_end · session 2de42bcb
+
+📋 Session summary
+
+Session: 2de42bcb
+Duration: 1s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: Kalshi Volume Explained: Quarterly Trends, Historical Growth, and Market Activity Data
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 04:20:17 UTC] visitor_session_end · session 40356292
+
+📋 Session summary
+
+Session: 40356292
+Duration: 26m 36s
+Entry: /
+Logged in: no
+
+Journey:
+1. Opened article: Kalshi Weather Prediction Markets Explained: How They Work, How Prices Are Set, and What Historical Data Reveals
+2. Opened chart: kalshi-weather-probability-convergence-jan-2025-2
+3. Opened chart: weather-market-calibration-curve
+4. Opened chart: Chart 3
+5. Left article: Kalshi Weather Prediction Markets Explained: How They Work, How Prices Are Set, and What Historical Data Reveals (26s)
+6. Left chart: kalshi-weather-probability-convergence-jan-2025-2 (19s)
+7. Left chart: weather-market-calibration-curve (15s)
+8. Left chart: Chart 3 (14s)
+9. Landed on Lychee homepage
+10. Opened article: Kalshi Weather Prediction Markets Explained: How They Work, How Prices Are Set, and What Historical Data Reveals
+11. Opened chart: kalshi-weather-probability-convergence-jan-2025-2
+12. Opened chart: weather-market-calibration-curve
+13. Opened chart: Chart 3
+
+Outcome: Browsed content
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 04:25:37 UTC] visitor_session_start · session 2d62d517
+
+🟢 New visitor session
+
+Session: 2d62d517
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 05:27:32 UTC] visitor_session_start · session 664f68ff
+
+🟢 New visitor session
+
+Session: 664f68ff
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 05:33:35 UTC] visitor_session_end · session 664f68ff
+
+📋 Session summary
+
+Session: 664f68ff
+Duration: 6m 3s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Polymarket Metadata Lookup
+2. Clicked "Движение в Ормузском проливе вернется в норму к 31 июля?рынок · id 2176262 · трафик в Ормузском проливе возвращается к н"
+3. Clicked "Открытый личи"
+4. Clicked "Попробуйте демо" (pricing)
+
+Outcome: Explored marketing pages
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 05:33:53 UTC] visitor_session_start · session 1e6d8c98
+
+🟢 New visitor session
+
+Session: 1e6d8c98
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 05:38:23 UTC] visitor_session_start · session adb72824
+
+🟢 New visitor session
+
+Session: adb72824
+Entry: /
+Logged in: no
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 05:38:26 UTC] visitor_session_end · session adb72824
+
+📋 Session summary
+
+Session: adb72824
+Duration: 3s
+Entry: /
+Logged in: no
+
+Journey:
+1. Landed on Kalshi Historical
+
+Outcome: Left without converting
+
+────────────────────────────────────────────────────────────────────────
+[2026-07-02 06:11:13 UTC] visitor_session_start · session 4a5f9780
+
+🟢 New visitor session
+
+Session: 4a5f9780
+Entry: /
+Logged in: no

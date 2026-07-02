@@ -3,8 +3,15 @@ import {
   getOrCreateAuthSessionId,
 } from "@/lib/analytics/authSessionStorage";
 import { trackAuthEvent, trackAuthError } from "@/lib/analytics/authJourneyClient";
+import {
+  buildDataPullContext,
+  setDataPullSurfaceContext,
+  clearDataPullSurfaceContext,
+} from "@/lib/analytics/dataPullContext";
 
 const JOURNEY_ENDPOINT = "/api/analytics/journey";
+
+export { setDataPullSurfaceContext, clearDataPullSurfaceContext };
 
 /** @type {{ email?: string; userId?: string }} */
 let notifyIdentity = {};
@@ -31,11 +38,22 @@ function isZeroRowDataPull(meta) {
   return count != null && count === 0;
 }
 
+function enrichDataPullMeta(meta = {}) {
+  return {
+    ...buildDataPullContext(),
+    ...meta,
+    email: meta.email || notifyIdentity.email,
+    userId: meta.userId || notifyIdentity.userId,
+  };
+}
+
 function postDataPullNotify(phase, meta) {
   if (typeof window === "undefined") return;
 
   const sessionId = getAuthSessionId() || getOrCreateAuthSessionId();
   if (!sessionId) return;
+
+  const enriched = enrichDataPullMeta(meta);
 
   const payload = {
     sessionKind: "auth",
@@ -43,9 +61,7 @@ function postDataPullNotify(phase, meta) {
     sessionId,
     meta: {
       phase,
-      ...meta,
-      email: meta.email || notifyIdentity.email,
-      userId: meta.userId || notifyIdentity.userId,
+      ...enriched,
     },
   };
 
@@ -62,8 +78,9 @@ function postDataPullNotify(phase, meta) {
  * @param {Record<string, unknown>} meta
  */
 export function trackDataPullStart(meta) {
-  trackAuthEvent("query_submit", { meta: { ...meta, status: "started" } });
-  postDataPullNotify("started", meta);
+  const enriched = enrichDataPullMeta(meta);
+  trackAuthEvent("query_submit", { meta: { ...enriched, status: "started" } });
+  postDataPullNotify("started", enriched);
 }
 
 /**
@@ -72,21 +89,26 @@ export function trackDataPullStart(meta) {
  * @param {Record<string, unknown>} meta
  */
 export function trackDataPullComplete(meta) {
-  const rowCount = resolveDataPullRowCount(meta);
-  const zeroRows = isZeroRowDataPull(meta);
+  const enriched = enrichDataPullMeta(meta);
+  const rowCount = resolveDataPullRowCount(enriched);
+  const zeroRows = isZeroRowDataPull(enriched);
   const status = zeroRows ? "zero_rows" : "success";
   const phase = zeroRows ? "zero_rows" : "completed";
-  const enriched = rowCount != null ? { ...meta, rowCount } : meta;
+  const withRows = rowCount != null ? { ...enriched, rowCount } : enriched;
 
-  trackAuthEvent("query_submit", { meta: { ...enriched, status } });
-  postDataPullNotify(phase, { ...enriched, status });
+  trackAuthEvent("query_submit", { meta: { ...withRows, status } });
+  postDataPullNotify(phase, { ...withRows, status });
 }
 
 /**
  * @param {{ message: string; integration?: string; source?: string; meta?: Record<string, unknown> }} err
  */
 export function trackDataPullError(err) {
-  const meta = { ...(err.meta || {}), message: err.message, integration: err.integration };
+  const meta = enrichDataPullMeta({
+    ...(err.meta || {}),
+    message: err.message,
+    integration: err.integration,
+  });
   trackAuthEvent("query_error", { label: err.message, meta });
   postDataPullNotify("error", meta);
   trackAuthError({

@@ -6,6 +6,7 @@ import {
   markVisitorSessionEnded,
   markVisitorSessionStarted,
 } from "@/lib/analytics/visitorSession";
+import { buildSessionStartMeta } from "@/lib/analytics/sessionStartMeta";
 
 const FLUSH_INTERVAL_MS = 8000;
 const MAX_QUEUE_SIZE = 80;
@@ -121,13 +122,7 @@ export function startVisitorSessionIfNeeded(identity = {}) {
   postJourney({
     action: "session_start",
     sessionId,
-    meta: {
-      entryPath: window.location.pathname || "/",
-      referrer: document.referrer || "",
-      isLoggedIn: !!identity.isLoggedIn,
-      email: identity.email,
-      userId: identity.userId,
-    },
+    meta: buildSessionStartMeta(identity),
   });
 }
 

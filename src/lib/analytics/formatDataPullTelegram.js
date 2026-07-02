@@ -1,14 +1,17 @@
 import { escapeHtml, formatFieldLines } from "@/lib/telegram/format";
 import { formatDuration } from "@/lib/analytics/formatJourneySummary";
+import { buildDataPullTelegramFields } from "@/lib/analytics/dataPullContext";
+import { buildGeoTelegramFields } from "@/lib/telegram/geoFormat";
 
 /**
  * @param {{
  *   phase: 'started' | 'completed' | 'zero_rows' | 'error';
  *   meta?: Record<string, unknown>;
  *   sessionEmail?: string;
+ *   sessionGeo?: { country?: string; region?: string; city?: string; client_ip?: string; user_agent?: string; accept_language?: string };
  * }} opts
  */
-export function buildDataPullTelegramMessage({ phase, meta = {}, sessionEmail }) {
+export function buildDataPullTelegramMessage({ phase, meta = {}, sessionEmail, sessionGeo }) {
   const headline =
     phase === "started"
       ? "📥 Data pull started"
@@ -50,7 +53,11 @@ export function buildDataPullTelegramMessage({ phase, meta = {}, sessionEmail })
   const lines = [
     `<b>${headline}</b>`,
     "",
-    formatFieldLines(fields),
+    formatFieldLines({
+      ...buildDataPullTelegramFields(meta),
+      ...fields,
+      ...buildGeoTelegramFields(sessionGeo || {}),
+    }),
   ].filter(Boolean);
 
   if (sessionEmail) {

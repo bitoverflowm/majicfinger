@@ -28,6 +28,7 @@ import {
   buildSessionStartTelegramMessage,
 } from "@/lib/analytics/formatJourneySummary";
 import { buildDataPullTelegramMessage } from "@/lib/analytics/formatDataPullTelegram";
+import { currentUtcMonthKey } from "@/lib/telegram/geoFormat";
 
 loadRepoEnvForAws();
 
@@ -123,6 +124,99 @@ async function loadEventsInRange(VisitorEvent) {
     .lean();
 }
 
+/** @param {Record<string, unknown>} session */
+function sessionGeoFields(session) {
+  return {
+    client_ip: session.client_ip,
+    country: session.country,
+    region: session.region,
+    city: session.city,
+    user_agent: session.user_agent,
+    accept_language: session.accept_language,
+  };
+}
+
+/** @param {import('mongoose').Model} VisitorSession */
+async function buildSessionStartCountMap(VisitorSession) {
+  const all = await VisitorSession.find({
+    start_notified_at: { $exists: true },
+    start_telegram_skip_reason: { $nin: ["start_dedupe", "ip_dedupe"] },
+    $or: [{ start_telegram_sent: true }, { start_telegram_sent: { $exists: false } }],
+  })
+    .sort({ start_notified_at: 1 })
+    .select("session_id session_kind start_notified_at")
+    .lean();
+
+  /** @type {Map<string, { count: number; monthCount: number }>} */
+  const bySessionId = new Map();
+  let visitorGlobal = 0;
+  let authGlobal = 0;
+  let visitorMonth = 0;
+  let authMonth = 0;
+  let monthCursor = "";
+
+  for (const session of all) {
+    const auth = session.session_kind === "auth";
+    const mk = currentUtcMonthKey(new Date(session.start_notified_at));
+    if (mk !== monthCursor) {
+      visitorMonth = 0;
+      authMonth = 0;
+      monthCursor = mk;
+    }
+    if (auth) {
+      authGlobal += 1;
+      authMonth += 1;
+      bySessionId.set(session.session_id, { count: authGlobal, monthCount: authMonth });
+    } else {
+      visitorGlobal += 1;
+      visitorMonth += 1;
+      bySessionId.set(session.session_id, { count: visitorGlobal, monthCount: visitorMonth });
+    }
+  }
+
+  return bySessionId;
+}
+
+/** @param {import('mongoose').Model} VisitorSession */
+async function buildSessionEndCountMap(VisitorSession) {
+  const all = await VisitorSession.find({
+    summary_sent_at: { $exists: true },
+    summary_skip_reason: { $ne: "start_dedupe_no_intent" },
+  })
+    .sort({ summary_sent_at: 1 })
+    .select("session_id session_kind summary_sent_at")
+    .lean();
+
+  /** @type {Map<string, { count: number; monthCount: number }>} */
+  const bySessionId = new Map();
+  let visitorGlobal = 0;
+  let authGlobal = 0;
+  let visitorMonth = 0;
+  let authMonth = 0;
+  let monthCursor = "";
+
+  for (const session of all) {
+    const auth = session.session_kind === "auth";
+    const mk = currentUtcMonthKey(new Date(session.summary_sent_at));
+    if (mk !== monthCursor) {
+      visitorMonth = 0;
+      authMonth = 0;
+      monthCursor = mk;
+    }
+    if (auth) {
+      authGlobal += 1;
+      authMonth += 1;
+      bySessionId.set(session.session_id, { count: authGlobal, monthCount: authMonth });
+    } else {
+      visitorGlobal += 1;
+      visitorMonth += 1;
+      bySessionId.set(session.session_id, { count: visitorGlobal, monthCount: visitorMonth });
+    }
+  }
+
+  return bySessionId;
+}
+
 /** @param {Record<string, unknown>} event */
 function dataPullPhaseFromEvent(event) {
   const meta = event.meta || {};
@@ -151,10 +245,12 @@ async function main() {
   const VisitorEvent = (await import("@/models/VisitorEvent")).default;
   const TelegramEventCounter = (await import("@/models/TelegramEventCounter")).default;
 
-  const [sessions, events, counters] = await Promise.all([
+  const [sessions, events, counters, startCounts, endCounts] = await Promise.all([
     loadSessionsInRange(VisitorSession),
     loadEventsInRange(VisitorEvent),
     TelegramEventCounter.find({}).lean(),
+    buildSessionStartCountMap(VisitorSession),
+    buildSessionEndCountMap(VisitorSession),
   ]);
 
   /** @type {ExportLine[]} */
@@ -167,14 +263,23 @@ async function main() {
     const startedInRange =
       session.started_at && session.started_at >= rangeStart && session.started_at < rangeEnd;
 
-    if (startedInRange) {
+    if (
+      startedInRange &&
+      session.start_telegram_skip_reason !== "start_dedupe" &&
+      session.start_telegram_skip_reason !== "ip_dedupe"
+    ) {
+      const ranks = startCounts.get(session.session_id);
+      const geo = sessionGeoFields(session);
       const text = auth
         ? buildAuthSessionStartTelegramMessage({
             session: {
               session_id: session.session_id,
               entry_path: session.entry_path,
               email: session.email,
+              ...geo,
             },
+            sessionCount: ranks?.count,
+            monthSessionCount: ranks?.monthCount,
           })
         : buildSessionStartTelegramMessage({
             session: {
@@ -183,7 +288,10 @@ async function main() {
               referrer: session.referrer,
               is_logged_in: session.is_logged_in,
               email: session.email,
+              ...geo,
             },
+            sessionCount: ranks?.count,
+            monthSessionCount: ranks?.monthCount,
           });
       lines.push({
         ts: session.started_at,
@@ -198,12 +306,14 @@ async function main() {
       session.summary_sent_at >= rangeStart &&
       session.summary_sent_at < rangeEnd;
 
-    if (summaryInRange) {
+    if (summaryInRange && session.summary_skip_reason !== "start_dedupe_no_intent") {
       const sessionEvents = await VisitorEvent.find({ session_id: session.session_id })
         .sort({ ts: 1 })
         .limit(auth ? 150 : 100)
         .lean();
 
+      const ranks = endCounts.get(session.session_id);
+      const geo = sessionGeoFields(session);
       const text = auth
         ? buildAuthSessionEndTelegramMessage({
             session: {
@@ -213,8 +323,11 @@ async function main() {
               entry_path: session.entry_path,
               email: session.email,
               chain_count: session.chain_count || 0,
+              ...geo,
             },
             events: sessionEvents,
+            sessionCount: ranks?.count,
+            monthSessionCount: ranks?.monthCount,
           })
         : buildSessionEndTelegramMessage({
             session: {
@@ -224,8 +337,11 @@ async function main() {
               entry_path: session.entry_path,
               email: session.email,
               is_logged_in: session.is_logged_in,
+              ...geo,
             },
             events: sessionEvents,
+            sessionCount: ranks?.count,
+            monthSessionCount: ranks?.monthCount,
           });
 
       lines.push({
@@ -299,6 +415,7 @@ async function main() {
         phase: pullPhase,
         meta: event.meta || {},
         sessionEmail: session?.email || event.meta?.email,
+        sessionGeo: session ? sessionGeoFields(session) : undefined,
       });
       lines.push({
         ts: event.ts,

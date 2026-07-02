@@ -1,4 +1,54 @@
-import { escapeHtml, ordinal } from "@/lib/telegram/format";
+import { escapeHtml, formatFieldLines } from "@/lib/telegram/format";
+import {
+  buildGeoTelegramFields,
+  countryCodeToFlag,
+  currentUtcMonthKey,
+  formatDualRankHeadline,
+} from "@/lib/telegram/geoFormat";
+import { buildLandingTelegramFields } from "@/lib/analytics/sessionFieldsFromMeta";
+
+/** @param {Array<string>} lines */
+function appendTelegramAlertCountLines(
+  lines,
+  telegramCount,
+  telegramMonthCount,
+  rawCount,
+  rawMonthCount,
+) {
+  const monthKey = currentUtcMonthKey();
+  if (telegramCount) {
+    lines.push(`<b>Telegram alerts (all time):</b> #${escapeHtml(String(telegramCount))}`);
+  }
+  if (telegramMonthCount) {
+    lines.push(
+      `<b>Telegram alerts (this month):</b> #${escapeHtml(String(telegramMonthCount))} (${escapeHtml(monthKey)})`,
+    );
+  }
+  if (rawCount) {
+    lines.push(`<b>Raw sessions (all time):</b> #${escapeHtml(String(rawCount))}`);
+  }
+  if (rawMonthCount) {
+    lines.push(
+      `<b>Raw sessions (this month):</b> #${escapeHtml(String(rawMonthCount))} (${escapeHtml(monthKey)})`,
+    );
+  }
+}
+
+/** @param {Array<string>} lines @param {Record<string, unknown>} session */
+function appendSessionGeoLines(lines, session) {
+  const geoText = formatFieldLines(buildGeoTelegramFields(session));
+  if (geoText) {
+    lines.push(geoText);
+  }
+}
+
+/** @param {Array<string>} lines @param {Record<string, unknown>} session */
+function appendSessionLandingLines(lines, session) {
+  const landingText = formatFieldLines(buildLandingTelegramFields(session));
+  if (landingText) {
+    lines.push(landingText);
+  }
+}
 
 /** @param {number} ms */
 export function formatDuration(ms) {
@@ -53,13 +103,15 @@ export function formatJourneyStep(event, index) {
       if (meta.status === "zero_rows") {
         return `${index}. Query returned 0 rows on ${meta.table || meta.integration || "table"}${
           meta.mode ? ` (${meta.mode})` : ""
-        }`;
+        }${meta.querySurfaceLabel ? ` · from ${meta.querySurfaceLabel}` : meta.queryPath ? ` · from ${meta.queryPath}` : ""}`;
       }
       return `${index}. Ran query on ${meta.table || "table"}${meta.mode ? ` (${meta.mode})` : ""}${
         meta.rowCount != null ? ` → ${meta.rowCount} rows` : ""
-      }`;
+      }${meta.querySurfaceLabel ? ` · from ${meta.querySurfaceLabel}` : meta.queryPath ? ` · from ${meta.queryPath}` : ""}`;
     case "query_error":
-      return `${index}. Query failed: ${meta.message || event.label || "unknown error"}`;
+      return `${index}. Query failed: ${meta.message || event.label || "unknown error"}${
+        meta.querySurfaceLabel ? ` (${meta.querySurfaceLabel})` : ""
+      }`;
     case "workspace_dwell":
       return `${index}. Spent ${meta.durationSeconds || "?"}s in ${meta.workspace || meta.integrationId || "workspace"}`;
     case "error":
@@ -71,6 +123,23 @@ export function formatJourneyStep(event, index) {
   }
 }
 
+/** @param {{ label?: string; meta?: Record<string, unknown> }} event */
+function hasHighIntentPageClickMeta(event) {
+  const meta = event.meta && typeof event.meta === "object" ? event.meta : {};
+  const label = String(meta.label || event.label || "").toLowerCase();
+  const href = String(meta.href || "").toLowerCase();
+  const section = String(meta.section || "").toLowerCase();
+  const destination = String(meta.destination || "").toLowerCase();
+  const needles = ["pricing", "checkout", "access now", "explore for free", "stripe"];
+  return needles.some(
+    (needle) =>
+      label.includes(needle) ||
+      href.includes(needle) ||
+      section.includes(needle) ||
+      destination.includes(needle),
+  );
+}
+
 /**
  * @param {Array<{ type: string; meta?: Record<string, unknown> }>} events
  */
@@ -79,6 +148,9 @@ export function inferSessionOutcome(events) {
   if (types.includes("signup")) return "Signed up";
   if (types.includes("hero_cta_click")) return "Clicked hero CTA";
   if (types.includes("fork_click")) return "Clicked Run for yourself";
+  if (events.some((e) => e.type === "page_click" && hasHighIntentPageClickMeta(e))) {
+    return "Clicked high-intent CTA";
+  }
   if (types.includes("content_view")) return "Browsed content";
   if (types.includes("page_click")) return "Explored marketing pages";
   return "Left without converting";
@@ -107,28 +179,42 @@ export function inferAuthSessionOutcome(events) {
  *   sessionCount?: number;
  * }} opts
  */
-export function buildSessionEndTelegramMessage({ session, events, sessionCount }) {
+export function buildSessionEndTelegramMessage({
+  session,
+  events,
+  sessionCount,
+  monthSessionCount,
+}) {
   const startedAt = session.started_at ? new Date(session.started_at).getTime() : Date.now();
   const endedAt = session.ended_at ? new Date(session.ended_at).getTime() : Date.now();
   const duration = formatDuration(Math.max(0, endedAt - startedAt));
   const shortId = String(session.session_id || "").slice(0, 8);
-  const rank = sessionCount ? ordinal(sessionCount) : null;
+  const flag = countryCodeToFlag(session.country);
+  const headline = formatDualRankHeadline({
+    count: sessionCount,
+    monthCount: monthSessionCount,
+    label: "session summary alert",
+    flag,
+  });
 
   const steps = events.slice(0, 25).map((event, i) => formatJourneyStep(event, i + 1));
   const more = events.length > 25 ? `\n… and ${events.length - 25} more steps` : "";
 
-  const lines = [
-    rank ? `<b>📋 ${rank} session summary</b>` : "<b>📋 Session summary</b>",
+  const lines = [`<b>📋 ${escapeHtml(headline)}</b>`, ""];
+  appendTelegramAlertCountLines(lines, sessionCount, monthSessionCount);
+  lines.push(
     "",
     `<b>Session:</b> ${escapeHtml(shortId)}`,
     `<b>Duration:</b> ${escapeHtml(duration)}`,
-    `<b>Entry:</b> ${escapeHtml(session.entry_path || "/")}`,
     `<b>Logged in:</b> ${session.is_logged_in || session.email ? "yes" : "no"}`,
-  ];
+  );
 
   if (session.email) {
     lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
   }
+
+  appendSessionLandingLines(lines, session);
+  appendSessionGeoLines(lines, session);
 
   lines.push("", "<b>Journey:</b>");
   if (steps.length) {
@@ -149,24 +235,38 @@ export function buildSessionEndTelegramMessage({ session, events, sessionCount }
  *   sessionCount?: number;
  * }} opts
  */
-export function buildSessionStartTelegramMessage({ session, sessionCount }) {
+export function buildSessionStartTelegramMessage({
+  session,
+  sessionCount,
+  monthSessionCount,
+  rawSessionCount,
+  rawMonthSessionCount,
+}) {
   const shortId = String(session.session_id || "").slice(0, 8);
-  const rank = sessionCount ? ordinal(sessionCount) : null;
+  const flag = countryCodeToFlag(session.country);
+  const headline = formatDualRankHeadline({
+    count: sessionCount,
+    monthCount: monthSessionCount,
+    label: "new visitor session alert",
+    flag,
+  });
 
-  const lines = [
-    rank ? `<b>🟢 ${rank} new visitor session</b>` : "<b>🟢 New visitor session</b>",
-    "",
-    `<b>Session:</b> ${escapeHtml(shortId)}`,
-    `<b>Entry:</b> ${escapeHtml(session.entry_path || "/")}`,
-    `<b>Logged in:</b> ${session.is_logged_in || session.email ? "yes" : "no"}`,
-  ];
+  const lines = [`<b>🟢 ${escapeHtml(headline)}</b>`, ""];
+  appendTelegramAlertCountLines(
+    lines,
+    sessionCount,
+    monthSessionCount,
+    rawSessionCount,
+    rawMonthSessionCount,
+  );
+  lines.push("", `<b>Session:</b> ${escapeHtml(shortId)}`, `<b>Logged in:</b> ${session.is_logged_in || session.email ? "yes" : "no"}`);
 
-  if (session.referrer) {
-    lines.push(`<b>Referrer:</b> ${escapeHtml(session.referrer.slice(0, 120))}`);
-  }
   if (session.email) {
     lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
   }
+
+  appendSessionLandingLines(lines, session);
+  appendSessionGeoLines(lines, session);
 
   return lines.join("\n");
 }
@@ -177,20 +277,30 @@ export function buildSessionStartTelegramMessage({ session, sessionCount }) {
  *   sessionCount?: number;
  * }} opts
  */
-export function buildAuthSessionStartTelegramMessage({ session, sessionCount }) {
+export function buildAuthSessionStartTelegramMessage({
+  session,
+  sessionCount,
+  monthSessionCount,
+}) {
   const shortId = String(session.session_id || "").slice(0, 8);
-  const rank = sessionCount ? ordinal(sessionCount) : null;
+  const flag = countryCodeToFlag(session.country);
+  const headline = formatDualRankHeadline({
+    count: sessionCount,
+    monthCount: monthSessionCount,
+    label: "authenticated session alert",
+    flag,
+  });
 
-  const lines = [
-    rank ? `<b>🔐 ${rank} authenticated session</b>` : "<b>🔐 Authenticated session started</b>",
-    "",
-    `<b>Session:</b> ${escapeHtml(shortId)}`,
-    `<b>Entry:</b> ${escapeHtml(session.entry_path || "/dashboard")}`,
-  ];
+  const lines = [`<b>🔐 ${escapeHtml(headline)}</b>`, ""];
+  appendTelegramAlertCountLines(lines, sessionCount, monthSessionCount);
+  lines.push("", `<b>Session:</b> ${escapeHtml(shortId)}`);
 
   if (session.email) {
     lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
   }
+
+  appendSessionLandingLines(lines, session);
+  appendSessionGeoLines(lines, session);
 
   return lines.join("\n");
 }
@@ -202,23 +312,34 @@ export function buildAuthSessionStartTelegramMessage({ session, sessionCount }) 
  *   sessionCount?: number;
  * }} opts
  */
-export function buildAuthSessionEndTelegramMessage({ session, events, sessionCount }) {
+export function buildAuthSessionEndTelegramMessage({
+  session,
+  events,
+  sessionCount,
+  monthSessionCount,
+}) {
   const startedAt = session.started_at ? new Date(session.started_at).getTime() : Date.now();
   const endedAt = session.ended_at ? new Date(session.ended_at).getTime() : Date.now();
   const duration = formatDuration(Math.max(0, endedAt - startedAt));
   const shortId = String(session.session_id || "").slice(0, 8);
-  const rank = sessionCount ? ordinal(sessionCount) : null;
+  const flag = countryCodeToFlag(session.country);
+  const headline = formatDualRankHeadline({
+    count: sessionCount,
+    monthCount: monthSessionCount,
+    label: "auth session summary alert",
+    flag,
+  });
 
   const steps = events.slice(0, 30).map((event, i) => formatJourneyStep(event, i + 1));
   const more = events.length > 30 ? `\n… and ${events.length - 30} more steps` : "";
 
-  const lines = [
-    rank ? `<b>📋 ${rank} auth session summary</b>` : "<b>📋 Auth session summary</b>",
+  const lines = [`<b>📋 ${escapeHtml(headline)}</b>`, ""];
+  appendTelegramAlertCountLines(lines, sessionCount, monthSessionCount);
+  lines.push(
     "",
     `<b>Session:</b> ${escapeHtml(shortId)}`,
     `<b>Duration:</b> ${escapeHtml(duration)}`,
-    `<b>Entry:</b> ${escapeHtml(session.entry_path || "/dashboard")}`,
-  ];
+  );
 
   if (session.email) {
     lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
@@ -227,6 +348,9 @@ export function buildAuthSessionEndTelegramMessage({ session, events, sessionCou
   if (session.chain_count) {
     lines.push(`<b>Chain updates:</b> ${session.chain_count}`);
   }
+
+  appendSessionLandingLines(lines, session);
+  appendSessionGeoLines(lines, session);
 
   lines.push("", "<b>Activity:</b>");
   if (steps.length) {

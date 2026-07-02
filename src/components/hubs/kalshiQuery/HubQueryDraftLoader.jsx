@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
 import { clearHubQueryDraft, loadHubQueryDraft } from "@/lib/hubs/hubQueryDraft";
+import { setDataPullSurfaceContext } from "@/lib/analytics/trackDataPull";
 
 /**
  * Loads hub query draft from sessionStorage when ?hubQuery=1 and runs pull on dashboard.
@@ -27,6 +28,12 @@ export function HubQueryDraftLoader() {
     }
 
     loadedRef.current = true;
+
+    setDataPullSurfaceContext({
+      hubQueryHandoff: true,
+      sourceHubPath: draft.sourceHubPath,
+      sourceHubName: draft.sourceHubName,
+    });
 
     try {
       applyHubQueryDraft(ctx, draft, { autoPull: false });

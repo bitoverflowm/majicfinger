@@ -26,6 +26,7 @@ import {
   normalizeHubQueryDraft,
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
+import { inferPageNameFromPath } from "@/lib/analytics/sessionStartMeta";
 import { cn } from "@/lib/utils";
 
 const LAKE_CONFIG = getConnectDataLakeConfig("kalshiHistorical");
@@ -165,11 +166,15 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
   }, []);
 
   const buildDraft = useCallback(() => {
+    const sourceHubPath =
+      typeof window !== "undefined" ? window.location.pathname || "" : "";
     return normalizeHubQueryDraft({
       sampleId,
       columnSelections,
       whereFilters: whereFilters.filter((f) => String(f.value ?? "").trim()),
       pendingSheetName: sheetName.trim() || undefined,
+      sourceHubPath: sourceHubPath || undefined,
+      sourceHubName: sourceHubPath ? inferPageNameFromPath(sourceHubPath) : undefined,
     });
   }, [sampleId, columnSelections, whereFilters, sheetName]);
 

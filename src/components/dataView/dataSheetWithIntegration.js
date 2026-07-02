@@ -15,6 +15,7 @@ import WallStreetBets from "@/components/integrationsView/integrationPlayground/
 import GeckoDex from "@/components/integrationsView/integrationPlayground/integrations/geckoDex";
 import Binance from "@/components/integrationsView/integrationPlayground/integrations/binance";
 import Chainlink from "@/components/integrationsView/integrationPlayground/integrations/chainlink";
+import { setDataPullSurfaceContext } from "@/lib/analytics/trackDataPull";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -228,6 +229,17 @@ export default function DataSheetWithIntegration({
       connectWorkspace === "binance");
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
   const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive;
+
+  useEffect(() => {
+    setDataPullSurfaceContext({
+      isDemo,
+      connectHomeMode,
+      connectWorkspace: connectWorkspace || null,
+      isLoggedIn: !!(user?.email || user?.userId),
+      userId: user?.userId || user?._id || null,
+    });
+  }, [isDemo, connectHomeMode, connectWorkspace, user]);
+
   const connectDataLakePullState = contextStateV2?.connectDataLakePullState ?? {};
   const connectUserPullActive = isConnectUserDataPullActive(connectDataLakePullState, {
     analyzeActive: connectHomeAnalyzeActive,

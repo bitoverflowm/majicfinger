@@ -2,10 +2,15 @@ import dbConnect from "@/lib/dbConnect";
 import TelegramEventCounter from "@/models/TelegramEventCounter";
 import { sendTelegramMessage } from "@/lib/telegram/notify";
 import { escapeHtml, formatFieldLines, ordinal } from "@/lib/telegram/format";
+import { currentUtcMonthKey } from "@/lib/telegram/geoFormat";
 
-/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click' | 'visitor_session' | 'visitor_session_end' | 'test_ping'} TelegramEventKey */
+/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click' | 'telegram_visitor_session_start' | 'telegram_visitor_session_end' | 'telegram_auth_session_start' | 'telegram_auth_session_end' | 'raw_visitor_session' | 'raw_auth_session' | 'test_ping'} TelegramEventKey */
 
 const COUNTER_TIMEOUT_MS = 5000;
+
+function monthlyEventKey(eventKey, monthKey = currentUtcMonthKey()) {
+  return `${eventKey}:${monthKey}`;
+}
 
 /** Clear a stuck connect so later routes are not blocked by a poisoned promise. */
 function resetMongooseCache() {
@@ -22,8 +27,7 @@ function memoryCounters() {
   return global.__telegramEventCounters;
 }
 
-async function incrementFromDb(eventKey) {
-  await dbConnect();
+async function incrementCounterKey(eventKey) {
   const doc = await TelegramEventCounter.findOneAndUpdate(
     { event_key: eventKey },
     { $inc: { count: 1 }, $set: { last_event_at: new Date() } },
@@ -32,32 +36,47 @@ async function incrementFromDb(eventKey) {
   return doc?.count ?? 1;
 }
 
+async function incrementFromDb(eventKey) {
+  await dbConnect();
+  const monthKey = monthlyEventKey(eventKey);
+  const [count, monthCount] = await Promise.all([
+    incrementCounterKey(eventKey),
+    incrementCounterKey(monthKey),
+  ]);
+  return { count, monthCount };
+}
+
 function incrementFromMemory(eventKey) {
   const counters = memoryCounters();
+  const monthKey = monthlyEventKey(eventKey);
   const next = (counters.get(eventKey) || 0) + 1;
+  const nextMonth = (counters.get(monthKey) || 0) + 1;
   counters.set(eventKey, next);
-  return next;
+  counters.set(monthKey, nextMonth);
+  return { count: next, monthCount: nextMonth };
 }
 
 /**
- * Atomically increment a counter and return the new total.
+ * Atomically increment all-time + current-month counters.
  * Falls back to in-memory counts if MongoDB is unreachable.
  * @param {TelegramEventKey} eventKey
  */
 export async function incrementTelegramEventCounter(eventKey) {
   try {
-    const count = await Promise.race([
+    const result = await Promise.race([
       incrementFromDb(eventKey),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error("MongoDB counter timeout")), COUNTER_TIMEOUT_MS),
       ),
     ]);
-    return { count, source: "mongodb" };
+    return { ...result, source: "mongodb" };
   } catch (err) {
     resetMongooseCache();
     console.warn(`[telegram] counter ${eventKey} using memory fallback:`, err?.message || err);
+    const { count, monthCount } = incrementFromMemory(eventKey);
     return {
-      count: incrementFromMemory(eventKey),
+      count,
+      monthCount,
       source: "memory",
       dbError: err?.message || "MongoDB unavailable",
     };
@@ -68,10 +87,21 @@ export async function incrementTelegramEventCounter(eventKey) {
  * @param {{ eventKey: TelegramEventKey; headline: string; fields?: Record<string, string | number | boolean | null | undefined> }} opts
  */
 export async function trackAndNotifyTelegramEvent({ eventKey, headline, fields = {} }) {
-  const { count, source, dbError } = await incrementTelegramEventCounter(eventKey);
+  const { count, monthCount, source, dbError } = await incrementTelegramEventCounter(eventKey);
   const rank = ordinal(count);
+  const monthRank = monthCount ? ordinal(monthCount) : null;
+  const headlineWithRanks = monthRank
+    ? headline.replace("{rank}", rank).replace("{month_rank}", monthRank)
+    : headline.replace("{rank}", rank).replace(/\s*\{month_rank\}[^\n]*/g, "");
   const lines = [
-    `<b>${escapeHtml(headline.replace("{rank}", rank))}</b>`,
+    `<b>${escapeHtml(headlineWithRanks)}</b>`,
+    "",
+    `<b>Telegram alerts (all time):</b> ${escapeHtml(String(count))}`,
+    ...(monthCount
+      ? [
+          `<b>Telegram alerts (this month):</b> ${escapeHtml(String(monthCount))} (${escapeHtml(currentUtcMonthKey())})`,
+        ]
+      : []),
     "",
     formatFieldLines(fields),
   ].filter(Boolean);
@@ -82,9 +112,16 @@ export async function trackAndNotifyTelegramEvent({ eventKey, headline, fields =
 
   const result = await sendTelegramMessage(text);
   if (!result.ok) {
-    return { ok: false, error: result.error || "Telegram send failed", count, source, dbError };
+    return {
+      ok: false,
+      error: result.error || "Telegram send failed",
+      count,
+      monthCount,
+      source,
+      dbError,
+    };
   }
-  return { ok: true, count, source, dbError };
+  return { ok: true, count, monthCount, source, dbError };
 }
 
 /**

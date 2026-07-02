@@ -11,6 +11,17 @@ import {
   buildSessionStartTelegramMessage,
 } from "@/lib/analytics/formatJourneySummary";
 import { buildDataPullTelegramMessage } from "@/lib/analytics/formatDataPullTelegram";
+import { extractClientMeta, geoFieldsFromMeta } from "@/lib/analytics/requestClientMeta";
+import { landingFieldsFromMeta } from "@/lib/analytics/sessionFieldsFromMeta";
+import {
+  hasMeaningfulVisitorOutcome,
+  wasVisitorStartTelegramSuppressed,
+} from "@/lib/analytics/sessionOutcome";
+import {
+  buildVisitorStartDedupeKey,
+  hasRecentVisitorStartTelegram,
+} from "@/lib/analytics/visitorDedupe";
+import { TELEGRAM_COUNTER_KEYS } from "@/lib/telegram/geoFormat";
 import VisitorSession from "@/models/VisitorSession";
 
 function isAuthSession(sessionKind) {
@@ -20,16 +31,57 @@ function isAuthSession(sessionKind) {
 /** Auth sessions with no real activity for this long are treated as abandoned. */
 const AUTH_SESSION_STALE_MS = 30 * 60 * 1000;
 
+function mergeRequestMeta(meta = {}, req) {
+  return { ...meta, ...extractClientMeta(req) };
+}
+
+/** @param {Record<string, unknown>} doc */
+function sessionContextFromDoc(doc) {
+  return {
+    session_id: doc.session_id,
+    entry_path: doc.entry_path,
+    entry_url: doc.entry_url,
+    entry_search: doc.entry_search,
+    page_type: doc.page_type,
+    page_name: doc.page_name,
+    referrer: doc.referrer,
+    visitor_id: doc.visitor_id,
+    utm_source: doc.utm_source,
+    utm_medium: doc.utm_medium,
+    utm_campaign: doc.utm_campaign,
+    utm_term: doc.utm_term,
+    utm_content: doc.utm_content,
+    client_ip: doc.client_ip,
+    country: doc.country,
+    region: doc.region,
+    city: doc.city,
+    user_agent: doc.user_agent,
+    accept_language: doc.accept_language,
+    email: doc.email,
+    is_logged_in: doc.is_logged_in,
+  };
+}
+
 async function recordSessionStart(sessionId, meta = {}, sessionKind = "visitor") {
   await dbConnect();
   const now = new Date();
   const auth = isAuthSession(sessionKind);
+  const geo = geoFieldsFromMeta(meta);
+  const landing = landingFieldsFromMeta(meta);
+
+  const entryPath = landing.entry_path || meta.entryPath || (auth ? "/dashboard" : "/");
+  const referrer = auth ? "" : landing.referrer || meta.referrer || "";
 
   const updateResult = await VisitorSession.updateOne(
-    { session_id: sessionId },
+    { session_id: sessionId, start_notified_at: { $exists: false } },
     {
       $set: {
+        start_notified_at: now,
         last_seen_at: now,
+        entry_path: entryPath,
+        ...geo,
+        ...landing,
+        ...(!auth ? { referrer } : {}),
         ...(meta.email ? { email: meta.email } : {}),
         ...(meta.userId ? { user_id: String(meta.userId) } : {}),
         is_logged_in: auth || !!meta.isLoggedIn,
@@ -38,8 +90,10 @@ async function recordSessionStart(sessionId, meta = {}, sessionKind = "visitor")
         session_id: sessionId,
         session_kind: auth ? "auth" : "visitor",
         started_at: now,
-        entry_path: meta.entryPath || (auth ? "/dashboard" : "/"),
-        referrer: auth ? "" : meta.referrer || "",
+        entry_path: entryPath,
+        referrer,
+        ...geo,
+        ...landing,
         ...(meta.email ? { email: meta.email } : {}),
         ...(meta.userId ? { user_id: String(meta.userId) } : {}),
         is_logged_in: auth || !!meta.isLoggedIn,
@@ -48,38 +102,88 @@ async function recordSessionStart(sessionId, meta = {}, sessionKind = "visitor")
     { upsert: true },
   );
 
+  const claimedStartNotify =
+    (updateResult.upsertedCount ?? 0) > 0 || (updateResult.modifiedCount ?? 0) > 0;
+
+  if (!claimedStartNotify) {
+    await VisitorSession.updateOne(
+      { session_id: sessionId },
+      {
+        $set: {
+          last_seen_at: now,
+          ...geo,
+          ...landing,
+          ...(meta.email ? { email: meta.email } : {}),
+          ...(meta.userId ? { user_id: String(meta.userId) } : {}),
+          is_logged_in: auth || !!meta.isLoggedIn,
+        },
+      },
+    );
+    return VisitorSession.findOne({ session_id: sessionId });
+  }
+
   const doc = await VisitorSession.findOne({ session_id: sessionId });
   if (!doc) return null;
 
-  const isNewSession = (updateResult.upsertedCount ?? 0) > 0;
-  if (!isNewSession) {
+  const rawCounterKey = auth
+    ? TELEGRAM_COUNTER_KEYS.rawAuthSession
+    : TELEGRAM_COUNTER_KEYS.rawVisitorSession;
+  const { count: rawCount, monthCount: rawMonthCount } =
+    await incrementTelegramEventCounter(rawCounterKey);
+
+  const sessionContext = sessionContextFromDoc(doc);
+  const dedupeKey = !auth ? buildVisitorStartDedupeKey(doc) : null;
+
+  if (
+    !auth &&
+    dedupeKey &&
+    (await hasRecentVisitorStartTelegram(VisitorSession, sessionId, dedupeKey, now))
+  ) {
+    await VisitorSession.updateOne(
+      { session_id: sessionId },
+      {
+        $set: {
+          start_telegram_skip_reason: "start_dedupe",
+          start_telegram_sent: false,
+          ...(dedupeKey.strategy !== "visitor_id" ? { start_dedupe_key: dedupeKey.key } : {}),
+        },
+      },
+    );
     return doc;
   }
 
-  const counterKey = auth ? "auth_session" : "visitor_session";
-  const { count } = await incrementTelegramEventCounter(counterKey);
+  const telegramCounterKey = auth
+    ? TELEGRAM_COUNTER_KEYS.authSessionStart
+    : TELEGRAM_COUNTER_KEYS.visitorSessionStart;
+  const { count, monthCount } = await incrementTelegramEventCounter(telegramCounterKey);
 
   const text = auth
     ? buildAuthSessionStartTelegramMessage({
-        session: {
-          session_id: sessionId,
-          entry_path: doc.entry_path,
-          email: doc.email,
-        },
+        session: sessionContext,
         sessionCount: count,
+        monthSessionCount: monthCount,
       })
     : buildSessionStartTelegramMessage({
-        session: {
-          session_id: sessionId,
-          entry_path: doc.entry_path,
-          referrer: doc.referrer,
-          is_logged_in: doc.is_logged_in,
-          email: doc.email,
-        },
+        session: sessionContext,
         sessionCount: count,
+        monthSessionCount: monthCount,
+        rawSessionCount: rawCount,
+        rawMonthSessionCount: rawMonthCount,
       });
 
   await sendTelegramMessage(text);
+  await VisitorSession.updateOne(
+    { session_id: sessionId },
+    {
+      $set: {
+        start_telegram_sent: true,
+        start_telegram_skip_reason: null,
+        ...(dedupeKey && dedupeKey.strategy !== "visitor_id"
+          ? { start_dedupe_key: dedupeKey.key }
+          : {}),
+      },
+    },
+  );
   return doc;
 }
 
@@ -95,7 +199,6 @@ async function recordSessionBatch(sessionId, events = [], sessionKind = "visitor
       $set: { last_seen_at: now },
       $setOnInsert: {
         started_at: now,
-        entry_path: auth ? "/dashboard" : "/",
         session_kind: auth ? "auth" : "visitor",
       },
     },
@@ -139,6 +242,39 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
     return { ok: true, deduped: true };
   }
 
+  const geo = geoFieldsFromMeta(meta);
+  const landing = landingFieldsFromMeta(meta);
+
+  const events = await VisitorEvent.find({ session_id: sessionId })
+    .sort({ ts: 1 })
+    .limit(auth ? 150 : 100)
+    .lean();
+
+  if (
+    !auth &&
+    existing &&
+    wasVisitorStartTelegramSuppressed(existing.start_telegram_skip_reason) &&
+    !hasMeaningfulVisitorOutcome(events)
+  ) {
+    await VisitorSession.updateOne(
+      { session_id: sessionId },
+      {
+        $set: {
+          ended_at: now,
+          last_seen_at: now,
+          summary_sent_at: now,
+          summary_skip_reason: "start_dedupe_no_intent",
+          ...geo,
+          ...landing,
+          ...(meta.email ? { email: meta.email } : {}),
+          ...(meta.userId ? { user_id: String(meta.userId) } : {}),
+          ...(meta.isLoggedIn != null ? { is_logged_in: !!meta.isLoggedIn } : {}),
+        },
+      },
+    );
+    return { ok: true, suppressed: true, reason: "start_dedupe_no_intent" };
+  }
+
   const session = await VisitorSession.findOneAndUpdate(
     { session_id: sessionId, summary_sent_at: { $exists: false } },
     {
@@ -146,6 +282,9 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
         ended_at: now,
         last_seen_at: now,
         summary_sent_at: now,
+        summary_skip_reason: null,
+        ...geo,
+        ...landing,
         ...(meta.email ? { email: meta.email } : {}),
         ...(meta.userId ? { user_id: String(meta.userId) } : {}),
         ...(meta.isLoggedIn != null ? { is_logged_in: !!meta.isLoggedIn } : {}),
@@ -158,38 +297,39 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
     return { ok: true, deduped: true };
   }
 
-  const events = await VisitorEvent.find({ session_id: sessionId })
-    .sort({ ts: 1 })
-    .limit(auth ? 150 : 100)
-    .lean();
+  const counterKey = auth
+    ? TELEGRAM_COUNTER_KEYS.authSessionEnd
+    : TELEGRAM_COUNTER_KEYS.visitorSessionEnd;
+  const { count, monthCount } = await incrementTelegramEventCounter(counterKey);
 
-  const counterKey = auth ? "auth_session_end" : "visitor_session_end";
-  const { count } = await incrementTelegramEventCounter(counterKey);
+  const sessionContext = sessionContextFromDoc(session);
 
   const text = auth
     ? buildAuthSessionEndTelegramMessage({
         session: {
+          ...sessionContext,
           session_id: sessionId,
           started_at: session.started_at,
           ended_at: now,
-          entry_path: session.entry_path,
           email: session.email || meta.email,
           chain_count: session.chain_count || 0,
         },
         events,
         sessionCount: count,
+        monthSessionCount: monthCount,
       })
     : buildSessionEndTelegramMessage({
         session: {
+          ...sessionContext,
           session_id: sessionId,
           started_at: session.started_at,
           ended_at: now,
-          entry_path: session.entry_path,
           email: session.email || meta.email,
           is_logged_in: session.is_logged_in || !!meta.isLoggedIn,
         },
         events,
         sessionCount: count,
+        monthSessionCount: monthCount,
       });
 
   await sendTelegramMessage(text);
@@ -308,6 +448,16 @@ async function recordDataPullNotify(sessionId, meta = {}) {
     phase,
     meta: pullMeta,
     sessionEmail: pullMeta.email || session?.email,
+    sessionGeo: session
+      ? {
+          client_ip: session.client_ip,
+          country: session.country,
+          region: session.region,
+          city: session.city,
+          user_agent: session.user_agent,
+          accept_language: session.accept_language,
+        }
+      : undefined,
   });
 
   await sendTelegramMessage(text);
@@ -342,7 +492,7 @@ export default async function handler(req, res) {
   try {
     switch (action) {
       case "session_start": {
-        await recordSessionStart(sessionId, meta, sessionKind);
+        await recordSessionStart(sessionId, mergeRequestMeta(meta, req), sessionKind);
         return res.status(200).json({ ok: true });
       }
       case "batch": {
@@ -357,7 +507,11 @@ export default async function handler(req, res) {
         if (events.length) {
           await recordSessionBatch(sessionId, events, sessionKind);
         }
-        const result = await recordSessionEnd(sessionId, meta, sessionKind);
+        const result = await recordSessionEnd(
+          sessionId,
+          mergeRequestMeta(meta, req),
+          sessionKind,
+        );
         return res.status(200).json(result);
       }
       case "session_chain": {

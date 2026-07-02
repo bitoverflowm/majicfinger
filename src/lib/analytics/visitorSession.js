@@ -1,6 +1,36 @@
 const SESSION_ID_KEY = "lychee:visitorSessionId";
 const SESSION_STARTED_KEY = "lychee:visitorSessionStarted";
 const SESSION_ENDED_KEY = "lychee:visitorSessionEnded";
+const VISITOR_ID_KEY = "lychee:visitorId";
+
+/** @returns {string | null} */
+export function getVisitorId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(VISITOR_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Persistent cross-session browser id used for start-alert dedupe. */
+export function getOrCreateVisitorId() {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const existing = localStorage.getItem(VISITOR_ID_KEY);
+    if (existing) return existing;
+
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `visitor-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(VISITOR_ID_KEY, id);
+    return id;
+  } catch {
+    return `visitor-${Date.now()}`;
+  }
+}
 
 /** @returns {string | null} */
 export function getVisitorSessionId() {

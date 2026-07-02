@@ -17,6 +17,8 @@ const STORAGE_KEY = "lychee:hubQueryDraft";
  * @property {Record<string, string[]>} columnSelections
  * @property {HubQueryWhereFilter[]} [whereFilters]
  * @property {string} [pendingSheetName]
+ * @property {string} [sourceHubPath]
+ * @property {string} [sourceHubName]
  * @property {{ ticker: string; entity: "markets" | "trades" }} [powerSearch]
  */
 
@@ -90,6 +92,8 @@ export function normalizeHubQueryDraft(draft) {
     columnSelections: draft.columnSelections || { [sampleId]: selections },
     whereFilters: Array.isArray(draft.whereFilters) ? draft.whereFilters : [],
     pendingSheetName: draft.pendingSheetName ? String(draft.pendingSheetName).trim() : undefined,
+    sourceHubPath: draft.sourceHubPath ? String(draft.sourceHubPath).trim() : undefined,
+    sourceHubName: draft.sourceHubName ? String(draft.sourceHubName).trim() : undefined,
     powerSearch: draft.powerSearch,
   };
 }
