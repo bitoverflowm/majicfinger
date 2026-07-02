@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
+import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
 
 /**
  * Track when someone opens and leaves a chart, dashboard, or article.
@@ -32,13 +33,20 @@ export function useTelegramContentTracker({
 
     if (!viewSentRef.current) {
       viewSentRef.current = true;
+      const viewPath = path || (typeof window !== "undefined" ? window.location.pathname : undefined);
       trackJourneyEvent("content_view", {
-        path: path || (typeof window !== "undefined" ? window.location.pathname : undefined),
+        path: viewPath,
         meta: {
           contentType,
           name,
           ownerHandle,
         },
+      });
+      sendTelegramAnalyticsEvent("content_view", {
+        contentType,
+        name,
+        path: viewPath,
+        ownerHandle,
       });
     }
 
@@ -57,6 +65,17 @@ export function useTelegramContentTracker({
           durationSeconds,
         },
       });
+      sendTelegramAnalyticsEvent(
+        "content_leave",
+        {
+          contentType,
+          name,
+          path: path || (typeof window !== "undefined" ? window.location.pathname : undefined),
+          ownerHandle,
+          durationSeconds,
+        },
+        { keepalive: true },
+      );
     };
 
     const onVisibilityChange = () => {

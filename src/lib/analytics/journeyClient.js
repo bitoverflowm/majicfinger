@@ -25,12 +25,16 @@ function scheduleFlush() {
   }, FLUSH_INTERVAL_MS);
 }
 
-function postJourney(body, { keepalive = false } = {}) {
+function postJourney(body, { keepalive = false, preferBeacon = false } = {}) {
   if (typeof window === "undefined") return;
 
   const payload = JSON.stringify({ sessionKind: "visitor", ...body });
   try {
-    if (keepalive && typeof navigator !== "undefined" && navigator.sendBeacon) {
+    if (
+      (keepalive || preferBeacon) &&
+      typeof navigator !== "undefined" &&
+      navigator.sendBeacon
+    ) {
       const blob = new Blob([payload], { type: "application/json" });
       navigator.sendBeacon(JOURNEY_ENDPOINT, blob);
       return;
@@ -43,7 +47,7 @@ function postJourney(body, { keepalive = false } = {}) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: payload,
-    keepalive,
+    keepalive: keepalive || preferBeacon,
   }).catch(() => {});
 }
 
@@ -119,11 +123,20 @@ export function startVisitorSessionIfNeeded(identity = {}) {
   const sessionId = getOrCreateVisitorSessionId();
   markVisitorSessionStarted();
 
-  postJourney({
+  const meta = buildSessionStartMeta(identity);
+  const body = {
     action: "session_start",
     sessionId,
-    meta: buildSessionStartMeta(identity),
-  });
+    meta,
+  };
+
+  // sendBeacon so the request survives tab close / fast navigation
+  postJourney(body, { preferBeacon: true });
+
+  // Server-side idempotent retry if the first delivery was lost or Telegram failed
+  window.setTimeout(() => {
+    postJourney({ ...body, meta: { ...meta, retry: true } }, { preferBeacon: true });
+  }, 3000);
 }
 
 /** @param {{ email?: string; userId?: string; isLoggedIn?: boolean }} identity */

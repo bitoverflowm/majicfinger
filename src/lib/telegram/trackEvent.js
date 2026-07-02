@@ -2,7 +2,9 @@ import dbConnect from "@/lib/dbConnect";
 import TelegramEventCounter from "@/models/TelegramEventCounter";
 import { sendTelegramMessage } from "@/lib/telegram/notify";
 import { escapeHtml, formatFieldLines, ordinal } from "@/lib/telegram/format";
-import { currentUtcMonthKey } from "@/lib/telegram/geoFormat";
+import { buildGeoTelegramFields, countryCodeToFlag, currentUtcMonthKey } from "@/lib/telegram/geoFormat";
+
+/** @typedef {ReturnType<import("@/lib/analytics/requestClientMeta").extractClientMeta>} TelegramGeoContext */
 
 /** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click' | 'telegram_visitor_session_start' | 'telegram_visitor_session_end' | 'telegram_auth_session_start' | 'telegram_auth_session_end' | 'raw_visitor_session' | 'raw_auth_session' | 'test_ping'} TelegramEventKey */
 
@@ -84,15 +86,37 @@ export async function incrementTelegramEventCounter(eventKey) {
 }
 
 /**
- * @param {{ eventKey: TelegramEventKey; headline: string; fields?: Record<string, string | number | boolean | null | undefined> }} opts
+ * @param {Record<string, string | number | boolean | null | undefined>} fields
+ * @param {TelegramGeoContext} [geo]
  */
-export async function trackAndNotifyTelegramEvent({ eventKey, headline, fields = {} }) {
+function fieldsWithGeo(fields, geo = {}) {
+  return { ...fields, ...buildGeoTelegramFields(geo) };
+}
+
+/**
+ * @param {string} headline
+ * @param {TelegramGeoContext} [geo]
+ */
+function headlineWithGeoFlag(headline, geo = {}) {
+  const flag = countryCodeToFlag(geo.country);
+  if (!flag || headline.includes(flag)) return headline;
+  return `${flag} ${headline}`;
+}
+
+/**
+ * @param {{ eventKey: TelegramEventKey; headline: string; fields?: Record<string, string | number | boolean | null | undefined>; geo?: TelegramGeoContext }} opts
+ */
+export async function trackAndNotifyTelegramEvent({ eventKey, headline, fields = {}, geo = {} }) {
   const { count, monthCount, source, dbError } = await incrementTelegramEventCounter(eventKey);
   const rank = ordinal(count);
   const monthRank = monthCount ? ordinal(monthCount) : null;
   const headlineWithRanks = monthRank
-    ? headline.replace("{rank}", rank).replace("{month_rank}", monthRank)
-    : headline.replace("{rank}", rank).replace(/\s*\{month_rank\}[^\n]*/g, "");
+    ? headlineWithGeoFlag(headline, geo)
+        .replace("{rank}", rank)
+        .replace("{month_rank}", monthRank)
+    : headlineWithGeoFlag(headline, geo)
+        .replace("{rank}", rank)
+        .replace(/\s*\{month_rank\}[^\n]*/g, "");
   const lines = [
     `<b>${escapeHtml(headlineWithRanks)}</b>`,
     "",
@@ -103,7 +127,7 @@ export async function trackAndNotifyTelegramEvent({ eventKey, headline, fields =
         ]
       : []),
     "",
-    formatFieldLines(fields),
+    formatFieldLines(fieldsWithGeo(fields, geo)),
   ].filter(Boolean);
   if (source === "memory" && dbError) {
     lines.push("", `<i>Count from memory — MongoDB unavailable</i>`);
@@ -133,33 +157,36 @@ export async function trackAndNotifyTelegramEvent({ eventKey, headline, fields =
  *   dashboardSlug?: string;
  *   isLoggedIn?: boolean;
  *   userEmail?: string;
+ *   geo?: TelegramGeoContext;
  * }} payload
  */
 export async function notifyForkClick(payload) {
+  const { geo, ...data } = payload;
   const kindLabel =
-    payload.kind === "dashboard"
+    data.kind === "dashboard"
       ? "dashboard"
-      : payload.kind === "dashboard_chart"
+      : data.kind === "dashboard_chart"
         ? "dashboard chart"
         : "chart";
 
   const name =
-    payload.displayName?.trim() ||
-    payload.chartSlug ||
-    payload.dashboardSlug ||
+    data.displayName?.trim() ||
+    data.chartSlug ||
+    data.dashboardSlug ||
     "Unknown";
 
   return trackAndNotifyTelegramEvent({
     eventKey: "fork_click",
     headline: `{rank} person to click fork`,
+    geo,
     fields: {
       Action: `Clicked fork on ${kindLabel}`,
       Name: name,
-      Owner: payload.ownerHandle ? `@${payload.ownerHandle}` : undefined,
-      "Chart slug": payload.chartSlug,
-      "Dashboard slug": payload.dashboardSlug,
-      "Logged in": payload.isLoggedIn ? "yes" : "no",
-      Email: payload.userEmail,
+      Owner: data.ownerHandle ? `@${data.ownerHandle}` : undefined,
+      "Chart slug": data.chartSlug,
+      "Dashboard slug": data.dashboardSlug,
+      "Logged in": data.isLoggedIn ? "yes" : "no",
+      Email: data.userEmail,
     },
   });
 }
@@ -173,21 +200,24 @@ export async function notifyForkClick(payload) {
  *   tier?: string;
  *   cycle?: string;
  *   status?: string;
+ *   geo?: TelegramGeoContext;
  * }} payload
  */
 export async function notifySignup(payload) {
-  const method = payload.method || "magic link";
+  const { geo, ...data } = payload;
+  const method = data.method || "magic link";
   return trackAndNotifyTelegramEvent({
     eventKey: "signup",
     headline: `{rank} user to sign up`,
+    geo,
     fields: {
-      Email: payload.email,
-      Name: payload.name,
-      Source: payload.source,
+      Email: data.email,
+      Name: data.name,
+      Source: data.source,
       Method: method,
-      Tier: payload.tier,
-      Cycle: payload.cycle,
-      Status: payload.status,
+      Tier: data.tier,
+      Cycle: data.cycle,
+      Status: data.status,
     },
   });
 }
@@ -198,54 +228,51 @@ export async function notifySignup(payload) {
  *   name: string;
  *   path?: string;
  *   ownerHandle?: string;
+ *   geo?: TelegramGeoContext;
  * }} payload
  */
 export async function notifyContentView(payload) {
+  const { geo, ...data } = payload;
   const typeLabel =
-    payload.contentType === "article"
+    data.contentType === "article"
       ? "article"
-      : payload.contentType === "dashboard"
+      : data.contentType === "dashboard"
         ? "dashboard"
         : "chart";
 
   return trackAndNotifyTelegramEvent({
     eventKey: "content_view",
     headline: `{rank} person to open a ${typeLabel}`,
+    geo,
     fields: {
       Action: `Reading ${typeLabel}`,
-      Name: payload.name,
-      Path: payload.path,
-      Owner: payload.ownerHandle ? `@${payload.ownerHandle}` : undefined,
+      Name: data.name,
+      Path: data.path,
+      Owner: data.ownerHandle ? `@${data.ownerHandle}` : undefined,
     },
   });
 }
 
 /**
  * @param {{
- *   contentType: 'chart' | 'dashboard' | 'article';
- *   name: string;
- *   path?: string;
- *   ownerHandle?: string;
- *   durationSeconds?: number;
- * }} payload
- */
-/**
- * @param {{
  *   pageType: 'homepage' | 'hub';
  *   pageName: string;
  *   path?: string;
+ *   geo?: TelegramGeoContext;
  * }} payload
  */
 export async function notifyPageView(payload) {
-  const typeLabel = payload.pageType === "hub" ? "hub page" : "homepage";
+  const { geo, ...data } = payload;
+  const typeLabel = data.pageType === "hub" ? "hub page" : "homepage";
   return trackAndNotifyTelegramEvent({
     eventKey: "page_view",
     headline: `{rank} person to visit a ${typeLabel}`,
+    geo,
     fields: {
       Action: `Opened ${typeLabel}`,
-      Page: payload.pageName,
-      Path: payload.path,
-      Type: payload.pageType,
+      Page: data.pageName,
+      Path: data.path,
+      Type: data.pageType,
     },
   });
 }
@@ -259,42 +286,57 @@ export async function notifyPageView(payload) {
  *   targetType?: string;
  *   href?: string;
  *   section?: string;
+ *   geo?: TelegramGeoContext;
  * }} payload
  */
 export async function notifyPageClick(payload) {
-  const typeLabel = payload.pageType === "hub" ? "hub page" : "homepage";
+  const { geo, ...data } = payload;
+  const typeLabel = data.pageType === "hub" ? "hub page" : "homepage";
   return trackAndNotifyTelegramEvent({
     eventKey: "page_click",
     headline: `{rank} click on ${typeLabel}`,
+    geo,
     fields: {
-      Page: payload.pageName,
-      Path: payload.path,
-      Type: payload.pageType,
-      Label: payload.label,
-      Target: payload.targetType,
-      Link: payload.href,
-      Section: payload.section,
+      Page: data.pageName,
+      Path: data.path,
+      Type: data.pageType,
+      Label: data.label,
+      Target: data.targetType,
+      Link: data.href,
+      Section: data.section,
     },
   });
 }
 
+/**
+ * @param {{
+ *   contentType: 'chart' | 'dashboard' | 'article';
+ *   name: string;
+ *   path?: string;
+ *   ownerHandle?: string;
+ *   durationSeconds?: number;
+ *   geo?: TelegramGeoContext;
+ * }} payload
+ */
 export async function notifyContentLeave(payload) {
+  const { geo, ...data } = payload;
   const typeLabel =
-    payload.contentType === "article"
+    data.contentType === "article"
       ? "article"
-      : payload.contentType === "dashboard"
+      : data.contentType === "dashboard"
         ? "dashboard"
         : "chart";
 
   return trackAndNotifyTelegramEvent({
     eventKey: "content_leave",
     headline: `{rank} person to leave a ${typeLabel}`,
+    geo,
     fields: {
       Action: `Left ${typeLabel}`,
-      Name: payload.name,
-      Path: payload.path,
-      Owner: payload.ownerHandle ? `@${payload.ownerHandle}` : undefined,
-      "Time on page (sec)": payload.durationSeconds,
+      Name: data.name,
+      Path: data.path,
+      Owner: data.ownerHandle ? `@${data.ownerHandle}` : undefined,
+      "Time on page (sec)": data.durationSeconds,
     },
   });
 }
@@ -312,24 +354,27 @@ export async function notifyContentLeave(payload) {
  *   referrer?: string;
  *   userEmail?: string;
  *   isLoggedIn?: boolean;
+ *   geo?: TelegramGeoContext;
  * }} payload
  */
 export async function notifyHeroCtaClick(payload) {
-  const headlineLabel = payload.eventLabel || payload.buttonText || "hero CTA";
+  const { geo, ...data } = payload;
+  const headlineLabel = data.eventLabel || data.buttonText || "hero CTA";
   return trackAndNotifyTelegramEvent({
     eventKey: "hero_cta_click",
     headline: `{rank} hero CTA — ${headlineLabel}`,
+    geo,
     fields: {
-      Page: payload.pagePath || payload.page,
-      Button: payload.buttonText,
-      "Event label": payload.eventLabel,
-      Destination: payload.destination,
-      Link: payload.href,
-      "User state": payload.userState,
-      "Session id": payload.sessionId,
-      Referrer: payload.referrer,
-      Email: payload.userEmail,
-      "Logged in": payload.isLoggedIn ? "yes" : "no",
+      Page: data.pagePath || data.page,
+      Button: data.buttonText,
+      "Event label": data.eventLabel,
+      Destination: data.destination,
+      Link: data.href,
+      "User state": data.userState,
+      "Session id": data.sessionId,
+      Referrer: data.referrer,
+      Email: data.userEmail,
+      "Logged in": data.isLoggedIn ? "yes" : "no",
     },
   });
 }

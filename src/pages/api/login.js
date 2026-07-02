@@ -10,6 +10,7 @@ import {
   defaultNameForDevBypassEmail,
 } from '@/lib/devLoginBypass'
 import { notifySignup } from '@/lib/telegram/trackEvent'
+import { extractClientMeta } from '@/lib/analytics/requestClientMeta'
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -86,6 +87,7 @@ export default async (req, res) => {
           name: user.name,
           source: req.body.signupSource || 'dev bypass',
           method: 'dev bypass',
+          geo: extractClientMeta(req),
         }).catch((err) => console.error('[telegram] signup notify failed', err))
       }
       const session = {
@@ -119,6 +121,7 @@ export default async (req, res) => {
         name: user.name,
         source: req.body.signupSource || 'magic link',
         method: 'magic link',
+        geo: extractClientMeta(req),
       }).catch((err) => console.error('[telegram] signup notify failed', err))
       const newSession = { ...metadata, userId: String(user._id), name: user.name }
       await setLoginSession(res, newSession)

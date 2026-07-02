@@ -62,6 +62,115 @@ function sessionContextFromDoc(doc) {
   };
 }
 
+async function incrementCounterSafe(eventKey) {
+  try {
+    return await incrementTelegramEventCounter(eventKey);
+  } catch (err) {
+    console.warn(`[journey] counter ${eventKey} failed:`, err?.message || err);
+    return { count: undefined, monthCount: undefined };
+  }
+}
+
+/**
+ * Send the session-start Telegram if not already sent or skipped.
+ * @param {{ session_id: string; session_kind?: string }} doc
+ * @param {boolean} auth
+ * @param {Date} now
+ * @param {{ countRaw?: boolean }} [opts]
+ */
+async function deliverSessionStartTelegram(doc, auth, now, opts = {}) {
+  if (doc.start_telegram_sent || doc.start_telegram_skip_reason) {
+    return { delivered: false, reason: "already_handled" };
+  }
+
+  const claim = await VisitorSession.updateOne(
+    {
+      session_id: doc.session_id,
+      start_telegram_sent: { $ne: true },
+      start_telegram_skip_reason: { $exists: false },
+    },
+    { $set: { start_delivery_claimed_at: now } },
+  );
+  if ((claim.modifiedCount ?? 0) === 0) {
+    return { delivered: false, reason: "delivery_claimed_elsewhere" };
+  }
+
+  const sessionContext = sessionContextFromDoc(doc);
+  const dedupeKey = !auth ? buildVisitorStartDedupeKey(doc) : null;
+
+  if (
+    !auth &&
+    dedupeKey &&
+    (await hasRecentVisitorStartTelegram(VisitorSession, doc.session_id, dedupeKey, now))
+  ) {
+    await VisitorSession.updateOne(
+      { session_id: doc.session_id },
+      {
+        $set: {
+          start_telegram_skip_reason: "start_dedupe",
+          start_telegram_sent: false,
+          ...(dedupeKey.strategy !== "visitor_id" ? { start_dedupe_key: dedupeKey.key } : {}),
+        },
+        $unset: { start_delivery_claimed_at: "" },
+      },
+    );
+    return { delivered: false, deduped: true };
+  }
+
+  let rawCount;
+  let rawMonthCount;
+  if (opts.countRaw) {
+    const rawCounterKey = auth
+      ? TELEGRAM_COUNTER_KEYS.rawAuthSession
+      : TELEGRAM_COUNTER_KEYS.rawVisitorSession;
+    ({ count: rawCount, monthCount: rawMonthCount } = await incrementCounterSafe(rawCounterKey));
+  }
+
+  const telegramCounterKey = auth
+    ? TELEGRAM_COUNTER_KEYS.authSessionStart
+    : TELEGRAM_COUNTER_KEYS.visitorSessionStart;
+  const { count, monthCount } = await incrementCounterSafe(telegramCounterKey);
+
+  const text = auth
+    ? buildAuthSessionStartTelegramMessage({
+        session: sessionContext,
+        sessionCount: count,
+        monthSessionCount: monthCount,
+      })
+    : buildSessionStartTelegramMessage({
+        session: sessionContext,
+        sessionCount: count,
+        monthSessionCount: monthCount,
+        rawSessionCount: rawCount,
+        rawMonthSessionCount: rawMonthCount,
+      });
+
+  const result = await sendTelegramMessage(text);
+  if (!result.ok) {
+    console.error("[journey] session start telegram failed:", result.error || result);
+    await VisitorSession.updateOne(
+      { session_id: doc.session_id },
+      { $unset: { start_delivery_claimed_at: "" } },
+    );
+    return { delivered: false, error: result.error || "telegram_failed" };
+  }
+
+  await VisitorSession.updateOne(
+    { session_id: doc.session_id },
+    {
+      $set: {
+        start_telegram_sent: true,
+        start_telegram_skip_reason: null,
+        ...(dedupeKey && dedupeKey.strategy !== "visitor_id"
+          ? { start_dedupe_key: dedupeKey.key }
+          : {}),
+      },
+      $unset: { start_delivery_claimed_at: "" },
+    },
+  );
+  return { delivered: true };
+}
+
 async function recordSessionStart(sessionId, meta = {}, sessionKind = "visitor") {
   await dbConnect();
   const now = new Date();
@@ -119,72 +228,21 @@ async function recordSessionStart(sessionId, meta = {}, sessionKind = "visitor")
         },
       },
     );
-    return VisitorSession.findOne({ session_id: sessionId });
   }
 
   const doc = await VisitorSession.findOne({ session_id: sessionId });
   if (!doc) return null;
 
-  const rawCounterKey = auth
-    ? TELEGRAM_COUNTER_KEYS.rawAuthSession
-    : TELEGRAM_COUNTER_KEYS.rawVisitorSession;
-  const { count: rawCount, monthCount: rawMonthCount } =
-    await incrementTelegramEventCounter(rawCounterKey);
-
-  const sessionContext = sessionContextFromDoc(doc);
-  const dedupeKey = !auth ? buildVisitorStartDedupeKey(doc) : null;
-
-  if (
-    !auth &&
-    dedupeKey &&
-    (await hasRecentVisitorStartTelegram(VisitorSession, sessionId, dedupeKey, now))
-  ) {
-    await VisitorSession.updateOne(
-      { session_id: sessionId },
-      {
-        $set: {
-          start_telegram_skip_reason: "start_dedupe",
-          start_telegram_sent: false,
-          ...(dedupeKey.strategy !== "visitor_id" ? { start_dedupe_key: dedupeKey.key } : {}),
-        },
-      },
-    );
+  if (doc.start_telegram_sent || doc.start_telegram_skip_reason) {
     return doc;
   }
 
-  const telegramCounterKey = auth
-    ? TELEGRAM_COUNTER_KEYS.authSessionStart
-    : TELEGRAM_COUNTER_KEYS.visitorSessionStart;
-  const { count, monthCount } = await incrementTelegramEventCounter(telegramCounterKey);
+  const shouldDeliver = claimedStartNotify || !!doc.start_notified_at;
+  if (shouldDeliver) {
+    await deliverSessionStartTelegram(doc, auth, now, { countRaw: claimedStartNotify });
+  }
 
-  const text = auth
-    ? buildAuthSessionStartTelegramMessage({
-        session: sessionContext,
-        sessionCount: count,
-        monthSessionCount: monthCount,
-      })
-    : buildSessionStartTelegramMessage({
-        session: sessionContext,
-        sessionCount: count,
-        monthSessionCount: monthCount,
-        rawSessionCount: rawCount,
-        rawMonthSessionCount: rawMonthCount,
-      });
-
-  await sendTelegramMessage(text);
-  await VisitorSession.updateOne(
-    { session_id: sessionId },
-    {
-      $set: {
-        start_telegram_sent: true,
-        start_telegram_skip_reason: null,
-        ...(dedupeKey && dedupeKey.strategy !== "visitor_id"
-          ? { start_dedupe_key: dedupeKey.key }
-          : {}),
-      },
-    },
-  );
-  return doc;
+  return VisitorSession.findOne({ session_id: sessionId });
 }
 
 async function recordSessionBatch(sessionId, events = [], sessionKind = "visitor") {
@@ -275,7 +333,7 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
     return { ok: true, suppressed: true, reason: "start_dedupe_no_intent" };
   }
 
-  const session = await VisitorSession.findOneAndUpdate(
+  let session = await VisitorSession.findOneAndUpdate(
     { session_id: sessionId, summary_sent_at: { $exists: false } },
     {
       $set: {
@@ -295,6 +353,16 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
 
   if (!session) {
     return { ok: true, deduped: true };
+  }
+
+  if (
+    !auth &&
+    !session.start_telegram_sent &&
+    !wasVisitorStartTelegramSuppressed(session.start_telegram_skip_reason)
+  ) {
+    await deliverSessionStartTelegram(session, auth, now, { countRaw: false });
+    const refreshed = await VisitorSession.findOne({ session_id: sessionId });
+    if (refreshed) session = refreshed;
   }
 
   const counterKey = auth
@@ -433,7 +501,7 @@ async function recordSessionError(sessionId, meta = {}) {
   return { ok: true };
 }
 
-async function recordDataPullNotify(sessionId, meta = {}) {
+async function recordDataPullNotify(sessionId, meta = {}, reqGeo = {}) {
   await dbConnect();
 
   const phase = meta.phase;
@@ -444,20 +512,20 @@ async function recordDataPullNotify(sessionId, meta = {}) {
   const session = await VisitorSession.findOne({ session_id: sessionId }).lean();
   const { phase: _phase, ...pullMeta } = meta;
 
+  const sessionGeo = {
+    client_ip: session?.client_ip || reqGeo.client_ip,
+    country: session?.country || reqGeo.country,
+    region: session?.region || reqGeo.region,
+    city: session?.city || reqGeo.city,
+    user_agent: session?.user_agent || reqGeo.user_agent,
+    accept_language: session?.accept_language || reqGeo.accept_language,
+  };
+
   const text = buildDataPullTelegramMessage({
     phase,
     meta: pullMeta,
     sessionEmail: pullMeta.email || session?.email,
-    sessionGeo: session
-      ? {
-          client_ip: session.client_ip,
-          country: session.country,
-          region: session.region,
-          city: session.city,
-          user_agent: session.user_agent,
-          accept_language: session.accept_language,
-        }
-      : undefined,
+    sessionGeo: Object.values(sessionGeo).some(Boolean) ? sessionGeo : undefined,
   });
 
   await sendTelegramMessage(text);
@@ -523,7 +591,11 @@ export default async function handler(req, res) {
         return res.status(200).json(result);
       }
       case "data_pull_notify": {
-        const result = await recordDataPullNotify(sessionId, meta);
+        const result = await recordDataPullNotify(
+          sessionId,
+          meta,
+          extractClientMeta(req),
+        );
         return res.status(200).json(result);
       }
       default:

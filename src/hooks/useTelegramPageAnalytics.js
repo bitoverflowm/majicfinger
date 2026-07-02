@@ -2,7 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
+import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
 import { extractClickTargetFromEvent } from "@/lib/telegram/extractClickTarget";
+import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
 
 const CLICK_THROTTLE_MS = 2000;
 const CLICK_DEDUPE_MS = 15000;
@@ -37,6 +39,7 @@ export function useTelegramPageAnalytics({
         path,
         meta: { pageType, pageName },
       });
+      sendTelegramAnalyticsEvent("page_view", { pageType, pageName, path });
     }
   }, [enabled, pageName, pageType, path]);
 
@@ -60,7 +63,7 @@ export function useTelegramPageAnalytics({
         recentClickKeysRef.current.clear();
       }
 
-      const send = () =>
+      const send = () => {
         trackJourneyEvent("page_click", {
           path,
           label: meta.label,
@@ -73,6 +76,17 @@ export function useTelegramPageAnalytics({
             section: meta.section,
           },
         });
+        sendTelegramAnalyticsEvent("page_click", {
+          pageType,
+          pageName,
+          path,
+          label: meta.label,
+          targetType: meta.targetType,
+          href: meta.href,
+          section: meta.section,
+          sessionId: getOrCreateVisitorSessionId(),
+        });
+      };
 
       if (typeof window.requestIdleCallback === "function") {
         window.requestIdleCallback(send, { timeout: 1500 });

@@ -6,6 +6,7 @@ import {
   notifyPageClick,
   notifyPageView,
 } from "@/lib/telegram/trackEvent";
+import { extractClientMeta } from "@/lib/analytics/requestClientMeta";
 
 const ALLOWED_EVENTS = new Set([
   "fork_click",
@@ -16,10 +17,30 @@ const ALLOWED_EVENTS = new Set([
   "hero_cta_click",
 ]);
 
+/** @param {import('next').NextApiRequest} req */
+function parseJsonBody(req) {
+  let body = req.body;
+  if (Buffer.isBuffer(body)) {
+    body = JSON.parse(body.toString("utf8"));
+  } else if (typeof body === "string") {
+    body = JSON.parse(body);
+  }
+  return body || {};
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, message: "Method not allowed" });
 
-  const { event, payload = {}, sessionId } = req.body || {};
+  let body;
+  try {
+    body = parseJsonBody(req);
+  } catch {
+    return res.status(400).json({ ok: false, message: "Invalid JSON" });
+  }
+
+  const { event, payload = {}, sessionId } = body;
+  const geo = extractClientMeta(req);
+
   if (!ALLOWED_EVENTS.has(event)) {
     return res.status(400).json({ ok: false, message: "Invalid event" });
   }
@@ -34,6 +55,7 @@ export default async function handler(req, res) {
         dashboardSlug: payload.dashboardSlug,
         isLoggedIn: !!payload.isLoggedIn,
         userEmail: payload.userEmail,
+        geo,
       });
       return res.status(200).json(result);
     }
@@ -47,6 +69,7 @@ export default async function handler(req, res) {
         name: payload.name,
         path: payload.path,
         ownerHandle: payload.ownerHandle,
+        geo,
       });
       return res.status(200).json(result);
     }
@@ -59,6 +82,7 @@ export default async function handler(req, res) {
         pageType: payload.pageType,
         pageName: payload.pageName,
         path: payload.path,
+        geo,
       });
       return res.status(200).json(result);
     }
@@ -75,6 +99,7 @@ export default async function handler(req, res) {
         targetType: payload.targetType,
         href: payload.href,
         section: payload.section,
+        geo,
       });
       return res.status(200).json(result);
     }
@@ -95,6 +120,7 @@ export default async function handler(req, res) {
         referrer: payload.referrer,
         userEmail: payload.userEmail,
         isLoggedIn: !!payload.isLoggedIn,
+        geo,
       });
       return res.status(200).json(result);
     }
@@ -120,6 +146,7 @@ export default async function handler(req, res) {
         path: payload.path,
         ownerHandle: payload.ownerHandle,
         durationSeconds: payload.durationSeconds,
+        geo,
       });
       return res.status(200).json(result);
     }
