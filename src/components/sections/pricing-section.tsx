@@ -96,16 +96,6 @@ type LifetimeAccess = {
   features: string[];
 };
 
-type DemoTier = {
-  name: string;
-  priceLabel: string;
-  suffix: string;
-  description: string;
-  buttonText: string;
-  href: string;
-  features: string[];
-};
-
 export function PricingSection() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("weekly");
   const { title, description, pricingItems } = siteConfig.pricingSection;
@@ -115,7 +105,6 @@ export function PricingSection() {
     }
   ).includedInPaidPlans;
   const lifetimeAccess = (siteConfig.pricingSection as { lifetimeAccess?: LifetimeAccess }).lifetimeAccess;
-  const demoTier = (siteConfig.pricingSection as { demoTier?: DemoTier }).demoTier;
 
   const computedTiers = useMemo(() => {
     return pricingItems.map((tier) => {
@@ -218,45 +207,7 @@ export function PricingSection() {
           </div>
         ) : null}
 
-        <div className="grid min-[650px]:grid-cols-2 min-[1100px]:grid-cols-4 gap-4 w-full max-w-7xl mx-auto px-6">
-          {demoTier ? (
-            <div
-              key={demoTier.name}
-              className="rounded-xl grid grid-rows-[auto_auto_1fr] relative h-fit min-[650px]:h-full min-[900px]:h-fit border border-dashed border-border bg-background/60"
-            >
-              <div className="flex flex-col gap-2 p-4">
-                <p className="text-sm">{demoTier.name}</p>
-                <div className="flex items-baseline">
-                  <span className="text-4xl font-semibold">{demoTier.priceLabel}</span>
-                  <span className="ml-2 text-sm text-muted-foreground">/{demoTier.suffix}</span>
-                </div>
-                <p className="text-sm leading-snug text-muted-foreground">{demoTier.description}</p>
-              </div>
-              <div className="flex flex-col gap-2 p-4">
-                <a
-                  href={demoTier.href}
-                  className="h-10 w-full flex items-center justify-center text-sm font-normal tracking-wide rounded-full px-4 border border-border bg-background hover:bg-muted transition-all"
-                >
-                  {demoTier.buttonText}
-                </a>
-              </div>
-              <div className="flex min-h-0 flex-col justify-start">
-                <hr className="border-border dark:border-white/20" />
-                <div className="p-4">
-                <ul className="space-y-2.5">
-                  {demoTier.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <div className="size-5 rounded-full border border-primary/20 flex items-center justify-center shrink-0">
-                        <div className="size-1.5 rounded-full bg-muted-foreground" />
-                      </div>
-                      <span className="text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                </div>
-              </div>
-            </div>
-          ) : null}
+        <div className="grid min-[650px]:grid-cols-2 min-[1100px]:grid-cols-3 gap-4 w-full max-w-7xl mx-auto px-6">
           {computedTiers.map((tier) => (
             <div
               key={tier.name}

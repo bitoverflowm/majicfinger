@@ -14,20 +14,6 @@ export const landingPageV2Config = {
   header: [
     { href: "/#guides", label: "Guides" },
   ],
-  demoTier: {
-    name: "Free demo",
-    priceLabel: "Free",
-    suffix: "forever",
-    description: "Try Lychee before you subscribe — no credit card required.",
-    buttonText: "Try the demo",
-    href: "/#demo",
-    features: [
-      "Run sample Kalshi and Polymarket pulls",
-      "Explore charts and data sheets",
-      "Fork one published workflow",
-      "10 rows per historical request",
-    ],
-  },
   pricing: [
     {
       name: "Basic",
