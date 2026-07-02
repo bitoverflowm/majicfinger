@@ -72,7 +72,12 @@ export const kalshiHistoricalHub: HubPageConfig = {
       subtitle: "Every Kalshi market and trade — ready to query, chart, export, and backtest.",
       heroChart: {
         username: "misterrpink",
-        slug: "nyc-weather-market-intraday-volatility-clustering",
+        slug: "kalshi-historical-data-hero",
+        eyebrow: "Historical volatility signal",
+        title: "NYC weather market volatility clustering",
+        subtitle:
+          "Built from Kalshi historical trades using rolling intraday price movement.",
+        caption: "Example analysis built in Lychee from Kalshi Historical data.",
       },
       heroBody: {
         parts: [

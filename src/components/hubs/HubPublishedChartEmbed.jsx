@@ -103,6 +103,7 @@ function HubChartEmbedBody({ chartPayload, username, slug, variant = "default" }
  *   slug: string;
  *   initialPayload?: object | null;
  *   variant?: "default" | "hero";
+ *   heroCopy?: { eyebrow?: string; title?: string; subtitle?: string; caption?: string };
  * }} props
  */
 export function HubPublishedChartEmbed({
@@ -110,6 +111,7 @@ export function HubPublishedChartEmbed({
   slug,
   initialPayload = null,
   variant = "default",
+  heroCopy,
 }) {
   const [payload, setPayload] = useState(initialPayload);
   const [err, setErr] = useState(null);
@@ -155,11 +157,43 @@ export function HubPublishedChartEmbed({
   const Wrapper = variant === "hero" ? "div" : "article";
   const wrapperClass =
     variant === "hero"
-      ? "w-full overflow-visible"
+      ? cn(
+          "w-full overflow-hidden rounded-xl border border-border/60 bg-card/40 shadow-sm",
+          heroCopy && "text-left",
+        )
       : "overflow-hidden rounded-xl border border-border bg-card/40";
+
+  const heroHeader =
+    variant === "hero" && heroCopy ? (
+      <div className="mb-4 px-4 pt-4 text-left sm:px-5 sm:pt-5">
+        {heroCopy.eyebrow ? (
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {heroCopy.eyebrow}
+          </p>
+        ) : null}
+        {heroCopy.title ? (
+          <h2 className="mt-1.5 text-lg font-semibold leading-tight text-foreground sm:text-xl">
+            {heroCopy.title}
+          </h2>
+        ) : null}
+        {heroCopy.subtitle ? (
+          <p className="mt-1 max-w-[42rem] text-sm leading-relaxed text-muted-foreground">
+            {heroCopy.subtitle}
+          </p>
+        ) : null}
+      </div>
+    ) : null;
+
+  const heroCaption =
+    variant === "hero" && heroCopy?.caption ? (
+      <p className="mt-3 px-4 pb-4 text-xs text-muted-foreground/75 sm:mt-4 sm:px-5 sm:pb-5">
+        {heroCopy.caption}
+      </p>
+    ) : null;
 
   return (
     <Wrapper className={wrapperClass}>
+      {heroHeader}
       {loading ? <Skeleton /> : null}
       {!loading && err ? (
         <div className={cn("flex items-center justify-center px-6 text-center text-sm text-muted-foreground", heightClass)}>
@@ -188,6 +222,7 @@ export function HubPublishedChartEmbed({
           ) : null}
         </>
       ) : null}
+      {heroCaption}
     </Wrapper>
   );
 }

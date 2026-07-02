@@ -110,6 +110,12 @@ function HubHero({
                   slug={section.heroChart.slug}
                   initialPayload={heroChartPayload ?? null}
                   variant="hero"
+                  heroCopy={{
+                    eyebrow: section.heroChart.eyebrow,
+                    title: section.heroChart.title,
+                    subtitle: section.heroChart.subtitle,
+                    caption: section.heroChart.caption,
+                  }}
                 />
               </div>
             ) : (

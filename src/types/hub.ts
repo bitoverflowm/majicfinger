@@ -42,7 +42,14 @@ export type HubHeroSection = {
   heroBody?: { parts: HubHeroBodyPart[] };
   variant?: "default" | "premium";
   /** Featured chart shown in the premium split-layout hero (right column). */
-  heroChart?: { username: string; slug: string };
+  heroChart?: {
+    username: string;
+    slug: string;
+    eyebrow?: string;
+    title?: string;
+    subtitle?: string;
+    caption?: string;
+  };
   capabilityPills?: string[];
   primaryCTAs: HubCta[];
   secondaryCTAs?: HubCta[];
