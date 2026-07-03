@@ -64,7 +64,7 @@ function HubHero({
           className="hero-aura-gradient pointer-events-none absolute inset-0 z-0 w-full"
         />
         <div className="relative z-10 w-full px-6 pb-16 pt-[6.8rem] md:pb-20 md:pt-[8.5rem]">
-          <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-2 lg:gap-14">
+          <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)] lg:gap-14">
             <div className="flex flex-col items-start gap-5 px-4 text-left sm:px-6 md:gap-6 lg:px-0 lg:pt-2">
               {section.eyebrow ? (
                 <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
@@ -104,7 +104,7 @@ function HubHero({
             </div>
 
             {section.heroChart ? (
-              <div className="w-full lg:-mr-2 lg:-mt-12 lg:self-start">
+              <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
                 <HubPublishedChartEmbed
                   username={section.heroChart.username}
                   slug={section.heroChart.slug}

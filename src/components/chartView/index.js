@@ -2769,7 +2769,7 @@ export function ChartCanvas() {
       <div
         className={cn(
           "flex flex-col",
-          embedInArticle ? "flex-none px-3 py-3 sm:px-4 sm:py-4" : "min-h-0 flex-1 px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2",
+          embedInArticle ? "flex-none px-3 py-3 sm:px-4 sm:py-4" : embedCompact ? "min-h-0 flex-1 px-0.5 py-2 sm:px-1.5 sm:py-2.5 lg:px-2" : "min-h-0 flex-1 px-0.5 py-3 sm:px-1.5 sm:py-4 lg:px-2",
         )}
       >
         <div
@@ -2782,7 +2782,7 @@ export function ChartCanvas() {
             <Card
               className={cn(
                 "flex flex-col gap-0 border-0",
-                embedInArticle ? "flex-none rounded-lg py-4 shadow-none" : embedCompact ? "min-h-0 flex-1 py-4 shadow-none" : "min-h-0 flex-1 py-4 shadow-xl",
+                embedInArticle ? "flex-none rounded-lg py-4 shadow-none" : embedCompact ? "min-h-0 flex-1 py-2 shadow-none" : "min-h-0 flex-1 py-4 shadow-xl",
               )}
               style={{
                 backgroundColor:
@@ -2868,10 +2868,10 @@ export function ChartCanvas() {
                       !embedInArticle &&
                         (xAxisTicksAngled
                           ? embedCompact
-                            ? "py-3 sm:py-4"
+                            ? "py-2 sm:py-2.5"
                             : "py-4 sm:py-5 md:min-h-[240px]"
                           : embedCompact
-                            ? "py-3 sm:py-4"
+                            ? "py-2 sm:py-2.5"
                             : "py-12"),
                       dark && !chartTextColor && "text-slate-200",
                     )}

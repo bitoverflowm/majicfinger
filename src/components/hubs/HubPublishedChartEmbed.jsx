@@ -164,15 +164,10 @@ export function HubPublishedChartEmbed({
       : "overflow-hidden rounded-xl border border-border bg-card/40";
 
   const heroHeader =
-    variant === "hero" && heroCopy ? (
+    variant === "hero" && heroCopy && (heroCopy.title || heroCopy.subtitle) ? (
       <div className="mb-4 px-4 pt-4 text-left sm:px-5 sm:pt-5">
-        {heroCopy.eyebrow ? (
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {heroCopy.eyebrow}
-          </p>
-        ) : null}
         {heroCopy.title ? (
-          <h2 className="mt-1.5 text-lg font-semibold leading-tight text-foreground sm:text-xl">
+          <h2 className="text-lg font-semibold leading-tight text-foreground sm:text-xl">
             {heroCopy.title}
           </h2>
         ) : null}
@@ -184,11 +179,25 @@ export function HubPublishedChartEmbed({
       </div>
     ) : null;
 
-  const heroCaption =
-    variant === "hero" && heroCopy?.caption ? (
-      <p className="mt-3 px-4 pb-4 text-xs text-muted-foreground/75 sm:mt-4 sm:px-5 sm:pb-5">
-        {heroCopy.caption}
-      </p>
+  const heroFooter =
+    variant === "hero" && heroCopy && (heroCopy.eyebrow || heroCopy.caption) ? (
+      <div className="px-4 pb-4 pt-3 text-left sm:px-5 sm:pb-5 sm:pt-4">
+        {heroCopy.eyebrow ? (
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {heroCopy.eyebrow}
+          </p>
+        ) : null}
+        {heroCopy.caption ? (
+          <p
+            className={cn(
+              "text-xs text-muted-foreground/75",
+              heroCopy.eyebrow && "mt-2",
+            )}
+          >
+            {heroCopy.caption}
+          </p>
+        ) : null}
+      </div>
     ) : null;
 
   return (
@@ -222,7 +231,7 @@ export function HubPublishedChartEmbed({
           ) : null}
         </>
       ) : null}
-      {heroCaption}
+      {heroFooter}
     </Wrapper>
   );
 }

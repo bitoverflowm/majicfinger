@@ -4,9 +4,9 @@ import { cn } from "@/lib/utils";
 /** Default height class for hub-published chart embeds. */
 export const HUB_CHART_EMBED_HEIGHT = "h-[570px] md:h-[630px]";
 
-/** Taller hero chart — extends below the left-column copy block. */
+/** Hero chart — wider aspect, sits beside the left-column copy block. */
 export const HUB_HERO_CHART_EMBED_HEIGHT =
-  "h-[380px] sm:h-[440px] md:h-[500px] lg:h-[560px]";
+  "h-[330px] sm:h-[375px] md:h-[420px] lg:h-[465px]";
 
 /** Default height class for standalone public chart pages. */
 export const PUBLIC_CHART_EMBED_HEIGHT =
