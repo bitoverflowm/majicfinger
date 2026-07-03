@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
 import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
@@ -103,7 +105,7 @@ function HubChartEmbedBody({ chartPayload, username, slug, variant = "default" }
  *   slug: string;
  *   initialPayload?: object | null;
  *   variant?: "default" | "hero";
- *   heroCopy?: { eyebrow?: string; title?: string; subtitle?: string; caption?: string };
+ *   heroCopy?: { eyebrow?: string; title?: string; subtitle?: string; caption?: string; captionLink?: { label: string; href: string } };
  * }} props
  */
 export function HubPublishedChartEmbed({
@@ -180,14 +182,14 @@ export function HubPublishedChartEmbed({
     ) : null;
 
   const heroFooter =
-    variant === "hero" && heroCopy && (heroCopy.eyebrow || heroCopy.caption) ? (
+    variant === "hero" && heroCopy && (heroCopy.eyebrow || heroCopy.caption || heroCopy.captionLink) ? (
       <div className="px-4 pb-4 pt-3 text-left sm:px-5 sm:pb-5 sm:pt-4">
         {heroCopy.eyebrow ? (
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {heroCopy.eyebrow}
           </p>
         ) : null}
-        {heroCopy.caption ? (
+        {heroCopy.caption || heroCopy.captionLink ? (
           <p
             className={cn(
               "text-xs text-muted-foreground/75",
@@ -195,6 +197,18 @@ export function HubPublishedChartEmbed({
             )}
           >
             {heroCopy.caption}
+            {heroCopy.captionLink ? (
+              <>
+                {" "}
+                <Link
+                  href={heroCopy.captionLink.href}
+                  className="inline text-foreground/80 transition-colors hover:text-foreground"
+                >
+                  {heroCopy.captionLink.label}
+                  <ArrowRight className="ml-0.5 inline h-3 w-3 align-text-bottom" aria-hidden />
+                </Link>
+              </>
+            ) : null}
           </p>
         ) : null}
       </div>

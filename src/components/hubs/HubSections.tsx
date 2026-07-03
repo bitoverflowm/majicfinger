@@ -115,6 +115,7 @@ function HubHero({
                     title: section.heroChart.title,
                     subtitle: section.heroChart.subtitle,
                     caption: section.heroChart.caption,
+                    captionLink: section.heroChart.captionLink,
                   }}
                 />
               </div>

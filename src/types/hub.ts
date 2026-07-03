@@ -49,6 +49,10 @@ export type HubHeroSection = {
     title?: string;
     subtitle?: string;
     caption?: string;
+    captionLink?: {
+      label: string;
+      href: string;
+    };
   };
   capabilityPills?: string[];
   primaryCTAs: HubCta[];

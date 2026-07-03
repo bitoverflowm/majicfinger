@@ -75,6 +75,10 @@ export const kalshiHistoricalHub: HubPageConfig = {
         slug: "kalshi-historical-data-hero",
         eyebrow: "NYC weather market historical volatility signal",
         caption: "Example analysis built form Kalshi historical trades using rolling intraday price movement in Lychee using in browser charting tool.",
+        captionLink: {
+          label: "See how this is done",
+          href: "/guides/kalshi-weather-volatility-chart",
+        },
       },
       heroBody: {
         parts: [
