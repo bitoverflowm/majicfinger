@@ -37,6 +37,9 @@ export const siteConfig = {
         "No-code charts",
         "Dashboards",
         "CSV/XLSX/JSON exports",
+        "No-code quant analysis",
+        "In browser data sheet",
+        "Math operations",
       ],
     },
     pricingItems: (landingPageV2Config.pricing as any[]).map((plan: any) => ({
