@@ -202,10 +202,13 @@ export function HubPublishedChartEmbed({
                 {" "}
                 <Link
                   href={heroCopy.captionLink.href}
-                  className="inline text-foreground/80 transition-colors hover:text-foreground"
+                  className="group/link inline font-medium text-primary underline underline-offset-2 transition-colors hover:text-primary/80"
                 >
                   {heroCopy.captionLink.label}
-                  <ArrowRight className="ml-0.5 inline h-3 w-3 align-text-bottom" aria-hidden />
+                  <ArrowRight
+                    className="ml-0.5 inline-block h-3 w-3 align-text-bottom motion-reduce:transform-none group-hover/link:animate-[link-arrow-nudge-right_0.45s_cubic-bezier(0.165,0.84,0.44,1)]"
+                    aria-hidden
+                  />
                 </Link>
               </>
             ) : null}

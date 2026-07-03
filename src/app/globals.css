@@ -330,3 +330,16 @@ body {
     transform: translateX(290%);
   }
 }
+
+@keyframes link-arrow-nudge-right {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  45% {
+    transform: translateX(0.2rem);
+  }
+  70% {
+    transform: translateX(0.1rem);
+  }
+}
