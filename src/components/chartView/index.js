@@ -2782,7 +2782,7 @@ export function ChartCanvas() {
             <Card
               className={cn(
                 "flex flex-col gap-0 border-0",
-                embedInArticle ? "flex-none rounded-lg py-4 shadow-none" : "min-h-0 flex-1 py-4 shadow-xl",
+                embedInArticle ? "flex-none rounded-lg py-4 shadow-none" : embedCompact ? "min-h-0 flex-1 py-4 shadow-none" : "min-h-0 flex-1 py-4 shadow-xl",
               )}
               style={{
                 backgroundColor:
