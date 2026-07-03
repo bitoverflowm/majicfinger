@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, type MouseEvent } from "react";
 import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
+import { scrollToHashSection } from "@/lib/scrollToHashSection";
 import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
 import { useUser } from "@/lib/hooks";
 import { userHasPaidAccess } from "@/lib/runYourself/hasPaidAccess";
@@ -28,37 +29,47 @@ export function HubCtaButton({ cta, variant = "primary" }: HubCtaButtonProps) {
       ? "inline-flex h-10 items-center justify-center rounded-full border border-white/[0.12] bg-secondary px-6 text-sm font-medium tracking-wide text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] transition-all ease-out hover:bg-secondary/80 active:scale-[0.98] dark:text-secondary-foreground"
       : "inline-flex h-10 items-center justify-center rounded-full border border-border bg-background px-6 text-sm font-medium tracking-wide text-foreground transition-all ease-out hover:bg-muted active:scale-[0.98]";
 
-  const handleClick = useCallback(() => {
-    if (!cta.eventLabel) return;
+  const handleClick = useCallback(
+    (e: MouseEvent<HTMLAnchorElement>) => {
+      if (cta.href.startsWith("#") && cta.href.length > 1) {
+        e.preventDefault();
+        scrollToHashSection(cta.href);
+      }
 
-    const pagePath =
-      typeof window !== "undefined" ? window.location.pathname || cta.tracking?.page || "" : cta.tracking?.page || "";
-    const sessionId = getOrCreateVisitorSessionId();
-    const referrer = typeof document !== "undefined" ? document.referrer || "" : "";
-    const userState = resolveUserState(user);
+      if (!cta.eventLabel) return;
 
-    const meta = {
-      eventLabel: cta.eventLabel,
-      buttonText: cta.label,
-      href: cta.href,
-      page: cta.tracking?.page || pagePath,
-      pagePath,
-      destination: cta.tracking?.destination || cta.href,
-      userState,
-      sessionId,
-      referrer,
-      userEmail: user?.email,
-      isLoggedIn: !!user,
-    };
+      const pagePath =
+        typeof window !== "undefined"
+          ? window.location.pathname || cta.tracking?.page || ""
+          : cta.tracking?.page || "";
+      const sessionId = getOrCreateVisitorSessionId();
+      const referrer = typeof document !== "undefined" ? document.referrer || "" : "";
+      const userState = resolveUserState(user);
 
-    trackJourneyEvent("hero_cta_click", {
-      path: pagePath,
-      label: cta.eventLabel,
-      meta,
-    });
+      const meta = {
+        eventLabel: cta.eventLabel,
+        buttonText: cta.label,
+        href: cta.href,
+        page: cta.tracking?.page || pagePath,
+        pagePath,
+        destination: cta.tracking?.destination || cta.href,
+        userState,
+        sessionId,
+        referrer,
+        userEmail: user?.email,
+        isLoggedIn: !!user,
+      };
 
-    sendTelegramAnalyticsEvent("hero_cta_click", meta, { sessionId });
-  }, [cta, user]);
+      trackJourneyEvent("hero_cta_click", {
+        path: pagePath,
+        label: cta.eventLabel,
+        meta,
+      });
+
+      sendTelegramAnalyticsEvent("hero_cta_click", meta, { sessionId });
+    },
+    [cta, user],
+  );
 
   return (
     <Link
@@ -66,7 +77,7 @@ export function HubCtaButton({ cta, variant = "primary" }: HubCtaButtonProps) {
       className={className}
       prefetch={false}
       aria-label={cta.ariaLabel || cta.label}
-      onClick={cta.eventLabel ? handleClick : undefined}
+      onClick={handleClick}
     >
       {cta.label}
     </Link>
