@@ -1,8 +1,8 @@
-import { createHubMetadata, hubPageDynamic, renderHubPage } from "@/lib/hubs/loadHubPage";
+import { createHubMetadata, hubPageRevalidate, renderHubPage } from "@/lib/hubs/loadHubPage";
 
 const SLUG = "kalshi-live-data";
 
-export const dynamic = hubPageDynamic;
+export const revalidate = hubPageRevalidate;
 export const metadata = createHubMetadata(SLUG);
 
 export default async function KalshiLiveDataHubPage() {

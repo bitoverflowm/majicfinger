@@ -16,15 +16,17 @@ import type {
   HubSection,
   HubStatsSection,
   HubTextBlockSection,
-  HubPublicChartPayload,
   HubVideoCarouselSection,
 } from "@/types/hub";
 import { HubHeroBody } from "@/components/hubs/HubHeroBody";
 import { HubHeroCapabilityPills } from "@/components/hubs/HubHeroCapabilityPills";
+import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
-import { HubPublishedChartEmbed } from "@/components/hubs/HubPublishedChartEmbed";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
-import { HubChartEmbedSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
+import {
+  HubChartEmbedSkeleton,
+  HubHeroChartEmbedSkeleton,
+} from "@/components/publicEmbed/ChartEmbedSkeleton";
 
 const HubKalshiQueryBuilder = dynamic(
   () =>
@@ -47,13 +49,20 @@ const HubPublishedChartEmbedLazy = dynamic(
   },
 );
 
-function HubHero({
-  section,
-  heroChartPayload,
-}: {
-  section: HubHeroSection;
-  heroChartPayload?: HubPublicChartPayload | null;
-}) {
+const HubHeroChartEmbedLazy = dynamic(
+  () =>
+    import("@/components/hubs/HubPublishedChartEmbed").then((m) => m.HubPublishedChartEmbed),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full overflow-hidden rounded-xl bg-card/40">
+        <HubHeroChartEmbedSkeleton />
+      </div>
+    ),
+  },
+);
+
+function HubHero({ section }: { section: HubHeroSection }) {
   const isPremium = section.variant === "premium";
 
   if (isPremium) {
@@ -105,10 +114,9 @@ function HubHero({
 
             {section.heroChart ? (
               <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
-                <HubPublishedChartEmbed
+                <HubHeroChartEmbedLazy
                   username={section.heroChart.username}
                   slug={section.heroChart.slug}
-                  initialPayload={heroChartPayload ?? null}
                   variant="hero"
                   heroCopy={{
                     eyebrow: section.heroChart.eyebrow,
@@ -239,7 +247,11 @@ function HubQuery({ section }: { section: HubQuerySection }) {
         </div>
 
         <div className="relative z-20 mx-auto mt-12 w-full max-w-4xl px-2 sm:px-4">
-          <HubKalshiQueryBuilder />
+          <HubLazyWhenVisible
+            fallback={<div className="h-48 w-full animate-pulse rounded-xl bg-muted/40" />}
+          >
+            <HubKalshiQueryBuilder />
+          </HubLazyWhenVisible>
         </div>
 
         <div className="mx-auto w-full max-w-3xl space-y-4 pt-12">
@@ -489,11 +501,16 @@ function HubPublishedCharts({
       </div>
       <div className="mt-12 grid grid-cols-1 gap-6 px-4 sm:px-6 md:grid-cols-2 lg:px-8">
         {visibleCharts.map((chart) => (
-          <HubPublishedChartEmbedLazy
+          <HubLazyWhenVisible
             key={`${chart.username}-${chart.slug}`}
-            username={chart.username}
-            slug={chart.slug}
-          />
+            fallback={
+              <article className="overflow-hidden rounded-xl border border-border bg-card/40">
+                <HubChartEmbedSkeleton />
+              </article>
+            }
+          >
+            <HubPublishedChartEmbedLazy username={chart.username} slug={chart.slug} />
+          </HubLazyWhenVisible>
         ))}
       </div>
     </section>
@@ -550,12 +567,10 @@ export function HubSectionRenderer({
   section,
   assets,
   index,
-  heroChartPayload = null,
 }: {
   section: HubSection;
   assets: HubPublishedAssets;
   index: number;
-  heroChartPayload?: HubPublicChartPayload | null;
 }) {
   const isAlternate = index % 2 === 1;
 
@@ -565,7 +580,7 @@ export function HubSectionRenderer({
 
   switch (section.type) {
     case "hero":
-      return wrapper(<HubHero section={section} heroChartPayload={heroChartPayload} />);
+      return wrapper(<HubHero section={section} />);
     case "stats":
       return wrapper(<HubStats section={section} />);
     case "proof_metrics":

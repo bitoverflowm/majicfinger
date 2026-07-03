@@ -190,7 +190,7 @@ export function PricingSection() {
         </div>
 
         {includedInPaidPlans ? (
-          <div className="mx-auto mb-4 flex w-full max-w-3xl flex-col items-center gap-2 rounded-lg border border-border/40 bg-muted/10 px-3 py-2 sm:px-4">
+          <div className="mx-auto mb-4 flex w-full max-w-3xl flex-col items-center gap-2 pb-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80 sm:text-xs">
               {includedInPaidPlans.label}
             </p>
