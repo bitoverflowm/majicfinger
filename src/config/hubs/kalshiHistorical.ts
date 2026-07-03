@@ -73,7 +73,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       heroChart: {
         username: "misterrpink",
         slug: "kalshi-historical-data-hero",
-        eyebrow: "Historical volatility signal",
+        eyebrow: "NYC weather market historical volatility signal",
         title: "NYC weather market volatility clustering",
         subtitle:
           "Built from Kalshi historical trades using rolling intraday price movement.",

@@ -158,7 +158,7 @@ export function HubPublishedChartEmbed({
   const wrapperClass =
     variant === "hero"
       ? cn(
-          "w-full overflow-hidden rounded-xl bg-card/40 shadow-sm",
+          "w-full overflow-hidden rounded-xl bg-card/40",
           heroCopy && "text-left",
         )
       : "overflow-hidden rounded-xl border border-border bg-card/40";
