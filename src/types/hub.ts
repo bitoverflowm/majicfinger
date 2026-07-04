@@ -152,6 +152,7 @@ export type HubComparisonTableSection = {
   rows: HubComparisonRow[];
   punchline?: string;
   cta?: HubCta;
+  secondaryCta?: HubCta;
 };
 
 export type HubFaqItem = {

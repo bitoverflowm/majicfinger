@@ -143,10 +143,20 @@ export const kalshiHistoricalComparisonTable: HubComparisonTableSection = {
   punchline:
     "With raw APIs and third-party feeds, you still have to collect, store, clean, join, export, chart, and analyze the data yourself. With Lychee, that work is already done — so you can go straight from question to answer.",
   cta: {
-    label: "Run a free Kalshi query",
+    label: "Get Access Now",
+    href: "/#pricing",
+    ariaLabel: "Access Kalshi Historical Data now",
+    eventLabel: "kalshi_historical_access_now",
+    tracking: {
+      page: "/kalshi-historical-data",
+      destination: "pricing / signup / full access",
+    },
+  },
+  secondaryCta: {
+    label: "Explore for free",
     href: "#explore-data",
-    ariaLabel: "Run a free Kalshi historical data query",
-    eventLabel: "kalshi_historical_comparison_query",
+    ariaLabel: "Explore Kalshi Historical Data for free",
+    eventLabel: "kalshi_historical_explore_free",
     tracking: {
       page: "/kalshi-historical-data",
       destination: "free demo / templates (#explore-data)",

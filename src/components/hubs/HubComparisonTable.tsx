@@ -152,8 +152,11 @@ export function HubComparisonTable({ section }: { section: HubComparisonTableSec
         ) : null}
 
         {section.cta ? (
-          <div className="flex justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <HubCtaButton cta={section.cta} variant="primary" />
+            {section.secondaryCta ? (
+              <HubCtaButton cta={section.secondaryCta} variant="secondary" />
+            ) : null}
           </div>
         ) : null}
       </div>
