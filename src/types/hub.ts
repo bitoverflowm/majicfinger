@@ -119,6 +119,7 @@ export type HubCardsSection = {
   title: string;
   intro?: string;
   note?: string;
+  cta?: HubCta;
   cards: HubCard[];
 };
 

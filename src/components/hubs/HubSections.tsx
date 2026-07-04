@@ -333,6 +333,11 @@ function HubCards({ section }: { section: HubCardsSection }) {
             ))}
           </div>
         ) : null}
+        {section.cta ? (
+          <div className="flex justify-center pt-2">
+            <HubCtaButton cta={section.cta} variant="primary" />
+          </div>
+        ) : null}
       </div>
     </section>
   );

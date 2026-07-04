@@ -95,7 +95,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       },
       primaryCTAs: [
         {
-          label: "Go Now",
+          label: "Get Access Now",
           href: "/#pricing",
           ariaLabel: "Access Kalshi Historical Data now",
           eventLabel: "kalshi_historical_access_now",
@@ -171,17 +171,17 @@ export const kalshiHistoricalHub: HubPageConfig = {
         {
           title: "Markets",
           description:
-            "Tickers, titles, categories, open and close times, market status, outcomes, volume, and event metadata.",
+            "Tickers, titles, categories, open/close times, market status, volume, event metadata, and final outcomes.",
         },
         {
           title: "Trades",
           description:
-            "Historical trade executions, prices, quantities, timestamps, market identifiers, and outcome-side information.",
+            "Historical executions with timestamps, prices, quantities, tickers, market IDs, and YES/NO side data.",
         },
         {
           title: "Orderbook history",
           description:
-            "Historical bid/ask behavior, liquidity, spreads, and market depth where available.",
+            "Historical bid/ask behavior, spreads, liquidity, market depth, and orderbook changes where available.",
         },
         {
           title: "Categories and events",
@@ -189,18 +189,24 @@ export const kalshiHistoricalHub: HubPageConfig = {
             "Weather, politics, sports, finance, crypto, economics, culture, and other Kalshi market categories.",
         },
         {
-          title: "Outcomes and resolution data",
+          title: "Resolution data",
           description:
-            "Resolved market outcomes for calibration, accuracy analysis, backtesting, and market-behavior research.",
+            "Final outcomes for calibration, accuracy studies, backtesting, lifecycle analysis, and strategy research.",
         },
         {
-          title: "Export-ready datasets",
+          title: "Exports",
           description:
-            "Download query results as CSV, XLSX, or JSON within your plan limits.",
+            "Download query results as CSV, XLSX, or JSON depending on your plan limits.",
         },
       ],
       note:
         "Kalshi Historical is just one layer of Lychee.\n\nEvery paid plan also includes Kalshi Live, Polymarket Historical, Polymarket Live, no-code charts, dashboards, exports, alerts, and quant workflows — so you can compare historical markets against what is happening now.",
+      cta: {
+        label: "Get Access Now",
+        href: "/#pricing",
+        ariaLabel: "Go to Lychee pricing",
+        requiresAuth: false,
+      },
     },
 
     {
