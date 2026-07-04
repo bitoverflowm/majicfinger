@@ -145,7 +145,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                   alt="Lychee"
                   width={30}
                   height={30}
-                  className="grayscale object-contain block rounded-full"
+                  className="size-[30px] object-contain block rounded-full"
                   priority
                 />
               </span>
@@ -234,7 +234,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                         alt="Lychee"
                         width={24}
                         height={24}
-                        className="grayscale object-contain block"
+                        className="size-6 object-contain block rounded-full"
                       />
                     </span>
                     <span className="pt-2 font-black text-xl leading-none text-primary">
