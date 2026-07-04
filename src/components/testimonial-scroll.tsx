@@ -50,7 +50,7 @@ export function SocialProofTestimonials({
 
   return (
     <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-accent py-16 md:py-20">
-      <Marquee pauseOnHover className="[--duration:20s] [--gap:1rem]">
+      <Marquee reverse={false} pauseOnHover className="[--duration:20s] [--gap:1rem]">
         {firstRow.map((card) => (
           <TestimonialCard key={card.id} {...card} />
         ))}

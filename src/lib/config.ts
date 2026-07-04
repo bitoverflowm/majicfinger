@@ -169,8 +169,6 @@ export const siteConfig = {
       title: "Company",
       links: [
         { id: 5, title: "Guides", url: "/guides" },
-        { id: 6, title: "Affiliates", url: "/affiliates" },
-        { id: 7, title: "GitHub", url: "https://github.com/misterrpink1" },
       ],
     },
     {
