@@ -1,4 +1,5 @@
 import type { HubPageConfig } from "@/types/hub";
+import { kalshiHistoricalComparisonTable } from "./kalshiHistoricalComparisonTable";
 
 export const kalshiHistoricalHub: HubPageConfig = {
   id: "kalshi-historical",
@@ -209,20 +210,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       },
     },
 
-    {
-      type: "bullets",
-      title: "Why Kalshi historical data is hard to use without Lychee",
-      intro:
-        "Raw historical prediction market analysis usually requires collecting data, storing large files, stitching markets to trades, handling live vs historical endpoints, cleaning fields, and building your own charts. Lychee turns the archive into a hosted no-code workspace.",
-      bullets: [
-        "No data pipeline to build",
-        "No local 36GB+ archive to manage",
-        "No Python required",
-        "No manual CSV wrangling",
-        "No stitching markets, trades, and outcomes by hand",
-        "Query, chart, export, and backtest from one workspace",
-      ],
-    },
+    kalshiHistoricalComparisonTable,
 
     {
       type: "cards",

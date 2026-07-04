@@ -130,6 +130,30 @@ export type HubBulletsSection = {
   bullets: string[];
 };
 
+export type HubComparisonColumn = {
+  id: string;
+  label: string;
+  badge?: string;
+};
+
+export type HubComparisonRow = {
+  feature: string;
+  cells: Record<string, string>;
+};
+
+export type HubComparisonTableSection = {
+  type: "comparison_table";
+  anchorId?: string;
+  title: string;
+  intro?: string;
+  /** Column id highlighted as the primary product (e.g. "lychee"). */
+  featuredColumnId: string;
+  columns: HubComparisonColumn[];
+  rows: HubComparisonRow[];
+  punchline?: string;
+  cta?: HubCta;
+};
+
 export type HubFaqItem = {
   question: string;
   answer: string;
@@ -193,6 +217,7 @@ export type HubSection =
   | HubTextBlockSection
   | HubCardsSection
   | HubBulletsSection
+  | HubComparisonTableSection
   | HubFaqSection
   | HubLinkGroupSection
   | HubCtaSection

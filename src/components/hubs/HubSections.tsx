@@ -1,5 +1,6 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { HubComparisonTable } from "@/components/hubs/HubComparisonTable";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { cn } from "@/lib/utils";
 import type {
@@ -608,6 +609,8 @@ export function HubSectionRenderer({
       return wrapper(<HubCards section={section} />);
     case "bullets":
       return wrapper(<HubBullets section={section} />);
+    case "comparison_table":
+      return wrapper(<HubComparisonTable section={section} />);
     case "faq":
       return wrapper(<HubFaq section={section} />);
     case "link_group":
