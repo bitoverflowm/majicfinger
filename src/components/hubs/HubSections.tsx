@@ -70,7 +70,7 @@ function HubHero({ section }: { section: HubHeroSection }) {
       <section className="relative w-full overflow-hidden">
         <div
           aria-hidden
-          className="hero-aura-gradient pointer-events-none absolute inset-0 z-0 w-full"
+          className="hub-hero-aura-gradient pointer-events-none absolute inset-0 z-0 w-full"
         />
         <div className="relative z-10 w-full px-6 pb-16 pt-[6.8rem] md:pb-20 md:pt-[8.5rem]">
           <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)] lg:gap-14">

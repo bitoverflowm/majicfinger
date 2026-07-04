@@ -217,13 +217,6 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
-      type: "text_block",
-      title: "Looking for a Kalshi historical data API?",
-      content:
-        "Lychee is not a public API product yet. It is a no-code workspace for people who want to use Kalshi historical data without building and maintaining their own API pipeline. You can search markets, inspect trades, chart results, export CSV/XLSX/JSON, and build research workflows directly in the browser.",
-    },
-
-    {
       type: "cards",
       title: "What you can do with Kalshi historical data",
       cards: [
