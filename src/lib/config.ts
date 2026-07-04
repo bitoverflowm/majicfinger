@@ -176,7 +176,6 @@ export const siteConfig = {
     {
       title: "Resources",
       links: [
-        { id: 9, title: "Search", url: "/search" },
         { id: 10, title: "Help", url: "/help" },
         { id: 11, title: "Privacy", url: "/privacy" },
         { id: 12, title: "Terms", url: "/terms" },

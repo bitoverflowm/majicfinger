@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
-/** Template-style highlight span for testimonial copy. */
+/** Template-style highlight span for testimonial copy (Lychee homepage theme). */
 export const TestimonialHighlight = ({
   children,
   className,
@@ -11,7 +11,7 @@ export const TestimonialHighlight = ({
 }) => (
   <span
     className={cn(
-      "p-1 py-0.5 font-medium dark:font-semibold text-secondary",
+      "bg-background p-1 py-0.5 font-bold text-primary",
       className,
     )}
   >

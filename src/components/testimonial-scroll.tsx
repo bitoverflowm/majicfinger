@@ -14,34 +14,28 @@ function TestimonialCard({
   className,
 }: SocialProofTestimonial & { className?: string }) {
   return (
-    <Link
-      href={src}
+    <figure
       className={cn(
-        "mb-4 flex w-full max-w-[280px] cursor-pointer break-inside-avoid flex-col items-center justify-between gap-4 rounded-xl p-4 shrink-0 text-center",
-        "bg-card border border-border/60",
-        "dark:bg-black dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]",
+        "relative w-64 shrink-0 cursor-pointer overflow-hidden rounded-xl border p-4",
+        "border-border/50 bg-background/50 hover:bg-background/70",
+        "transition-colors duration-200",
         className,
       )}
-      rel="noopener noreferrer"
-      target="_blank"
     >
-      <span className="text-4xl text-primary/60 leading-none select-none">
-        &quot;
-      </span>
-      <div className="select-none text-sm font-normal text-muted-foreground text-center -mt-2">
-        {description}
-      </div>
-      <p className="text-xs font-medium text-muted-foreground">{role}</p>
-      <div className="flex flex-col items-center gap-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={img}
-          alt={name}
-          className="h-10 w-10 rounded-full object-cover ring-1 ring-border"
-        />
-        <p className="font-medium text-foreground text-sm">{name}</p>
-      </div>
-    </Link>
+      <Link href={src} rel="noopener noreferrer" target="_blank" className="block">
+        <div className="flex flex-row items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={img} alt={name} className="h-8 w-8 rounded-full object-cover" />
+          <div className="flex min-w-0 flex-col">
+            <figcaption className="truncate text-xs font-medium text-foreground">{name}</figcaption>
+            <p className="truncate text-xs font-medium text-muted-foreground">{role}</p>
+          </div>
+        </div>
+        <blockquote className="mt-2 text-left text-xs leading-relaxed text-foreground/90">
+          {description}
+        </blockquote>
+      </Link>
+    </figure>
   );
 }
 
@@ -55,19 +49,19 @@ export function SocialProofTestimonials({
   const secondRow = testimonials.slice(half);
 
   return (
-    <div className="relative mt-8 flex w-full flex-col items-center justify-center overflow-hidden py-6">
-      <Marquee pauseOnHover reverse={false} className="[--duration:45s] [--gap:1rem]">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-accent py-16 md:py-20">
+      <Marquee pauseOnHover className="[--duration:20s] [--gap:1rem]">
         {firstRow.map((card) => (
           <TestimonialCard key={card.id} {...card} />
         ))}
       </Marquee>
-      <Marquee reverse pauseOnHover className="[--duration:55s] [--gap:1rem]">
+      <Marquee reverse pauseOnHover className="[--duration:20s] [--gap:1rem]">
         {secondRow.map((card) => (
           <TestimonialCard key={card.id} {...card} />
         ))}
       </Marquee>
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-background" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-background" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-accent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-accent" />
     </div>
   );
 }
