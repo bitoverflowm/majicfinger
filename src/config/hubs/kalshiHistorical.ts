@@ -74,28 +74,28 @@ export const kalshiHistoricalHub: HubPageConfig = {
         username: "misterrpink",
         slug: "kalshi-historical-data-hero",
         eyebrow: "NYC weather market historical volatility signal",
-        caption: "Example analysis built form Kalshi historical trades using rolling intraday price movement in Lychee using in browser charting tool.",
+        caption: "Analysis built form Kalshi historical market and trades using rolling intraday price movement using Lychee no-code browser based charting and quant tools.",
         captionLink: {
-          label: "See how this is done",
+          label: "How to guide",
           href: "/guides/kalshi-weather-volatility-chart",
         },
       },
       heroBody: {
         parts: [
-          { type: "text", value: "Access " },
+          { type: "text", value: "Instantly access " },
           { type: "metric", value: "7.68M+" },
           { type: "text", value: " unique markets and " },
           { type: "metric", value: "72.1M+" },
           {
             type: "text",
             value:
-              " historical trades since July 2021, including prices, volume, outcomes, and orderbook history — no code or data pipeline required.",
+              " historical trades since July 2021, including prices, volume, outcomes, and orderbook history — no code, no setup or data pipeline required.",
           },
         ],
       },
       primaryCTAs: [
         {
-          label: "Access Now",
+          label: "Go Now",
           href: "/#pricing",
           ariaLabel: "Access Kalshi Historical Data now",
           eventLabel: "kalshi_historical_access_now",
@@ -166,7 +166,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       type: "cards",
       title: "What's inside the Kalshi historical dataset?",
       intro:
-        "Lychee gives you browser-based access to historical Kalshi markets, trades, prices, volume, outcomes, categories, and orderbook history. Use it to search past markets, inspect trade behavior, compare categories, export datasets, and build research workflows without managing files or API pipelines. Lychee's Kalshi Historical archive currently includes 7.68M+ unique markets and 72.1M+ historical trades, compressed into a 36GB+ hosted dataset you can query without code.",
+        "Complete Kalshi market history, trades, prices, outcomes, categories, and orderbook behavior — ready to query, chart, export, and backtest from your browser.",
       cards: [
         {
           title: "Markets",
@@ -199,6 +199,8 @@ export const kalshiHistoricalHub: HubPageConfig = {
             "Download query results as CSV, XLSX, or JSON within your plan limits.",
         },
       ],
+      note:
+        "Kalshi Historical is just one layer of Lychee.\n\nEvery paid plan also includes Kalshi Live, Polymarket Historical, Polymarket Live, no-code charts, dashboards, exports, alerts, and quant workflows — so you can compare historical markets against what is happening now.",
     },
 
     {

@@ -292,9 +292,12 @@ function HubCards({ section }: { section: HubCardsSection }) {
   return (
     <section
       id={section.anchorId}
-      className={cn("w-full px-6 py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+      className={cn(
+        "w-full px-6 py-16 sm:px-8 md:px-10 md:py-24",
+        section.anchorId && "scroll-mt-28",
+      )}
     >
-      <div className="mx-auto w-full max-w-4xl space-y-10">
+      <div className="mx-auto w-full max-w-4xl space-y-10 px-2 sm:px-0">
         <div className="mx-auto max-w-2xl space-y-4 text-center">
           <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             {section.title}
@@ -319,9 +322,16 @@ function HubCards({ section }: { section: HubCardsSection }) {
           ))}
         </ul>
         {section.note ? (
-          <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed text-muted-foreground text-pretty">
-            {section.note}
-          </p>
+          <div className="mx-auto max-w-2xl space-y-4 text-center">
+            {section.note.split("\n\n").map((paragraph) => (
+              <p
+                key={paragraph.slice(0, 48)}
+                className="text-sm leading-relaxed text-muted-foreground text-pretty md:text-base"
+              >
+                {paragraph}
+              </p>
+            ))}
+          </div>
         ) : null}
       </div>
     </section>
