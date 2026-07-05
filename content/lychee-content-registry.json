@@ -51,7 +51,7 @@
       "integrationTopic": "politics"
     },
     {
-      "href": "/misterrpink/dashboards/kalshi-historical-weather-datas",
+      "href": "/misterrpink/dashboards/kalshi-historical-weather-data",
       "title": "Kalshi Historical Weather Dashboard",
       "contentClass": "dashboard",
       "integrationHub": "kalshi-historical",

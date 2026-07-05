@@ -9,6 +9,7 @@ import type {
   HubCtaSection,
   HubFaqSection,
   HubHeroSection,
+  HubLink,
   HubLinkGroupSection,
   HubPublishedAssets,
   HubPublishedChartsSection,
@@ -398,7 +399,33 @@ function HubFaq({ section }: { section: HubFaqSection }) {
   );
 }
 
+function HubLinkList({ links }: { links: HubLink[] }) {
+  return (
+    <ul className="space-y-2">
+      {links.map((link) => (
+        <li key={link.href}>
+          <Link
+            href={link.href}
+            className="group flex flex-wrap gap-x-2 text-base leading-relaxed hover:underline underline-offset-2"
+            prefetch={false}
+          >
+            <span className="font-medium text-foreground group-hover:text-primary">
+              {link.title}
+              {link.description ? ":" : ""}
+            </span>
+            {link.description ? (
+              <span className="text-muted-foreground">{link.description}</span>
+            ) : null}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
+  const hasCategories = section.categories && section.categories.length > 0;
+
   return (
     <section
       id={section.anchorId}
@@ -409,32 +436,37 @@ function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
           {section.title}
         </h2>
         <div className="mx-auto w-full max-w-xl space-y-10">
-          {section.groups.map((group) => (
-            <div key={group.label} className="space-y-3">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                {group.label}
-              </h3>
-              <ul className="space-y-2">
-                {group.links.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="group flex flex-wrap gap-x-2 text-base leading-relaxed hover:underline underline-offset-2"
-                      prefetch={false}
-                    >
-                      <span className="font-medium text-foreground group-hover:text-primary">
-                        {link.title}
-                        {link.description ? ":" : ""}
-                      </span>
-                      {link.description ? (
-                        <span className="text-muted-foreground">{link.description}</span>
-                      ) : null}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {hasCategories
+            ? section.categories!.map((category, categoryIndex) => (
+                <div
+                  key={category.label ?? `category-${categoryIndex}`}
+                  className="space-y-6"
+                >
+                  {category.label ? (
+                    <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                      {category.label}
+                    </h3>
+                  ) : null}
+                  <div className={cn("space-y-6", category.label && "pl-0 sm:pl-1")}>
+                    {category.subgroups.map((subgroup) => (
+                      <div key={`${category.label ?? "general"}-${subgroup.label}`} className="space-y-3">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+                          {subgroup.label}
+                        </h4>
+                        <HubLinkList links={subgroup.links} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            : section.groups?.map((group) => (
+                <div key={group.label} className="space-y-3">
+                  <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                    {group.label}
+                  </h3>
+                  <HubLinkList links={group.links} />
+                </div>
+              ))}
         </div>
       </div>
     </section>

@@ -22,6 +22,17 @@ export type HubLinkGroup = {
   links: HubLink[];
 };
 
+export type HubLinkSubGroup = {
+  label: string;
+  links: HubLink[];
+};
+
+export type HubLinkCategory = {
+  /** Omit for overview/general items — no category heading is shown. */
+  label?: string;
+  subgroups: HubLinkSubGroup[];
+};
+
 export type HubStat = {
   label: string;
   value: string;
@@ -170,7 +181,10 @@ export type HubLinkGroupSection = {
   type: "link_group";
   anchorId?: string;
   title: string;
-  groups: HubLinkGroup[];
+  /** Flat topic groups (legacy / registry injection). */
+  groups?: HubLinkGroup[];
+  /** Category → subcategory hierarchy (Guides, Research, Charts, …). */
+  categories?: HubLinkCategory[];
 };
 
 export type HubCtaSection = {

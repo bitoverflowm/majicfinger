@@ -1,5 +1,6 @@
 import type { HubPageConfig } from "@/types/hub";
 import { kalshiHistoricalComparisonTable } from "./kalshiHistoricalComparisonTable";
+import { kalshiHistoricalResearchGuides } from "./kalshiHistoricalResearchGuides";
 
 export const kalshiHistoricalHub: HubPageConfig = {
   id: "kalshi-historical",
@@ -271,12 +272,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       ],
     },
 
-    {
-      type: "link_group",
-      anchorId: "guides",
-      title: "Start here",
-      groups: [],
-    },
+    kalshiHistoricalResearchGuides,
 
     {
       type: "published_charts",
@@ -323,102 +319,6 @@ export const kalshiHistoricalHub: HubPageConfig = {
       title: "Dashboards",
       description:
         "Live, shareable Kalshi dashboards — volume trends, market analysis, and weather prediction market insights built on historical data.",
-    },
-
-    {
-      type: "link_group",
-      title: "Kalshi historical research & resources",
-      groups: [
-        {
-          label: "Volume analysis",
-          links: [
-            {
-              title: "What Does Volume Mean on Kalshi?",
-              href: "/guides/what-does-volume-mean-on-kalshi",
-              description:
-                "Trading volume, liquidity, and market activity explained for beginners.",
-            },
-            {
-              title: "Kalshi Volume Guide",
-              href: "/guides/kalshi-volume",
-              description:
-                "How to analyze Kalshi trading volume trends and category activity.",
-            },
-            {
-              title: "Kalshi Volume Chart Guide",
-              href: "/guides/kalshi-volume-chart-guide",
-              description:
-                "Build volume charts and breakdowns from historical Kalshi market data.",
-            },
-            {
-              title: "Kalshi Volume Dashboard",
-              href: "/misterrpink/dashboards/kalshi-volume-dashboard",
-              description:
-                "Quarterly volume trends, category activity, and shareable Kalshi market insights.",
-            },
-          ],
-        },
-        {
-          label: "Weather analysis",
-          links: [
-            {
-              title: "Kalshi Weather Prediction Markets Analysis",
-              href: "/guides/kalshi-weather-prediction-markets-analysis",
-              description:
-                "Research on weather market behavior, pricing, and historical patterns.",
-            },
-            {
-              title: "Kalshi Historical Weather Dashboard",
-              href: "/misterrpink/dashboards/kalshi-historical-weather-datas",
-              description:
-                "Shareable dashboard for historical Kalshi weather market data.",
-            },
-            {
-              title: "Weather Probability Convergence Chart",
-              href: "/misterrpink/charts/kalshi-weather-probability-convergence-jan-2025-2",
-            },
-            {
-              title: "Weather Market Calibration Curve",
-              href: "/misterrpink/charts/weather-market-calibration-curve",
-            },
-            {
-              title: "Build a Probability Convergence Chart",
-              href: "/guides/kalshi-weather-probability-convergence-chart",
-            },
-            {
-              title: "Build a Weather Calibration Chart",
-              href: "/guides/kalshi-weather-probability-calibration-chart",
-            },
-            {
-              title: "Build a Weather Volatility Chart",
-              href: "/guides/kalshi-weather-volatility-chart",
-            },
-          ],
-        },
-        {
-          label: "Political market research",
-          links: [
-            {
-              title: "Are 90% Prediction Markets Reliable?",
-              href: "/guides/kalshi-political-prediction-market-accuracy",
-              description:
-                "Kalshi political market calibration study — final-price reliability at 90–100% and the 90% trap in prediction markets.",
-            },
-            {
-              title: "When Do Prediction Markets Become Accurate?",
-              href: "/guides/kalshi-historical-political-prediction-market-accuracy-lifecycle",
-              description:
-                "Lifecycle analysis across 25,552 market snapshots — when political odds become reliable.",
-            },
-            {
-              title: "Political Prediction Markets & Election Forecasting",
-              href: "/guides/kalshi-political-prediction-markets-analysis",
-              description:
-                "How political markets compare to polls and what historical pricing reveals.",
-            },
-          ],
-        },
-      ],
     },
 
     {

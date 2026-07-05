@@ -11,7 +11,11 @@ export function enrichHubConfig(config: HubPageConfig): HubPageConfig {
   let foundGuidesSection = false;
 
   const sections = config.sections.flatMap((section) => {
-    if (section.type !== "link_group" || section.anchorId !== "guides") {
+    if (
+      section.type !== "link_group" ||
+      section.anchorId !== "guides" ||
+      (section.categories && section.categories.length > 0)
+    ) {
       return [section];
     }
 
