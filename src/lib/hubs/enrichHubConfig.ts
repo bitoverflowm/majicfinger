@@ -11,15 +11,17 @@ export function enrichHubConfig(config: HubPageConfig): HubPageConfig {
   let foundGuidesSection = false;
 
   const sections = config.sections.flatMap((section) => {
-    if (
-      section.type !== "link_group" ||
-      section.anchorId !== "guides" ||
-      (section.categories && section.categories.length > 0)
-    ) {
+    if (section.type !== "link_group" || section.anchorId !== "guides") {
       return [section];
     }
 
     foundGuidesSection = true;
+
+    // Manual category hierarchy — keep as-is, skip registry injection.
+    if (section.categories && section.categories.length > 0) {
+      return [section];
+    }
+
     if (groups.length === 0) return [];
     return [{ ...section, groups }];
   });
