@@ -213,43 +213,6 @@ export const kalshiHistoricalHub: HubPageConfig = {
     kalshiHistoricalComparisonTable,
 
     {
-      type: "cards",
-      title: "What you can do with Kalshi historical data",
-      cards: [
-        {
-          title: "Find high-volume markets",
-          description:
-            "Sort historical Kalshi markets by volume to find the contracts that attracted the most trading activity.",
-        },
-        {
-          title: "Analyze category behavior",
-          description:
-            "Compare weather, politics, sports, crypto, economics, and other categories across volume, outcomes, and price behavior.",
-        },
-        {
-          title: "Study trades and price movement",
-          description:
-            "Inspect historical trades, price changes, liquidity, and market behavior around major events.",
-        },
-        {
-          title: "Build charts and dashboards",
-          description:
-            "Turn historical queries into charts, dashboards, calibration curves, convergence views, and volume breakdowns.",
-        },
-        {
-          title: "Export data",
-          description:
-            "Download CSV, XLSX, or JSON samples and larger plan-based exports for your own research stack.",
-        },
-        {
-          title: "Backtest ideas",
-          description:
-            "Test market hypotheses against resolved historical markets, trade behavior, outcomes, volume, and pricing patterns.",
-        },
-      ],
-    },
-
-    {
       type: "query",
       anchorId: "explore-data",
       title: "Search Kalshi historical data",

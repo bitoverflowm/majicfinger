@@ -97,7 +97,7 @@ type LifetimeAccess = {
 };
 
 export function PricingSection() {
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("weekly");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const { title, description, pricingItems } = siteConfig.pricingSection;
   const includedInPaidPlans = (
     siteConfig.pricingSection as {
