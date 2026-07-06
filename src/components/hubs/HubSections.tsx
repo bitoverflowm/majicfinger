@@ -581,7 +581,7 @@ function HubVideoCarousel({ section }: { section: HubVideoCarouselSection }) {
           </p>
         ) : null}
       </div>
-      <div className="mx-auto mt-12 w-full max-w-5xl">
+      <div className="mx-auto mt-12 w-full max-w-6xl">
         <HubVideoInstructionsCarousel videos={section.videos} />
       </div>
     </section>
