@@ -314,14 +314,6 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
-      type: "published_dashboards",
-      anchorId: "published-dashboards",
-      title: "Dashboards",
-      description:
-        "Live, shareable Kalshi dashboards — volume trends, market analysis, and weather prediction market insights built on historical data.",
-    },
-
-    {
       type: "faq",
       title: "Kalshi Historical FAQ",
       items: [
