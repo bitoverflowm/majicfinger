@@ -603,8 +603,8 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
               </p>
             </div>
 
-            <div className={cn("flex flex-col md:flex-row md:items-stretch", density.gridGap)}>
-              <div className="md:w-[min(100%,13rem)] md:shrink-0 lg:w-[min(100%,20rem)] xl:w-1/3">
+            <div className={cn("grid grid-cols-1 items-stretch sm:grid-cols-3", density.gridGap)}>
+              <div className="min-w-0">
                 <HubStartingPointColumn
                   icon={Database}
                   title="Browse raw historical data"
@@ -631,10 +631,10 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                 </HubStartingPointColumn>
               </div>
 
-              <div className="relative min-h-[16rem] flex-1 overflow-hidden md:min-h-0">
+              <div className="relative min-h-[16rem] min-w-0 overflow-hidden sm:col-span-2 sm:min-h-0">
                 <div
                   className={cn(
-                    "grid h-full transition-all duration-500 ease-out md:grid-cols-2",
+                    "grid h-full grid-cols-1 transition-all duration-500 ease-out sm:grid-cols-2",
                     density.gridGap,
                     hoveredSampleId
                       ? "pointer-events-none translate-x-6 opacity-0"
