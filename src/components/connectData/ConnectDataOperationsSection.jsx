@@ -14,6 +14,7 @@ import {
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
+import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { scrollConnectComposeTargetIntoView } from "@/lib/connectHubScroll";
 import { cn } from "@/lib/utils";
 
@@ -140,6 +141,7 @@ export function ConnectDataOperationsSection({
                 <button
                   type="button"
                   onClick={() => onOperationClick(op.id)}
+                  {...{ [GUIDED_TARGET_ATTR]: `kalshi.compose.op.${op.id}` }}
                   className={cn(
                     "flex h-full w-full flex-col rounded-lg border border-border/60 bg-card p-3 text-left transition-colors duration-150",
                     isOpen && "border-primary/50 bg-primary/5",

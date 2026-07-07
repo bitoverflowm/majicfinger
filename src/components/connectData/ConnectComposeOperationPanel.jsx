@@ -35,6 +35,7 @@ import {
 import { glueTableNamesForDataset } from "@/config/dataLakeParquetSamples";
 import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
+import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { pruneConnectComposeBeforePull } from "@/lib/connectComposeSanitize";
 import { hasConfiguredTableJoins } from "@/lib/composeJoinColumns";
 import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
@@ -487,7 +488,13 @@ export function ConnectComposeOperationPanel({
             ))}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-[11px] gap-1"
+                  {...{ [GUIDED_TARGET_ATTR]: "kalshi.compose.where.add" }}
+                >
                   <Plus className="h-3 w-3" />
                   {composeWhereFilters.length > 0
                     ? "Add another filter"

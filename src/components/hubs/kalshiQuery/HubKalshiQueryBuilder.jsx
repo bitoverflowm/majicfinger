@@ -20,6 +20,9 @@ import {
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
+import { GuidedWorkflowOverlay } from "@/components/guidedWorkflow/GuidedWorkflowOverlay";
+import { GuidedWorkflowActionsBridge } from "@/components/guidedWorkflow/GuidedWorkflowActionsBridge";
+import { GuidedWorkflowProvider } from "@/components/guidedWorkflow/GuidedWorkflowProvider";
 import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +39,13 @@ import {
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
 import { inferPageNameFromPath } from "@/lib/analytics/sessionStartMeta";
+import {
+  KALSHI_HISTORICAL_GUIDED_WORKFLOWS,
+  KALSHI_WORKFLOW_ICONS,
+} from "@/lib/guidedWorkflows/kalshiHistorical";
+import { buildGuidedSnapshot } from "@/lib/guidedWorkflows/snapshot";
+import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
+import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { cn } from "@/lib/utils";
 
 const LAKE_CONFIG = getConnectDataLakeConfig("kalshiHistorical");
@@ -63,59 +73,17 @@ const HUB_MARKET_SEARCH_EXAMPLES = [
   { label: "Fed rate", icon: CircleDollarSign, iconClass: "text-emerald-700 dark:text-emerald-400" },
 ];
 
-const HUB_WORKFLOW_TEMPLATES = [
-  {
-    id: "trades-for-market",
-    title: "Get trades for a market",
-    description: "Pull all trades for a specific market.",
-    icon: RefreshCw,
-    apply: () => ({
-      sampleId: "athena-kal-trades",
-      columns: ["ticker", "yes_price", "count", "taker_side", "created_time"],
-      filters: [],
-      sheetName: "market_trades",
-    }),
-  },
-  {
-    id: "resolved-weather",
-    title: "Find resolved weather markets",
-    description: "Discover weather markets that have resolved.",
-    icon: CloudSun,
-    apply: () => ({
-      sampleId: "athena-kal-markets",
-      columns: ["ticker", "title", "kalshi_taxonomy_category", "volume", "result", "close_time"],
-      filters: [
-        { column: "kalshi_taxonomy_category", kind: "string", op: "contains", value: "Weather" },
-        { column: "status", kind: "string", op: "eq", value: "finalized" },
-      ],
-      sheetName: "weather_resolved",
-    }),
-  },
-  {
-    id: "price-history",
-    title: "Build a price history chart",
-    description: "Visualize price history over time.",
-    icon: LineChart,
-    apply: () => ({
-      sampleId: "athena-kal-trades",
-      columns: ["ticker", "yes_price", "created_time"],
-      filters: [],
-      sheetName: "price_history",
-    }),
-  },
-  {
-    id: "backtest-outcomes",
-    title: "Backtest final outcomes",
-    description: "Evaluate strategies using final market outcomes.",
-    icon: Target,
-    apply: () => ({
-      sampleId: "athena-kal-markets",
-      columns: ["ticker", "title", "volume", "last_price", "result", "status"],
-      filters: [{ column: "status", kind: "string", op: "eq", value: "finalized" }],
-      sheetName: "backtest_outcomes",
-    }),
-  },
-];
+const WORKFLOW_ICON_COMPONENTS = {
+  RefreshCw,
+  CloudSun,
+  LineChart,
+  Target,
+};
+
+const SOURCE_GUIDED_TARGETS = {
+  "athena-kal-markets": KALSHI_GUIDED_TARGETS.sourceMarkets,
+  "athena-kal-trades": KALSHI_GUIDED_TARGETS.sourceTrades,
+};
 
 function hubSourceCardClasses({ isSelected, accent, isHovered }) {
   if (isSelected) {
@@ -212,7 +180,16 @@ function HubStartingPointColumn({ icon: Icon, title, badge, description, childre
   );
 }
 
-function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave, compact = false }) {
+function HubKalshiSourceOption({
+  source,
+  isSelected,
+  onSelect,
+  onHover,
+  onLeave,
+  compact = false,
+  guidedTarget,
+  disableHover = false,
+}) {
   const presentation = HUB_KALSHI_SOURCE_PRESENTATION[source.sampleId];
   if (!presentation) return null;
 
@@ -223,8 +200,9 @@ function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave,
     <button
       type="button"
       onClick={() => onSelect(source.sampleId)}
-      onMouseEnter={() => onHover(source.sampleId)}
-      onMouseLeave={onLeave}
+      onMouseEnter={() => !disableHover && onHover(source.sampleId)}
+      onMouseLeave={() => !disableHover && onLeave()}
+      {...(guidedTarget ? { [GUIDED_TARGET_ATTR]: guidedTarget } : {})}
       className={cn(
         "group flex w-full items-center text-left transition-all duration-200 ease-out hover:translate-x-1.5",
         compact ? "gap-2 rounded-lg border p-2.5" : "gap-2 rounded-lg border p-2.5 lg:gap-3 lg:rounded-xl lg:p-3",
@@ -273,13 +251,15 @@ function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave,
   );
 }
 
-function HubWorkflowOption({ template, onSelect, compact = false }) {
-  const Icon = template.icon;
+function HubWorkflowOption({ workflow, onSelect, compact = false }) {
+  const iconName = KALSHI_WORKFLOW_ICONS[workflow.id] || "RefreshCw";
+  const Icon = WORKFLOW_ICON_COMPONENTS[iconName] || RefreshCw;
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(template)}
+      onClick={() => onSelect(workflow.id)}
+      {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.workflow(workflow.id) }}
       className={cn(
         "flex w-full items-center border border-border/60 bg-background text-left transition-all duration-200 ease-out hover:translate-x-1 hover:border-border hover:bg-muted/25",
         compact ? "gap-2 rounded-lg p-2.5" : "gap-2 rounded-lg p-2.5 lg:gap-3 lg:rounded-xl lg:p-3",
@@ -295,7 +275,7 @@ function HubWorkflowOption({ template, onSelect, compact = false }) {
       </span>
       <div className="min-w-0 flex-1">
         <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-xs lg:text-sm")}>
-          {template.title}
+          {workflow.title}
         </span>
         <p
           className={cn(
@@ -303,7 +283,7 @@ function HubWorkflowOption({ template, onSelect, compact = false }) {
             compact ? "text-[11px]" : "text-[11px] lg:text-xs",
           )}
         >
-          {template.description}
+          {workflow.description}
         </p>
       </div>
       <ChevronRight
@@ -373,6 +353,10 @@ function ColumnDefinitionsPanel({
 }
 
 export function HubKalshiQueryBuilder({ embedded = false }) {
+  return <HubKalshiQueryBuilderInner embedded={embedded} />;
+}
+
+function HubKalshiQueryBuilderInner({ embedded = false }) {
   const { data: user, isLoading: userLoading } = useSWR("/api/user", userSwrFetcher);
   const isLoggedIn = !!user;
   const [authOpen, setAuthOpen] = useState(false);
@@ -389,6 +373,10 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
   const [marketSearchInitial, setMarketSearchInitial] = useState("");
   const [marketSearchKey, setMarketSearchKey] = useState(0);
   const clearHoverTimeoutRef = useRef(null);
+  const guidedActionsRef = useRef({ startWorkflow: () => {}, cancelWorkflow: () => {} });
+  const pendingWorkflowIdRef = useRef(null);
+  const [guidedActive, setGuidedActive] = useState(false);
+  const [guidedStartTick, setGuidedStartTick] = useState(0);
 
   const hoveredSourceLabel = useMemo(() => {
     if (!hoveredSampleId) return "";
@@ -496,19 +484,26 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
     setError(null);
   }, []);
 
-  const handleApplyWorkflow = useCallback((template) => {
-    const preset = template.apply();
-    setSampleId(preset.sampleId);
-    setColumnSelections({ [preset.sampleId]: preset.columns });
-    const filters = preset.filters.map((filter) => ({
-      ...filter,
-      id: genFilterId(),
-    }));
-    setComposeSeed({
-      whereFilters: filters,
-      activeComposeOps: filters.length > 0 ? ["where"] : [],
-    });
-    setSheetName(preset.sheetName || "");
+  const handleStartGuidedWorkflow = useCallback((workflowId) => {
+    guidedActionsRef.current.cancelWorkflow?.();
+    pendingWorkflowIdRef.current = workflowId;
+    setSampleId("");
+    setColumnSelections({});
+    setActiveComposeOps([]);
+    setComposeSeed(null);
+    setComposeDraft({});
+    setSheetName("");
+    setError(null);
+    setGuidedStartTick((t) => t + 1);
+  }, []);
+
+  const cancelToStartingView = useCallback(() => {
+    guidedActionsRef.current.cancelWorkflow?.();
+    setSampleId("");
+    setActiveComposeOps([]);
+    setComposeSeed(null);
+    setComposeDraft({});
+    setSheetName("");
     setError(null);
   }, []);
 
@@ -576,7 +571,27 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
 
   const density = hubEmbedDensity(embedded);
 
+  const guidedSnapshot = useMemo(
+    () =>
+      buildGuidedSnapshot({
+        sampleId,
+        columnSelections,
+        activeComposeOps,
+        composeDraft,
+        sheetName,
+      }),
+    [sampleId, columnSelections, activeComposeOps, composeDraft, sheetName],
+  );
+
   return (
+    <GuidedWorkflowProvider snapshot={guidedSnapshot}>
+      <GuidedWorkflowActionsBridge
+        actionsRef={guidedActionsRef}
+        pendingWorkflowIdRef={pendingWorkflowIdRef}
+        onActiveChange={setGuidedActive}
+        startAfterTick={guidedStartTick}
+      />
+      <GuidedWorkflowOverlay />
     <>
       <div
         className={cn(
@@ -619,6 +634,8 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                         onHover={handleSourceHover}
                         onLeave={handleSourceLeave}
                         compact={embedded}
+                        guidedTarget={SOURCE_GUIDED_TARGETS[source.sampleId]}
+                        disableHover={guidedActive}
                       />
                     ))}
                   </div>
@@ -630,7 +647,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                   className={cn(
                     "grid h-full grid-cols-1 transition-all duration-500 ease-out sm:grid-cols-2",
                     density.gridGap,
-                    hoveredSampleId
+                    hoveredSampleId && !guidedActive
                       ? "pointer-events-none translate-x-6 opacity-0"
                       : "translate-x-0 opacity-100",
                   )}
@@ -698,11 +715,11 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                     compact={embedded}
                   >
                     <div className={density.listGap}>
-                      {HUB_WORKFLOW_TEMPLATES.map((template) => (
+                      {KALSHI_HISTORICAL_GUIDED_WORKFLOWS.map((workflow) => (
                         <HubWorkflowOption
-                          key={template.id}
-                          template={template}
-                          onSelect={handleApplyWorkflow}
+                          key={workflow.id}
+                          workflow={workflow}
+                          onSelect={handleStartGuidedWorkflow}
                           compact={embedded}
                         />
                       ))}
@@ -756,10 +773,8 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                     variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-[0.6875rem]"
-                    onClick={() => {
-                      setSampleId("");
-                      setWhereFilters([]);
-                    }}
+                    onClick={cancelToStartingView}
+                    {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.cancel }}
                   >
                     Cancel
                   </Button>
@@ -773,6 +788,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                       <button
                         type="button"
                         onClick={() => toggleColumn(col.name)}
+                        {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.column(col.name) }}
                         className={cn(
                           "flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left transition-colors",
                           isSelected
@@ -844,6 +860,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                 onChange={(e) => setSheetName(e.target.value)}
                 placeholder="e.g. high_volume_markets"
                 className="max-w-md"
+                {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.sheetName }}
               />
             </div>
           </>
@@ -861,6 +878,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
               className={cn("rounded-full text-sm lg:text-base", density.submitPx)}
               disabled={submitBusy || userLoading || !sampleId || selectedColumns.length === 0}
               onClick={handleSubmit}
+              {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.runQuery }}
             >
               {submitBusy ? "Starting…" : userLoading ? "Loading…" : isLoggedIn ? "Run query" : "Run for Free"}
             </Button>
@@ -879,5 +897,6 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
         onAuthenticated={() => void continueToDashboard()}
       />
     </>
+    </GuidedWorkflowProvider>
   );
 }
