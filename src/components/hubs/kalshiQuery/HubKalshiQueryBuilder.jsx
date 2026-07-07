@@ -149,19 +149,17 @@ function hubSourceIconClasses({ accent }) {
 
 function HubStartingPointColumn({ icon: Icon, title, badge, description, children }) {
   return (
-    <div className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/15 p-4">
+    <div className="relative flex h-full flex-col rounded-xl border border-border/70 bg-muted/15 p-4">
       <div className="mb-4 space-y-2 border-b border-border/50 pb-4">
         <div className="flex items-start gap-2.5">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary dark:text-secondary">
             <Icon className="size-4" strokeWidth={1.75} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-              <span className="inline-flex rounded-full border border-secondary/25 bg-secondary/10 px-2 py-0.5 text-[0.625rem] font-medium leading-tight text-secondary dark:text-secondary">
-                {badge}
-              </span>
-            </div>
+            <span className="mb-1.5 inline-flex rounded-full border border-secondary/25 bg-secondary/10 px-2 py-0.5 text-[0.625rem] font-medium leading-tight text-secondary dark:text-secondary">
+              {badge}
+            </span>
+            <h3 className="text-sm font-semibold leading-snug text-foreground">{title}</h3>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
           </div>
         </div>
@@ -552,9 +550,9 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                 >
                   <HubStartingPointColumn
                     icon={Search}
-                    title="Search a market"
+                    title="Search for a specific market"
                     badge="Best for known markets"
-                    description="Find a market or event by name or ticker."
+                    description="Load a Kalshi market by ticker, title, or event so you can explore its historical data faster."
                   >
                     <p className="text-xs font-medium text-muted-foreground">Search</p>
                     <KalshiPowerToolsSearch
@@ -593,9 +591,9 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
 
                   <HubStartingPointColumn
                     icon={Wand2}
-                    title="Use a workflow"
+                    title="Use a guided workflow"
                     badge="Best for guided setup"
-                    description="Jump into common research tasks."
+                    description="Follow a step-by-step guided walkthrough for common Kalshi historical data tasks."
                   >
                     <div className="space-y-2">
                       {HUB_WORKFLOW_TEMPLATES.map((template) => (
