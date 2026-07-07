@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronRight,
@@ -249,17 +249,29 @@ function genFilterId() {
   return `hub-w-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
-function ColumnDefinitionsPanel({ columns, getDisplayLabel, showAll = false }) {
+function ColumnDefinitionsPanel({
+  columns,
+  getDisplayLabel,
+  showAll = false,
+  title,
+  className,
+}) {
   if (!columns?.length) return null;
   return (
-    <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+    <div
+      className={cn(
+        "flex h-full flex-col rounded-xl border border-border/70 bg-muted/15 p-4",
+        className,
+      )}
+    >
       <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Column definitions ({columns.length})
+        {title ?? `Column definitions (${columns.length})`}
       </p>
       <ul
         className={cn(
-          "space-y-2",
+          "min-h-0 flex-1 space-y-2",
           !showAll && "max-h-[min(20rem,40vh)] overflow-y-auto",
+          showAll && "overflow-y-auto",
         )}
       >
         {columns.map((col) => (
@@ -293,6 +305,43 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
   const [sheetName, setSheetName] = useState("");
   const [marketSearchInitial, setMarketSearchInitial] = useState("");
   const [marketSearchKey, setMarketSearchKey] = useState(0);
+  const clearHoverTimeoutRef = useRef(null);
+
+  const hoveredSourceLabel = useMemo(() => {
+    if (!hoveredSampleId) return "";
+    return KALSHI_CONNECT_DATA_SOURCES.find((source) => source.sampleId === hoveredSampleId)?.title ?? "";
+  }, [hoveredSampleId]);
+
+  const handleSourceHover = useCallback((id) => {
+    if (clearHoverTimeoutRef.current) {
+      clearTimeout(clearHoverTimeoutRef.current);
+      clearHoverTimeoutRef.current = null;
+    }
+    setHoveredSampleId(id);
+  }, []);
+
+  const handleSourceLeave = useCallback(() => {
+    clearHoverTimeoutRef.current = setTimeout(() => {
+      setHoveredSampleId("");
+    }, 120);
+  }, []);
+
+  const handlePreviewHover = useCallback(() => {
+    if (clearHoverTimeoutRef.current) {
+      clearTimeout(clearHoverTimeoutRef.current);
+      clearHoverTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handlePreviewLeave = useCallback(() => {
+    setHoveredSampleId("");
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (clearHoverTimeoutRef.current) clearTimeout(clearHoverTimeoutRef.current);
+    };
+  }, []);
 
   const columns = useMemo(
     () => (sampleId ? getKalshiConnectColumnsForSample(sampleId) : []),
@@ -464,112 +513,141 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
               </p>
             </div>
 
-            <div className="grid items-stretch gap-4 lg:grid-cols-3">
-              <HubStartingPointColumn
-                icon={Database}
-                title="Start from data"
-                badge="Best for discovery"
-                description="Explore the dataset you need."
-              >
-                <p className="text-xs font-medium text-muted-foreground">Choose a data source</p>
-                <div className="space-y-2">
-                  {KALSHI_CONNECT_DATA_SOURCES.map((source) => (
-                    <HubKalshiSourceOption
-                      key={source.sampleId}
-                      source={source}
-                      isSelected={sampleId === source.sampleId}
-                      onSelect={handleSelectSource}
-                      onHover={setHoveredSampleId}
-                      onLeave={() => setHoveredSampleId("")}
-                    />
-                  ))}
-                </div>
-                {hoveredSampleId ? (
-                  <ColumnDefinitionsPanel
-                    columns={hoverPreviewColumns}
-                    getDisplayLabel={getColumnLabel}
-                    showAll
-                  />
-                ) : null}
-              </HubStartingPointColumn>
-
-              <HubStartingPointColumn
-                icon={Search}
-                title="Search a market"
-                badge="Best for known markets"
-                description="Find a market or event by name or ticker."
-              >
-                <p className="text-xs font-medium text-muted-foreground">Search</p>
-                <KalshiPowerToolsSearch
-                  key={marketSearchKey}
-                  variant="embedded"
-                  initialQuery={marketSearchInitial}
-                  onSelect={handlePowerSearchSelect}
-                />
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Examples</p>
-                  <ul className="space-y-1">
-                    {HUB_MARKET_SEARCH_EXAMPLES.map((example) => (
-                      <li key={example}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMarketSearchInitial(example);
-                            setMarketSearchKey((key) => key + 1);
-                          }}
-                          className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
-                        >
-                          <TrendingUp
-                            className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                            aria-hidden
-                          />
-                          {example}
-                        </button>
-                      </li>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+              <div className="lg:w-[min(100%,20rem)] lg:shrink-0 xl:w-1/3">
+                <HubStartingPointColumn
+                  icon={Database}
+                  title="Start from data"
+                  badge="Best for discovery"
+                  description="Explore the dataset you need."
+                >
+                  <p className="text-xs font-medium text-muted-foreground">Choose a data source</p>
+                  <div className="space-y-2">
+                    {KALSHI_CONNECT_DATA_SOURCES.map((source) => (
+                      <HubKalshiSourceOption
+                        key={source.sampleId}
+                        source={source}
+                        isSelected={sampleId === source.sampleId}
+                        onSelect={handleSelectSource}
+                        onHover={handleSourceHover}
+                        onLeave={handleSourceLeave}
+                      />
                     ))}
-                  </ul>
-                </div>
-              </HubStartingPointColumn>
+                  </div>
+                </HubStartingPointColumn>
+              </div>
 
-              <HubStartingPointColumn
-                icon={Wand2}
-                title="Use a workflow"
-                badge="Best for guided setup"
-                description="Jump into common research tasks."
-              >
-                <div className="space-y-2">
-                  {HUB_WORKFLOW_TEMPLATES.map((template) => (
-                    <HubWorkflowOption
-                      key={template.id}
-                      template={template}
-                      onSelect={handleApplyWorkflow}
+              <div className="relative min-h-[18rem] flex-1 overflow-hidden lg:min-h-0">
+                <div
+                  className={cn(
+                    "grid h-full gap-4 transition-all duration-500 ease-out lg:grid-cols-2",
+                    hoveredSampleId
+                      ? "pointer-events-none translate-x-6 opacity-0"
+                      : "translate-x-0 opacity-100",
+                  )}
+                  aria-hidden={!!hoveredSampleId}
+                >
+                  <HubStartingPointColumn
+                    icon={Search}
+                    title="Search a market"
+                    badge="Best for known markets"
+                    description="Find a market or event by name or ticker."
+                  >
+                    <p className="text-xs font-medium text-muted-foreground">Search</p>
+                    <KalshiPowerToolsSearch
+                      key={marketSearchKey}
+                      variant="embedded"
+                      initialQuery={marketSearchInitial}
+                      onSelect={handlePowerSearchSelect}
                     />
-                  ))}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Examples</p>
+                      <ul className="space-y-1">
+                        {HUB_MARKET_SEARCH_EXAMPLES.map((example) => (
+                          <li key={example}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMarketSearchInitial(example);
+                                setMarketSearchKey((key) => key + 1);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
+                            >
+                              <TrendingUp
+                                className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                                aria-hidden
+                              />
+                              {example}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </HubStartingPointColumn>
+
+                  <HubStartingPointColumn
+                    icon={Wand2}
+                    title="Use a workflow"
+                    badge="Best for guided setup"
+                    description="Jump into common research tasks."
+                  >
+                    <div className="space-y-2">
+                      {HUB_WORKFLOW_TEMPLATES.map((template) => (
+                        <HubWorkflowOption
+                          key={template.id}
+                          template={template}
+                          onSelect={handleApplyWorkflow}
+                        />
+                      ))}
+                    </div>
+                  </HubStartingPointColumn>
                 </div>
-              </HubStartingPointColumn>
+
+                <div
+                  className={cn(
+                    "absolute inset-0 transition-all duration-500 ease-out",
+                    hoveredSampleId
+                      ? "translate-x-0 opacity-100"
+                      : "pointer-events-none translate-x-8 opacity-0",
+                  )}
+                  onMouseEnter={handlePreviewHover}
+                  onMouseLeave={handlePreviewLeave}
+                  aria-hidden={!hoveredSampleId}
+                >
+                  {hoveredSampleId ? (
+                    <ColumnDefinitionsPanel
+                      columns={hoverPreviewColumns}
+                      getDisplayLabel={getColumnLabel}
+                      showAll
+                      title={`${hoveredSourceLabel} columns (${hoverPreviewColumns.length})`}
+                      className="h-full"
+                    />
+                  ) : null}
+                </div>
+              </div>
             </div>
           </div>
         ) : null}
 
         {sampleId ? (
           <>
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
                   Columns
                 </Label>
-                <div className="flex gap-1">
-                  <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={selectAllColumns}>
+                <div className="flex gap-0.5">
+                  <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[0.6875rem]" onClick={selectAllColumns}>
                     Select all
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={clearColumns}>
+                  <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[0.6875rem]" onClick={clearColumns}>
                     Clear
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 text-xs"
+                    className="h-6 px-2 text-[0.6875rem]"
                     onClick={() => {
                       setSampleId("");
                       setWhereFilters([]);
@@ -579,7 +657,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                   </Button>
                 </div>
               </div>
-              <ul className="grid gap-2 sm:grid-cols-2">
+              <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                 {columns.map((col) => {
                   const isSelected = selectedSet.has(col.name);
                   return (
@@ -588,7 +666,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                         type="button"
                         onClick={() => toggleColumn(col.name)}
                         className={cn(
-                          "flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors",
+                          "flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left transition-colors",
                           isSelected
                             ? "border-primary/40 bg-primary/5"
                             : "border-border/60 bg-background hover:bg-muted/20",
@@ -596,22 +674,22 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                       >
                         <span
                           className={cn(
-                            "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                            "mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border",
                             isSelected
                               ? "border-primary bg-primary text-primary-foreground"
                               : "border-border bg-background",
                           )}
                         >
-                          {isSelected ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
+                          {isSelected ? <Check className="h-2 w-2" strokeWidth={3} /> : null}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            <span className="text-sm font-medium text-foreground">
+                          <span className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                            <span className="text-xs font-medium leading-tight text-foreground">
                               {getColumnLabel(col)}
                             </span>
-                            <span className="text-[11px] text-muted-foreground">{col.type}</span>
+                            <span className="text-[10px] leading-tight text-muted-foreground">{col.type}</span>
                           </span>
-                          <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                          <span className="mt-0.5 block line-clamp-2 text-[11px] leading-snug text-muted-foreground">
                             {col.description}
                           </span>
                         </span>
