@@ -51,16 +51,21 @@ export function KalshiPowerToolsSearch({
   onSelect,
   disabled = false,
   className,
+  variant = "default",
+  placeholder,
+  inputClassName,
+  initialQuery = "",
   parameterMode,
   suggestionsApiPath = "/api/data-lake/kalshi-search/suggestions",
   entityTagLabel,
 }) {
   const rootRef = useRef(null);
+  const inputRef = useRef(null);
   const suggestAbortRef = useRef(null);
   const suggestSeqRef = useRef(0);
   const debounceRef = useRef(null);
 
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestLoading, setSuggestLoading] = useState(false);
@@ -137,6 +142,22 @@ export function KalshiPowerToolsSearch({
   }, [parameterMode]);
 
   useEffect(() => {
+    setQ(initialQuery);
+  }, [initialQuery]);
+
+  useEffect(() => {
+    if (variant !== "embedded") return;
+    function onKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [variant]);
+
+  useEffect(() => {
     function onDoc(e) {
       if (rootRef.current && !rootRef.current.contains(e.target)) {
         setSuggestOpen(false);
@@ -181,13 +202,23 @@ export function KalshiPowerToolsSearch({
           ? "Search Kalshi markets by ticker or title — select a market to pull its trades."
           : "Search Kalshi markets and trades by ticker or title — select a result to load data.";
 
+  const resolvedPlaceholder =
+    placeholder ??
+    (variant === "embedded"
+      ? "Search by ticker, title, or event (e.g. 'NYC high temp', 'Election 2024', 'KXUSA-24-1234')"
+      : "Search ticker, title, or event ticker…");
+
   return (
     <div className={cn("space-y-2", className)}>
-      <motion.div className="flex items-center gap-2">
-        <Zap className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
-        <h2 className="text-sm font-semibold tracking-tight text-foreground">Power Tools</h2>
-      </motion.div>
-      <p className="text-[11px] leading-snug text-muted-foreground">{searchHint}</p>
+      {variant === "default" ? (
+        <>
+          <motion.div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">Power Tools</h2>
+          </motion.div>
+          <p className="text-[11px] leading-snug text-muted-foreground">{searchHint}</p>
+        </>
+      ) : null}
 
       <div ref={rootRef} className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
@@ -218,8 +249,9 @@ export function KalshiPowerToolsSearch({
           </AnimatePresence>
         </span>
         <input
+          ref={inputRef}
           type="search"
-          placeholder="Search ticker, title, or event ticker…"
+          placeholder={resolvedPlaceholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => suggestions.length > 0 && setSuggestOpen(true)}
@@ -227,15 +259,22 @@ export function KalshiPowerToolsSearch({
           disabled={busy}
           autoComplete="off"
           className={cn(
-            "flex h-10 w-full rounded-md border border-border bg-background py-2 pl-10 pr-3 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "flex h-10 w-full rounded-md border border-border bg-background py-2 pl-10 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            variant === "embedded" ? "h-11 rounded-xl pr-14" : "pr-3",
             suggestLoading && "shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]",
             busy && "opacity-70",
+            inputClassName,
           )}
           aria-label="Kalshi historical search"
           aria-busy={suggestLoading || selectLoading}
           aria-autocomplete="list"
           aria-expanded={suggestOpen}
         />
+        {variant === "embedded" ? (
+          <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border/80 bg-muted/50 px-1.5 py-0.5 text-[0.625rem] font-medium text-muted-foreground sm:inline-flex">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        ) : null}
 
         <AnimatePresence>
           {suggestOpen && !suggestLoading && suggestions.length === 0 && q.trim().length >= 2 ? (

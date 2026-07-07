@@ -108,8 +108,10 @@ export type HubQuerySection = {
   anchorId?: string;
   title: string;
   description: string;
+  /** Stacked Lychee + Kalshi logos and pill below the section title. */
+  headerBranding?: "kalshi_historical";
   examplesTitle?: string;
-  examples: string[];
+  examples?: string[];
   cta?: HubCta;
 };
 

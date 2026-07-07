@@ -22,6 +22,7 @@ import type {
 } from "@/types/hub";
 import { HubHeroBody } from "@/components/hubs/HubHeroBody";
 import { HubHeroCapabilityPills } from "@/components/hubs/HubHeroCapabilityPills";
+import { HubKalshiExplorerBranding } from "@/components/hubs/HubKalshiExplorerBranding";
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
@@ -246,9 +247,12 @@ function HubQuery({ section }: { section: HubQuerySection }) {
           <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
             {section.description}
           </p>
+          {section.headerBranding === "kalshi_historical" ? (
+            <HubKalshiExplorerBranding />
+          ) : null}
         </div>
 
-        <div className="relative z-20 mx-auto mt-12 w-full max-w-4xl px-2 sm:px-4">
+        <div className="relative z-20 mx-auto mt-12 w-full max-w-6xl px-2 sm:px-4">
           <HubLazyWhenVisible
             fallback={<div className="h-48 w-full animate-pulse rounded-xl bg-muted/40" />}
           >
@@ -256,6 +260,7 @@ function HubQuery({ section }: { section: HubQuerySection }) {
           </HubLazyWhenVisible>
         </div>
 
+        {section.examples && section.examples.length > 0 ? (
         <div className="mx-auto w-full max-w-3xl space-y-4 pt-12">
           <p className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {section.examplesTitle || "Example queries you can build"}
@@ -271,6 +276,7 @@ function HubQuery({ section }: { section: HubQuerySection }) {
             ))}
           </ul>
         </div>
+        ) : null}
     </section>
   );
 }

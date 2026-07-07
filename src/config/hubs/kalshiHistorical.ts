@@ -216,20 +216,10 @@ export const kalshiHistoricalHub: HubPageConfig = {
     {
       type: "query",
       anchorId: "explore-data",
-      title: "Search Kalshi historical data",
+      title: "Try Lychee’s Kalshi Historical Data Explorer",
+      headerBranding: "kalshi_historical",
       description:
-        "Run no-code queries on historical Kalshi markets, trades, prices, volume, outcomes, and Kalshi orderbook history. Export results as CSV, XLSX, or JSON within your plan limits.",
-      examples: [
-        "Kalshi historical data download",
-        "Kalshi historical order book data",
-        "Kalshi trade history CSV export",
-        "Kalshi backtesting historical data",
-        "Kalshi market data analysis",
-        "Find markets with highest volume",
-        "Show Kalshi past markets by category",
-        "Analyze Kalshi trading volume trends",
-      ],
-      examplesTitle: "Example queries you can build",
+        "Search historical Kalshi markets and trades, preview real rows, apply filters, and export clean results without writing code.",
     },
 
     {

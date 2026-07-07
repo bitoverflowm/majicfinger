@@ -1,7 +1,21 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Check, Plus, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  CloudSun,
+  Database,
+  Layers,
+  LineChart,
+  Plus,
+  RefreshCw,
+  Search,
+  Target,
+  Trash2,
+  TrendingUp,
+  Wand2,
+} from "lucide-react";
 
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
 import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
@@ -30,6 +44,201 @@ import { inferPageNameFromPath } from "@/lib/analytics/sessionStartMeta";
 import { cn } from "@/lib/utils";
 
 const LAKE_CONFIG = getConnectDataLakeConfig("kalshiHistorical");
+
+const HUB_KALSHI_SOURCE_PRESENTATION = {
+  "athena-kal-markets": {
+    icon: Layers,
+    description:
+      "Contract-level data: titles, categories, outcomes, volume, settlement, and more.",
+    badge: "Best for market discovery and backtests",
+    accent: "secondary",
+  },
+  "athena-kal-trades": {
+    icon: LineChart,
+    description: "Execution-level data: price, size, timestamp, side, buyer, and seller.",
+    badge: "Best for price history and volatility analysis",
+    accent: "emerald",
+  },
+};
+
+const HUB_MARKET_SEARCH_EXAMPLES = [
+  "NYC high temp",
+  "Presidential Election 2024",
+  "KXLLM1",
+  "Fed rate",
+];
+
+const HUB_WORKFLOW_TEMPLATES = [
+  {
+    id: "trades-for-market",
+    title: "Get trades for a market",
+    description: "Pull all trades for a specific market.",
+    icon: RefreshCw,
+    apply: () => ({
+      sampleId: "athena-kal-trades",
+      columns: ["ticker", "yes_price", "count", "taker_side", "created_time"],
+      filters: [],
+      sheetName: "market_trades",
+    }),
+  },
+  {
+    id: "resolved-weather",
+    title: "Find resolved weather markets",
+    description: "Discover weather markets that have resolved.",
+    icon: CloudSun,
+    apply: () => ({
+      sampleId: "athena-kal-markets",
+      columns: ["ticker", "title", "kalshi_taxonomy_category", "volume", "result", "close_time"],
+      filters: [
+        { column: "kalshi_taxonomy_category", kind: "string", op: "contains", value: "Weather" },
+        { column: "status", kind: "string", op: "eq", value: "finalized" },
+      ],
+      sheetName: "weather_resolved",
+    }),
+  },
+  {
+    id: "price-history",
+    title: "Build a price history chart",
+    description: "Visualize price history over time.",
+    icon: LineChart,
+    apply: () => ({
+      sampleId: "athena-kal-trades",
+      columns: ["ticker", "yes_price", "created_time"],
+      filters: [],
+      sheetName: "price_history",
+    }),
+  },
+  {
+    id: "backtest-outcomes",
+    title: "Backtest final outcomes",
+    description: "Evaluate strategies using final market outcomes.",
+    icon: Target,
+    apply: () => ({
+      sampleId: "athena-kal-markets",
+      columns: ["ticker", "title", "volume", "last_price", "result", "status"],
+      filters: [{ column: "status", kind: "string", op: "eq", value: "finalized" }],
+      sheetName: "backtest_outcomes",
+    }),
+  },
+];
+
+function hubSourceCardClasses({ isSelected, accent, isHovered }) {
+  if (isSelected) {
+    return accent === "emerald"
+      ? "border-emerald-500/60 bg-emerald-500/5 ring-2 ring-emerald-500/20"
+      : "border-secondary/60 bg-secondary/5 ring-2 ring-secondary/25";
+  }
+  if (isHovered) return "border-border bg-muted/30";
+  return "border-border/60 bg-background hover:border-border hover:bg-muted/20";
+}
+
+function hubSourceRadioClasses({ isSelected, accent }) {
+  if (!isSelected) return "border-muted-foreground/35 bg-background";
+  return accent === "emerald"
+    ? "border-emerald-500 bg-background"
+    : "border-secondary bg-background";
+}
+
+function hubSourceIconClasses({ accent }) {
+  return accent === "emerald"
+    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+    : "bg-secondary/15 text-secondary dark:text-secondary";
+}
+
+function HubStartingPointColumn({ icon: Icon, title, badge, description, children }) {
+  return (
+    <div className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/15 p-4">
+      <div className="mb-4 space-y-2 border-b border-border/50 pb-4">
+        <div className="flex items-start gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary dark:text-secondary">
+            <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+              <span className="inline-flex rounded-full border border-secondary/25 bg-secondary/10 px-2 py-0.5 text-[0.625rem] font-medium leading-tight text-secondary dark:text-secondary">
+                {badge}
+              </span>
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-3">{children}</div>
+    </div>
+  );
+}
+
+function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave }) {
+  const presentation = HUB_KALSHI_SOURCE_PRESENTATION[source.sampleId];
+  if (!presentation) return null;
+
+  const Icon = presentation.icon;
+  const { accent } = presentation;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(source.sampleId)}
+      onMouseEnter={() => onHover(source.sampleId)}
+      onMouseLeave={onLeave}
+      className={cn(
+        "group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-200 ease-out hover:translate-x-1.5",
+        hubSourceCardClasses({ isSelected, accent, isHovered: false }),
+      )}
+    >
+      <span
+        className={cn(
+          "flex size-9 shrink-0 items-center justify-center rounded-lg",
+          hubSourceIconClasses({ accent }),
+        )}
+      >
+        <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="text-sm font-medium text-foreground">{source.title}</span>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{source.description}</p>
+      </div>
+      <span
+        className={cn(
+          "flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+          hubSourceRadioClasses({ isSelected, accent }),
+        )}
+        aria-hidden
+      >
+        {isSelected ? (
+          <span
+            className={cn(
+              "size-2 rounded-full",
+              accent === "emerald" ? "bg-emerald-500" : "bg-secondary",
+            )}
+          />
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
+function HubWorkflowOption({ template, onSelect }) {
+  const Icon = template.icon;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(template)}
+      className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all duration-200 ease-out hover:translate-x-1 hover:border-border hover:bg-muted/25"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground">
+        <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="text-sm font-medium text-foreground">{template.title}</span>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{template.description}</p>
+      </div>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
+    </button>
+  );
+}
 
 function getColumnLabel(col) {
   if (LAKE_CONFIG?.getColumnDisplayLabel) return LAKE_CONFIG.getColumnDisplayLabel(col);
@@ -82,6 +291,8 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
   const [columnSelections, setColumnSelections] = useState({});
   const [whereFilters, setWhereFilters] = useState([]);
   const [sheetName, setSheetName] = useState("");
+  const [marketSearchInitial, setMarketSearchInitial] = useState("");
+  const [marketSearchKey, setMarketSearchKey] = useState(0);
 
   const columns = useMemo(
     () => (sampleId ? getKalshiConnectColumnsForSample(sampleId) : []),
@@ -121,7 +332,9 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
   }, [sampleId]);
 
   const handleSelectSource = useCallback((id) => {
+    const cols = getKalshiConnectColumnsForSample(id).map((c) => c.name);
     setSampleId(id);
+    setColumnSelections((prev) => ({ ...prev, [id]: cols }));
     setWhereFilters([]);
     setError(null);
   }, []);
@@ -140,6 +353,20 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
         value: suggestion.ticker,
       },
     ]);
+    setError(null);
+  }, []);
+
+  const handleApplyWorkflow = useCallback((template) => {
+    const preset = template.apply();
+    setSampleId(preset.sampleId);
+    setColumnSelections({ [preset.sampleId]: preset.columns });
+    setWhereFilters(
+      preset.filters.map((filter) => ({
+        ...filter,
+        id: genFilterId(),
+      })),
+    );
+    setSheetName(preset.sheetName || "");
     setError(null);
   }, []);
 
@@ -226,60 +453,101 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
             : "border-y border-border px-6 py-8 md:px-8 md:py-10",
         )}
       >
-        <div className="space-y-3">
-          <h3 className="text-base font-semibold text-foreground">Get Kalshi Historical Data Now:</h3>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Choose Markets or Trades, pick columns, add filters, then run your query in Lychee.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Data source
-          </Label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {KALSHI_CONNECT_DATA_SOURCES.map((source) => {
-              const isSelected = sampleId === source.sampleId;
-              const isHovered = hoveredSampleId === source.sampleId;
-              return (
-                <button
-                  key={source.sampleId}
-                  type="button"
-                  onClick={() => handleSelectSource(source.sampleId)}
-                  onMouseEnter={() => setHoveredSampleId(source.sampleId)}
-                  onMouseLeave={() => setHoveredSampleId("")}
-                  className={cn(
-                    "rounded-xl border p-4 text-left transition-all",
-                    isSelected
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                      : isHovered
-                        ? "border-border bg-muted/30"
-                        : "border-border/60 bg-background hover:border-border hover:bg-muted/20",
-                  )}
-                >
-                  <span className="text-sm font-semibold text-foreground">{source.title}</span>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {source.description}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-          {!sampleId && hoveredSampleId ? (
-            <ColumnDefinitionsPanel
-              columns={hoverPreviewColumns}
-              getDisplayLabel={getColumnLabel}
-              showAll
-            />
-          ) : null}
-        </div>
-
         {!sampleId ? (
-          <div className="space-y-3">
-            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Or search for a market
-            </Label>
-            <KalshiPowerToolsSearch onSelect={handlePowerSearchSelect} />
+          <div className="space-y-5">
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold tracking-tight text-foreground">
+                Choose your starting point
+              </h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Each option opens the right query setup automatically.
+              </p>
+            </div>
+
+            <div className="grid items-stretch gap-4 lg:grid-cols-3">
+              <HubStartingPointColumn
+                icon={Database}
+                title="Start from data"
+                badge="Best for discovery"
+                description="Explore the dataset you need."
+              >
+                <p className="text-xs font-medium text-muted-foreground">Choose a data source</p>
+                <div className="space-y-2">
+                  {KALSHI_CONNECT_DATA_SOURCES.map((source) => (
+                    <HubKalshiSourceOption
+                      key={source.sampleId}
+                      source={source}
+                      isSelected={sampleId === source.sampleId}
+                      onSelect={handleSelectSource}
+                      onHover={setHoveredSampleId}
+                      onLeave={() => setHoveredSampleId("")}
+                    />
+                  ))}
+                </div>
+                {hoveredSampleId ? (
+                  <ColumnDefinitionsPanel
+                    columns={hoverPreviewColumns}
+                    getDisplayLabel={getColumnLabel}
+                    showAll
+                  />
+                ) : null}
+              </HubStartingPointColumn>
+
+              <HubStartingPointColumn
+                icon={Search}
+                title="Search a market"
+                badge="Best for known markets"
+                description="Find a market or event by name or ticker."
+              >
+                <p className="text-xs font-medium text-muted-foreground">Search</p>
+                <KalshiPowerToolsSearch
+                  key={marketSearchKey}
+                  variant="embedded"
+                  initialQuery={marketSearchInitial}
+                  onSelect={handlePowerSearchSelect}
+                />
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Examples</p>
+                  <ul className="space-y-1">
+                    {HUB_MARKET_SEARCH_EXAMPLES.map((example) => (
+                      <li key={example}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMarketSearchInitial(example);
+                            setMarketSearchKey((key) => key + 1);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
+                        >
+                          <TrendingUp
+                            className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                            aria-hidden
+                          />
+                          {example}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </HubStartingPointColumn>
+
+              <HubStartingPointColumn
+                icon={Wand2}
+                title="Use a workflow"
+                badge="Best for guided setup"
+                description="Jump into common research tasks."
+              >
+                <div className="space-y-2">
+                  {HUB_WORKFLOW_TEMPLATES.map((template) => (
+                    <HubWorkflowOption
+                      key={template.id}
+                      template={template}
+                      onSelect={handleApplyWorkflow}
+                    />
+                  ))}
+                </div>
+              </HubStartingPointColumn>
+            </div>
           </div>
         ) : null}
 
