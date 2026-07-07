@@ -32,12 +32,26 @@ const OPERATION_ICONS = {
  *   selectedCount: number;
  *   className?: string;
  *   operations?: import("@/lib/connectComposeOperations").ConnectComposeOperation[];
+ *   activeComposeOps?: string[];
+ *   setActiveComposeOps?: (fn: string[] | ((prev: string[]) => string[])) => void;
+ *   title?: string;
+ *   description?: string;
  * }} props
  */
-export function ConnectDataOperationsSection({ selectedCount, className, operations }) {
+export function ConnectDataOperationsSection({
+  selectedCount,
+  className,
+  operations,
+  activeComposeOps: activeComposeOpsProp,
+  setActiveComposeOps: setActiveComposeOpsProp,
+  title = "Refine your query",
+  description = "Optional: you can add filters, sort, limit or join multiple datasets. You can apply multiple operations at once.",
+}) {
   const sectionRef = useRef(null);
   const didScrollRef = useRef(false);
-  const { connectActiveComposeOps = [], setConnectActiveComposeOps } = useMyStateV2() ?? {};
+  const ctx = useMyStateV2() ?? {};
+  const connectActiveComposeOps = activeComposeOpsProp ?? ctx.connectActiveComposeOps ?? [];
+  const setConnectActiveComposeOps = setActiveComposeOpsProp ?? ctx.setConnectActiveComposeOps;
 
   const show = selectedCount > 0;
   const openSet = new Set(connectActiveComposeOps);
@@ -104,10 +118,8 @@ export function ConnectDataOperationsSection({ selectedCount, className, operati
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
         >
-          <h2 className="text-xs font-semibold tracking-tight text-foreground">Refine your query</h2>
-          <p className="mt-1 max-w-prose text-[11px] leading-snug text-muted-foreground">
-            Optional: you can add filters, sort, limit or join multiple datasets. You can apply multiple operations at once.
-          </p>
+          <h2 className="text-xs font-semibold tracking-tight text-foreground">{title}</h2>
+          <p className="mt-1 max-w-prose text-[11px] leading-snug text-muted-foreground">{description}</p>
         </motion.div>
 
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">

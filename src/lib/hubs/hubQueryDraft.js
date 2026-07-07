@@ -16,6 +16,14 @@ const STORAGE_KEY = "lychee:hubQueryDraft";
  * @property {string} sampleId
  * @property {Record<string, string[]>} columnSelections
  * @property {HubQueryWhereFilter[]} [whereFilters]
+ * @property {string[]} [activeComposeOps]
+ * @property {object[]} [columnComposeItems]
+ * @property {object[]} [orderBy]
+ * @property {object[]} [havingFilters]
+ * @property {object[]} [joins]
+ * @property {boolean} [composeLimitOpen]
+ * @property {string} [composeLimitValue]
+ * @property {string} [composeLimitScope]
  * @property {string} [pendingSheetName]
  * @property {string} [sourceHubPath]
  * @property {string} [sourceHubName]
@@ -91,6 +99,14 @@ export function normalizeHubQueryDraft(draft) {
     sampleId,
     columnSelections: draft.columnSelections || { [sampleId]: selections },
     whereFilters: Array.isArray(draft.whereFilters) ? draft.whereFilters : [],
+    activeComposeOps: Array.isArray(draft.activeComposeOps) ? draft.activeComposeOps : [],
+    columnComposeItems: Array.isArray(draft.columnComposeItems) ? draft.columnComposeItems : [],
+    orderBy: Array.isArray(draft.orderBy) ? draft.orderBy : [],
+    havingFilters: Array.isArray(draft.havingFilters) ? draft.havingFilters : [],
+    joins: Array.isArray(draft.joins) ? draft.joins : [],
+    composeLimitOpen: !!draft.composeLimitOpen,
+    composeLimitValue: draft.composeLimitValue != null ? String(draft.composeLimitValue) : "",
+    composeLimitScope: draft.composeLimitScope ? String(draft.composeLimitScope) : "primary",
     pendingSheetName: draft.pendingSheetName ? String(draft.pendingSheetName).trim() : undefined,
     sourceHubPath: draft.sourceHubPath ? String(draft.sourceHubPath).trim() : undefined,
     sourceHubName: draft.sourceHubName ? String(draft.sourceHubName).trim() : undefined,

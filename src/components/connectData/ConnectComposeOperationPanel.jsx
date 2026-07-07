@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Play, Plus } from "lucide-react";
@@ -49,25 +49,43 @@ import {
   isDemoGatedHistoricalIntegration,
   useDemoProGate,
 } from "@/hooks/useDemoProGate";
-import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 
 /**
  * Inline compose controls (mirrors integrations panel) for Connect home vertical flow.
+ *
+ * @param {{
+ *   className?: string;
+ *   standalone?: boolean;
+ *   sampleId?: string;
+ *   columnSelections?: Record<string, string[]>;
+ *   hidePullActions?: boolean;
+ *   activeComposeOps?: string[];
+ *   setActiveComposeOps?: (fn: string[] | ((prev: string[]) => string[])) => void;
+ *   onComposeChange?: (snapshot: Record<string, unknown>) => void;
+ *   composeSeed?: Record<string, unknown> | null;
+ *   panelClassName?: string;
+ * }} [props]
  */
-function integrationDisplayName(integrationId) {
-  const row = integrations_list.find((i) => i.clickHandler === integrationId);
-  return row?.name || integrationId || "Historical data";
-}
-
-export function ConnectComposeOperationPanel({ className }) {
+export function ConnectComposeOperationPanel({
+  className,
+  standalone = false,
+  sampleId: standaloneSampleId,
+  columnSelections: standaloneColumnSelections,
+  hidePullActions = false,
+  activeComposeOps: activeComposeOpsProp,
+  setActiveComposeOps: setActiveComposeOpsProp,
+  onComposeChange,
+  composeSeed,
+  panelClassName,
+}) {
   const ctx = useMyStateV2() ?? {};
-  const isDemo = !!ctx.isDemo;
+  const isDemo = standalone ? false : !!ctx.isDemo;
   const { requestHistoricalProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const {
-    connectActiveComposeOps = [],
-    setConnectActiveComposeOps,
-    connectDataLakeSampleId,
-    connectDataLakeColumnSelections,
+    connectActiveComposeOps: ctxActiveComposeOps = [],
+    setConnectActiveComposeOps: ctxSetActiveComposeOps,
+    connectDataLakeSampleId: ctxSampleId,
+    connectDataLakeColumnSelections: ctxColumnSelections,
     connectWorkspace,
     activeSheetId,
     dataSheets,
@@ -77,7 +95,18 @@ export function ConnectComposeOperationPanel({ className }) {
     requestConnectAnalyzeScroll,
   } = ctx;
 
-  const compose = useDataLakeComposeState(true);
+  const connectActiveComposeOps = standalone
+    ? activeComposeOpsProp ?? []
+    : ctxActiveComposeOps;
+  const setConnectActiveComposeOps = standalone
+    ? setActiveComposeOpsProp
+    : ctxSetActiveComposeOps;
+  const connectDataLakeSampleId = standalone ? standaloneSampleId : ctxSampleId;
+  const connectDataLakeColumnSelections = standalone
+    ? standaloneColumnSelections
+    : ctxColumnSelections;
+
+  const compose = useDataLakeComposeState(!standalone);
   const {
     columnComposeItems,
     setColumnComposeItems,
@@ -97,7 +126,8 @@ export function ConnectComposeOperationPanel({ className }) {
     setComposeJoins,
   } = compose;
 
-  const lakeConfig = getConnectDataLakeConfig(connectWorkspace);
+  const workspaceId = standalone ? "kalshiHistorical" : connectWorkspace;
+  const lakeConfig = getConnectDataLakeConfig(workspaceId);
   const sampleById = useMemo(
     () => Object.fromEntries((lakeConfig?.sampleOptions || []).map((s) => [s.id, s])),
     [lakeConfig],
@@ -123,6 +153,72 @@ export function ConnectComposeOperationPanel({ className }) {
     setColumnComposeItems,
     typesByName,
   });
+
+  useEffect(() => {
+    if (!composeSeed || !standalone) return;
+    if (Array.isArray(composeSeed.whereFilters)) {
+      setComposeWhereFilters?.(composeSeed.whereFilters);
+    }
+    if (Array.isArray(composeSeed.activeComposeOps)) {
+      setConnectActiveComposeOps?.(composeSeed.activeComposeOps);
+    }
+    if (Array.isArray(composeSeed.orderBy)) {
+      setColumnComposeOrderBy?.(composeSeed.orderBy);
+    }
+    if (Array.isArray(composeSeed.havingFilters)) {
+      setComposeHavingFilters?.(composeSeed.havingFilters);
+    }
+    if (Array.isArray(composeSeed.joins)) {
+      setComposeJoins?.(composeSeed.joins);
+    }
+    if (composeSeed.composeLimitOpen != null) {
+      setComposeLimitRuleOpen?.(!!composeSeed.composeLimitOpen);
+    }
+    if (composeSeed.composeLimitValue != null) {
+      setComposeLimitRuleValue?.(String(composeSeed.composeLimitValue));
+    }
+    if (composeSeed.composeLimitScope != null) {
+      setComposeLimitScope?.(String(composeSeed.composeLimitScope));
+    }
+  }, [
+    composeSeed,
+    standalone,
+    setComposeWhereFilters,
+    setConnectActiveComposeOps,
+    setColumnComposeOrderBy,
+    setComposeHavingFilters,
+    setComposeJoins,
+    setComposeLimitRuleOpen,
+    setComposeLimitRuleValue,
+    setComposeLimitScope,
+  ]);
+
+  useEffect(() => {
+    if (!standalone || !onComposeChange) return;
+    onComposeChange({
+      activeComposeOps: connectActiveComposeOps,
+      columnComposeItems,
+      orderBy: columnComposeOrderBy,
+      whereFilters: composeWhereFilters,
+      havingFilters: composeHavingFilters,
+      joins: composeJoins,
+      composeLimitOpen: composeLimitRuleOpen,
+      composeLimitValue: composeLimitRuleValue,
+      composeLimitScope: composeLimitScope,
+    });
+  }, [
+    standalone,
+    onComposeChange,
+    connectActiveComposeOps,
+    columnComposeItems,
+    columnComposeOrderBy,
+    composeWhereFilters,
+    composeHavingFilters,
+    composeJoins,
+    composeLimitRuleOpen,
+    composeLimitRuleValue,
+    composeLimitScope,
+  ]);
 
   const pullColumns = useMemo(
     () => columnComposeItems.map((i) => i.column).filter(Boolean),
@@ -275,6 +371,7 @@ export function ConnectComposeOperationPanel({ className }) {
   ]);
 
   const handleRunPull = useCallback(() => {
+    if (standalone) return;
     const pruned = pruneConnectComposeBeforePull({
       connectActiveComposeOps,
       columnComposeItems,
@@ -763,7 +860,7 @@ export function ConnectComposeOperationPanel({ className }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-4 rounded-lg border border-border/60 bg-muted/15 p-4"
+            className={cn("space-y-4 rounded-lg border border-border/60 bg-muted/15 p-4", panelClassName)}
           >
             <motion.div
               initial={{ opacity: 0, y: 4 }}
@@ -778,6 +875,7 @@ export function ConnectComposeOperationPanel({ className }) {
         ))}
       </AnimatePresence>
 
+      {!hidePullActions ? (
       <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
@@ -804,7 +902,8 @@ export function ConnectComposeOperationPanel({ className }) {
           <Play className="!size-2 shrink-0 fill-current" aria-hidden />
         </Button>
       </motion.div>
-      {demoProDialog}
+      ) : null}
+      {!hidePullActions ? demoProDialog : null}
     </motion.div>
   );
 }

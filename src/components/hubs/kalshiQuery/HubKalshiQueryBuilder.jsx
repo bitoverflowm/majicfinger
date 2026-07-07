@@ -9,28 +9,21 @@ import {
   Hash,
   Layers,
   LineChart,
-  Plus,
   RefreshCw,
   Search,
   Target,
-  Trash2,
   Vote,
   Wand2,
   CircleDollarSign,
 } from "lucide-react";
 
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
+import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
+import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { KALSHI_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
 import useSWR from "swr";
 import { userSwrFetcher } from "@/lib/hooks";
@@ -389,7 +382,9 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
   const [sampleId, setSampleId] = useState("");
   const [hoveredSampleId, setHoveredSampleId] = useState("");
   const [columnSelections, setColumnSelections] = useState({});
-  const [whereFilters, setWhereFilters] = useState([]);
+  const [activeComposeOps, setActiveComposeOps] = useState([]);
+  const [composeDraft, setComposeDraft] = useState({});
+  const [composeSeed, setComposeSeed] = useState(null);
   const [sheetName, setSheetName] = useState("");
   const [marketSearchInitial, setMarketSearchInitial] = useState("");
   const [marketSearchKey, setMarketSearchKey] = useState(0);
@@ -469,27 +464,35 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
   }, [sampleId]);
 
   const handleSelectSource = useCallback((id) => {
-    const cols = getKalshiConnectColumnsForSample(id).map((c) => c.name);
     setSampleId(id);
-    setColumnSelections((prev) => ({ ...prev, [id]: cols }));
-    setWhereFilters([]);
+    setColumnSelections((prev) => ({
+      ...prev,
+      [id]: prev[id] ?? [],
+    }));
+    setActiveComposeOps([]);
+    setComposeSeed(null);
     setError(null);
   }, []);
 
   const handlePowerSearchSelect = useCallback((suggestion) => {
     const id = suggestion.entity === "markets" ? "athena-kal-markets" : "athena-kal-trades";
-    const cols = getKalshiConnectColumnsForSample(id).map((c) => c.name);
     setSampleId(id);
-    setColumnSelections((prev) => ({ ...prev, [id]: cols }));
-    setWhereFilters([
-      {
-        id: genFilterId(),
-        column: "ticker",
-        kind: "string",
-        op: "eq",
-        value: suggestion.ticker,
-      },
-    ]);
+    setColumnSelections((prev) => ({
+      ...prev,
+      [id]: prev[id] ?? [],
+    }));
+    setComposeSeed({
+      whereFilters: [
+        {
+          id: genFilterId(),
+          column: "ticker",
+          kind: "string",
+          op: "eq",
+          value: suggestion.ticker,
+        },
+      ],
+      activeComposeOps: ["where"],
+    });
     setError(null);
   }, []);
 
@@ -497,50 +500,41 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
     const preset = template.apply();
     setSampleId(preset.sampleId);
     setColumnSelections({ [preset.sampleId]: preset.columns });
-    setWhereFilters(
-      preset.filters.map((filter) => ({
-        ...filter,
-        id: genFilterId(),
-      })),
-    );
+    const filters = preset.filters.map((filter) => ({
+      ...filter,
+      id: genFilterId(),
+    }));
+    setComposeSeed({
+      whereFilters: filters,
+      activeComposeOps: filters.length > 0 ? ["where"] : [],
+    });
     setSheetName(preset.sheetName || "");
     setError(null);
-  }, []);
-
-  const addFilter = useCallback(() => {
-    const defaultCol = columns[0]?.name || "ticker";
-    setWhereFilters((prev) => [
-      ...prev,
-      {
-        id: genFilterId(),
-        column: defaultCol,
-        kind: "string",
-        op: "eq",
-        value: "",
-      },
-    ]);
-  }, [columns]);
-
-  const updateFilter = useCallback((id, patch) => {
-    setWhereFilters((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
-  }, []);
-
-  const removeFilter = useCallback((id) => {
-    setWhereFilters((prev) => prev.filter((f) => f.id !== id));
   }, []);
 
   const buildDraft = useCallback(() => {
     const sourceHubPath =
       typeof window !== "undefined" ? window.location.pathname || "" : "";
+    const whereFilters = (composeDraft.whereFilters || []).filter((f) =>
+      String(f.value ?? "").trim(),
+    );
     return normalizeHubQueryDraft({
       sampleId,
       columnSelections,
-      whereFilters: whereFilters.filter((f) => String(f.value ?? "").trim()),
+      whereFilters,
+      activeComposeOps: composeDraft.activeComposeOps || activeComposeOps,
+      columnComposeItems: composeDraft.columnComposeItems || [],
+      orderBy: composeDraft.orderBy || [],
+      havingFilters: composeDraft.havingFilters || [],
+      joins: composeDraft.joins || [],
+      composeLimitOpen: !!composeDraft.composeLimitOpen,
+      composeLimitValue: composeDraft.composeLimitValue ?? "",
+      composeLimitScope: composeDraft.composeLimitScope ?? "primary",
       pendingSheetName: sheetName.trim() || undefined,
       sourceHubPath: sourceHubPath || undefined,
       sourceHubName: sourceHubPath ? inferPageNameFromPath(sourceHubPath) : undefined,
     });
-  }, [sampleId, columnSelections, whereFilters, sheetName]);
+  }, [sampleId, columnSelections, composeDraft, activeComposeOps, sheetName]);
 
   const continueToDashboard = useCallback(async () => {
     const draft = buildDraft();
@@ -814,84 +808,31 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
               </ul>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Filters (optional)
-                </Label>
-                <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={addFilter}>
-                  <Plus className="h-3.5 w-3.5" />
-                  Add filter
-                </Button>
-              </div>
-              {whereFilters.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No filters — query returns up to the row limit.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {whereFilters.map((filter) => (
-                    <li
-                      key={filter.id}
-                      className="flex flex-wrap items-end gap-2 rounded-lg border border-border/60 bg-background p-3"
-                    >
-                      <div className="min-w-[8rem] flex-1">
-                        <Label className="text-[10px] text-muted-foreground">Column</Label>
-                        <Select
-                          value={filter.column}
-                          onValueChange={(v) => updateFilter(filter.id, { column: v })}
-                        >
-                          <SelectTrigger className="h-9 mt-1">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {columns.map((col) => (
-                              <SelectItem key={col.name} value={col.name}>
-                                {getColumnLabel(col)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="w-28">
-                        <Label className="text-[10px] text-muted-foreground">Operator</Label>
-                        <Select
-                          value={filter.op}
-                          onValueChange={(v) => updateFilter(filter.id, { op: v })}
-                        >
-                          <SelectTrigger className="h-9 mt-1">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="eq">equals</SelectItem>
-                            <SelectItem value="contains">contains</SelectItem>
-                            <SelectItem value="gt">greater than</SelectItem>
-                            <SelectItem value="lt">less than</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="min-w-[8rem] flex-1">
-                        <Label className="text-[10px] text-muted-foreground">Value</Label>
-                        <Input
-                          className="h-9 mt-1"
-                          value={filter.value}
-                          onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-                          placeholder="Filter value"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 text-muted-foreground"
-                        onClick={() => removeFilter(filter.id)}
-                        aria-label="Remove filter"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            {selectedColumns.length > 0 ? (
+              <>
+                <ConnectDataOperationsSection
+                  selectedCount={selectedColumns.length}
+                  className={cn("mt-0 border-t-0 pt-0", embedded && "mt-0")}
+                  activeComposeOps={activeComposeOps}
+                  setActiveComposeOps={setActiveComposeOps}
+                  title="Refine your query"
+                  description="Optional: add filters, sort, limit, join, summarize, or conditional columns before you run."
+                />
+                <ConnectComposeOperationPanel
+                  key={sampleId}
+                  standalone
+                  sampleId={sampleId}
+                  columnSelections={columnSelections}
+                  hidePullActions
+                  activeComposeOps={activeComposeOps}
+                  setActiveComposeOps={setActiveComposeOps}
+                  onComposeChange={setComposeDraft}
+                  composeSeed={composeSeed}
+                  className="mt-0"
+                  panelClassName={embedded ? "p-3" : "p-3 lg:p-4"}
+                />
+              </>
+            ) : null}
 
             <div className="space-y-2">
               <Label htmlFor="hub-sheet-name" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

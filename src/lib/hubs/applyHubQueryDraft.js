@@ -24,10 +24,16 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
     ctx.setConnectDataLakeSampleId?.(sampleId);
     ctx.setConnectDataLakeColumnSelections?.({ ...columnSelections });
     ctx.setDataLakeComposeWhereFilters?.(draft.whereFilters || []);
-    ctx.setDataLakeComposeHavingFilters?.([]);
-    ctx.setDataLakeComposeJoins?.([]);
-    ctx.setDataLakeComposeOrderBy?.([]);
-    ctx.setConnectActiveComposeOps?.([]);
+    ctx.setDataLakeComposeHavingFilters?.(draft.havingFilters || []);
+    ctx.setDataLakeComposeJoins?.(draft.joins || []);
+    ctx.setDataLakeComposeOrderBy?.(draft.orderBy || []);
+    ctx.setDataLakeComposeLimitOpen?.(!!draft.composeLimitOpen);
+    ctx.setDataLakeComposeLimitValue?.(draft.composeLimitValue ?? "");
+    ctx.setDataLakeComposeLimitScope?.(draft.composeLimitScope ?? "primary");
+    ctx.setDataLakeColumnComposeItems?.(
+      Array.isArray(draft.columnComposeItems) ? draft.columnComposeItems : [],
+    );
+    ctx.setConnectActiveComposeOps?.(draft.activeComposeOps || []);
 
     if (draft.pendingSheetName) {
       ctx.setConnectHomePendingSheetName?.(draft.pendingSheetName);
