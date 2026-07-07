@@ -57,7 +57,7 @@ export async function GuideLayout({
       >
         <div
           className={cn(
-            "min-w-0 w-full flex-1",
+            "min-w-0 w-full flex-1 overflow-x-visible",
             hasToc
               ? "max-w-[56rem] xl:max-w-[52rem] 2xl:max-w-[56rem]"
               : "max-w-[56rem] 2xl:max-w-[58rem]",
@@ -66,7 +66,7 @@ export async function GuideLayout({
           <div className="mb-2 flex justify-end sm:mb-3">
             <GuideArticleThemeToggle />
           </div>
-          <article id="main-article" className="relative w-full min-w-0">
+          <article id="main-article" className="relative w-full min-w-0 overflow-x-visible">
             <ArticleChartLoadProvider plan={chartLoadPlan}>
               <ArticleBodySegments
                 mdxSource={mdxSource}

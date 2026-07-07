@@ -22,12 +22,17 @@ export function isArticlePageBreakElement(child: ReactNode): child is ReactEleme
   return type?.[ARTICLE_PAGE_BREAK_MARK] === true;
 }
 
-/** Grey strip between white article blocks — matches LycheeContentShell. */
+/**
+ * Grey strip between white article blocks — matches LycheeContentShell.
+ * Outsets into GuideLayout horizontal padding so the demo reads wider than the white page.
+ */
 export const ARTICLE_PAGE_BREAK_SHELL_CLASS = cn(
-  "relative w-full bg-[#F5F5F5]/20 dark:bg-background",
-  "py-8 md:py-10",
+  "relative left-1/2 -translate-x-1/2 bg-[#F5F5F5]/20 dark:bg-background",
+  "py-6 md:py-8",
+  "w-[calc((100%+2.5rem)*0.97)] sm:w-[calc((100%+4rem)*0.97)]",
+  "md:w-[calc((100%+5rem)*0.97)] lg:w-[calc((100%+6rem)*0.97)]",
+  "xl:w-[calc((100%+5rem)*0.97)] 2xl:w-[calc((100%+6rem)*0.97)]",
 );
 
 /** Inner width for page-break demos (query builder, etc.). */
-export const ARTICLE_PAGE_BREAK_INNER_CLASS =
-  "mx-auto w-full max-w-6xl px-4 sm:px-6 md:px-8";
+export const ARTICLE_PAGE_BREAK_INNER_CLASS = "w-full max-w-none";
