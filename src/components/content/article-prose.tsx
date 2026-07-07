@@ -20,6 +20,13 @@ export const LYCHEE_CONTENT_TYPE = {
 /** Fixed reading measure — card grows; text column never widens. */
 export const ARTICLE_TEXT_COLUMN_CLASS = "mx-auto w-full max-w-[42.5rem]";
 
+/**
+ * Prose children without `data-article-bleed` stay in the reading column; wide MDX embeds
+ * (e.g. KalshiHistoricalDataQuery) opt out and span the article surface instead.
+ */
+export const ARTICLE_PROSE_INSET_CLASS =
+  "[&>:not([data-article-bleed])]:mx-auto [&>:not([data-article-bleed])]:w-full [&>:not([data-article-bleed])]:max-w-[42.5rem]";
+
 /** White reading surface */
 export const ARTICLE_SURFACE_CLASS = cn(
   "relative w-full overflow-x-clip rounded-sm bg-white transition-all duration-150",
@@ -33,6 +40,7 @@ export const ARTICLE_SURFACE_CLASS = cn(
 /** Centralized MDX body typography for all lychee_content. */
 export const ARTICLE_PROSE_CLASS = cn(
   "prose prose-neutral dark:prose-invert max-w-none w-full min-w-0 overflow-x-clip font-article prose-sm",
+  ARTICLE_PROSE_INSET_CLASS,
   "prose-headings:font-article prose-headings:tracking-normal prose-headings:scroll-mt-28",
   "prose-h1:text-[1.125rem] prose-h1:font-normal prose-h1:leading-snug prose-h1:mt-8 prose-h1:mb-3 sm:prose-h1:text-[1.25rem] sm:prose-h1:mt-12 sm:prose-h1:mb-4",
   "prose-h2:mt-8 prose-h2:mb-3 sm:prose-h2:mt-10 sm:prose-h2:mb-4",

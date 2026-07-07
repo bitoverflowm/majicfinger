@@ -39,13 +39,17 @@ export function KalshiHistoricalDataQuery({
   id = "kalshi-historical-data-query",
 }: KalshiHistoricalDataQueryProps) {
   return (
-    <section id={id} className="not-prose my-10 w-full scroll-mt-28">
+    <section
+      id={id}
+      data-article-bleed
+      className="not-prose my-10 w-full scroll-mt-28 font-sans antialiased"
+    >
       <div className="w-full overflow-hidden rounded-xl border border-border bg-background">
-        <div className="space-y-2 border-b border-border/60 px-4 py-5 text-center sm:px-6">
-          <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+        <div className="space-y-2 border-b border-border/60 px-6 py-5 text-center md:px-8">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             {title}
           </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
+          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
             {description}
           </p>
         </div>

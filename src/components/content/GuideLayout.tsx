@@ -83,11 +83,13 @@ export function GuideLayout({
                 )}
                 <ArticleHeaderRule />
               </header>
+            </div>
 
-              <ArticleChartLoadProvider plan={chartLoadPlan}>
-                <ArticleProse>{children}</ArticleProse>
-              </ArticleChartLoadProvider>
+            <ArticleChartLoadProvider plan={chartLoadPlan}>
+              <ArticleProse>{children}</ArticleProse>
+            </ArticleChartLoadProvider>
 
+            <div className={ARTICLE_TEXT_COLUMN_CLASS}>
               <div className="mt-10 w-full min-w-0 font-sans sm:mt-14">
                 <GuideTakeawayCta />
               </div>
