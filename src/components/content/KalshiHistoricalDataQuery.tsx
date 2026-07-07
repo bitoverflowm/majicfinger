@@ -1,4 +1,8 @@
 import dynamic from "next/dynamic";
+import {
+  ARTICLE_PAGE_BREAK_INNER_CLASS,
+  markArticlePageBreakComponent,
+} from "./article-page-break";
 
 const HubKalshiQueryBuilder = dynamic(
   () =>
@@ -41,20 +45,24 @@ export function KalshiHistoricalDataQuery({
   return (
     <section
       id={id}
-      data-article-bleed
-      className="not-prose my-10 w-full scroll-mt-28 font-sans antialiased"
+      data-article-page-break
+      className="not-prose scroll-mt-28 font-sans antialiased"
     >
-      <div className="w-full overflow-hidden rounded-xl border border-border bg-background">
-        <div className="space-y-1.5 border-b border-border/60 px-4 py-4 text-center md:px-5">
-          <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-            {title}
-          </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
-            {description}
-          </p>
+      <div className={ARTICLE_PAGE_BREAK_INNER_CLASS}>
+        <div className="w-full overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+          <div className="space-y-1.5 border-b border-border/60 px-4 py-4 text-center md:px-5">
+            <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+              {title}
+            </h2>
+            <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+              {description}
+            </p>
+          </div>
+          <HubKalshiQueryBuilder embedded />
         </div>
-        <HubKalshiQueryBuilder embedded />
       </div>
     </section>
   );
 }
+
+markArticlePageBreakComponent(KalshiHistoricalDataQuery);

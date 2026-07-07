@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { GuideLayout } from "@/components/content/GuideLayout";
 import { ArticleViewTracker } from "@/components/analytics/ArticleViewTracker";
-import { MDXContent } from "@/lib/content/mdx";
 import { getContentBySlug, getAllSlugs } from "@/lib/content";
 import { extractMdxHeadingsForToc } from "@/lib/content/extract-mdx-headings";
 import { stripDuplicateMdxTitleHeading } from "@/lib/content/strip-duplicate-mdx-title";
@@ -97,9 +96,8 @@ export default async function GuidePage({
         contentType={contentType}
         tocItems={tocItems}
         chartLoadPlan={chartLoadPlan}
-      >
-        <MDXContent source={bodyContent} />
-      </GuideLayout>
+        mdxSource={bodyContent}
+      />
     </>
   );
 }

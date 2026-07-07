@@ -4,9 +4,10 @@ import remarkGfm from "remark-gfm";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { useMDXComponents } from "@/components/content/mdx-components";
 
-export async function MDXContent({ source }: { source: string }) {
+/** Resolved MDX tree — pass directly to GuideLayout for article body segmentation. */
+export async function renderMDXBody(source: string) {
   const components = useMDXComponents({});
-  const content = await MDXRemote({
+  return MDXRemote({
     source,
     components,
     options: {
@@ -27,5 +28,8 @@ export async function MDXContent({ source }: { source: string }) {
       },
     },
   });
-  return <>{content}</>;
+}
+
+export async function MDXContent({ source }: { source: string }) {
+  return renderMDXBody(source);
 }

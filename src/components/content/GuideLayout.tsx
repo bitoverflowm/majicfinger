@@ -4,13 +4,12 @@ import { GuideTakeawayCta } from "./GuideTakeawayCta";
 import { ArticleMetaBar } from "./ArticleMetaBar";
 import { RelatedContentSection } from "./RelatedContentSection";
 import {
-  ARTICLE_SURFACE_CLASS,
   ARTICLE_TEXT_COLUMN_CLASS,
   ArticleLead,
   ArticleHeaderRule,
-  ArticleProse,
   ArticleTitle,
 } from "./article-prose";
+import { ArticleBodySegments } from "./ArticleBodySegments";
 import { getRelatedContent } from "@/lib/content/related";
 import type { TocItem } from "@/lib/content/extract-mdx-headings";
 import type { BaseContent, ContentType } from "@/lib/content/types";
@@ -33,16 +32,16 @@ interface GuideLayoutProps {
   contentType?: ContentType;
   tocItems?: TocItem[];
   chartLoadPlan?: ArticleChartLoadPlanEntry[];
-  children: React.ReactNode;
+  mdxSource: string;
 }
 
-export function GuideLayout({
+export async function GuideLayout({
   slug,
   frontmatter,
   contentType = "guides",
   tocItems = [],
   chartLoadPlan = [],
-  children,
+  mdxSource,
 }: GuideLayoutProps) {
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
   const hasToc = tocItems.length > 0;
@@ -67,35 +66,38 @@ export function GuideLayout({
           <div className="mb-2 flex justify-end sm:mb-3">
             <GuideArticleThemeToggle />
           </div>
-          <article id="main-article" className={ARTICLE_SURFACE_CLASS}>
-            <div className={ARTICLE_TEXT_COLUMN_CLASS}>
-              <header className="not-prose mb-6 w-full max-w-full overflow-hidden pt-4 sm:mb-8 sm:pt-6 md:pt-8">
-                <ArticleMetaBar
-                  author={frontmatter.author}
-                  publishedAt={frontmatter.publishedAt}
-                  readingTime={frontmatter.readingTime}
-                  title={frontmatter.title}
-                  shareUrl={resolveShareUrl(slug, frontmatter)}
-                />
-                <ArticleTitle>{frontmatter.title}</ArticleTitle>
-                {frontmatter.description && (
-                  <ArticleLead>{frontmatter.description}</ArticleLead>
-                )}
-                <ArticleHeaderRule />
-              </header>
-            </div>
-
+          <article id="main-article" className="relative w-full min-w-0">
             <ArticleChartLoadProvider plan={chartLoadPlan}>
-              <ArticleProse>{children}</ArticleProse>
+              <ArticleBodySegments
+                mdxSource={mdxSource}
+                header={
+                  <div className={ARTICLE_TEXT_COLUMN_CLASS}>
+                    <header className="not-prose mb-6 w-full max-w-full overflow-hidden pt-4 sm:mb-8 sm:pt-6 md:pt-8">
+                      <ArticleMetaBar
+                        author={frontmatter.author}
+                        publishedAt={frontmatter.publishedAt}
+                        readingTime={frontmatter.readingTime}
+                        title={frontmatter.title}
+                        shareUrl={resolveShareUrl(slug, frontmatter)}
+                      />
+                      <ArticleTitle>{frontmatter.title}</ArticleTitle>
+                      {frontmatter.description && (
+                        <ArticleLead>{frontmatter.description}</ArticleLead>
+                      )}
+                      <ArticleHeaderRule />
+                    </header>
+                  </div>
+                }
+                footer={
+                  <div className={ARTICLE_TEXT_COLUMN_CLASS}>
+                    <div className="mt-10 w-full min-w-0 font-sans sm:mt-14">
+                      <GuideTakeawayCta />
+                    </div>
+                    <RelatedContentSection items={related} />
+                  </div>
+                }
+              />
             </ArticleChartLoadProvider>
-
-            <div className={ARTICLE_TEXT_COLUMN_CLASS}>
-              <div className="mt-10 w-full min-w-0 font-sans sm:mt-14">
-                <GuideTakeawayCta />
-              </div>
-
-              <RelatedContentSection items={related} />
-            </div>
           </article>
         </div>
 

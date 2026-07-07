@@ -21,8 +21,8 @@ export const LYCHEE_CONTENT_TYPE = {
 export const ARTICLE_TEXT_COLUMN_CLASS = "mx-auto w-full max-w-[42.5rem]";
 
 /**
- * Prose children without `data-article-bleed` stay in the reading column; wide MDX embeds
- * (e.g. KalshiHistoricalDataQuery) opt out and span the article surface instead.
+ * Prose children without `data-article-bleed` stay in the reading column.
+ * Full-width MDX demos use `data-article-page-break` on ArticleBodySegments instead.
  */
 export const ARTICLE_PROSE_INSET_CLASS =
   "[&>:not([data-article-bleed])]:mx-auto [&>:not([data-article-bleed])]:w-full [&>:not([data-article-bleed])]:max-w-[42.5rem]";
