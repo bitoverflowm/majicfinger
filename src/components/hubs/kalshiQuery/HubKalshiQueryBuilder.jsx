@@ -147,18 +147,24 @@ function hubSourceIconClasses({ accent }) {
     : "bg-secondary/15 text-secondary dark:text-secondary";
 }
 
-/** Tighter typography and spacing for MDX guide embeds (hub page keeps defaults). */
+/** Tighter typography and spacing for MDX guide embeds; hub scales down between md–lg. */
 function hubEmbedDensity(embedded) {
   return {
-    surface: embedded ? "px-4 py-5 md:px-5 md:py-6" : "px-6 py-8 md:px-8 md:py-10",
-    stack: embedded ? "space-y-6" : "space-y-8",
-    sectionStack: embedded ? "space-y-4" : "space-y-5",
-    gridGap: embedded ? "gap-3" : "gap-4",
-    heading: embedded ? "text-base" : "text-lg",
-    subheading: embedded ? "text-xs" : "text-sm",
-    footerPt: embedded ? "pt-4" : "pt-6",
-    submitSize: embedded ? "default" : "lg",
-    submitPx: embedded ? "px-6" : "px-8",
+    surface: embedded
+      ? "px-4 py-5 md:px-5 md:py-6"
+      : "px-4 py-5 md:px-5 md:py-6 lg:px-8 lg:py-10",
+    stack: embedded ? "space-y-6" : "space-y-6 lg:space-y-8",
+    sectionStack: embedded ? "space-y-4" : "space-y-4 lg:space-y-5",
+    gridGap: embedded ? "gap-3" : "gap-3 lg:gap-4",
+    heading: embedded ? "text-base" : "text-base lg:text-lg",
+    subheading: embedded ? "text-xs" : "text-xs lg:text-sm",
+    footerPt: embedded ? "pt-4" : "pt-4 lg:pt-6",
+    submitSize: embedded ? "default" : "default",
+    submitPx: embedded ? "px-6" : "px-6 lg:px-8",
+    label: embedded ? "text-[11px]" : "text-[11px] lg:text-xs",
+    example: embedded ? "text-[11px]" : "text-[11px] lg:text-xs",
+    exampleIcon: embedded ? "size-3" : "size-3 lg:size-3.5",
+    listGap: embedded ? "space-y-1.5" : "space-y-1.5 lg:space-y-2",
   };
 }
 
@@ -167,23 +173,23 @@ function HubStartingPointColumn({ icon: Icon, title, badge, description, childre
     <div
       className={cn(
         "relative flex h-full flex-col rounded-xl border border-border/70 bg-muted/15",
-        compact ? "p-3" : "p-4",
+        compact ? "p-3" : "p-3 md:p-3 lg:p-4",
       )}
     >
       <div
         className={cn(
           "space-y-2 border-b border-border/50",
-          compact ? "mb-3 pb-3" : "mb-4 pb-4",
+          compact ? "mb-3 pb-3" : "mb-3 pb-3 lg:mb-4 lg:pb-4",
         )}
       >
-        <div className={cn("flex items-start", compact ? "gap-2" : "gap-2.5")}>
+        <div className={cn("flex items-start", compact ? "gap-2" : "gap-2 lg:gap-2.5")}>
           <span
             className={cn(
               "flex shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary dark:text-secondary",
-              compact ? "size-7" : "size-8",
+              compact ? "size-7" : "size-7 lg:size-8",
             )}
           >
-            <Icon className={compact ? "size-3.5" : "size-4"} strokeWidth={1.75} aria-hidden />
+            <Icon className={compact ? "size-3.5" : "size-3.5 lg:size-4"} strokeWidth={1.75} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
             <span className="mb-1 inline-flex rounded-full border border-secondary/25 bg-secondary/10 px-2 py-0.5 text-[0.625rem] font-medium leading-tight text-secondary dark:text-secondary">
@@ -192,7 +198,7 @@ function HubStartingPointColumn({ icon: Icon, title, badge, description, childre
             <h3
               className={cn(
                 "font-semibold leading-snug text-foreground",
-                compact ? "text-xs" : "text-sm",
+                compact ? "text-xs" : "text-xs lg:text-sm",
               )}
             >
               {title}
@@ -200,7 +206,7 @@ function HubStartingPointColumn({ icon: Icon, title, badge, description, childre
             <p
               className={cn(
                 "mt-1 leading-relaxed text-muted-foreground",
-                compact ? "text-[11px] leading-snug" : "text-xs",
+                compact ? "text-[11px] leading-snug" : "text-[11px] leading-snug lg:text-xs",
               )}
             >
               {description}
@@ -228,27 +234,27 @@ function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave,
       onMouseLeave={onLeave}
       className={cn(
         "group flex w-full items-center text-left transition-all duration-200 ease-out hover:translate-x-1.5",
-        compact ? "gap-2 rounded-lg border p-2.5" : "gap-3 rounded-xl border p-3",
+        compact ? "gap-2 rounded-lg border p-2.5" : "gap-2 rounded-lg border p-2.5 lg:gap-3 lg:rounded-xl lg:p-3",
         hubSourceCardClasses({ isSelected, accent, isHovered: false }),
       )}
     >
       <span
         className={cn(
           "flex shrink-0 items-center justify-center rounded-lg",
-          compact ? "size-8" : "size-9",
+          compact ? "size-8" : "size-8 lg:size-9",
           hubSourceIconClasses({ accent }),
         )}
       >
-        <Icon className={compact ? "size-3.5" : "size-4"} strokeWidth={1.75} aria-hidden />
+        <Icon className={compact ? "size-3.5" : "size-3.5 lg:size-4"} strokeWidth={1.75} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+        <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-xs lg:text-sm")}>
           {source.title}
         </span>
         <p
           className={cn(
             "mt-0.5 leading-snug text-muted-foreground",
-            compact ? "text-[11px]" : "text-xs",
+            compact ? "text-[11px]" : "text-[11px] lg:text-xs",
           )}
         >
           {source.description}
@@ -283,32 +289,32 @@ function HubWorkflowOption({ template, onSelect, compact = false }) {
       onClick={() => onSelect(template)}
       className={cn(
         "flex w-full items-center border border-border/60 bg-background text-left transition-all duration-200 ease-out hover:translate-x-1 hover:border-border hover:bg-muted/25",
-        compact ? "gap-2 rounded-lg p-2.5" : "gap-3 rounded-xl p-3",
+        compact ? "gap-2 rounded-lg p-2.5" : "gap-2 rounded-lg p-2.5 lg:gap-3 lg:rounded-xl lg:p-3",
       )}
     >
       <span
         className={cn(
           "flex shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground",
-          compact ? "size-8" : "size-9",
+          compact ? "size-8" : "size-8 lg:size-9",
         )}
       >
-        <Icon className={compact ? "size-3.5" : "size-4"} strokeWidth={1.75} aria-hidden />
+        <Icon className={compact ? "size-3.5" : "size-3.5 lg:size-4"} strokeWidth={1.75} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+        <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-xs lg:text-sm")}>
           {template.title}
         </span>
         <p
           className={cn(
             "mt-0.5 leading-snug text-muted-foreground",
-            compact ? "text-[11px]" : "text-xs",
+            compact ? "text-[11px]" : "text-[11px] lg:text-xs",
           )}
         >
           {template.description}
         </p>
       </div>
       <ChevronRight
-        className={cn("shrink-0 text-muted-foreground/70", compact ? "size-3.5" : "size-4")}
+        className={cn("shrink-0 text-muted-foreground/70", compact ? "size-3.5" : "size-3.5 lg:size-4")}
         aria-hidden
       />
     </button>
@@ -597,8 +603,8 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
               </p>
             </div>
 
-            <div className={cn("flex flex-col lg:flex-row lg:items-stretch", density.gridGap)}>
-              <div className="lg:w-[min(100%,20rem)] lg:shrink-0 xl:w-1/3">
+            <div className={cn("flex flex-col md:flex-row md:items-stretch", density.gridGap)}>
+              <div className="md:w-[min(100%,13rem)] md:shrink-0 lg:w-[min(100%,20rem)] xl:w-1/3">
                 <HubStartingPointColumn
                   icon={Database}
                   title="Browse raw historical data"
@@ -606,10 +612,10 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                   description="Choose a dataset first, then filter, select columns, and query the exact rows you need."
                   compact={embedded}
                 >
-                  <p className={cn("font-medium text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
+                  <p className={cn("font-medium text-muted-foreground", density.label)}>
                     Choose a data source
                   </p>
-                  <div className={embedded ? "space-y-1.5" : "space-y-2"}>
+                  <div className={density.listGap}>
                     {KALSHI_CONNECT_DATA_SOURCES.map((source) => (
                       <HubKalshiSourceOption
                         key={source.sampleId}
@@ -625,10 +631,10 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                 </HubStartingPointColumn>
               </div>
 
-              <div className={cn("relative flex-1 overflow-hidden", embedded ? "min-h-[16rem] lg:min-h-0" : "min-h-[18rem] lg:min-h-0")}>
+              <div className="relative min-h-[16rem] flex-1 overflow-hidden md:min-h-0">
                 <div
                   className={cn(
-                    "grid h-full transition-all duration-500 ease-out lg:grid-cols-2",
+                    "grid h-full transition-all duration-500 ease-out md:grid-cols-2",
                     density.gridGap,
                     hoveredSampleId
                       ? "pointer-events-none translate-x-6 opacity-0"
@@ -643,7 +649,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                     description="Load a Kalshi market by ticker, title, or event so you can explore its historical data faster."
                     compact={embedded}
                   >
-                    <p className={cn("font-medium text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
+                    <p className={cn("font-medium text-muted-foreground", density.label)}>
                       Search
                     </p>
                     <KalshiPowerToolsSearch
@@ -651,10 +657,14 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                       variant="embedded"
                       initialQuery={marketSearchInitial}
                       onSelect={handlePowerSearchSelect}
-                      inputClassName={embedded ? "h-9 rounded-lg pl-9 pr-12 text-xs" : undefined}
+                      inputClassName={
+                        embedded
+                          ? "h-9 rounded-lg pl-9 pr-12 text-xs"
+                          : "h-9 rounded-lg pl-9 pr-12 text-xs lg:h-11 lg:text-sm"
+                      }
                     />
-                    <div className={embedded ? "space-y-1.5" : "space-y-2"}>
-                      <p className={cn("font-medium text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
+                    <div className={density.listGap}>
+                      <p className={cn("font-medium text-muted-foreground", density.label)}>
                         Examples
                       </p>
                       <ul className="space-y-1">
@@ -670,11 +680,11 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                               }}
                               className={cn(
                                 "flex w-full items-center gap-2 rounded-md px-1 py-1 text-left leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground",
-                                embedded ? "text-[11px]" : "text-xs",
+                                density.example,
                               )}
                             >
                               <ExampleIcon
-                                className={cn("shrink-0", embedded ? "size-3" : "size-3.5", example.iconClass)}
+                                className={cn("shrink-0", density.exampleIcon, example.iconClass)}
                                 aria-hidden
                               />
                               {example.label}
@@ -693,7 +703,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                     description="Follow a step-by-step guided walkthrough for common Kalshi historical data tasks."
                     compact={embedded}
                   >
-                    <div className={embedded ? "space-y-1.5" : "space-y-2"}>
+                    <div className={density.listGap}>
                       {HUB_WORKFLOW_TEMPLATES.map((template) => (
                         <HubWorkflowOption
                           key={template.id}
@@ -907,7 +917,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
             <Button
               type="button"
               size={density.submitSize}
-              className={cn("rounded-full", density.submitPx)}
+              className={cn("rounded-full text-sm lg:text-base", density.submitPx)}
               disabled={submitBusy || userLoading || !sampleId || selectedColumns.length === 0}
               onClick={handleSubmit}
             >
