@@ -45,11 +45,11 @@ export function KalshiHistoricalDataQuery({
       className="not-prose my-10 w-full scroll-mt-28 font-sans antialiased"
     >
       <div className="w-full overflow-hidden rounded-xl border border-border bg-background">
-        <div className="space-y-2 border-b border-border/60 px-6 py-5 text-center md:px-8">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+        <div className="space-y-1.5 border-b border-border/60 px-4 py-4 text-center md:px-5">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
             {title}
           </h2>
-          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+          <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
             {description}
           </p>
         </div>

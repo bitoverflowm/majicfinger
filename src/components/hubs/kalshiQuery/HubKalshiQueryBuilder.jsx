@@ -147,29 +147,73 @@ function hubSourceIconClasses({ accent }) {
     : "bg-secondary/15 text-secondary dark:text-secondary";
 }
 
-function HubStartingPointColumn({ icon: Icon, title, badge, description, children }) {
+/** Tighter typography and spacing for MDX guide embeds (hub page keeps defaults). */
+function hubEmbedDensity(embedded) {
+  return {
+    surface: embedded ? "px-4 py-5 md:px-5 md:py-6" : "px-6 py-8 md:px-8 md:py-10",
+    stack: embedded ? "space-y-6" : "space-y-8",
+    sectionStack: embedded ? "space-y-4" : "space-y-5",
+    gridGap: embedded ? "gap-3" : "gap-4",
+    heading: embedded ? "text-base" : "text-lg",
+    subheading: embedded ? "text-xs" : "text-sm",
+    footerPt: embedded ? "pt-4" : "pt-6",
+    submitSize: embedded ? "default" : "lg",
+    submitPx: embedded ? "px-6" : "px-8",
+  };
+}
+
+function HubStartingPointColumn({ icon: Icon, title, badge, description, children, compact = false }) {
   return (
-    <div className="relative flex h-full flex-col rounded-xl border border-border/70 bg-muted/15 p-4">
-      <div className="mb-4 space-y-2 border-b border-border/50 pb-4">
-        <div className="flex items-start gap-2.5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary dark:text-secondary">
-            <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+    <div
+      className={cn(
+        "relative flex h-full flex-col rounded-xl border border-border/70 bg-muted/15",
+        compact ? "p-3" : "p-4",
+      )}
+    >
+      <div
+        className={cn(
+          "space-y-2 border-b border-border/50",
+          compact ? "mb-3 pb-3" : "mb-4 pb-4",
+        )}
+      >
+        <div className={cn("flex items-start", compact ? "gap-2" : "gap-2.5")}>
+          <span
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary dark:text-secondary",
+              compact ? "size-7" : "size-8",
+            )}
+          >
+            <Icon className={compact ? "size-3.5" : "size-4"} strokeWidth={1.75} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <span className="mb-1.5 inline-flex rounded-full border border-secondary/25 bg-secondary/10 px-2 py-0.5 text-[0.625rem] font-medium leading-tight text-secondary dark:text-secondary">
+            <span className="mb-1 inline-flex rounded-full border border-secondary/25 bg-secondary/10 px-2 py-0.5 text-[0.625rem] font-medium leading-tight text-secondary dark:text-secondary">
               {badge}
             </span>
-            <h3 className="text-sm font-semibold leading-snug text-foreground">{title}</h3>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+            <h3
+              className={cn(
+                "font-semibold leading-snug text-foreground",
+                compact ? "text-xs" : "text-sm",
+              )}
+            >
+              {title}
+            </h3>
+            <p
+              className={cn(
+                "mt-1 leading-relaxed text-muted-foreground",
+                compact ? "text-[11px] leading-snug" : "text-xs",
+              )}
+            >
+              {description}
+            </p>
           </div>
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-3">{children}</div>
+      <div className={cn("flex min-h-0 flex-1 flex-col", compact ? "gap-2" : "gap-3")}>{children}</div>
     </div>
   );
 }
 
-function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave }) {
+function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave, compact = false }) {
   const presentation = HUB_KALSHI_SOURCE_PRESENTATION[source.sampleId];
   if (!presentation) return null;
 
@@ -183,21 +227,32 @@ function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave 
       onMouseEnter={() => onHover(source.sampleId)}
       onMouseLeave={onLeave}
       className={cn(
-        "group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-200 ease-out hover:translate-x-1.5",
+        "group flex w-full items-center text-left transition-all duration-200 ease-out hover:translate-x-1.5",
+        compact ? "gap-2 rounded-lg border p-2.5" : "gap-3 rounded-xl border p-3",
         hubSourceCardClasses({ isSelected, accent, isHovered: false }),
       )}
     >
       <span
         className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-lg",
+          "flex shrink-0 items-center justify-center rounded-lg",
+          compact ? "size-8" : "size-9",
           hubSourceIconClasses({ accent }),
         )}
       >
-        <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+        <Icon className={compact ? "size-3.5" : "size-4"} strokeWidth={1.75} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <span className="text-sm font-medium text-foreground">{source.title}</span>
-        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{source.description}</p>
+        <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+          {source.title}
+        </span>
+        <p
+          className={cn(
+            "mt-0.5 leading-snug text-muted-foreground",
+            compact ? "text-[11px]" : "text-xs",
+          )}
+        >
+          {source.description}
+        </p>
       </div>
       <span
         className={cn(
@@ -219,23 +274,43 @@ function HubKalshiSourceOption({ source, isSelected, onSelect, onHover, onLeave 
   );
 }
 
-function HubWorkflowOption({ template, onSelect }) {
+function HubWorkflowOption({ template, onSelect, compact = false }) {
   const Icon = template.icon;
 
   return (
     <button
       type="button"
       onClick={() => onSelect(template)}
-      className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all duration-200 ease-out hover:translate-x-1 hover:border-border hover:bg-muted/25"
+      className={cn(
+        "flex w-full items-center border border-border/60 bg-background text-left transition-all duration-200 ease-out hover:translate-x-1 hover:border-border hover:bg-muted/25",
+        compact ? "gap-2 rounded-lg p-2.5" : "gap-3 rounded-xl p-3",
+      )}
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground">
-        <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+      <span
+        className={cn(
+          "flex shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground",
+          compact ? "size-8" : "size-9",
+        )}
+      >
+        <Icon className={compact ? "size-3.5" : "size-4"} strokeWidth={1.75} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <span className="text-sm font-medium text-foreground">{template.title}</span>
-        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{template.description}</p>
+        <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+          {template.title}
+        </span>
+        <p
+          className={cn(
+            "mt-0.5 leading-snug text-muted-foreground",
+            compact ? "text-[11px]" : "text-xs",
+          )}
+        >
+          {template.description}
+        </p>
       </div>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
+      <ChevronRight
+        className={cn("shrink-0 text-muted-foreground/70", compact ? "size-3.5" : "size-4")}
+        aria-hidden
+      />
     </button>
   );
 }
@@ -255,16 +330,23 @@ function ColumnDefinitionsPanel({
   showAll = false,
   title,
   className,
+  compact = false,
 }) {
   if (!columns?.length) return null;
   return (
     <div
       className={cn(
-        "flex h-full flex-col rounded-xl border border-border/70 bg-muted/15 p-4",
+        "flex h-full flex-col rounded-xl border border-border/70 bg-muted/15",
+        compact ? "p-3" : "p-4",
         className,
       )}
     >
-      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <p
+        className={cn(
+          "font-medium uppercase tracking-wider text-muted-foreground",
+          compact ? "mb-2 text-[10px]" : "mb-3 text-xs",
+        )}
+      >
         {title ?? `Column definitions (${columns.length})`}
       </p>
       <ul
@@ -492,38 +574,42 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
     setAuthOpen(true);
   }, [buildDraft, userLoading, isLoggedIn, continueToDashboard]);
 
+  const density = hubEmbedDensity(embedded);
+
   return (
     <>
       <div
         className={cn(
-          "relative z-20 w-full space-y-8 bg-background font-sans",
-          embedded
-            ? "px-6 py-8 md:px-8 md:py-10"
-            : "border-y border-border px-6 py-8 md:px-8 md:py-10",
+          "relative z-20 w-full bg-background font-sans",
+          density.stack,
+          embedded ? density.surface : cn("border-y border-border", density.surface),
         )}
       >
         {!sampleId ? (
-          <div className="space-y-5">
+          <div className={density.sectionStack}>
             <div className="space-y-1">
-              <h3 className="text-lg font-semibold tracking-tight text-foreground">
+              <h3 className={cn("font-semibold tracking-tight text-foreground", density.heading)}>
                 What do you want to do with Kalshi historical data?
               </h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className={cn("leading-relaxed text-muted-foreground", density.subheading)}>
                 Start from raw data, search a specific market, or launch a guided workflow built
                 for prediction market research.
               </p>
             </div>
 
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+            <div className={cn("flex flex-col lg:flex-row lg:items-stretch", density.gridGap)}>
               <div className="lg:w-[min(100%,20rem)] lg:shrink-0 xl:w-1/3">
                 <HubStartingPointColumn
                   icon={Database}
                   title="Browse raw historical data"
                   badge="Best for discovery"
                   description="Choose a dataset first, then filter, select columns, and query the exact rows you need."
+                  compact={embedded}
                 >
-                  <p className="text-xs font-medium text-muted-foreground">Choose a data source</p>
-                  <div className="space-y-2">
+                  <p className={cn("font-medium text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
+                    Choose a data source
+                  </p>
+                  <div className={embedded ? "space-y-1.5" : "space-y-2"}>
                     {KALSHI_CONNECT_DATA_SOURCES.map((source) => (
                       <HubKalshiSourceOption
                         key={source.sampleId}
@@ -532,16 +618,18 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                         onSelect={handleSelectSource}
                         onHover={handleSourceHover}
                         onLeave={handleSourceLeave}
+                        compact={embedded}
                       />
                     ))}
                   </div>
                 </HubStartingPointColumn>
               </div>
 
-              <div className="relative min-h-[18rem] flex-1 overflow-hidden lg:min-h-0">
+              <div className={cn("relative flex-1 overflow-hidden", embedded ? "min-h-[16rem] lg:min-h-0" : "min-h-[18rem] lg:min-h-0")}>
                 <div
                   className={cn(
-                    "grid h-full gap-4 transition-all duration-500 ease-out lg:grid-cols-2",
+                    "grid h-full transition-all duration-500 ease-out lg:grid-cols-2",
+                    density.gridGap,
                     hoveredSampleId
                       ? "pointer-events-none translate-x-6 opacity-0"
                       : "translate-x-0 opacity-100",
@@ -553,16 +641,22 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                     title="Search for a specific market"
                     badge="Best for known markets"
                     description="Load a Kalshi market by ticker, title, or event so you can explore its historical data faster."
+                    compact={embedded}
                   >
-                    <p className="text-xs font-medium text-muted-foreground">Search</p>
+                    <p className={cn("font-medium text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
+                      Search
+                    </p>
                     <KalshiPowerToolsSearch
                       key={marketSearchKey}
                       variant="embedded"
                       initialQuery={marketSearchInitial}
                       onSelect={handlePowerSearchSelect}
+                      inputClassName={embedded ? "h-9 rounded-lg pl-9 pr-12 text-xs" : undefined}
                     />
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Examples</p>
+                    <div className={embedded ? "space-y-1.5" : "space-y-2"}>
+                      <p className={cn("font-medium text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
+                        Examples
+                      </p>
                       <ul className="space-y-1">
                         {HUB_MARKET_SEARCH_EXAMPLES.map((example) => {
                           const ExampleIcon = example.icon;
@@ -574,10 +668,13 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                                 setMarketSearchInitial(example.label);
                                 setMarketSearchKey((key) => key + 1);
                               }}
-                              className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
+                              className={cn(
+                                "flex w-full items-center gap-2 rounded-md px-1 py-1 text-left leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground",
+                                embedded ? "text-[11px]" : "text-xs",
+                              )}
                             >
                               <ExampleIcon
-                                className={cn("size-3.5 shrink-0", example.iconClass)}
+                                className={cn("shrink-0", embedded ? "size-3" : "size-3.5", example.iconClass)}
                                 aria-hidden
                               />
                               {example.label}
@@ -594,13 +691,15 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                     title="Use a guided workflow"
                     badge="Best for guided setup"
                     description="Follow a step-by-step guided walkthrough for common Kalshi historical data tasks."
+                    compact={embedded}
                   >
-                    <div className="space-y-2">
+                    <div className={embedded ? "space-y-1.5" : "space-y-2"}>
                       {HUB_WORKFLOW_TEMPLATES.map((template) => (
                         <HubWorkflowOption
                           key={template.id}
                           template={template}
                           onSelect={handleApplyWorkflow}
+                          compact={embedded}
                         />
                       ))}
                     </div>
@@ -625,6 +724,7 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                       showAll
                       title={`${hoveredSourceLabel} columns (${hoverPreviewColumns.length})`}
                       className="h-full"
+                      compact={embedded}
                     />
                   ) : null}
                 </div>
@@ -798,21 +898,25 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
           </>
         ) : null}
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p className={cn("text-destructive", embedded ? "text-xs" : "text-sm")}>{error}</p>
+        ) : null}
 
-        <div className="flex justify-end border-t border-border/60 pt-6">
+        <div className={cn("flex justify-end border-t border-border/60", density.footerPt)}>
           <div className="flex flex-col items-center gap-2">
             <Button
               type="button"
-              size="lg"
-              className="rounded-full px-8"
+              size={density.submitSize}
+              className={cn("rounded-full", density.submitPx)}
               disabled={submitBusy || userLoading || !sampleId || selectedColumns.length === 0}
               onClick={handleSubmit}
             >
               {submitBusy ? "Starting…" : userLoading ? "Loading…" : isLoggedIn ? "Run query" : "Run for Free"}
             </Button>
             {!isLoggedIn ? (
-              <p className="text-xs text-muted-foreground">No credit card required</p>
+              <p className={cn("text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
+                No credit card required
+              </p>
             ) : null}
           </div>
         </div>
