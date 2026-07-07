@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CloudSun,
   Database,
+  Hash,
   Layers,
   LineChart,
   Plus,
@@ -13,8 +14,9 @@ import {
   Search,
   Target,
   Trash2,
-  TrendingUp,
+  Vote,
   Wand2,
+  CircleDollarSign,
 } from "lucide-react";
 
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
@@ -62,10 +64,10 @@ const HUB_KALSHI_SOURCE_PRESENTATION = {
 };
 
 const HUB_MARKET_SEARCH_EXAMPLES = [
-  "NYC high temp",
-  "Presidential Election 2024",
-  "KXLLM1",
-  "Fed rate",
+  { label: "NYC high temp", icon: CloudSun, iconClass: "text-sky-600 dark:text-sky-400" },
+  { label: "Presidential Election 2024", icon: Vote, iconClass: "text-secondary dark:text-secondary" },
+  { label: "KXLLM1", icon: Hash, iconClass: "text-muted-foreground" },
+  { label: "Fed rate", icon: CircleDollarSign, iconClass: "text-emerald-700 dark:text-emerald-400" },
 ];
 
 const HUB_WORKFLOW_TEMPLATES = [
@@ -506,10 +508,11 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
           <div className="space-y-5">
             <div className="space-y-1">
               <h3 className="text-lg font-semibold tracking-tight text-foreground">
-                Choose your starting point
+                What do you want to do with Kalshi historical data?
               </h3>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Each option opens the right query setup automatically.
+                Start from raw data, search a specific market, or launch a guided workflow built
+                for prediction market research.
               </p>
             </div>
 
@@ -517,9 +520,9 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
               <div className="lg:w-[min(100%,20rem)] lg:shrink-0 xl:w-1/3">
                 <HubStartingPointColumn
                   icon={Database}
-                  title="Start from data"
+                  title="Browse raw historical data"
                   badge="Best for discovery"
-                  description="Explore the dataset you need."
+                  description="Choose a dataset first, then filter, select columns, and query the exact rows you need."
                 >
                   <p className="text-xs font-medium text-muted-foreground">Choose a data source</p>
                   <div className="space-y-2">
@@ -563,24 +566,27 @@ export function HubKalshiQueryBuilder({ embedded = false }) {
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-muted-foreground">Examples</p>
                       <ul className="space-y-1">
-                        {HUB_MARKET_SEARCH_EXAMPLES.map((example) => (
-                          <li key={example}>
+                        {HUB_MARKET_SEARCH_EXAMPLES.map((example) => {
+                          const ExampleIcon = example.icon;
+                          return (
+                          <li key={example.label}>
                             <button
                               type="button"
                               onClick={() => {
-                                setMarketSearchInitial(example);
+                                setMarketSearchInitial(example.label);
                                 setMarketSearchKey((key) => key + 1);
                               }}
                               className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground"
                             >
-                              <TrendingUp
-                                className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                              <ExampleIcon
+                                className={cn("size-3.5 shrink-0", example.iconClass)}
                                 aria-hidden
                               />
-                              {example}
+                              {example.label}
                             </button>
                           </li>
-                        ))}
+                          );
+                        })}
                       </ul>
                     </div>
                   </HubStartingPointColumn>
