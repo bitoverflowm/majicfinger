@@ -21,4 +21,5 @@ export const KALSHI_GUIDED_TARGETS = {
   sheetName: "kalshi.sheetName" as const,
   runQuery: "kalshi.runQuery" as const,
   cancel: "kalshi.cancel" as const,
+  guideExit: "kalshi.guide.exit" as const,
 };

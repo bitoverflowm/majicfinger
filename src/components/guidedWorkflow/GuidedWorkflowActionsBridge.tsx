@@ -13,22 +13,22 @@ export function GuidedWorkflowActionsBridge({
   onActiveChange,
   startAfterTick,
 }) {
-  const { startWorkflow, cancelWorkflow, isActive } = useGuidedWorkflow();
+  const { startWorkflow, cancelWorkflow, isGuideOpen } = useGuidedWorkflow();
 
   useEffect(() => {
     actionsRef.current = { startWorkflow, cancelWorkflow };
   }, [actionsRef, startWorkflow, cancelWorkflow]);
 
   useEffect(() => {
-    onActiveChange?.(isActive);
-  }, [isActive, onActiveChange]);
+    onActiveChange?.(isGuideOpen);
+  }, [isGuideOpen, onActiveChange]);
 
   useEffect(() => {
     const id = pendingWorkflowIdRef.current;
-    if (!id || isActive) return;
+    if (!id) return;
     pendingWorkflowIdRef.current = null;
     startWorkflow(id);
-  }, [isActive, startWorkflow, pendingWorkflowIdRef, startAfterTick]);
+  }, [startWorkflow, pendingWorkflowIdRef, startAfterTick]);
 
   return null;
 }

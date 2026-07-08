@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
  *   onExit: () => void;
  *   className?: string;
  *   style?: React.CSSProperties;
+ *   showExitActions?: boolean;
  * }} props
  */
 export function GuidedWorkflowTooltip({
@@ -22,6 +23,7 @@ export function GuidedWorkflowTooltip({
   onExit,
   className,
   style,
+  showExitActions = true,
 }) {
   return (
     <div
@@ -38,16 +40,18 @@ export function GuidedWorkflowTooltip({
         <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Step {stepIndex + 1} of {totalSteps}
         </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground"
-          onClick={onExit}
-          aria-label="Exit guide"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        {showExitActions ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-muted-foreground"
+            onClick={onExit}
+            aria-label="Exit guide"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        ) : null}
       </div>
       <h4 id="guided-step-title" className="mt-1 text-sm font-semibold text-foreground">
         {step.title}
@@ -55,12 +59,14 @@ export function GuidedWorkflowTooltip({
       <p id="guided-step-body" className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
         {step.body}
       </p>
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
-        <p className="text-[10px] text-muted-foreground">Press Esc to exit anytime</p>
-        <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={onExit}>
-          Exit guide
-        </Button>
-      </div>
+      {showExitActions ? (
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+          <p className="text-[10px] text-muted-foreground">Press Esc to exit anytime</p>
+          <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={onExit}>
+            Exit guide
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

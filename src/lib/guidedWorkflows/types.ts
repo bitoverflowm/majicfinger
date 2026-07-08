@@ -15,7 +15,12 @@ export type GuidedTargetId =
   | "kalshi.compose.limit.value"
   | "kalshi.sheetName"
   | "kalshi.runQuery"
-  | "kalshi.cancel";
+  | "kalshi.cancel"
+  | "kalshi.guide.exit";
+
+export type GuidedPhase = "idle" | "intro" | "exit-hint" | "active";
+
+export type GuidedWorkflowStatus = "idle" | "intro" | "exit-hint" | "active" | "completed" | "cancelled";
 
 export type GuidedSnapshotMatch = {
   sampleId?: string;
@@ -60,7 +65,5 @@ export type GuidedWorkflowDefinition = {
   description: string;
   steps: GuidedStep[];
 };
-
-export type GuidedWorkflowStatus = "idle" | "active" | "completed" | "cancelled";
 
 export const GUIDED_TARGET_ATTR = "data-guided-target";
