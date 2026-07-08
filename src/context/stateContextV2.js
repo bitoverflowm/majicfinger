@@ -100,6 +100,8 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const connectDataLakePullAbortRef = useRef(null);
     /** Each connectDataLakePullTick is consumed once (survives panel remount during boot). */
     const connectDataLakePullConsumedTickRef = useRef(0);
+    /** Guided inline pull — hub draft snapshot for compose filter fallback. */
+    const guidedWorkflowHubDraftRef = useRef(initialSettings?.guidedWorkflowHubDraft ?? null);
     /** Saved project load — drives Connect home sheet skeleton + progress bar. */
     const [connectProjectLoadState, setConnectProjectLoadState] = useState(CONNECT_PROJECT_LOAD_IDLE);
     /** Kalshi/Polymarket lake sample id chosen on Connect home (e.g. athena-kal-markets). */
@@ -107,7 +109,9 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       initialSettings?.connectDataLakeSampleId ?? "",
     );
     /** Connect home data-lake column picks keyed by sample id (Kalshi + Polymarket historical). */
-    const [connectDataLakeColumnSelections, setConnectDataLakeColumnSelections] = useState({});
+    const [connectDataLakeColumnSelections, setConnectDataLakeColumnSelections] = useState(
+      initialSettings?.connectDataLakeColumnSelections ?? {},
+    );
     /** Connect home Polymarket API endpoint query id (e.g. listMarkets). */
     const [connectApiEndpointId, setConnectApiEndpointId] = useState("");
     /** Connect home API column picks keyed by endpoint query id. */
@@ -149,16 +153,46 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     /** Athena test-ping status per lake sample id (idle | loading | ok | error). */
     const [athenaPingBySampleId, setAthenaPingBySampleId] = useState({});
     /** Connect home: refine operation panels open below the hub (stacked: where, join, sort, …). */
-    const [connectActiveComposeOps, setConnectActiveComposeOps] = useState([]);
+    const [connectActiveComposeOps, setConnectActiveComposeOps] = useState(
+      Array.isArray(initialSettings?.connectActiveComposeOps)
+        ? initialSettings.connectActiveComposeOps
+        : [],
+    );
     /** Shared compose state (Connect inline + Kalshi integrations panel). */
-    const [dataLakeColumnComposeItems, setDataLakeColumnComposeItems] = useState([]);
-    const [dataLakeComposeOrderBy, setDataLakeComposeOrderBy] = useState([]);
-    const [dataLakeComposeLimitOpen, setDataLakeComposeLimitOpen] = useState(false);
-    const [dataLakeComposeLimitValue, setDataLakeComposeLimitValue] = useState("");
-    const [dataLakeComposeLimitScope, setDataLakeComposeLimitScope] = useState("primary");
-    const [dataLakeComposeWhereFilters, setDataLakeComposeWhereFilters] = useState([]);
-    const [dataLakeComposeHavingFilters, setDataLakeComposeHavingFilters] = useState([]);
-    const [dataLakeComposeJoins, setDataLakeComposeJoins] = useState([]);
+    const [dataLakeColumnComposeItems, setDataLakeColumnComposeItems] = useState(
+      Array.isArray(initialSettings?.dataLakeColumnComposeItems)
+        ? initialSettings.dataLakeColumnComposeItems
+        : [],
+    );
+    const [dataLakeComposeOrderBy, setDataLakeComposeOrderBy] = useState(
+      Array.isArray(initialSettings?.dataLakeComposeOrderBy)
+        ? initialSettings.dataLakeComposeOrderBy
+        : [],
+    );
+    const [dataLakeComposeLimitOpen, setDataLakeComposeLimitOpen] = useState(
+      !!initialSettings?.dataLakeComposeLimitOpen,
+    );
+    const [dataLakeComposeLimitValue, setDataLakeComposeLimitValue] = useState(
+      initialSettings?.dataLakeComposeLimitValue ?? "",
+    );
+    const [dataLakeComposeLimitScope, setDataLakeComposeLimitScope] = useState(
+      initialSettings?.dataLakeComposeLimitScope ?? "primary",
+    );
+    const [dataLakeComposeWhereFilters, setDataLakeComposeWhereFilters] = useState(
+      Array.isArray(initialSettings?.dataLakeComposeWhereFilters)
+        ? initialSettings.dataLakeComposeWhereFilters
+        : [],
+    );
+    const [dataLakeComposeHavingFilters, setDataLakeComposeHavingFilters] = useState(
+      Array.isArray(initialSettings?.dataLakeComposeHavingFilters)
+        ? initialSettings.dataLakeComposeHavingFilters
+        : [],
+    );
+    const [dataLakeComposeJoins, setDataLakeComposeJoins] = useState(
+      Array.isArray(initialSettings?.dataLakeComposeJoins)
+        ? initialSettings.dataLakeComposeJoins
+        : [],
+    );
 
     /* Dashboard and bento state */
     const [dashData, setDashData] = useState([{
@@ -908,7 +942,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
 
     return (
-        <StateContextV2.Provider value={{providerValue, isDemo, setIsDemo, guidedWorkflowPull, guidedWorkflowPullRequested, setGuidedWorkflowPullRequested, runYourselfLocked, setRunYourselfLocked, runYourselfSessionActive, setRunYourselfSessionActive, workspaceWriteLocked, setWorkspaceWriteLocked, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, rightPanelOpen, setRightPanelOpen, rightPanelTab, setRightPanelTab, connectWorkspace, setConnectWorkspace, connectWorkspaceScrollTick, requestConnectWorkspace, connectComposeScrollTick, requestConnectComposeScroll, connectDataLakePullTick, requestConnectDataLakePull, connectHomeLeftNavOpen, setConnectHomeLeftNavOpen, connectHomeFlowStepsOpen, setConnectHomeFlowStepsOpen, connectHomeAnalyzeActive, setConnectHomeAnalyzeActive, connectHomeCenterView, setConnectHomeCenterView, connectAnalyzeScrollTick, requestConnectAnalyzeScroll, connectDataLakePullState, setConnectDataLakePullState, connectLargePullApplyRef, connectDataLakePullAbortRef, connectDataLakePullConsumedTickRef, connectProjectLoadState, setConnectProjectLoadState, connectDataLakeSampleId, setConnectDataLakeSampleId, connectDataLakeColumnSelections, setConnectDataLakeColumnSelections, connectApiEndpointId, setConnectApiEndpointId, connectApiColumnSelections, setConnectApiColumnSelections, connectLiveSourceId, setConnectLiveSourceId, connectLiveColumnSelections, setConnectLiveColumnSelections, connectKalshiLiveEndpointId, setConnectKalshiLiveEndpointId, connectKalshiLiveColumnSelections, setConnectKalshiLiveColumnSelections, connectKalshiLiveFilters, setConnectKalshiLiveFilters, connectKalshiLiveLimit, setConnectKalshiLiveLimit, connectKalshiLiveTickers, setConnectKalshiLiveTickers, connectKalshiLiveCandlestickTickers, setConnectKalshiLiveCandlestickTickers, connectKalshiLiveTradesTicker, setConnectKalshiLiveTradesTicker, connectKalshiLiveSeriesTicker, setConnectKalshiLiveSeriesTicker, connectKalshiLiveSeriesListFilters, setConnectKalshiLiveSeriesListFilters, connectKalshiLiveSeriesListSort, setConnectKalshiLiveSeriesListSort, connectKalshiLiveWhereFilters, setConnectKalshiLiveWhereFilters, connectKalshiLiveSortClauses, setConnectKalshiLiveSortClauses, kalshiLivePingState, setKalshiLivePingState, pingKalshiLiveExchange: pingKalshiLiveExchangeStatus, connectIntegrationPullTick, requestConnectIntegrationPull, cancelConnectDataFeedPull, connectHomePendingSheetName, setConnectHomePendingSheetName, connectHomePullDestination, setConnectHomePullDestination, athenaPingBySampleId, setAthenaPingBySampleId, pingAthenaLakeSample, connectActiveComposeOps, setConnectActiveComposeOps, dataLakeColumnComposeItems, setDataLakeColumnComposeItems, dataLakeComposeOrderBy, setDataLakeComposeOrderBy, dataLakeComposeLimitOpen, setDataLakeComposeLimitOpen, dataLakeComposeLimitValue, setDataLakeComposeLimitValue, dataLakeComposeLimitScope, setDataLakeComposeLimitScope, dataLakeComposeWhereFilters, setDataLakeComposeWhereFilters, dataLakeComposeHavingFilters, setDataLakeComposeHavingFilters, dataLakeComposeJoins, setDataLakeComposeJoins, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedChartDashboards, setSavedChartDashboards, activeChartDashboardId, setActiveChartDashboardId, chartDashboardDraft, setChartDashboardDraft, selectedDashboardCard, setSelectedDashboardCard, refetchChartDashboardsTick, setRefetchChartDashboardsTick, saveProjectDialogNonce, requestSaveProjectDialog, pageFormatDockTarget, setPageFormatDockTarget, chartComposerDock, setChartComposerDock, cardGridComposerDock, setCardGridComposerDock, chartPickerEmphasis, setChartPickerEmphasis, dashboardComposerLayoutActions, setDashboardComposerLayoutActions, pageTitleFormatDockOpen, setPageTitleFormatDockOpen, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, userHandle, setUserHandle, profilePic, setProfilePic, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, loadedChartBuilderSnapshot, setLoadedChartBuilderSnapshot, chartSheets, setChartSheets, activeChartSheetId, setActiveChartSheetId, addNewChartAndActivate, chartSnapshotFlusher, setChartSnapshotFlusher, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions, dataSheets, setDataSheets, activeSheetId, setActiveSheetId, addNewSheetAndActivate, replaceCurrentSheetData, setSheetData}}>
+        <StateContextV2.Provider value={{providerValue, isDemo, setIsDemo, guidedWorkflowPull, guidedWorkflowPullRequested, setGuidedWorkflowPullRequested, guidedWorkflowHubDraftRef, runYourselfLocked, setRunYourselfLocked, runYourselfSessionActive, setRunYourselfSessionActive, workspaceWriteLocked, setWorkspaceWriteLocked, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, rightPanelOpen, setRightPanelOpen, rightPanelTab, setRightPanelTab, connectWorkspace, setConnectWorkspace, connectWorkspaceScrollTick, requestConnectWorkspace, connectComposeScrollTick, requestConnectComposeScroll, connectDataLakePullTick, requestConnectDataLakePull, connectHomeLeftNavOpen, setConnectHomeLeftNavOpen, connectHomeFlowStepsOpen, setConnectHomeFlowStepsOpen, connectHomeAnalyzeActive, setConnectHomeAnalyzeActive, connectHomeCenterView, setConnectHomeCenterView, connectAnalyzeScrollTick, requestConnectAnalyzeScroll, connectDataLakePullState, setConnectDataLakePullState, connectLargePullApplyRef, connectDataLakePullAbortRef, connectDataLakePullConsumedTickRef, connectProjectLoadState, setConnectProjectLoadState, connectDataLakeSampleId, setConnectDataLakeSampleId, connectDataLakeColumnSelections, setConnectDataLakeColumnSelections, connectApiEndpointId, setConnectApiEndpointId, connectApiColumnSelections, setConnectApiColumnSelections, connectLiveSourceId, setConnectLiveSourceId, connectLiveColumnSelections, setConnectLiveColumnSelections, connectKalshiLiveEndpointId, setConnectKalshiLiveEndpointId, connectKalshiLiveColumnSelections, setConnectKalshiLiveColumnSelections, connectKalshiLiveFilters, setConnectKalshiLiveFilters, connectKalshiLiveLimit, setConnectKalshiLiveLimit, connectKalshiLiveTickers, setConnectKalshiLiveTickers, connectKalshiLiveCandlestickTickers, setConnectKalshiLiveCandlestickTickers, connectKalshiLiveTradesTicker, setConnectKalshiLiveTradesTicker, connectKalshiLiveSeriesTicker, setConnectKalshiLiveSeriesTicker, connectKalshiLiveSeriesListFilters, setConnectKalshiLiveSeriesListFilters, connectKalshiLiveSeriesListSort, setConnectKalshiLiveSeriesListSort, connectKalshiLiveWhereFilters, setConnectKalshiLiveWhereFilters, connectKalshiLiveSortClauses, setConnectKalshiLiveSortClauses, kalshiLivePingState, setKalshiLivePingState, pingKalshiLiveExchange: pingKalshiLiveExchangeStatus, connectIntegrationPullTick, requestConnectIntegrationPull, cancelConnectDataFeedPull, connectHomePendingSheetName, setConnectHomePendingSheetName, connectHomePullDestination, setConnectHomePullDestination, athenaPingBySampleId, setAthenaPingBySampleId, pingAthenaLakeSample, connectActiveComposeOps, setConnectActiveComposeOps, dataLakeColumnComposeItems, setDataLakeColumnComposeItems, dataLakeComposeOrderBy, setDataLakeComposeOrderBy, dataLakeComposeLimitOpen, setDataLakeComposeLimitOpen, dataLakeComposeLimitValue, setDataLakeComposeLimitValue, dataLakeComposeLimitScope, setDataLakeComposeLimitScope, dataLakeComposeWhereFilters, setDataLakeComposeWhereFilters, dataLakeComposeHavingFilters, setDataLakeComposeHavingFilters, dataLakeComposeJoins, setDataLakeComposeJoins, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedChartDashboards, setSavedChartDashboards, activeChartDashboardId, setActiveChartDashboardId, chartDashboardDraft, setChartDashboardDraft, selectedDashboardCard, setSelectedDashboardCard, refetchChartDashboardsTick, setRefetchChartDashboardsTick, saveProjectDialogNonce, requestSaveProjectDialog, pageFormatDockTarget, setPageFormatDockTarget, chartComposerDock, setChartComposerDock, cardGridComposerDock, setCardGridComposerDock, chartPickerEmphasis, setChartPickerEmphasis, dashboardComposerLayoutActions, setDashboardComposerLayoutActions, pageTitleFormatDockOpen, setPageTitleFormatDockOpen, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, userHandle, setUserHandle, profilePic, setProfilePic, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, loadedChartBuilderSnapshot, setLoadedChartBuilderSnapshot, chartSheets, setChartSheets, activeChartSheetId, setActiveChartSheetId, addNewChartAndActivate, chartSnapshotFlusher, setChartSnapshotFlusher, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions, dataSheets, setDataSheets, activeSheetId, setActiveSheetId, addNewSheetAndActivate, replaceCurrentSheetData, setSheetData}}>
             {children}
         </StateContextV2.Provider>
     )

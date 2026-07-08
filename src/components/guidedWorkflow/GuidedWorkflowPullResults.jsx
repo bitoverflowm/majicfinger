@@ -1,23 +1,37 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import DashBody from "@/app/dashboard/dashBody";
 import LiveStreamManager from "@/app/dashboard/components/liveStreamManager";
 import { StateProvider } from "@/context/stateContext";
 import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
-import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
+import {
+  applyHubQueryDraft,
+  buildColumnComposeItemsFromSelections,
+} from "@/lib/hubs/applyHubQueryDraft";
+import { normalizeHubQueryDraft, normalizeHubQueryWhereFilters } from "@/lib/hubs/hubQueryDraft";
 import { cn } from "@/lib/utils";
 
 function GuidedWorkflowPullBootstrap({ draft }) {
   const ctx = useMyStateV2();
   const appliedRef = useRef(false);
+  const normalizedDraft = useMemo(
+    () =>
+      draft
+        ? normalizeHubQueryDraft({
+            ...draft,
+            whereFilters: normalizeHubQueryWhereFilters(draft.whereFilters),
+          })
+        : null,
+    [draft],
+  );
 
   useEffect(() => {
-    if (!ctx || !draft || appliedRef.current) return;
+    if (!ctx || !normalizedDraft || appliedRef.current) return;
     appliedRef.current = true;
-    applyHubQueryDraft(ctx, draft, { autoPull: false, guidedInlinePull: true });
-  }, [ctx, draft]);
+    applyHubQueryDraft(ctx, normalizedDraft, { autoPull: false, guidedInlinePull: true });
+  }, [ctx, normalizedDraft]);
 
   return null;
 }
@@ -33,6 +47,15 @@ function GuidedWorkflowPullBootstrap({ draft }) {
  */
 export function GuidedWorkflowPullResults({ draft, embedded = false, className }) {
   const sampleId = draft?.sampleId || "";
+  const whereFilters = normalizeHubQueryWhereFilters(draft?.whereFilters);
+  const guidedHubDraft = draft ? { ...draft, whereFilters } : null;
+  const columnSelections = draft?.columnSelections || {};
+  const columnComposeItems = useMemo(() => {
+    if (Array.isArray(draft?.columnComposeItems) && draft.columnComposeItems.length > 0) {
+      return draft.columnComposeItems;
+    }
+    return buildColumnComposeItemsFromSelections(sampleId, columnSelections);
+  }, [draft?.columnComposeItems, sampleId, columnSelections]);
 
   return (
     <div
@@ -50,9 +73,20 @@ export function GuidedWorkflowPullResults({ draft, embedded = false, className }
             demo: true,
             guidedWorkflowPull: true,
             guidedWorkflowPullRequested: true,
+            guidedWorkflowHubDraft: guidedHubDraft,
             viewing: "connectDataHome",
             connectWorkspace: "kalshiHistorical",
             connectDataLakeSampleId: sampleId,
+            connectDataLakeColumnSelections: columnSelections,
+            dataLakeColumnComposeItems: columnComposeItems,
+            dataLakeComposeWhereFilters: whereFilters,
+            dataLakeComposeOrderBy: Array.isArray(draft?.orderBy) ? draft.orderBy : [],
+            dataLakeComposeLimitOpen: !!draft?.composeLimitOpen,
+            dataLakeComposeLimitValue: draft?.composeLimitValue ?? "",
+            dataLakeComposeLimitScope: draft?.composeLimitScope ?? "primary",
+            connectActiveComposeOps: Array.isArray(draft?.activeComposeOps)
+              ? draft.activeComposeOps
+              : [],
             connectHomeAnalyzeActive: true,
             connectDataLakePullState: {
               loading: true,

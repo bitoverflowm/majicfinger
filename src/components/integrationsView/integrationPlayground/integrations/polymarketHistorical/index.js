@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
  * Polymarket Historical — archived Becker / Lychee Parquet in S3, queried via DuckDB-WASM in the browser.
  */
 export default function PolymarketHistorical({ setConnectedData, connectHomePullBridge = false }) {
-  const { label, progress, ready, error, retry } = useBeckerParquetBoot();
+  const { label, progress, ready, error, retry } = useBeckerParquetBoot({
+    skipWarm: connectHomePullBridge,
+  });
 
   if (error) {
     return (

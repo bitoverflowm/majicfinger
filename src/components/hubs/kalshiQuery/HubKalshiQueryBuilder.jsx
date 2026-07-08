@@ -37,6 +37,8 @@ import {
   buildHubQueryDashboardUrl,
   navigateToHubQueryDashboard,
   normalizeHubQueryDraft,
+  normalizeHubQueryWhereFilters,
+  hasComposeDraftPayload,
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
 import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
@@ -522,10 +524,13 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
   const buildDraft = useCallback(() => {
     const sourceHubPath =
       typeof window !== "undefined" ? window.location.pathname || "" : "";
-    const draftState = composeDraftRef.current || composeDraft;
-    const whereFilters = (draftState.whereFilters || []).filter((f) =>
-      String(f.value ?? "").trim(),
-    );
+    const refDraft = composeDraftRef.current;
+    const draftState = hasComposeDraftPayload(refDraft)
+      ? refDraft
+      : hasComposeDraftPayload(composeDraft)
+        ? composeDraft
+        : { ...composeDraft, ...(refDraft || {}) };
+    const whereFilters = normalizeHubQueryWhereFilters(draftState.whereFilters);
     return normalizeHubQueryDraft({
       sampleId,
       columnSelections,

@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 
 /** Kalshi Historical — Becker Parquet under `kalshi/` in the same S3 bucket as Polymarket historical. */
 export default function KalshiHistorical({ setConnectedData, connectHomePullBridge = false }) {
-  const { label, progress, ready, error, retry } = useBeckerParquetBoot();
+  const { label, progress, ready, error, retry } = useBeckerParquetBoot({
+    // Connect-home / guided pulls run Athena first; DuckDB is only needed after rows return.
+    skipWarm: connectHomePullBridge,
+  });
 
   if (error) {
     return (

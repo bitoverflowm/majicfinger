@@ -31,6 +31,66 @@ const STORAGE_KEY = "lychee:hubQueryDraft";
  * @property {string} [guidedWorkflowId]
  */
 
+/** @param {unknown} filters */
+export function normalizeHubQueryWhereFilters(filters) {
+  if (!Array.isArray(filters)) return [];
+  return filters
+    .map((f) => {
+      if (!f || typeof f !== "object") return null;
+      const column = String(f.column || "").trim();
+      const value = String(f.value ?? "").trim();
+      if (!column || !value) return null;
+      const kindRaw = String(f.kind || "").toLowerCase().trim();
+      const kind =
+        kindRaw === "date" ? "date" : kindRaw === "number" ? "number" : "string";
+      const op = String(f.op || "eq").trim() || "eq";
+      return {
+        id: String(f.id || `w-${column}-${Math.random().toString(36).slice(2)}`),
+        column,
+        kind,
+        op,
+        value,
+      };
+    })
+    .filter(Boolean);
+}
+
+/** @param {unknown} draft */
+export function hasComposeDraftPayload(draft) {
+  if (!draft || typeof draft !== "object") return false;
+  return (
+    (Array.isArray(draft.whereFilters) && draft.whereFilters.length > 0) ||
+    (Array.isArray(draft.columnComposeItems) && draft.columnComposeItems.length > 0) ||
+    (Array.isArray(draft.orderBy) && draft.orderBy.length > 0) ||
+    (Array.isArray(draft.activeComposeOps) && draft.activeComposeOps.length > 0) ||
+    !!draft.composeLimitOpen
+  );
+}
+
+/**
+ * Compose WHERE filters from live panel state, with guided inline-pull draft fallback.
+ * @param {unknown} composeWhereFilters
+ * @param {boolean} guidedWorkflowPull
+ * @param {React.MutableRefObject<import("./hubQueryDraft").HubQueryDraft | null> | null | undefined} guidedHubDraftRef
+ */
+export function resolveEffectiveHubWhereFilters(
+  composeWhereFilters,
+  guidedWorkflowPull,
+  guidedHubDraftRef,
+) {
+  const fromCompose = normalizeHubQueryWhereFilters(composeWhereFilters);
+  if (fromCompose.length > 0) return fromCompose;
+  if (!guidedWorkflowPull || !guidedHubDraftRef?.current) return [];
+  return normalizeHubQueryWhereFilters(guidedHubDraftRef.current.whereFilters);
+}
+
+/** @param {HubQueryWhereFilter[]} whereFilters */
+export function buildComposeFiltersPayload(whereFilters) {
+  const normalized = normalizeHubQueryWhereFilters(whereFilters);
+  if (!normalized.length) return null;
+  return { and: normalized, or: [] };
+}
+
 /**
  * @param {HubQueryDraft} draft
  */
@@ -104,7 +164,7 @@ export function normalizeHubQueryDraft(draft) {
     integrationId: "kalshiHistorical",
     sampleId,
     columnSelections: draft.columnSelections || { [sampleId]: selections },
-    whereFilters: Array.isArray(draft.whereFilters) ? draft.whereFilters : [],
+    whereFilters: normalizeHubQueryWhereFilters(draft.whereFilters),
     activeComposeOps: Array.isArray(draft.activeComposeOps) ? draft.activeComposeOps : [],
     columnComposeItems: Array.isArray(draft.columnComposeItems) ? draft.columnComposeItems : [],
     orderBy: Array.isArray(draft.orderBy) ? draft.orderBy : [],

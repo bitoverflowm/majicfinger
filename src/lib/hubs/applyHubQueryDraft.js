@@ -1,13 +1,14 @@
 import { flushSync } from "react-dom";
 
 import { genComposeRowId } from "@/lib/dataLakeComposeHelpers";
+import { normalizeHubQueryWhereFilters } from "@/lib/hubs/hubQueryDraft";
 import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
 
 /**
  * @param {string} sampleId
  * @param {Record<string, string[]>} columnSelections
  */
-function buildColumnComposeItemsFromSelections(sampleId, columnSelections) {
+export function buildColumnComposeItemsFromSelections(sampleId, columnSelections) {
   const cols = columnSelections?.[sampleId];
   if (!Array.isArray(cols) || cols.length === 0) return [];
   return cols.map((col) => ({
@@ -38,6 +39,7 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
   const { autoPull = true, guidedInlinePull = false } = options;
   const sampleId = draft.sampleId;
   const columnSelections = draft.columnSelections || {};
+  const whereFilters = normalizeHubQueryWhereFilters(draft.whereFilters);
 
   flushSync(() => {
     ctx.setViewing?.("connectDataHome");
@@ -60,7 +62,7 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
 
     ctx.setConnectDataLakeSampleId?.(sampleId);
     ctx.setConnectDataLakeColumnSelections?.({ ...columnSelections });
-    ctx.setDataLakeComposeWhereFilters?.(draft.whereFilters || []);
+    ctx.setDataLakeComposeWhereFilters?.(whereFilters);
     ctx.setDataLakeComposeHavingFilters?.(draft.havingFilters || []);
     ctx.setDataLakeComposeJoins?.(draft.joins || []);
     ctx.setDataLakeComposeOrderBy?.(draft.orderBy || []);
@@ -80,7 +82,13 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
   });
 
   prepareConnectHomePullSheet(ctx);
-  if (autoPull) {
+  if (guidedInlinePull && ctx.guidedWorkflowHubDraftRef) {
+    ctx.guidedWorkflowHubDraftRef.current = {
+      ...draft,
+      whereFilters,
+    };
+  }
+  if (autoPull || guidedInlinePull) {
     ctx.requestConnectDataLakePull?.();
   }
 }

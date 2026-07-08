@@ -103,6 +103,7 @@ import {
   applyConnectHomeSheetNameToActiveSheet,
   resolveConnectHomeSheetDestination,
 } from "@/lib/connectHomePullDestination";
+import { buildComposeFiltersPayload, resolveEffectiveHubWhereFilters } from "@/lib/hubs/hubQueryDraft";
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
 import { COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT } from "@/lib/composeLimitScope";
@@ -1456,7 +1457,7 @@ export default function DataLakeParquetPanel({
   }, [kalshiTradesJoinPreset]);
 
   useEffect(() => {
-    if (!isDemo) return;
+    if (!isDemo || guidedWorkflowPull) return;
     setComposeWhereFilters([]);
     setAddWhereFilterMenuOpen(false);
     setMetaQueryMode("all");
@@ -1469,7 +1470,7 @@ export default function DataLakeParquetPanel({
           : op,
       ),
     );
-  }, [isDemo]);
+  }, [isDemo, guidedWorkflowPull]);
 
   const refreshBeckerViews = useCallback(() => {
     setBeckerViews(listBeckerParquetViews());
@@ -1961,7 +1962,8 @@ export default function DataLakeParquetPanel({
           syncConnectPullState({ progress });
         },
         loadFn: async () => {
-          const safeComposeFilters = demoPullMode ? null : composeFilters;
+          const safeComposeFilters = composeFilters;
+          const composeCaseSensitive = !guidedWorkflowPull;
           if (mode === "meta") {
             if (Array.isArray(metaOpSpecs) && metaOpSpecs.length > 0) {
               /** @type {string[][]} */
@@ -2107,7 +2109,7 @@ export default function DataLakeParquetPanel({
                   queryType: "compose",
                   compose: composeSpec,
                   filters: safeComposeFilters || null,
-                  caseSensitive: true,
+                  caseSensitive: composeCaseSensitive,
                   demo: demoPullMode,
                   ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                 },
@@ -2192,7 +2194,7 @@ export default function DataLakeParquetPanel({
         },
       });
     },
-    [dataset, metaOperationColumn, metaOperationKind, isDemo, athenaRowLimit, subscriberAthenaAccess, syncConnectPullState, handleAthenaPullPhase],
+    [dataset, metaOperationColumn, metaOperationKind, isDemo, demoPullMode, guidedWorkflowPull, athenaRowLimit, subscriberAthenaAccess, syncConnectPullState, handleAthenaPullPhase],
   );
 
   const executeIngestReplace = useCallback(async () => {
@@ -3241,12 +3243,15 @@ export default function DataLakeParquetPanel({
     const effectiveIngestMode = selectionTab === "meta" ? "meta" : "columns";
     const composeSpecForRun = isComposeTab ? buildServerComposePayload() : undefined;
     const composeSelectForCard = composeSpecForRun?.select ?? [];
+    const effectiveWhereFilters = resolveEffectiveHubWhereFilters(
+      composeWhereFilters,
+      guidedWorkflowPull,
+      ctx?.guidedWorkflowHubDraftRef,
+    );
     const composeFiltersForRun = isComposeTab
       ? demoPullMode
         ? null
-        : composeWhereFilters.length
-          ? { and: composeWhereFilters, or: [] }
-          : null
+        : buildComposeFiltersPayload(effectiveWhereFilters)
       : undefined;
 
     const requestStartMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
@@ -3567,9 +3572,10 @@ export default function DataLakeParquetPanel({
 
   useEffect(() => {
     if (!connectHomeDataLakeCompose || !connectHomePullBridge) return;
-    if (!connectDataLakePullTick || !connectDataLakePullConsumedTickRef) return;
+    if (!connectDataLakePullConsumedTickRef) return;
 
     const pendingTick =
+      !!connectDataLakePullTick &&
       connectDataLakePullConsumedTickRef.current < connectDataLakePullTick;
     const pendingGuided = guidedWorkflowPull && guidedWorkflowPullRequested;
     if (!pendingTick && !pendingGuided) return;
