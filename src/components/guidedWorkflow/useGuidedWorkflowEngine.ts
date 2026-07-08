@@ -112,6 +112,7 @@ export function useGuidedWorkflowEngine(snapshot: GuidedWorkflowSnapshot) {
   const continueStep = useCallback(() => {
     if (phase !== "active" || !workflow || !currentStep) return;
     if (currentStep.completeWhen.type !== "continue") return;
+    if (!snapshotMatches(snapshotRef.current, currentStep.assert)) return;
 
     const nextIndex = stepIndex + 1;
     if (nextIndex >= workflow.steps.length) {

@@ -15,6 +15,7 @@ import { GuidedWorkflowTooltip } from "./GuidedWorkflowTooltip";
 import { useGuidedWorkflowOptional } from "./GuidedWorkflowProvider";
 import { useGuidedTargetRect } from "./useGuidedTargetRect";
 import { isInfoStep } from "@/lib/guidedWorkflows/types";
+import { snapshotMatches } from "@/lib/guidedWorkflows/snapshot";
 import {
   computeGuidedDialogPosition,
   DEFAULT_GUIDED_DIALOG_SIZE,
@@ -217,6 +218,14 @@ export function GuidedWorkflowOverlay() {
   } = ctx;
 
   const infoStep = currentStep && isInfoStep(currentStep);
+  const blockSpotlightInteraction =
+    phase === "active" &&
+    !!infoStep &&
+    currentStep?.blockTargetInteraction !== false;
+  const continueDisabled =
+    !!infoStep &&
+    !!currentStep?.assert &&
+    !snapshotMatches(ctx.snapshot, currentStep.assert);
   const showExitButton = phase === "exit-hint" || phase === "active";
   const spotlightRect =
     phase === "exit-hint" && exitHintTargetRect.rect ? exitHintTargetRect.rect : rect;
@@ -234,7 +243,7 @@ export function GuidedWorkflowOverlay() {
           {spotlightRect && spotlightReady ? (
             <DimPanels
               rect={spotlightRect}
-              blockInteraction={phase === "active" && !!infoStep}
+              blockInteraction={blockSpotlightInteraction}
             />
           ) : (
             <div className="pointer-events-auto absolute inset-0 bg-black/55" aria-hidden />
@@ -283,6 +292,7 @@ export function GuidedWorkflowOverlay() {
               stepIndex={stepIndex}
               totalSteps={totalSteps}
               onContinue={continueStep}
+              continueDisabled={continueDisabled}
             />
           ) : (
             <GuidedWorkflowTooltip

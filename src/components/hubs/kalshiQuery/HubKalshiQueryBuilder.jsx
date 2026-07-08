@@ -34,10 +34,12 @@ import { getConnectDataLakeConfig } from "@/lib/connectQueryComposeConfig";
 import { getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
 import {
   buildHubQueryDashboardUrl,
+  isGuidedGuestHubQueryDraft,
   navigateToHubQueryDashboard,
   normalizeHubQueryDraft,
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
+import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
 import { inferPageNameFromPath } from "@/lib/analytics/sessionStartMeta";
 import {
   KALSHI_HISTORICAL_GUIDED_WORKFLOWS,
@@ -559,6 +561,20 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
       setError("Select Markets or Trades and at least one column.");
       return;
     }
+
+    const skipAuthForGuidedPull =
+      guidedActive &&
+      guidedActionsRef.current?.workflow?.id === KALSHI_GUIDED_WEATHER_WORKFLOW_ID;
+
+    if (skipAuthForGuidedPull) {
+      saveHubQueryDraft({
+        ...draft,
+        guidedWorkflowId: KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
+      });
+      void continueToDashboard();
+      return;
+    }
+
     saveHubQueryDraft(draft);
 
     if (isLoggedIn) {
@@ -567,7 +583,7 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
     }
 
     setAuthOpen(true);
-  }, [buildDraft, userLoading, isLoggedIn, continueToDashboard]);
+  }, [buildDraft, userLoading, isLoggedIn, continueToDashboard, guidedActive]);
 
   const density = hubEmbedDensity(embedded);
 

@@ -6,13 +6,14 @@ import { cn } from "@/lib/utils";
 import { GuidedStepBody } from "./GuidedStepBody";
 
 /**
- * Read-only guide step — user advances with Continue only.
+ * Guide step with a Continue button (and optional assert gate).
  *
  * @param {{
  *   step: import("@/lib/guidedWorkflows/types").GuidedStep;
  *   stepIndex: number;
  *   totalSteps: number;
  *   onContinue: () => void;
+ *   continueDisabled?: boolean;
  *   className?: string;
  *   style?: React.CSSProperties;
  * }} props
@@ -22,6 +23,7 @@ export function GuidedWorkflowInfoDialog({
   stepIndex,
   totalSteps,
   onContinue,
+  continueDisabled = false,
   className,
   style,
 }) {
@@ -48,8 +50,14 @@ export function GuidedWorkflowInfoDialog({
         className="mt-1.5 text-xs leading-relaxed text-muted-foreground"
       />
       <div className="mt-4 flex justify-end">
-        <Button type="button" size="sm" className="h-8 text-xs" onClick={onContinue}>
-          Continue
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 text-xs"
+          onClick={onContinue}
+          disabled={continueDisabled}
+        >
+          {step.continueLabel || "Continue"}
         </Button>
       </div>
     </div>

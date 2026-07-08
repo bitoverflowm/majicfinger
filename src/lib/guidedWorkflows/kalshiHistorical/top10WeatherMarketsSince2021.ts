@@ -1,6 +1,7 @@
 import { KALSHI_GUIDED_TARGETS } from "../targets";
 import {
   KALSHI_GUIDED_STEP_IDS,
+  KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
   KALSHI_GUIDED_WHERE_CATEGORY_COLUMN,
 } from "./stepIds";
 import type { GuidedStep, GuidedWorkflowDefinition } from "../types";
@@ -28,7 +29,7 @@ function columnSelectStep(
 }
 
 export const top10WeatherMarketsSince2021Workflow: GuidedWorkflowDefinition = {
-  id: "top-10-weather-markets-since-2021",
+  id: KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
   title: "Get top 10 weather markets, all time by volume",
   description: "Find and rank the highest-volume weather markets since Kalshi launched in 2021",
   steps: [
@@ -243,15 +244,16 @@ export const top10WeatherMarketsSince2021Workflow: GuidedWorkflowDefinition = {
     },
     {
       id: "name-sheet",
+      kind: "info",
       target: KALSHI_GUIDED_TARGETS.sheetName,
       title: "Name your sheet",
-      body: "Give this pull a sheet name — you can rename it later, but labeling your data now is good practice for organization.",
+      body: "Give this pull a sheet name — you can rename it later, but labeling your data now is good practice for organization. When you're done typing, click Continue.",
       placement: "top",
-      completeWhen: {
-        type: "state",
-        match: { sheetNameNonEmpty: true },
-      },
+      completeWhen: { type: "continue" },
+      assert: { sheetNameNonEmpty: true },
       waitForTarget: true,
+      blockTargetInteraction: false,
+      continueLabel: "Continue",
     },
     {
       id: "run-query",

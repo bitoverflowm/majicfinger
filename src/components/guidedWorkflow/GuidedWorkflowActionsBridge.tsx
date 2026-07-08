@@ -13,11 +13,11 @@ export function GuidedWorkflowActionsBridge({
   onActiveChange,
   startAfterTick,
 }) {
-  const { startWorkflow, cancelWorkflow, isGuideOpen } = useGuidedWorkflow();
+  const { startWorkflow, cancelWorkflow, isGuideOpen, workflow } = useGuidedWorkflow();
 
   useEffect(() => {
-    actionsRef.current = { startWorkflow, cancelWorkflow };
-  }, [actionsRef, startWorkflow, cancelWorkflow]);
+    actionsRef.current = { startWorkflow, cancelWorkflow, workflow };
+  }, [actionsRef, startWorkflow, cancelWorkflow, workflow]);
 
   useEffect(() => {
     onActiveChange?.(isGuideOpen);

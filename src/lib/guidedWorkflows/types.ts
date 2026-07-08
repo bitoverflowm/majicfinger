@@ -94,6 +94,8 @@ export type GuidedStep = {
   waitForTarget?: boolean;
   /** Info steps: block clicks inside the spotlight (default true when kind is info). */
   blockTargetInteraction?: boolean;
+  /** Continue-button label for info / continue steps (default "Continue"). */
+  continueLabel?: string;
 };
 
 export function isInfoStep(step: GuidedStep): boolean {

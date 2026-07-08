@@ -2,8 +2,8 @@
 
 import Script from 'next/script'
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useEffect, useMemo } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
 
 import { StateProvider } from '@/context/stateContext'
@@ -19,45 +19,71 @@ import { Progress } from "@/components/ui/progress"
 
 import { userSwrFetcher } from "@/lib/hooks"
 import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJourneyInit"
+import { isGuidedGuestHubQueryDraft, loadHubQueryDraft } from "@/lib/hubs/hubQueryDraft"
 
-const Dashbaord = () => {
+const GUEST_GUIDED_USER = {
+    userId: "guided-guest",
+    email: "guest@guided.lychee",
+    name: "Guest",
+}
+
+function DashboardLoading() {
+    return (
+        <div className="flex min-h-svh w-full flex-col items-center justify-center gap-3 bg-background px-6 text-muted-foreground">
+            <p className="text-sm font-medium">Loading…</p>
+            <Progress indeterminate className="h-2.5 w-full max-w-xs" indicatorClassName="bg-primary" />
+        </div>
+    )
+}
+
+function DashboardInner() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const hubQueryHandoff = searchParams.get("hubQuery") === "1"
+    const guidedGuestSession = useMemo(() => {
+        if (!hubQueryHandoff || typeof window === "undefined") return false
+        return isGuidedGuestHubQueryDraft(loadHubQueryDraft())
+    }, [hubQueryHandoff])
+
     const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher)
 
     useEffect(() => {
         if (isLoading) return
-        if (!user) {
+        if (!user && !guidedGuestSession) {
             router.replace("/login")
         }
-    }, [isLoading, user, router])
+    }, [isLoading, user, router, guidedGuestSession])
 
-    if (isLoading || !user) {
-        return (
-            <div className="flex min-h-svh w-full flex-col items-center justify-center gap-3 bg-background px-6 text-muted-foreground">
-                <p className="text-sm font-medium">Loading…</p>
-                <Progress indeterminate className="h-2.5 w-full max-w-xs" indicatorClassName="bg-primary" />
-            </div>
-        )
+    if (!guidedGuestSession && (isLoading || !user)) {
+        return <DashboardLoading />
     }
+
+    const sessionUser = user || GUEST_GUIDED_USER
 
     return (
         <div>
-            {/*<Script async src="https://cdn.promotekit.com/promotekit.js" data-promotekit="03b8c588-8350-4a0c-97f0-0a839509e8e0" strategy="afterInteractive"/>*/}
-
             <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
             <StateProvider>
-                <StateProviderV2>
-                    <AuthenticatedJourneyInit user={user} />
+                <StateProviderV2 initialSettings={{ viewing: "connectDataHome" }}>
+                    {!guidedGuestSession ? <AuthenticatedJourneyInit user={sessionUser} /> : null}
                     <LiveStreamManager />
                     <Toaster />
                     <main className="flex min-h-svh flex-col">
-                        <RunYourselfLoaderGate userId={user.userId} />
+                        {!guidedGuestSession ? <RunYourselfLoaderGate userId={sessionUser.userId} /> : null}
                         <HubQueryLoaderGate />
-                        <DashBody user={user}/>
+                        <DashBody user={sessionUser} guidedGuestSession={guidedGuestSession} />
                     </main>
                 </StateProviderV2>
             </StateProvider>
         </div>
+    )
+}
+
+const Dashbaord = () => {
+    return (
+        <Suspense fallback={<DashboardLoading />}>
+            <DashboardInner />
+        </Suspense>
     )
 }
 

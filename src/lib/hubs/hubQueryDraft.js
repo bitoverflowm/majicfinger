@@ -28,6 +28,7 @@ const STORAGE_KEY = "lychee:hubQueryDraft";
  * @property {string} [sourceHubPath]
  * @property {string} [sourceHubName]
  * @property {{ ticker: string; entity: "markets" | "trades" }} [powerSearch]
+ * @property {string} [guidedWorkflowId]
  */
 
 /**
@@ -65,6 +66,11 @@ export function clearHubQueryDraft() {
   } catch {
     /* ignore */
   }
+}
+
+/** Guided workflow handoffs that may run without logging in first. */
+export function isGuidedGuestHubQueryDraft(draft) {
+  return !!draft?.guidedWorkflowId;
 }
 
 export function buildHubQueryDashboardUrl() {
@@ -111,5 +117,8 @@ export function normalizeHubQueryDraft(draft) {
     sourceHubPath: draft.sourceHubPath ? String(draft.sourceHubPath).trim() : undefined,
     sourceHubName: draft.sourceHubName ? String(draft.sourceHubName).trim() : undefined,
     powerSearch: draft.powerSearch,
+    guidedWorkflowId: draft.guidedWorkflowId
+      ? String(draft.guidedWorkflowId).trim()
+      : undefined,
   };
 }
