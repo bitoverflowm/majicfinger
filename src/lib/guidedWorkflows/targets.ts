@@ -23,4 +23,5 @@ export const KALSHI_GUIDED_TARGETS = {
   cancel: "kalshi.cancel" as const,
   guideExit: "kalshi.guide.exit" as const,
   columnsPanel: "kalshi.columns.panel" as const,
+  composePanel: "kalshi.compose.panel" as const,
 };

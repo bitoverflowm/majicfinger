@@ -17,7 +17,8 @@ export type GuidedTargetId =
   | "kalshi.runQuery"
   | "kalshi.cancel"
   | "kalshi.guide.exit"
-  | "kalshi.columns.panel";
+  | "kalshi.columns.panel"
+  | "kalshi.compose.panel";
 
 export type GuidedStepKind = "action" | "info";
 

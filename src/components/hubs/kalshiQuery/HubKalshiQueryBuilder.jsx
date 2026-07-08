@@ -828,7 +828,10 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
             </div>
 
             {selectedColumns.length > 0 ? (
-              <>
+              <div
+                className="space-y-0"
+                {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.composePanel }}
+              >
                 <ConnectDataOperationsSection
                   selectedCount={selectedColumns.length}
                   className={cn("mt-0 border-t-0 pt-0", embedded && "mt-0")}
@@ -850,7 +853,7 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
                   className="mt-0"
                   panelClassName={embedded ? "p-3" : "p-3 lg:p-4"}
                 />
-              </>
+              </div>
             ) : null}
 
             <div className="space-y-2">
