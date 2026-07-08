@@ -557,6 +557,8 @@ export default function DataLakeParquetPanel({
   const setActiveSheetId = ctx?.setActiveSheetId;
   const isDemo = !!ctx?.isDemo;
   const guidedWorkflowPull = !!ctx?.guidedWorkflowPull;
+  const guidedWorkflowPullRequested = !!ctx?.guidedWorkflowPullRequested;
+  const setGuidedWorkflowPullRequested = ctx?.setGuidedWorkflowPullRequested;
   const demoPullMode = isDemo && !guidedWorkflowPull;
   const viewing = ctx?.viewing;
   const connectWorkspace = ctx?.connectWorkspace;
@@ -621,7 +623,7 @@ export default function DataLakeParquetPanel({
   const subscriberAthenaAccess = useMemo(() => userHasExpandedAthenaAccess(user), [user]);
   const athenaRowLimit = useMemo(
     () => getHistoricalPullRowLimit(user, { isDemo: demoPullMode }),
-    [user, isDemo],
+    [user, demoPullMode],
   );
 
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
@@ -3240,7 +3242,7 @@ export default function DataLakeParquetPanel({
     const composeSpecForRun = isComposeTab ? buildServerComposePayload() : undefined;
     const composeSelectForCard = composeSpecForRun?.select ?? [];
     const composeFiltersForRun = isComposeTab
-      ? isDemo
+      ? demoPullMode
         ? null
         : composeWhereFilters.length
           ? { and: composeWhereFilters, or: [] }
@@ -3566,8 +3568,22 @@ export default function DataLakeParquetPanel({
   useEffect(() => {
     if (!connectHomeDataLakeCompose || !connectHomePullBridge) return;
     if (!connectDataLakePullTick || !connectDataLakePullConsumedTickRef) return;
-    if (connectDataLakePullConsumedTickRef.current >= connectDataLakePullTick) return;
-    connectDataLakePullConsumedTickRef.current = connectDataLakePullTick;
+
+    const pendingTick =
+      connectDataLakePullConsumedTickRef.current < connectDataLakePullTick;
+    const pendingGuided = guidedWorkflowPull && guidedWorkflowPullRequested;
+    if (!pendingTick && !pendingGuided) return;
+
+    if (!connectDataLakeSampleId || sampleId !== connectDataLakeSampleId) return;
+    if (!selected?.table) return;
+    if (columnComposeItems.length === 0) return;
+
+    if (pendingTick) {
+      connectDataLakePullConsumedTickRef.current = connectDataLakePullTick;
+    }
+    if (pendingGuided) {
+      setGuidedWorkflowPullRequested?.(false);
+    }
 
     requestConnectAnalyzeScroll?.();
     const runPull = () => handleLoadRef.current();
@@ -3583,6 +3599,13 @@ export default function DataLakeParquetPanel({
     connectHomePullBridge,
     connectDataLakePullTick,
     connectDataLakePullConsumedTickRef,
+    connectDataLakeSampleId,
+    sampleId,
+    selected?.table,
+    columnComposeItems.length,
+    guidedWorkflowPull,
+    guidedWorkflowPullRequested,
+    setGuidedWorkflowPullRequested,
     requestConnectAnalyzeScroll,
   ]);
 

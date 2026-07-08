@@ -52,6 +52,7 @@ const CONNECT_HOME_GRID_SURFACE =
 export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, setStartNew }) {
   const context = useMyStateV2();
   const isDemo = !!context?.isDemo;
+  const guidedWorkflowPull = !!context?.guidedWorkflowPull;
   const connectWorkspace = context?.connectWorkspace;
   const connectWorkspaceScrollTick = context?.connectWorkspaceScrollTick ?? 0;
   const connectAnalyzeScrollTick = context?.connectAnalyzeScrollTick ?? 0;
@@ -158,6 +159,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     });
 
   const composeWorkspacePhase =
+    !guidedWorkflowPull &&
     workspaceActive &&
     isConnectIntegration &&
     !connectHomeAnalyzeActive &&

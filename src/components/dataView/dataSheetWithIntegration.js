@@ -205,6 +205,7 @@ export default function DataSheetWithIntegration({
     !!user?.userId && user.userId !== "dev-bypass-no-db" && /^[a-f0-9]{24}$/i.test(user.userId);
   const contextStateV2 = useMyStateV2();
   const isDemo = !!contextStateV2?.isDemo;
+  const guidedWorkflowPull = !!contextStateV2?.guidedWorkflowPull;
   const viewing = contextStateV2?.viewing;
   const setViewing = contextStateV2?.setViewing;
   const integrationSidebar = contextStateV2?.integrationSidebar;
@@ -818,6 +819,7 @@ export default function DataSheetWithIntegration({
 
   const showComposeBlock =
     showConnectIntegrationIntro &&
+    !guidedWorkflowPull &&
     !connectHomeAnalyzeActive &&
     !connectUserPullActive &&
     (connectHomeComposeOnly || !connectHomeAnalyzeLocked);

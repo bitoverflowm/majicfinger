@@ -16,14 +16,7 @@ function GuidedWorkflowPullBootstrap({ draft }) {
   useEffect(() => {
     if (!ctx || !draft || appliedRef.current) return;
     appliedRef.current = true;
-
-    applyHubQueryDraft(ctx, draft, { autoPull: false });
-
-    const pullTimer = window.setTimeout(() => {
-      ctx.requestConnectDataLakePull?.();
-    }, 400);
-
-    return () => window.clearTimeout(pullTimer);
+    applyHubQueryDraft(ctx, draft, { autoPull: false, guidedInlinePull: true });
   }, [ctx, draft]);
 
   return null;
@@ -39,6 +32,8 @@ function GuidedWorkflowPullBootstrap({ draft }) {
  * }} props
  */
 export function GuidedWorkflowPullResults({ draft, embedded = false, className }) {
+  const sampleId = draft?.sampleId || "";
+
   return (
     <div
       className={cn(
@@ -54,10 +49,20 @@ export function GuidedWorkflowPullResults({ draft, embedded = false, className }
           initialSettings={{
             demo: true,
             guidedWorkflowPull: true,
+            guidedWorkflowPullRequested: true,
             viewing: "connectDataHome",
+            connectWorkspace: "kalshiHistorical",
+            connectDataLakeSampleId: sampleId,
+            connectHomeAnalyzeActive: true,
+            connectDataLakePullState: {
+              loading: true,
+              label: "Preparing your data pull…",
+              progress: 2,
+              error: null,
+            },
             rightPanelOpen: false,
             rightPanelTab: "integrations",
-            integrationSidebar: null,
+            integrationSidebar: "kalshiHistorical",
             connectHomeFlowStepsOpen: false,
           }}
         >

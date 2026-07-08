@@ -370,7 +370,12 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
   const [columnSelections, setColumnSelections] = useState({});
   const [activeComposeOps, setActiveComposeOps] = useState([]);
   const [composeDraft, setComposeDraft] = useState({});
+  const composeDraftRef = useRef({});
   const [composeSeed, setComposeSeed] = useState(null);
+  const handleComposeChange = useCallback((next) => {
+    composeDraftRef.current = next;
+    setComposeDraft(next);
+  }, []);
   const [sheetName, setSheetName] = useState("");
   const [marketSearchInitial, setMarketSearchInitial] = useState("");
   const [marketSearchKey, setMarketSearchKey] = useState(0);
@@ -496,6 +501,7 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
     setActiveComposeOps([]);
     setComposeSeed(null);
     setComposeDraft({});
+    composeDraftRef.current = {};
     setSheetName("");
     setError(null);
     setGuidedStartTick((t) => t + 1);
@@ -508,6 +514,7 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
     setActiveComposeOps([]);
     setComposeSeed(null);
     setComposeDraft({});
+    composeDraftRef.current = {};
     setSheetName("");
     setError(null);
   }, []);
@@ -515,21 +522,22 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
   const buildDraft = useCallback(() => {
     const sourceHubPath =
       typeof window !== "undefined" ? window.location.pathname || "" : "";
-    const whereFilters = (composeDraft.whereFilters || []).filter((f) =>
+    const draftState = composeDraftRef.current || composeDraft;
+    const whereFilters = (draftState.whereFilters || []).filter((f) =>
       String(f.value ?? "").trim(),
     );
     return normalizeHubQueryDraft({
       sampleId,
       columnSelections,
       whereFilters,
-      activeComposeOps: composeDraft.activeComposeOps || activeComposeOps,
-      columnComposeItems: composeDraft.columnComposeItems || [],
-      orderBy: composeDraft.orderBy || [],
-      havingFilters: composeDraft.havingFilters || [],
-      joins: composeDraft.joins || [],
-      composeLimitOpen: !!composeDraft.composeLimitOpen,
-      composeLimitValue: composeDraft.composeLimitValue ?? "",
-      composeLimitScope: composeDraft.composeLimitScope ?? "primary",
+      activeComposeOps: draftState.activeComposeOps || activeComposeOps,
+      columnComposeItems: draftState.columnComposeItems || [],
+      orderBy: draftState.orderBy || [],
+      havingFilters: draftState.havingFilters || [],
+      joins: draftState.joins || [],
+      composeLimitOpen: !!draftState.composeLimitOpen,
+      composeLimitValue: draftState.composeLimitValue ?? "",
+      composeLimitScope: draftState.composeLimitScope ?? "primary",
       pendingSheetName: sheetName.trim() || undefined,
       sourceHubPath: sourceHubPath || undefined,
       sourceHubName: sourceHubPath ? inferPageNameFromPath(sourceHubPath) : undefined,
@@ -871,7 +879,7 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
                   hidePullActions
                   activeComposeOps={activeComposeOps}
                   setActiveComposeOps={setActiveComposeOps}
-                  onComposeChange={setComposeDraft}
+                  onComposeChange={handleComposeChange}
                   composeSeed={composeSeed}
                   className="mt-0"
                   panelClassName={embedded ? "p-3" : "p-3 lg:p-4"}
