@@ -5,6 +5,40 @@ import { MousePointer2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const VIEWPORT_MARGIN = 16;
+const CARD_MAX_WIDTH = 320;
+const CARD_ESTIMATED_HEIGHT = 148;
+
+/**
+ * @param {{
+ *   exitButtonRect: { top: number; left: number; width: number; height: number };
+ *   vw: number;
+ *   vh: number;
+ * }} params
+ */
+function computeExitHintPosition({ exitButtonRect, vw, vh }) {
+  const cardWidth = Math.min(CARD_MAX_WIDTH, vw - VIEWPORT_MARGIN * 2);
+  const gap = 12;
+
+  // Below the X, right-aligned with the exit button
+  let top = exitButtonRect.top + exitButtonRect.height + gap;
+  let left = exitButtonRect.left + exitButtonRect.width - cardWidth;
+
+  left = Math.max(VIEWPORT_MARGIN, Math.min(left, vw - cardWidth - VIEWPORT_MARGIN));
+
+  if (top + CARD_ESTIMATED_HEIGHT > vh - VIEWPORT_MARGIN) {
+    top = exitButtonRect.top - CARD_ESTIMATED_HEIGHT - gap;
+  }
+  top = Math.max(VIEWPORT_MARGIN, Math.min(top, vh - CARD_ESTIMATED_HEIGHT - VIEWPORT_MARGIN));
+
+  const pointerRight = Math.max(
+    12,
+    Math.min(cardWidth - 12, exitButtonRect.left + exitButtonRect.width / 2 - left),
+  );
+
+  return { top, left, cardWidth, pointerRight };
+}
+
 /**
  * Bouncing pointer callout for the global guide exit control.
  *
@@ -17,20 +51,23 @@ import { cn } from "@/lib/utils";
 export function GuidedWorkflowExitHint({ exitButtonRect, onDismiss, className }) {
   if (!exitButtonRect) return null;
 
-  const pointerTop = exitButtonRect.top + exitButtonRect.height + 12;
-  const pointerLeft = Math.max(
-    16,
-    exitButtonRect.left + exitButtonRect.width / 2 - 160,
-  );
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const { top, left, cardWidth, pointerRight } = computeExitHintPosition({
+    exitButtonRect,
+    vw,
+    vh,
+  });
 
   return (
     <div
       className={cn("pointer-events-auto fixed z-[10001]", className)}
-      style={{ top: pointerTop, left: pointerLeft, width: "min(20rem, calc(100vw - 2rem))" }}
+      style={{ top, left, width: cardWidth }}
     >
       <div className="relative rounded-xl border border-border bg-background p-4 shadow-lg">
         <div
-          className="absolute -top-8 right-4 animate-bounce text-primary"
+          className="absolute -top-8 animate-bounce text-primary"
+          style={{ right: cardWidth - pointerRight }}
           aria-hidden
         >
           <MousePointer2 className="size-7 rotate-[-30deg]" strokeWidth={2} />
