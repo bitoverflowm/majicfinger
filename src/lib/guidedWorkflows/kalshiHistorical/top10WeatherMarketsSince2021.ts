@@ -1,7 +1,11 @@
 import { KALSHI_GUIDED_TARGETS } from "../targets";
+import {
+  KALSHI_GUIDED_STEP_IDS,
+  KALSHI_GUIDED_WHERE_CATEGORY_COLUMN,
+} from "./stepIds";
 import type { GuidedStep, GuidedWorkflowDefinition } from "../types";
 
-const CATEGORY_COLUMN = "kalshi_taxonomy_category";
+const CATEGORY_COLUMN = KALSHI_GUIDED_WHERE_CATEGORY_COLUMN;
 
 function columnSelectStep(
   column: string,
@@ -122,19 +126,15 @@ export const top10WeatherMarketsSince2021Workflow: GuidedWorkflowDefinition = {
       waitForTarget: true,
     },
     {
-      id: "where-add-filter",
-      target: KALSHI_GUIDED_TARGETS.whereAdd,
-      title: 'Select "Select column you want to filter"',
-      body: "We will first define the column property by which we want to filter the dataset. You can add multiple Where filters, but we only need one for this workflow.",
-      placement: "top",
-      completeWhen: { type: "click" },
-      waitForTarget: true,
-    },
-    {
-      id: "where-pick-category",
-      target: KALSHI_GUIDED_TARGETS.whereAdd,
+      id: KALSHI_GUIDED_STEP_IDS.wherePickCategory,
+      target: KALSHI_GUIDED_TARGETS.wherePanel,
       title: "Select Category",
-      body: "Open the menu and choose Category from the list.",
+      body: "Open the filter menu and select Category.",
+      bodySegments: [
+        { text: "Open the filter menu and select " },
+        { text: "Category", bold: true },
+        { text: " — this is the column we will filter on for weather markets." },
+      ],
       placement: "top",
       completeWhen: {
         type: "state",

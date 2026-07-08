@@ -12,6 +12,7 @@ export const KALSHI_GUIDED_TARGETS = {
   column: (name: string) => `kalshi.column.${name}` as GuidedTargetId,
   composeOp: (opId: string) => `kalshi.compose.op.${opId}` as GuidedTargetId,
   whereAdd: "kalshi.compose.where.add" as const,
+  wherePickCategory: "kalshi.compose.where.pickCategory" as const,
   whereColumn: "kalshi.compose.where.column" as const,
   whereOp: "kalshi.compose.where.op" as const,
   whereValue: "kalshi.compose.where.value" as const,

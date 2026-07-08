@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { GuidedStepBody } from "./GuidedStepBody";
+
 /**
  * Read-only guide step — user advances with Continue only.
  *
@@ -40,9 +42,11 @@ export function GuidedWorkflowInfoDialog({
       <h4 id="guided-info-title" className="mt-1 text-sm font-semibold text-foreground">
         {step.title}
       </h4>
-      <p id="guided-info-body" className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-        {step.body}
-      </p>
+      <GuidedStepBody
+        step={step}
+        id="guided-info-body"
+        className="mt-1.5 text-xs leading-relaxed text-muted-foreground"
+      />
       <div className="mt-4 flex justify-end">
         <Button type="button" size="sm" className="h-8 text-xs" onClick={onContinue}>
           Continue

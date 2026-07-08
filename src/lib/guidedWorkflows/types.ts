@@ -7,6 +7,7 @@ export type GuidedTargetId =
   | `kalshi.column.${string}`
   | `kalshi.compose.op.${string}`
   | "kalshi.compose.where.add"
+  | "kalshi.compose.where.pickCategory"
   | "kalshi.compose.where.column"
   | "kalshi.compose.where.op"
   | "kalshi.compose.where.value"
@@ -68,6 +69,11 @@ export type GuidedWorkflowSnapshot = {
   sheetName: string;
 };
 
+export type GuidedBodySegment = {
+  text: string;
+  bold?: boolean;
+};
+
 export type GuidedStepCompleteWhen =
   | { type: "click" }
   | { type: "state"; match: GuidedSnapshotMatch }
@@ -80,6 +86,8 @@ export type GuidedStep = {
   target: GuidedTargetId;
   title: string;
   body: string;
+  /** Optional rich body copy — takes precedence over `body` when set. */
+  bodySegments?: GuidedBodySegment[];
   placement?: "top" | "bottom" | "left" | "right";
   completeWhen: GuidedStepCompleteWhen;
   assert?: GuidedSnapshotMatch;

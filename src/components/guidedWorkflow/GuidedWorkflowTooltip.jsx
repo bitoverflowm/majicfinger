@@ -5,6 +5,8 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { GuidedStepBody } from "./GuidedStepBody";
+
 /**
  * @param {{
  *   step: import("@/lib/guidedWorkflows/types").GuidedStep;
@@ -56,9 +58,11 @@ export function GuidedWorkflowTooltip({
       <h4 id="guided-step-title" className="mt-1 text-sm font-semibold text-foreground">
         {step.title}
       </h4>
-      <p id="guided-step-body" className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-        {step.body}
-      </p>
+      <GuidedStepBody
+        step={step}
+        id="guided-step-body"
+        className="mt-1.5 text-xs leading-relaxed text-muted-foreground"
+      />
       {showExitActions ? (
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
           <p className="text-[10px] text-muted-foreground">Press Esc to exit anytime</p>

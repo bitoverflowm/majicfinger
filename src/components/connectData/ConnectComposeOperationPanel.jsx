@@ -37,6 +37,11 @@ import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
+import {
+  KALSHI_GUIDED_STEP_IDS,
+  KALSHI_GUIDED_WHERE_CATEGORY_COLUMN,
+} from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
+import { useGuidedWorkflowOptional } from "@/components/guidedWorkflow/GuidedWorkflowProvider";
 import { pruneConnectComposeBeforePull } from "@/lib/connectComposeSanitize";
 import { hasConfiguredTableJoins } from "@/lib/composeJoinColumns";
 import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
@@ -236,6 +241,16 @@ export function ConnectComposeOperationPanel({
     const unique = [...new Set(fromSelected)];
     return unique.length > 0 ? unique : availableColumns;
   }, [columnComposeItems, availableColumns]);
+
+  const guided = useGuidedWorkflowOptional();
+  const isCategoryPickStep =
+    guided?.phase === "active" &&
+    guided?.currentStep?.id === KALSHI_GUIDED_STEP_IDS.wherePickCategory;
+
+  const whereFilterColumnOptions = useMemo(() => {
+    if (!isCategoryPickStep) return baseTableColumnNames;
+    return baseTableColumnNames.filter((c) => c === KALSHI_GUIDED_WHERE_CATEGORY_COLUMN);
+  }, [isCategoryPickStep, baseTableColumnNames]);
 
   const columnsForCompose = pullColumns.length > 0 ? [...new Set(pullColumns)] : availableColumns;
 
@@ -440,7 +455,7 @@ export function ConnectComposeOperationPanel({
                     <SelectValue placeholder="Column" />
                   </SelectTrigger>
                   <SelectContent>
-                    {baseTableColumnNames.map((c) => (
+                    {whereFilterColumnOptions.map((c) => (
                       <SelectItem key={c} value={c} className="text-[13px]">
                         {composeSourceColumnLabel(c)}
                       </SelectItem>
@@ -488,6 +503,7 @@ export function ConnectComposeOperationPanel({
                     ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.whereValue }
                     : {})}
                 />
+                {!(isCategoryPickStep && fIdx === 0) ? (
                 <button
                   type="button"
                   className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted/60"
@@ -496,6 +512,7 @@ export function ConnectComposeOperationPanel({
                 >
                   <Minus className="h-2.5 w-2.5" />
                 </button>
+                ) : null}
               </div>
             ))}
             <DropdownMenu>
@@ -514,8 +531,14 @@ export function ConnectComposeOperationPanel({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 max-h-[280px] overflow-y-auto">
-                {baseTableColumnNames.map((col) => (
-                  <DropdownMenuItem key={col} onSelect={() => addWhereFilter(col, "eq")}>
+                {whereFilterColumnOptions.map((col) => (
+                  <DropdownMenuItem
+                    key={col}
+                    onSelect={() => addWhereFilter(col, "eq")}
+                    {...(col === KALSHI_GUIDED_WHERE_CATEGORY_COLUMN
+                      ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.wherePickCategory }
+                      : {})}
+                  >
                     {composeSourceColumnLabel(col)}
                   </DropdownMenuItem>
                 ))}
