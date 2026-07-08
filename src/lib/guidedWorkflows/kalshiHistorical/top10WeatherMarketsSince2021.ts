@@ -5,7 +5,7 @@ function columnSelectStep(
   column: string,
   title: string,
   body: string,
-  placement: GuidedStep["placement"] = "right",
+  placement: GuidedStep["placement"] = "bottom",
 ): GuidedStep {
   return {
     id: `select-column-${column}`,

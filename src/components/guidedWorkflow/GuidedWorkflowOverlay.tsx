@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -15,39 +15,14 @@ import { GuidedWorkflowTooltip } from "./GuidedWorkflowTooltip";
 import { useGuidedWorkflowOptional } from "./GuidedWorkflowProvider";
 import { useGuidedTargetRect } from "./useGuidedTargetRect";
 import { isInfoStep } from "@/lib/guidedWorkflows/types";
+import {
+  computeGuidedDialogPosition,
+  DEFAULT_GUIDED_DIALOG_SIZE,
+} from "./computeGuidedDialogPosition";
 
 const OVERLAY_Z = 9998;
 const CHROME_Z = 10000;
 const HINT_Z = 10001;
-
-function computeTooltipPosition(
-  spotlight: { top: number; left: number; width: number; height: number },
-  placement: string,
-) {
-  const gap = 12;
-  const tooltipW = 352;
-  const tooltipH = 160;
-  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
-  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
-
-  let top = spotlight.top + spotlight.height + gap;
-  let left = spotlight.left + spotlight.width / 2 - tooltipW / 2;
-
-  if (placement === "top") {
-    top = spotlight.top - tooltipH - gap;
-  } else if (placement === "left") {
-    top = spotlight.top + spotlight.height / 2 - tooltipH / 2;
-    left = spotlight.left - tooltipW - gap;
-  } else if (placement === "right") {
-    top = spotlight.top + spotlight.height / 2 - tooltipH / 2;
-    left = spotlight.left + spotlight.width + gap;
-  }
-
-  left = Math.max(12, Math.min(left, vw - tooltipW - 12));
-  top = Math.max(12, Math.min(top, vh - tooltipH - 12));
-
-  return { top, left };
-}
 
 function DimPanels({
   rect,
@@ -124,6 +99,8 @@ function GuidedWorkflowExitButton({ onExit, buttonRef }) {
 export function GuidedWorkflowOverlay() {
   const ctx = useGuidedWorkflowOptional();
   const [mounted, setMounted] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const [dialogSize, setDialogSize] = useState(DEFAULT_GUIDED_DIALOG_SIZE);
   const exitButtonRef = useRef<HTMLButtonElement | null>(null);
   const [exitButtonRect, setExitButtonRect] = useState<{
     top: number;
@@ -137,6 +114,7 @@ export function GuidedWorkflowOverlay() {
   const phase = ctx?.phase ?? "idle";
   const isGuideOpen = ctx?.isGuideOpen ?? false;
   const currentStep = ctx?.currentStep ?? null;
+  const stepIndex = ctx?.stepIndex ?? 0;
   const targetId = phase === "active" ? currentStep?.target ?? null : null;
 
   const { rect, ready } = useGuidedTargetRect(targetId, {
@@ -172,14 +150,48 @@ export function GuidedWorkflowOverlay() {
 
   const tooltipPos = useMemo(() => {
     if (!rect) return { top: 24, left: 24 };
-    return computeTooltipPosition(rect, currentStep?.placement ?? "bottom");
-  }, [rect, currentStep?.placement]);
+    return computeGuidedDialogPosition(
+      rect,
+      currentStep?.placement ?? "bottom",
+      dialogSize,
+    );
+  }, [rect, currentStep?.placement, dialogSize]);
+
+  useLayoutEffect(() => {
+    setDialogSize(DEFAULT_GUIDED_DIALOG_SIZE);
+  }, [currentStep?.id, stepIndex]);
+
+  useLayoutEffect(() => {
+    const el = dialogRef.current;
+    if (!el || phase !== "active") return;
+
+    const measure = () => {
+      const bounds = el.getBoundingClientRect();
+      if (bounds.width < 1 || bounds.height < 1) return;
+      setDialogSize((prev) => {
+        const next = { width: bounds.width, height: bounds.height };
+        if (Math.abs(prev.width - next.width) < 1 && Math.abs(prev.height - next.height) < 1) {
+          return prev;
+        }
+        return next;
+      });
+    };
+
+    measure();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+
+    return undefined;
+  }, [phase, currentStep?.id, stepIndex]);
 
   if (!mounted || !ctx || !isGuideOpen || !ctx.workflow) return null;
 
   const {
     workflow,
-    stepIndex,
     totalSteps,
     cancelWorkflow,
     beginGuide,
@@ -239,6 +251,7 @@ export function GuidedWorkflowOverlay() {
 
       {phase === "active" && currentStep ? (
         <div
+          ref={dialogRef}
           className={cn("fixed", !ready && "opacity-80")}
           style={{
             zIndex: HINT_Z,
