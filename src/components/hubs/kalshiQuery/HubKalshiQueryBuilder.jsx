@@ -23,6 +23,7 @@ import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDa
 import { GuidedWorkflowOverlay } from "@/components/guidedWorkflow/GuidedWorkflowOverlay";
 import { GuidedWorkflowActionsBridge } from "@/components/guidedWorkflow/GuidedWorkflowActionsBridge";
 import { GuidedWorkflowProvider } from "@/components/guidedWorkflow/GuidedWorkflowProvider";
+import { GuidedWorkflowPullResults } from "@/components/guidedWorkflow/GuidedWorkflowPullResults";
 import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,6 @@ import { getConnectDataLakeConfig } from "@/lib/connectQueryComposeConfig";
 import { getKalshiConnectColumnsForSample } from "@/lib/kalshiConnectColumns";
 import {
   buildHubQueryDashboardUrl,
-  isGuidedGuestHubQueryDraft,
   navigateToHubQueryDashboard,
   normalizeHubQueryDraft,
   saveHubQueryDraft,
@@ -377,8 +377,10 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
   const clearHoverTimeoutRef = useRef(null);
   const guidedActionsRef = useRef({ startWorkflow: () => {}, cancelWorkflow: () => {} });
   const pendingWorkflowIdRef = useRef(null);
+  const guidedInlinePullWorkflowIdRef = useRef(null);
   const [guidedActive, setGuidedActive] = useState(false);
   const [guidedStartTick, setGuidedStartTick] = useState(0);
+  const [guidedPullDraft, setGuidedPullDraft] = useState(null);
 
   const hoveredSourceLabel = useMemo(() => {
     if (!hoveredSampleId) return "";
@@ -500,6 +502,7 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
   }, []);
 
   const cancelToStartingView = useCallback(() => {
+    guidedInlinePullWorkflowIdRef.current = null;
     guidedActionsRef.current.cancelWorkflow?.();
     setSampleId("");
     setActiveComposeOps([]);
@@ -562,16 +565,16 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
       return;
     }
 
-    const skipAuthForGuidedPull =
-      guidedActive &&
-      guidedActionsRef.current?.workflow?.id === KALSHI_GUIDED_WEATHER_WORKFLOW_ID;
+    const useGuidedInlinePull =
+      guidedInlinePullWorkflowIdRef.current === KALSHI_GUIDED_WEATHER_WORKFLOW_ID;
 
-    if (skipAuthForGuidedPull) {
-      saveHubQueryDraft({
+    if (useGuidedInlinePull) {
+      guidedInlinePullWorkflowIdRef.current = null;
+      setGuidedPullDraft({
         ...draft,
         guidedWorkflowId: KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
       });
-      void continueToDashboard();
+      setError(null);
       return;
     }
 
@@ -583,7 +586,7 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
     }
 
     setAuthOpen(true);
-  }, [buildDraft, userLoading, isLoggedIn, continueToDashboard, guidedActive]);
+  }, [buildDraft, userLoading, isLoggedIn, continueToDashboard]);
 
   const density = hubEmbedDensity(embedded);
 
@@ -604,10 +607,14 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
       <GuidedWorkflowActionsBridge
         actionsRef={guidedActionsRef}
         pendingWorkflowIdRef={pendingWorkflowIdRef}
+        inlinePullWorkflowIdRef={guidedInlinePullWorkflowIdRef}
         onActiveChange={setGuidedActive}
         startAfterTick={guidedStartTick}
       />
       <GuidedWorkflowOverlay />
+    {guidedPullDraft ? (
+      <GuidedWorkflowPullResults draft={guidedPullDraft} embedded={embedded} />
+    ) : (
     <>
       <div
         className={cn(
@@ -919,6 +926,7 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
         onAuthenticated={() => void continueToDashboard()}
       />
     </>
+    )}
     </GuidedWorkflowProvider>
   );
 }

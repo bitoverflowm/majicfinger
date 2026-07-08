@@ -556,6 +556,8 @@ export default function DataLakeParquetPanel({
   const activeSheetId = ctx?.activeSheetId;
   const setActiveSheetId = ctx?.setActiveSheetId;
   const isDemo = !!ctx?.isDemo;
+  const guidedWorkflowPull = !!ctx?.guidedWorkflowPull;
+  const demoPullMode = isDemo && !guidedWorkflowPull;
   const viewing = ctx?.viewing;
   const connectWorkspace = ctx?.connectWorkspace;
   const connectDataLakeSampleId = ctx?.connectDataLakeSampleId ?? "";
@@ -618,7 +620,7 @@ export default function DataLakeParquetPanel({
   const user = useUser();
   const subscriberAthenaAccess = useMemo(() => userHasExpandedAthenaAccess(user), [user]);
   const athenaRowLimit = useMemo(
-    () => getHistoricalPullRowLimit(user, { isDemo }),
+    () => getHistoricalPullRowLimit(user, { isDemo: demoPullMode }),
     [user, isDemo],
   );
 
@@ -1957,7 +1959,7 @@ export default function DataLakeParquetPanel({
           syncConnectPullState({ progress });
         },
         loadFn: async () => {
-          const safeComposeFilters = isDemo ? null : composeFilters;
+          const safeComposeFilters = demoPullMode ? null : composeFilters;
           if (mode === "meta") {
             if (Array.isArray(metaOpSpecs) && metaOpSpecs.length > 0) {
               /** @type {string[][]} */
@@ -2053,7 +2055,7 @@ export default function DataLakeParquetPanel({
                       filters: safeComposeFilters || null,
                       sheetRows: sheetJoin.sheetRows,
                       join: sheetJoin.join,
-                      demo: isDemo,
+                      demo: demoPullMode,
                       ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                     }),
                   });
@@ -2080,7 +2082,7 @@ export default function DataLakeParquetPanel({
                       filters: safeComposeFilters || null,
                       joins: sheetJoin.joins || [],
                       sheetGraph: sheetJoin.sheetGraph || {},
-                      demo: isDemo,
+                      demo: demoPullMode,
                       ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                     }),
                   });
@@ -2104,7 +2106,7 @@ export default function DataLakeParquetPanel({
                   compose: composeSpec,
                   filters: safeComposeFilters || null,
                   caseSensitive: true,
-                  demo: isDemo,
+                  demo: demoPullMode,
                   ...(composeAthenaRowLimit != null ? { limit: composeAthenaRowLimit } : {}),
                 },
                 { signal, maxWaitMs: 900000, onPhase: handleAthenaPullPhase },

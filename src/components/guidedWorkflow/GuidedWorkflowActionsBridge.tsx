@@ -10,6 +10,7 @@ import { useGuidedWorkflow } from "./GuidedWorkflowProvider";
 export function GuidedWorkflowActionsBridge({
   actionsRef,
   pendingWorkflowIdRef,
+  inlinePullWorkflowIdRef,
   onActiveChange,
   startAfterTick,
 }) {
@@ -18,6 +19,11 @@ export function GuidedWorkflowActionsBridge({
   useEffect(() => {
     actionsRef.current = { startWorkflow, cancelWorkflow, workflow };
   }, [actionsRef, startWorkflow, cancelWorkflow, workflow]);
+
+  useEffect(() => {
+    if (!inlinePullWorkflowIdRef || !workflow?.id) return;
+    inlinePullWorkflowIdRef.current = workflow.id;
+  }, [workflow, inlinePullWorkflowIdRef]);
 
   useEffect(() => {
     onActiveChange?.(isGuideOpen);
