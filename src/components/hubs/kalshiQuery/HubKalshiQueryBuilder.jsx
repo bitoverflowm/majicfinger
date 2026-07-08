@@ -756,7 +756,10 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
 
         {sampleId ? (
           <>
-            <div className="space-y-2">
+            <div
+              className="space-y-2"
+              {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.columnsPanel }}
+            >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
                   Columns

@@ -16,7 +16,10 @@ export type GuidedTargetId =
   | "kalshi.sheetName"
   | "kalshi.runQuery"
   | "kalshi.cancel"
-  | "kalshi.guide.exit";
+  | "kalshi.guide.exit"
+  | "kalshi.columns.panel";
+
+export type GuidedStepKind = "action" | "info";
 
 export type GuidedPhase = "idle" | "intro" | "exit-hint" | "active";
 
@@ -46,10 +49,12 @@ export type GuidedWorkflowSnapshot = {
 export type GuidedStepCompleteWhen =
   | { type: "click" }
   | { type: "state"; match: GuidedSnapshotMatch }
-  | { type: "input"; field: string; equals?: string };
+  | { type: "input"; field: string; equals?: string }
+  | { type: "continue" };
 
 export type GuidedStep = {
   id: string;
+  kind?: GuidedStepKind;
   target: GuidedTargetId;
   title: string;
   body: string;
@@ -57,7 +62,13 @@ export type GuidedStep = {
   completeWhen: GuidedStepCompleteWhen;
   assert?: GuidedSnapshotMatch;
   waitForTarget?: boolean;
+  /** Info steps: block clicks inside the spotlight (default true when kind is info). */
+  blockTargetInteraction?: boolean;
 };
+
+export function isInfoStep(step: GuidedStep): boolean {
+  return step.kind === "info" || step.completeWhen.type === "continue";
+}
 
 export type GuidedWorkflowDefinition = {
   id: string;

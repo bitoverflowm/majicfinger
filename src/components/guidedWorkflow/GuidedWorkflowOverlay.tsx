@@ -9,10 +9,12 @@ import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { cn } from "@/lib/utils";
 
 import { GuidedWorkflowExitHint } from "./GuidedWorkflowExitHint";
+import { GuidedWorkflowInfoDialog } from "./GuidedWorkflowInfoDialog";
 import { GuidedWorkflowIntro } from "./GuidedWorkflowIntro";
 import { GuidedWorkflowTooltip } from "./GuidedWorkflowTooltip";
 import { useGuidedWorkflowOptional } from "./GuidedWorkflowProvider";
 import { useGuidedTargetRect } from "./useGuidedTargetRect";
+import { isInfoStep } from "@/lib/guidedWorkflows/types";
 
 const OVERLAY_Z = 9998;
 const CHROME_Z = 10000;
@@ -47,7 +49,13 @@ function computeTooltipPosition(
   return { top, left };
 }
 
-function DimPanels({ rect }: { rect: { top: number; left: number; width: number; height: number } }) {
+function DimPanels({
+  rect,
+  blockInteraction = false,
+}: {
+  rect: { top: number; left: number; width: number; height: number };
+  blockInteraction?: boolean;
+}) {
   const panels = [
     { top: 0, left: 0, right: 0, height: rect.top },
     { top: rect.top + rect.height, left: 0, right: 0, bottom: 0 },
@@ -75,6 +83,20 @@ function DimPanels({ rect }: { rect: { top: number; left: number; width: number;
           zIndex: OVERLAY_Z + 1,
         }}
       />
+      {blockInteraction ? (
+        <div
+          className="absolute rounded-lg bg-transparent"
+          style={{
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            pointerEvents: "auto",
+            zIndex: OVERLAY_Z + 2,
+          }}
+          aria-hidden
+        />
+      ) : null}
     </>
   );
 }
@@ -162,8 +184,10 @@ export function GuidedWorkflowOverlay() {
     cancelWorkflow,
     beginGuide,
     dismissExitHint,
+    continueStep,
   } = ctx;
 
+  const infoStep = currentStep && isInfoStep(currentStep);
   const showExitButton = phase === "exit-hint" || phase === "active";
   const spotlightRect =
     phase === "exit-hint" && exitHintTargetRect.rect ? exitHintTargetRect.rect : rect;
@@ -179,7 +203,10 @@ export function GuidedWorkflowOverlay() {
       {phase === "exit-hint" || phase === "active" ? (
         <>
           {spotlightRect && spotlightReady ? (
-            <DimPanels rect={spotlightRect} />
+            <DimPanels
+              rect={spotlightRect}
+              blockInteraction={phase === "active" && !!infoStep}
+            />
           ) : (
             <div className="pointer-events-auto absolute inset-0 bg-black/55" aria-hidden />
           )}
@@ -220,13 +247,22 @@ export function GuidedWorkflowOverlay() {
             pointerEvents: "auto",
           }}
         >
-          <GuidedWorkflowTooltip
-            step={currentStep}
-            stepIndex={stepIndex}
-            totalSteps={totalSteps}
-            onExit={cancelWorkflow}
-            showExitActions={false}
-          />
+          {infoStep ? (
+            <GuidedWorkflowInfoDialog
+              step={currentStep}
+              stepIndex={stepIndex}
+              totalSteps={totalSteps}
+              onContinue={continueStep}
+            />
+          ) : (
+            <GuidedWorkflowTooltip
+              step={currentStep}
+              stepIndex={stepIndex}
+              totalSteps={totalSteps}
+              onExit={cancelWorkflow}
+              showExitActions={false}
+            />
+          )}
         </div>
       ) : null}
     </div>,

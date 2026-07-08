@@ -10,6 +10,7 @@ import type {
   GuidedWorkflowDefinition,
   GuidedWorkflowSnapshot,
 } from "@/lib/guidedWorkflows/types";
+import { isInfoStep } from "@/lib/guidedWorkflows/types";
 
 import { findGuidedTargetElement } from "./guidedTargetRegistry";
 
@@ -19,6 +20,10 @@ function stepComplete(
   clickedTarget: boolean,
 ): boolean {
   const { completeWhen } = step;
+
+  if (completeWhen.type === "continue") {
+    return false;
+  }
 
   if (completeWhen.type === "click") {
     if (!clickedTarget) return false;
@@ -104,8 +109,21 @@ export function useGuidedWorkflowEngine(snapshot: GuidedWorkflowSnapshot) {
     advanceIfReady(true);
   }, [advanceIfReady]);
 
+  const continueStep = useCallback(() => {
+    if (phase !== "active" || !workflow || !currentStep) return;
+    if (currentStep.completeWhen.type !== "continue") return;
+
+    const nextIndex = stepIndex + 1;
+    if (nextIndex >= workflow.steps.length) {
+      completeWorkflow();
+      return;
+    }
+    setStepIndex(nextIndex);
+  }, [phase, workflow, currentStep, stepIndex, completeWorkflow]);
+
   useEffect(() => {
     if (!isActive || !currentStep) return;
+    if (isInfoStep(currentStep)) return;
     if (currentStep.completeWhen.type !== "state") return;
 
     const id = window.setInterval(() => {
@@ -129,6 +147,7 @@ export function useGuidedWorkflowEngine(snapshot: GuidedWorkflowSnapshot) {
 
   useEffect(() => {
     if (!isActive || !currentStep) return;
+    if (isInfoStep(currentStep)) return;
     if (currentStep.completeWhen.type !== "click") return;
 
     const el = findGuidedTargetElement(currentStep.target);
@@ -155,6 +174,8 @@ export function useGuidedWorkflowEngine(snapshot: GuidedWorkflowSnapshot) {
     beginGuide,
     dismissExitHint,
     notifyTargetClick,
+    continueStep,
+    isInfoStep: currentStep ? isInfoStep(currentStep) : false,
   };
 }
 

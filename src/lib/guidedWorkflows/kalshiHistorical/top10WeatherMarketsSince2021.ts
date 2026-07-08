@@ -16,5 +16,16 @@ export const top10WeatherMarketsSince2021Workflow: GuidedWorkflowDefinition = {
       assert: { sampleId: "athena-kal-markets" },
       waitForTarget: true,
     },
+    {
+      id: "columns-fields-overview",
+      kind: "info",
+      target: KALSHI_GUIDED_TARGETS.columnsPanel,
+      title: "Market fields",
+      body: "These are all the fields you can include for each market in your pull. In the next steps, we'll show you exactly which ones to select.",
+      placement: "bottom",
+      completeWhen: { type: "continue" },
+      waitForTarget: true,
+      blockTargetInteraction: true,
+    },
   ],
 };

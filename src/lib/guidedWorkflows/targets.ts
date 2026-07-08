@@ -22,4 +22,5 @@ export const KALSHI_GUIDED_TARGETS = {
   runQuery: "kalshi.runQuery" as const,
   cancel: "kalshi.cancel" as const,
   guideExit: "kalshi.guide.exit" as const,
+  columnsPanel: "kalshi.columns.panel" as const,
 };
