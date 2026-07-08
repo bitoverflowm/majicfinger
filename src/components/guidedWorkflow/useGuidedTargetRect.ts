@@ -5,8 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { GuidedTargetId } from "@/lib/guidedWorkflows/types";
 
 import { findGuidedTargetElement, scrollGuidedTargetIntoView } from "./guidedTargetRegistry";
-
-const PADDING = 8;
+import { measureGuidedSpotlightRect } from "./guidedSpotlightRect";
 
 export type SpotlightRect = {
   top: number;
@@ -14,15 +13,6 @@ export type SpotlightRect = {
   width: number;
   height: number;
 };
-
-function rectWithPadding(rect: DOMRect): SpotlightRect {
-  return {
-    top: Math.max(0, rect.top - PADDING),
-    left: Math.max(0, rect.left - PADDING),
-    width: rect.width + PADDING * 2,
-    height: rect.height + PADDING * 2,
-  };
-}
 
 /**
  * Track DOM rect for a guided target; polls when waitForTarget until element mounts.
@@ -46,7 +36,7 @@ export function useGuidedTargetRect(
       setReady(false);
       return;
     }
-    setRect(rectWithPadding(el.getBoundingClientRect()));
+    setRect(measureGuidedSpotlightRect(el));
     setReady(true);
     scrollGuidedTargetIntoView(el);
   }, [targetId]);
@@ -60,17 +50,25 @@ export function useGuidedTargetRect(
 
     measure();
 
-    const pollMs = options.waitForTarget ? 120 : 0;
-    const pollId =
-      pollMs > 0 && !ready
-        ? window.setInterval(() => {
-            measure();
-          }, pollMs)
-        : null;
+    const pollMs = options.waitForTarget ? 120 : 100;
+    const pollId = window.setInterval(() => {
+      measure();
+    }, pollMs);
 
     const onLayout = () => measure();
     window.addEventListener("resize", onLayout);
     window.addEventListener("scroll", onLayout, true);
+
+    let mo: MutationObserver | null = null;
+    if (typeof MutationObserver !== "undefined") {
+      mo = new MutationObserver(onLayout);
+      mo.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["data-state", "aria-expanded"],
+        subtree: true,
+        childList: true,
+      });
+    }
 
     let ro: ResizeObserver | null = null;
     const el = findGuidedTargetElement(targetId);
@@ -80,12 +78,13 @@ export function useGuidedTargetRect(
     }
 
     return () => {
-      if (pollId) window.clearInterval(pollId);
+      window.clearInterval(pollId);
       window.removeEventListener("resize", onLayout);
       window.removeEventListener("scroll", onLayout, true);
+      mo?.disconnect();
       ro?.disconnect();
     };
-  }, [options.active, options.waitForTarget, targetId, measure, ready]);
+  }, [options.active, options.waitForTarget, targetId, measure]);
 
   return { rect, ready };
 }

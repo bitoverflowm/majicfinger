@@ -112,6 +112,23 @@ export function GuidedWorkflowOverlay() {
   useEffect(() => setMounted(true), []);
 
   const phase = ctx?.phase ?? "idle";
+
+  useEffect(() => {
+    if (phase !== "active") return;
+
+    const style = document.createElement("style");
+    style.id = "guided-workflow-popover-z";
+    style.textContent = `
+      [data-state="open"][role="menu"],
+      [data-state="open"][role="listbox"],
+      [data-radix-select-content][data-state="open"] {
+        z-index: 10002 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, [phase]);
+
   const isGuideOpen = ctx?.isGuideOpen ?? false;
   const currentStep = ctx?.currentStep ?? null;
   const stepIndex = ctx?.stepIndex ?? 0;
