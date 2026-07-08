@@ -36,6 +36,7 @@ import { glueTableNamesForDataset } from "@/config/dataLakeParquetSamples";
 import { getColumnMetaForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
+import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { pruneConnectComposeBeforePull } from "@/lib/connectComposeSanitize";
 import { hasConfiguredTableJoins } from "@/lib/composeJoinColumns";
 import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
@@ -421,7 +422,7 @@ export function ConnectComposeOperationPanel({
     <>
         {opId === "where" ? (
           <div className="space-y-2">
-            {composeWhereFilters.map((f) => (
+            {composeWhereFilters.map((f, fIdx) => (
               <div key={f.id} className="flex w-full flex-nowrap items-center gap-1.5">
                 <Select
                   value={f.column}
@@ -430,7 +431,12 @@ export function ConnectComposeOperationPanel({
                     updateWhereFilter(f.id, { column: val, kind });
                   }}
                 >
-                  <SelectTrigger className="h-7 w-auto min-w-[5.5rem] max-w-[10rem] shrink-0 text-[11px]">
+                  <SelectTrigger
+                    className="h-7 w-auto min-w-[5.5rem] max-w-[10rem] shrink-0 text-[11px]"
+                    {...(fIdx === 0
+                      ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.whereColumn }
+                      : {})}
+                  >
                     <SelectValue placeholder="Column" />
                   </SelectTrigger>
                   <SelectContent>
@@ -447,6 +453,9 @@ export function ConnectComposeOperationPanel({
                       variant="outline"
                       size="sm"
                       className="h-7 shrink-0 px-2 text-[11px] min-w-8"
+                      {...(fIdx === 0
+                        ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.whereOp }
+                        : {})}
                     >
                       {operatorSymbol(f.op)}
                     </Button>
@@ -475,6 +484,9 @@ export function ConnectComposeOperationPanel({
                   className="h-7 min-w-[3rem] flex-1 text-[11px]"
                   value={String(f.value ?? "")}
                   onChange={(e) => updateWhereFilter(f.id, { value: e.target.value })}
+                  {...(fIdx === 0
+                    ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.whereValue }
+                    : {})}
                 />
                 <button
                   type="button"
@@ -493,7 +505,7 @@ export function ConnectComposeOperationPanel({
                   variant="outline"
                   size="sm"
                   className="h-7 text-[11px] gap-1"
-                  {...{ [GUIDED_TARGET_ATTR]: "kalshi.compose.where.add" }}
+                  {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.whereAdd }}
                 >
                   <Plus className="h-3 w-3" />
                   {composeWhereFilters.length > 0
@@ -642,7 +654,12 @@ export function ConnectComposeOperationPanel({
                             )
                           }
                         >
-                          <SelectTrigger className="h-8 w-full min-w-0 text-xs">
+                          <SelectTrigger
+                            className="h-8 w-full min-w-0 text-xs"
+                            {...(obIdx === 0
+                              ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.sortColumn }
+                              : {})}
+                          >
                             <SelectValue placeholder="Column" />
                           </SelectTrigger>
                           <SelectContent>
@@ -663,7 +680,12 @@ export function ConnectComposeOperationPanel({
                             )
                           }
                         >
-                          <SelectTrigger className="h-8 w-full min-w-0 text-xs">
+                          <SelectTrigger
+                            className="h-8 w-full min-w-0 text-xs"
+                            {...(obIdx === 0
+                              ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.sortDirection }
+                              : {})}
+                          >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -698,6 +720,7 @@ export function ConnectComposeOperationPanel({
               className="h-8 text-xs"
               disabled={!composeSelectAliasChoices.length}
               onClick={addSortClause}
+              {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.sortAdd }}
             >
               {columnComposeOrderBy.length > 0 ? "Add another sort" : "Add sort"}
             </Button>
@@ -863,6 +886,9 @@ export function ConnectComposeOperationPanel({
           <motion.div
             key={op.id}
             id={`connect-compose-${op.id}`}
+            {...(op.id === "where"
+              ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.wherePanel }
+              : {})}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}

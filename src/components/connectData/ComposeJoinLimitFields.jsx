@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT } from "@/lib/composeLimitScope";
+import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
+import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -50,6 +52,7 @@ export function ComposeJoinLimitFields({
                 setComposeLimitRuleValue?.(e.target.value);
               }}
               placeholder={`e.g. ${ATHENA_SAMPLE_ROW_LIMIT}`}
+              {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.limitValue }}
             />
             <Button
               type="button"
@@ -103,6 +106,7 @@ export function ComposeJoinLimitFields({
               String(v || "").trim() ? v : String(ATHENA_SAMPLE_ROW_LIMIT),
             );
           }}
+          {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.limitSet }}
         >
           Set row limit
         </Button>

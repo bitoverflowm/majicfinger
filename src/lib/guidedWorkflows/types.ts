@@ -11,8 +11,12 @@ export type GuidedTargetId =
   | "kalshi.compose.where.op"
   | "kalshi.compose.where.value"
   | "kalshi.compose.sort.add"
+  | "kalshi.compose.sort.column"
+  | "kalshi.compose.sort.direction"
   | "kalshi.compose.limit.toggle"
+  | "kalshi.compose.limit.set"
   | "kalshi.compose.limit.value"
+  | "kalshi.compose.where.panel"
   | "kalshi.sheetName"
   | "kalshi.runQuery"
   | "kalshi.cancel"
@@ -26,12 +30,29 @@ export type GuidedPhase = "idle" | "intro" | "exit-hint" | "active";
 
 export type GuidedWorkflowStatus = "idle" | "intro" | "exit-hint" | "active" | "completed" | "cancelled";
 
+export type GuidedWhereFilterMatch = {
+  column?: string;
+  op?: string;
+  value?: string;
+  valueEqualsIgnoreCase?: string;
+};
+
+export type GuidedOrderByMatch = {
+  alias?: string;
+  direction?: string;
+};
+
 export type GuidedSnapshotMatch = {
   sampleId?: string;
   selectedColumns?: string[] | { includes?: string[]; length?: number };
   activeComposeOps?: string[] | { includes?: string };
   whereFilterCount?: number;
+  whereFilter?: GuidedWhereFilterMatch;
+  orderBy?: GuidedOrderByMatch;
+  composeLimitOpen?: boolean;
+  composeLimitValue?: string;
   sheetName?: string;
+  sheetNameNonEmpty?: boolean;
 };
 
 export type GuidedWorkflowSnapshot = {

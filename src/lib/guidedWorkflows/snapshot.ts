@@ -68,7 +68,44 @@ export function snapshotMatches(
     return false;
   }
 
+  if (match.whereFilter != null) {
+    const spec = match.whereFilter;
+    const found = snapshot.whereFilters.some((f) => {
+      if (spec.column != null && f.column !== spec.column) return false;
+      if (spec.op != null && f.op !== spec.op) return false;
+      if (spec.value != null && f.value !== spec.value) return false;
+      if (
+        spec.valueEqualsIgnoreCase != null &&
+        f.value.trim().toLowerCase() !== spec.valueEqualsIgnoreCase.trim().toLowerCase()
+      ) {
+        return false;
+      }
+      return true;
+    });
+    if (!found) return false;
+  }
+
+  if (match.orderBy != null) {
+    const spec = match.orderBy;
+    const found = snapshot.orderBy.some((row) => {
+      if (spec.alias != null && row.alias !== spec.alias) return false;
+      if (spec.direction != null && row.direction !== spec.direction) return false;
+      return true;
+    });
+    if (!found) return false;
+  }
+
+  if (match.composeLimitOpen != null && snapshot.composeLimitOpen !== match.composeLimitOpen) {
+    return false;
+  }
+
+  if (match.composeLimitValue != null && snapshot.composeLimitValue !== match.composeLimitValue) {
+    return false;
+  }
+
   if (match.sheetName != null && snapshot.sheetName !== match.sheetName) return false;
+
+  if (match.sheetNameNonEmpty && !snapshot.sheetName.trim()) return false;
 
   return true;
 }
