@@ -3,6 +3,7 @@ import {
   ARTICLE_PAGE_BREAK_INNER_CLASS,
   markArticlePageBreakComponent,
 } from "./article-page-break";
+import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQueryMockup";
 
 const HubKalshiQueryBuilder = dynamic(
   () =>
@@ -49,17 +50,17 @@ export function KalshiHistoricalDataQuery({
       className="not-prose scroll-mt-28 font-sans antialiased"
     >
       <div className={ARTICLE_PAGE_BREAK_INNER_CLASS}>
-        <div className="w-full overflow-hidden rounded-xl border border-border bg-background shadow-sm">
-          <div className="space-y-1.5 border-b border-border/60 px-4 py-4 text-center md:px-5">
-            <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-              {title}
-            </h2>
-            <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
-              {description}
-            </p>
-          </div>
-          <HubKalshiQueryBuilder embedded />
+        <div className="mx-auto mb-6 max-w-2xl space-y-1.5 text-center md:mb-8">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+            {title}
+          </h2>
+          <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+            {description}
+          </p>
         </div>
+        <HubKalshiQueryMockup>
+          <HubKalshiQueryBuilder embedded mockup />
+        </HubKalshiQueryMockup>
       </div>
     </section>
   );

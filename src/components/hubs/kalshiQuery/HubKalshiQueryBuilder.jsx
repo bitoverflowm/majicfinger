@@ -354,11 +354,11 @@ function ColumnDefinitionsPanel({
   );
 }
 
-export function HubKalshiQueryBuilder({ embedded = false }) {
-  return <HubKalshiQueryBuilderInner embedded={embedded} />;
+export function HubKalshiQueryBuilder({ embedded = false, mockup = false }) {
+  return <HubKalshiQueryBuilderInner embedded={embedded} mockup={mockup} />;
 }
 
-function HubKalshiQueryBuilderInner({ embedded = false }) {
+function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
   const { data: user, isLoading: userLoading } = useSWR("/api/user", userSwrFetcher);
   const isLoggedIn = !!user;
   const [authOpen, setAuthOpen] = useState(false);
@@ -624,14 +624,14 @@ function HubKalshiQueryBuilderInner({ embedded = false }) {
       />
       <GuidedWorkflowOverlay />
     {guidedPullDraft ? (
-      <GuidedWorkflowPullResults draft={guidedPullDraft} embedded={embedded} />
+      <GuidedWorkflowPullResults draft={guidedPullDraft} embedded={embedded} mockup={mockup} />
     ) : (
     <>
       <div
         className={cn(
           "relative z-20 w-full bg-background font-sans",
           density.stack,
-          embedded ? density.surface : cn("border-y border-border", density.surface),
+          mockup || embedded ? density.surface : cn("border-y border-border", density.surface),
         )}
       >
         {!sampleId ? (

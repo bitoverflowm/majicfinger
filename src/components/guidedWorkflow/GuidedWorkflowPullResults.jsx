@@ -45,7 +45,7 @@ function GuidedWorkflowPullBootstrap({ draft }) {
  *   className?: string;
  * }} props
  */
-export function GuidedWorkflowPullResults({ draft, embedded = false, className }) {
+export function GuidedWorkflowPullResults({ draft, embedded = false, mockup = false, className }) {
   const sampleId = draft?.sampleId || "";
   const whereFilters = normalizeHubQueryWhereFilters(draft?.whereFilters);
   const guidedHubDraft = draft ? { ...draft, whereFilters } : null;
@@ -60,10 +60,17 @@ export function GuidedWorkflowPullResults({ draft, embedded = false, className }
   return (
     <div
       className={cn(
-        "relative isolate w-full overflow-hidden rounded-xl border border-border bg-background shadow-sm ring-1 ring-border/60",
-        embedded
-          ? "h-[min(85vh,820px)] min-h-[560px]"
-          : "h-[min(90vh,920px)] min-h-[720px]",
+        mockup
+          ? "relative flex w-full flex-col overflow-hidden"
+          : "relative isolate w-full overflow-hidden rounded-xl border border-border bg-background shadow-sm ring-1 ring-border/60",
+        !mockup &&
+          (embedded
+            ? "h-[min(85vh,820px)] min-h-[560px]"
+            : "h-[min(90vh,920px)] min-h-[720px]"),
+        mockup &&
+          (embedded
+            ? "min-h-[min(85vh,820px)]"
+            : "min-h-[min(90vh,920px)]"),
         className,
       )}
     >
@@ -102,7 +109,12 @@ export function GuidedWorkflowPullResults({ draft, embedded = false, className }
         >
           <LiveStreamManager />
           <GuidedWorkflowPullBootstrap draft={draft} />
-          <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+          <div
+            className={cn(
+              "flex min-h-0 w-full flex-col overflow-hidden",
+              mockup ? "min-h-[min(85vh,820px)] flex-1" : "h-full",
+            )}
+          >
             <DashBody user={null} />
           </div>
         </StateProviderV2>

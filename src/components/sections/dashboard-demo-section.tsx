@@ -6,6 +6,7 @@ import { StateProviderV2 } from "@/context/stateContextV2";
 
 import DashBody from "@/app/dashboard/dashBody";
 import LiveStreamManager from "@/app/dashboard/components/liveStreamManager";
+import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 
 export function DashboardDemoSection() {
   return (
@@ -13,10 +14,10 @@ export function DashboardDemoSection() {
       id="demo"
       className="relative z-30 mx-auto mb-0 w-full max-w-[min(100%,84rem)] mt-14 px-6 pb-6 pt-0 sm:mt-12 sm:px-8 md:mt-8 lg:mt-6 lg:px-10"
     >
-      <div
+      <DemoWindowMockup
         id="demo-mockup"
         data-demo-mockup
-        className="relative isolate size-full overflow-hidden overscroll-none rounded-2xl border border-border bg-background shadow-xl ring-1 ring-border/60"
+        contentClassName="h-[min(90vh,920px)] min-h-[720px] overflow-hidden"
       >
         <StateProvider>
           <StateProviderV2
@@ -29,12 +30,12 @@ export function DashboardDemoSection() {
             }}
           >
             <LiveStreamManager />
-            <div className="flex h-[min(90vh,920px)] min-h-[720px] w-full flex-col overflow-hidden">
+            <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
               <DashBody user={null} />
             </div>
           </StateProviderV2>
         </StateProvider>
-      </div>
+      </DemoWindowMockup>
     </section>
   );
 }

@@ -23,6 +23,7 @@ import type {
 import { HubHeroBody } from "@/components/hubs/HubHeroBody";
 import { HubHeroCapabilityPills } from "@/components/hubs/HubHeroCapabilityPills";
 import { HubKalshiExplorerBranding } from "@/components/hubs/HubKalshiExplorerBranding";
+import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQueryMockup";
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
@@ -254,9 +255,13 @@ function HubQuery({ section }: { section: HubQuerySection }) {
 
         <div className="relative z-20 mx-auto mt-12 w-full max-w-6xl px-2 sm:px-4">
           <HubLazyWhenVisible
-            fallback={<div className="h-48 w-full animate-pulse rounded-xl bg-muted/40" />}
+            fallback={
+              <div className="h-48 w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60" />
+            }
           >
-            <HubKalshiQueryBuilder />
+            <HubKalshiQueryMockup>
+              <HubKalshiQueryBuilder mockup />
+            </HubKalshiQueryMockup>
           </HubLazyWhenVisible>
         </div>
 
