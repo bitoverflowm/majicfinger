@@ -1,4 +1,3 @@
-import { backtestOutcomesWorkflow } from "./backtestOutcomes";
 import { priceHistoryWorkflow } from "./priceHistory";
 import { resolvedWeatherWorkflow } from "./resolvedWeather";
 import { top10WeatherMarketsSince2021Workflow } from "./top10WeatherMarketsSince2021";
@@ -10,7 +9,6 @@ export const KALSHI_HISTORICAL_GUIDED_WORKFLOWS: GuidedWorkflowDefinition[] = [
   tradesForMarketWorkflow,
   resolvedWeatherWorkflow,
   priceHistoryWorkflow,
-  backtestOutcomesWorkflow,
 ];
 
 const byId = Object.fromEntries(
@@ -27,5 +25,4 @@ export const KALSHI_WORKFLOW_ICONS: Record<string, string> = {
   "trades-for-market": "RefreshCw",
   "resolved-weather": "CloudSun",
   "price-history": "LineChart",
-  "backtest-outcomes": "Target",
 };

@@ -11,7 +11,6 @@ import {
   LineChart,
   RefreshCw,
   Search,
-  Target,
   Vote,
   Wand2,
   CircleDollarSign,
@@ -81,7 +80,6 @@ const WORKFLOW_ICON_COMPONENTS = {
   RefreshCw,
   CloudSun,
   LineChart,
-  Target,
 };
 
 const SOURCE_GUIDED_TARGETS = {
