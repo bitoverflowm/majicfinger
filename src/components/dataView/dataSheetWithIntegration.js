@@ -56,7 +56,9 @@ import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWor
 import { ConnectHomeRequestHistory } from "@/components/connectData/ConnectHomeRequestHistory";
 import { ConnectIntegrationsPickerList } from "@/components/connectData/ConnectIntegrationsPickerList";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
-import { isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
+import { connectHomeAnySheetHasData, isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
+import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
+import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import {
   CONNECT_HOME_CENTER_VIEW,
   isConnectHomeDesignPanelTab,
@@ -260,6 +262,16 @@ export default function DataSheetWithIntegration({
     const sheets = dataSheets && typeof dataSheets === "object" ? Object.values(dataSheets) : [];
     return sheets.some((s) => Array.isArray(s?.data) && s.data.length > 0);
   }, [dataSheets]);
+  const hasAnySheetRows = useMemo(
+    () => connectHomeAnySheetHasData(dataSheets, connectedData),
+    [dataSheets, connectedData],
+  );
+  const guidedDataSheetTargetReady =
+    guidedWorkflowPull &&
+    hasAnySheetRows &&
+    !connectDataLakePullState.error &&
+    (!connectDataLakePullState.loading ||
+      (Number(connectDataLakePullState.progress) || 0) >= 100);
   const isConnectUploadWithSheetData =
     connectHomeMode &&
     isConnectUploadWorkspace(connectWorkspace) &&
@@ -1211,6 +1223,9 @@ export default function DataSheetWithIntegration({
         <main
           ref={mainColumnRef}
           id={connectHomeSheetLayoutLive ? "connect-home-analyze-sheet" : undefined}
+          {...(guidedDataSheetTargetReady && connectHomeSheetLayoutLive
+            ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.dataSheet }
+            : {})}
           className={cn(
             connectHomeSheetLayoutLive
               ? isDemo

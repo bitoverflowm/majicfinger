@@ -13,6 +13,8 @@ import {
 import { normalizeHubQueryDraft, normalizeHubQueryWhereFilters } from "@/lib/hubs/hubQueryDraft";
 import { cn } from "@/lib/utils";
 
+import { GuidedWorkflowPostPullSync } from "./GuidedWorkflowPostPullSync";
+
 function GuidedWorkflowPullBootstrap({ draft }) {
   const ctx = useMyStateV2();
   const appliedRef = useRef(false);
@@ -45,7 +47,13 @@ function GuidedWorkflowPullBootstrap({ draft }) {
  *   className?: string;
  * }} props
  */
-export function GuidedWorkflowPullResults({ draft, embedded = false, mockup = false, className }) {
+export function GuidedWorkflowPullResults({
+  draft,
+  embedded = false,
+  mockup = false,
+  className,
+  onPullComplete,
+}) {
   const sampleId = draft?.sampleId || "";
   const whereFilters = normalizeHubQueryWhereFilters(draft?.whereFilters);
   const guidedHubDraft = draft ? { ...draft, whereFilters } : null;
@@ -109,6 +117,7 @@ export function GuidedWorkflowPullResults({ draft, embedded = false, mockup = fa
         >
           <LiveStreamManager />
           <GuidedWorkflowPullBootstrap draft={draft} />
+          <GuidedWorkflowPostPullSync onPullComplete={onPullComplete} />
           <div
             className={cn(
               "flex min-h-0 w-full flex-col overflow-hidden",

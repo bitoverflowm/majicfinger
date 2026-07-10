@@ -19,8 +19,11 @@ import {
 import { AmberCancelButton } from "@/components/primitives/destructive-icon-button";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
+  connectHomeAnySheetHasData,
   isConnectUserDataPullActive,
 } from "@/lib/connectHomePullDestination";
+import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
+import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { resolvePaletteSeedForNewChart } from "@/lib/chartPaletteSnapshot";
 import { CONNECT_HOME_CENTER_VIEW, normalizeConnectHomeCenterView } from "@/lib/connectHomeFlow";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
@@ -240,6 +243,15 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const connectWorkspace = ctx?.connectWorkspace;
   const connectDataLakePullState = ctx?.connectDataLakePullState ?? {};
   const cancelConnectDataFeedPull = ctx?.cancelConnectDataFeedPull;
+  const guidedWorkflowPull = !!ctx?.guidedWorkflowPull;
+  const connectedData = ctx?.connectedData ?? [];
+  const pullProgress = Number(connectDataLakePullState.progress) || 0;
+  const hasAnySheetRows = connectHomeAnySheetHasData(dataSheets, connectedData);
+  const guidedExportTargetReady =
+    guidedWorkflowPull &&
+    hasAnySheetRows &&
+    !connectDataLakePullState.error &&
+    (!connectDataLakePullState.loading || pullProgress >= 100);
 
   const connectHomeAnalyzeActive = !!ctx?.connectHomeAnalyzeActive;
   const sheetPullViewActive =
@@ -514,6 +526,9 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
                   type="button"
                   className={cn(actionChipBase, textSize, exportActive ? actionChipActive : actionChipIdle)}
                   onClick={openExport}
+                  {...(guidedExportTargetReady
+                    ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.exportButton }
+                    : {})}
                 >
                   Export
                 </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   Check,
   ChevronRight,
@@ -40,10 +41,11 @@ import {
   hasComposeDraftPayload,
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
-import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
+import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID, KALSHI_GUIDED_STEP_IDS } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
 import { inferPageNameFromPath } from "@/lib/analytics/sessionStartMeta";
 import {
   KALSHI_HISTORICAL_GUIDED_WORKFLOWS,
+  KALSHI_COMING_SOON_GUIDED_WORKFLOW_IDS,
   KALSHI_WORKFLOW_ICONS,
 } from "@/lib/guidedWorkflows/kalshiHistorical";
 import { buildGuidedSnapshot } from "@/lib/guidedWorkflows/snapshot";
@@ -253,45 +255,69 @@ function HubKalshiSourceOption({
   );
 }
 
-function HubWorkflowOption({ workflow, onSelect, compact = false }) {
+function HubWorkflowOption({ workflow, onSelect, compact = false, comingSoon = false }) {
   const iconName = KALSHI_WORKFLOW_ICONS[workflow.id] || "RefreshCw";
   const Icon = WORKFLOW_ICON_COMPONENTS[iconName] || RefreshCw;
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(workflow.id)}
-      {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.workflow(workflow.id) }}
+      disabled={comingSoon}
+      onClick={() => {
+        if (comingSoon) return;
+        onSelect(workflow.id);
+      }}
+      {...(!comingSoon ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.workflow(workflow.id) } : {})}
       className={cn(
-        "flex w-full items-center border border-border/60 bg-background text-left transition-all duration-200 ease-out hover:translate-x-1 hover:border-border hover:bg-muted/25",
+        "flex w-full items-center border text-left transition-all duration-200 ease-out",
         compact ? "gap-2 rounded-lg p-2.5" : "gap-2 rounded-lg p-2.5 lg:gap-3 lg:rounded-xl lg:p-3",
+        comingSoon
+          ? "cursor-not-allowed border-border/40 bg-muted/20 opacity-60"
+          : "border-border/60 bg-background hover:translate-x-1 hover:border-border hover:bg-muted/25",
       )}
     >
       <span
         className={cn(
-          "flex shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground",
+          "flex shrink-0 items-center justify-center rounded-lg",
           compact ? "size-8" : "size-8 lg:size-9",
+          comingSoon ? "bg-muted/40 text-muted-foreground/70" : "bg-muted/50 text-muted-foreground",
         )}
       >
         <Icon className={compact ? "size-3.5" : "size-3.5 lg:size-4"} strokeWidth={1.75} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-xs lg:text-sm")}>
-          {workflow.title}
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={cn(
+              "font-medium",
+              compact ? "text-xs" : "text-xs lg:text-sm",
+              comingSoon ? "text-muted-foreground" : "text-foreground",
+            )}
+          >
+            {workflow.title}
+          </span>
+          {comingSoon ? (
+            <span className="inline-flex rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted-foreground">
+              Coming soon
+            </span>
+          ) : null}
         </span>
         <p
           className={cn(
-            "mt-0.5 leading-snug text-muted-foreground",
+            "mt-0.5 leading-snug",
             compact ? "text-[11px]" : "text-[11px] lg:text-xs",
+            comingSoon ? "text-muted-foreground/80" : "text-muted-foreground",
           )}
         >
           {workflow.description}
         </p>
       </div>
-      <ChevronRight
-        className={cn("shrink-0 text-muted-foreground/70", compact ? "size-3.5" : "size-3.5 lg:size-4")}
-        aria-hidden
-      />
+      {!comingSoon ? (
+        <ChevronRight
+          className={cn("shrink-0 text-muted-foreground/70", compact ? "size-3.5" : "size-3.5 lg:size-4")}
+          aria-hidden
+        />
+      ) : null}
     </button>
   );
 }
@@ -386,6 +412,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
   const [guidedActive, setGuidedActive] = useState(false);
   const [guidedStartTick, setGuidedStartTick] = useState(0);
   const [guidedPullDraft, setGuidedPullDraft] = useState(null);
+  const [guidedPostPullReady, setGuidedPostPullReady] = useState(false);
 
   const hoveredSourceLabel = useMemo(() => {
     if (!hoveredSampleId) return "";
@@ -567,6 +594,16 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
     }
   }, [buildDraft]);
 
+  const handleGuidedPullComplete = useCallback(() => {
+    flushSync(() => {
+      setGuidedPostPullReady(true);
+    });
+    guidedActionsRef.current.resumePostPullStep?.(
+      KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
+      KALSHI_GUIDED_STEP_IDS.dataSheetLoaded,
+    );
+  }, []);
+
   const handleSubmit = useCallback(() => {
     if (userLoading) return;
 
@@ -581,9 +618,13 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
 
     if (useGuidedInlinePull) {
       guidedInlinePullWorkflowIdRef.current = null;
-      setGuidedPullDraft({
-        ...draft,
-        guidedWorkflowId: KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
+      guidedActionsRef.current.suppressRunQueryAdvance?.();
+      setGuidedPostPullReady(false);
+      flushSync(() => {
+        setGuidedPullDraft({
+          ...draft,
+          guidedWorkflowId: KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
+        });
       });
       setError(null);
       return;
@@ -622,9 +663,16 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
         onActiveChange={setGuidedActive}
         startAfterTick={guidedStartTick}
       />
-      <GuidedWorkflowOverlay />
+      <GuidedWorkflowOverlay
+        suspended={!!guidedPullDraft && !guidedPostPullReady}
+      />
     {guidedPullDraft ? (
-      <GuidedWorkflowPullResults draft={guidedPullDraft} embedded={embedded} mockup={mockup} />
+      <GuidedWorkflowPullResults
+        draft={guidedPullDraft}
+        embedded={embedded}
+        mockup={mockup}
+        onPullComplete={handleGuidedPullComplete}
+      />
     ) : (
     <>
       <div
@@ -755,6 +803,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                           workflow={workflow}
                           onSelect={handleStartGuidedWorkflow}
                           compact={embedded}
+                          comingSoon={KALSHI_COMING_SOON_GUIDED_WORKFLOW_IDS.has(workflow.id)}
                         />
                       ))}
                     </div>

@@ -97,7 +97,7 @@ function GuidedWorkflowExitButton({ onExit, buttonRef }) {
   );
 }
 
-export function GuidedWorkflowOverlay() {
+export function GuidedWorkflowOverlay({ suspended = false }) {
   const ctx = useGuidedWorkflowOptional();
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -206,7 +206,7 @@ export function GuidedWorkflowOverlay() {
     return undefined;
   }, [phase, currentStep?.id, stepIndex]);
 
-  if (!mounted || !ctx || !isGuideOpen || !ctx.workflow) return null;
+  if (!mounted || !ctx || !isGuideOpen || !ctx.workflow || suspended) return null;
 
   const {
     workflow,

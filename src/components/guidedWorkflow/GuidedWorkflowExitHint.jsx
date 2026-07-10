@@ -1,7 +1,5 @@
 "use client";
 
-import { MousePointer2 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -31,16 +29,11 @@ function computeExitHintPosition({ exitButtonRect, vw, vh }) {
   }
   top = Math.max(VIEWPORT_MARGIN, Math.min(top, vh - CARD_ESTIMATED_HEIGHT - VIEWPORT_MARGIN));
 
-  const pointerRight = Math.max(
-    12,
-    Math.min(cardWidth - 12, exitButtonRect.left + exitButtonRect.width / 2 - left),
-  );
-
-  return { top, left, cardWidth, pointerRight };
+  return { top, left, cardWidth };
 }
 
 /**
- * Bouncing pointer callout for the global guide exit control.
+ * Callout for the global guide exit control.
  *
  * @param {{
  *   exitButtonRect: { top: number; left: number; width: number; height: number } | null;
@@ -53,7 +46,7 @@ export function GuidedWorkflowExitHint({ exitButtonRect, onDismiss, className })
 
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
-  const { top, left, cardWidth, pointerRight } = computeExitHintPosition({
+  const { top, left, cardWidth } = computeExitHintPosition({
     exitButtonRect,
     vw,
     vh,
@@ -65,13 +58,6 @@ export function GuidedWorkflowExitHint({ exitButtonRect, onDismiss, className })
       style={{ top, left, width: cardWidth }}
     >
       <div className="relative rounded-xl border border-border bg-background p-4 shadow-lg">
-        <div
-          className="absolute -top-8 animate-bounce text-primary"
-          style={{ right: cardWidth - pointerRight }}
-          aria-hidden
-        >
-          <MousePointer2 className="size-7 rotate-[-30deg]" strokeWidth={2} />
-        </div>
         <p className="text-sm font-medium text-foreground">
           You can exit this guide at any point in time
         </p>

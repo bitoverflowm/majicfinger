@@ -29,4 +29,8 @@ export const KALSHI_GUIDED_TARGETS = {
   guideExit: "kalshi.guide.exit" as const,
   columnsPanel: "kalshi.columns.panel" as const,
   composePanel: "kalshi.compose.panel" as const,
+  dataSheet: "kalshi.dataSheet" as const,
+  exportButton: "kalshi.exportButton" as const,
+  exportCsv: "kalshi.export.csv" as const,
+  exportPanel: "kalshi.export.panel" as const,
 };

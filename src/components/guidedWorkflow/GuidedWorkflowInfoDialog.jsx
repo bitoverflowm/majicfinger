@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -49,13 +51,27 @@ export function GuidedWorkflowInfoDialog({
         id="guided-info-body"
         className="mt-1.5 text-xs leading-relaxed text-muted-foreground"
       />
-      <div className="mt-4 flex justify-end">
+      {step.footerText ? (
+        <p className="mt-3 text-xs leading-relaxed text-foreground">{step.footerText}</p>
+      ) : null}
+      <div
+        className={cn(
+          "mt-4 flex gap-2",
+          step.ctaLink ? "flex-col sm:flex-row sm:items-center sm:justify-between" : "justify-end",
+        )}
+      >
+        {step.ctaLink ? (
+          <Button type="button" size="sm" className="h-8 text-xs" asChild>
+            <Link href={step.ctaLink.href}>{step.ctaLink.label}</Link>
+          </Button>
+        ) : null}
         <Button
           type="button"
           size="sm"
-          className="h-8 text-xs"
+          className={cn("h-8 text-xs", step.ctaLink && "sm:ml-auto")}
           onClick={onContinue}
           disabled={continueDisabled}
+          variant={step.ctaLink ? "outline" : "default"}
         >
           {step.continueLabel || "Continue"}
         </Button>

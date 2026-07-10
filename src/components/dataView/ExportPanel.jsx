@@ -25,6 +25,8 @@ import { useUser } from "@/lib/hooks";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
+import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
+import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import {
   createChartPublishProgressTicker,
   pickWorkspaceDataSheetsForPublish,
@@ -821,6 +823,11 @@ function ExportDataSection({ runOrRequestPro }) {
   const contextStateV2 = useMyStateV2();
   const connectedData = contextStateV2?.connectedData || [];
   const connectedCols = contextStateV2?.connectedCols || [];
+  const guidedWorkflowPull = !!contextStateV2?.guidedWorkflowPull;
+  const exportPanelOpen =
+    contextStateV2?.rightPanelTab === "export" && !!contextStateV2?.rightPanelOpen;
+  const guidedCsvTargetReady =
+    guidedWorkflowPull && exportPanelOpen && Array.isArray(connectedData) && connectedData.length > 0;
 
   const colKeys = useMemo(() => getColKeys(connectedCols), [connectedCols]);
   const exportData = useMemo(() => connectedData || [], [connectedData]);
@@ -884,7 +891,16 @@ function ExportDataSection({ runOrRequestPro }) {
           variant="outline"
           size="sm"
           className="h-8 px-2 text-[10px]"
-          onClick={() => runOrRequestPro?.(() => downloadCSV(), "exporting data")}
+          onClick={() => {
+            if (guidedWorkflowPull) {
+              downloadCSV();
+              return;
+            }
+            runOrRequestPro?.(() => downloadCSV(), "exporting data");
+          }}
+          {...(guidedCsvTargetReady
+            ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.exportCsv }
+            : {})}
         >
           CSV
         </Button>

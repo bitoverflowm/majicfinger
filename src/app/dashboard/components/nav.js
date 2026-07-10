@@ -1310,13 +1310,13 @@ const Nav = () => {
               href="/dashboard"
               className="flex min-w-0 items-center gap-2 rounded-md outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ring-1 ring-border">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-border">
                 <Image
                   src="/logo.png"
-                  width={24}
-                  height={24}
+                  width={32}
+                  height={32}
                   alt="Lychee"
-                  className="object-cover"
+                  className="size-full object-cover"
                 />
               </span>
               <span className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">

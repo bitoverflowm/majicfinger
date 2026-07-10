@@ -11,6 +11,13 @@ export const KALSHI_HISTORICAL_GUIDED_WORKFLOWS: GuidedWorkflowDefinition[] = [
   priceHistoryWorkflow,
 ];
 
+/** Guided workflows visible in the hub but not yet launchable. */
+export const KALSHI_COMING_SOON_GUIDED_WORKFLOW_IDS = new Set([
+  "trades-for-market",
+  "resolved-weather",
+  "price-history",
+]);
+
 const byId = Object.fromEntries(
   KALSHI_HISTORICAL_GUIDED_WORKFLOWS.map((w) => [w.id, w]),
 ) as Record<string, GuidedWorkflowDefinition>;

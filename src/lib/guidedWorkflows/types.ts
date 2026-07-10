@@ -23,7 +23,11 @@ export type GuidedTargetId =
   | "kalshi.cancel"
   | "kalshi.guide.exit"
   | "kalshi.columns.panel"
-  | "kalshi.compose.panel";
+  | "kalshi.compose.panel"
+  | "kalshi.dataSheet"
+  | "kalshi.exportButton"
+  | "kalshi.export.csv"
+  | "kalshi.export.panel";
 
 export type GuidedStepKind = "action" | "info";
 
@@ -96,6 +100,10 @@ export type GuidedStep = {
   blockTargetInteraction?: boolean;
   /** Continue-button label for info / continue steps (default "Continue"). */
   continueLabel?: string;
+  /** Optional secondary line shown above actions on info steps. */
+  footerText?: string;
+  /** Optional primary CTA link (e.g. Upgrade to Pro). */
+  ctaLink?: { label: string; href: string };
 };
 
 export function isInfoStep(step: GuidedStep): boolean {

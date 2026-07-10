@@ -14,11 +14,34 @@ export function GuidedWorkflowActionsBridge({
   onActiveChange,
   startAfterTick,
 }) {
-  const { startWorkflow, cancelWorkflow, isGuideOpen, workflow } = useGuidedWorkflow();
+  const {
+    startWorkflow,
+    cancelWorkflow,
+    isGuideOpen,
+    workflow,
+    resumePostPullStep,
+    suppressRunQueryAdvance,
+    goToStepById,
+  } = useGuidedWorkflow();
 
   useEffect(() => {
-    actionsRef.current = { startWorkflow, cancelWorkflow, workflow };
-  }, [actionsRef, startWorkflow, cancelWorkflow, workflow]);
+    actionsRef.current = {
+      startWorkflow,
+      cancelWorkflow,
+      workflow,
+      resumePostPullStep,
+      suppressRunQueryAdvance,
+      goToStepById,
+    };
+  }, [
+    actionsRef,
+    startWorkflow,
+    cancelWorkflow,
+    workflow,
+    resumePostPullStep,
+    suppressRunQueryAdvance,
+    goToStepById,
+  ]);
 
   useEffect(() => {
     if (!inlinePullWorkflowIdRef || !workflow?.id) return;
