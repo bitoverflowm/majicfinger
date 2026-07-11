@@ -41,6 +41,7 @@ import {
   hasComposeDraftPayload,
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
+import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
 import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID, KALSHI_GUIDED_STEP_IDS } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
 import { inferPageNameFromPath } from "@/lib/analytics/sessionStartMeta";
 import {
@@ -51,6 +52,8 @@ import {
 import { buildGuidedSnapshot } from "@/lib/guidedWorkflows/snapshot";
 import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
+import { useMyStateV2 } from "@/context/stateContextV2";
+import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 
 const LAKE_CONFIG = getConnectDataLakeConfig("kalshiHistorical");
@@ -380,13 +383,42 @@ function ColumnDefinitionsPanel({
   );
 }
 
-export function HubKalshiQueryBuilder({ embedded = false, mockup = false }) {
-  return <HubKalshiQueryBuilderInner embedded={embedded} mockup={mockup} />;
+/**
+ * @param {{
+ *   embedded?: boolean;
+ *   mockup?: boolean;
+ *   connectHome?: boolean;
+ * }} props
+ * `connectHome` — dashboard / demo Kalshi Historical workspace: same starting layout,
+ * but Run applies the draft in-place and triggers the existing Athena pull bridge.
+ */
+export function HubKalshiQueryBuilder({
+  embedded = false,
+  mockup = false,
+  connectHome = false,
+}) {
+  return (
+    <HubKalshiQueryBuilderInner
+      embedded={embedded}
+      mockup={mockup}
+      connectHome={connectHome}
+    />
+  );
 }
 
-function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
+function HubKalshiQueryBuilderInner({
+  embedded = false,
+  mockup = false,
+  connectHome = false,
+}) {
   const { data: user, isLoading: userLoading } = useSWR("/api/user", userSwrFetcher);
   const isLoggedIn = !!user;
+  const connectCtx = useMyStateV2();
+  const {
+    requestHistoricalProUpgrade,
+    workspaceWriteLocked,
+    dialog: demoProDialog,
+  } = useDemoProGate();
   const [authOpen, setAuthOpen] = useState(false);
   const [submitBusy, setSubmitBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -487,16 +519,29 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
     setColumnSelections((prev) => ({ ...prev, [sampleId]: [] }));
   }, [sampleId]);
 
-  const handleSelectSource = useCallback((id) => {
-    setSampleId(id);
-    setColumnSelections((prev) => ({
-      ...prev,
-      [id]: prev[id] ?? [],
-    }));
-    setActiveComposeOps([]);
-    setComposeSeed(null);
-    setError(null);
-  }, []);
+  const handleSelectSource = useCallback(
+    (id) => {
+      setSampleId(id);
+      setColumnSelections((prev) => ({
+        ...prev,
+        [id]: prev[id] ?? [],
+      }));
+      setActiveComposeOps([]);
+      setComposeSeed(null);
+      setError(null);
+      if (connectHome) {
+        const snap = LAKE_CONFIG?.sampleOptions?.find((s) => s.id === id);
+        if (snap && LAKE_CONFIG?.lake) {
+          void connectCtx?.pingAthenaLakeSample?.({
+            sampleId: id,
+            lake: LAKE_CONFIG.lake,
+            table: snap.table,
+          });
+        }
+      }
+    },
+    [connectHome, connectCtx],
+  );
 
   const handlePowerSearchSelect = useCallback((suggestion) => {
     const id = suggestion.entity === "markets" ? "athena-kal-markets" : "athena-kal-trades";
@@ -604,8 +649,31 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
     );
   }, []);
 
+  const runConnectHomePull = useCallback(
+    (draft) => {
+      if (!connectCtx) {
+        setError("Workspace is not ready. Try again in a moment.");
+        return;
+      }
+      if (workspaceWriteLocked) {
+        requestHistoricalProUpgrade("Kalshi Historical");
+        return;
+      }
+      setSubmitBusy(true);
+      setError(null);
+      try {
+        applyHubQueryDraft(connectCtx, draft, { autoPull: true });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      } finally {
+        setSubmitBusy(false);
+      }
+    },
+    [connectCtx, workspaceWriteLocked, requestHistoricalProUpgrade],
+  );
+
   const handleSubmit = useCallback(() => {
-    if (userLoading) return;
+    if (!connectHome && userLoading) return;
 
     const draft = buildDraft();
     if (!draft) {
@@ -630,6 +698,11 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
       return;
     }
 
+    if (connectHome) {
+      runConnectHomePull(draft);
+      return;
+    }
+
     saveHubQueryDraft(draft);
 
     if (isLoggedIn) {
@@ -638,9 +711,16 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
     }
 
     setAuthOpen(true);
-  }, [buildDraft, userLoading, isLoggedIn, continueToDashboard]);
+  }, [
+    buildDraft,
+    userLoading,
+    isLoggedIn,
+    continueToDashboard,
+    connectHome,
+    runConnectHomePull,
+  ]);
 
-  const density = hubEmbedDensity(embedded);
+  const density = hubEmbedDensity(embedded || connectHome);
 
   const guidedSnapshot = useMemo(
     () =>
@@ -677,9 +757,13 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
     <>
       <div
         className={cn(
-          "relative z-20 w-full bg-background font-sans",
+          "relative z-20 w-full font-sans",
           density.stack,
-          mockup || embedded ? density.surface : cn("border-y border-border", density.surface),
+          connectHome
+            ? null
+            : mockup || embedded
+              ? cn("bg-background", density.surface)
+              : cn("border-y border-border bg-background", density.surface),
         )}
       >
         {!sampleId ? (
@@ -701,7 +785,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                   title="Browse raw historical data"
                   badge="Best for discovery"
                   description="Choose a dataset first, then filter, select columns, and query the exact rows you need."
-                  compact={embedded}
+                  compact={embedded || connectHome}
                 >
                   <p className={cn("font-medium text-muted-foreground", density.label)}>
                     Choose a data source
@@ -715,7 +799,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                         onSelect={handleSelectSource}
                         onHover={handleSourceHover}
                         onLeave={handleSourceLeave}
-                        compact={embedded}
+                        compact={embedded || connectHome}
                         guidedTarget={SOURCE_GUIDED_TARGETS[source.sampleId]}
                         disableHover={guidedActive}
                       />
@@ -740,7 +824,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                     title="Search for a specific market"
                     badge="Best for known markets"
                     description="Load a Kalshi market by ticker, title, or event so you can explore its historical data faster."
-                    compact={embedded}
+                    compact={embedded || connectHome}
                   >
                     <p className={cn("font-medium text-muted-foreground", density.label)}>
                       Search
@@ -751,7 +835,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                       initialQuery={marketSearchInitial}
                       onSelect={handlePowerSearchSelect}
                       inputClassName={
-                        embedded
+                        embedded || connectHome
                           ? "h-9 rounded-lg pl-9 pr-12 text-xs"
                           : "h-9 rounded-lg pl-9 pr-12 text-xs lg:h-11 lg:text-sm"
                       }
@@ -794,7 +878,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                     title="Use a guided workflow"
                     badge="Best for guided setup"
                     description="Follow a step-by-step guided walkthrough for common Kalshi historical data tasks."
-                    compact={embedded}
+                    compact={embedded || connectHome}
                   >
                     <div className={density.listGap}>
                       {KALSHI_HISTORICAL_GUIDED_WORKFLOWS.map((workflow) => (
@@ -802,7 +886,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                           key={workflow.id}
                           workflow={workflow}
                           onSelect={handleStartGuidedWorkflow}
-                          compact={embedded}
+                          compact={embedded || connectHome}
                           comingSoon={KALSHI_COMING_SOON_GUIDED_WORKFLOW_IDS.has(workflow.id)}
                         />
                       ))}
@@ -828,7 +912,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                       showAll
                       title={`${hoveredSourceLabel} columns (${hoverPreviewColumns.length})`}
                       className="h-full"
-                      compact={embedded}
+                      compact={embedded || connectHome}
                     />
                   ) : null}
                 </div>
@@ -934,7 +1018,7 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
                   onComposeChange={handleComposeChange}
                   composeSeed={composeSeed}
                   className="mt-0"
-                  panelClassName={embedded ? "p-3" : "p-3 lg:p-4"}
+                  panelClassName={embedded || connectHome ? "p-3" : "p-3 lg:p-4"}
                 />
               </div>
             ) : null}
@@ -965,13 +1049,28 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
               type="button"
               size={density.submitSize}
               className={cn("rounded-full text-sm lg:text-base", density.submitPx)}
-              disabled={submitBusy || userLoading || !sampleId || selectedColumns.length === 0}
+              disabled={
+                submitBusy ||
+                (!connectHome && userLoading) ||
+                !sampleId ||
+                selectedColumns.length === 0
+              }
               onClick={handleSubmit}
               {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.runQuery }}
             >
-              {submitBusy ? "Starting…" : userLoading ? "Loading…" : isLoggedIn ? "Run query" : "Run for Free"}
+              {submitBusy
+                ? connectHome
+                  ? "Running…"
+                  : "Starting…"
+                : !connectHome && userLoading
+                  ? "Loading…"
+                  : connectHome
+                    ? "Run pull"
+                    : isLoggedIn
+                      ? "Run query"
+                      : "Run for Free"}
             </Button>
-            {!isLoggedIn ? (
+            {!connectHome && !isLoggedIn ? (
               <p className={cn("text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
                 No credit card required
               </p>
@@ -980,11 +1079,14 @@ function HubKalshiQueryBuilderInner({ embedded = false, mockup = false }) {
         </div>
       </div>
 
-      <RunForYourselfAuthModal
-        open={authOpen}
-        onOpenChange={setAuthOpen}
-        onAuthenticated={() => void continueToDashboard()}
-      />
+      {!connectHome ? (
+        <RunForYourselfAuthModal
+          open={authOpen}
+          onOpenChange={setAuthOpen}
+          onAuthenticated={() => void continueToDashboard()}
+        />
+      ) : null}
+      {connectHome ? demoProDialog : null}
     </>
     )}
     </GuidedWorkflowProvider>

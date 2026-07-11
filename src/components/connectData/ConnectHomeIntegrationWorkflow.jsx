@@ -46,6 +46,7 @@ import {
   isDemoGatedHistoricalIntegration,
   useDemoProGate,
 } from "@/hooks/useDemoProGate";
+import { HubKalshiQueryBuilder } from "@/components/hubs/kalshiQuery/HubKalshiQueryBuilder";
 
 function sampleByIdForConfig(lakeConfig) {
   return Object.fromEntries((lakeConfig?.sampleOptions || []).map((s) => [s.id, s]));
@@ -86,24 +87,30 @@ function IntegrationWorkflowHeader({ name, description, compact = false, onGoBac
         <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
         Go back
       </Button>
-      <div className={cn(compact ? "space-y-1" : "space-y-2")}>
-        <h1
-          className={cn(
-            "font-semibold tracking-tight text-foreground",
-            compact ? "text-lg" : "text-xl sm:text-2xl",
-          )}
-        >
-          {name}
-        </h1>
-        <p
-          className={cn(
-            "leading-snug text-muted-foreground",
-            compact ? "text-xs" : "text-sm",
-          )}
-        >
-          {description}
-        </p>
-      </div>
+      {name || description ? (
+        <div className={cn(compact ? "space-y-1" : "space-y-2")}>
+          {name ? (
+            <h1
+              className={cn(
+                "font-semibold tracking-tight text-foreground",
+                compact ? "text-lg" : "text-xl sm:text-2xl",
+              )}
+            >
+              {name}
+            </h1>
+          ) : null}
+          {description ? (
+            <p
+              className={cn(
+                "leading-snug text-muted-foreground",
+                compact ? "text-xs" : "text-sm",
+              )}
+            >
+              {description}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -813,6 +820,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
 
   const { name, description } = getIntegrationMeta(integrationId);
   const connectKalshiLiveEndpointId = ctx.connectKalshiLiveEndpointId;
+  const isKalshiHistorical = integrationId === "kalshiHistorical";
 
   const hasComposeUi =
     (isDataLake && !!connectDataLakeSampleId) ||
@@ -826,17 +834,22 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       className={cn(
         "flex flex-col px-4 sm:px-6 md:px-10 lg:px-14",
         connectWorkspaceScrollInsetClass,
-        hasComposeUi
+        hasComposeUi || isKalshiHistorical
           ? "min-h-0 justify-start py-4 sm:py-5"
           : "min-h-0 justify-start pb-10 pt-16 sm:pb-12 sm:pt-20 md:pt-24",
         className,
       )}
     >
-      <div className="mx-auto w-full max-w-2xl">
+      <div
+        className={cn(
+          "mx-auto w-full",
+          isKalshiHistorical ? "max-w-6xl" : "max-w-2xl",
+        )}
+      >
         <IntegrationWorkflowHeader
-          name={name}
-          description={description}
-          compact={hasComposeUi}
+          name={isKalshiHistorical ? undefined : name}
+          description={isKalshiHistorical ? undefined : description}
+          compact={hasComposeUi || isKalshiHistorical}
           onGoBack={handleGoBackToIntegrations}
         />
 
@@ -844,7 +857,13 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
           <KalshiLiveIntegrationsCore onRunPull={handleRunIntegrationPull} />
         ) : null}
 
-        {isDataLake && lakeConfig ? (
+        {isKalshiHistorical ? (
+          <div className="mt-4 sm:mt-5">
+            <HubKalshiQueryBuilder connectHome />
+          </div>
+        ) : null}
+
+        {isDataLake && lakeConfig && !isKalshiHistorical ? (
           <DataLakeSourceCards
             lakeConfig={lakeConfig}
             selectedSampleId={connectDataLakeSampleId}
@@ -856,7 +875,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
             onDeselectColumn={deselectLakeColumn}
             onSelectAllColumns={selectAllLakeColumns}
             onDeselectAllColumns={deselectAllLakeColumns}
-            showPowerTools={integrationId === "kalshiHistorical"}
+            showPowerTools={false}
             onPowerSearchSelect={handleKalshiPowerSearchSelect}
             powerSearchDisabled={!!connectDataLakePullState?.loading}
           />
