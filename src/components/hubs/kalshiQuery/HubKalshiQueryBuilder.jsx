@@ -672,6 +672,39 @@ function HubKalshiQueryBuilderInner({
     [connectCtx, workspaceWriteLocked, requestHistoricalProUpgrade],
   );
 
+  const runConnectHomeGuidedPull = useCallback(
+    (draft) => {
+      if (!connectCtx) {
+        setError("Workspace is not ready. Try again in a moment.");
+        return;
+      }
+      if (workspaceWriteLocked) {
+        requestHistoricalProUpgrade("Kalshi Historical");
+        return;
+      }
+      setSubmitBusy(true);
+      setError(null);
+      try {
+        guidedActionsRef.current.suppressRunQueryAdvance?.();
+        flushSync(() => {
+          connectCtx.setConnectHomeGuidedSession?.({
+            workflowId: KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
+            resumeStepId: KALSHI_GUIDED_STEP_IDS.dataSheetLoaded,
+          });
+          connectCtx.setGuidedWorkflowPull?.(true);
+          applyHubQueryDraft(connectCtx, draft, { autoPull: true });
+        });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong");
+        connectCtx.setConnectHomeGuidedSession?.(null);
+        connectCtx.setGuidedWorkflowPull?.(false);
+      } finally {
+        setSubmitBusy(false);
+      }
+    },
+    [connectCtx, workspaceWriteLocked, requestHistoricalProUpgrade],
+  );
+
   const handleSubmit = useCallback(() => {
     if (!connectHome && userLoading) return;
 
@@ -686,6 +719,14 @@ function HubKalshiQueryBuilderInner({
 
     if (useGuidedInlinePull) {
       guidedInlinePullWorkflowIdRef.current = null;
+
+      // Dashboard / demo connect-home: pull into the real full-screen sheet (no nested DashBody).
+      if (connectHome) {
+        runConnectHomeGuidedPull(draft);
+        setError(null);
+        return;
+      }
+
       guidedActionsRef.current.suppressRunQueryAdvance?.();
       setGuidedPostPullReady(false);
       flushSync(() => {
@@ -718,6 +759,7 @@ function HubKalshiQueryBuilderInner({
     continueToDashboard,
     connectHome,
     runConnectHomePull,
+    runConnectHomeGuidedPull,
   ]);
 
   const density = hubEmbedDensity(embedded || connectHome);
@@ -745,12 +787,14 @@ function HubKalshiQueryBuilderInner({
       />
       <GuidedWorkflowOverlay
         suspended={!!guidedPullDraft && !guidedPostPullReady}
+        hideUpgradeCta={connectHome && isLoggedIn}
       />
     {guidedPullDraft ? (
       <GuidedWorkflowPullResults
         draft={guidedPullDraft}
         embedded={embedded}
         mockup={mockup}
+        connectHome={connectHome}
         onPullComplete={handleGuidedPullComplete}
       />
     ) : (

@@ -44,13 +44,17 @@ function GuidedWorkflowPullBootstrap({ draft }) {
  * @param {{
  *   draft: import("@/lib/hubs/hubQueryDraft").HubQueryDraft;
  *   embedded?: boolean;
+ *   mockup?: boolean;
+ *   connectHome?: boolean;
  *   className?: string;
+ *   onPullComplete?: () => void;
  * }} props
  */
 export function GuidedWorkflowPullResults({
   draft,
   embedded = false,
   mockup = false,
+  connectHome = false,
   className,
   onPullComplete,
 }) {
@@ -65,20 +69,23 @@ export function GuidedWorkflowPullResults({
     return buildColumnComposeItemsFromSelections(sampleId, columnSelections);
   }, [draft?.columnComposeItems, sampleId, columnSelections]);
 
+  const flushChrome = mockup || connectHome;
+
   return (
     <div
       className={cn(
-        mockup
+        flushChrome
           ? "relative flex w-full flex-col overflow-hidden"
           : "relative isolate w-full overflow-hidden rounded-xl border border-border bg-background shadow-sm ring-1 ring-border/60",
-        !mockup &&
-          (embedded
-            ? "h-[min(85vh,820px)] min-h-[560px]"
-            : "h-[min(90vh,920px)] min-h-[720px]"),
-        mockup &&
-          (embedded
-            ? "min-h-[min(85vh,820px)]"
-            : "min-h-[min(90vh,920px)]"),
+        connectHome
+          ? "min-h-0 flex-1"
+          : flushChrome
+            ? embedded
+              ? "min-h-[min(85vh,820px)]"
+              : "min-h-[min(90vh,920px)]"
+            : embedded
+              ? "h-[min(85vh,820px)] min-h-[560px]"
+              : "h-[min(90vh,920px)] min-h-[720px]",
         className,
       )}
     >
@@ -121,7 +128,8 @@ export function GuidedWorkflowPullResults({
           <div
             className={cn(
               "flex min-h-0 w-full flex-col overflow-hidden",
-              mockup ? "min-h-[min(85vh,820px)] flex-1" : "h-full",
+              flushChrome ? "min-h-[min(85vh,820px)] flex-1" : "h-full",
+              connectHome && "min-h-0",
             )}
           >
             <DashBody user={null} />

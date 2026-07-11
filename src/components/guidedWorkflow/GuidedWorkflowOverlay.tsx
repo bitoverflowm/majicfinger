@@ -97,7 +97,13 @@ function GuidedWorkflowExitButton({ onExit, buttonRef }) {
   );
 }
 
-export function GuidedWorkflowOverlay({ suspended = false }) {
+export function GuidedWorkflowOverlay({
+  suspended = false,
+  hideUpgradeCta = false,
+}: {
+  suspended?: boolean;
+  hideUpgradeCta?: boolean;
+}) {
   const ctx = useGuidedWorkflowOptional();
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -293,6 +299,7 @@ export function GuidedWorkflowOverlay({ suspended = false }) {
               totalSteps={totalSteps}
               onContinue={continueStep}
               continueDisabled={continueDisabled}
+              hideUpgradeCta={hideUpgradeCta}
             />
           ) : (
             <GuidedWorkflowTooltip

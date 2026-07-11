@@ -43,6 +43,7 @@ import { ConnectHomeProjectLoadShell } from "@/components/connectData/ConnectHom
 import ConnectDataStep1 from "@/components/connectData/ConnectDataStep1";
 import { ConnectHomeFileUpload } from "@/components/connectData/ConnectHomeFileUpload";
 import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSteps";
+import { ConnectHomeKalshiGuidedHost } from "@/components/connectData/ConnectHomeKalshiGuidedHost";
 
 /** Match Connect hub + nav header white; override AG Grid Balham grey canvas. */
 const CONNECT_HOME_SURFACE = "bg-white dark:bg-slate-950";
@@ -404,6 +405,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
       ref={shellMainRef}
       className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950"
     >
+      <ConnectHomeKalshiGuidedHost />
       {useFixedViewport ? (
         <ConnectHomeAnalyzeViewport isDemo={isDemo} connectFlowStep={connectFlowStep}>
           <section

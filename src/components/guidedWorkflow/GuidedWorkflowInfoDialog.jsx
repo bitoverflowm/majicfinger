@@ -16,6 +16,7 @@ import { GuidedStepBody } from "./GuidedStepBody";
  *   totalSteps: number;
  *   onContinue: () => void;
  *   continueDisabled?: boolean;
+ *   hideUpgradeCta?: boolean;
  *   className?: string;
  *   style?: React.CSSProperties;
  * }} props
@@ -26,9 +27,13 @@ export function GuidedWorkflowInfoDialog({
   totalSteps,
   onContinue,
   continueDisabled = false,
+  hideUpgradeCta = false,
   className,
   style,
 }) {
+  const showUpgradeCta = !hideUpgradeCta && !!step.ctaLink;
+  const showFooterText = !hideUpgradeCta && !!step.footerText;
+
   return (
     <div
       className={cn(
@@ -51,16 +56,16 @@ export function GuidedWorkflowInfoDialog({
         id="guided-info-body"
         className="mt-1.5 text-xs leading-relaxed text-muted-foreground"
       />
-      {step.footerText ? (
+      {showFooterText ? (
         <p className="mt-3 text-xs leading-relaxed text-foreground">{step.footerText}</p>
       ) : null}
       <div
         className={cn(
           "mt-4 flex gap-2",
-          step.ctaLink ? "flex-col sm:flex-row sm:items-center sm:justify-between" : "justify-end",
+          showUpgradeCta ? "flex-col sm:flex-row sm:items-center sm:justify-between" : "justify-end",
         )}
       >
-        {step.ctaLink ? (
+        {showUpgradeCta ? (
           <Button type="button" size="sm" className="h-8 text-xs" asChild>
             <Link href={step.ctaLink.href}>{step.ctaLink.label}</Link>
           </Button>
@@ -68,10 +73,10 @@ export function GuidedWorkflowInfoDialog({
         <Button
           type="button"
           size="sm"
-          className={cn("h-8 text-xs", step.ctaLink && "sm:ml-auto")}
+          className={cn("h-8 text-xs", showUpgradeCta && "sm:ml-auto")}
           onClick={onContinue}
           disabled={continueDisabled}
-          variant={step.ctaLink ? "outline" : "default"}
+          variant={showUpgradeCta ? "outline" : "default"}
         >
           {step.continueLabel || "Continue"}
         </Button>
