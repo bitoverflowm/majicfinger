@@ -462,7 +462,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                   })
             }
           >
-            {isDemo ? (
+            {isDemo && !guidedWorkflowPull ? (
               <ConnectHomeFlowSteps
                 currentStep={connectFlowStep}
                 sticky

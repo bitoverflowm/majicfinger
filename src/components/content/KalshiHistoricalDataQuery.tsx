@@ -3,6 +3,10 @@ import {
   ARTICLE_PAGE_BREAK_INNER_CLASS,
   markArticlePageBreakComponent,
 } from "./article-page-break";
+import {
+  KalshiExplorerDemoChrome,
+  type KalshiDemoReadingKind,
+} from "./KalshiExplorerDemoChrome";
 import { HubKalshiExplorerBranding } from "@/components/hubs/HubKalshiExplorerBranding";
 import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQueryMockup";
 import { KALSHI_HISTORICAL_EXPLORE_SECTION } from "@/config/hubs/kalshiHistorical";
@@ -24,6 +28,11 @@ export type KalshiHistoricalDataQueryProps = {
   id?: string;
   /** Show Lychee × Kalshi branding badge (default true). */
   showBranding?: boolean;
+  /**
+   * Wording for the continue link: research vs guide.
+   * When omitted, inferred from the current `/guides/...` slug via the content registry.
+   */
+  readingKind?: KalshiDemoReadingKind;
 };
 
 /**
@@ -39,6 +48,7 @@ export function KalshiHistoricalDataQuery({
   description = KALSHI_HISTORICAL_EXPLORE_SECTION.description,
   id = "kalshi-historical-data-query",
   showBranding = true,
+  readingKind,
 }: KalshiHistoricalDataQueryProps) {
   return (
     <section
@@ -48,6 +58,7 @@ export function KalshiHistoricalDataQuery({
     >
       <div className={ARTICLE_PAGE_BREAK_INNER_CLASS}>
         <div className="mx-auto w-full max-w-3xl space-y-4 text-center">
+          <KalshiExplorerDemoChrome sectionId={id} readingKind={readingKind} />
           <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             {title}
           </h2>

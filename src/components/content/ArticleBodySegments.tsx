@@ -96,10 +96,14 @@ export async function ArticleBodySegments({ mdxSource, header, footer }: Article
         return (
           <div
             key={`prose-${index}`}
-            className={articleSurfaceSegmentClass({
-              roundedTop: isFirstProse,
-              roundedBottom: isLastProse && !footerFollowsPageBreak && !nextIsPageBreak,
-            })}
+            id={prevIsPageBreak ? "article-after-demo" : undefined}
+            className={cn(
+              articleSurfaceSegmentClass({
+                roundedTop: isFirstProse,
+                roundedBottom: isLastProse && !footerFollowsPageBreak && !nextIsPageBreak,
+              }),
+              prevIsPageBreak && "scroll-mt-28",
+            )}
           >
             {isFirstProse ? header : null}
             <ArticleProse className={prevIsPageBreak ? "pt-0" : undefined}>

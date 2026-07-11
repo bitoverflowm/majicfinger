@@ -1,13 +1,18 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { connectHubAnalyzeViewportClass, connectHubDemoInsetClass } from "@/lib/connectHubLayout";
 import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSteps";
 
 /**
  * Step 2 — fixed viewport: sheet / chart / dashboard + side panel (no hub scroll stack).
+ * Demo shows the STEP rail once; nested guided-pull shells omit it to avoid a double rail.
  */
 export function ConnectHomeAnalyzeViewport({ isDemo, connectFlowStep, children, className }) {
+  const guidedWorkflowPull = !!useMyStateV2()?.guidedWorkflowPull;
+  const showDemoFlowSteps = isDemo && !guidedWorkflowPull;
+
   return (
     <div
       className={cn(
@@ -16,7 +21,7 @@ export function ConnectHomeAnalyzeViewport({ isDemo, connectFlowStep, children, 
         className,
       )}
     >
-      {isDemo ? (
+      {showDemoFlowSteps ? (
         <div
           className={cn(
             "relative grid min-h-0 flex-1 grid-cols-[8.5rem_minmax(0,1fr)] gap-x-6 lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
@@ -33,7 +38,14 @@ export function ConnectHomeAnalyzeViewport({ isDemo, connectFlowStep, children, 
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:px-6 lg:px-8">
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 flex-col overflow-hidden",
+            isDemo
+              ? cn(connectHubDemoInsetClass, "overflow-x-visible overflow-y-hidden")
+              : "md:px-6 lg:px-8",
+          )}
+        >
           {children}
         </div>
       )}
