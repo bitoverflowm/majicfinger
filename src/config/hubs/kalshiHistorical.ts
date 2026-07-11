@@ -2,6 +2,14 @@ import type { HubPageConfig } from "@/types/hub";
 import { kalshiHistoricalComparisonTable } from "./kalshiHistoricalComparisonTable";
 import { kalshiHistoricalResearchGuides } from "./kalshiHistoricalResearchGuides";
 
+/** Shared copy for the hub explore block and guide `<KalshiHistoricalDataQuery />` embeds. */
+export const KALSHI_HISTORICAL_EXPLORE_SECTION = {
+  anchorId: "explore-data",
+  title: "Try Lychee’s Kalshi Historical Data Explorer",
+  description:
+    "Search historical Kalshi markets and trades, preview real rows, apply filters, and export clean results without writing code.",
+} as const;
+
 export const kalshiHistoricalHub: HubPageConfig = {
   id: "kalshi-historical",
   slug: "kalshi-historical-data",
@@ -215,11 +223,10 @@ export const kalshiHistoricalHub: HubPageConfig = {
 
     {
       type: "query",
-      anchorId: "explore-data",
-      title: "Try Lychee’s Kalshi Historical Data Explorer",
+      anchorId: KALSHI_HISTORICAL_EXPLORE_SECTION.anchorId,
+      title: KALSHI_HISTORICAL_EXPLORE_SECTION.title,
       headerBranding: "kalshi_historical",
-      description:
-        "Search historical Kalshi markets and trades, preview real rows, apply filters, and export clean results without writing code.",
+      description: KALSHI_HISTORICAL_EXPLORE_SECTION.description,
     },
 
     {
