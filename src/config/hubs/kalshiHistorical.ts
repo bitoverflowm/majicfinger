@@ -234,7 +234,12 @@ export const kalshiHistoricalHub: HubPageConfig = {
       anchorId: "example-workflows",
       title: "Example Kalshi historical workflows",
       intro: "Start with simple workflows, then scale into deeper research.",
-      note: "Guided query recipes are coming soon. For now, start with a free Kalshi query or explore the example research below.",
+      note: "Choose a guided workflow and Lychee will walk you through every step—from selecting the historical dataset and applying filters to running the query, inspecting the results, and building the final chart or export.",
+      noteCta: {
+        label: "Try it now →",
+        href: "#explore-data",
+        highlightTargetId: "kalshi-guided-workflows",
+      },
       cards: [
         {
           title: "Top Kalshi markets by volume",

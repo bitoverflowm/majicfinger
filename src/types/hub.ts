@@ -132,6 +132,13 @@ export type HubCardsSection = {
   title: string;
   intro?: string;
   note?: string;
+  /** Optional text link under the note (e.g. scroll to explore demo). */
+  noteCta?: {
+    label: string;
+    href: string;
+    /** DOM id to briefly highlight after scroll (e.g. guided workflow column). */
+    highlightTargetId?: string;
+  };
   cta?: HubCta;
   cards: HubCard[];
 };

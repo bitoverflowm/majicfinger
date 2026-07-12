@@ -2,6 +2,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { HubComparisonTable } from "@/components/hubs/HubComparisonTable";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
+import { HubCardsNoteCta } from "@/components/hubs/HubCardsNoteCta";
 import { cn } from "@/lib/utils";
 import type {
   HubBulletsSection,
@@ -334,16 +335,25 @@ function HubCards({ section }: { section: HubCardsSection }) {
             </li>
           ))}
         </ul>
-        {section.note ? (
-          <div className="mx-auto max-w-2xl space-y-4 text-center">
-            {section.note.split("\n\n").map((paragraph) => (
-              <p
-                key={paragraph.slice(0, 48)}
-                className="text-sm leading-relaxed text-muted-foreground text-pretty md:text-base"
-              >
-                {paragraph}
-              </p>
-            ))}
+        {section.note || section.noteCta ? (
+          <div className="mx-auto max-w-2xl space-y-3 text-center">
+            {section.note
+              ? section.note.split("\n\n").map((paragraph) => (
+                  <p
+                    key={paragraph.slice(0, 48)}
+                    className="text-sm leading-relaxed text-muted-foreground text-pretty md:text-base"
+                  >
+                    {paragraph}
+                  </p>
+                ))
+              : null}
+            {section.noteCta ? (
+              <HubCardsNoteCta
+                label={section.noteCta.label}
+                href={section.noteCta.href}
+                highlightTargetId={section.noteCta.highlightTargetId}
+              />
+            ) : null}
           </div>
         ) : null}
         {section.cta ? (

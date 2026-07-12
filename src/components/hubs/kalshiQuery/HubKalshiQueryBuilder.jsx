@@ -136,11 +136,23 @@ function hubEmbedDensity(embedded) {
   };
 }
 
-function HubStartingPointColumn({ icon: Icon, title, badge, description, children, compact = false }) {
+function HubStartingPointColumn({
+  icon: Icon,
+  title,
+  badge,
+  description,
+  children,
+  compact = false,
+  id,
+}) {
   return (
     <div
+      id={id}
       className={cn(
-        "relative flex h-full flex-col rounded-xl border border-border/70 bg-muted/15",
+        "relative flex h-full flex-col rounded-xl border border-border/70 bg-muted/15 scroll-mt-28",
+        "transition-[box-shadow,ring-color] duration-300",
+        "data-[guided-flash=true]:ring-2 data-[guided-flash=true]:ring-secondary data-[guided-flash=true]:ring-offset-2 data-[guided-flash=true]:ring-offset-background",
+        "data-[guided-flash=true]:shadow-[0_0_0_6px_rgba(40,120,255,0.16)]",
         compact ? "p-3" : "p-3 md:p-3 lg:p-4",
       )}
     >
@@ -918,6 +930,7 @@ function HubKalshiQueryBuilderInner({
                   </HubStartingPointColumn>
 
                   <HubStartingPointColumn
+                    id="kalshi-guided-workflows"
                     icon={Wand2}
                     title="Use a guided workflow"
                     badge="Best for guided setup"
