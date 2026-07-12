@@ -51,9 +51,14 @@ export function HubCardsNoteCta({
   href = "#explore-data",
   highlightTargetId = KALSHI_GUIDED_WORKFLOWS_ANCHOR_ID,
   className,
+}: {
+  label?: string;
+  href?: string;
+  highlightTargetId?: string;
+  className?: string;
 }) {
   const onClick = useCallback(
-    (e) => {
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
       e.preventDefault();
       scrollToExploreAndHighlightGuidedWorkflows({
         exploreHash: href,
