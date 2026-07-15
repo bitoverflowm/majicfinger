@@ -834,7 +834,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       className={cn(
         "flex flex-col px-4 sm:px-6 md:px-10 lg:px-14",
         connectWorkspaceScrollInsetClass,
-        hasComposeUi || isKalshiHistorical
+        hasComposeUi || isKalshiHistorical || isKalshiLive
           ? "min-h-0 justify-start py-4 sm:py-5"
           : "min-h-0 justify-start pb-10 pt-16 sm:pb-12 sm:pt-20 md:pt-24",
         className,
@@ -843,18 +843,20 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       <div
         className={cn(
           "mx-auto w-full",
-          isKalshiHistorical ? "max-w-6xl" : "max-w-2xl",
+          isKalshiHistorical || isKalshiLive ? "max-w-6xl" : "max-w-2xl",
         )}
       >
         <IntegrationWorkflowHeader
-          name={isKalshiHistorical ? undefined : name}
-          description={isKalshiHistorical ? undefined : description}
-          compact={hasComposeUi || isKalshiHistorical}
+          name={isKalshiHistorical || isKalshiLive ? undefined : name}
+          description={isKalshiHistorical || isKalshiLive ? undefined : description}
+          compact={hasComposeUi || isKalshiHistorical || isKalshiLive}
           onGoBack={handleGoBackToIntegrations}
         />
 
         {isKalshiLive ? (
-          <KalshiLiveIntegrationsCore onRunPull={handleRunIntegrationPull} />
+          <div className="mt-4 sm:mt-5">
+            <KalshiLiveIntegrationsCore onRunPull={handleRunIntegrationPull} />
+          </div>
         ) : null}
 
         {isKalshiHistorical ? (

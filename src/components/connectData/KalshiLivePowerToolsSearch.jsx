@@ -60,6 +60,9 @@ const SCOPE_PLACEHOLDER = {
  *   className?: string;
  *   scope?: KalshiLiveSearchScope;
  *   onScopeChange?: (scope: KalshiLiveSearchScope) => void;
+ *   variant?: "default" | "embedded";
+ *   initialQuery?: string;
+ *   inputClassName?: string;
  * }} props
  */
 export function KalshiLivePowerToolsSearch({
@@ -69,6 +72,9 @@ export function KalshiLivePowerToolsSearch({
   className,
   scope: controlledScope,
   onScopeChange,
+  variant = "default",
+  initialQuery = "",
+  inputClassName,
 }) {
   const [internalScope, setInternalScope] = useState(/** @type {KalshiLiveSearchScope} */ ("markets"));
   const scope = controlledScope ?? internalScope;
@@ -84,8 +90,9 @@ export function KalshiLivePowerToolsSearch({
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(null);
   const suggestSeqRef = useRef(0);
+  const inputRef = useRef(null);
 
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => (typeof initialQuery === "string" ? initialQuery : ""));
   const [suggestions, setSuggestions] = useState([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestLoading, setSuggestLoading] = useState(false);
@@ -186,16 +193,29 @@ export function KalshiLivePowerToolsSearch({
     [onSelectMarket, onSelectSeries],
   );
 
+  useEffect(() => {
+    if (variant !== "embedded") return;
+    const id = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [variant]);
+
   const busy = disabled || selectLoading;
   const entityTagLabel = scope === "series" ? "Series" : "Market";
+  const isEmbedded = variant === "embedded";
 
   return (
     <div className={cn("space-y-2", className)}>
-      <motion.div className="flex items-center gap-2">
-        <Zap className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
-        <h2 className="text-sm font-semibold tracking-tight text-foreground">Power Tools</h2>
-      </motion.div>
-      <p className="text-[11px] leading-snug text-muted-foreground">{SCOPE_HINT[scope]}</p>
+      {isEmbedded ? null : (
+        <>
+          <motion.div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">Power Tools</h2>
+          </motion.div>
+          <p className="text-[11px] leading-snug text-muted-foreground">{SCOPE_HINT[scope]}</p>
+        </>
+      )}
 
       <div className="relative flex gap-2">
         <div className="relative min-w-0 flex-1">
@@ -207,8 +227,13 @@ export function KalshiLivePowerToolsSearch({
             )}
           </span>
           <input
+            ref={inputRef}
             type="search"
-            placeholder={SCOPE_PLACEHOLDER[scope]}
+            placeholder={
+              isEmbedded
+                ? "Search by ticker, title, or event…"
+                : SCOPE_PLACEHOLDER[scope]
+            }
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onFocus={() => suggestions.length > 0 && setSuggestOpen(true)}
@@ -221,8 +246,10 @@ export function KalshiLivePowerToolsSearch({
             disabled={busy}
             autoComplete="off"
             className={cn(
-              "flex h-10 w-full rounded-md border border-border bg-background py-2 pl-10 pr-3 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              "flex h-10 w-full rounded-md border border-border bg-background py-2 pl-10 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              isEmbedded ? "h-11 rounded-xl pr-12" : "pr-3",
               busy && "opacity-70",
+              inputClassName,
             )}
             aria-label={scope === "series" ? "Kalshi Live series search" : "Kalshi Live market search"}
           />
@@ -285,7 +312,13 @@ export function KalshiLivePowerToolsSearch({
         </div>
 
         <Select value={scope} onValueChange={handleScopeChange} disabled={busy}>
-          <SelectTrigger className="h-10 w-[7.25rem] shrink-0 text-xs" aria-label="Search scope">
+          <SelectTrigger
+            className={cn(
+              "w-[7.25rem] shrink-0 text-xs",
+              isEmbedded ? "h-9" : "h-10",
+            )}
+            aria-label="Search scope"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
