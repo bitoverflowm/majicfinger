@@ -33,6 +33,7 @@ import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { operatorSymbol } from "@/lib/dataLakeComposeHelpers";
 import { validateKalshiLiveCandlestickPull } from "@/lib/kalshiLive/candlestickCompose";
 import { validateKalshiLiveTradesPull } from "@/lib/kalshiLive/tradeCompose";
+import { validateKalshiLiveOrderbookPull } from "@/lib/kalshiLive/orderbookCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import {
   getKalshiLiveAllColumnNames,
@@ -94,6 +95,7 @@ function defaultWhereValue(endpointId, column) {
     if (column === "min_ts") return now - 24 * 60 * 60;
     if (column === "max_ts") return now;
   }
+  if (endpointId === "orderbook" && column === "depth") return 0;
   if (column === "category") return "Economics";
   if (column === "status") return "open";
   const type = getKalshiLiveColumnType(endpointId, column);
@@ -136,6 +138,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveColumnSelections = {},
     connectKalshiLiveCandlestickTickers = "",
     connectKalshiLiveTradesTicker = "",
+    connectKalshiLiveOrderbookTicker = "",
   } = ctx;
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
@@ -258,6 +261,14 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "orderbook") {
+      const orderbookErr = validateKalshiLiveOrderbookPull(connectKalshiLiveOrderbookTicker);
+      if (orderbookErr) {
+        setFilterError?.(orderbookErr);
+        return;
+      }
+    }
+
     setFilterError?.(null);
     flushSync(() => {
       onRunPull?.();
@@ -270,6 +281,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveWhereFilters,
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveTradesTicker,
+    connectKalshiLiveOrderbookTicker,
     setFilterError,
     onRunPull,
   ]);
@@ -451,7 +463,9 @@ export function KalshiLiveComposeOperationPanel({
               ? "start_ts, end_ts, and period_interval are sent to Kalshi. Other columns filter on our side after the pull."
               : endpointId === "trades"
                 ? "min_ts and max_ts are sent to Kalshi. Other columns filter on our side after the pull."
-                : "Filters on category, tags, and updated time use Kalshi API params when possible. Other columns are filtered on our side after the pull. Category → Other matches custom text or non-standard categories."}
+                : endpointId === "orderbook"
+                  ? "Optional depth (0–100) is sent to Kalshi. Other columns filter on our side after the pull."
+                  : "Filters on category, tags, and updated time use Kalshi API params when possible. Other columns are filtered on our side after the pull. Category → Other matches custom text or non-standard categories."}
           </p>
         </div>
       );

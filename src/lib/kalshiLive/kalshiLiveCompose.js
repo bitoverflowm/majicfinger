@@ -7,6 +7,11 @@ import {
   KALSHI_LIVE_TRADES_COLUMNS,
   TRADES_API_WHERE_COLUMN_LIST,
 } from "@/lib/kalshiLive/tradesColumns";
+import {
+  KALSHI_LIVE_ORDERBOOK_API_FILTER_COLUMNS,
+  KALSHI_LIVE_ORDERBOOK_COLUMNS,
+  ORDERBOOK_API_WHERE_COLUMN_LIST,
+} from "@/lib/kalshiLive/orderbookColumns";
 import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
 import { validateKalshiLiveMarketFilters } from "@/lib/kalshiLive/marketFilterRules";
 import { KALSHI_LIVE_SERIES_COLUMNS } from "@/lib/kalshiLive/seriesColumns";
@@ -54,6 +59,11 @@ export function getKalshiLiveAllColumnNames(endpointId) {
     const api = TRADES_API_WHERE_COLUMN_LIST.filter((c) => !sheet.includes(c));
     return [...api, ...sheet];
   }
+  if (endpointId === "orderbook") {
+    const sheet = KALSHI_LIVE_ORDERBOOK_COLUMNS.map((c) => c.name);
+    const api = ORDERBOOK_API_WHERE_COLUMN_LIST.filter((c) => !sheet.includes(c));
+    return [...api, ...sheet];
+  }
   const cols =
     endpointId === "markets"
       ? KALSHI_LIVE_MARKETS_COLUMNS
@@ -79,6 +89,11 @@ export function getKalshiLiveColumnType(endpointId, column) {
   if (endpointId === "trades") {
     if (KALSHI_LIVE_TRADES_API_FILTER_COLUMNS.has(column)) return "timestamp";
     const row = KALSHI_LIVE_TRADES_COLUMNS.find((c) => c.name === column);
+    return row?.type || "string";
+  }
+  if (endpointId === "orderbook") {
+    if (KALSHI_LIVE_ORDERBOOK_API_FILTER_COLUMNS.has(column)) return "number";
+    const row = KALSHI_LIVE_ORDERBOOK_COLUMNS.find((c) => c.name === column);
     return row?.type || "string";
   }
   const cols =
@@ -114,7 +129,7 @@ export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
     return validateKalshiLiveSeriesListFilters(apiFilters);
   }
 
-  if (endpointId === "candlesticks" || endpointId === "trades") {
+  if (endpointId === "candlesticks" || endpointId === "trades" || endpointId === "orderbook") {
     return null;
   }
 

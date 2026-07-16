@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion";
 import {
   CandlestickChart,
   CloudSun,
+  BookOpen,
   Hash,
   Layers,
   LineChart,
@@ -23,6 +24,7 @@ import {
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { KalshiLiveCandlestickTickersField } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickTickersField";
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
+import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookTickerField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -59,6 +61,10 @@ const LIVE_SOURCE_PRESENTATION = {
   trades: {
     icon: LineChart,
     accent: "secondary",
+  },
+  orderbook: {
+    icon: BookOpen,
+    accent: "emerald",
   },
 };
 
@@ -298,6 +304,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveCandlestickTickers,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
+    connectKalshiLiveOrderbookTicker = "",
+    setConnectKalshiLiveOrderbookTicker,
     setConnectActiveComposeOps,
     kalshiLivePingState = "idle",
     pingKalshiLiveExchange,
@@ -373,6 +381,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveSortClauses?.([]);
       if (id !== "candlesticks") setConnectKalshiLiveCandlestickTickers?.("");
       if (id !== "trades") setConnectKalshiLiveTradesTicker?.("");
+      if (id !== "orderbook") setConnectKalshiLiveOrderbookTicker?.("");
       setFilterError(null);
       setHoveredEndpointId("");
       if (kalshiLivePingState === "idle") pingKalshiLiveExchange?.();
@@ -384,6 +393,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveSortClauses,
       setConnectKalshiLiveCandlestickTickers,
       setConnectKalshiLiveTradesTicker,
+      setConnectKalshiLiveOrderbookTicker,
       kalshiLivePingState,
       pingKalshiLiveExchange,
     ],
@@ -396,6 +406,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveSortClauses?.([]);
     setConnectKalshiLiveCandlestickTickers?.("");
     setConnectKalshiLiveTradesTicker?.("");
+    setConnectKalshiLiveOrderbookTicker?.("");
     setFilterError(null);
   }, [
     setConnectKalshiLiveEndpointId,
@@ -404,6 +415,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveSortClauses,
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveTradesTicker,
+    setConnectKalshiLiveOrderbookTicker,
   ]);
 
   const patchColumns = useCallback(
@@ -636,6 +648,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                   className="mb-3"
                   value={connectKalshiLiveTradesTicker}
                   onChange={(v) => setConnectKalshiLiveTradesTicker?.(v)}
+                  disabled={pullLoading}
+                />
+              ) : null}
+              {selectedId === "orderbook" ? (
+                <KalshiLiveOrderbookTickerField
+                  className="mb-3"
+                  value={connectKalshiLiveOrderbookTicker}
+                  onChange={(v) => setConnectKalshiLiveOrderbookTicker?.(v)}
                   disabled={pullLoading}
                 />
               ) : null}
