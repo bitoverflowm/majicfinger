@@ -1,6 +1,10 @@
 import { flushSync } from "react-dom";
 
-import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
+import {
+  applyConnectHomePullData,
+  prepareConnectHomePullSheet,
+} from "@/lib/connectHomePullDestination";
+import { flattenKalshiEmbeddingSearchToRows } from "@/lib/kalshiLive/kalshiLiveEmbeddingSearch";
 import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
 import { KALSHI_LIVE_SERIES_COLUMNS } from "@/lib/kalshiLive/seriesColumns";
 
@@ -66,4 +70,18 @@ export function applyKalshiLiveSeriesPowerSearchSelection(ctx, suggestion) {
 
   prepareConnectHomePullSheet(ctx);
   ctx.requestConnectIntegrationPull?.();
+}
+
+/**
+ * Load embedding-search hit markets into the connect-home sheet.
+ *
+ * @param {Record<string, unknown>} ctx
+ * @param {import("@/lib/kalshiLive/kalshiLiveEmbeddingSearch").KalshiEmbeddingSearchSuggestion} suggestion
+ */
+export function applyKalshiLiveEmbeddingSearchSelection(ctx, suggestion) {
+  const rows = flattenKalshiEmbeddingSearchToRows(suggestion);
+  prepareConnectHomePullSheet(ctx);
+  flushSync(() => {
+    applyConnectHomePullData(ctx, rows);
+  });
 }

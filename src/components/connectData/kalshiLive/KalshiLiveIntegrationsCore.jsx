@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { KalshiLivePowerToolsSearch } from "@/components/connectData/KalshiLivePowerToolsSearch";
+import { KalshiLiveEmbeddingSearch } from "@/components/connectData/KalshiLiveEmbeddingSearch";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import {
   ColumnPicker,
@@ -39,6 +40,7 @@ import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import {
   applyKalshiLivePowerSearchSelection,
   applyKalshiLiveSeriesPowerSearchSelection,
+  applyKalshiLiveEmbeddingSearchSelection,
 } from "@/lib/kalshiLivePowerSearchPull";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
@@ -517,6 +519,13 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     [ctx, runKalshiLiveAction],
   );
 
+  const handleEmbeddingSearchSelect = useCallback(
+    (suggestion) => {
+      runKalshiLiveAction(() => applyKalshiLiveEmbeddingSearchSelection(ctx, suggestion));
+    },
+    [ctx, runKalshiLiveAction],
+  );
+
   const getDisplayLabel = useCallback(
     (col) => KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(selectedId, col),
     [selectedId],
@@ -653,6 +662,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                       onSelectSeries={handlePowerSearchSeries}
                       disabled={pullLoading}
                       inputClassName="h-9 rounded-lg pl-9 pr-12 text-xs"
+                    />
+                    <KalshiLiveEmbeddingSearch
+                      onFocus={expandSearch}
+                      onSelect={handleEmbeddingSearchSelect}
+                      disabled={pullLoading}
                     />
                     <div className={density.listGap}>
                       <p className={cn("font-medium text-muted-foreground", density.label)}>
