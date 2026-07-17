@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   CandlestickChart,
   CloudSun,
@@ -15,6 +15,7 @@ import {
   Vote,
   Wand2,
   CircleDollarSign,
+  X,
 } from "lucide-react";
 
 import { KalshiLivePowerToolsSearch } from "@/components/connectData/KalshiLivePowerToolsSearch";
@@ -140,7 +141,15 @@ function hubSourceIconClasses({ accent }) {
     : "bg-secondary/15 text-secondary dark:text-secondary";
 }
 
-function HubStartingPointColumn({ icon: Icon, title, badge, description, children, id }) {
+function HubStartingPointColumn({
+  icon: Icon,
+  title,
+  badge,
+  description,
+  children,
+  id,
+  headerAction = null,
+}) {
   return (
     <div
       id={id}
@@ -161,6 +170,7 @@ function HubStartingPointColumn({ icon: Icon, title, badge, description, childre
             <h3 className="text-xs font-semibold leading-snug text-foreground">{title}</h3>
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{description}</p>
           </div>
+          {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2">{children}</div>
@@ -352,7 +362,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
   const [filterError, setFilterError] = useState(null);
   const [marketSearchInitial, setMarketSearchInitial] = useState("");
   const [marketSearchKey, setMarketSearchKey] = useState(0);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [startingGridHeight, setStartingGridHeight] = useState(null);
   const clearHoverTimeoutRef = useRef(null);
+  const startingGridRef = useRef(null);
 
   const endpoints = KALSHI_LIVE_CONNECT_CONFIG.endpoints;
   const selectedId = connectKalshiLiveEndpointId;
@@ -410,9 +423,25 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setHoveredEndpointId("");
   }, []);
 
+  const expandSearch = useCallback(() => {
+    if (clearHoverTimeoutRef.current) {
+      clearTimeout(clearHoverTimeoutRef.current);
+      clearHoverTimeoutRef.current = null;
+    }
+    const height = startingGridRef.current?.getBoundingClientRect().height;
+    if (Number.isFinite(height) && height > 0) setStartingGridHeight(height);
+    setHoveredEndpointId("");
+    setSearchExpanded(true);
+  }, []);
+
+  const collapseSearch = useCallback(() => {
+    setSearchExpanded(false);
+  }, []);
+
   const handleSelectEndpoint = useCallback(
     (id) => {
       if (KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS.has(id)) return;
+      setSearchExpanded(false);
       setConnectKalshiLiveEndpointId?.(id);
       setConnectActiveComposeOps?.([]);
       setConnectKalshiLiveWhereFilters?.([]);
@@ -445,6 +474,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveCandlestickTickers?.("");
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveOrderbookTicker?.("");
+    setSearchExpanded(false);
     setFilterError(null);
   }, [
     setConnectKalshiLiveEndpointId,
@@ -506,131 +536,219 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
             </p>
           </div>
 
-          <div className={cn("grid grid-cols-1 items-stretch sm:grid-cols-3", density.gridGap)}>
-            <div className="min-w-0">
-              <HubStartingPointColumn
-                icon={Layers}
-                title="Browse live endpoints"
-                badge="Best for discovery"
-                description="Choose an API endpoint first, then filter, select columns, and pull the rows you need."
-              >
-                <p className={cn("font-medium text-muted-foreground", density.label)}>
-                  Choose a data source
-                </p>
-                <div className={density.listGap}>
-                  {endpoints.map((endpoint) => (
-                    <LiveSourceOption
-                      key={endpoint.id}
-                      endpoint={endpoint}
-                      isSelected={selectedId === endpoint.id}
-                      onSelect={handleSelectEndpoint}
-                      onHover={handleSourceHover}
-                      onLeave={handleSourceLeave}
-                    />
-                  ))}
-                </div>
-              </HubStartingPointColumn>
-            </div>
+          <motion.div
+            ref={startingGridRef}
+            layout
+            transition={{ layout: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }}
+            style={{
+              minHeight:
+                searchExpanded && startingGridHeight ? `${startingGridHeight}px` : undefined,
+            }}
+            className={cn(
+              "grid grid-cols-1 items-stretch sm:grid-cols-3",
+              density.gridGap,
+            )}
+          >
+            <AnimatePresence initial={false} mode="popLayout">
+              {!searchExpanded ? (
+                <motion.div
+                  key="live-endpoints"
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="min-w-0"
+                >
+                  <HubStartingPointColumn
+                    icon={Layers}
+                    title="Browse live endpoints"
+                    badge="Best for discovery"
+                    description="Choose an API endpoint first, then filter, select columns, and pull the rows you need."
+                  >
+                    <p className={cn("font-medium text-muted-foreground", density.label)}>
+                      Choose a data source
+                    </p>
+                    <div className={density.listGap}>
+                      {endpoints.map((endpoint) => (
+                        <LiveSourceOption
+                          key={endpoint.id}
+                          endpoint={endpoint}
+                          isSelected={selectedId === endpoint.id}
+                          onSelect={handleSelectEndpoint}
+                          onHover={handleSourceHover}
+                          onLeave={handleSourceLeave}
+                        />
+                      ))}
+                    </div>
+                  </HubStartingPointColumn>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
 
-            <div className="relative min-h-[16rem] min-w-0 overflow-hidden sm:col-span-2 sm:min-h-0">
-              <div
+            <motion.div
+              layout
+              transition={{ layout: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }}
+              className={cn(
+                "relative min-h-[16rem] min-w-0 sm:min-h-0",
+                searchExpanded
+                  ? "h-full overflow-visible sm:col-span-3"
+                  : "overflow-hidden sm:col-span-2",
+              )}
+            >
+              <motion.div
+                layout
+                transition={{ layout: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }}
                 className={cn(
                   "grid h-full grid-cols-1 transition-all duration-500 ease-out sm:grid-cols-2",
                   density.gridGap,
-                  hoveredEndpointId
+                  !searchExpanded && hoveredEndpointId
                     ? "pointer-events-none translate-x-6 opacity-0"
                     : "translate-x-0 opacity-100",
                 )}
-                aria-hidden={!!hoveredEndpointId}
+                aria-hidden={!searchExpanded && !!hoveredEndpointId}
               >
-                <HubStartingPointColumn
-                  icon={Search}
-                  title="Search for a specific market"
-                  badge="Best for known markets"
-                  description="Load a Kalshi market or series by ticker, title, or event so you can explore live data faster."
+                <motion.div
+                  layout
+                  transition={{ layout: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }}
+                  className={cn("min-w-0", searchExpanded && "h-full sm:col-span-2")}
                 >
-                  <p className={cn("font-medium text-muted-foreground", density.label)}>Search</p>
-                  <KalshiLivePowerToolsSearch
-                    key={marketSearchKey}
-                    variant="embedded"
-                    initialQuery={marketSearchInitial}
-                    onSelectMarket={handlePowerSearchMarket}
-                    onSelectSeries={handlePowerSearchSeries}
-                    disabled={pullLoading}
-                    inputClassName="h-9 rounded-lg pl-9 pr-12 text-xs"
-                  />
-                  <div className={density.listGap}>
-                    <p className={cn("font-medium text-muted-foreground", density.label)}>
-                      Examples
-                    </p>
-                    <ul className="space-y-1">
-                      {LIVE_MARKET_SEARCH_EXAMPLES.map((example) => {
-                        const ExampleIcon = example.icon;
-                        return (
-                          <li key={example.label}>
-                            <button
+                  <HubStartingPointColumn
+                    icon={Search}
+                    title="Search for a specific market"
+                    badge="Best for known markets"
+                    description="Load a Kalshi market or series by ticker, title, or event so you can explore live data faster."
+                    headerAction={
+                      <AnimatePresence initial={false}>
+                        {searchExpanded ? (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.18 }}
+                          >
+                            <Button
                               type="button"
-                              onClick={() => {
-                                setMarketSearchInitial(example.label);
-                                setMarketSearchKey((key) => key + 1);
-                              }}
-                              className={cn(
-                                "flex w-full items-center gap-2 rounded-md px-1 py-1 text-left leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground",
-                                density.example,
-                              )}
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                              onClick={collapseSearch}
+                              aria-label="Close search and show all options"
                             >
-                              <ExampleIcon
-                                className={cn("shrink-0", density.exampleIcon, example.iconClass)}
-                                aria-hidden
-                              />
-                              {example.label}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                </HubStartingPointColumn>
-
-                <HubStartingPointColumn
-                  id="kalshi-live-guided-workflows"
-                  icon={Wand2}
-                  title="Use a guided workflow"
-                  badge="Best for guided setup"
-                  description="Follow a step-by-step guided walkthrough for common Kalshi live data tasks."
-                >
-                  <div className={density.listGap}>
-                    {KALSHI_LIVE_COMING_SOON_WORKFLOWS.map((workflow) => (
-                      <ComingSoonWorkflowOption key={workflow.id} workflow={workflow} />
-                    ))}
-                  </div>
-                </HubStartingPointColumn>
-              </div>
-
-              <div
-                className={cn(
-                  "absolute inset-0 transition-all duration-500 ease-out",
-                  hoveredEndpointId
-                    ? "translate-x-0 opacity-100"
-                    : "pointer-events-none translate-x-8 opacity-0",
-                )}
-                onMouseEnter={handlePreviewHover}
-                onMouseLeave={handlePreviewLeave}
-                aria-hidden={!hoveredEndpointId}
-              >
-                {hoveredEndpointId ? (
-                  <ColumnDefinitionsPanel
-                    columns={hoverPreviewColumns}
-                    getDisplayLabel={(col) =>
-                      KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(hoveredEndpointId, col)
+                              <X className="size-3.5" aria-hidden />
+                            </Button>
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
                     }
-                    title={`${hoveredSourceLabel} columns (${hoverPreviewColumns.length})`}
-                    className="h-full"
-                  />
-                ) : null}
-              </div>
-            </div>
-          </div>
+                  >
+                    <p className={cn("font-medium text-muted-foreground", density.label)}>Search</p>
+                    <KalshiLivePowerToolsSearch
+                      key={marketSearchKey}
+                      variant="embedded"
+                      initialQuery={marketSearchInitial}
+                      autoFocus={!!marketSearchInitial}
+                      onFocus={expandSearch}
+                      onSelectMarket={handlePowerSearchMarket}
+                      onSelectSeries={handlePowerSearchSeries}
+                      disabled={pullLoading}
+                      inputClassName="h-9 rounded-lg pl-9 pr-12 text-xs"
+                    />
+                    <div className={density.listGap}>
+                      <p className={cn("font-medium text-muted-foreground", density.label)}>
+                        Examples
+                      </p>
+                      <ul
+                        className={cn(
+                          "space-y-1",
+                          searchExpanded && "sm:grid sm:grid-cols-2 sm:gap-x-4 sm:space-y-0",
+                        )}
+                      >
+                        {LIVE_MARKET_SEARCH_EXAMPLES.map((example) => {
+                          const ExampleIcon = example.icon;
+                          return (
+                            <li key={example.label}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  expandSearch();
+                                  setMarketSearchInitial(example.label);
+                                  setMarketSearchKey((key) => key + 1);
+                                }}
+                                className={cn(
+                                  "flex w-full items-center gap-2 rounded-md px-1 py-1 text-left leading-snug text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground",
+                                  density.example,
+                                )}
+                              >
+                                <ExampleIcon
+                                  className={cn("shrink-0", density.exampleIcon, example.iconClass)}
+                                  aria-hidden
+                                />
+                                {example.label}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </HubStartingPointColumn>
+                </motion.div>
+
+                <AnimatePresence initial={false} mode="popLayout">
+                  {!searchExpanded ? (
+                    <motion.div
+                      key="guided-workflows"
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="min-w-0"
+                    >
+                      <HubStartingPointColumn
+                        id="kalshi-live-guided-workflows"
+                        icon={Wand2}
+                        title="Use a guided workflow"
+                        badge="Best for guided setup"
+                        description="Follow a step-by-step guided walkthrough for common Kalshi live data tasks."
+                      >
+                        <div className={density.listGap}>
+                          {KALSHI_LIVE_COMING_SOON_WORKFLOWS.map((workflow) => (
+                            <ComingSoonWorkflowOption key={workflow.id} workflow={workflow} />
+                          ))}
+                        </div>
+                      </HubStartingPointColumn>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </motion.div>
+
+              {!searchExpanded ? (
+                <div
+                  className={cn(
+                    "absolute inset-0 transition-all duration-500 ease-out",
+                    hoveredEndpointId
+                      ? "translate-x-0 opacity-100"
+                      : "pointer-events-none translate-x-8 opacity-0",
+                  )}
+                  onMouseEnter={handlePreviewHover}
+                  onMouseLeave={handlePreviewLeave}
+                  aria-hidden={!hoveredEndpointId}
+                >
+                  {hoveredEndpointId ? (
+                    <ColumnDefinitionsPanel
+                      columns={hoverPreviewColumns}
+                      getDisplayLabel={(col) =>
+                        KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(hoveredEndpointId, col)
+                      }
+                      title={`${hoveredSourceLabel} columns (${hoverPreviewColumns.length})`}
+                      className="h-full"
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </motion.div>
+          </motion.div>
         </div>
       ) : (
         <div className="space-y-3">

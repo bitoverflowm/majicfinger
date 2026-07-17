@@ -63,6 +63,8 @@ const SCOPE_PLACEHOLDER = {
  *   variant?: "default" | "embedded";
  *   initialQuery?: string;
  *   inputClassName?: string;
+ *   autoFocus?: boolean;
+ *   onFocus?: () => void;
  * }} props
  */
 export function KalshiLivePowerToolsSearch({
@@ -75,6 +77,8 @@ export function KalshiLivePowerToolsSearch({
   variant = "default",
   initialQuery = "",
   inputClassName,
+  autoFocus = false,
+  onFocus,
 }) {
   const [internalScope, setInternalScope] = useState(/** @type {KalshiLiveSearchScope} */ ("markets"));
   const scope = controlledScope ?? internalScope;
@@ -194,12 +198,12 @@ export function KalshiLivePowerToolsSearch({
   );
 
   useEffect(() => {
-    if (variant !== "embedded") return;
+    if (!autoFocus) return;
     const id = requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
     return () => cancelAnimationFrame(id);
-  }, [variant]);
+  }, [autoFocus]);
 
   const busy = disabled || selectLoading;
   const entityTagLabel = scope === "series" ? "Series" : "Market";
@@ -236,7 +240,10 @@ export function KalshiLivePowerToolsSearch({
             }
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            onFocus={() => suggestions.length > 0 && setSuggestOpen(true)}
+            onFocus={() => {
+              onFocus?.();
+              if (suggestions.length > 0) setSuggestOpen(true);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
