@@ -83,5 +83,7 @@ export function applyKalshiLiveEmbeddingSearchSelection(ctx, suggestion) {
   prepareConnectHomePullSheet(ctx);
   flushSync(() => {
     applyConnectHomePullData(ctx, rows);
+    ctx.setConnectHomeAnalyzeActive?.(true);
   });
+  ctx.requestConnectAnalyzeScroll?.();
 }
