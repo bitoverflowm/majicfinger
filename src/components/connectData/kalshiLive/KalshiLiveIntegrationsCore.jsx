@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   KALSHI_LIVE_CONNECT_CONFIG,
+  KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS,
   getKalshiLiveComposeOperationIds,
 } from "@/config/kalshiLiveConnect";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
@@ -174,46 +175,81 @@ function LiveSourceOption({ endpoint, isSelected, onSelect, onHover, onLeave }) 
   };
   const Icon = presentation.icon;
   const { accent } = presentation;
+  const underConstruction = !!endpoint.underConstruction;
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(endpoint.id)}
-      onMouseEnter={() => onHover(endpoint.id)}
+      disabled={underConstruction}
+      onClick={() => {
+        if (underConstruction) return;
+        onSelect(endpoint.id);
+      }}
+      onMouseEnter={() => {
+        if (underConstruction) return;
+        onHover(endpoint.id);
+      }}
       onMouseLeave={onLeave}
       className={cn(
-        "group flex w-full items-center gap-2 rounded-lg border p-2.5 text-left transition-all duration-200 ease-out hover:translate-x-1.5",
-        hubSourceCardClasses({ isSelected, accent }),
+        "group flex w-full items-center gap-2 rounded-lg border p-2.5 text-left transition-all duration-200 ease-out",
+        underConstruction
+          ? "cursor-not-allowed border-border/40 bg-muted/20 opacity-60"
+          : cn("hover:translate-x-1.5", hubSourceCardClasses({ isSelected, accent })),
       )}
     >
       <span
         className={cn(
           "flex size-8 shrink-0 items-center justify-center rounded-lg",
-          hubSourceIconClasses({ accent }),
+          underConstruction
+            ? "bg-muted/40 text-muted-foreground/70"
+            : hubSourceIconClasses({ accent }),
         )}
       >
         <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <span className="text-xs font-medium text-foreground">{endpoint.title}</span>
-        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{endpoint.description}</p>
-      </div>
-      <span
-        className={cn(
-          "flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-          hubSourceRadioClasses({ isSelected, accent }),
-        )}
-        aria-hidden
-      >
-        {isSelected ? (
+        <span className="flex flex-wrap items-center gap-1.5">
           <span
             className={cn(
-              "size-2 rounded-full",
-              accent === "emerald" ? "bg-emerald-500" : "bg-secondary",
+              "text-xs font-medium",
+              underConstruction ? "text-muted-foreground" : "text-foreground",
             )}
-          />
-        ) : null}
-      </span>
+          >
+            {endpoint.title}
+          </span>
+          {underConstruction ? (
+            <span className="inline-flex rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted-foreground">
+              Under construction
+            </span>
+          ) : null}
+        </span>
+        <p
+          className={cn(
+            "mt-0.5 text-[11px] leading-snug",
+            underConstruction ? "text-muted-foreground/80" : "text-muted-foreground",
+          )}
+        >
+          {endpoint.description}
+        </p>
+      </div>
+      {underConstruction ? null : (
+        <span
+          className={cn(
+            "flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+            hubSourceRadioClasses({ isSelected, accent }),
+          )}
+          aria-hidden
+        >
+          {isSelected ? (
+            <span
+              className={cn(
+                "size-2 rounded-full",
+                accent === "emerald" ? "bg-emerald-500" : "bg-secondary",
+              )}
+            />
+          ) : null}
+        </span>
+      )}
     </button>
   );
 }
@@ -349,6 +385,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
   }, []);
 
   const handleSourceHover = useCallback((id) => {
+    if (KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS.has(id)) return;
     if (clearHoverTimeoutRef.current) {
       clearTimeout(clearHoverTimeoutRef.current);
       clearHoverTimeoutRef.current = null;
@@ -375,6 +412,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
 
   const handleSelectEndpoint = useCallback(
     (id) => {
+      if (KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS.has(id)) return;
       setConnectKalshiLiveEndpointId?.(id);
       setConnectActiveComposeOps?.([]);
       setConnectKalshiLiveWhereFilters?.([]);
@@ -417,6 +455,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveOrderbookTicker,
   ]);
+
+  useEffect(() => {
+    if (!selectedId || !KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS.has(selectedId)) return;
+    handleClearEndpoint();
+  }, [selectedId, handleClearEndpoint]);
 
   const patchColumns = useCallback(
     (sampleId, updater) => {

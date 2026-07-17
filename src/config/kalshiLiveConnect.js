@@ -58,6 +58,11 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
   },
 ];
 
+/** Endpoint ids that are visible but not selectable yet. */
+export const KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS = new Set(
+  KALSHI_LIVE_CONNECT_ENDPOINTS.filter((ep) => ep.underConstruction).map((ep) => ep.id),
+);
+
 export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
 
 /** @param {string} endpointId */
