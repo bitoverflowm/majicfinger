@@ -28,6 +28,7 @@ function formatCutoffLocal(iso) {
  *   direction: "before" | "after";
  *   targetIntegration: "kalshiHistorical" | "kalshiLive";
  *   targetLabel: string;
+ *   dataLabel?: string;
  * }} props
  */
 export function KalshiCandlestickCutoffNote({
@@ -35,6 +36,7 @@ export function KalshiCandlestickCutoffNote({
   direction,
   targetIntegration,
   targetLabel,
+  dataLabel = "candlestick data",
 }) {
   const ctx = useMyStateV2() ?? {};
   const { requestConnectWorkspace, setIntegrationSidebar, setRightPanelTab } = ctx;
@@ -87,7 +89,7 @@ export function KalshiCandlestickCutoffNote({
 
   return (
     <p className={cn("text-[11px] leading-snug text-muted-foreground", className)}>
-      Note: if you are looking for candlestick data {direction}{" "}
+      Note: if you are looking for {dataLabel} {direction}{" "}
       <span className="font-medium text-foreground">{localDate}</span>, go{" "}
       <button
         type="button"
@@ -129,6 +131,7 @@ export function KalshiHistoricalCandlestickLiveCutoffNote({ className }) {
       direction="after"
       targetIntegration="kalshiLive"
       targetLabel="Kalshi Live"
+      dataLabel="kalshi data"
     />
   );
 }
