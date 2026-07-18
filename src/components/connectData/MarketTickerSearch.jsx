@@ -578,6 +578,38 @@ export function MarketTickerSearch({
               </DialogDescription>
             </DialogHeader>
 
+            {(seriesModal?.markets || []).length > 0 ? (
+              <div className="-mt-1 flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[11px] font-normal"
+                  onClick={() => {
+                    setSeriesModal((prev) => {
+                      if (!prev) return prev;
+                      const allSelected =
+                        prev.markets.length > 0 &&
+                        prev.markets.every((m) => prev.selected.has(m.ticker));
+                      if (allSelected) {
+                        return { ...prev, selected: new Set() };
+                      }
+                      return {
+                        ...prev,
+                        selected: new Set(prev.markets.map((m) => m.ticker)),
+                      };
+                    });
+                  }}
+                >
+                  {seriesModal &&
+                  seriesModal.markets.length > 0 &&
+                  seriesModal.markets.every((m) => seriesModal.selected.has(m.ticker))
+                    ? "Deselect all"
+                    : "Select all"}
+                </Button>
+              </div>
+            ) : null}
+
             <div className="max-h-[min(24rem,50vh)] space-y-1 overflow-auto pr-1">
               {(seriesModal?.markets || []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">No markets available for this series.</p>

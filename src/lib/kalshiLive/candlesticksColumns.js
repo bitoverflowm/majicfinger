@@ -3,7 +3,7 @@
 /** @typedef {'string' | 'number' | 'nullable_number' | 'timestamp'} KalshiLiveCandlestickFieldType */
 
 export const KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS = [
-  { value: 1, label: "1 minute" },
+  { value: 1, label: "1 min" },
   { value: 60, label: "1 hour" },
   { value: 1440, label: "1 day" },
 ];

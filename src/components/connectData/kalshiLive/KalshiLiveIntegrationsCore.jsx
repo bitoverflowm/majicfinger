@@ -26,6 +26,7 @@ import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { KalshiLiveCandlestickTickersField } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickTickersField";
+import { KalshiLiveCandlestickCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickCommonQueries";
 import { KalshiLiveCandlestickHistoricalCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
 import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookTickerField";
@@ -828,12 +829,15 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
 
           <AnimatePresence>
             {selectedId === "candlesticks" ? (
-              <KalshiLiveCandlestickTickersField
-                className="mt-4"
-                value={connectKalshiLiveCandlestickTickers}
-                onChange={(v) => setConnectKalshiLiveCandlestickTickers?.(v)}
-                disabled={pullLoading}
-              />
+              <>
+                <KalshiLiveCandlestickTickersField
+                  className="mt-4"
+                  value={connectKalshiLiveCandlestickTickers}
+                  onChange={(v) => setConnectKalshiLiveCandlestickTickers?.(v)}
+                  disabled={pullLoading}
+                />
+                <KalshiLiveCandlestickCommonQueries className="mt-4" disabled={pullLoading} />
+              </>
             ) : null}
             {selectedId === "trades" ? (
               <KalshiLiveTradesTickerField
