@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
@@ -339,18 +340,29 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         ...prev,
         loading: true,
         label: "Fetching Kalshi Live candlesticks…",
-        progress: 20,
+        progress: 8,
         error: null,
       }));
 
-      const { raw, rows: accumulated, querySummary } = await fetchKalshiLiveCandlesticksPull({
-        marketTickers,
-        whereFilters,
-        sortClauses,
-        limit,
-        selectedColumns: cols,
-        signal: ac.signal,
-      });
+      const { byTicker, raw, rows: accumulated, querySummary } =
+        await fetchKalshiLiveCandlesticksPull({
+          marketTickers,
+          whereFilters,
+          sortClauses,
+          limit,
+          selectedColumns: cols,
+          signal: ac.signal,
+          onTickerProgress: ({ ticker, index, total }) => {
+            const pct = Math.min(90, 8 + Math.round(((index + 1) / Math.max(1, total)) * 80));
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              label: `Fetching ${ticker} (${index + 1}/${total})…`,
+              progress: pct,
+              error: null,
+            }));
+          },
+        });
 
       if (setRows) setRows(accumulated);
 
@@ -365,36 +377,96 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
           ? performance.now()
           : Date.now()) - requestStartMs;
 
-      const requestCard = {
-        id: genRequestCardId(),
-        createdAt: Date.now(),
-        elapsedMs,
-        lake: "kalshi-live",
-        table: "candlesticks",
-        sheetId: sheetId || null,
-        querySummary,
-        loadedRowCount: accumulated.length,
-      };
+      const groups =
+        Array.isArray(byTicker) && byTicker.length
+          ? byTicker
+          : [{ ticker: marketTickers || "candlesticks", raw, rows: accumulated }];
 
-      if (sheetId && setDataSheets) {
-        setDataSheets((prev) =>
-          applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
-            provenance: {
-              source: "kalshi-live",
-              endpoint: "candlesticks",
-              marketTickers,
-              whereFilters,
-              sortClauses,
-              limit,
-              querySummary,
-            },
-            requestCards: [requestCard],
-          }),
-        );
+      let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      let totalRows = 0;
+
+      for (let i = 0; i < groups.length; i++) {
+        const group = groups[i];
+        const tickerName = String(group.ticker || `market-${i + 1}`).trim().slice(0, 80);
+        const rows = Array.isArray(group.rows) ? group.rows : [];
+        totalRows += rows.length;
+
+        let targetSheetId = firstSheetId;
+        if (i === 0) {
+          if (!targetSheetId && ctx?.addNewSheetAndActivate) {
+            flushSync(() => {
+              ctx.addNewSheetAndActivate(
+                (newId) => {
+                  targetSheetId = newId;
+                  firstSheetId = newId;
+                },
+                { syncActivate: true },
+              );
+            });
+          }
+        } else if (ctx?.addNewSheetAndActivate) {
+          flushSync(() => {
+            ctx.addNewSheetAndActivate(
+              (newId) => {
+                targetSheetId = newId;
+              },
+              { syncActivate: true },
+            );
+          });
+        }
+
+        if (!targetSheetId) continue;
+
+        const requestCard = {
+          id: genRequestCardId(),
+          createdAt: Date.now(),
+          elapsedMs,
+          lake: "kalshi-live",
+          table: "candlesticks",
+          sheetId: targetSheetId,
+          querySummary,
+          loadedRowCount: rows.length,
+        };
+
+        if (setDataSheets) {
+          setDataSheets((prev) => {
+            const patched = applyAthenaPullToSheetPatch(prev, targetSheetId, rows, {
+              provenance: {
+                source: "kalshi-live",
+                endpoint: "candlesticks",
+                marketTickers: tickerName,
+                whereFilters,
+                sortClauses,
+                limit,
+                querySummary,
+              },
+              requestCards: [requestCard],
+            });
+            const sheet = patched?.[targetSheetId];
+            if (!sheet) return patched;
+            return {
+              ...patched,
+              [targetSheetId]: { ...sheet, name: tickerName },
+            };
+          });
+        } else if (i === 0) {
+          applyConnectHomePullData(ctx, rows);
+        }
+
+        if (i === 0 && ctx?.setConnectHomeAnalyzeActive) {
+          ctx.setConnectHomeAnalyzeActive(true);
+        }
       }
 
-      applyConnectHomePullData(ctx, accumulated);
-      return accumulated.length;
+      // Keep the first ticker sheet active for the user.
+      if (firstSheetId && ctx?.setActiveSheetId) {
+        ctx.setActiveSheetId(firstSheetId);
+      }
+      if (ctx?.requestConnectAnalyzeScroll) {
+        ctx.requestConnectAnalyzeScroll();
+      }
+
+      return totalRows;
     },
     [
       connectKalshiLiveWhereFilters,

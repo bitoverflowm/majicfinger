@@ -24,7 +24,8 @@ function parseIntParam(req, name) {
 
 /**
  * GET /api/integrations/kalshi-live/markets/candlesticks
- * Proxies batch (default) or single-market candlesticks when one ticker + series_ticker.
+ * Proxies candlesticks. With per_ticker=1 (or a single ticker), prefers the
+ * single-market upstream path; otherwise uses batch.
  */
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -38,6 +39,7 @@ export default async function handler(req, res) {
   const periodInterval = parseIntParam(req, "period_interval");
   const includeLatest = parseBool(req.query.include_latest_before_start);
   const seriesTickerParam = queryParam(req, "series_ticker");
+  const forceSingle = parseBool(req.query.per_ticker);
 
   if (!tickers.length) {
     return res.status(400).json({ error: "market_tickers is required", code: "BAD_REQUEST" });
@@ -63,20 +65,29 @@ export default async function handler(req, res) {
   };
 
   try {
-    let markets;
-    if (tickers.length === 1) {
-      const seriesTicker = seriesTickerParam || inferSeriesTickerFromMarket(tickers[0]);
+    /** @type {{ market_ticker?: string; marketTicker?: string; candlesticks?: unknown[] }[]} */
+    let markets = [];
+
+    const fetchSingle = async (marketTicker) => {
+      const seriesTicker = seriesTickerParam || inferSeriesTickerFromMarket(marketTicker);
       try {
-        markets = await fetchKalshiLiveCandlesticksSingleUpstream({
+        return await fetchKalshiLiveCandlesticksSingleUpstream({
           ...baseOpts,
           seriesTicker,
-          marketTicker: tickers[0],
+          marketTicker,
         });
       } catch {
-        markets = await fetchKalshiLiveCandlesticksBatchUpstream({
+        return await fetchKalshiLiveCandlesticksBatchUpstream({
           ...baseOpts,
-          marketTickers: tickers,
+          marketTickers: [marketTicker],
         });
+      }
+    };
+
+    if (forceSingle || tickers.length === 1) {
+      for (const ticker of tickers) {
+        const chunk = await fetchSingle(ticker);
+        markets = markets.concat(Array.isArray(chunk) ? chunk : []);
       }
     } else {
       markets = await fetchKalshiLiveCandlesticksBatchUpstream({
