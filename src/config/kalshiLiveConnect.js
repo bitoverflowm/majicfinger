@@ -40,7 +40,8 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
   },
   {
     id: "candlesticks",
-    title: "Get Market Candlesticks",
+    title: "Market Candlesticks",
+    selectedTitle: "Get Market Candlesticks",
     description:
       "OHLC price, bid/ask, and volume for one or many markets.",
   },

@@ -799,7 +799,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                 Source
               </Label>
               <p className="text-sm font-semibold tracking-tight text-foreground">
-                {endpoints.find((ep) => ep.id === selectedId)?.title ?? selectedId}
+                {(() => {
+                  const ep = endpoints.find((e) => e.id === selectedId);
+                  return ep?.selectedTitle ?? ep?.title ?? selectedId;
+                })()}
               </p>
               {selectedId === "candlesticks" ? (
                 <KalshiLiveCandlestickHistoricalCutoffNote className="mt-1.5 max-w-xl" />
