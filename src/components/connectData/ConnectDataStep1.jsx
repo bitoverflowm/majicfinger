@@ -67,10 +67,16 @@ const CONNECT_INTEGRATION_ORDER = [
   "productHunt",
 ];
 
-const EXAMPLE_DASHBOARD = {
-  title: "Kalshi volume dashboard (example)",
-  href: "/misterrpink/dashboards/kalshi-volume",
-};
+const CONNECT_HOME_DASHBOARDS = [
+  {
+    title: "Kalshi volume dashboard",
+    href: "/misterrpink/dashboards/kalshi-volume",
+  },
+  {
+    title: "Weather market dashboard",
+    href: "/misterrpink/dashboards/kalshi-historical-weather-data",
+  },
+];
 
 const PREDICTION_TEMPLATE_LABEL = "Fork Templates Coming Soon";
 
@@ -993,18 +999,21 @@ export default function ConnectDataStep1({
               <div>
                 <SectionTitle className={connectHubSectionTitleClass}>Dashboards</SectionTitle>
                 <div className={integrationsColClass}>
-                  <PillLink
-                    href={EXAMPLE_DASHBOARD.href}
-                    external
-                    wide
-                    className={connectHubWideTemplatesScaleExtra}
-                    labelClassName={connectHubWideLabelScaleExtra}
-                    iconSlotClassName={connectHubIconSlotResponsive}
-                    externalIconClassName="h-3 w-3 lg:h-3.5 lg:w-3.5"
-                    icon={<LayoutDashboard className={connectHubIconGlyphClass} strokeWidth={iconStroke} />}
-                    label={EXAMPLE_DASHBOARD.title}
-                    title="Public example dashboard"
-                  />
+                  {CONNECT_HOME_DASHBOARDS.map((dashboard) => (
+                    <PillLink
+                      key={dashboard.href}
+                      href={dashboard.href}
+                      external
+                      wide
+                      className={connectHubWideTemplatesScaleExtra}
+                      labelClassName={connectHubWideLabelScaleExtra}
+                      iconSlotClassName={connectHubIconSlotResponsive}
+                      externalIconClassName="h-3 w-3 lg:h-3.5 lg:w-3.5"
+                      icon={<LayoutDashboard className={connectHubIconGlyphClass} strokeWidth={iconStroke} />}
+                      label={dashboard.title}
+                      title={dashboard.title}
+                    />
+                  ))}
                 </div>
               </div>
               <div>
