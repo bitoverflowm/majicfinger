@@ -26,6 +26,7 @@ import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { KalshiLiveCandlestickTickersField } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickTickersField";
+import { KalshiLiveCandlestickHistoricalCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
 import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookTickerField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
@@ -800,6 +801,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
               <p className="text-sm font-semibold tracking-tight text-foreground">
                 {endpoints.find((ep) => ep.id === selectedId)?.title ?? selectedId}
               </p>
+              {selectedId === "candlesticks" ? (
+                <KalshiLiveCandlestickHistoricalCutoffNote className="mt-1.5 max-w-xl" />
+              ) : null}
             </div>
             <Button
               type="button"
