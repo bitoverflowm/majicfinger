@@ -20,29 +20,33 @@ export function KalshiLiveCandlestickTickersField({ value, onChange, className, 
   const count = parsed.length;
 
   return (
-    <div
-      className={cn(
-        "space-y-2 rounded-lg border border-border/50 bg-muted/10 p-3",
-        className,
-      )}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Label className="text-xs font-medium text-foreground">Market tickers</Label>
-        <span className="text-[10px] text-muted-foreground">
-          {count > 0 ? `${count} ticker${count === 1 ? "" : "s"}` : "Required · max 100"}
-        </span>
-      </div>
-      <Textarea
-        className="min-h-[4.5rem] font-mono text-xs leading-relaxed"
-        placeholder={"One or more tickers, e.g.\nKXHIGHNY-25JAN01-T77\nor comma-separated: TICKER1, TICKER2"}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <p className="text-[10px] leading-snug text-muted-foreground">
-        One ticker uses the single-market path when possible; multiple tickers use batch candlesticks
-        (up to 100). Power search is not used for this endpoint yet.
+    <div className={cn("space-y-2", className)}>
+      <h2 className="text-xs font-semibold tracking-tight text-foreground">
+        Which market or markets are you looking for?
+      </h2>
+      <p className="text-[11px] leading-snug text-muted-foreground">
+        You can search up to 100 markets at once, capped to 10,000 rows of data in one go.
       </p>
+      <div className="space-y-2 rounded-lg bg-muted/10 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label className="text-xs font-medium text-foreground">Market tickers</Label>
+          <span className="text-[10px] text-muted-foreground">
+            {count > 0 ? `${count} ticker${count === 1 ? "" : "s"}` : "Required · max 100"}
+          </span>
+        </div>
+        <Textarea
+          className="min-h-[4.5rem] font-mono text-xs leading-relaxed"
+          placeholder={
+            "Add one or more tickers here, e.g. KXHIGHNY-25JAN01-T77; multiple tickers separated by commas: TICKER1, TICKER2"
+          }
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          If you don&apos;t know your ticker, search anything and suggestions will populate.
+        </p>
+      </div>
     </div>
   );
 }

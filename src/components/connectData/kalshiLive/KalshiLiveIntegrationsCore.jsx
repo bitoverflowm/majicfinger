@@ -820,6 +820,30 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
           </div>
 
           <AnimatePresence>
+            {selectedId === "candlesticks" ? (
+              <KalshiLiveCandlestickTickersField
+                className="mt-4"
+                value={connectKalshiLiveCandlestickTickers}
+                onChange={(v) => setConnectKalshiLiveCandlestickTickers?.(v)}
+                disabled={pullLoading}
+              />
+            ) : null}
+            {selectedId === "trades" ? (
+              <KalshiLiveTradesTickerField
+                className="mt-4"
+                value={connectKalshiLiveTradesTicker}
+                onChange={(v) => setConnectKalshiLiveTradesTicker?.(v)}
+                disabled={pullLoading}
+              />
+            ) : null}
+            {selectedId === "orderbook" ? (
+              <KalshiLiveOrderbookTickerField
+                className="mt-4"
+                value={connectKalshiLiveOrderbookTicker}
+                onChange={(v) => setConnectKalshiLiveOrderbookTicker?.(v)}
+                disabled={pullLoading}
+              />
+            ) : null}
             <ColumnPicker
               key={selectedId}
               sourceId={selectedId}
@@ -843,30 +867,6 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
               onDeselectAll={() => patchColumns(selectedId, () => [])}
               showComposeOperations={false}
             >
-              {selectedId === "candlesticks" ? (
-                <KalshiLiveCandlestickTickersField
-                  className="mb-3"
-                  value={connectKalshiLiveCandlestickTickers}
-                  onChange={(v) => setConnectKalshiLiveCandlestickTickers?.(v)}
-                  disabled={pullLoading}
-                />
-              ) : null}
-              {selectedId === "trades" ? (
-                <KalshiLiveTradesTickerField
-                  className="mb-3"
-                  value={connectKalshiLiveTradesTicker}
-                  onChange={(v) => setConnectKalshiLiveTradesTicker?.(v)}
-                  disabled={pullLoading}
-                />
-              ) : null}
-              {selectedId === "orderbook" ? (
-                <KalshiLiveOrderbookTickerField
-                  className="mb-3"
-                  value={connectKalshiLiveOrderbookTicker}
-                  onChange={(v) => setConnectKalshiLiveOrderbookTicker?.(v)}
-                  disabled={pullLoading}
-                />
-              ) : null}
               <ConnectDataOperationsSection
                 selectedCount={selectedColumns.length}
                 operations={composeOperations}
