@@ -4,7 +4,10 @@ import {
   applyConnectHomePullData,
   prepareConnectHomePullSheet,
 } from "@/lib/connectHomePullDestination";
-import { flattenKalshiEmbeddingSearchToRows } from "@/lib/kalshiLive/kalshiLiveEmbeddingSearch";
+import {
+  flattenKalshiEmbeddingSearchSuggestionsToRows,
+  flattenKalshiEmbeddingSearchToRows,
+} from "@/lib/kalshiLive/kalshiLiveEmbeddingSearch";
 import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
 import { KALSHI_LIVE_SERIES_COLUMNS } from "@/lib/kalshiLive/seriesColumns";
 
@@ -80,6 +83,23 @@ export function applyKalshiLiveSeriesPowerSearchSelection(ctx, suggestion) {
  */
 export function applyKalshiLiveEmbeddingSearchSelection(ctx, suggestion) {
   const rows = flattenKalshiEmbeddingSearchToRows(suggestion);
+  prepareConnectHomePullSheet(ctx);
+  flushSync(() => {
+    applyConnectHomePullData(ctx, rows);
+    ctx.setConnectHomeAnalyzeActive?.(true);
+  });
+  ctx.requestConnectAnalyzeScroll?.();
+}
+
+/**
+ * Load every embedding-search hit into the connect-home sheet (Enter / pull all).
+ *
+ * @param {Record<string, unknown>} ctx
+ * @param {import("@/lib/kalshiLive/kalshiLiveEmbeddingSearch").KalshiEmbeddingSearchSuggestion[]} suggestions
+ */
+export function applyKalshiLiveEmbeddingSearchAll(ctx, suggestions) {
+  const rows = flattenKalshiEmbeddingSearchSuggestionsToRows(suggestions);
+  if (!rows.length) return;
   prepareConnectHomePullSheet(ctx);
   flushSync(() => {
     applyConnectHomePullData(ctx, rows);

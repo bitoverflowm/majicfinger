@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Search, Sparkles } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 
 import {
   isKalshiEmbeddingSearchEligible,
@@ -23,16 +23,25 @@ const suggestionRowVariants = {
 };
 
 /**
- * Experimental Kalshi elections embedding search box.
+ * Natural-language / semantic Kalshi elections embedding search.
+ *
+ * Enter pulls all current matches into the sheet; clicking a suggestion pulls that hit only.
  *
  * @param {{
  *   onSelect: (suggestion: KalshiEmbeddingSearchSuggestion) => void | Promise<void>;
+ *   onSubmitAll?: (suggestions: KalshiEmbeddingSearchSuggestion[]) => void | Promise<void>;
  *   disabled?: boolean;
  *   className?: string;
  *   onFocus?: () => void;
  * }} props
  */
-export function KalshiLiveEmbeddingSearch({ onSelect, disabled = false, className, onFocus }) {
+export function KalshiLiveEmbeddingSearch({
+  onSelect,
+  onSubmitAll,
+  disabled = false,
+  className,
+  onFocus,
+}) {
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(null);
   const suggestSeqRef = useRef(0);
@@ -119,21 +128,29 @@ export function KalshiLiveEmbeddingSearch({ onSelect, disabled = false, classNam
     [onSelect],
   );
 
+  const handleSubmitAll = useCallback(async () => {
+    if (!suggestions.length) return;
+    setSuggestOpen(false);
+    setSelectLoading(true);
+    setError(null);
+    try {
+      if (onSubmitAll) {
+        await onSubmitAll(suggestions);
+      } else {
+        await onSelect(suggestions[0]);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load data");
+    } finally {
+      setSelectLoading(false);
+    }
+  }, [onSelect, onSubmitAll, suggestions]);
+
   const busy = disabled || selectLoading;
   const eligible = isKalshiEmbeddingSearchEligible(q);
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="flex items-center gap-1.5">
-        <Sparkles className="size-3.5 shrink-0 text-amber-500" aria-hidden />
-        <p className="text-[11px] font-medium text-muted-foreground">
-          Embedding search (experimental)
-        </p>
-      </div>
-      <p className="text-[10px] leading-snug text-muted-foreground">
-        Type at least one word with 5+ letters. Uses Kalshi elections embedding search.
-      </p>
-
       <div className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
           {suggestLoading ? (
@@ -144,7 +161,7 @@ export function KalshiLiveEmbeddingSearch({ onSelect, disabled = false, classNam
         </span>
         <input
           type="search"
-          placeholder="e.g. trump, israel, palestine…"
+          placeholder="Search anything — series, markets, topics…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => {
@@ -154,7 +171,9 @@ export function KalshiLiveEmbeddingSearch({ onSelect, disabled = false, classNam
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              if (suggestOpen && suggestions.length > 0) handleSelect(suggestions[0]);
+              if (eligible && suggestions.length > 0) {
+                void handleSubmitAll();
+              }
             }
           }}
           disabled={busy}
@@ -163,7 +182,7 @@ export function KalshiLiveEmbeddingSearch({ onSelect, disabled = false, classNam
             "flex h-9 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             busy && "opacity-70",
           )}
-          aria-label="Kalshi embedding series search"
+          aria-label="Natural language Kalshi search"
         />
 
         <AnimatePresence>
@@ -228,6 +247,12 @@ export function KalshiLiveEmbeddingSearch({ onSelect, disabled = false, classNam
           ) : null}
         </AnimatePresence>
       </div>
+
+      {q.trim() && !eligible ? (
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          Type at least one word with 5+ letters to search.
+        </p>
+      ) : null}
 
       {selectLoading ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

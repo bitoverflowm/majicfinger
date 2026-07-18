@@ -127,6 +127,16 @@ export function flattenKalshiEmbeddingSearchToRows(suggestion) {
 }
 
 /**
+ * Flatten all embedding-search hits into sheet rows.
+ * @param {KalshiEmbeddingSearchSuggestion[]} suggestions
+ * @returns {Record<string, unknown>[]}
+ */
+export function flattenKalshiEmbeddingSearchSuggestionsToRows(suggestions) {
+  const list = Array.isArray(suggestions) ? suggestions : [];
+  return list.flatMap((s) => flattenKalshiEmbeddingSearchToRows(s));
+}
+
+/**
  * Server-side fetch of embedding search suggestions.
  * @param {string} q
  * @param {{ signal?: AbortSignal }} [opts]

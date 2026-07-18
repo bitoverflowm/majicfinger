@@ -12,6 +12,7 @@ import {
   List,
   RefreshCw,
   Search,
+  Sparkles,
   Vote,
   Wand2,
   CircleDollarSign,
@@ -41,6 +42,7 @@ import {
   applyKalshiLivePowerSearchSelection,
   applyKalshiLiveSeriesPowerSearchSelection,
   applyKalshiLiveEmbeddingSearchSelection,
+  applyKalshiLiveEmbeddingSearchAll,
 } from "@/lib/kalshiLivePowerSearchPull";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
@@ -151,6 +153,7 @@ function HubStartingPointColumn({
   children,
   id,
   headerAction = null,
+  className,
 }) {
   return (
     <div
@@ -158,6 +161,7 @@ function HubStartingPointColumn({
       className={cn(
         "relative flex h-full flex-col rounded-xl border border-border/70 bg-muted/15 scroll-mt-28 p-3",
         "transition-[box-shadow,ring-color] duration-300",
+        className,
       )}
     >
       <div className="mb-3 space-y-2 border-b border-border/50 pb-3">
@@ -526,6 +530,13 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     [ctx, runKalshiLiveAction],
   );
 
+  const handleEmbeddingSearchSubmitAll = useCallback(
+    (suggestions) => {
+      runKalshiLiveAction(() => applyKalshiLiveEmbeddingSearchAll(ctx, suggestions));
+    },
+    [ctx, runKalshiLiveAction],
+  );
+
   const getDisplayLabel = useCallback(
     (col) => KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(selectedId, col),
     [selectedId],
@@ -540,8 +551,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
               What do you want to do with Kalshi live data?
             </h3>
             <p className={cn("leading-relaxed text-muted-foreground", density.subheading)}>
-              Start from a live endpoint, search a specific market or series, or launch a guided
-              workflow built for real-time prediction market monitoring.
+              Start from a live endpoint, search with natural language or by ticker, or launch a
+              guided workflow built for real-time prediction market monitoring.
             </p>
           </div>
 
@@ -620,13 +631,18 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                 <motion.div
                   layout
                   transition={{ layout: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }}
-                  className={cn("min-w-0", searchExpanded && "h-full sm:col-span-2")}
+                  className={cn(
+                    "relative flex min-w-0 flex-col",
+                    density.gridGap,
+                    searchExpanded && "h-full sm:col-span-2",
+                  )}
                 >
                   <HubStartingPointColumn
-                    icon={Search}
-                    title="Search for a specific market"
-                    badge="Best for known markets"
-                    description="Load a Kalshi market or series by ticker, title, or event so you can explore live data faster."
+                    icon={Sparkles}
+                    title="Natural Language Search"
+                    badge="Semantic search"
+                    description="Search anything you want and we will return all matching series, markets, etc. Hit enter on your search to pull all matches into your data sheet view. Or select a specific search recommendation to view that specific result."
+                    className="h-auto shrink-0"
                     headerAction={
                       <AnimatePresence initial={false}>
                         {searchExpanded ? (
@@ -651,6 +667,21 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                       </AnimatePresence>
                     }
                   >
+                    <KalshiLiveEmbeddingSearch
+                      onFocus={expandSearch}
+                      onSelect={handleEmbeddingSearchSelect}
+                      onSubmitAll={handleEmbeddingSearchSubmitAll}
+                      disabled={pullLoading}
+                    />
+                  </HubStartingPointColumn>
+
+                  <HubStartingPointColumn
+                    icon={Search}
+                    title="Search for a specific market, series, or trade"
+                    badge="Best for known markets"
+                    description="For best results search by ticker, but general search is also possible."
+                    className="h-auto min-h-0 flex-1"
+                  >
                     <p className={cn("font-medium text-muted-foreground", density.label)}>Search</p>
                     <KalshiLivePowerToolsSearch
                       key={marketSearchKey}
@@ -662,11 +693,6 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                       onSelectSeries={handlePowerSearchSeries}
                       disabled={pullLoading}
                       inputClassName="h-9 rounded-lg pl-9 pr-12 text-xs"
-                    />
-                    <KalshiLiveEmbeddingSearch
-                      onFocus={expandSearch}
-                      onSelect={handleEmbeddingSearchSelect}
-                      disabled={pullLoading}
                     />
                     <div className={density.listGap}>
                       <p className={cn("font-medium text-muted-foreground", density.label)}>
