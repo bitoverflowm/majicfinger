@@ -21,11 +21,21 @@ function formatCutoffLocal(iso) {
 }
 
 /**
- * Note under Get Market Candlesticks: live/historical cutoff + link to Kalshi Historical.
+ * Live vs historical candlestick cutoff note.
  *
- * @param {{ className?: string }} props
+ * @param {{
+ *   className?: string;
+ *   direction: "before" | "after";
+ *   targetIntegration: "kalshiHistorical" | "kalshiLive";
+ *   targetLabel: string;
+ * }} props
  */
-export function KalshiLiveCandlestickHistoricalCutoffNote({ className }) {
+export function KalshiCandlestickCutoffNote({
+  className,
+  direction,
+  targetIntegration,
+  targetLabel,
+}) {
   const ctx = useMyStateV2() ?? {};
   const { requestConnectWorkspace, setIntegrationSidebar, setRightPanelTab } = ctx;
 
@@ -59,11 +69,11 @@ export function KalshiLiveCandlestickHistoricalCutoffNote({ className }) {
     return () => ac.abort();
   }, []);
 
-  const goToKalshiHistorical = useCallback(() => {
+  const goToTarget = useCallback(() => {
     setRightPanelTab?.("integrations");
-    setIntegrationSidebar?.("kalshiHistorical");
-    requestConnectWorkspace?.("kalshiHistorical");
-  }, [requestConnectWorkspace, setIntegrationSidebar, setRightPanelTab]);
+    setIntegrationSidebar?.(targetIntegration);
+    requestConnectWorkspace?.(targetIntegration);
+  }, [requestConnectWorkspace, setIntegrationSidebar, setRightPanelTab, targetIntegration]);
 
   if (loading) {
     return (
@@ -77,16 +87,48 @@ export function KalshiLiveCandlestickHistoricalCutoffNote({ className }) {
 
   return (
     <p className={cn("text-[11px] leading-snug text-muted-foreground", className)}>
-      Note: if you are looking for candlestick data before{" "}
+      Note: if you are looking for candlestick data {direction}{" "}
       <span className="font-medium text-foreground">{localDate}</span>, go{" "}
       <button
         type="button"
-        onClick={goToKalshiHistorical}
+        onClick={goToTarget}
         className="font-medium text-secondary underline underline-offset-2 hover:text-secondary/80"
       >
         here
       </button>{" "}
-      to use Kalshi Historical.
+      to use {targetLabel}.
     </p>
+  );
+}
+
+/**
+ * Note under Get Market Candlesticks: cutoff + link to Kalshi Historical.
+ *
+ * @param {{ className?: string }} props
+ */
+export function KalshiLiveCandlestickHistoricalCutoffNote({ className }) {
+  return (
+    <KalshiCandlestickCutoffNote
+      className={className}
+      direction="before"
+      targetIntegration="kalshiHistorical"
+      targetLabel="Kalshi Historical"
+    />
+  );
+}
+
+/**
+ * Note on Kalshi Historical hub: cutoff + link to Kalshi Live.
+ *
+ * @param {{ className?: string }} props
+ */
+export function KalshiHistoricalCandlestickLiveCutoffNote({ className }) {
+  return (
+    <KalshiCandlestickCutoffNote
+      className={className}
+      direction="after"
+      targetIntegration="kalshiLive"
+      targetLabel="Kalshi Live"
+    />
   );
 }

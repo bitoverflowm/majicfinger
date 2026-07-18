@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
+import { KalshiHistoricalCandlestickLiveCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { GuidedWorkflowOverlay } from "@/components/guidedWorkflow/GuidedWorkflowOverlay";
@@ -832,6 +833,7 @@ function HubKalshiQueryBuilderInner({
                 Start from raw data, search a specific market, or launch a guided workflow built
                 for prediction market research.
               </p>
+              <KalshiHistoricalCandlestickLiveCutoffNote className="pt-0.5" />
             </div>
 
             <div className={cn("grid grid-cols-1 items-stretch sm:grid-cols-3", density.gridGap)}>
