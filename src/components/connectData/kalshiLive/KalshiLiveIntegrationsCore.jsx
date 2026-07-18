@@ -170,9 +170,11 @@ function HubStartingPointColumn({
             <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <span className="mb-1 inline-flex rounded-full border border-secondary/25 bg-secondary/10 px-2 py-0.5 text-[0.625rem] font-medium leading-tight text-secondary dark:text-secondary">
-              {badge}
-            </span>
+            {badge ? (
+              <span className="mb-1 inline-flex rounded-full border border-secondary/25 bg-secondary/10 px-2 py-0.5 text-[0.625rem] font-medium leading-tight text-secondary dark:text-secondary">
+                {badge}
+              </span>
+            ) : null}
             <h3 className="text-xs font-semibold leading-snug text-foreground">{title}</h3>
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{description}</p>
           </div>
@@ -582,9 +584,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                 >
                   <HubStartingPointColumn
                     icon={Layers}
-                    title="Browse live endpoints"
-                    badge="Best for discovery"
-                    description="Choose an API endpoint first, then filter, select columns, and pull the rows you need."
+                    title="Live Data Straight from Kalshi"
+                    badge="The Latest Data"
+                    description="Choose what you want to track, then narrow it to the exact markets, fields, and time range you need."
                   >
                     <p className={cn("font-medium text-muted-foreground", density.label)}>
                       Choose a data source
@@ -640,7 +642,6 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                   <HubStartingPointColumn
                     icon={Sparkles}
                     title="Natural Language Search"
-                    badge="Semantic search"
                     description="Search anything you want and we will return all matching series, markets, etc. Hit enter on your search to pull all matches into your data sheet view. Or select a specific search recommendation to view that specific result."
                     className="h-auto shrink-0"
                     headerAction={
@@ -678,7 +679,6 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                   <HubStartingPointColumn
                     icon={Search}
                     title="Search for a specific market, series, or trade"
-                    badge="Best for known markets"
                     description="For best results search by ticker, but general search is also possible."
                     className="h-auto min-h-0 flex-1"
                   >
