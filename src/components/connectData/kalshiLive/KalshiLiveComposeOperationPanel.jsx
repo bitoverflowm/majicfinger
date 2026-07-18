@@ -137,9 +137,27 @@ export function KalshiLiveComposeOperationPanel({
     setConnectKalshiLiveLimit,
     connectKalshiLiveColumnSelections = {},
     connectKalshiLiveCandlestickTickers = "",
+    connectKalshiLiveCandlestickTickerMeta = {},
     connectKalshiLiveTradesTicker = "",
     connectKalshiLiveOrderbookTicker = "",
   } = ctx;
+
+  const candlestickAutoSheets = useMemo(() => {
+    if (endpointId !== "candlesticks") return null;
+    const tickers = String(connectKalshiLiveCandlestickTickers || "")
+      .split(/[\s,]+/)
+      .map((t) => t.trim().toUpperCase())
+      .filter(Boolean);
+    const unique = [...new Set(tickers)];
+    return unique.map((ticker) => ({
+      name: ticker,
+      title: connectKalshiLiveCandlestickTickerMeta?.[ticker] || ticker,
+    }));
+  }, [
+    endpointId,
+    connectKalshiLiveCandlestickTickers,
+    connectKalshiLiveCandlestickTickerMeta,
+  ]);
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
 
@@ -631,6 +649,12 @@ export function KalshiLiveComposeOperationPanel({
         <ConnectHomeSheetPullFields
           sheetNameInputId="connect-home-kalshi-live-sheet-name"
           className="flex-1 min-w-0"
+          autoNamedSheets={candlestickAutoSheets}
+          autoNamedSheetsMessage={
+            candlestickAutoSheets
+              ? "For convenience each market candlestick data will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
+              : undefined
+          }
         />
         <Button
           type="button"

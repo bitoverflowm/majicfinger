@@ -357,6 +357,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveSortClauses,
     connectKalshiLiveCandlestickTickers = "",
     setConnectKalshiLiveCandlestickTickers,
+    setConnectKalshiLiveCandlestickTickerMeta,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker = "",
@@ -455,7 +456,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectActiveComposeOps?.([]);
       setConnectKalshiLiveWhereFilters?.([]);
       setConnectKalshiLiveSortClauses?.([]);
-      if (id !== "candlesticks") setConnectKalshiLiveCandlestickTickers?.("");
+      if (id !== "candlesticks") {
+        setConnectKalshiLiveCandlestickTickers?.("");
+        setConnectKalshiLiveCandlestickTickerMeta?.({});
+      }
       if (id !== "trades") setConnectKalshiLiveTradesTicker?.("");
       if (id !== "orderbook") setConnectKalshiLiveOrderbookTicker?.("");
       setFilterError(null);
@@ -468,6 +472,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveWhereFilters,
       setConnectKalshiLiveSortClauses,
       setConnectKalshiLiveCandlestickTickers,
+      setConnectKalshiLiveCandlestickTickerMeta,
       setConnectKalshiLiveTradesTicker,
       setConnectKalshiLiveOrderbookTicker,
       kalshiLivePingState,
@@ -481,6 +486,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveWhereFilters?.([]);
     setConnectKalshiLiveSortClauses?.([]);
     setConnectKalshiLiveCandlestickTickers?.("");
+    setConnectKalshiLiveCandlestickTickerMeta?.({});
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveOrderbookTicker?.("");
     setSearchExpanded(false);
@@ -491,6 +497,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveWhereFilters,
     setConnectKalshiLiveSortClauses,
     setConnectKalshiLiveCandlestickTickers,
+    setConnectKalshiLiveCandlestickTickerMeta,
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveOrderbookTicker,
   ]);

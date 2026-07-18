@@ -1,6 +1,7 @@
 "use client";
 
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,6 +15,9 @@ import { cn } from "@/lib/utils";
  * }} props
  */
 export function KalshiLiveCandlestickTickersField({ value, onChange, className, disabled }) {
+  const ctx = useMyStateV2() ?? {};
+  const setMeta = ctx.setConnectKalshiLiveCandlestickTickerMeta;
+
   return (
     <div className={cn("space-y-2", className)}>
       <h2 className="text-xs font-semibold tracking-tight text-foreground">
@@ -23,7 +27,20 @@ export function KalshiLiveCandlestickTickersField({ value, onChange, className, 
         You can search up to 100 markets at once — each market is capped to 10,000 rows per pull.
       </p>
       <div className="space-y-2 rounded-lg bg-muted/10 p-3">
-        <MarketTickerSearch value={value} onChange={onChange} disabled={disabled} />
+        <MarketTickerSearch
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          onSelectionsChange={(selections) => {
+            const next = {};
+            for (const s of selections || []) {
+              const ticker = String(s?.ticker || "").trim().toUpperCase();
+              if (!ticker) continue;
+              next[ticker] = String(s?.title || ticker).trim() || ticker;
+            }
+            setMeta?.(next);
+          }}
+        />
       </div>
     </div>
   );

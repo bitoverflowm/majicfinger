@@ -62,6 +62,7 @@ const MAX_TICKERS = 100;
  * @param {{
  *   value: string;
  *   onChange: (value: string) => void;
+ *   onSelectionsChange?: (selections: MarketTickerSelection[]) => void;
  *   disabled?: boolean;
  *   className?: string;
  *   maxTickers?: number;
@@ -71,6 +72,7 @@ const MAX_TICKERS = 100;
 export function MarketTickerSearch({
   value,
   onChange,
+  onSelectionsChange,
   disabled = false,
   className,
   maxTickers = MAX_TICKERS,
@@ -100,8 +102,9 @@ export function MarketTickerSearch({
   const emitChange = useCallback(
     (next) => {
       onChange(serializeMarketTickerSelections(next));
+      onSelectionsChange?.(next);
     },
-    [onChange],
+    [onChange, onSelectionsChange],
   );
 
   // Hydrate badges when parent value changes (e.g. restore / clear).
