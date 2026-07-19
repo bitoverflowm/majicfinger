@@ -21,7 +21,7 @@ export function KalshiLiveCandlestickTickersField({ value, onChange, className, 
   return (
     <div className={cn("space-y-2", className)}>
       <h2 className="text-xs font-semibold tracking-tight text-foreground">
-        Which market or markets are you looking for?
+        Which market(s) are you looking for?
       </h2>
       <p className="text-[11px] leading-snug text-muted-foreground">
         You can search up to 100 markets at once — each market is capped to 10,000 rows per pull.

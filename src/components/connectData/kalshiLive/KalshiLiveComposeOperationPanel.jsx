@@ -624,13 +624,11 @@ export function KalshiLiveComposeOperationPanel({
         ))}
       </AnimatePresence>
 
-      {!openComposeOps.length ? (
+      {!openComposeOps.length && endpointId !== "candlesticks" ? (
         <p className="text-[10px] leading-snug text-muted-foreground">
-          {endpointId === "candlesticks"
-            ? "Refine is optional — Run pull uses the last 24 hours and 1-hour candles unless you add Where filters."
-            : endpointId === "trades"
-              ? "Refine is optional — Run pull uses your row limit and optional min_ts / max_ts Where filters."
-              : "Refine is optional — open Where, Sort, or limit above, or run with your column selection."}
+          {endpointId === "trades"
+            ? "Refine is optional — Run pull uses your row limit and optional min_ts / max_ts Where filters."
+            : "Refine is optional — open Where, Sort, or limit above, or run with your column selection."}
         </p>
       ) : null}
 

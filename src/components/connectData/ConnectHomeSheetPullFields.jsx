@@ -64,9 +64,7 @@ export function ConnectHomeSheetPullFields({
           ) : (
             <Label className="text-[11px] font-medium text-muted-foreground">Sheet names</Label>
           )}
-          {autoNamedSheets.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">Add market tickers above to see sheet names.</p>
-          ) : (
+          {autoNamedSheets.length > 0 ? (
             <TooltipProvider delayDuration={200}>
               <ul className="flex flex-wrap gap-1.5">
                 {autoNamedSheets.map((sheet) => (
@@ -85,7 +83,7 @@ export function ConnectHomeSheetPullFields({
                 ))}
               </ul>
             </TooltipProvider>
-          )}
+          ) : null}
         </div>
       ) : (
         <div className={cn("flex min-w-[10rem] flex-col gap-1", nameFieldClassName)}>

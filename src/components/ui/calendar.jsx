@@ -16,12 +16,12 @@ function Calendar({
     (<DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        "p-3 text-popover-foreground [--rdp-caption-font-size:0.75rem] [--rdp-cell-size:2.25rem]",
+        "w-fit p-3 text-popover-foreground [--rdp-caption-font-size:0.75rem] [--rdp-cell-size:2.25rem]",
         className
       )}
       classNames={{
-        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
+        months: "flex w-fit flex-col space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0",
+        month: "w-fit space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
         caption_label:
           "text-xs font-medium text-muted-foreground",
@@ -32,25 +32,28 @@ function Calendar({
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
-        table: "w-full border-collapse space-y-1",
+        table: "w-fit border-collapse space-y-1",
         head_row: "flex",
         head_cell:
           "w-9 rounded-md text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
-        row: "flex w-full mt-2",
-        cell: "relative h-9 w-9 p-0 text-center text-xs [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-slate-100/50 [&:has([aria-selected])]:bg-slate-100 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20 dark:[&:has([aria-selected].day-outside)]:bg-slate-800/50 dark:[&:has([aria-selected])]:bg-slate-800",
+        row: "flex w-fit mt-2",
+        cell: "relative h-9 w-9 p-0 text-center text-xs first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 !text-xs font-normal aria-selected:opacity-100"
+          "h-9 w-9 p-0 !text-xs font-normal text-foreground aria-selected:opacity-100"
         ),
-        day_range_end: "day-range-end",
+        day_range_start:
+          "day-range-start rounded-l-md !bg-slate-900 !text-slate-50 hover:!bg-slate-900 hover:!text-slate-50 focus:!bg-slate-900 focus:!text-slate-50 dark:!bg-slate-50 dark:!text-slate-900",
+        day_range_end:
+          "day-range-end rounded-r-md !bg-slate-900 !text-slate-50 hover:!bg-slate-900 hover:!text-slate-50 focus:!bg-slate-900 focus:!text-slate-50 dark:!bg-slate-50 dark:!text-slate-900",
         day_selected:
-          "bg-slate-900 text-slate-50 hover:bg-slate-900 hover:text-slate-50 focus:bg-slate-900 focus:text-slate-50 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50 dark:hover:text-slate-900 dark:focus:bg-slate-50 dark:focus:text-slate-900",
+          "!bg-slate-900 !text-slate-50 hover:!bg-slate-900 hover:!text-slate-50 focus:!bg-slate-900 focus:!text-slate-50 dark:!bg-slate-50 dark:!text-slate-900 dark:hover:!bg-slate-50 dark:hover:!text-slate-900 dark:focus:!bg-slate-50 dark:focus:!text-slate-900",
         day_today: "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50",
         day_outside:
-          "day-outside text-slate-500 opacity-50 aria-selected:bg-slate-100/50 aria-selected:text-slate-500 aria-selected:opacity-30 dark:text-slate-400 dark:aria-selected:bg-slate-800/50 dark:aria-selected:text-slate-400",
-        day_disabled: "text-slate-500 opacity-50 dark:text-slate-400",
+          "day-outside text-slate-400 opacity-60 aria-selected:!bg-slate-900 aria-selected:!text-slate-50 aria-selected:!opacity-100 dark:text-slate-500",
+        day_disabled: "text-slate-400 opacity-40 dark:text-slate-500",
         day_range_middle:
-          "aria-selected:bg-slate-100 aria-selected:text-slate-900 dark:aria-selected:bg-slate-800 dark:aria-selected:text-slate-50",
+          "aria-selected:!bg-slate-100 aria-selected:!text-slate-900 dark:aria-selected:!bg-slate-800 dark:aria-selected:!text-slate-50",
         day_hidden: "invisible",
         ...classNames,
       }}

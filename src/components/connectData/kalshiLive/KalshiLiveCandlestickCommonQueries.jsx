@@ -243,24 +243,26 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
                 </span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="range"
-                numberOfMonths={1}
-                selected={range}
-                onSelect={handleRangeSelect}
-                defaultMonth={range.from || range.to || cutoffDate || undefined}
-                fromDate={cutoffDate || undefined}
-                toDate={new Date()}
-                disabled={(date) => {
-                  const day = startOfLocalDay(date);
-                  if (cutoffDate && day < cutoffDate) return true;
-                  if (day > startOfLocalDay(new Date())) return true;
-                  return false;
-                }}
-              />
+            <PopoverContent className="w-auto max-w-[calc(100vw-2rem)] p-0" align="start">
+              <div className="w-fit">
+                <Calendar
+                  mode="range"
+                  numberOfMonths={1}
+                  selected={range}
+                  onSelect={handleRangeSelect}
+                  defaultMonth={range.from || range.to || cutoffDate || undefined}
+                  fromDate={cutoffDate || undefined}
+                  toDate={new Date()}
+                  disabled={(date) => {
+                    const day = startOfLocalDay(date);
+                    if (cutoffDate && day < cutoffDate) return true;
+                    if (day > startOfLocalDay(new Date())) return true;
+                    return false;
+                  }}
+                />
+              </div>
               {cutoffDate ? (
-                <p className="border-t border-border/50 px-3 py-2 text-[10px] leading-snug text-muted-foreground">
+                <p className="max-w-[17.5rem] border-t border-border/50 px-3 py-2 text-[10px] leading-snug text-muted-foreground">
                   Live data starts on or after{" "}
                   {cutoffDate.toLocaleDateString(undefined, { dateStyle: "medium" })}. Earlier
                   dates are available in Kalshi Historical.
