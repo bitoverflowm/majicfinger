@@ -72,6 +72,18 @@ export function clampCandlestickWindowToKalshiCap(startTs, endTs, periodInterval
 }
 
 /**
+ * Max inclusive calendar days for startOfDay→endOfDay picks under Kalshi's candle cap.
+ *
+ * @param {number} periodIntervalMinutes
+ */
+export function maxKalshiCandlestickInclusiveDays(periodIntervalMinutes) {
+  const maxSec = maxKalshiCandlestickRangeSec(periodIntervalMinutes);
+  if (!Number.isFinite(maxSec) || maxSec <= 0) return NaN;
+  // N inclusive days → span ≈ N * 86400 - 1 when using startOfDay / endOfDay.
+  return Math.max(1, Math.floor((maxSec + 1) / 86400));
+}
+
+/**
  * Human-readable max window for a period (for UI hints).
  *
  * @param {number} periodIntervalMinutes
@@ -89,6 +101,29 @@ export function formatKalshiCandlestickMaxRangeHint(periodIntervalMinutes) {
     return `Kalshi allows at most ${KALSHI_CANDLESTICK_MAX_CANDLES.toLocaleString()} candles (~${days} days at 1 hour).`;
   }
   return `Kalshi allows at most ${KALSHI_CANDLESTICK_MAX_CANDLES.toLocaleString()} candles (~${Math.floor(maxSec / 86400)} days at 1 day).`;
+}
+
+/**
+ * Short copy for the date-range calendar explaining why days are disabled.
+ *
+ * @param {number} periodIntervalMinutes
+ */
+export function formatKalshiCandlestickCalendarWindowMessage(periodIntervalMinutes) {
+  const period = Math.floor(Number(periodIntervalMinutes));
+  const maxSec = maxKalshiCandlestickRangeSec(period);
+  const inclusiveDays = maxKalshiCandlestickInclusiveDays(period);
+  if (!Number.isFinite(maxSec) || !Number.isFinite(inclusiveDays)) return "";
+
+  const periodLabel = period === 1 ? "1-minute" : period === 60 ? "1-hour" : "1-day";
+  const approx =
+    period === 1
+      ? `~${(maxSec / 86400).toFixed(1)} days`
+      : `~${Math.floor(maxSec / 86400).toLocaleString()} days`;
+
+  return (
+    `Kalshi limits each request to ${KALSHI_CANDLESTICK_MAX_CANDLES.toLocaleString()} candles ` +
+    `(${approx} at ${periodLabel}). After you pick a start date, only days within that window stay selectable.`
+  );
 }
 
 /**

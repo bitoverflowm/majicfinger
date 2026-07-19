@@ -17,7 +17,8 @@ import {
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   clampCandlestickWindowToKalshiCap,
-  formatKalshiCandlestickMaxRangeHint,
+  formatKalshiCandlestickCalendarWindowMessage,
+  maxKalshiCandlestickInclusiveDays,
 } from "@/lib/kalshiLive/candlestickCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,12 @@ function startOfLocalDay(d) {
 function endOfLocalDay(d) {
   const x = new Date(d);
   x.setHours(23, 59, 59, 0);
+  return x;
+}
+
+function addLocalDays(d, n) {
+  const x = startOfLocalDay(d);
+  x.setDate(x.getDate() + n);
   return x;
 }
 
@@ -113,19 +120,29 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
 
   const [cutoffDate, setCutoffDate] = useState(/** @type {Date | null} */ (null));
   const [rangeOpen, setRangeOpen] = useState(false);
-  const [clampedNotice, setClampedNotice] = useState(/** @type {string | null} */ (null));
+  const [draftRange, setDraftRange] = useState(
+    /** @type {{ from?: Date; to?: Date } | undefined} */ (undefined),
+  );
 
   const startTs = Number(readFilterValue(connectKalshiLiveWhereFilters, "start_ts"));
   const endTs = Number(readFilterValue(connectKalshiLiveWhereFilters, "end_ts"));
   const periodInterval = Number(readFilterValue(connectKalshiLiveWhereFilters, "period_interval"));
 
-  const range = useMemo(
+  const periodValue = [1, 60, 1440].includes(periodInterval)
+    ? periodInterval
+    : DEFAULT_PERIOD;
+
+  const committedRange = useMemo(
     () => ({
       from: dateFromUnix(startTs),
       to: dateFromUnix(endTs),
     }),
     [startTs, endTs],
   );
+
+  const calendarSelected = draftRange ?? committedRange;
+  const maxInclusiveDays = maxKalshiCandlestickInclusiveDays(periodValue);
+  const calendarWindowMessage = formatKalshiCandlestickCalendarWindowMessage(periodValue);
 
   // Seed defaults once (last 24h, 1 hour candles) if missing.
   useEffect(() => {
@@ -195,7 +212,6 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
     );
     if (!clamped || nextStart === startTs) return;
     setConnectKalshiLiveWhereFilters((prev) => upsertApiFilter(prev, "start_ts", nextStart));
-    setClampedNotice(formatKalshiCandlestickMaxRangeHint(periodInterval));
   }, [startTs, endTs, periodInterval, setConnectKalshiLiveWhereFilters]);
 
   const handlePeriodChange = useCallback(
@@ -212,45 +228,59 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
             end,
             period,
           );
-          if (clamped) {
-            next = upsertApiFilter(next, "start_ts", nextStart);
-            setClampedNotice(formatKalshiCandlestickMaxRangeHint(period));
-          } else {
-            setClampedNotice(null);
-          }
+          if (clamped) next = upsertApiFilter(next, "start_ts", nextStart);
         }
         return next;
       });
+      setDraftRange(undefined);
     },
     [setConnectKalshiLiveWhereFilters],
   );
 
-  const handleRangeSelect = useCallback(
-    (next) => {
-      if (!next?.from && !next?.to) return;
-      let from = next.from ? startOfLocalDay(next.from) : null;
-      let to = next.to ? endOfLocalDay(next.to) : next.from ? endOfLocalDay(next.from) : null;
-
-      if (cutoffDate && from && from < cutoffDate) {
-        from = new Date(cutoffDate);
+  const handleRangeOpenChange = useCallback(
+    (open) => {
+      setRangeOpen(open);
+      if (open) {
+        setDraftRange({
+          from: committedRange.from ? startOfLocalDay(committedRange.from) : undefined,
+          to: committedRange.to ? startOfLocalDay(committedRange.to) : undefined,
+        });
+      } else {
+        setDraftRange(undefined);
       }
-      if (cutoffDate && to && to < cutoffDate) {
-        to = endOfLocalDay(cutoffDate);
+    },
+    [committedRange.from, committedRange.to],
+  );
+
+  const commitRange = useCallback(
+    (from, to) => {
+      let fromDay = from ? startOfLocalDay(from) : null;
+      let toDay = to ? startOfLocalDay(to) : fromDay;
+
+      if (cutoffDate && fromDay && fromDay < cutoffDate) fromDay = new Date(cutoffDate);
+      if (cutoffDate && toDay && toDay < cutoffDate) toDay = new Date(cutoffDate);
+
+      const today = startOfLocalDay(new Date());
+      if (toDay && toDay > today) toDay = today;
+      if (fromDay && fromDay > today) fromDay = today;
+
+      if (fromDay && toDay && fromDay > toDay) {
+        const tmp = fromDay;
+        fromDay = toDay;
+        toDay = tmp;
       }
 
-      const now = new Date();
-      if (to && to > now) to = now;
-
-      let fromSec = unixFromDate(from);
-      let toSec = unixFromDate(to);
-      const period = [1, 60, 1440].includes(periodInterval) ? periodInterval : DEFAULT_PERIOD;
-      let didClamp = false;
+      let fromSec = unixFromDate(fromDay ? startOfLocalDay(fromDay) : null);
+      let toSec = unixFromDate(toDay ? endOfLocalDay(toDay) : null);
+      if (toSec != null) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (toSec > nowSec) toSec = nowSec;
+      }
 
       if (fromSec != null && toSec != null) {
-        const clamped = clampCandlestickWindowToKalshiCap(fromSec, toSec, period);
+        const clamped = clampCandlestickWindowToKalshiCap(fromSec, toSec, periodValue);
         fromSec = clamped.start_ts;
         toSec = clamped.end_ts;
-        didClamp = clamped.clamped;
       }
 
       setConnectKalshiLiveWhereFilters?.((prev) => {
@@ -259,13 +289,53 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
         if (toSec != null) nextFilters = upsertApiFilter(nextFilters, "end_ts", toSec);
         return nextFilters;
       });
-      setClampedNotice(didClamp ? formatKalshiCandlestickMaxRangeHint(period) : null);
+
+      setDraftRange({
+        from: fromSec != null ? startOfLocalDay(dateFromUnix(fromSec)) : undefined,
+        to: toSec != null ? startOfLocalDay(dateFromUnix(toSec)) : undefined,
+      });
     },
-    [cutoffDate, periodInterval, setConnectKalshiLiveWhereFilters],
+    [cutoffDate, periodValue, setConnectKalshiLiveWhereFilters],
   );
 
-  const periodValue = [1, 60, 1440].includes(periodInterval) ? String(periodInterval) : String(DEFAULT_PERIOD);
-  const maxRangeHint = formatKalshiCandlestickMaxRangeHint(Number(periodValue));
+  const handleRangeSelect = useCallback(
+    (next) => {
+      if (!next?.from) {
+        setDraftRange(undefined);
+        return;
+      }
+
+      // First click: keep incomplete range so we can disable days outside the candle window.
+      if (next.from && !next.to) {
+        setDraftRange({ from: startOfLocalDay(next.from), to: undefined });
+        return;
+      }
+
+      commitRange(next.from, next.to);
+    },
+    [commitRange],
+  );
+
+  const isDayDisabled = useCallback(
+    (date) => {
+      const day = startOfLocalDay(date);
+      const today = startOfLocalDay(new Date());
+      if (cutoffDate && day < cutoffDate) return true;
+      if (day > today) return true;
+
+      // While choosing the end date, lock selection to Kalshi's max candle window.
+      const pickingEnd = Boolean(draftRange?.from && !draftRange?.to);
+      if (pickingEnd && Number.isFinite(maxInclusiveDays)) {
+        const anchor = startOfLocalDay(draftRange.from);
+        const minDay = addLocalDays(anchor, -(maxInclusiveDays - 1));
+        const maxDay = addLocalDays(anchor, maxInclusiveDays - 1);
+        if (day < minDay || day > maxDay) return true;
+      }
+
+      return false;
+    },
+    [cutoffDate, draftRange, maxInclusiveDays],
+  );
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -280,7 +350,7 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label className="text-[11px] font-medium text-muted-foreground">Date range</Label>
-          <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
+          <Popover open={rangeOpen} onOpenChange={handleRangeOpenChange}>
             <PopoverTrigger asChild>
               <Button
                 type="button"
@@ -292,10 +362,10 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
                 <span
                   className={cn(
                     "truncate",
-                    !(range.from || range.to) && "text-muted-foreground",
+                    !(committedRange.from || committedRange.to) && "text-muted-foreground",
                   )}
                 >
-                  {formatRangeLabel(range.from, range.to)}
+                  {formatRangeLabel(committedRange.from, committedRange.to)}
                 </span>
               </Button>
             </PopoverTrigger>
@@ -304,33 +374,44 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
                 <Calendar
                   mode="range"
                   numberOfMonths={1}
-                  selected={range}
+                  selected={calendarSelected}
                   onSelect={handleRangeSelect}
-                  defaultMonth={range.from || range.to || cutoffDate || undefined}
+                  defaultMonth={
+                    calendarSelected?.from ||
+                    calendarSelected?.to ||
+                    cutoffDate ||
+                    undefined
+                  }
                   fromDate={cutoffDate || undefined}
                   toDate={new Date()}
-                  disabled={(date) => {
-                    const day = startOfLocalDay(date);
-                    if (cutoffDate && day < cutoffDate) return true;
-                    if (day > startOfLocalDay(new Date())) return true;
-                    return false;
-                  }}
+                  disabled={isDayDisabled}
                 />
               </div>
-              {cutoffDate ? (
-                <p className="max-w-[17.5rem] border-t border-border/50 px-3 py-2 text-[10px] leading-snug text-muted-foreground">
-                  Live data starts on or after{" "}
-                  {cutoffDate.toLocaleDateString(undefined, { dateStyle: "medium" })}. Earlier
-                  dates are available in Kalshi Historical.
-                </p>
-              ) : null}
+              <div className="max-w-[17.5rem] space-y-1.5 border-t border-border/50 px-3 py-2">
+                {calendarWindowMessage ? (
+                  <p className="text-[10px] leading-snug text-muted-foreground">
+                    {calendarWindowMessage}
+                  </p>
+                ) : null}
+                {cutoffDate ? (
+                  <p className="text-[10px] leading-snug text-muted-foreground">
+                    Live data starts on or after{" "}
+                    {cutoffDate.toLocaleDateString(undefined, { dateStyle: "medium" })}.
+                    Earlier dates are in Kalshi Historical.
+                  </p>
+                ) : null}
+              </div>
             </PopoverContent>
           </Popover>
         </div>
 
         <div className="space-y-1.5">
           <Label className="text-[11px] font-medium text-muted-foreground">Period interval</Label>
-          <Select value={periodValue} disabled={disabled} onValueChange={handlePeriodChange}>
+          <Select
+            value={String(periodValue)}
+            disabled={disabled}
+            onValueChange={handlePeriodChange}
+          >
             <SelectTrigger className="h-9 text-xs">
               <SelectValue placeholder="Interval" />
             </SelectTrigger>
@@ -344,14 +425,6 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
           </Select>
         </div>
       </div>
-
-      {clampedNotice || maxRangeHint ? (
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          {clampedNotice
-            ? `Range narrowed to Kalshi's limit. ${clampedNotice}`
-            : maxRangeHint}
-        </p>
-      ) : null}
     </div>
   );
 }
