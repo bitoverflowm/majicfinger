@@ -6,7 +6,7 @@ import { CandlestickSeries, ColorType, createChart } from "lightweight-charts";
 import { cn } from "@/lib/utils";
 
 /**
- * TradingView Lightweight Charts candlestick pane.
+ * Lightweight Charts candlestick pane (open-source library; no on-chart TV logo).
  *
  * @param {{
  *   data: { time: number; open: number; high: number; low: number; close: number }[];
@@ -48,6 +48,9 @@ export function CandlestickChartView({ data, dark = false, className }) {
       },
     });
 
+    // Belt-and-suspenders: some Fast Refresh paths keep a prior chart instance.
+    chart.applyOptions({ layout: { attributionLogo: false } });
+
     const series = chart.addSeries(CandlestickSeries, {
       upColor: "#26a69a",
       downColor: "#ef5350",
@@ -59,14 +62,29 @@ export function CandlestickChartView({ data, dark = false, className }) {
     chartRef.current = chart;
     seriesRef.current = series;
 
-    const ro = typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(() => {
-          chart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
-        })
-      : null;
+    const hideLogo = () => {
+      el.querySelectorAll("a#tv-attr-logo").forEach((node) => {
+        node.setAttribute("hidden", "true");
+        /** @type {HTMLElement} */ (node).style.display = "none";
+      });
+    };
+    hideLogo();
+    const mo =
+      typeof MutationObserver !== "undefined"
+        ? new MutationObserver(() => hideLogo())
+        : null;
+    mo?.observe(el, { childList: true, subtree: true });
+
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            chart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+          })
+        : null;
     ro?.observe(el);
 
     return () => {
+      mo?.disconnect();
       ro?.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -86,7 +104,10 @@ export function CandlestickChartView({ data, dark = false, className }) {
   return (
     <div
       ref={containerRef}
-      className={cn("h-full min-h-[220px] w-full", className)}
+      className={cn(
+        "h-full min-h-[220px] w-full [&_a#tv-attr-logo]:hidden",
+        className,
+      )}
       role="img"
       aria-label="Candlestick chart"
     />
