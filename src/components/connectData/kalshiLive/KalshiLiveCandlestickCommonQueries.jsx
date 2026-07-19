@@ -387,20 +387,13 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
                   disabled={isDayDisabled}
                 />
               </div>
-              <div className="max-w-[17.5rem] space-y-1.5 border-t border-border/50 px-3 py-2">
-                {calendarWindowMessage ? (
+              {calendarWindowMessage ? (
+                <div className="max-w-[17.5rem] border-t border-border/50 px-3 py-2">
                   <p className="text-[10px] leading-snug text-muted-foreground">
                     {calendarWindowMessage}
                   </p>
-                ) : null}
-                {cutoffDate ? (
-                  <p className="text-[10px] leading-snug text-muted-foreground">
-                    Live data starts on or after{" "}
-                    {cutoffDate.toLocaleDateString(undefined, { dateStyle: "medium" })}.
-                    Earlier dates are in Kalshi Historical.
-                  </p>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </PopoverContent>
           </Popover>
         </div>

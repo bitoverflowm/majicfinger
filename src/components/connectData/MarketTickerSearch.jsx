@@ -63,16 +63,26 @@ import { cn } from "@/lib/utils";
 const MAX_TICKERS = 100;
 
 /**
- * @param {{ status?: string; openTime?: string; closeTime?: string }} meta
+ * @param {{
+ *   status?: string;
+ *   openTime?: string;
+ *   closeTime?: string;
+ *   className?: string;
+ * }} meta
  */
-function SuggestionMetaRow({ status, openTime, closeTime }) {
+function SuggestionMetaRow({ status, openTime, closeTime, className }) {
   const live = isKalshiMarketLiveStatus(status);
   const statusLabel = formatKalshiMarketStatusLabel(status);
   const dateRange = formatKalshiMarketDateRange(openTime, closeTime);
   if (!statusLabel && !dateRange) return null;
 
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+    <span
+      className={cn(
+        "inline-flex shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-0.5 text-right text-[10px] leading-tight text-muted-foreground",
+        className,
+      )}
+    >
       {statusLabel ? (
         <span className="inline-flex items-center gap-1.5">
           {live ? (
@@ -91,7 +101,7 @@ function SuggestionMetaRow({ status, openTime, closeTime }) {
           </span>
         </span>
       ) : null}
-      {dateRange ? <span className="tabular-nums">{dateRange}</span> : null}
+      {dateRange ? <span className="tabular-nums whitespace-nowrap">{dateRange}</span> : null}
     </span>
   );
 }
@@ -516,63 +526,65 @@ export function MarketTickerSearch({
                   const seriesTiming =
                     s.kind === "series" ? aggregateKalshiMarketTiming(s.markets) : null;
                   return (
-                  <li
-                    key={
-                      s.kind === "market"
-                        ? `m:${s.ticker}`
-                        : `s:${s.ticker}:${marketCount}`
-                    }
-                    role="option"
-                  >
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-50"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        if (s.kind === "market") addSelections([s]);
-                        else openSeriesModal(s);
-                      }}
+                    <li
+                      key={
+                        s.kind === "market"
+                          ? `m:${s.ticker}`
+                          : `s:${s.ticker}:${marketCount}`
+                      }
+                      role="option"
                     >
-                      <span className="font-medium text-foreground line-clamp-2">
-                        {s.title || s.ticker}
-                      </span>
-                      {s.subtitle ? (
-                        <span className="text-xs text-muted-foreground line-clamp-1">
-                          {s.subtitle}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="flex w-full items-start gap-3 px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-50"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          if (s.kind === "market") addSelections([s]);
+                          else openSeriesModal(s);
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 space-y-0.5">
+                          <span className="block font-medium text-foreground line-clamp-2">
+                            {s.title || s.ticker}
+                          </span>
+                          {s.subtitle ? (
+                            <span className="block text-xs text-muted-foreground line-clamp-1">
+                              {s.subtitle}
+                            </span>
+                          ) : null}
+                          <span className="block text-xs text-muted-foreground">
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide ring-1",
+                                s.kind === "market"
+                                  ? "bg-emerald-500/15 text-emerald-900 ring-emerald-600/25 dark:bg-emerald-400/15 dark:text-emerald-100 dark:ring-emerald-400/35"
+                                  : "bg-violet-500/15 text-violet-900 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35",
+                              )}
+                            >
+                              {s.kind === "market" ? "Market" : "Series"}
+                            </span>
+                            {s.ticker ? ` · ${s.ticker}` : ""}
+                            {s.kind === "series" && marketCount
+                              ? ` · ${marketCount} markets`
+                              : ""}
+                          </span>
                         </span>
-                      ) : null}
-                      {s.kind === "market" ? (
-                        <SuggestionMetaRow
-                          status={s.status}
-                          openTime={s.openTime}
-                          closeTime={s.closeTime}
-                        />
-                      ) : seriesTiming ? (
-                        <SuggestionMetaRow
-                          status={seriesTiming.status}
-                          openTime={seriesTiming.openTime}
-                          closeTime={seriesTiming.closeTime}
-                        />
-                      ) : null}
-                      <span className="text-xs text-muted-foreground">
-                        <span
-                          className={cn(
-                            "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide ring-1",
-                            s.kind === "market"
-                              ? "bg-emerald-500/15 text-emerald-900 ring-emerald-600/25 dark:bg-emerald-400/15 dark:text-emerald-100 dark:ring-emerald-400/35"
-                              : "bg-violet-500/15 text-violet-900 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35",
-                          )}
-                        >
-                          {s.kind === "market" ? "Market" : "Series"}
-                        </span>
-                        {s.ticker ? ` · ${s.ticker}` : ""}
-                        {s.kind === "series" && marketCount
-                          ? ` · ${marketCount} markets`
-                          : ""}
-                      </span>
-                    </button>
-                  </li>
+                        {s.kind === "market" ? (
+                          <SuggestionMetaRow
+                            status={s.status}
+                            openTime={s.openTime}
+                            closeTime={s.closeTime}
+                          />
+                        ) : seriesTiming ? (
+                          <SuggestionMetaRow
+                            status={seriesTiming.status}
+                            openTime={seriesTiming.openTime}
+                            closeTime={seriesTiming.closeTime}
+                          />
+                        ) : null}
+                      </button>
+                    </li>
                   );
                 })}
               </motion.ul>
@@ -722,14 +734,16 @@ export function MarketTickerSearch({
                         {checked ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
                       </span>
                       <span className="min-w-0 flex-1 space-y-0.5">
-                        <span className="block text-xs font-medium text-foreground">
-                          {m.title || m.ticker}
+                        <span className="flex items-start justify-between gap-2">
+                          <span className="min-w-0 text-xs font-medium text-foreground">
+                            {m.title || m.ticker}
+                          </span>
+                          <SuggestionMetaRow
+                            status={m.status}
+                            openTime={m.openTime}
+                            closeTime={m.closeTime}
+                          />
                         </span>
-                        <SuggestionMetaRow
-                          status={m.status}
-                          openTime={m.openTime}
-                          closeTime={m.closeTime}
-                        />
                         <span className="block font-mono text-[10px] text-muted-foreground">
                           {m.ticker}
                         </span>
