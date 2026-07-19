@@ -205,6 +205,9 @@ export default function ChartControls() {
     LIVELINE_COLOR_OPTIONS,
     candlestickOhlcSetId,
     setCandlestickOhlcSetId,
+    candlestickSheetId,
+    setCandlestickSheetId,
+    candlestickSheetOptions,
     candlestickMapped,
 
     chartLineFilters,
@@ -348,8 +351,14 @@ export default function ChartControls() {
   /** Applied on each item (Tooltip sets data-state=closed, so parent [data-state=off] selectors miss). */
   const chartTypeItemClass =
     "text-slate-700 dark:text-slate-300 [&_svg]:fill-current [&_svg]:text-current";
+  /** Lucide stroke icons (e.g. CandlestickChart) must not inherit fill-current or they look clipped. */
+  const chartTypeStrokeIconClass =
+    "text-slate-700 dark:text-slate-300 [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:text-current";
   const chartTypeItemClassName = (type) =>
-    cn(chartTypeItemClass, selChartType === type && chartTypeSelectedClass);
+    cn(
+      type === "candlestick" ? chartTypeStrokeIconClass : chartTypeItemClass,
+      selChartType === type && chartTypeSelectedClass,
+    );
   const chartTypeIconClass = "h-4 w-4 shrink-0 text-current";
 
   // Only one section open at a time; default to Chart Meta.
@@ -1358,7 +1367,7 @@ export default function ChartControls() {
                               aria-label="Candlestick chart"
                               className={chartTypeItemClassName("candlestick")}
                             >
-                              <CandlestickChart className={chartTypeIconClass} />
+                              <CandlestickChart className={cn(chartTypeIconClass, "fill-none")} />
                             </ToggleGroupItem>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[280px] text-xs">
@@ -1401,6 +1410,33 @@ export default function ChartControls() {
                         <span className="font-mono text-[10px]">end_period_ts</span> plus a full OHLC
                         quartet. Bars missing any open/high/low/close value are skipped.
                       </p>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] font-medium text-muted-foreground">
+                          Data sheet
+                        </Label>
+                        <Select
+                          value={candlestickSheetId || "__active__"}
+                          onValueChange={(v) =>
+                            setCandlestickSheetId(v === "__active__" ? "" : v)
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Sheet" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value="__active__" className="text-xs">
+                              Active sheet
+                            </SelectItem>
+                            {(candlestickSheetOptions || []).map((sheet) => (
+                              <SelectItem key={sheet.id} value={sheet.id} className="text-xs">
+                                {sheet.name || sheet.id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       {candlestickMapped?.available?.length ? (
                         <div className="space-y-1.5">
                           <Label className="text-[11px] font-medium text-muted-foreground">

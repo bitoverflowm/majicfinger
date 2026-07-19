@@ -29,6 +29,7 @@ export function CandlestickChartView({ data, dark = false, className }) {
         background: { type: ColorType.Solid, color: dark ? "#020617" : "#ffffff" },
         textColor: dark ? "#e2e8f0" : "#0f172a",
         fontSize: 11,
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: dark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.25)" },

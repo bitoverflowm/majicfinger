@@ -880,7 +880,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [livelineBadgeVariant, setLivelineBadgeVariant] = useState('default');
   const [livelineColorChoice, setLivelineColorChoice] = useState('__palette__');
   /** Prefer price / yes_bid / yes_ask / generic, or auto. */
-  const [candlestickOhlcSetId, setCandlestickOhlcSetId] = useState('auto');
+  const [candlestickOhlcSetId, setCandlestickOhlcSetId] = useState("auto");
+  /** Which data sheet to chart; empty = active sheet. */
+  const [candlestickSheetId, setCandlestickSheetId] = useState("");
 
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
@@ -963,6 +965,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (s.chartConfig && typeof s.chartConfig === "object") setChartConfig(s.chartConfig);
       if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
       if (s.candlestickOhlcSetId != null) setCandlestickOhlcSetId(String(s.candlestickOhlcSetId) || "auto");
+      if (s.candlestickSheetId != null) setCandlestickSheetId(String(s.candlestickSheetId || ""));
     }
     const rows = Array.isArray(effectiveData) ? effectiveData : [];
     const anySheetRows = Object.values(contextStateV2?.dataSheets || {}).some(
@@ -1070,6 +1073,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.livelineBadgeVariant != null) setLivelineBadgeVariant(s.livelineBadgeVariant);
     if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
     if (s.candlestickOhlcSetId != null) setCandlestickOhlcSetId(String(s.candlestickOhlcSetId) || "auto");
+    if (s.candlestickSheetId != null) setCandlestickSheetId(String(s.candlestickSheetId || ""));
     if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
     if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
     if (Array.isArray(s.chartLineFilters)) {
@@ -1455,12 +1459,34 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       .filter((p) => p.value != null && Number.isFinite(p.value));
   }, [chartData, selX, selY]);
 
+  const candlestickSourceRows = useMemo(() => {
+    const dataSheets = contextStateV2?.dataSheets || {};
+    const requested = String(candlestickSheetId || "").trim();
+    const resolvedId = requested
+      ? resolveChartSheetId(requested, dataSheets, activeSheetId)
+      : activeSheetId;
+    if (resolvedId && Array.isArray(dataSheets?.[resolvedId]?.data)) {
+      return dataSheets[resolvedId].data;
+    }
+    // Fallback: connected / override rows (single-sheet or demo).
+    return Array.isArray(chartData) ? chartData : [];
+  }, [candlestickSheetId, contextStateV2?.dataSheets, activeSheetId, chartData]);
+
+  const candlestickSheetOptions = useMemo(() => {
+    return (globalSheetColumnGroups || [])
+      .filter((g) => g.sheetId && g.sheetId !== "__inline__")
+      .map((g) => ({
+        id: g.sheetId,
+        name: g.sheetName || g.sheetId,
+      }));
+  }, [globalSheetColumnGroups]);
+
   const candlestickMapped = useMemo(
     () =>
-      mapRowsToCandlestickSeriesData(chartData || [], {
+      mapRowsToCandlestickSeriesData(candlestickSourceRows || [], {
         ohlcSetId: candlestickOhlcSetId,
       }),
-    [chartData, candlestickOhlcSetId],
+    [candlestickSourceRows, candlestickOhlcSetId],
   );
 
   /**
@@ -1747,6 +1773,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     livelineBadgeVariant,
     livelineColorChoice,
     candlestickOhlcSetId,
+    candlestickSheetId,
     chartFilterColumn,
     chartFilterConfig,
     chartLineFilters,
@@ -1963,6 +1990,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     LIVELINE_COLOR_OPTIONS,
     candlestickOhlcSetId,
     setCandlestickOhlcSetId,
+    candlestickSheetId,
+    setCandlestickSheetId,
+    candlestickSheetOptions,
     candlestickMapped,
 
     chartFilterColumn,
