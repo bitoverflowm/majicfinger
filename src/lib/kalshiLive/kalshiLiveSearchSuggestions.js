@@ -121,6 +121,10 @@ function scoreEventMarket(tokens, event, market) {
     { text: eventTicker, weight: 50 },
   ]);
 
+  // Only boost open markets that already matched the query — otherwise every
+  // active market scores > 0 and crowds out real text matches.
+  if (score <= 0) return 0;
+
   const status = String(market?.status || "").toLowerCase();
   if (status === "active" || status === "open") score += 10;
 
@@ -266,7 +270,7 @@ export async function fetchKalshiLiveSearchSuggestions(q) {
     return { suggestions: [] };
   }
 
-  const cacheKey = tokens.join(" ");
+  const cacheKey = `v2:${tokens.join(" ")}`;
   const cached = suggestionCache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return { suggestions: cached.suggestions };

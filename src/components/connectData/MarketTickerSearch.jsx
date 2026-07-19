@@ -282,13 +282,17 @@ export function MarketTickerSearch({
       await Promise.allSettled(tasks);
       if (mySeq !== suggestSeqRef.current) return;
 
-      // Prefer exact market ticker matches first
+      // Exact ticker match first; for natural language prefer series (semantic)
+      // over the live market text scan, which is a weaker heuristic.
       const upper = trimmed.toUpperCase();
       next.sort((a, b) => {
         const aExact = a.kind === "market" && a.ticker === upper ? 0 : 1;
         const bExact = b.kind === "market" && b.ticker === upper ? 0 : 1;
         if (aExact !== bExact) return aExact - bExact;
-        if (a.kind !== b.kind) return a.kind === "market" ? -1 : 1;
+        if (a.kind !== b.kind) {
+          if (tickerLike) return a.kind === "market" ? -1 : 1;
+          return a.kind === "series" ? -1 : 1;
+        }
         return 0;
       });
 
